@@ -17,9 +17,14 @@ export interface Missing {
   readonly what: string;
 }
 
+/** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
+export type VoiceFix = "agora" | "deepseek" | "voice";
+
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
   readonly reason: string;
+  /** Where in 设置 the owner fixes it, when a setting does. */
+  readonly settings?: VoiceFix;
 }
 
 export interface VoiceAgentFailed {

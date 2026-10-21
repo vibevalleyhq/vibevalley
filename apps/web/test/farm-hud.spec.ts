@@ -67,3 +67,22 @@ test("a click on an empty plot opens the sowing bag; 先起草 makes the issue i
   expect(made?.project).toBe("farm-hud");
   expect(made?.status).toBe("backlog");
 });
+
+test("the helpers open side by side, and a click elsewhere folds them and a helper's card", async ({ page }) => {
+  await openFarm(page);
+  const group = page.getByRole("group", { name: "帮工" });
+  await group.getByRole("button", { name: "帮工", exact: true }).click();
+  const friends = group.getByRole("button", { name: /，/ });
+  await expect(friends.nth(1)).toBeVisible();
+  // In a row, not stacked under the narrow button.
+  const [a, b] = [await friends.nth(0).boundingBox(), await friends.nth(1).boundingBox()];
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+  expect(b!.x).toBeGreaterThan(a!.x);
+
+  await friends.nth(0).click();
+  const card = group.getByRole("dialog");
+  await expect(card).toBeVisible();
+  await page.mouse.click(720, 300);
+  await expect(card).toHaveCount(0);
+  await expect(friends).toHaveCount(0);
+});

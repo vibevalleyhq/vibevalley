@@ -1,144 +1,170 @@
-// How much the runtimes' accounts have left: a bottle at the HUD's top right, filled
-// to the lowest of them; open, each runtime's machine, usage windows, today's spend and a stop it is under.
+// How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
+// runtime's machine, usage windows, today's spend and a stop it is under.
 
-import { useEffect, useRef, useState } from "react";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { useRuntimes } from "../../data/runtimes";
-import { yuan } from "../../rules/chat";
-import { useFarmCommands } from "../commands";
-import { CardColors, PxButton, SpriteIcon } from "../kit";
-import { HudCard } from "./Hud";
 import { bottleSprite, machineOf, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "./rules";
+import { yuan } from "../../rules/chat";
+import { aria } from "../../app/util";
+import { ready, useRuntimes } from "../../data/query";
+import { CardColors, PxButton, SpriteIcon } from "../kit";
+import { commands } from "../state";
+import { HudCard } from "./Hud";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
 
-export function RuntimeIcon({ runtime, size }: { runtime: string; size: number }) {
-  const machine = machineOf(runtime);
+export function RuntimeIcon(props: { runtime: string; size: number }) {
   return (
-    <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-      {machine ? <SpriteIcon name={machine} size={size} /> : <span className="block h-full w-full bg-cream-200" />}
+    <span class="relative inline-block shrink-0" style={{ width: `${props.size}px`, height: `${props.size}px` }}>
+      <Show when={machineOf(props.runtime)} fallback={<span class="block h-full w-full bg-cream-200" />}>
+        {(machine) => <SpriteIcon name={machine()} size={props.size} />}
+      </Show>
       <img
-        src={`/pixel/logo-${runtime}.png`}
+        src={`/pixel/logo-${props.runtime}.png`}
         alt=""
         onError={(e) => (e.currentTarget.style.display = "none")}
-        className="absolute -right-1 -bottom-1 [image-rendering:pixelated]"
-        style={{ width: Math.round(size * 0.46), height: Math.round(size * 0.46) }}
+        class="absolute -right-1 -bottom-1 [image-rendering:pixelated]"
+        style={{ width: `${Math.round(props.size * 0.46)}px`, height: `${Math.round(props.size * 0.46)}px` }}
       />
     </span>
   );
 }
 
-function UsageLines({ usage }: { usage: AccountUsage | null }) {
-  if (!usage) return <p className="text-[12px] text-bark-400">不报额度</p>;
-  switch (usage.status) {
-    case "login_required":
-      return <p className="text-[12px] text-[#b8682a]">没登录，额度读不到</p>;
-    case "unavailable":
-      return <p className="text-[12px] text-bark-400">读不到：{usage.reason}</p>;
-    case "balance":
-      return (
-        <p className="text-[12px]" style={{ color: usage.available ? "#2f1f13" : "#c84a3a" }}>
-          按量计费 · {usage.provider} 余额{usage.available ? "" : "，不够用了"}
-        </p>
-      );
-    case "ok":
-      return (
-        <div className="mt-1 flex flex-col gap-1">
-          {usage.windows.map((w) => {
-            const left = 100 - w.usedPercent;
-            return (
-              <div key={w.label} className="text-[12px]">
-                <div className="flex justify-between gap-2">
-                  <span className="truncate">{windowLabel(w.label)}</span>
-                  <span style={{ color: levelInk[quotaLevel(left)] }}>{Math.round(left)}%</span>
-                </div>
-                <span className="block h-1.5 w-full" style={{ background: CardColors.barTrack }}>
-                  <span className="block h-full" style={{ width: `${Math.max(0, Math.min(100, left))}%`, background: levelInk[quotaLevel(left)] }} />
-                </span>
-                {w.resetsAt !== null && <span className="text-[10px] text-bark-400">{resetText(w.resetsAt)}</span>}
-              </div>
-            );
-          })}
-        </div>
-      );
-  }
-}
-
-function Machine({ info }: { info: RuntimeInfo }) {
-  const quota = quotaOf(info);
-  const usage = info.usage;
+function UsageLines(props: { usage: AccountUsage | null }) {
   return (
-    <div className="flex gap-2.5 border-[1.5px] border-cream-200 bg-cream-100 p-2" data-testid="quota-machine">
-      <RuntimeIcon runtime={info.id} size={34} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[13px]">{info.preset.label}</span>
-          {usage?.status === "ok" && usage.subscription && <span className="truncate text-[12px] text-bark-500">{usage.subscription}</span>}
-        </div>
-        <UsageLines usage={usage} />
-        {info.spentToday !== undefined && (
-          <p className="mt-0.5 text-[12px] text-bark-500">
-            今天花了约 {yuan(info.spentToday)}
-            {(info.settings.dailyBudget ?? 0) > 0 ? ` / 预算 ${yuan(info.settings.dailyBudget!)}` : ""}
+    <Switch fallback={<p class="text-[12px] text-bark-400">不报额度</p>}>
+      <Match when={props.usage?.status === "login_required"}>
+        <p class="text-[12px] text-[#b8682a]">没登录，额度读不到</p>
+      </Match>
+      <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
+        {(u) => <p class="text-[12px] text-bark-400">读不到：{u().reason}</p>}
+      </Match>
+      <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
+        {(u) => (
+          <p class="text-[12px]" style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
+            按量计费 · {u().provider} 余额{u().available ? "" : "，不够用了"}
           </p>
         )}
-        {info.stop && <p className="mt-0.5 text-[12px] text-berry">{info.stop}</p>}
+      </Match>
+      <Match when={props.usage?.status === "ok" ? props.usage : undefined}>
+        {(u) => (
+          <div class="mt-1 flex flex-col gap-1">
+            <For each={u().windows}>
+              {(w) => {
+                const left = () => 100 - w.usedPercent;
+                return (
+                  <div class="text-[12px]">
+                    <div class="flex justify-between gap-2">
+                      <span class="truncate">{windowLabel(w.label)}</span>
+                      <span style={{ color: levelInk[quotaLevel(left())] }}>{Math.round(left())}%</span>
+                    </div>
+                    <span class="block h-1.5 w-full" style={{ background: CardColors.barTrack }}>
+                      <span class="block h-full" style={{ width: `${Math.max(0, Math.min(100, left()))}%`, background: levelInk[quotaLevel(left())] }} />
+                    </span>
+                    <Show when={w.resetsAt !== null}>
+                      <span class="text-[10px] text-bark-400">{resetText(w.resetsAt!)}</span>
+                    </Show>
+                  </div>
+                );
+              }}
+            </For>
+          </div>
+        )}
+      </Match>
+    </Switch>
+  );
+}
+
+function Machine(props: { info: RuntimeInfo }) {
+  const quota = () => quotaOf(props.info);
+  const usage = () => props.info.usage;
+  const subscription = () => {
+    const u = usage();
+    return u?.status === "ok" ? u.subscription : undefined;
+  };
+  return (
+    <div class="flex gap-2.5 border-[1.5px] border-cream-200 bg-cream-100 p-2" data-testid="quota-machine">
+      <RuntimeIcon runtime={props.info.id} size={34} />
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[13px]">{props.info.preset.label}</span>
+          <Show when={subscription()}>{(sub) => <span class="truncate text-[12px] text-bark-500">{sub()}</span>}</Show>
+        </div>
+        <UsageLines usage={usage()} />
+        <Show when={props.info.spentToday !== undefined}>
+          <p class="mt-0.5 text-[12px] text-bark-500">
+            今天花了约 {yuan(props.info.spentToday!)}
+            {(props.info.settings.dailyBudget ?? 0) > 0 ? ` / 预算 ${yuan(props.info.settings.dailyBudget!)}` : ""}
+          </p>
+        </Show>
+        <Show when={props.info.stop}>
+          <p class="mt-0.5 text-[12px] text-berry">{props.info.stop}</p>
+        </Show>
       </div>
-      <div className="flex w-12 flex-col items-center">
-        <SpriteIcon name={bottleSprite(quota)} size={40} label={quota.text} />
-        <span className="text-[12px]" style={{ color: quota.level === "unknown" ? "#9b7550" : quota.level === "empty" ? "#c84a3a" : "#46301d" }}>
-          {quota.short || "—"}
+      <div class="flex w-12 flex-col items-center">
+        <SpriteIcon name={bottleSprite(quota())} size={40} label={quota().text} />
+        <span class="text-[12px]" style={{ color: quota().level === "unknown" ? "#9b7550" : quota().level === "empty" ? "#c84a3a" : "#46301d" }}>
+          {quota().short || "—"}
         </span>
       </div>
     </div>
   );
 }
 
-export function QuotaPill({ height }: { height: number }) {
-  const runtimes = usableRuntimes(useRuntimes().data ?? []);
-  const commands = useFarmCommands();
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => box.current?.contains(e.target as Node) || setOpen(false);
+export function QuotaPill(props: { height: number }) {
+  const all = useRuntimes();
+  const runtimes = () => usableRuntimes(ready(all, []));
+  const [open, setOpen] = createSignal(false);
+  let box!: HTMLDivElement;
+  createEffect(open, (on) => {
+    if (!on) return;
+    const away = (e: PointerEvent) => box.contains(e.target as Node) || setOpen(false);
     window.addEventListener("pointerdown", away);
     return () => window.removeEventListener("pointerdown", away);
-  }, [open]);
-  if (runtimes.length === 0) return null;
-  const lefts = runtimes.flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
-  const lowest = lefts.length ? Math.min(...lefts) : undefined;
-  const shown = lowest === undefined ? undefined : Math.round(lowest);
+  });
+  const lowest = () => {
+    const lefts = runtimes().flatMap((r) => (r.quota?.left === undefined ? [] : [r.quota.left]));
+    return lefts.length ? Math.min(...lefts) : undefined;
+  };
+  const shown = () => {
+    const l = lowest();
+    return l === undefined ? undefined : Math.round(l);
+  };
   return (
-    <div ref={box} className="pointer-events-auto relative">
-      <button
-        type="button"
-        aria-label={shown === undefined ? "各 runtime 的剩余额度" : `剩余额度，最少的还剩 ${shown}%`}
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="cursor-pointer"
-      >
-        <HudCard height={height} bright={open}>
-          <SpriteIcon name={bottleSprite({ level: quotaLevel(lowest), fill: lowest === undefined ? 0 : lowest / 100, short: "", text: "" })} size={28} />
-          <span style={{ color: lowest === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest)] }}>{shown === undefined ? "额度" : `${shown}%`}</span>
-        </HudCard>
-      </button>
-      {open && (
-        <div className="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label="剩余额度">
-          <div className="flex items-center">
-            <span className="flex-1 text-[13px]">剩余额度</span>
-            <PxButton size="icon" label="现在读一次额度" onClick={() => runtimes.forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}>
-              <SpriteIcon name="button-refresh" size={14} />
-            </PxButton>
+    <Show when={runtimes().length > 0}>
+      <div ref={(el) => (box = el)} class="pointer-events-auto relative">
+        <button
+          type="button"
+          aria-label={shown() === undefined ? "各 runtime 的剩余额度" : `剩余额度，最少的还剩 ${shown()}%`}
+          aria-expanded={aria(open())}
+          onClick={() => setOpen(!open())}
+          class="cursor-pointer"
+        >
+          <HudCard height={props.height} bright={open()}>
+            <SpriteIcon
+              name={bottleSprite({ level: quotaLevel(lowest()), fill: lowest() === undefined ? 0 : lowest()! / 100, short: "", text: "" })}
+              size={28}
+            />
+            <span style={{ color: lowest() === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest())] }}>{shown() === undefined ? "额度" : `${shown()}%`}</span>
+          </HudCard>
+        </button>
+        <Show when={open()}>
+          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label="剩余额度">
+            <div class="flex items-center">
+              <span class="flex-1 text-[13px]">剩余额度</span>
+              <PxButton size="icon" label="现在读一次额度" onClick={() => runtimes().forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}>
+                <SpriteIcon name="button-refresh" size={14} />
+              </PxButton>
+            </div>
+            <div class="mt-2 flex max-h-[min(512px,70vh)] flex-col gap-3 overflow-y-auto">
+              <For each={runtimes()} keyed={(r) => r.id}>
+                {(r) => <Machine info={r()} />}
+              </For>
+            </div>
+            <p class="mt-2 text-[12px] text-bark-400">从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。</p>
           </div>
-          <div className="mt-2 flex max-h-[min(512px,70vh)] flex-col gap-3 overflow-y-auto">
-            {runtimes.map((r) => (
-              <Machine key={r.id} info={r} />
-            ))}
-          </div>
-          <p className="mt-2 text-[12px] text-bark-400">从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。</p>
-        </div>
-      )}
-    </div>
+        </Show>
+      </div>
+    </Show>
   );
 }

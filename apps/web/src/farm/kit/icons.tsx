@@ -1,86 +1,97 @@
+import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { Phase, SessionAction } from "@vibevalley/protocol";
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
-import { cx } from "./base";
 
 // No line icons and no characters standing in for icons: the pixel font has no ✓, ✗ or ›.
 
 /** A drawing from apps/web/public/pixel; decorative unless it has a label. */
-export function SpriteIcon({ name, size, label, className, style }: { name: string; size: number; label?: string; className?: string; style?: CSSProperties }) {
+export function SpriteIcon(props: { name: string; size: number; label?: string; class?: JSX.ClassValue; style?: JSX.CSSProperties }) {
   return (
     <img
-      src={`/pixel/${name}.png`}
-      width={size}
-      height={size}
-      alt={label ?? ""}
-      aria-hidden={label ? undefined : true}
-      draggable={false}
-      className={cx("inline-block shrink-0 object-contain [image-rendering:pixelated]", className)}
-      style={{ width: size, height: size, ...style }}
+      src={`/pixel/${props.name}.png`}
+      width={props.size}
+      height={props.size}
+      alt={props.label ?? ""}
+      aria-hidden={props.label ? undefined : "true"}
+      draggable="false"
+      class={["inline-block shrink-0 object-contain [image-rendering:pixelated]", props.class]}
+      style={{ width: `${props.size}px`, height: `${props.size}px`, ...props.style }}
     />
   );
 }
 
-export function ActionGlyph({ action, size = 16 }: { action: SessionAction; size?: number }) {
-  return action === "none" ? null : <SpriteIcon name={`act-${action}`} size={size} />;
+export function ActionGlyph(props: { action: SessionAction; size?: number }) {
+  return (
+    <Show when={props.action !== "none"}>
+      <SpriteIcon name={`act-${props.action}`} size={props.size ?? 16} />
+    </Show>
+  );
 }
 
-export function PhaseGlyph({ phase, size = 16 }: { phase: Phase; size?: number }) {
-  switch (phase._tag) {
-    case "arriving":
-      return <SpriteIcon name="icon-seeds" size={size} />;
-    case "working":
-      return phase.doing.action === "none" ? (
-        <span className="inline-block shrink-0" style={{ width: size, height: size }} />
-      ) : (
+export function PhaseGlyph(props: { phase: Phase; size?: number }) {
+  const size = () => props.size ?? 16;
+  const doing = () => (props.phase._tag === "working" ? props.phase.doing.action : undefined);
+  const closed = () => (props.phase._tag === "closed" ? props.phase.closed : undefined);
+  return (
+    <Switch>
+      <Match when={props.phase._tag === "arriving"}>
+        <SpriteIcon name="icon-seeds" size={size()} />
+      </Match>
+      <Match when={props.phase._tag === "working" && doing() === "none"}>
+        <span class="inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }} />
+      </Match>
+      <Match when={props.phase._tag === "working"}>
         <Bob>
-          <SpriteIcon name={`act-${phase.doing.action}`} size={size} />
+          <SpriteIcon name={`act-${doing()}`} size={size()} />
         </Bob>
-      );
-    case "ripe":
-      return <SpriteIcon name="icon-harvest" size={size} />;
-    case "failed":
-      return <SpriteIcon name="icon-bug" size={size} />;
-    case "resting":
-      return <SpriteIcon name="act-wait" size={size} />;
-    case "closed":
-      return <SpriteIcon name={phase.closed === "merged" ? "icon-harvest" : "act-wait"} size={size} />;
-  }
+      </Match>
+      <Match when={props.phase._tag === "ripe"}>
+        <SpriteIcon name="icon-harvest" size={size()} />
+      </Match>
+      <Match when={props.phase._tag === "failed"}>
+        <SpriteIcon name="icon-bug" size={size()} />
+      </Match>
+      <Match when={props.phase._tag === "resting"}>
+        <SpriteIcon name="act-wait" size={size()} />
+      </Match>
+      <Match when={props.phase._tag === "closed"}>
+        <SpriteIcon name={closed() === "merged" ? "icon-harvest" : "act-wait"} size={size()} />
+      </Match>
+    </Switch>
+  );
 }
 
-export function useReducedMotion(): boolean {
+/** Whether the system asks for less motion; it follows the setting while mounted. */
+export function reducedMotion() {
   const query = "(prefers-reduced-motion: reduce)";
-  const [reduced, setReduced] = useState(() => typeof matchMedia === "function" && matchMedia(query).matches);
-  useEffect(() => {
+  const [reduced, setReduced] = createSignal(typeof matchMedia === "function" && matchMedia(query).matches);
+  onSettled(() => {
     if (typeof matchMedia !== "function") return;
     const m = matchMedia(query);
     const on = () => setReduced(m.matches);
     m.addEventListener("change", on);
     return () => m.removeEventListener("change", on);
-  }, []);
+  });
   return reduced;
 }
 
 /** Two frames, no tween, so the pixels stay whole; still when the system asks for less motion. */
-function Bob({ children }: { children: ReactNode }) {
-  const still = useReducedMotion();
-  const [up, setUp] = useState(false);
-  useEffect(() => {
-    if (still) {
-      setUp(false);
-      return;
-    }
-    const beat = setInterval(() => setUp((u) => !u), 450);
+function Bob(props: { children: JSX.Element }) {
+  const still = reducedMotion();
+  const [up, setUp] = createSignal(false);
+  onSettled(() => {
+    const beat = setInterval(() => setUp((u) => !still() && !u), 450);
     return () => clearInterval(beat);
-  }, [still]);
-  return <span className={cx("inline-flex shrink-0", up && "-translate-y-px")}>{children}</span>;
+  });
+  return <span class={["inline-flex shrink-0", { "-translate-y-px": up() }]}>{props.children}</span>;
 }
 
 /** A sprite before a line, at its first line's height. */
-export function Marked({ mark, children, size = 12, top = 2 }: { mark: string; children: ReactNode; size?: number; top?: number }) {
+export function Marked(props: { mark: string; children: JSX.Element; size?: number; top?: number }) {
   return (
-    <span className="inline-flex min-w-0 items-start gap-1.5">
-      <SpriteIcon name={mark} size={size} style={{ marginTop: top }} />
-      <span className="min-w-0">{children}</span>
+    <span class="inline-flex min-w-0 items-start gap-1.5">
+      <SpriteIcon name={props.mark} size={props.size ?? 12} style={{ "margin-top": `${props.top ?? 2}px` }} />
+      <span class="min-w-0">{props.children}</span>
     </span>
   );
 }

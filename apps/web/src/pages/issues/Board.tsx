@@ -1,64 +1,61 @@
+import { createSignal, For, Match, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
-import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import type { Ordering } from "../../rules/board";
 import { type BoardCard, cardLook, cardMove, cardProject, laneOrder } from "../../rules/cards";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "../../rules/issues";
+import { autofocus } from "../../app/util";
 import { Icon } from "../../ui/Icon";
-import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
-import { useNameOf, useGraphs } from "./hooks";
 import { Segmented } from "../../ui/Segmented";
+import { useGraphs, useNameOf } from "./hooks";
+import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
-export function IconButton({ icon, label, onClick, size = 14 }: { icon: string; label: string; onClick: () => void; size?: number }) {
+export function IconButton(props: { icon: string; label: string; onClick: () => void; size?: number }) {
   return (
     <button
       type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md hover:bg-selected"
+      aria-label={props.label}
+      title={props.label}
+      onClick={() => props.onClick()}
+      class="inline-flex size-6 cursor-pointer items-center justify-center rounded-md hover:bg-selected"
     >
-      <Icon name={icon} size={size} />
+      <Icon name={props.icon} size={props.size ?? 14} />
     </button>
   );
 }
 
 /** One sentence, enter, and it is a 待办: the board's lane and the list's groups both use it. */
-export function QuickAdd({
-  onAdd,
-  inputRef,
-  autoFocus = false,
-}: {
-  onAdd: (text: string) => void;
-  inputRef?: React.Ref<HTMLInputElement>;
-  autoFocus?: boolean;
-}) {
-  const [text, setText] = useState("");
-  const submit = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-    const t = text.trim();
+export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTMLInputElement) => void; autofocus?: boolean }) {
+  const [text, setText] = createSignal("");
+  const focus = autofocus<HTMLInputElement>();
+  const submit = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" || e.isComposing) return;
+    const t = text().trim();
     if (!t) return;
     setText("");
-    onAdd(t);
+    props.onAdd(t);
   };
   return (
     <input
-      ref={inputRef}
-      value={text}
-      autoFocus={autoFocus}
-      onChange={(e) => setText(e.target.value)}
+      ref={(el) => {
+        props.ref?.(el);
+        if (props.autofocus) focus(el);
+      }}
+      value={text()}
+      onInput={(e) => setText(e.currentTarget.value)}
       onKeyDown={submit}
       placeholder="＋ 写一张，回车存下"
       aria-label="写一张待办"
-      className="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"
+      class="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"
     />
   );
 }
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
-export function OlderLink({ hidden, onClick }: { hidden: number; onClick: () => void }) {
+export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="mx-auto block cursor-pointer py-1 text-sm text-water hover:underline">
-      {hidden > 0 ? `更早的 ${hidden} 张` : "只看最近的"}
+    <button type="button" onClick={() => props.onClick()} class="mx-auto block cursor-pointer py-1 text-sm text-water hover:underline">
+      {props.hidden > 0 ? `更早的 ${props.hidden} 张` : "只看最近的"}
     </button>
   );
 }
@@ -84,69 +81,66 @@ export interface BoardProps {
   onWrite: () => void;
 }
 
+type Drag = { dragging: () => BoardCard | null; setDragging: (c: BoardCard | null) => void };
+
 /** Four lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
-  const [lane, setLane] = useState<Lane>("todo");
-  const [dragging, setDragging] = useState<BoardCard | null>(null);
-  const addRef = useRef<HTMLInputElement>(null);
+  const [lane, setLane] = createSignal<Lane>("todo");
+  const [dragging, setDragging] = createSignal<BoardCard | null>(null);
+  let addInput: HTMLInputElement | undefined;
+  const drag: Drag = { dragging, setDragging: (c) => setDragging(() => c) };
   return (
-    <div className="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
-      <div className="mb-2 @min-[700px]:hidden">
+    <div class="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
+      <div class="mb-2 @min-[700px]:hidden">
         <Segmented
           label="看哪一列"
           block
-          value={lane}
+          value={lane()}
           onChange={setLane}
           options={lanes.map((l) => ({ value: l, label: `${laneLabel[l]} ${props.cards.filter((c) => c.lane === l).length}` }))}
         />
       </div>
-      <div className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto">
-        {lanes.map((l) => (
-          <LaneView
-            key={l}
-            {...props}
-            lane={l}
-            shownNarrow={l === lane}
-            cards={props.cards.filter((c) => c.lane === l)}
-            dragging={dragging}
-            setDragging={setDragging}
-            addRef={addRef}
-          />
-        ))}
+      <div class="flex min-h-0 flex-1 gap-2.5 overflow-x-auto">
+        <For each={lanes}>
+          {(l) => (
+            <LaneView
+              board={props}
+              lane={l}
+              shownNarrow={l === lane()}
+              cards={props.cards.filter((c) => c.lane === l)}
+              drag={drag}
+              addRef={(el) => (addInput = el)}
+              focusAdd={() => addInput?.focus()}
+            />
+          )}
+        </For>
       </div>
     </div>
   );
 }
 
-function LaneView({
-  lane,
-  cards,
-  shownNarrow,
-  dragging,
-  setDragging,
-  addRef,
-  ...p
-}: BoardProps & {
+function LaneView(props: {
+  board: BoardProps;
   lane: Lane;
+  cards: BoardCard[];
   shownNarrow: boolean;
-  dragging: BoardCard | null;
-  setDragging: (c: BoardCard | null) => void;
-  addRef: React.RefObject<HTMLInputElement | null>;
+  drag: Drag;
+  addRef: (el: HTMLInputElement) => void;
+  focusAdd: () => void;
 }) {
-  const [over, setOver] = useState(false);
-  let shown = laneOrder(lane, cards, p.ordering);
-  let hidden = 0;
-  if (lane === "closed" && !p.older && shown.length > closedShown) {
-    hidden = shown.length - closedShown;
-    shown = shown.slice(0, closedShown);
-  }
-  const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, lane) !== undefined || (lane === "todo" && c.kind === "todo"));
-  const head = lane === "working" ? `${cards.filter((c) => c.kind === "issue").length} / ${maxRunning} 块地` : `${cards.length}`;
+  const [over, setOver] = createSignal(false);
+  const p = () => props.board;
+  const folded = () => props.lane === "closed" && !p().older && props.cards.length > closedShown;
+  const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
+  const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
+  const hidden = () => (folded() ? ordered().length - closedShown : 0);
+  const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
+  const head = () => (props.lane === "working" ? `${props.cards.filter((c) => c.kind === "issue").length} / ${maxRunning} 块地` : `${props.cards.length}`);
   return (
     <section
-      aria-label={laneLabel[lane]}
+      aria-label={laneLabel[props.lane]}
       onDragOver={(e) => {
-        if (!accepts(dragging)) return;
+        if (!accepts(props.drag.dragging())) return;
         e.preventDefault();
         setOver(true);
       }}
@@ -156,134 +150,140 @@ function LaneView({
       onDrop={(e) => {
         e.preventDefault();
         setOver(false);
-        if (dragging && accepts(dragging)) p.onDrop(dragging, lane);
-        setDragging(null);
+        const d = props.drag.dragging();
+        if (d && accepts(d)) p().onDrop(d, props.lane);
+        props.drag.setDragging(null);
       }}
-      className={`min-w-[220px] flex-1 flex-col rounded-[10px] border px-2 pt-1.5 pb-2 ${shownNarrow ? "flex" : "hidden @min-[700px]:flex"} ${over ? "border-leaf bg-leaf/15" : "border-transparent bg-hover"}`}
+      class={[
+        "min-w-[220px] flex-1 flex-col rounded-[10px] border px-2 pt-1.5 pb-2",
+        props.shownNarrow ? "flex" : "hidden @min-[700px]:flex",
+        over() ? "border-leaf bg-leaf/15" : "border-transparent bg-hover",
+      ]}
     >
-      <header className="flex h-7 items-center gap-2 px-1">
-        <StatusMark status={laneStatus[lane]} />
-        <h2 className="text-sm font-semibold">{laneLabel[lane]}</h2>
-        <span className="text-xs text-muted">{head}</span>
-        {lane === "todo" && (
-          <span className="ml-auto flex">
-            <IconButton icon="button-add" label="写一张" onClick={() => addRef.current?.focus()} />
-            <IconButton icon="button-edit" label="详细写一张" onClick={p.onWrite} />
+      <header class="flex h-7 items-center gap-2 px-1">
+        <StatusMark status={laneStatus[props.lane]} />
+        <h2 class="text-sm font-semibold">{laneLabel[props.lane]}</h2>
+        <span class="text-xs text-muted">{head()}</span>
+        <Show when={props.lane === "todo"}>
+          <span class="ml-auto flex">
+            <IconButton icon="button-add" label="写一张" onClick={props.focusAdd} />
+            <IconButton icon="button-edit" label="详细写一张" onClick={p().onWrite} />
           </span>
-        )}
+        </Show>
       </header>
-      {lane === "todo" && (
-        <div className="mt-1.5">
-          <QuickAdd onAdd={p.onAdd} inputRef={addRef} />
+      <Show when={props.lane === "todo"}>
+        <div class="mt-1.5">
+          <QuickAdd onAdd={(t) => p().onAdd(t)} ref={props.addRef} />
         </div>
-      )}
-      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
-        {p.loading ? (
-          <p className="px-1 text-xs text-faint">在读……</p>
-        ) : cards.length === 0 ? (
-          <p className="px-1 text-xs leading-relaxed text-faint">{emptyText[lane]}</p>
-        ) : (
-          <>
-            {shown.map((c) => (
-              <CardView
-                key={c.id}
-                card={c}
-                selected={c.id === p.selected}
-                onOpen={p.onOpen}
-                dragging={dragging}
-                setDragging={setDragging}
-                // Anything but manual hides the owner's order of 待办, so a card cannot be dropped between two there.
-                onPlace={c.kind === "todo" && p.ordering === "manual" ? (moved) => p.onPlace(moved, c.id) : undefined}
-              />
-            ))}
-            {(hidden > 0 || (lane === "closed" && p.older && cards.length > closedShown)) && <OlderLink hidden={hidden} onClick={p.onOlder} />}
-          </>
-        )}
+      </Show>
+      <div class="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+        <Switch
+          fallback={
+            <>
+              <For each={shown()} keyed={(c) => c.id}>
+                {(c) => (
+                  <CardView
+                    card={c()}
+                    selected={c().id === p().selected}
+                    onOpen={p().onOpen}
+                    drag={props.drag}
+                    // Anything but manual hides the owner's order of 待办, so a card cannot be dropped between two there.
+                    onPlace={c().kind === "todo" && p().ordering === "manual" ? (moved) => p().onPlace(moved, c().id) : undefined}
+                  />
+                )}
+              </For>
+              <Show when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
+                <OlderLink hidden={hidden()} onClick={p().onOlder} />
+              </Show>
+            </>
+          }
+        >
+          <Match when={p().loading}>
+            <p class="px-1 text-xs text-faint">在读……</p>
+          </Match>
+          <Match when={props.cards.length === 0}>
+            <p class="px-1 text-xs leading-relaxed text-faint">{emptyText[props.lane]}</p>
+          </Match>
+        </Switch>
       </div>
     </section>
   );
 }
 
-function CardView({
-  card,
-  selected,
-  onOpen,
-  dragging,
-  setDragging,
-  onPlace,
-}: {
-  card: BoardCard;
-  selected: boolean;
-  onOpen: (id: string) => void;
-  dragging: BoardCard | null;
-  setDragging: (c: BoardCard | null) => void;
-  onPlace?: (moved: BoardCard) => void;
-}) {
+function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: string) => void; drag: Drag; onPlace?: (moved: BoardCard) => void }) {
   const nameOf = useNameOf();
   const graphs = useGraphs();
-  const look = cardLook(card, nameOf, graphs, Date.now());
-  const [before, setBefore] = useState(false);
-  const where = [look.number, cardProject(card)].filter(Boolean).join(" · ");
-  const placing = onPlace && dragging?.kind === "todo" && dragging.id !== card.id;
+  const look = () => cardLook(props.card, nameOf(), graphs(), Date.now());
+  const [before, setBefore] = createSignal(false);
+  const where = () => [look().number, cardProject(props.card)].filter(Boolean).join(" · ");
+  const placing = () => {
+    const d = props.drag.dragging();
+    return !!props.onPlace && d?.kind === "todo" && d.id !== props.card.id;
+  };
   return (
     <div
       onDragOver={(e) => {
-        if (!placing) return;
+        if (!placing()) return;
         e.preventDefault();
         e.stopPropagation();
         setBefore(true);
       }}
       onDragLeave={() => setBefore(false)}
       onDrop={(e) => {
-        if (!placing || !dragging) return;
+        const d = props.drag.dragging();
+        if (!placing() || !d) return;
         e.preventDefault();
         e.stopPropagation();
         setBefore(false);
-        onPlace(dragging);
-        setDragging(null);
+        props.onPlace?.(d);
+        props.drag.setDragging(null);
       }}
     >
-      {before && <div className="mb-1 h-0.5 rounded-full bg-leaf" />}
+      <Show when={before()}>
+        <div class="mb-1 h-0.5 rounded-full bg-leaf" />
+      </Show>
       <div
         role="button"
-        tabIndex={0}
-        aria-label={look.title}
-        aria-current={selected || undefined}
-        title={look.detail}
-        draggable={card.kind !== "task" && card.kind !== "manager" && card.kind !== "missing"}
+        tabindex={0}
+        aria-label={look().title}
+        aria-current={props.selected ? "true" : undefined}
+        title={look().detail}
+        draggable={props.card.kind !== "task" && props.card.kind !== "manager" && props.card.kind !== "missing" ? "true" : "false"}
         onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", card.id);
-          setDragging(card);
+          e.dataTransfer!.effectAllowed = "move";
+          e.dataTransfer!.setData("text/plain", props.card.id);
+          props.drag.setDragging(props.card);
         }}
-        onDragEnd={() => setDragging(null)}
-        onClick={() => onOpen(card.id)}
+        onDragEnd={() => props.drag.setDragging(null)}
+        onClick={() => props.onOpen(props.card.id)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onOpen(card.id);
+            props.onOpen(props.card.id);
           }
         }}
-        className={`group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors ${
-          selected ? "border-line bg-selected" : "border-line bg-page hover:border-[#2f1f132e] hover:shadow-[0_1px_3px_#2f1f1314]"
-        } ${dragging?.id === card.id ? "opacity-40" : ""}`}
+        class={[
+          "group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors",
+          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-[#2f1f132e] hover:shadow-[0_1px_3px_#2f1f1314]",
+          { "opacity-40": props.drag.dragging()?.id === props.card.id },
+        ]}
       >
-        {where && <div className="truncate text-[11px] leading-[14px] text-muted">{where}</div>}
-        <div className="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look.title}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <StatusMark status={look.status} tone={look.statusTone} size={13} />
-          {look.priority && <PriorityMark priority={look.priority} size={13} />}
-          <CardFace card={card} size={18} />
-          {look.progress && <ProgressMark {...look.progress} />}
-          {look.flags.map((f) => (
-            <FlagChip key={f.text} {...f} />
-          ))}
+        <Show when={where()}>
+          <div class="truncate text-[11px] leading-[14px] text-muted">{where()}</div>
+        </Show>
+        <div class="mt-0.5 line-clamp-2 text-sm font-medium break-words">{look().title}</div>
+        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+          <StatusMark status={look().status} tone={look().statusTone} size={13} />
+          <Show when={look().priority}>{(pr) => <PriorityMark priority={pr()} size={13} />}</Show>
+          <CardFace card={props.card} size={18} />
+          <Show when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</Show>
+          <For each={look().flags}>{(f) => <FlagChip text={f.text} tone={f.tone} />}</For>
         </div>
       </div>
     </div>
   );
 }
 
-export function EmptyNote({ children }: { children: ReactNode }) {
-  return <p className="px-3 text-xs text-faint">{children}</p>;
+export function EmptyNote(props: { children: JSX.Element }) {
+  return <p class="px-3 text-xs text-faint">{props.children}</p>;
 }

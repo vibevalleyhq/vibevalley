@@ -21,6 +21,20 @@ test("/ draws the farm on a canvas, without errors", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("while the village's pictures come in, a bar says how far; drawn, it goes", async ({ page }) => {
+  // Each picture a little late, so the bar is there to see.
+  await page.route("**/pixel/*.png", async (route) => {
+    await new Promise((r) => setTimeout(r, 150));
+    await route.continue();
+  });
+  await page.goto("/");
+  const bar = page.getByRole("progressbar", { name: "进村" });
+  await expect(bar).toBeVisible();
+  await expect(page.getByText(/搬东西进村 \d+\/\d+/)).toBeVisible();
+  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect(bar).toHaveCount(0);
+});
+
 test("the farm links to the workbench, and the workbench back to the farm", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "工作台" }).click();

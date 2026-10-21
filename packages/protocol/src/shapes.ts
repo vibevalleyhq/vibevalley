@@ -1,6 +1,8 @@
 // The shapes the server and the page share: every type on the wire and on disk, and the closed sets' members. schema.ts
 // holds a Schema for each, typed by it (Schema.Codec<T.X>), so the two cannot drift apart; api.ts the endpoints.
 
+import type { ApiError } from "./api";
+
 /** The manager's participant id, and the agent of an issue for it. No agent profile has this id. */
 export const managerAgent = "manager";
 
@@ -2153,6 +2155,8 @@ export class VibeValleyApiError extends Error {
     readonly status: number,
     readonly tag: string | undefined,
     readonly reason: string,
+    /** The error as the server wrote it, for what it carries besides the reason. */
+    readonly error?: ApiError,
   ) {
     super(reason);
   }
@@ -2442,7 +2446,12 @@ export class VibeValleyApi {
     if (!res.ok) {
       const j = (decoded ?? {}) as { _tag?: unknown; reason?: unknown };
       const reason = typeof j.reason === "string" ? j.reason : "服务端答 " + res.status;
-      throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason);
+      throw new VibeValleyApiError(
+        res.status,
+        typeof j._tag === "string" ? j._tag : undefined,
+        reason,
+        typeof j._tag === "string" ? (j as ApiError) : undefined,
+      );
     }
     return decoded;
   }

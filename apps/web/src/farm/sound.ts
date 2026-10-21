@@ -2,7 +2,6 @@
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import type { GameEffect, Session } from "@vibevalley/protocol";
 import type { BedFxKind } from "./tools";
@@ -256,7 +255,7 @@ export function setMuted(next: boolean) {
   for (const l of muteListeners) l();
 }
 
-function subscribeMuted(listener: () => void) {
+export function subscribeMuted(listener: () => void) {
   muteListeners.add(listener);
   // Another tab on this machine changed it.
   const onStorage = (e: StorageEvent) => {
@@ -269,10 +268,6 @@ function subscribeMuted(listener: () => void) {
     muteListeners.delete(listener);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-export function useMuted(): [boolean, (muted: boolean) => void] {
-  return [useSyncExternalStore(subscribeMuted, isMuted, () => false), setMuted];
 }
 
 let synth: Synth | undefined;
@@ -375,31 +370,10 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
 // one before, then holds the floor.
 let floorFree = 0;
 
-function inTurn(name: SoundName, hold: number) {
+export function inTurn(name: SoundName, hold: number) {
   const now = Date.now();
   const at = Math.max(now, floorFree);
   floorFree = at + hold;
   if (at === now) playSound(name);
   else setTimeout(() => playSound(name), at - now);
-}
-
-export function useFarmSounds(input: FarmSoundInput) {
-  const prev = useRef(input);
-  useEffect(() => {
-    const before = prev.current;
-    prev.current = input;
-    if (before === input) return;
-    for (const cue of farmCues(before, input)) {
-      if (cue.hold === undefined) playSound(cue.name);
-      else inTurn(cue.name, cue.hold);
-    }
-  });
-  useEffect(() => {
-    window.addEventListener("pointerdown", unlockSound, { once: true });
-    window.addEventListener("keydown", unlockSound, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlockSound);
-      window.removeEventListener("keydown", unlockSound);
-    };
-  }, []);
 }

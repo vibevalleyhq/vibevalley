@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
 
-test("a call without Agora's keys says why, and the button tries again", async ({ page }) => {
+test("a call without Agora's keys says why, offers 设置, and the button tries again", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   const chat = page.getByRole("region", { name: "田头" });
@@ -15,6 +15,12 @@ test("a call without Agora's keys says why, and the button tries again", async (
   await expect(call).toHaveAttribute("title", "按一下，和管家语音说话");
   await call.click();
   await expect(call).toHaveAttribute("title", /^上次没接通：.+再按一下重试$/, { timeout: 10_000 });
+  // The reason over the chat window, with the way to the setting that fixes it.
+  const problem = page.getByRole("alert").filter({ hasText: "语音没接通" });
+  await expect(problem).toContainText("Agora");
+  await problem.getByRole("button", { name: "去设置" }).click();
+  await expect(page).toHaveURL(/\/settings\/agora$/);
+  await expect(page.getByLabel("Agora App ID")).toBeVisible();
 });
 
 test("dictation waits for a transcriber to be set in 声音", async ({ page }) => {

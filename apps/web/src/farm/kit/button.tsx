@@ -1,5 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cx, pxDrop, pxText } from "./base";
+import { omit, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { cx, pxDrop, pxText } from "./style";
 import { SpriteIcon } from "./icons";
 
 export type PxTone = "plain" | "primary" | "danger" | "accent";
@@ -21,48 +22,46 @@ const sizes: Record<PxSize, string> = {
 };
 
 /** Disabled without `onClick`. `label` names an icon button; `title` is its tooltip. `icon` goes before the words at 14 px. */
-export function PxButton({
-  children,
-  onClick,
-  tone = "plain",
-  size = "md",
-  icon,
-  label,
-  disabled,
-  className,
-  type = "button",
-  ...rest
-}: {
-  children?: ReactNode;
-  tone?: PxTone;
-  size?: PxSize;
-  icon?: string;
-  label?: string;
-} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label">) {
+export function PxButton(
+  props: {
+    children?: JSX.Element;
+    tone?: PxTone;
+    size?: PxSize;
+    icon?: string;
+    label?: string;
+    onClick?: (e: MouseEvent) => void;
+  } & Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label" | "onClick">,
+) {
+  const rest = omit(props, "children", "tone", "size", "icon", "label", "onClick", "disabled", "class", "type");
   // An icon alone is not framed: it sits inside a frame already (a window, a field, a card), and a ring per icon is a box
   // in a box. Hover and press show it can be tapped; the focus outline stays.
-  const bare = size === "icon" && tone === "plain";
+  const bare = () => (props.size ?? "md") === "icon" && (props.tone ?? "plain") === "plain";
   return (
     <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled || !onClick}
-      aria-label={label}
-      className={cx(
+      type={props.type ?? "button"}
+      {...rest}
+      onClick={(e) => props.onClick?.(e)}
+      disabled={props.disabled || !props.onClick}
+      aria-label={props.label}
+      class={[
         pxText.sm,
         "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap select-none",
         "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid",
         "disabled:cursor-default disabled:opacity-45",
-        sizes[size],
-        bare
+        sizes[props.size ?? "md"],
+        bare()
           ? "text-bark-900 enabled:hover:bg-cream-200 enabled:active:bg-cream-300"
-          : cx(tones[tone], "border-2 border-bark-500", pxDrop, "enabled:active:translate-x-[2px] enabled:active:translate-y-[2px] enabled:active:shadow-none"),
-        className,
-      )}
-      {...rest}
+          : cx(
+              tones[props.tone ?? "plain"],
+              "border-2 border-bark-500",
+              pxDrop,
+              "enabled:active:translate-x-[2px] enabled:active:translate-y-[2px] enabled:active:shadow-none",
+            ),
+        props.class,
+      ]}
     >
-      {icon && <SpriteIcon name={icon} size={14} />}
-      {children}
+      <Show when={props.icon}>{(icon) => <SpriteIcon name={icon()} size={14} />}</Show>
+      {props.children}
     </button>
   );
 }

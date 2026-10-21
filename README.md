@@ -33,7 +33,7 @@
 
 ```mermaid
 flowchart LR
-  you([你]) -- 打字 / 语音 --> app[React 页面<br/>农场画面、田头、配置]
+  you([你]) -- 打字 / 语音 --> app[页面<br/>农场画面、田头、配置]
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
   subgraph server[TypeScript 服务端 127.0.0.1:8787]
@@ -50,7 +50,7 @@ flowchart LR
 
 - **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：管家、帮工、田头、项目和收获、种植计划、语音、连接器都在这一个进程里，数据在 PGlite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **页面**（`apps/web`，React）：农场和像素村、田头、工单、文档、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
+- **页面**（`apps/web`，Solid 2）：农场和像素村、田头、工单、文档、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
 - **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏和语音的快捷键。
 - **形状只写一次**：接口和数据形状写在 `packages/protocol`（`shapes.ts`、`schema.ts`、`api.ts`），服务端和页面 import 同一份，两边不会对不上。
 
@@ -104,7 +104,7 @@ cd apps/server && npm start -- --web ../web/dist      # 服务端，127.0.0.1:87
 
 ```
 apps/server/       TypeScript 服务端（Effect v4、PGlite）：src/ 按概念分的服务（工单、执行、项目、群聊、管家、频道和连接器、游戏……），db/ 表结构和查询
-apps/web/          React 页面：农场、像素村、田头、工单、文档、配置页、语音；服务端在 / 提供
+apps/web/          页面（Solid 2）：农场、像素村、田头、工单、文档、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
 packages/protocol/ 形状、接口和几处共用的规则的唯一来源，服务端和页面都 import 它
 packages/host/     宿主接口：通知、菜单栏、快捷键，没有的是 null
@@ -124,7 +124,7 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 ## 致谢
 
 - [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
-- [Effect](https://effect.website/)、[PGlite](https://pglite.dev/)、[React](https://react.dev/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
+- [Effect](https://effect.website/)、[PGlite](https://pglite.dev/)、[Solid](https://www.solidjs.com/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
 - [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
 - [DeepSeek](https://www.deepseek.com/)：管家用的模型。
 - [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。

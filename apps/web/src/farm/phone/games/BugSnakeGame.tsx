@@ -1,10 +1,7 @@
-// 贪吃虫 on the phone: the rules are bugSnake.ts; here the clock, the pad and the
-// drawing, each cell six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
+// 贪吃虫 on the phone: the rules are farm/phone/games/bugSnake.ts; here the clock, the pad and the drawing, each cell
+// six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
 
-import { useEffect, useRef, useState } from "react";
-import { playSound } from "../../sound";
-import { drawPattern, lcd } from "../lcd";
-import { kept, usePad, useTicks } from "../pad";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import {
   type BugSnake,
   type BugSnakeEnd,
@@ -16,14 +13,17 @@ import {
   type SnakeHeading,
   steerBugSnake,
 } from "./bugSnake";
+import { drawPattern, lcd } from "../lcd";
+import { playSound } from "../../sound";
+import { kept, usePad, useTicks } from "../../support";
+
+const game = kept<BugSnake | null>(null);
+const best = kept(0);
 
 const cell = 6;
 const zoom = 3;
 const width = bugSnakeWidth * cell;
 const height = bugSnakeHeight * cell;
-
-const game = kept<BugSnake | null>(null);
-const best = kept(0);
 
 /** The head looking right; the other ways are it turned. */
 const head = [" #### ", "####.#", "######", "######", "####.#", " #### "];
@@ -57,13 +57,13 @@ const five = (n: number) => String(n).padStart(5, "0");
 export function BugSnakeGame() {
   const [g, setG] = game.use();
   const [top, setTop] = best.use();
-  const [playing, setPlaying] = useState(false);
-  const since = useRef(0);
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const [playing, setPlaying] = createSignal(false);
+  let since = 0;
+  let canvas: HTMLCanvasElement | undefined;
 
   const start = () => {
     setG(newBugSnake(Math.floor(Math.random() * 2 ** 31)));
-    since.current = 0;
+    since = 0;
     setPlaying(true);
     playSound("plant");
   };
@@ -80,74 +80,77 @@ export function BugSnakeGame() {
     setG(next);
   };
 
-  useTicks(playing && !!g && g.over === null, (ms) => {
-    const now = game.get();
-    if (!now) return;
-    since.current += ms;
-    if (since.current >= bugSnakeStepMs(now)) {
-      since.current = 0;
-      apply(crawlBugSnake(now));
-    }
-  });
+  useTicks(
+    () => playing() && !!g() && g()!.over === null,
+    (ms) => {
+      const now = game.get();
+      if (!now) return;
+      since += ms;
+      if (since >= bugSnakeStepMs(now)) {
+        since = 0;
+        apply(crawlBugSnake(now));
+      }
+    },
+  );
 
   usePad((button, down) => {
     if (!down) return;
     const now = game.get();
     if (!now || now.over !== null) return void (button === "a" && start());
-    if (!playing) return void (button === "a" && setPlaying(true));
+    if (!playing()) return void (button === "a" && setPlaying(true));
     if (button === "b") return setPlaying(false);
     if (button !== "a") setG(steerBugSnake(now, button));
   });
 
-  useEffect(() => {
-    const ctx = canvas.current?.getContext("2d");
+  createEffect(g, (state) => {
+    const ctx = canvas?.getContext("2d");
     if (!ctx) return;
     ctx.fillStyle = lcd.paper;
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = lcd.light;
     for (let y = 0; y < bugSnakeHeight; y++) for (let x = 0; x < bugSnakeWidth; x++) ctx.fillRect(x * cell + 2, y * cell + 3, 2, 1);
-    if (!g) return;
+    if (!state) return;
     const draw = (picture: readonly string[], c: number) => drawPattern(ctx, picture, (c % bugSnakeWidth) * cell, Math.floor(c / bugSnakeWidth) * cell);
-    draw(seed, g.food);
+    draw(seed, state.food);
     // It blinks its last ten ticks, before it flies off.
-    if (g.bug !== null && (g.bugLeft > 10 || Math.floor(g.bugLeft / 2) % 2 === 0)) draw(bug[g.bugLeft % 2]!, g.bug);
-    g.body.forEach((c, i) => draw(i === 0 ? heads[g.heading] : i === g.body.length - 1 ? tail : segment[i % 2]!, c));
-  }, [g]);
+    if (state.bug !== null && (state.bugLeft > 10 || Math.floor(state.bugLeft / 2) % 2 === 0)) draw(bug[state.bugLeft % 2]!, state.bug);
+    state.body.forEach((c, i) => draw(i === 0 ? heads[state.heading] : i === state.body.length - 1 ? tail : segment[i % 2]!, c));
+  });
 
-  const score = g?.score ?? 0;
+  const score = () => g()?.score ?? 0;
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
-      <div className="flex w-full px-2">
+    <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
+      <div class="flex w-full px-2">
         <span>贪吃虫</span>
-        <span className="ml-auto tabular-nums">最好 {five(Math.max(top, score))}</span>
+        <span class="ml-auto tabular-nums">最好 {five(Math.max(top(), score()))}</span>
       </div>
-      <div className="mt-1 flex w-full px-2 tabular-nums">
+      <div class="mt-1 flex w-full px-2 tabular-nums">
         <span>
-          种子 {g?.eaten ?? 0} · 虫 {g?.bugs ?? 0}
+          种子 {g()?.eaten ?? 0} · 虫 {g()?.bugs ?? 0}
         </span>
-        <span className="ml-auto">{five(score)}</span>
+        <span class="ml-auto">{five(score())}</span>
       </div>
-      <div className="relative mt-2" style={{ boxShadow: `0 0 0 2px ${lcd.ink}` }}>
+      <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
         <canvas
-          ref={canvas}
+          ref={(el) => (canvas = el)}
           width={width}
           height={height}
           role="img"
           aria-label="贪吃虫的田"
-          className="block [image-rendering:pixelated]"
-          style={{ width: width * zoom, height: height * zoom }}
+          class="block [image-rendering:pixelated]"
+          style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
-        {(!g || g.over !== null || !playing) && (
-          <div className="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
+        <Show when={!g() || g()!.over !== null || !playing()}>
+          <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
             <span>
-              {g?.over ? ended[g.over] : g ? "暂停" : "贪吃虫"}
+              {g()?.over ? ended[g()!.over!] : g() ? "暂停" : "贪吃虫"}
               <br />
-              <span className="phone-blink">按 A {g && g.over === null ? "继续" : g ? "再来" : "开始"}</span>
+              <span class="phone-blink">按 A {g() && g()!.over === null ? "继续" : g() ? "再来" : "开始"}</span>
             </span>
           </div>
-        )}
+        </Show>
       </div>
-      <p className="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
+      <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
         方向键转弯，B 暂停
         <br />
         吃种子长一节，虫子飞走前吃掉多得分
@@ -160,9 +163,10 @@ export function BugSnakeGame() {
 export function BugSnakeIcon() {
   const rows = ["    # #   ", "    ###   ", "++..#o#  #", "++..###  +"];
   const fill: Readonly<Record<string, string>> = { "#": lcd.ink, "+": lcd.dark, ".": lcd.mid, o: lcd.paper };
+  const cells = rows.flatMap((row, y) => [...row].flatMap((c, x) => (fill[c] ? [{ x, y, fill: fill[c] }] : [])));
   return (
-    <svg width="28" height="28" viewBox="0 -1 10 10" shapeRendering="crispEdges" aria-hidden>
-      {rows.flatMap((row, y) => [...row].map((c, x) => (fill[c] ? <rect key={`${x},${y}`} x={x} y={y + 2} width={1} height={1} fill={fill[c]} /> : null)))}
+    <svg width="28" height="28" viewBox="0 -1 10 10" shape-rendering="crispEdges" aria-hidden="true">
+      <For each={cells}>{(c) => <rect x={c.x} y={c.y + 2} width={1} height={1} fill={c.fill} />}</For>
       <rect x="0" y="6" width="10" height="1" fill={lcd.dark} />
     </svg>
   );

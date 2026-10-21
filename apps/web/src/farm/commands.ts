@@ -1,10 +1,8 @@
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
-import { useMemo, useRef } from "react";
 import type { GraphActRequest, GraphSplitRequest, Session, StateFrame, TaskActRequest, TaskEdit } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
-import { useFrames } from "../data/frame";
 import { farm, farmState } from "./store";
 import { aimTool, type BedFxKind, bugText, type PlotAim, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
@@ -151,14 +149,6 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     },
   };
   return commands;
-}
-
-/** The farm's commands, over the frame the page has now. */
-export function useFarmCommands(): FarmCommands {
-  const { frame } = useFrames();
-  const latest = useRef(frame);
-  latest.current = frame;
-  return useMemo(() => farmCommands(() => latest.current), []);
 }
 
 /**

@@ -63,15 +63,20 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
     },
     { scope: "worker" },
   ],
-  // On CI the page's errors go to the job's log: the runner is gone by the time anyone looks.
+  // An error that escapes the page fails the test: Solid stops updating the whole page after one (REACTIVITY_HALTED), so
+  // the page would go on looking alive. On CI the page's console errors also go to the job's log.
   page: async ({ page }, use) => {
-    if (process.env.CI) {
+    const escaped: string[] = [];
+    page.on("pageerror", (e) => {
+      escaped.push(e.message);
+      if (process.env.CI) console.log(`[page] ${e.message}`);
+    });
+    if (process.env.CI)
       page.on("console", (m) => {
         if (m.type() === "error") console.log(`[page] ${m.text()}`);
       });
-      page.on("pageerror", (e) => console.log(`[page] ${e.message}`));
-    }
     await use(page);
+    expect(escaped, "errors that escaped the page").toEqual([]);
   },
   baseURL: async ({ server }, use) => use(server.url),
   api: async ({ server }, use) => use(new VibeValleyApi(server.url)),

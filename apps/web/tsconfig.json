@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
     "types": ["vite/client", "node", "bun"]
   },
   "include": ["src", "test", "scripts", "vite.config.ts", "playwright.config.ts"]

@@ -1,47 +1,47 @@
-// The farm chat window's input row: the manager's
-// face that opens and folds the window, who the next job goes to, the box (Enter sends, Shift+Enter starts a line, @ names
-// someone), and the stop button while the manager thinks. A failed send keeps the draft and its key, so a retry is the
-// same message, not a second one.
+// The farm chat window's input row: the manager's face that opens and folds the window, who the next job goes to, the
+// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the manager thinks. A failed
+// send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { type KeyboardEvent, useRef, useState } from "react";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { useAgents } from "../../data/agents";
-import { useCore } from "../../data/frame";
-import { insertName, type Nameable, nameables, offeredFor, threadOwnerOf, typedName } from "../../rules/chat";
-import { AgentFace, ManagerFace } from "../../ui/Face";
-import { SpriteIcon } from "../kit";
+import { newSendKey, say } from "./say";
 import { playSound } from "../sound";
-import { farm, useFarm } from "../store";
-import { CallButton, DictationButton } from "../../voice/Buttons";
-
-/** 16 random bytes in hex: names one send. */
-export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
-
-/** Says a line in a conversation (the general one when it is undefined), with the picked helper; the manager is woken first. */
-export async function say(text: string, conversation: Conversation | undefined, sendKey: string, agent: string | undefined) {
-  await api.manager.open();
-  await api.channel.say({ body: { text, conversation: conversation?.kind === "general" ? undefined : conversation?.id, agent, sendKey } });
-}
+import { farm } from "../store";
+import { insertName, type Nameable, nameables, offeredFor, threadOwnerOf, typedName } from "../../rules/chat";
+import { aria } from "../../app/util";
+import { useCore } from "../../data/frame";
+import { ready, useAgents } from "../../data/query";
+import { AgentFace, ManagerFace } from "../../ui/Face";
+import { CallButton } from "../../voice/CallButton";
+import { DictationButton } from "../../voice/DictationButton";
+import { SpriteIcon } from "../kit";
+import { useFarm } from "../state";
 
 /** Who the next line goes to, with a button to stop picking. */
-function PickChip({ named }: { named: boolean }) {
+function PickChip(props: { named: boolean }) {
   const pick = useFarm((s) => s.pick);
-  const agent = (useAgents().data ?? []).find((a) => a.id === pick);
-  if (pick === "auto" || !agent?.enabled) return null;
+  const agents = useAgents();
+  const agent = () => ready(agents, []).find((a) => a.id === pick());
   return (
-    <span className="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={`派给${agent.name}`}>
-      <AgentFace agentId={agent.id} look={agent.look} size={26} />
-      {named && <span className="max-w-20 truncate text-[12px] text-bark-800">派给{agent.name}</span>}
-      <button
-        type="button"
-        aria-label="不指定帮工"
-        onClick={() => farm.setPick("auto")}
-        className="flex h-6 w-6 cursor-pointer items-center justify-center hover:bg-cream-300"
-      >
-        <SpriteIcon name="button-close" size={12} />
-      </button>
-    </span>
+    <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
+      {(a) => (
+        <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={`派给${a().name}`}>
+          <AgentFace agentId={a().id} look={a().look} size={26} />
+          <Show when={props.named}>
+            <span class="max-w-20 truncate text-[12px] text-bark-800">派给{a().name}</span>
+          </Show>
+          <button
+            type="button"
+            aria-label="不指定帮工"
+            onClick={() => farm.setPick("auto")}
+            class="flex h-6 w-6 cursor-pointer items-center justify-center hover:bg-cream-300"
+          >
+            <SpriteIcon name="button-close" size={12} />
+          </button>
+        </span>
+      )}
+    </Show>
   );
 }
 
@@ -56,14 +56,7 @@ const ring: Record<ChatPhase, string> = {
   error: "#c84a3a",
 };
 
-export function FarmComposer({
-  conversation,
-  thread,
-  phase,
-  open,
-  unread,
-  onProblem,
-}: {
+export function FarmComposer(props: {
   conversation: Conversation | undefined;
   thread: boolean;
   phase: ChatPhase;
@@ -74,63 +67,68 @@ export function FarmComposer({
   const core = useCore();
   const look = useFarm((s) => s.managerLook);
   const pick = useFarm((s) => s.pick);
-  const input = useRef<HTMLTextAreaElement>(null);
-  const [text, setText] = useState("");
-  const [caret, setCaret] = useState(0);
-  const [active, setActive] = useState(0);
-  const [closed, setClosed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const key = useRef<{ draft: string; key: string }>(undefined);
-  const typing = closed ? undefined : typedName(text, caret);
-  const offered = typing ? offeredFor(nameables(core?.sessions ?? [], Date.now()), typing.query) : [];
-  const stoppable = core?.manager === "thinking" || core?.manager === "speaking";
-  const owner = thread && conversation ? threadOwnerOf(conversation, core?.sessions ?? []) : undefined;
-  const placeholder = thread ? (owner ? `在串里说，${owner.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…";
+  let input: HTMLTextAreaElement | undefined;
+  const [text, setText] = createSignal("");
+  const [caret, setCaret] = createSignal(0);
+  const [active, setActive] = createSignal(0);
+  const [closed, setClosed] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  let key: { draft: string; key: string } | undefined;
+  const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
+  const offered = createMemo(() => {
+    const t = typing();
+    return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
+  });
+  const stoppable = () => core()?.manager === "thinking" || core()?.manager === "speaking";
+  const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
+  const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");
 
   const edit = (value: string, at: number) => {
     setText(value);
     setCaret(at);
     setActive(0);
     setClosed(false);
-    onProblem(undefined);
+    props.onProblem(undefined);
     // Naming someone opens the window, to show who can be named.
-    if (!open && typedName(value, at)) farm.chatOpen(true);
+    if (!props.open && typedName(value, at)) farm.chatOpen(true);
   };
   const choose = (n: Nameable) => {
-    if (!typing) return;
-    const next = insertName(text, caret, typing.start, n.token);
+    const t = typing();
+    if (!t) return;
+    const next = insertName(text(), caret(), t.start, n.token);
     edit(next.text, next.caret);
     requestAnimationFrame(() => {
-      input.current?.focus();
-      input.current?.setSelectionRange(next.caret, next.caret);
+      input?.focus();
+      input?.setSelectionRange(next.caret, next.caret);
     });
   };
   const send = async () => {
-    const said = text.trim();
-    if (!said || busy) return;
-    if (key.current?.draft !== said) key.current = { draft: said, key: newSendKey() };
+    const said = text().trim();
+    if (!said || busy()) return;
+    if (key?.draft !== said) key = { draft: said, key: newSendKey() };
     setBusy(true);
     try {
-      await say(said, conversation, key.current.key, thread || pick === "auto" ? undefined : pick);
-      key.current = undefined;
+      await say(said, props.conversation, key.key, props.thread || pick() === "auto" ? undefined : pick());
+      key = undefined;
       edit("", 0);
     } catch (e) {
-      onProblem(`没发出去：${reasonOf(e)}`);
+      props.onProblem(`没发出去：${reasonOf(e)}`);
     } finally {
       setBusy(false);
     }
   };
-  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.nativeEvent.isComposing) return;
-    if (offered.length > 0) {
+  const onKey = (e: KeyboardEvent) => {
+    if (e.isComposing) return;
+    const list = offered();
+    if (list.length > 0) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        setActive((a) => (a + (e.key === "ArrowDown" ? 1 : offered.length - 1)) % offered.length);
+        setActive((a) => (a + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length);
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        const n = offered[active];
+        const n = list[active()];
         if (n) choose(n);
         return;
       }
@@ -146,71 +144,81 @@ export function FarmComposer({
       void send();
     }
   };
+  // The caret moves without typing too (arrow keys, a click): the @ menu follows it.
+  const follow = (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart);
 
   return (
-    <div className={`relative flex items-end gap-1.5 p-1.5 ${open ? "border-t border-cream-200" : ""}`}>
-      {offered.length > 0 && (
-        <div className="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px" role="listbox" aria-label="叫谁">
-          {offered.map((n, i) => (
-            <button
-              key={n.token}
-              type="button"
-              role="option"
-              aria-selected={i === active}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => choose(n)}
-              className={`flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px] ${i === active ? "bg-leaf-300/40" : ""}`}
-            >
-              <span className="text-bark-900">{n.name}</span>
-              <span className="truncate text-bark-500">{n.note}</span>
-            </button>
-          ))}
+    <div class={["relative flex items-end gap-1.5 p-1.5", { "border-t border-cream-200": props.open }]}>
+      <Show when={offered().length > 0}>
+        <div class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px" role="listbox" aria-label="叫谁">
+          <For each={offered()} keyed={(n) => n.token}>
+            {(n, i) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={aria(i() === active())}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(n())}
+                class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === active() }]}
+              >
+                <span class="text-bark-900">{n().name}</span>
+                <span class="truncate text-bark-500">{n().note}</span>
+              </button>
+            )}
+          </For>
         </div>
-      )}
+      </Show>
       <button
         type="button"
-        aria-label={open ? "收起对话" : "展开对话"}
-        title={open ? "收起对话" : unread ? "田头有新话，点开看看" : "展开对话"}
+        aria-label={props.open ? "收起对话" : "展开对话"}
+        title={props.open ? "收起对话" : props.unread ? "田头有新话，点开看看" : "展开对话"}
         onClick={() => {
-          playSound(open ? "close" : "open");
-          farm.chatOpen(!open);
+          playSound(props.open ? "close" : "open");
+          farm.chatOpen(!props.open);
         }}
-        className="relative shrink-0 cursor-pointer p-0.5 shadow-[inset_0_0_0_2px_#2f1f1340]"
-        style={{ background: ring[phase] }}
+        class="relative shrink-0 cursor-pointer p-0.5 shadow-[inset_0_0_0_2px_#2f1f1340]"
+        style={{ background: ring[props.phase] }}
       >
-        <ManagerFace size={40} look={look} />
-        {unread && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />}
+        <ManagerFace size={40} look={look()} />
+        <Show when={props.unread}>
+          <span class="absolute -top-0.5 -right-0.5 h-3 w-3 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
+        </Show>
       </button>
-      <div className="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
-        {!thread && <PickChip named />}
+      <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
+        <Show when={!props.thread}>
+          <PickChip named />
+        </Show>
         <textarea
-          ref={input}
+          ref={(el) => (input = el)}
           rows={1}
-          value={text}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          onChange={(e) => edit(e.target.value, e.target.selectionStart)}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          value={text()}
+          placeholder={placeholder()}
+          aria-label={placeholder()}
+          onInput={(e) => edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+          onKeyUp={follow}
+          onClick={follow}
           onKeyDown={onKey}
-          className="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 font-pixel text-[12px] leading-4 text-bark-900 outline-none placeholder:text-bark-400"
+          class="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 font-pixel text-[12px] leading-4 text-bark-900 outline-none placeholder:text-bark-400"
         />
-        {stoppable && (
+        <Show when={stoppable()}>
           <button
             type="button"
             aria-label="叫管家停下"
             title="叫管家停下这一轮，派出去的帮工照常干活"
             onClick={() => void api.manager.stop().catch(() => {})}
-            className="cursor-pointer p-1"
+            class="cursor-pointer p-1"
           >
             <SpriteIcon name="button-stop" size={24} />
           </button>
-        )}
-        <DictationButton field={input} value={text} onValue={edit} />
-        <button type="button" aria-label="发送" disabled={!text.trim() || busy} onClick={() => void send()} className="cursor-pointer p-1 disabled:opacity-40">
+        </Show>
+        <DictationButton field={() => input} value={text()} onValue={edit} />
+        <button type="button" aria-label="发送" disabled={!text().trim() || busy()} onClick={() => void send()} class="cursor-pointer p-1 disabled:opacity-40">
           <SpriteIcon name="button-send" size={20} />
         </button>
       </div>
-      {!thread && <CallButton />}
+      <Show when={!props.thread}>
+        <CallButton />
+      </Show>
     </div>
   );
 }

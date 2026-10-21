@@ -1,129 +1,116 @@
-// The rows of the farm's chat window: bubbles for
-// what is said (yours on the right in green), a turn report with its outcome, the thread a message has, the message a
-// thread hangs from, and a long message folded to its first lines.
+// The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
+// outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
-import { useState, type ReactNode } from "react";
+import { createSignal, Match, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
+import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
 import { AgentFace, ManagerFace, OwnerFace } from "../../ui/Face";
 import { PxMarkdown, SpriteIcon } from "../kit";
-import { useFarm } from "../store";
+import { useFarm } from "../state";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
-export const farmClock = (at: number) => {
-  const d = new Date(Math.round(at));
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-
-/** Long enough to fold: over 240 characters, eight lines or more, a heading or a code block. */
-export const readsLong = (text: string) => text.length > 240 || (text.match(/\n/g)?.length ?? 0) >= 8 || /^(#{1,6} |```)/m.test(text);
-
 /** A message's text; a long one shows its first lines until opened. One still streaming is shown whole. */
-export function ChatText({ text, folds = true, link = "text-leaf-700" }: { text: string; folds?: boolean; link?: string }) {
-  const [open, setOpen] = useState(false);
-  if (!folds || !readsLong(text)) return <PxMarkdown text={text} mentions />;
+export function ChatText(props: { text: string; folds?: boolean; link?: string }) {
+  const [open, setOpen] = createSignal(false);
   return (
-    <div className="flex flex-col items-start">
-      <div className={open ? "" : "max-h-[117px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]"}>
-        <PxMarkdown text={text} mentions />
+    <Show when={(props.folds ?? true) && readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
+      <div class="flex flex-col items-start">
+        <div class={open() ? "" : "max-h-[117px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]"}>
+          <PxMarkdown text={props.text} mentions />
+        </div>
+        <button type="button" onClick={() => setOpen(!open())} class={["mt-1 cursor-pointer text-[12px] hover:underline", props.link ?? "text-leaf-700"]}>
+          {open() ? "收起" : "展开阅读"}
+        </button>
       </div>
-      <button type="button" onClick={() => setOpen(!open)} className={`mt-1 cursor-pointer text-[12px] hover:underline ${link}`}>
-        {open ? "收起" : "展开阅读"}
-      </button>
-    </div>
+    </Show>
   );
 }
 
 /** A dispatch note: one line until tapped. */
-function DispatchNote({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
+function DispatchNote(props: { text: string }) {
+  const [open, setOpen] = createSignal(false);
   return (
     <button
       type="button"
-      aria-label={open ? "收起派活" : "展开派活"}
-      onClick={() => setOpen(!open)}
-      className="group flex w-full cursor-pointer items-start gap-1.5 text-left"
+      aria-label={open() ? "收起派活" : "展开派活"}
+      onClick={() => setOpen(!open())}
+      class="group flex w-full cursor-pointer items-start gap-1.5 text-left"
     >
-      <span className="min-w-0 flex-1">
-        {open ? <PxMarkdown text={text} mentions /> : <span className="block truncate">{text.replace(/\s+/g, " ").trim()}</span>}
+      <span class="min-w-0 flex-1">
+        <Show when={open()} fallback={<span class="block truncate">{props.text.replace(/\s+/g, " ").trim()}</span>}>
+          <PxMarkdown text={props.text} mentions />
+        </Show>
       </span>
-      <SpriteIcon name={open ? "button-collapse" : "button-enlarge"} size={12} className="mt-1 opacity-60 group-hover:opacity-100" />
+      <SpriteIcon name={open() ? "button-collapse" : "button-enlarge"} size={12} class="mt-1 opacity-60 group-hover:opacity-100" />
     </button>
   );
 }
 
-export function FaceOf({ m, agents, size = 30 }: { m: ChatMessage; agents: ReadonlyMap<string, Agent>; size?: number }) {
+export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agent>; size?: number }) {
   const look = useFarm((s) => s.managerLook);
-  if (m.fromKind === "user") return <OwnerFace size={size} />;
-  if (m.fromKind === "manager") return <ManagerFace size={size} look={look} />;
-  const id = m.agent ?? m.from;
-  return <AgentFace agentId={id} look={agents.get(id)?.look} size={size} />;
-}
-
-export function SenderName({ m }: { m: ChatMessage }) {
-  if (m.fromKind !== "agent") return <>{m.name}</>;
+  const size = () => props.size ?? 30;
   return (
-    <>
-      {m.name} <span className="font-mono text-bark-500">@{m.from}</span>
-    </>
+    <Switch fallback={<AgentFace agentId={props.m.agent ?? props.m.from} look={props.agents.get(props.m.agent ?? props.m.from)?.look} size={size()} />}>
+      <Match when={props.m.fromKind === "user"}>
+        <OwnerFace size={size()} />
+      </Match>
+      <Match when={props.m.fromKind === "manager"}>
+        <ManagerFace size={size()} look={look()} />
+      </Match>
+    </Switch>
   );
 }
 
-export function ChatRow({
-  mine,
-  first,
-  face,
-  name,
-  title,
-  children,
-}: {
-  mine: boolean;
-  first: boolean;
-  face?: ReactNode;
-  name?: ReactNode;
-  title?: string;
-  children: ReactNode;
-}) {
+export function SenderName(props: { m: ChatMessage }) {
   return (
-    <div className={`flex items-start gap-2 ${first ? "pt-1" : ""} ${mine ? "justify-end" : ""}`}>
-      {!mine && <span className="w-[30px] shrink-0">{first ? face : null}</span>}
-      <div className={`flex max-w-[84%] flex-col ${mine ? "items-end" : "items-start"}`}>
-        {!mine && first && name && <span className={`mx-1 mb-0.5 ${small}`}>{name}</span>}
+    <Show when={props.m.fromKind === "agent"} fallback={<>{props.m.name}</>}>
+      {props.m.name} <span class="font-mono text-bark-500">@{props.m.from}</span>
+    </Show>
+  );
+}
+
+export function ChatRow(props: { mine: boolean; first: boolean; face?: JSX.Element; name?: JSX.Element; title?: string; children: JSX.Element }) {
+  return (
+    <div class={["flex items-start gap-2", { "pt-1": props.first, "justify-end": props.mine }]}>
+      <Show when={!props.mine}>
+        <span class="w-[30px] shrink-0">{props.first ? props.face : null}</span>
+      </Show>
+      <div class={["flex max-w-[84%] flex-col", props.mine ? "items-end" : "items-start"]}>
+        <Show when={!props.mine && props.first && props.name}>
+          <span class={["mx-1 mb-0.5", small]}>{props.name}</span>
+        </Show>
         <div
-          title={title}
-          className={`px-3 py-2 text-[12px] leading-[1.625] ${mine ? "bg-leaf-500 text-cream-50 shadow-[0_2px_0_0_#3f6427]" : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_#7a5f4029]"}`}
+          title={props.title}
+          class={[
+            "px-3 py-2 text-[12px] leading-[1.625]",
+            props.mine
+              ? "bg-leaf-500 text-cream-50 shadow-[0_2px_0_0_#3f6427]"
+              : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_#7a5f4029]",
+          ]}
         >
-          {children}
+          {props.children}
         </div>
       </div>
     </div>
   );
 }
 
-export function ChatBubble({
-  m,
-  mine,
-  first,
-  face,
-  tag,
-  folded,
-  after,
-}: {
-  m: ChatMessage;
-  mine: boolean;
-  first: boolean;
-  face?: ReactNode;
-  tag?: string;
-  folded?: boolean;
-  after?: ReactNode;
-}) {
+export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolean; face?: JSX.Element; tag?: string; folded?: boolean; after?: JSX.Element }) {
   return (
-    <ChatRow mine={mine} first={first} face={face} name={<SenderName m={m} />} title={farmClock(m.at)}>
-      {tag && <span className="mb-1 inline-block bg-wheat/40 px-1.5 text-[12px] text-bark-800">{tag}</span>}
-      {folded ? <DispatchNote text={m.text} /> : <ChatText text={m.text} folds={m.final} link={mine ? "text-cream-50" : "text-leaf-700"} />}
-      {!m.final && <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden />}
-      {after}
+    <ChatRow mine={props.mine} first={props.first} face={props.face} name={<SenderName m={props.m} />} title={farmClock(props.m.at)}>
+      <Show when={props.tag}>
+        <span class="mb-1 inline-block bg-wheat/40 px-1.5 text-[12px] text-bark-800">{props.tag}</span>
+      </Show>
+      <Show when={props.folded} fallback={<ChatText text={props.m.text} folds={props.m.final} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
+        <DispatchNote text={props.m.text} />
+      </Show>
+      <Show when={!props.m.final}>
+        <span class="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden="true" />
+      </Show>
+      {props.after}
     </ChatRow>
   );
 }
@@ -134,45 +121,47 @@ const outcomeTag: Record<Outcome, [label: string, fill: string, ink: string]> = 
   interrupted: ["叫停了", "#e2c995", "#67482d"],
 };
 
-export function ChatReport({ m, first, face, steps }: { m: ChatMessage; first: boolean; face: ReactNode; steps?: ReactNode }) {
-  const [label, fill, ink] = outcomeTag[m.outcome ?? "completed"];
+export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.Element; steps?: JSX.Element }) {
+  const tag = () => outcomeTag[props.m.outcome ?? "completed"];
   return (
-    <ChatRow mine={false} first={first} face={face} name={<SenderName m={m} />} title={farmClock(m.at)}>
-      <span className="mb-1 inline-block px-1.5 text-[12px]" style={{ background: fill, color: ink }}>
-        {label}
+    <ChatRow mine={false} first={props.first} face={props.face} name={<SenderName m={props.m} />} title={farmClock(props.m.at)}>
+      <span class="mb-1 inline-block px-1.5 text-[12px]" style={{ background: tag()[1], color: tag()[2] }}>
+        {tag()[0]}
       </span>
-      <ChatText text={m.text} folds={m.final} />
-      {m.spent && <p className={`mt-1 ${small}`}>这一轮花了 {spentText(m.spent)}</p>}
-      {steps}
+      <ChatText text={props.m.text} folds={props.m.final} />
+      <Show when={props.m.spent}>{(spent) => <p class={["mt-1", small]}>这一轮花了 {spentText(spent())}</p>}</Show>
+      {props.steps}
     </ChatRow>
   );
 }
 
-export function ThreadChip({ thread, unread, onOpen }: { thread: Conversation; unread: number; onOpen: () => void }) {
+export function ThreadChip(props: { thread: Conversation; unread: number; onOpen: () => void }) {
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className="mt-1.5 flex cursor-pointer items-center gap-1.5 border border-cream-300 bg-cream-50/80 px-2 py-0.5 hover:bg-cream-50"
+      onClick={() => props.onOpen()}
+      class="mt-1.5 flex cursor-pointer items-center gap-1.5 border border-cream-300 bg-cream-50/80 px-2 py-0.5 hover:bg-cream-50"
     >
       <SpriteIcon name="button-thread" size={12} />
-      <span className="text-[12px] text-leaf-700">{thread.replies > 0 ? `${thread.replies} 条回复` : "工单串"}</span>
-      {unread > 0 && <span className="bg-berry px-1.5 text-[12px] text-cream-50">{unread} 新</span>}
+      <span class="text-[12px] text-leaf-700">{props.thread.replies > 0 ? `${props.thread.replies} 条回复` : "工单串"}</span>
+      <Show when={props.unread > 0}>
+        <span class="bg-berry px-1.5 text-[12px] text-cream-50">{props.unread} 新</span>
+      </Show>
       <SpriteIcon name="button-next" size={12} />
     </button>
   );
 }
 
-export function ParentMessage({ m, face }: { m: ChatMessage; face: ReactNode }) {
+export function ParentMessage(props: { m: ChatMessage; face: JSX.Element }) {
   return (
-    <div className="mb-1 flex items-start gap-2 bg-cream-100 px-2.5 py-2">
-      {face}
-      <div className="min-w-0 flex-1">
-        <p className={small}>
-          <SenderName m={m} /> · {farmClock(m.at)}
+    <div class="mb-1 flex items-start gap-2 bg-cream-100 px-2.5 py-2">
+      {props.face}
+      <div class="min-w-0 flex-1">
+        <p class={small}>
+          <SenderName m={props.m} /> · {farmClock(props.m.at)}
         </p>
-        <div className="text-[12px] text-bark-800">
-          <ChatText text={m.text} folds={m.final} />
+        <div class="text-[12px] text-bark-800">
+          <ChatText text={props.m.text} folds={props.m.final} />
         </div>
       </div>
     </div>

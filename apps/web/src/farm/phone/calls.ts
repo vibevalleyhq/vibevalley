@@ -2,11 +2,9 @@
 // call log, and which rings now are the page's, kept for this page's life. The web has no voice, so no call is the
 // manager's on the line.
 
-import { useEffect, useSyncExternalStore } from "react";
 import type { InboxItem, InboxKind } from "@vibevalley/protocol";
-import { useFrames } from "../../data/frame";
 import { playSound } from "../sound";
-import { farm, farmState, subscribeFarm } from "../store";
+import { farm, farmState } from "../store";
 
 export const inboxKindLabel: Readonly<Record<InboxKind, string>> = {
   merge: "活熟了",
@@ -166,26 +164,3 @@ export const phoneCalls = new PhoneCalls({
   },
   now: () => Date.now(),
 });
-
-export const usePhone = () => useSyncExternalStore(phoneCalls.subscribe, phoneCalls.get);
-
-/** Feeds the inbox to the phone while the farm is on screen; putting the phone away stops a ring. */
-export function usePhoneCalls() {
-  const inbox = useFrames().frame?.inbox;
-  useEffect(() => {
-    phoneCalls.resume();
-    let open = farmState().phoneOpen;
-    const off = subscribeFarm(() => {
-      const now = farmState().phoneOpen;
-      if (open && !now) phoneCalls.putAway();
-      open = now;
-    });
-    return () => {
-      off();
-      phoneCalls.pause();
-    };
-  }, []);
-  useEffect(() => {
-    if (inbox) phoneCalls.calls(inbox);
-  }, [inbox]);
-}

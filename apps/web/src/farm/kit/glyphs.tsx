@@ -1,47 +1,25 @@
-export type Cell = readonly [x: number, y: number];
-
-export const tickCells: readonly Cell[] = [
-  [6, 1],
-  [5, 2],
-  [4, 3],
-  [0, 3],
-  [1, 4],
-  [3, 4],
-  [2, 5],
-];
-
-export const crossCells: readonly Cell[] = [
-  [1, 1],
-  [5, 1],
-  [2, 2],
-  [4, 2],
-  [3, 3],
-  [2, 4],
-  [4, 4],
-  [1, 5],
-  [5, 5],
-];
+import { For } from "solid-js";
+import { type Cell, crossCells, tickCells } from "./cells";
 
 /** Whole cells on a `grid`×`grid` square; `color` is a CSS colour. */
-export function PixelMark({ cells, size, color, grid = 7, label }: { cells: readonly Cell[]; size: number; color: string; grid?: number; label?: string }) {
+export function PixelMark(props: { cells: readonly Cell[]; size: number; color: string; grid?: number; label?: string }) {
+  const grid = () => props.grid ?? 7;
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${grid} ${grid}`}
-      shapeRendering="crispEdges"
-      className="inline-block shrink-0"
-      role={label ? "img" : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
+      width={props.size}
+      height={props.size}
+      viewBox={`0 0 ${grid()} ${grid()}`}
+      shape-rendering="crispEdges"
+      class="inline-block shrink-0"
+      role={props.label ? "img" : undefined}
+      aria-label={props.label}
+      aria-hidden={props.label ? undefined : "true"}
     >
-      {cells.map(([x, y]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={color} />
-      ))}
+      <For each={props.cells}>{([x, y]) => <rect x={x} y={y} width={1} height={1} fill={props.color} />}</For>
     </svg>
   );
 }
 
-export const TickMark = (p: { size: number; color: string; label?: string }) => <PixelMark cells={tickCells} {...p} />;
+export const TickMark = (p: { size: number; color: string; label?: string }) => <PixelMark cells={tickCells} size={p.size} color={p.color} label={p.label} />;
 
-export const CrossMark = (p: { size: number; color: string; label?: string }) => <PixelMark cells={crossCells} {...p} />;
+export const CrossMark = (p: { size: number; color: string; label?: string }) => <PixelMark cells={crossCells} size={p.size} color={p.color} label={p.label} />;

@@ -22,7 +22,7 @@
 - **种子**：`packages/protocol/src/rules/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seeds.ts` 读它（`seedAgents`、`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
 - **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.save`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
-- **页面**：`apps/web/src/pages/agents/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`pages/runtimes/RuntimesPage.tsx`（农具）、`pages/settings/SkillsPage.tsx`；数据在 `data/agents.ts`（`useAgents`、`useAgentIssues` 问 `agent.check`）、`data/runtimes.ts`（`useRuntimes`）；`rules/skills.ts`（`installedSkills`、`runtimeName`）、`rules/cast.ts`（`castOf`）。
+- **页面**：`apps/web/src/pages/agents/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`pages/runtimes/RuntimesPage.tsx`（农具）、`pages/settings/SkillsPage.tsx`；数据在 `data/query.ts`（`useAgents`、`useRuntimes`）、`data/agents.ts`（`useWorkAgents`、`useAgentIssues` 问 `agent.check`）；`rules/skills.ts`（`installedSkills`、`runtimeName`）、`rules/cast.ts`（`castOf`）。
 
 ## 模型和不变量
 

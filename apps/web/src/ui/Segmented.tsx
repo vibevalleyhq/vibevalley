@@ -1,10 +1,7 @@
-export function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-  block = false,
-}: {
+import { For } from "solid-js";
+import { aria } from "../app/util";
+
+export function Segmented<T extends string>(props: {
   value: T;
   options: { value: T; label: string; disabled?: boolean; title?: string }[];
   onChange: (v: T) => void;
@@ -12,20 +9,25 @@ export function Segmented<T extends string>({
   block?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className={`inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5 ${block ? "flex w-full" : ""}`}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={o.value === value}
-          disabled={o.disabled}
-          title={o.title}
-          onClick={() => onChange(o.value)}
-          className={`h-6 cursor-pointer rounded px-2.5 disabled:cursor-default disabled:opacity-40 text-sm whitespace-nowrap ${block ? "flex-1" : ""} ${o.value === value ? "bg-page font-medium shadow-[0_1px_2px_#2f1f1326]" : "text-muted hover:text-ink"}`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div role="group" aria-label={props.label} class={["inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}>
+      <For each={props.options}>
+        {(o) => (
+          <button
+            type="button"
+            aria-pressed={aria(o.value === props.value)}
+            disabled={o.disabled}
+            title={o.title}
+            onClick={() => props.onChange(o.value)}
+            class={[
+              "h-6 cursor-pointer rounded px-2.5 text-sm whitespace-nowrap disabled:cursor-default disabled:opacity-40",
+              { "flex-1": !!props.block },
+              o.value === props.value ? "bg-page font-medium shadow-[0_1px_2px_#2f1f1326]" : "text-muted hover:text-ink",
+            ]}
+          >
+            {o.label}
+          </button>
+        )}
+      </For>
     </div>
   );
 }
