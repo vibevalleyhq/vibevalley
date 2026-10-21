@@ -19,7 +19,7 @@
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
 - **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
-- **规则和黄金数据**：几处都用的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有一个主人的在那个模块里（`issue/rules.ts`、`channel/rules.ts`……）；黄金数据是 `packages/protocol/testdata/*.jsonl.gz` 和 `apps/server/src/<模块>/testdata/*.jsonl.gz`，读写工具 `src/testing/golden.ts` 和 `packages/protocol/src/rules/golden.test.ts`。
+- **规则和黄金数据**：几处都用的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有一个主人的在那个模块里（`issue/rules.ts`、`channel/rules.ts`……）；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`bun run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
@@ -123,7 +123,7 @@
 ## 怎么验证
 
 - `src/base/schema.test.ts`：一份基线，表名、索引名，每个查询文件只写它自己的表。
-- `packages/protocol/src/rules/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
+- `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
 - `bun run check`：`vp check`，格式、lint 和类型。
 - `bun run server:check`：protocol 的测试、服务端的类型、`db:check`、vitest。
 - `bun run web:check`、`cd apps/web && bun run test`、`bun run desktop:test`：各包的类型、页面能构建，Playwright 对着真的服务端和整个应用。

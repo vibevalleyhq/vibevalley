@@ -1,87 +1,10 @@
 // A task graph is issues: the graph's own and one per step.
 
-import type { CoreState, GraphState, Issue, IssueClose, Task, TaskGraph } from "../shapes";
+import type { CoreState, Issue, TaskGraph } from "../shapes";
 import { asksForYou, blockedBy, graphSpent, isSettled, layersOf } from "./tasks";
 import { compare, compareText, or } from "./text";
 
-export const taskIssueID = (graph: string, key: string) => graph + "." + key;
-
-const graphClosed = (s: GraphState): IssueClose | undefined => (s === "done" ? "merged" : s === "abandoned" ? "dismissed" : undefined);
-
-function taskClosed(graph: GraphState, n: Task): IssueClose | undefined {
-  if (n.state === "merged") return "merged_into_graph";
-  if (n.state === "skipped" || graph === "done" || graph === "abandoned") return "dismissed";
-  return undefined;
-}
-
-type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "acceptance" | "findings" | "asks" | "standing">;
-
-/** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
-export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
-  const was = new Map(before.map((t) => [t.id, t]));
-  const keep = (draft: Draft, closed: IssueClose | undefined): Issue => {
-    const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
-    const old = was.get(t.id);
-    if (old) {
-      Object.assign(t, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
-      if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
-    }
-    t.sessions ??= [];
-    t.closed = closed;
-    if (closed !== undefined && t.closedAt === undefined) t.closedAt = now;
-    return t;
-  };
-  const project = graph.project;
-  const out = [
-    keep(
-      {
-        id: graph.id,
-        title: graph.title,
-        description: graph.goal,
-        project,
-        // A helper's issue split under it keeps who it was given to.
-        assignee: was.get(graph.id)?.assignee,
-        graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
-      },
-      graphClosed(graph.state),
-    ),
-  ];
-  (graph.tasks ?? []).forEach((n, i) => {
-    const blocked = (n.needs ?? []).map((need) => taskIssueID(graph.id, need));
-    out.push(
-      keep(
-        {
-          id: taskIssueID(graph.id, n.id),
-          title: n.title,
-          description: n.brief,
-          project,
-          assignee: n.agent,
-          rank: i > 0 ? i : undefined,
-          parent: graph.id,
-          blockedBy: blocked.length > 0 ? blocked : undefined,
-          task: {
-            key: n.id,
-            state: n.state,
-            check: n.check,
-            scope: n.scope,
-            acceptance: n.acceptance,
-            frozen: n.frozen,
-            session: n.session,
-            conclusion: n.conclusion,
-            commits: n.commits,
-            spent: n.spent,
-            tries: n.tries,
-            failures: n.failures,
-          },
-        },
-        taskClosed(graph.state, n),
-      ),
-    );
-  });
-  return out;
-}
-
-function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
+export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   const g = parent.graph!;
   const graph: TaskGraph = {
     id: parent.id,
@@ -136,10 +59,4 @@ export function graphsOf(state: CoreState): TaskGraph[] {
     .filter((t) => t.graph)
     .map((t) => graphFrom(t, issues))
     .sort((a, b) => or(compare(a.createdAt, b.createdAt), compareText(a.id, b.id)));
-}
-
-export function graphOf(state: CoreState, id: string): TaskGraph | undefined {
-  const issues = state.issues ?? [];
-  const t = issues.find((t) => t.id === id && t.graph);
-  return t ? graphFrom(t, issues) : undefined;
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
-import { blockedBy, clip, graphOf, inbox, isAcceptance, taskIssueID, taskOf } from "@vibevalley/protocol/rules";
+import { blockedBy, inbox, isAcceptance, taskOf } from "@vibevalley/protocol/rules";
+import { clip } from "../base/text.ts";
+import { graphOf, taskIssueID } from "./rules.ts";
 import { Effect, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";

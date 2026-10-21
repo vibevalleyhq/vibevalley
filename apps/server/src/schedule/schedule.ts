@@ -3,7 +3,7 @@
 // is published for the manager, who does it.
 
 import { type Schedule, type ScheduleBy, type ScheduleRequest } from "@vibevalley/protocol";
-import { dueText, scheduleProblem } from "@vibevalley/protocol/rules";
+import { dueText, scheduleProblem } from "./rules.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/schedule.sql.ts";

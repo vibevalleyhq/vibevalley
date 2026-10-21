@@ -1,21 +1,30 @@
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
-import type { GraphEvent, Issue, Session, Task, TaskEdit, TaskGraph } from "@vibevalley/protocol";
 import {
-  acceptanceChecks,
-  acceptancesOf,
+  type CoreState,
+  type GraphEvent,
+  type GraphState,
+  type Issue,
+  type IssueClose,
+  type Session,
+  type Task,
+  type TaskEdit,
+  type TaskGraph,
+} from "@vibevalley/protocol";
+import {
+  blockedBy,
   canEditTask,
   canRemoveTask,
+  graphFrom,
   graphProblems,
   graphStateText,
   isAcceptance,
   isForManager,
   isSettled,
-  readyTasks,
+  slice,
   taskOf,
   taskStateText,
-  withTask,
 } from "@vibevalley/protocol/rules";
 
 /** The farm's limits come on top. */
@@ -269,4 +278,144 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
   if (issue.sessions.length === 0 || issue.sessions.at(-1) !== session.id) return "这张工单现在不归你做";
   if (!session.branch) return "你直接在项目里干活，没有自己的分支：拆了没处开计划的分支";
   return "";
+}
+
+export const taskIssueID = (graph: string, key: string) => graph + "." + key;
+
+/** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
+export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
+  const was = new Map(before.map((t) => [t.id, t]));
+  const keep = (draft: Draft, closed: IssueClose | undefined): Issue => {
+    const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
+    const old = was.get(t.id);
+    if (old) {
+      Object.assign(t, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
+      if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
+    }
+    t.sessions ??= [];
+    t.closed = closed;
+    if (closed !== undefined && t.closedAt === undefined) t.closedAt = now;
+    return t;
+  };
+  const project = graph.project;
+  const out = [
+    keep(
+      {
+        id: graph.id,
+        title: graph.title,
+        description: graph.goal,
+        project,
+        // A helper's issue split under it keeps who it was given to.
+        assignee: was.get(graph.id)?.assignee,
+        graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
+      },
+      graphClosed(graph.state),
+    ),
+  ];
+  (graph.tasks ?? []).forEach((n, i) => {
+    const blocked = (n.needs ?? []).map((need) => taskIssueID(graph.id, need));
+    out.push(
+      keep(
+        {
+          id: taskIssueID(graph.id, n.id),
+          title: n.title,
+          description: n.brief,
+          project,
+          assignee: n.agent,
+          rank: i > 0 ? i : undefined,
+          parent: graph.id,
+          blockedBy: blocked.length > 0 ? blocked : undefined,
+          task: {
+            key: n.id,
+            state: n.state,
+            check: n.check,
+            scope: n.scope,
+            acceptance: n.acceptance,
+            frozen: n.frozen,
+            session: n.session,
+            conclusion: n.conclusion,
+            commits: n.commits,
+            spent: n.spent,
+            tries: n.tries,
+            failures: n.failures,
+          },
+        },
+        taskClosed(graph.state, n),
+      ),
+    );
+  });
+  return out;
+}
+
+export function graphOf(state: CoreState, id: string): TaskGraph | undefined {
+  const issues = state.issues ?? [];
+  const t = issues.find((t) => t.id === id && t.graph);
+  return t ? graphFrom(t, issues) : undefined;
+}
+
+const graphClosed = (s: GraphState): IssueClose | undefined => (s === "done" ? "merged" : s === "abandoned" ? "dismissed" : undefined);
+
+function taskClosed(graph: GraphState, n: Task): IssueClose | undefined {
+  if (n.state === "merged") return "merged_into_graph";
+  if (n.state === "skipped" || graph === "done" || graph === "abandoned") return "dismissed";
+  return undefined;
+}
+
+type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "acceptance" | "findings" | "asks" | "standing">;
+
+export const defaultParallel = 3;
+
+export const autoRetries = 2;
+
+export const readyTasks = (graph: TaskGraph): Task[] =>
+  graph.state !== "running" ? [] : (graph.tasks ?? []).filter((n) => n.state === "waiting" && blockedBy(graph, n).length === 0);
+
+export const withTask = (graph: TaskGraph, id: string, change: (n: Task) => Task): TaskGraph => ({
+  ...graph,
+  tasks: (graph.tasks ?? []).map((n) => (n.id === id ? change(n) : n)),
+});
+
+export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
+  const seen = new Set<string>();
+  const visit = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    for (const need of taskOf(graph, id)?.needs ?? []) visit(need);
+  };
+  for (const need of task.needs ?? []) visit(need);
+  return (graph.tasks ?? []).filter((n) => n.id !== task.id && seen.has(n.id));
+}
+
+export const acceptancesOf = (graph: TaskGraph, task: Task) => ancestorsOf(graph, task).filter((n) => isAcceptance(n) && n.state === "merged");
+
+export const isLast = (graph: TaskGraph, task: Task) => !(graph.tasks ?? []).some((n) => (n.needs ?? []).includes(task.id));
+
+export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
+  const out: string[] = [];
+  if (!isLast(graph, task)) return out;
+  for (const n of acceptancesOf(graph, task)) if (n.check && !out.includes(n.check) && n.check !== task.check) out.push(n.check);
+  return out;
+}
+
+export function graphText(graph: TaskGraph): string {
+  const tasks = graph.tasks ?? [];
+  const merged = tasks.filter(isSettled).length;
+  let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
+  if (graph.branch) head += "，分支 " + graph.branch;
+  head += "）：" + graphStateText[graph.state];
+  if (tasks.length > 0) head += `，${merged}/${tasks.length} 步做完`;
+  if (graph.note) head += "。" + graph.note;
+  const lines = [head];
+  for (const n of tasks) {
+    let detail = taskStateText[n.state];
+    if (n.state === "waiting") {
+      const waits = blockedBy(graph, n);
+      if (waits.length > 0) detail = "等 " + waits.join("、");
+    }
+    let line = "  - " + n.id + " " + n.title + (isAcceptance(n) ? "（验收）" : "") + "：" + detail;
+    if (n.session) line += "（帮工 " + n.session + "）";
+    if (n.conclusion) line += "；" + slice(n.conclusion, 0, 80);
+    lines.push(line);
+  }
+  return lines.join("\n");
 }

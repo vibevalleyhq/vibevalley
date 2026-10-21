@@ -14,7 +14,7 @@ import {
   type SettingsUpdateVoice,
   type VoiceSettings,
 } from "@vibevalley/protocol";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import { defaultVoice } from "./rules.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";

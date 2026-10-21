@@ -1,23 +1,36 @@
-// The golden files (testdata, first recorded from the server's Go version) hold the rules to their answers:
+// The golden files (testdata, first recorded from the server's Go version) hold the core state's rules to their answers:
 // runs of facts folded from an empty farm, the shared rules' calls, and the task graphs', schedules' and patrol's cases.
 // Each is compared as JSON. Times of day are read in Asia/Shanghai (vite.config.ts sets it).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vite-plus/test";
-import type { Conversation, CoreState, Fact, Issue, Schedule, ScheduleRequest, Session, TaskGraph } from "../shapes";
-import { targetOf } from "./chat";
-import { emptyCoreState, reduce } from "./core";
-import { inbox } from "./inbox";
-import { yuan } from "./money";
-import { phaseText } from "./phase";
-import { nextRun, nextText, scheduleProblem, whenText } from "./schedules";
-import { graphChanges, graphEventText } from "./taskChanges";
-import { acceptanceChecks, asksForYou, blockedBy, graphProblems, graphSpent, graphText, layersOf, readyTasks } from "./tasks";
-import { standingOf, standingWantsOwner } from "./standing";
-import { effectsOf, viewOf } from "./view";
+import {
+  asksForYou,
+  blockedBy,
+  effectsOf,
+  emptyCoreState,
+  graphProblems,
+  graphSpent,
+  inbox,
+  layersOf,
+  nextRun,
+  nextText,
+  phaseText,
+  reduce,
+  standingOf,
+  standingWantsOwner,
+  targetOf,
+  viewOf,
+  whenText,
+} from "@vibevalley/protocol/rules";
+import { acceptanceChecks, graphText, readyTasks } from "../task/rules.ts";
+import { scheduleProblem } from "../schedule/rules.ts";
+import { yuan } from "../runtime/money.ts";
+import { graphChanges, graphEventText } from "../task/changes.ts";
+import type { Conversation, CoreState, Fact, Issue, Schedule, ScheduleRequest, Session, TaskGraph } from "@vibevalley/protocol";
 
-const testdata = new URL("../../testdata/", import.meta.url);
+const testdata = new URL("./testdata/", import.meta.url);
 
 async function lines(name: string): Promise<Record<string, unknown>[]> {
   const body = new TextDecoder().decode(gunzipSync(readFileSync(new URL(name, testdata))));

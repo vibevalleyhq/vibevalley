@@ -1,6 +1,6 @@
 import type { Event } from "@botiverse/oar";
 import type { Agent, Doing, Session } from "@vibevalley/protocol";
-import { clip } from "@vibevalley/protocol/rules";
+import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";

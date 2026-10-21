@@ -13,7 +13,9 @@ import {
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { head, nextText, phaseText, runtimeLabel, shortTitle, standingLabel, standingWantsOwner, whenText, yuan } from "@vibevalley/protocol/rules";
+import { nextText, phaseText, runtimeLabel, shortTitle, standingLabel, standingWantsOwner, whenText } from "@vibevalley/protocol/rules";
+import { head } from "../base/text.ts";
+import { yuan } from "../runtime/money.ts";
 import type { Roster } from "../session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));

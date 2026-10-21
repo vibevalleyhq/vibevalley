@@ -3,8 +3,19 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, Ask, CheckResult, CriterionCheck, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
-import { clip, isBusy, maxTasks, runtimeLabel, slice } from "@vibevalley/protocol/rules";
+import {
+  type Agent,
+  type Ask,
+  type CheckResult,
+  type CriterionCheck,
+  type Doing,
+  type MCPServer,
+  type Outcome,
+  type Session,
+  type Skill,
+} from "@vibevalley/protocol";
+import { isBusy, maxTasks, runtimeLabel, slice } from "@vibevalley/protocol/rules";
+import { clip } from "../base/text.ts";
 import type { Workplace } from "../project/project.ts";
 
 const summaryMax = 160;
@@ -306,3 +317,5 @@ export function recalledIn(input: string): string {
   const block = parts[parts.length - 2]!;
   return block.startsWith(recallHead) ? block.split("\n").slice(1).join("\n") : "";
 }
+
+export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

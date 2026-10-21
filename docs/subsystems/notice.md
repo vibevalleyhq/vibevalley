@@ -67,7 +67,7 @@
 
 ## 怎么验证
 
-- `packages/protocol/src/rules/golden.test.ts`（每种什么时候算、id、截字、先后，和工单站位一致）；`inbox.test.ts`（交回来带着问题、停在半路、每件的话、刚来的）。
+- `apps/server/src/core/golden.test.ts`（每种什么时候算、id、截字、先后，和工单站位一致）；`inbox.test.ts`（交回来带着问题、停在半路、每件的话、刚来的）。
 - `apps/server/src/notice/rules.test.ts`：巡查照黄金数据。
 - `apps/server/src/manager/manager.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。

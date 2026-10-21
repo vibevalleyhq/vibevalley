@@ -3,10 +3,9 @@
 process.env.TZ = "Asia/Shanghai";
 
 import { expect, test } from "vite-plus/test";
-import type { Schedule, ScheduleRequest, ScheduleWhen } from "../shapes";
-import { emptyCoreState, reduce } from "./core";
-import { frameOf } from "./frame";
-import { nextRun, nextText, scheduleProblem, whenText } from "./schedules";
+import type { Schedule, ScheduleRequest, ScheduleWhen } from "@vibevalley/protocol";
+import { emptyCoreState, frameOf, nextRun, nextText, reduce, whenText } from "@vibevalley/protocol/rules";
+import { scheduleProblem } from "./rules.ts";
 
 const sh = "Asia/Shanghai";
 const at = (iso: string) => Date.parse(iso + "+08:00");

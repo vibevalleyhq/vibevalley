@@ -18,30 +18,12 @@ import type {
   TaskGraph,
 } from "@vibevalley/protocol";
 import { GraphActorValues, GraphEventKindValues } from "@vibevalley/protocol";
-import {
-  acceptanceChecks,
-  acceptancesOf,
-  actorText,
-  clip,
-  autoRetries,
-  conflictBrief,
-  defaultParallel,
-  graphActionText,
-  graphChanges,
-  graphEventText,
-  graphOf,
-  graphProblems,
-  graphsOf,
-  graphStateText,
-  graphText,
-  isAcceptance,
-  isBusy,
-  isOpen,
-  sessionOf,
-  taskIssueID,
-  taskOf,
-  withTask,
-} from "@vibevalley/protocol/rules";
+import { graphActionText, graphProblems, graphsOf, graphStateText, isAcceptance, isBusy, isOpen, sessionOf, taskOf } from "@vibevalley/protocol/rules";
+import { clip } from "../base/text.ts";
+import { acceptanceChecks, acceptancesOf, autoRetries, defaultParallel, graphText, withTask } from "./rules.ts";
+import { graphOf, taskIssueID } from "./rules.ts";
+import { conflictBrief } from "../issue/rules.ts";
+import { actorText, graphChanges, graphEventText } from "./changes.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/task_event.sql.ts";

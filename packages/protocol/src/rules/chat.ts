@@ -1,6 +1,6 @@
 // The chat in the core state.
 
-import { type Chat, type ChatMessage, type Conversation, generalName, type SenderKind } from "../shapes";
+import { type Chat, type ChatMessage, type Conversation, generalName } from "../shapes";
 import { compareText } from "./text";
 
 /** The database keeps them all; the state these many. */
@@ -60,34 +60,4 @@ export function channelOf(chat: Chat | undefined, c: Conversation | undefined): 
 
 export const addressOf = (chat: Chat | undefined, c: Conversation) => targetOf(c, channelOf(chat, c)?.name);
 
-/** Counted since the person last spoke in the conversation. */
-export const hopLimit = 4;
-export const agentWakeCooldownMs = 60_000;
-/** Past this, only the person wakes the session. */
-export const wakeBreaker = 3;
 export const noticeBatchMs = 3_000;
-export const wakeMessages = 3;
-export const summaryConversations = 20;
-/** The same words from the same sender in the same place this soon again are a retry, not a new message. */
-export const retryWindowMs = 60_000;
-export const heldShown = 3;
-
-/** A message as the manager and a session read it. */
-export interface InboxMessage {
-  readonly id: string;
-  readonly number: number;
-  readonly target: string;
-  readonly from: string;
-  readonly fromKind: SenderKind;
-  readonly name: string;
-  readonly text: string;
-}
-
-/** The words' own line breaks are marked, so no message can pass for a header. */
-export function messageLine(m: InboxMessage): string {
-  const from = m.fromKind === "agent" ? m.from + " " + m.name : m.name;
-  return `[target=${m.target} msg=${m.number} from=${from}] ${m.text.trim().replaceAll("\n", "\n  │ ")}`;
-}
-
-/** One line each, in order: how the manager and a session read what came to them. */
-export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");

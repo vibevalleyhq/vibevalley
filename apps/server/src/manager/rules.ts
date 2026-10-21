@@ -2,7 +2,9 @@
 // in it, what the patrol finds, and how a model answer's tokens are worded.
 
 import type { EventTokens, RunTriggerKind, RuntimeInfo } from "@vibevalley/protocol";
-import { head, type InboxMessage, messageLine, quotaLow, yuan } from "@vibevalley/protocol/rules";
+import { head } from "../base/text.ts";
+import { type InboxMessage, messageLine } from "../channel/rules.ts";
+import { quotaLow, yuan } from "../runtime/money.ts";
 import type { PatrolNote } from "../notice/rules.ts";
 
 /** The model the manager answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */

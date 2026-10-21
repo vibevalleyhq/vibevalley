@@ -19,7 +19,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 ## 在哪
 
 - 服务端 `apps/server/src/task`（`Tasks`）：`task.ts` 拆、调度、验证、动作、计划的经过和开机恢复；`rules.ts` 是只有它用的纯函数（`startable`、`parseSplit`、`editTask`、`removeTask`、`taskBrief`、冻结文件的判断和交给帮工的几句话）。
-- 几处都用的规则在 `packages/protocol/src/rules`：`tasks.ts`（`graphProblems`、`readyTasks`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、验收的几条、`maxTasks`、`defaultParallel`、`autoRetries`）、`taskIssues.ts`（`graphIssues` 把计划拆成一家工单，`graphsOf`、`graphOf` 从核心状态里的工单拼回计划）、`taskChanges.ts`（两版计划比出经过和它的说法）、`dag.ts`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.ts`。
+- 规则：只有服务端跑的在 `apps/server/src/task`：`rules.ts`（`readyTasks`、验收的几条、`defaultParallel`、`autoRetries`、`graphText`，`graphIssues` 把计划拆成一家工单，`graphOf`）、`changes.ts`（两版计划比出经过和它的说法）；出帧和折法要的还在 `packages/protocol/src/rules`：`tasks.ts`（`graphProblems`、`blockedBy`、`layersOf`、`graphActions`、`taskActions`、`canEditTask`、`maxTasks`）、`taskIssues.ts`（`graphsOf` 从核心状态里的工单拼回计划）、`dag.ts`（边的规则，和 `engine` 共用）。工单状态怎么从计划算在 `issues.ts`。
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
@@ -125,5 +125,5 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 
 - `apps/server/src/task/task.test.ts`（脚本扮演帮工、真的 git 仓库）：菱形的图拆开、两件同时做、合进去后下一件看得到它们的文件、收获；验收这一步先做、冻结；做不成的一件先打回、再留给主人重试或跳过；有问题的计划打回一次；农场停下时在做的计划暂停、继续后接着做；挑档案和规划帮工读的话；计划是父工单、每件是它下面的工单；帮工拆自己的工单，各件马上开工。
 - `task/rules.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
-- `packages/protocol/src/rules/golden.test.ts`：计划拆成工单再拼回来、各张工单的状态、经过的说法（`rules.jsonl.gz`）。
+- `apps/server/src/core/golden.test.ts`：计划拆成工单再拼回来、各张工单的状态、经过的说法（`rules.jsonl.gz`）。
 - 页面：`apps/web/test/farm-hud.spec.ts`（计划板打开），`issues.spec.ts`（计划的工单在看板上）。

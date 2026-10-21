@@ -17,7 +17,10 @@ import {
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { graphsOf, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { head } from "../base/text.ts";
+import { graphText } from "../task/rules.ts";
+import { inboxLines } from "../channel/rules.ts";
 import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";

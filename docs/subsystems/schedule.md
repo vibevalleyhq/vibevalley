@@ -84,5 +84,5 @@
 ## 怎么验证
 
 - `apps/server/src/schedule/schedule.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）；错过几次只算一次、补跑、一次性跑过就关；什么要等主人同意；定、到点、说出来、存下、重开后接着；存不下的一次不发布、下次再试；cron 的定时存下、坏的拒绝；管家自己定的等主人同意，重启后也等。服务的时钟由测试换（`ScheduleOptions.now`）。
-- `packages/protocol/src/rules/schedules.test.ts`：每天、每周、每隔、一次的下次时间，cron 的下次时间（两个日子字段任一到点、闰年）和夏令时前后与每天、每周一致，报错，说成话；折法留着定时、帧里填话。
+- `apps/server/src/schedule/cron.test.ts`：每天、每周、每隔、一次的下次时间，cron 的下次时间（两个日子字段任一到点、闰年）和夏令时前后与每天、每周一致，报错，说成话；折法留着定时、帧里填话。
 - 页面：`apps/web/test/chat.spec.ts`（定时的开关和删）。

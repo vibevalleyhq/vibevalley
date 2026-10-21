@@ -161,10 +161,7 @@ export function viewOf(state: CoreState): FarmView {
   return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
 }
 
-/** Every achievement, in the page's order. */
-export const achievementsInWords = (): Achievement[] => achievements.map(achievementInWords);
-
-function achievementInWords(a: AchievementDef): Achievement {
+export function achievementInWords(a: AchievementDef): Achievement {
   const tiers: AchievementTier[] = a.tiers.map((need, i) => ({ need, title: tierTitle(a, i + 1), coins: a.coins[i] ?? 0, reached: reachedText(a, i + 1) }));
   return { id: a.id, category: a.category, title: a.title, detail: a.detail, unit: a.unit, wearable: a.category !== "starter", tiers };
 }

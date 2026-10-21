@@ -5,7 +5,7 @@
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect } from "effect";
-import { head } from "@vibevalley/protocol/rules";
+import { head } from "../../base/text.ts";
 import * as engine from "./taskGraph.ts";
 import type { TaskStore } from "./taskStore.ts";
 import type { Helper } from "./self.ts";

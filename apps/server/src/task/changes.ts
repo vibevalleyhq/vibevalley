@@ -1,7 +1,7 @@
 // What changed in a task graph, step by step, and how each change is said.
 
-import type { GraphActor, GraphEventKind, Task, TaskFieldChange, TaskGraph } from "../shapes";
-import { taskOf } from "./tasks";
+import type { GraphActor, GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
+import { taskOf } from "@vibevalley/protocol/rules";
 
 /** A graph event before it is stored: no id, actor or time yet. */
 export interface GraphChange {

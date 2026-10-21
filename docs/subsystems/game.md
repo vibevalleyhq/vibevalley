@@ -102,5 +102,5 @@
 
 - `apps/server/src/game/progress.test.ts`：账本逐步折和整本折照黄金数据（`testdata/rules.jsonl.gz`）付钱、解锁；收获按提交数和连胜付钱。
 - `game/game.test.ts`：账本能折回进度（重启后同样、不重复补记等级）；主人看收成和打电话记账；一个帮工的 commit 每个仓库只数一次；下一个帮工站到主人点的空地。
-- `packages/protocol/src/rules/golden.test.ts`：等级、地块、特效、成就的说法和进度、空地（`play.jsonl.gz`、`rules.jsonl.gz`）。
+- `apps/server/src/core/golden.test.ts`：等级、地块、特效、成就的说法和进度、空地（`play.jsonl.gz`、`rules.jsonl.gz`）。
 - 页面：`apps/web/test/farm-hud.spec.ts`（任务与成就、仓库）、`voice.spec.ts`（调试台放升级的横幅）。

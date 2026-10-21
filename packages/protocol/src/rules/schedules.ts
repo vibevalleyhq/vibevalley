@@ -3,11 +3,11 @@
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
 import { Cron, DateTime, Option } from "effect";
-import type { Schedule, ScheduleRequest, ScheduleWhen } from "../shapes";
+import type { Schedule, ScheduleWhen } from "../shapes";
 
 export const minEveryMinutes = 1;
 
-const scheduleTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+export const scheduleTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 export const weekdays = ["日", "一", "二", "三", "四", "五", "六"] as const;
 
@@ -29,33 +29,10 @@ function runZone(tz: string): DateTime.TimeZone | undefined {
 }
 
 /** The zone a schedule may be given and its times are written in: an IANA name or an offset (+08:00, +0800, +08). */
-function givenZone(tz: string): DateTime.TimeZone | undefined {
+export function givenZone(tz: string): DateTime.TimeZone | undefined {
   const m = givenOffset.exec(tz);
   if (m) return fixed(m[1]!, m[2]!, m[3]);
   return tz.startsWith("+") || tz.startsWith("-") ? undefined : named(tz);
-}
-
-export function scheduleProblem(req: ScheduleRequest, now: number): string {
-  if (req.name.trim() === "") return "定时要有个名字";
-  if (req.text.trim() === "") return "定时要写到点了做什么";
-  if (req.tz !== undefined && !givenZone(req.tz)) return "不认识这个时区：" + req.tz;
-  const w = req.when;
-  switch (w.kind) {
-    case "once":
-      return w.at > now ? "" : "一次性的时间要在以后";
-    case "every":
-      return w.minutes >= minEveryMinutes ? "" : `间隔至少 ${minEveryMinutes} 分钟`;
-    case "daily":
-      return scheduleTime.test(w.time) ? "" : "时间写成 HH:MM，比如 09:00：" + w.time;
-    case "weekly": {
-      if (!scheduleTime.test(w.time)) return "时间写成 HH:MM，比如 09:00：" + w.time;
-      const days = w.days ?? [];
-      return days.length > 0 && !days.some((d) => d < 0 || d > 6) ? "" : "每周的哪几天：0 到 6，0 是周日";
-    }
-    case "cron":
-      return cronProblem(w.expr, now, req.tz);
-  }
-  return "不认识这种定时";
 }
 
 /**
@@ -63,7 +40,7 @@ export function scheduleProblem(req: ScheduleRequest, now: number): string {
  * the same time before the change (02:30 on a spring-forward night is 03:30), a repeated one is its first occurrence;
  * none at all (30 February) is undefined.
  */
-function nextOf(cron: Cron.Cron, from: number): number | undefined {
+export function nextOf(cron: Cron.Cron, from: number): number | undefined {
   try {
     return Cron.next(cron, new Date(from)).getTime();
   } catch {
@@ -91,7 +68,7 @@ export function nextRun(s: Schedule): number | undefined {
   return undefined;
 }
 
-function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
+export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
   const m = scheduleTime.exec(at);
   const timeZone = runZone(tz);
   if (!m || !timeZone) return undefined;
@@ -135,15 +112,6 @@ export function nextText(s: Schedule): string {
   return "关着";
 }
 
-export function dueText(s: Schedule, missed: boolean): string {
-  return "⏰ 定时「" + s.name + "」到点了" + (missed ? "（服务端没开着时错过的，补一次）" : "") + "：" + s.text;
-}
-
-// ── Cron ──
-// Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
-// Day of week is 0 to 7, both 0 and 7 Sunday. As in Vixie cron, when neither day field starts with *, a day matching
-// either one is due; otherwise it must match both.
-
 /** The fields as sets; the day fields are both due (and) when either starts with *, else either one is. */
 interface CronSpec {
   readonly minutes: ReadonlySet<number>;
@@ -170,7 +138,7 @@ function atoi(s: string): number | undefined {
 }
 
 /** Go's strings.Fields: split on Unicode white space, as Go's unicode.IsSpace has it. */
-const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/).filter((f) => f !== "");
+export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/).filter((f) => f !== "");
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi, name } = cronFields[i]!;
@@ -204,7 +172,7 @@ function cronField(field: string, i: number): Set<number> | string {
   return bits;
 }
 
-function parseCron(expr: string): CronSpec | string {
+export function parseCron(expr: string): CronSpec | string {
   const f = fields(expr);
   if (f.length !== 5) return "cron 要五段：分 时 日 月 周几，比如 0 9 * * 1-5";
   const bits: Set<number>[] = [];
@@ -223,13 +191,6 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
   const timeZone = runZone(tz);
   if (typeof spec === "string" || !timeZone) return undefined;
   return nextOf(Cron.make({ ...spec, tz: timeZone }), from);
-}
-
-function cronProblem(expr: string, now: number, tz: string | undefined): string {
-  const spec = parseCron(expr);
-  if (typeof spec === "string") return spec;
-  const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : givenZone(tz)!;
-  return nextOf(Cron.make({ ...spec, tz: timeZone }), now) === undefined ? "这个 cron 永远不会到点：" + expr : "";
 }
 
 /** The common shapes in words, the rest as the expression itself. */

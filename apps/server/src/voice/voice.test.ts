@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import { defaultVoice } from "../setting/rules.ts";
 import { Effect, Layer } from "effect";
 import { layer as manager } from "../manager/manager.ts";
 import { Setting } from "../setting/setting.ts";

@@ -19,7 +19,8 @@ import {
   type TemplateBlank,
   type TemplateKind,
 } from "@vibevalley/protocol";
-import { clip, isForManager, shortTitle } from "@vibevalley/protocol/rules";
+import { isForManager, shortTitle } from "@vibevalley/protocol/rules";
+import { clip } from "../base/text.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
@@ -329,3 +330,7 @@ export const findingsOf = (text: string) =>
 
 /** A pull request's description: the session's conclusion (its 结论： part), else all it last said. */
 export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
+
+/** What a session is told when merging its base in would conflict. */
+export const conflictBrief = (base: string, files: readonly string[]) =>
+  `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;

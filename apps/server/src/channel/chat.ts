@@ -19,21 +19,9 @@ import {
   type Spent,
   type SubjectKind,
 } from "@vibevalley/protocol";
-import {
-  agentWakeCooldownMs,
-  head,
-  heldShown,
-  hopLimit,
-  type InboxMessage,
-  isBusy,
-  keepConversations,
-  keepMessages,
-  retryWindowMs,
-  sessionOnIssue,
-  summaryConversations,
-  targetOf,
-  wakeBreaker,
-} from "@vibevalley/protocol/rules";
+import { isBusy, keepConversations, keepMessages, sessionOnIssue, targetOf } from "@vibevalley/protocol/rules";
+import { head } from "../base/text.ts";
+import { agentWakeCooldownMs, heldShown, hopLimit, type InboxMessage, retryWindowMs, summaryConversations, wakeBreaker } from "./rules.ts";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";

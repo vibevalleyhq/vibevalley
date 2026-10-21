@@ -16,7 +16,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/voice/voice.ts`（`Voice`）：RTC 授予（签发、认领、续签、撤销）、通话（开始、停、`heard`、`said`）、把语音设置翻成声网的 vendors（`vendorsFor`、`agentFor`）、语音线路和隧道、听写。声网的令牌用 npm 的 `agora-token`，请 agent 进出用 `agora-agents`（声网的 ConvoAI SDK）。
-- 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `packages/protocol/src/rules/voice.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
+- 形状和规则：`shapes.ts` 的 `VoiceSettings`（`VoiceASR`、`VoiceAnswer`、`VoiceTTS` 三个联合）、`SettingsUpdateVoice`、`AgoraGrant`、`Dictation`；数的范围是 `shapes.ts` 的 `voiceSilenceMsMin` 等常量；默认在 `setting/rules.ts`（`defaultVoice`）。保存前的检查和只存差异在 `setting/rules.ts`（`voiceProblem`、`voiceSettingsOver`、`voiceOverrides`）。
 - 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，没带通话 id 的 `manager.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。

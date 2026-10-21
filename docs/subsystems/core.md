@@ -132,7 +132,7 @@
 ## 怎么验证
 
 - `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧。
-- `packages/protocol/src/rules/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`schedules.test.ts` 查折法和出帧填的话。
+- `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`schedule/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、说命令哪里不对。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。
 - 能力表：`bun run docs:verify`（`scripts/capabilities.ts --check`）。

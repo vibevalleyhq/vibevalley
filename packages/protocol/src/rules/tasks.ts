@@ -3,13 +3,9 @@
 import type { GraphAction, GraphState, Spent, Task, TaskAction, TaskGraph, TaskState } from "../shapes";
 import { isOpen } from "./core";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "./dag";
-import { slice } from "./text";
 
 /** More steps than this means the job should be split into tasks. */
 export const maxTasks = 12;
-export const defaultParallel = 3;
-export const autoRetries = 2;
-
 export const taskOf = (graph: TaskGraph, id: string) => (graph.tasks ?? []).find((n) => n.id === id);
 
 export const isSettled = (n: Task) => n.state === "merged" || n.state === "skipped";
@@ -23,14 +19,6 @@ export function blockedBy(graph: TaskGraph, task: Task): string[] {
     return !need || !isSettled(need);
   });
 }
-
-export const readyTasks = (graph: TaskGraph): Task[] =>
-  graph.state !== "running" ? [] : (graph.tasks ?? []).filter((n) => n.state === "waiting" && blockedBy(graph, n).length === 0);
-
-export const withTask = (graph: TaskGraph, id: string, change: (n: Task) => Task): TaskGraph => ({
-  ...graph,
-  tasks: (graph.tasks ?? []).map((n) => (n.id === id ? change(n) : n)),
-});
 
 export function graphSpent(graph: TaskGraph): Spent | undefined {
   let spent = false;
@@ -81,28 +69,6 @@ export const taskActionText: Record<TaskAction, string> = { retry: "重试", ski
 
 export const isAcceptance = (n: Task) => n.acceptance === true;
 
-export function ancestorsOf(graph: TaskGraph, task: Task): Task[] {
-  const seen = new Set<string>();
-  const visit = (id: string) => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    for (const need of taskOf(graph, id)?.needs ?? []) visit(need);
-  };
-  for (const need of task.needs ?? []) visit(need);
-  return (graph.tasks ?? []).filter((n) => n.id !== task.id && seen.has(n.id));
-}
-
-export const acceptancesOf = (graph: TaskGraph, task: Task) => ancestorsOf(graph, task).filter((n) => isAcceptance(n) && n.state === "merged");
-
-export const isLast = (graph: TaskGraph, task: Task) => !(graph.tasks ?? []).some((n) => (n.needs ?? []).includes(task.id));
-
-export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
-  const out: string[] = [];
-  if (!isLast(graph, task)) return out;
-  for (const n of acceptancesOf(graph, task)) if (n.check && !out.includes(n.check) && n.check !== task.check) out.push(n.check);
-  return out;
-}
-
 const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.id, after: n.needs ?? [] }));
 
 export function graphProblems(tasks: readonly Task[] | null | undefined): string[] {
@@ -138,29 +104,6 @@ export function graphProblems(tasks: readonly Task[] | null | undefined): string
 }
 
 export const layersOf = (tasks: readonly Task[] | null | undefined) => dagLayers(dagOf(tasks ?? []));
-
-export function graphText(graph: TaskGraph): string {
-  const tasks = graph.tasks ?? [];
-  const merged = tasks.filter(isSettled).length;
-  let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
-  if (graph.branch) head += "，分支 " + graph.branch;
-  head += "）：" + graphStateText[graph.state];
-  if (tasks.length > 0) head += `，${merged}/${tasks.length} 步做完`;
-  if (graph.note) head += "。" + graph.note;
-  const lines = [head];
-  for (const n of tasks) {
-    let detail = taskStateText[n.state];
-    if (n.state === "waiting") {
-      const waits = blockedBy(graph, n);
-      if (waits.length > 0) detail = "等 " + waits.join("、");
-    }
-    let line = "  - " + n.id + " " + n.title + (isAcceptance(n) ? "（验收）" : "") + "：" + detail;
-    if (n.session) line += "（帮工 " + n.session + "）";
-    if (n.conclusion) line += "；" + slice(n.conclusion, 0, 80);
-    lines.push(line);
-  }
-  return lines.join("\n");
-}
 
 /** What the graph's state allows now; the frame carries it so the client does not repeat the switch. */
 export function graphActions(graph: TaskGraph): GraphAction[] {

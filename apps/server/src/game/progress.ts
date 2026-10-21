@@ -2,9 +2,20 @@
 // Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
 // (docs/subsystems/game.md). Nothing here changes what it is given.
 
-import type { AchievementDef, CoreState, Fact, LedgerEntry, Progress, ProgressNews, TaskGraph, Unlock } from "@vibevalley/protocol";
+import {
+  type Achievement,
+  type AchievementDef,
+  type CoreState,
+  type Fact,
+  type LedgerEntry,
+  type Progress,
+  type ProgressNews,
+  type TaskGraph,
+  type Unlock,
+} from "@vibevalley/protocol";
 import { everyone, managerAgent } from "@vibevalley/protocol";
-import { achievements, emptyProgress, graphOf, layersOf, levelForCommits, sessionOf, sessionOnIssue } from "@vibevalley/protocol/rules";
+import { achievementInWords, achievements, emptyProgress, layersOf, levelForCommits, sessionOf, sessionOnIssue } from "@vibevalley/protocol/rules";
+import { graphOf } from "../task/rules.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
@@ -247,3 +258,6 @@ export function catchUp(state: CoreState): Entry[] {
   const known = state.progress?.counts.farm_level ?? 1;
   return level > known ? [{ kind: "level", level }] : [];
 }
+
+/** Every achievement, in the page's order. */
+export const achievementsInWords = (): Achievement[] => achievements.map(achievementInWords);

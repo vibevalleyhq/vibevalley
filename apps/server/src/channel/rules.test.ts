@@ -1,4 +1,4 @@
-import type { InboxMessage } from "@vibevalley/protocol/rules";
+import type { InboxMessage } from "./rules.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { type AudienceInput, busyNotice, channelNameProblem, chatAudience, mentionsIn, parseChatTarget, type UnreadRow, wakeInput } from "./rules.ts";

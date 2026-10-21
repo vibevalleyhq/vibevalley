@@ -116,7 +116,3 @@ export function withIssueStatuses(state: CoreState): CoreState {
   });
   return next ? { ...state, issues: next } : state;
 }
-
-/** What a session is told when merging its base in would conflict. */
-export const conflictBrief = (base: string, files: readonly string[]) =>
-  `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;

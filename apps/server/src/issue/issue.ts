@@ -40,10 +40,7 @@ import {
 } from "@vibevalley/protocol";
 import {
   actLabel,
-  conflictBrief,
   cut,
-  dueText,
-  graphIssues,
   isBusy,
   isForManager,
   issueDraftingOf,
@@ -56,6 +53,9 @@ import {
   statusMoves,
   templateCatalog,
 } from "@vibevalley/protocol/rules";
+import { graphIssues } from "../task/rules.ts";
+import { dueText } from "../schedule/rules.ts";
+import { conflictBrief } from "./rules.ts";
 import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";

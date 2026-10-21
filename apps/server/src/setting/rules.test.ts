@@ -1,5 +1,5 @@
 import type { SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import { defaultVoice } from "./rules.ts";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { keyHint, memorySourcesProblem, settingsProblem, voiceOverrides, voiceProblem, voiceSettingsOver } from "./rules.ts";

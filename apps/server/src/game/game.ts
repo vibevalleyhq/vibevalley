@@ -4,7 +4,7 @@
 // entry that cannot be written is logged, and the farm goes on.
 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
-import { achievementsInWords } from "@vibevalley/protocol/rules";
+import { achievementsInWords } from "./progress.ts";
 import { Context, Effect, Layer, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/game_ledger.sql.ts";

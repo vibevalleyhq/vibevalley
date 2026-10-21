@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type ChatMessage, type Conversation, managerAgent, type Session } from "@vibevalley/protocol";
-import { conversationOf, generalOf, head, isBusy, messagesIn, wakeBreaker } from "@vibevalley/protocol/rules";
+import { conversationOf, generalOf, isBusy, messagesIn } from "@vibevalley/protocol/rules";
+import { head } from "../base/text.ts";
+import { wakeBreaker } from "./rules.ts";
 import { Effect, Layer, PubSub, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";

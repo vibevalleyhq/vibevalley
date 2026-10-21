@@ -1,12 +1,10 @@
 // What a session is doing and what it waits on.
 
-import type { Conflict, Doing, Retry, Session } from "../shapes";
+import type { Conflict, Retry, Session } from "../shapes";
 import { actionText } from "./seeds";
 
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
-
-export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });
 
 export type Need =
   | { readonly kind: "quiet"; readonly since: number }

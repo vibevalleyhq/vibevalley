@@ -1,16 +1,16 @@
-// The generated schemas (schema.ts) take every fact, state, view and inbox in the golden runs (testdata), and
+// The protocol's schemas (packages/protocol/src/schema.ts) take every fact, state, view and inbox in the golden runs (testdata), and
 // the frames the rules make of them.
 
 import { expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { Schema } from "effect";
-import type { CoreState, Fact } from "./shapes";
-import { emptyCoreState, frameOf, reduce } from "./rules";
-import * as S from "./schema";
+import type { CoreState, Fact } from "@vibevalley/protocol";
+import { emptyCoreState, frameOf, reduce } from "@vibevalley/protocol/rules";
+import * as S from "@vibevalley/protocol/schema";
 
 test("the golden runs and the frames made of them decode", async () => {
-  const url = new URL("../testdata/reduce.jsonl.gz", import.meta.url);
+  const url = new URL("./testdata/reduce.jsonl.gz", import.meta.url);
   const rows = new TextDecoder()
     .decode(gunzipSync(readFileSync(url)))
     .split("\n")

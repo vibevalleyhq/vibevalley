@@ -1,4 +1,4 @@
-import { type InboxMessage } from "@vibevalley/protocol/rules";
+import { type InboxMessage } from "../channel/rules.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { managerInboxLines, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
 
