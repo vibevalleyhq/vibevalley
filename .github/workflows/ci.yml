@@ -65,13 +65,9 @@ jobs:
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       - run: pnpm install --frozen-lockfile
       - run: pnpm run web:check
-      - run: pnpm exec playwright install --with-deps chromium
+      # Only the page's rule tests: the Playwright suite runs on the owner's machine (cd apps/web && pnpm run test).
+      - run: pnpm run test:rules
         working-directory: apps/web
-      - run: pnpm run test
-        working-directory: apps/web
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with: { name: web-test-results, path: apps/web/test-results, retention-days: 7 }
 
   desktop:
     name: desktop
