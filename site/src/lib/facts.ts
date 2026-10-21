@@ -4,15 +4,15 @@
 export const FACTS = [
   // The machines in use: VibeValley's own, pi, claude, codex (docs/reference/agents-and-runtimes.md; the rest are off for now).
   { key: 'machines', n: 4, icon: 'machine-tractor' },
-  // 7 species × 4 outfits (server/internal/protocol/shapes.go).
+  // 7 species × 4 outfits (packages/protocol/src/shapes.ts).
   { key: 'looks', n: 28, icon: 'bear-farmer-side' },
-  // Helpers at work at once (MaxRunning, server/internal/protocol/shapes.go).
+  // Helpers at work at once (maxRunning, packages/protocol/src/shapes.ts).
   { key: 'plots', n: 6, icon: 'plot-wheat' },
-  // The achievements in server/internal/protocol/seeds.json.
+  // The achievements in packages/protocol/src/rules/seeds.json.
   { key: 'achievements', n: 21, icon: 'icon-trophy' },
-  // The games on the farm phone (app/lib/phone/screens.dart).
+  // The games on the farm phone (apps/web/src/farm/phone/screens.tsx).
   { key: 'games', n: 5, icon: 'icon-star' },
-  // WeChat, Feishu, QQ (server/internal/protocol/shapes.go, connectors).
+  // WeChat, Feishu, QQ (packages/protocol/src/shapes.ts, ConnectorIDValues).
   { key: 'connectors', n: 3, icon: 'icon-pigeon' },
 ] as const
 

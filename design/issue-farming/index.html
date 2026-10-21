@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>一块地的游戏化</title>
 <style>
-  @font-face { font-family: Pixel; src: url('../../app/assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf'); }
+  @font-face { font-family: Pixel; src: url('../../apps/web/public/fonts/fusion-pixel-12px-proportional-zh_hans.otf'); }
   :root {
     --bg: #f5e6c4; --paper: #fbf2dc; --card: #fffaf0; --ink: #2f1f13; --muted: #7f5b3b; --soft: #9b7550;
     --line: #c8a46e; --edge: #7f5b3b; --leaf: #6f9e45; --leaf-soft: #d7e8b9; --berry: #b8473d; --berry-soft: #f3d3cc;
@@ -128,38 +128,38 @@
       <h3>聊清楚</h3>
       <div class="who">你、管家和帮工在工单串里说清楚：要什么，怎么算做完</div>
       <div class="stages">
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-empty.png"><span>荒地</span><em>刚写下</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-empty.png"><span>荒地</span><em>刚写下</em></div>
         <div class="arrow">›</div>
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-dry.png"><span>缺肥</span><em>缺信息</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-dry.png"><span>缺肥</span><em>缺信息</em></div>
       </div>
-      <div class="branch ask"><img class="px" src="../../app/assets/pixel/icon-seeds.png"><div><b>施肥</b>：回答它问的、补上验收标准。地养好了才能播种。</div></div>
+      <div class="branch ask"><img class="px" src="../../apps/web/public/pixel/icon-seeds.png"><div><b>施肥</b>：回答它问的、补上验收标准。地养好了才能播种。</div></div>
       <div class="note">状态：<code>backlog</code>。缺肥是工单上的一个标记（它有没回答的问题），不是新状态。</div>
     </div>
     <div class="act">
       <h3>安排活</h3>
       <div class="who">定谁来种（可以几个人），要不要拆；代码活这时开 worktree</div>
       <div class="stages">
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-seeded.png"><span>播种</span><em>排队或刚派</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-seeded.png"><span>播种</span><em>排队或刚派</em></div>
         <div class="arrow">›</div>
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-sprout.png"><span>发芽</span><em>开始干</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-sprout.png"><span>发芽</span><em>开始干</em></div>
         <div class="arrow">›</div>
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-leafy.png"><span>长叶</span><em>改了东西</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-leafy.png"><span>长叶</span><em>改了东西</em></div>
       </div>
-      <div class="branch ask"><img class="px" src="../../app/assets/pixel/icon-water.png"><div><b>浇水</b>：带一句话；很久没动静地会干裂，浇一下就醒。</div></div>
+      <div class="branch ask"><img class="px" src="../../apps/web/public/pixel/icon-water.png"><div><b>浇水</b>：带一句话；很久没动静地会干裂，浇一下就醒。</div></div>
       <div class="note">状态：<code>todo</code>（种子袋排在院门外）→ <code>in_progress</code>。</div>
     </div>
     <div class="act">
       <h3>完成</h3>
       <div class="who">交回来，过验收，收获</div>
       <div class="stages">
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-flowering.png"><span>抽穗</span><em>等验收</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-flowering.png"><span>抽穗</span><em>等验收</em></div>
         <div class="arrow">›</div>
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-wheat.png"><span>结果</span><em>过了验收</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-wheat.png"><span>结果</span><em>过了验收</em></div>
         <div class="arrow">›</div>
-        <div class="stage"><img class="px" src="../../app/assets/pixel/plot-harvested.png"><span>收获</span><em>合进去或关上</em></div>
+        <div class="stage"><img class="px" src="../../apps/web/public/pixel/plot-harvested.png"><span>收获</span><em>合进去或关上</em></div>
       </div>
-      <div class="branch"><img class="px" src="../../app/assets/pixel/plot-weeds.png"><div><b>没过验收 → 长草</b>：每一条意见是一棵草，回到「长叶」去修；修完一条拔一棵。</div></div>
-      <div class="branch"><img class="px" src="../../app/assets/pixel/plot-withered.png"><div><b>这一轮失败 → 长虫</b>：模型、命令或检查出错；杀虫让它接着修。</div></div>
+      <div class="branch"><img class="px" src="../../apps/web/public/pixel/plot-weeds.png"><div><b>没过验收 → 长草</b>：每一条意见是一棵草，回到「长叶」去修；修完一条拔一棵。</div></div>
+      <div class="branch"><img class="px" src="../../apps/web/public/pixel/plot-withered.png"><div><b>这一轮失败 → 长虫</b>：模型、命令或检查出错；杀虫让它接着修。</div></div>
       <div class="note">状态：<code>in_review</code> 就是「等验收」；过了验收是「结果」，收获以后 <code>done</code>。</div>
     </div>
   </div>
@@ -169,16 +169,16 @@
   <h2>二、对照表<small>状态、地、牌子、该谁动手</small></h2>
   <table>
     <tr><th>地</th><th>叫法</th><th>阶段</th><th>工单状态</th><th>牌子</th><th>现在该谁动手</th></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-empty.png"></td><td>荒地</td><td>聊清楚</td><td><code>backlog</code></td><td></td><td>你或管家：说清楚要什么</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-dry.png"></td><td>缺肥</td><td>聊清楚</td><td><code>backlog</code> + 有没回答的问题</td><td><span class="tag t-wheat">缺肥</span></td><td>你：回答问题（施肥）</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-seeded.png"></td><td>播种</td><td>安排活</td><td><code>todo</code></td><td><span class="tag t-plain">排队中</span></td><td>农场：有空地自动开工</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-sprout.png"></td><td>发芽 / 长叶</td><td>安排活</td><td><code>in_progress</code></td><td></td><td>帮工</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-dry.png"></td><td>干裂</td><td>安排活</td><td><code>in_progress</code> + 很久没动静</td><td><span class="tag t-water">没动静</span></td><td>你：浇水，或叫停</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-flowering.png"></td><td>抽穗</td><td>完成</td><td><code>in_review</code></td><td><span class="tag t-wheat">等验收</span></td><td>验收的人（见第五节）</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-weeds.png"></td><td>长草</td><td>完成 → 回到安排活</td><td><code>in_progress</code> + 验收意见</td><td><span class="tag t-berry">3 棵草</span></td><td>帮工：照意见修</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-withered.png"></td><td>长虫</td><td>安排活</td><td><code>in_review</code>，最后一轮失败</td><td><span class="tag t-berry">有虫</span></td><td>你：杀虫（让它接着修）</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-wheat.png"></td><td>结果</td><td>完成</td><td><code>in_review</code> + 验收过了</td><td><span class="tag t-leaf">可收获</span></td><td>你：收获</td></tr>
-    <tr><td class="sp"><img class="px" src="../../app/assets/pixel/plot-harvested.png"></td><td>麦茬</td><td>完成</td><td><code>done</code></td><td></td><td>进仓库</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-empty.png"></td><td>荒地</td><td>聊清楚</td><td><code>backlog</code></td><td></td><td>你或管家：说清楚要什么</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-dry.png"></td><td>缺肥</td><td>聊清楚</td><td><code>backlog</code> + 有没回答的问题</td><td><span class="tag t-wheat">缺肥</span></td><td>你：回答问题（施肥）</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-seeded.png"></td><td>播种</td><td>安排活</td><td><code>todo</code></td><td><span class="tag t-plain">排队中</span></td><td>农场：有空地自动开工</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-sprout.png"></td><td>发芽 / 长叶</td><td>安排活</td><td><code>in_progress</code></td><td></td><td>帮工</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-dry.png"></td><td>干裂</td><td>安排活</td><td><code>in_progress</code> + 很久没动静</td><td><span class="tag t-water">没动静</span></td><td>你：浇水，或叫停</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-flowering.png"></td><td>抽穗</td><td>完成</td><td><code>in_review</code></td><td><span class="tag t-wheat">等验收</span></td><td>验收的人（见第五节）</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-weeds.png"></td><td>长草</td><td>完成 → 回到安排活</td><td><code>in_progress</code> + 验收意见</td><td><span class="tag t-berry">3 棵草</span></td><td>帮工：照意见修</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-withered.png"></td><td>长虫</td><td>安排活</td><td><code>in_review</code>，最后一轮失败</td><td><span class="tag t-berry">有虫</span></td><td>你：杀虫（让它接着修）</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-wheat.png"></td><td>结果</td><td>完成</td><td><code>in_review</code> + 验收过了</td><td><span class="tag t-leaf">可收获</span></td><td>你：收获</td></tr>
+    <tr><td class="sp"><img class="px" src="../../apps/web/public/pixel/plot-harvested.png"></td><td>麦茬</td><td>完成</td><td><code>done</code></td><td></td><td>进仓库</td></tr>
   </table>
   <p class="note">只加两样东西：「验收过了没有」和「没回答的问题」。工单的六个状态不变，<code>in_review</code> 的意思收窄成「等验收」。</p>
 </section>
@@ -186,14 +186,14 @@
 <section>
   <h2>三、农活<small>每样工具就是一件对工单做的事</small></h2>
   <div class="grid g3">
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-hand.png"><div><b>手</b><p>派活：把工单挪到待办；点一个帮工头像拉它下地（和在田头 @ 它一样）。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-seeds.png"><div><b>施肥</b> <span class="new">要新画肥料袋</span><p>补信息：回答帮工问的，补上验收标准。聊清楚这一段的农活。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-water.png"><div><b>浇水</b><p>带话：对整张工单说一句，地上的人都听得到；干裂的地浇一下就醒。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-weed.png"><div><b>除草</b><p>照验收意见修：一棵草一条意见；也能点一棵草单独交代怎么修。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-bug.png"><div><b>杀虫</b><p>这一轮失败了：让它带着出错的原因接着修。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-harvest.png"><div><b>收获</b><p>验收过了的地：合进主分支、提 PR，或者（不是代码活）直接关上。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-shovel.png"><div><b>铲除</b><p>不要了：叫停地上的人，工单挪到已取消；分支上有提交就留着。</p></div></div>
-    <div class="card chore"><img class="px" src="../../app/assets/pixel/icon-scarecrow.png"><div><b>稻草人</b> <span class="new">新</span><p>验收：站到抽穗的地里，按这块地的验收方式验（见第五节）。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-hand.png"><div><b>手</b><p>派活：把工单挪到待办；点一个帮工头像拉它下地（和在田头 @ 它一样）。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-seeds.png"><div><b>施肥</b> <span class="new">要新画肥料袋</span><p>补信息：回答帮工问的，补上验收标准。聊清楚这一段的农活。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-water.png"><div><b>浇水</b><p>带话：对整张工单说一句，地上的人都听得到；干裂的地浇一下就醒。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-weed.png"><div><b>除草</b><p>照验收意见修：一棵草一条意见；也能点一棵草单独交代怎么修。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-bug.png"><div><b>杀虫</b><p>这一轮失败了：让它带着出错的原因接着修。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-harvest.png"><div><b>收获</b><p>验收过了的地：合进主分支、提 PR，或者（不是代码活）直接关上。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-shovel.png"><div><b>铲除</b><p>不要了：叫停地上的人，工单挪到已取消；分支上有提交就留着。</p></div></div>
+    <div class="card chore"><img class="px" src="../../apps/web/public/pixel/icon-scarecrow.png"><div><b>稻草人</b> <span class="new">新</span><p>验收：站到抽穗的地里，按这块地的验收方式验（见第五节）。</p></div></div>
   </div>
 </section>
 
@@ -202,10 +202,10 @@
   <p class="lead">在田头 @ 谁，就是叫谁下地。一块地上可以有好几个，但锄头只有一把：谁拿着锄头谁改代码（一块地一个 worktree，两个人同时改会打架）。别人能看、能说、能把意见交给拿锄头的。不是代码活就没有锄头这回事，大家都能动手。</p>
   <div class="card">
     <div class="crew">
-      <div class="hand"><img class="px" src="../../app/assets/pixel/bear-farmer-work.png"><b>Claude 师傅</b><span>主种：改代码</span><span class="hoe">拿着锄头</span></div>
-      <div class="hand"><img class="px" src="../../app/assets/pixel/fox-rain-read.png"><b>Codex 老匠</b><span>帮手：@ 来写测试</span><span>等锄头传过来</span></div>
-      <div class="hand"><img class="px" src="../../app/assets/pixel/hedgehog-gardener-worry.png"><b>Pi 实验员</b><span>看地的：验收</span><span>插了 3 面小旗</span></div>
-      <div class="hand"><img class="px" src="../../app/assets/pixel/manager-auntie.png" style="height:72px"><b>管家</b><span>拉人、分活、催</span><span>站在田埂上</span></div>
+      <div class="hand"><img class="px" src="../../apps/web/public/pixel/bear-farmer-work.png"><b>Claude 师傅</b><span>主种：改代码</span><span class="hoe">拿着锄头</span></div>
+      <div class="hand"><img class="px" src="../../apps/web/public/pixel/fox-rain-read.png"><b>Codex 老匠</b><span>帮手：@ 来写测试</span><span>等锄头传过来</span></div>
+      <div class="hand"><img class="px" src="../../apps/web/public/pixel/hedgehog-gardener-worry.png"><b>Pi 实验员</b><span>看地的：验收</span><span>插了 3 面小旗</span></div>
+      <div class="hand"><img class="px" src="../../apps/web/public/pixel/manager-auntie.png" style="height:72px"><b>管家</b><span>拉人、分活、催</span><span>站在田埂上</span></div>
     </div>
     <p class="note">每一轮干活标着是谁干的，收成清单里每个提交带着名字，账本按人记功劳。锄头传了几次、现在在谁手上，地块详情里看得到。</p>
   </div>
@@ -222,17 +222,17 @@
   <div class="grid g2" style="margin-top:14px">
     <div class="card">
       <h4 class="pixel" style="margin:0 0 6px;font-weight:400">验收标准（聊清楚时写下）</h4>
-      <div class="check"><img class="px" src="../../app/assets/pixel/mark-check.png">命令行能用 <code>issue status</code> 挪状态</div>
-      <div class="check"><img class="px" src="../../app/assets/pixel/mark-check.png">不许的转换被拒，并说为什么</div>
-      <div class="check"><img class="px" src="../../app/assets/pixel/mark-cross.png">看板拖卡调同一个接口</div>
-      <div class="check"><img class="px" src="../../app/assets/pixel/mark-warn.png">文档跟着改了（看地的拿不准，交给你）</div>
+      <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-check.png">命令行能用 <code>issue status</code> 挪状态</div>
+      <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-check.png">不许的转换被拒，并说为什么</div>
+      <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-cross.png">看板拖卡调同一个接口</div>
+      <div class="check"><img class="px" src="../../apps/web/public/pixel/mark-warn.png">文档跟着改了（看地的拿不准，交给你）</div>
     </div>
     <div class="card">
       <h4 class="pixel" style="margin:0 0 6px;font-weight:400">没过验收：三棵草</h4>
       <ul class="weeds">
-        <li class="pulled"><img class="px" src="../../app/assets/pixel/icon-weed.png">IssueStatus 的错误没带原因 — 已修，拔掉了</li>
-        <li><img class="px" src="../../app/assets/pixel/icon-weed.png">看板拖到「处理中」还在调旧的 start</li>
-        <li><img class="px" src="../../app/assets/pixel/icon-weed.png">server.md 没写 moves 字段</li>
+        <li class="pulled"><img class="px" src="../../apps/web/public/pixel/icon-weed.png">IssueStatus 的错误没带原因 — 已修，拔掉了</li>
+        <li><img class="px" src="../../apps/web/public/pixel/icon-weed.png">看板拖到「处理中」还在调旧的 start</li>
+        <li><img class="px" src="../../apps/web/public/pixel/icon-weed.png">server.md 没写 moves 字段</li>
       </ul>
     </div>
   </div>
@@ -251,9 +251,9 @@
     <div class="mock-body">
       <div class="aside">
         <div class="plot">
-          <img class="px soil" src="../../app/assets/pixel/plot-flowering.png">
-          <img class="px who" src="../../app/assets/pixel/bear-farmer-work.png">
-          <img class="px who2" src="../../app/assets/pixel/hedgehog-gardener-worry.png">
+          <img class="px soil" src="../../apps/web/public/pixel/plot-flowering.png">
+          <img class="px who" src="../../apps/web/public/pixel/bear-farmer-work.png">
+          <img class="px who2" src="../../apps/web/public/pixel/hedgehog-gardener-worry.png">
         </div>
         <b class="pixel" style="font-weight:400">抽穗了</b>
         <small>第 3 块地 · 第 4 季</small>
@@ -262,7 +262,7 @@
       </div>
       <div>
         <div class="need">
-          <img class="px" src="../../app/assets/pixel/icon-scarecrow.png">
+          <img class="px" src="../../apps/web/public/pixel/icon-scarecrow.png">
           <div style="flex:1"><b>这块地现在需要你：验收</b><p>检查全过；看地的打了 3 个勾、1 个拿不准，交给你看。</p></div>
           <span class="btn go">验收通过</span>
           <span class="btn no">没过，写意见</span>

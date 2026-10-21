@@ -1,0 +1,6 @@
+{
+  "migrations": "migrations",
+  "queries": "queries",
+  "out": "generated",
+  "postgresMajor": 18
+}

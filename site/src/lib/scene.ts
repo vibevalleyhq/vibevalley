@@ -1,10 +1,10 @@
-// The game's title scene (app/lib/title/: scene.dart, layers.dart; first written for the retired web page):
+// The game's title scene (apps/web/src/farm/title):
 // the farm at an hour of the day, clouds crossing, smoke from the chimney, plants swaying along the bottom, seeds
 // blowing off the dandelions, fireflies at dusk and night, and the farmer with his pet on the hill. Everything is
 // placed in shares of the scene's own pixels (1536 x 1024), so it stays put on the picture however the page crops it.
 // Only where things are and how big: the pictures' addresses come from images.ts (compressed copies, made at build).
 
-import sizes from '../../../app/assets/title/sprites.json'
+import sizes from '../../../apps/web/public/title/sprites.json'
 
 export const SCENE = { w: 1536, h: 1024 } as const
 

@@ -7,7 +7,7 @@ Status: proposed
 管家和档案本质上是一种东西：一个模型、一份人设、一组工具。差别只在两处：管家手里的工具多（派活、带话、合并、计划、定时、开频道），以及它常驻、不绑工单。可是代码里把它们写成了两种东西：
 
 - **档案这半边已经并了**：管家是档案 `manager`（`protocol.ManagerAgent`），模型从档案读，记忆走 `memory.*`（见「做到哪了」）。
-- **工具这半边还是两套**：管家的工具手写在 `internal/manager/tools.go`（`dispatch`、`tell`、`changes`、`roster`、`task`、`schedule`、`open_channel`、`memory_search`……），帮工的工具手写在 `internal/mcp/mcp.go`（`channel_say`、`channel_read`、`channel_inbox`、`session_list`、`memory_search`、`memory_add`）。记性的两个工具写了两遍；同一件事（读频道）管家叫 `read_chat`，帮工叫 `channel_read`，规则也各写一份。
+- **工具这半边还是两套**：管家的工具手写在 `apps/server/src/tool/tool.ts`（`dispatch`、`tell`、`changes`、`roster`、`task`、`schedule`、`open_channel`、`memory_search`……），帮工的工具手写在 `apps/server/src/mcp/mcp.ts`（`channel_say`、`channel_read`、`channel_inbox`、`session_list`、`memory_search`、`memory_add`）。记性的两个工具写了两遍；同一件事（读频道）管家叫 `read_chat`，帮工叫 `channel_read`，规则也各写一份。
 - **谁能做什么写在三处**：管家的工具表、MCP 的工具表、能力表的 `can manager`（[先有能力，再有入口](docs/subsystems/core.md)）。想让一个帮工也能拆子工单（一个「领班」），或者让管家能建档案，没有地方改，只能再手接一遍。
 - 「管家」「帮工」作为两种调用者散在 16 个服务端文件里（`ManagerAgent`、`IsForManager` 等的判断）；其中一部分是真的不一样（见下面「不是能力的差别」），一部分只是「它的工具多」。
 
@@ -19,14 +19,14 @@ Status: proposed
 
 | 在哪 | 管什么 |
 |---|---|
-| `protocol` | 给出去的形状：`Agent.Can` 这个字段和 `Capability` 的取值，存盘、发给 Flutter、档案页改它都用它。不放规则 |
-| `internal/agent` | 档案这个概念：默认给哪些能力、哪份是常驻的、谁能改 `Can` |
-| `internal/tool` | 工具表：每个工具要哪种能力、执行时放行、把结果写成给模型看的一句话 |
-| 能力表（`api.go` 的 `can`） | 只管 HTTP 入口：主人、「连接到本机」后的设备能调哪些接口；不管 agent |
+| `protocol` | 给出去的形状：`Agent.can` 这个字段和 `Capability` 的取值，存盘、发给页面、档案页改它都用它。不放规则 |
+| `apps/server/src/agent` | 档案这个概念：默认给哪些能力、哪份是常驻的、谁能改 `Can` |
+| `apps/server/src/tool` | 工具表：每个工具要哪种能力、执行时放行、把结果写成给模型看的一句话 |
+| 能力表（`packages/protocol/src/api.ts` 的 `can`） | 只管 HTTP 入口：主人、「连接到本机」后的设备能调哪些接口；不管 agent |
 
 ### 1. 能力是档案的字段
 
-`protocol.Agent` 加 `Can []Capability`，`Capability` 是封闭的枚举。一种能力是一组工具，哪个工具归哪种能力写在 `internal/tool`，不写在 `protocol`：
+`protocol.Agent` 加 `Can []Capability`，`Capability` 是封闭的枚举。一种能力是一组工具，哪个工具归哪种能力写在 `apps/server/src/tool`，不写在 `protocol`：
 
 | 能力 | 工具（现在的名字） | 管家 | 普通档案默认 |
 |---|---|---|---|
@@ -45,7 +45,7 @@ Status: proposed
 
 ### 2. 一张工具表，两种接法
 
-工具只定义一次：名字、给模型看的说明、参数（Go 类型生成 schema，管家现在的做法）、要哪种能力、执行函数。执行函数收到的是认证过的调用者：
+工具只定义一次：名字、给模型看的说明、参数（Effect Schema，`tool/schemas.ts`）、要哪种能力、执行函数。执行函数收到的是认证过的调用者：
 
 ```go
 type Caller struct {
@@ -58,9 +58,9 @@ type Caller struct {
 }
 ```
 
-- 表放在一个新包 `internal/tool`（排在 `task`、`schedule` 之后、`manager` 之前，`tool.Service`）。工具的规则还在拥有它的服务里，`tool` 只做参数、放行和把结果写成给模型看的一句话。
-- **管家**在进程里拿这张表：`tool.Service` 按 `Can` 交出 `agentcore.AgentTool`，`internal/manager` 不再手写工具，只留它特有的输入、回复和 Run 的接线。
-- **外部农机上的 Session**（Claude Code、Codex……）经 `/mcp` 拿同一张表：`internal/mcp` 只做 MCP 的传输和认证（从请求认出 Session，再找到它的档案），工具列表按档案的 `Can` 过滤。
+- 表放在一个新包 `apps/server/src/tool`（排在 `task`、`schedule` 之后、`manager` 之前，`tool.Service`）。工具的规则还在拥有它的服务里，`tool` 只做参数、放行和把结果写成给模型看的一句话。
+- **管家**在进程里拿这张表：`tool.Service` 按 `Can` 交出 pi-agent-core 的 `AgentTool`，`apps/server/src/manager` 不再手写工具，只留它特有的输入、回复和 Run 的接线。
+- **外部农机上的 Session**（Claude Code、Codex……）经 `/mcp` 拿同一张表：`apps/server/src/mcp` 只做 MCP 的传输和认证（从请求认出 Session，再找到它的档案），工具列表按档案的 `Can` 过滤。
 - 放行在执行时再查一次 `Can`，不只靠列表过滤：档案的 `Can` 在 Session 干活时被主人改小，下一次调用就拒。
 - 同一件事只留一个名字（`read_chat` 和 `channel_read` 合成一个）；名字和说明照管家现在为模型调过的那份，帮工那份不同的地方逐条比过再定。
 
@@ -76,7 +76,7 @@ type Caller struct {
 
 下面这些不是「工具多少」，并进档案以后照样不同，代码里保留，但都按「这份档案是不是常驻的」判断一次，不再散着写 `== ManagerAgent`：
 
-- **在哪跑**：管家跑在服务端进程里的 `internal/agent/brain`，常驻、不绑工单、不进 worktree；电话、听写、`/v1/chat/completions` 要它低延迟地插话，也要它的提示开头不变（[提示开头不变](docs/subsystems/manager.md)）。普通档案每次为一张工单开一个 Session，经 smith 驱动外部农机。所以管家的农机仍然只能是 `vibevalley`。
+- **在哪跑**：管家跑在服务端进程里的 `apps/server/src/agent/brain`，常驻、不绑工单、不进 worktree；电话、听写、`/v1/chat/completions` 要它低延迟地插话，也要它的提示开头不变（[提示开头不变](docs/subsystems/manager.md)）。普通档案每次为一张工单开一个 Session，经 oar 驱动外部农机。所以管家的农机仍然只能是 `vibevalley`。
 - **在频道里是谁**：`channel_participant.kind` 留着 `manager`：不在地里、不离开、田头的话都给它（见 Alternatives）。
 - **不能派给它**：工单派给管家走管家的输入，不开 Session（`Issue.Hire` 拒绝派给管家）。
 
@@ -92,27 +92,27 @@ type Caller struct {
 ### 做的顺序
 
 1. `Capability` 和 `Agent.Can`，档案页能改；`agent.Service` 的「是不是常驻」替掉散着的 `ManagerAgent` 判断。档案存在家目录的 `config.json`，不加迁移。
-2. `internal/tool`：两边的工具都搬进去，管家和 `/mcp` 都从它拿（已做）。
+2. `apps/server/src/tool`：两边的工具都搬进去，管家和 `/mcp` 都从它拿（已做）。
 3. `/mcp` 按 `Can` 过滤和放行；能力表的 `can` 去掉 `manager`、`session`。
 4. `hire` 的工具和「管家建的」的展示。
 
 ### 做到哪了
 
-档案那半边 2026-10-17 做了：档案 `manager` 在加载时补上（`agent.go` 的 `managerProfile`），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`manager.go` 的 `modelOf`），配置的 `manager` 段、`protocol.Runtime` 枚举和 `ManagerMemory.Runtime` 删了。Flutter 的 `DeskConfig` 把管家的档案单放在 `manager`，各处的档案列表里没有它。记忆合成 `memory.list`、`recall`、`create`、`delete`（`/api/v1/memories/{agent}`，管家是 `manager`）。帮工的 `memory_search`、`memory_add` 经 `/mcp` 也有了（7ddb14d），和管家的是两份实现。
+档案那半边 2026-10-17 做了：档案 `manager` 在加载时补上（`agent/agent.ts` 的 `managerProfile`），`Agents()` 是派活用的档案（不含管家），`All()` 是全部，`agent.list` 返回全部；删管家、把它的农机换掉被拒绝；`Issue.Hire` 拒绝派给管家；管家的模型从档案读（`manager/manager.ts` 的 `modelOf`），配置的 `manager` 段、`protocol.Runtime` 枚举和 `ManagerMemory.Runtime` 删了。页面的 `DeskConfig` 把管家的档案单放在 `manager`，各处的档案列表里没有它。记忆合成 `memory.list`、`recall`、`create`、`delete`（`/api/v1/memories/{agent}`，管家是 `manager`）。帮工的 `memory_search`、`memory_add` 经 `/mcp` 也有了（7ddb14d），和管家的是两份实现。
 
-工具表（第 2 节的目录）2026-10-18 做了：`internal/tool` 排在 `task` 之后、`manager` 之前，按事情分文件（`look.go`、`talk.go`、`memory.go`、`dispatch.go`、`task.go`、`channel.go`），管家的 23 个工具和帮工的 6 个都搬了进去；`manager/tools.go`、`manager/schema.go` 删了，管家经 `tool.Service.Manager` 拿工具，调用者从它正在回答的输入取；`internal/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Manager`、`Session`），没有 `Can`。
+工具表（第 2 节的目录）2026-10-18 做了：`apps/server/src/tool` 排在 `task` 之后、`manager` 之前，按事情分文件（`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`），管家的 23 个工具和帮工的 6 个都搬了进去；`tool/tool.ts`、`tool/schemas.ts` 删了，管家经 `tool.Service.Manager` 拿工具，调用者从它正在回答的输入取；`apps/server/src/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Manager`、`Session`），没有 `Can`。
 
 还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `manager` 和 `session`（第 3 节）、`hire`（第 5 节）、管家页上改模型；从[先有能力，再有入口](docs/subsystems/core.md)并过来的：管家的 `dispatch` 现在直接 `Issue.Hire`、满了就拒绝，要改成先写工单再挪到待办（`issue.status`），和主人派的一条规则、满了排队。
 
 ## Alternatives considered
 
-**管家的工具留在 `internal/manager`，不进档案。** 本篇的前一版就是这样定的，理由是「它的工具是派活的规则，主人改了会让派活失灵」。不再这样：主人能改的是 `Can`（给不给一组工具），不是工具本身，工具的说明和参数仍然只在一处、由代码定；而留在 `internal/manager` 的代价已经出现了：记性工具写了两遍，领班和建档案没有地方加。
+**管家的工具留在 `apps/server/src/manager`，不进档案。** 本篇的前一版就是这样定的，理由是「它的工具是派活的规则，主人改了会让派活失灵」。不再这样：主人能改的是 `Can`（给不给一组工具），不是工具本身，工具的说明和参数仍然只在一处、由代码定；而留在 `apps/server/src/manager` 的代价已经出现了：记性工具写了两遍，领班和建档案没有地方加。
 
-**管家改叫 Agent。** `Agent` 已经指全部档案；另外 `internal/agent/brain`（我们自己的 agent 循环）和 `cmd/vibevalley` 的 `Agent.Model` 也叫 agent，再加一个就是第四个意思。名字 Manager 只留给这个角色和服务 `internal/manager`，界面上还叫管家。
+**管家改叫 Agent。** `Agent` 已经指全部档案；另外 `apps/server/src/agent/brain`（我们自己的 agent 循环）和 `cli.ts` 的 `Agent.Model` 也叫 agent，再加一个就是第四个意思。名字 Manager 只留给这个角色和服务 `apps/server/src/manager`，界面上还叫管家。
 
-**频道里管家也说成 `agent`。** 2026-10-17 做到一半撤回：频道里管家和 Session 的处理处处不同，合并以后要在五处写「是 agent 但不是管家」：给 Session 拼的消息行（`MessageLine` 写 id 和名字，管家只写名字）、Inbox 里谁问的（`InboxFromManager`）、开机叫醒在地里的（`chat.go`）、把不在地里的标成离开（`deliver.go`，管家会被标走）、账本里的交接（`game/progress.go`）。`manager` 这个种类把这件事说在一处，比五个例外清楚。
+**频道里管家也说成 `agent`。** 2026-10-17 做到一半撤回：频道里管家和 Session 的处理处处不同，合并以后要在五处写「是 agent 但不是管家」：给 Session 拼的消息行（`MessageLine` 写 id 和名字，管家只写名字）、Inbox 里谁问的（`InboxFromManager`）、开机叫醒在地里的（`channel/chat.ts`）、把不在地里的标成离开（`channel/chat.ts`，管家会被标走）、账本里的交接（`game/progress.ts`）。`manager` 这个种类把这件事说在一处，比五个例外清楚。
 
-**工具挂在 `api.go` 的操作上（`//vibevalley:tool`，`can` 里加 `agent`）。** 能力表那篇原来的打算，本篇第一稿也照着写了：能力表成为 agent 能做什么的唯一来源。不选：那样是 HTTP 接口决定 agent 能做什么，方向反了；模型的工具要的参数和说明和接口不一样，硬对上要么工具变差，要么为模型加接口。`protocol` 管给出去的形状，agent 的能力归档案和工具表。
+**工具挂在 `packages/protocol/src/api.ts` 的操作上（`//vibevalley:tool`，`can` 里加 `agent`）。** 能力表那篇原来的打算，本篇第一稿也照着写了：能力表成为 agent 能做什么的唯一来源。不选：那样是 HTTP 接口决定 agent 能做什么，方向反了；模型的工具要的参数和说明和接口不一样，硬对上要么工具变差，要么为模型加接口。`protocol` 管给出去的形状，agent 的能力归档案和工具表。
 
 **能力按角色分（`manager`、`lead`、`helper` 三档）。** 好懂，但每多一种用法就要多一档，档和档之间的差别还是要落到工具上；直接列能力，角色只是一组默认值。
 
@@ -125,13 +125,13 @@ type Caller struct {
 ## Acceptance criteria
 
 - `protocol.Agent` 有 `Can`；`agent list` 里管家的 `Can` 是全部，新建的档案是 `talk`、`memory`、`look`；`agent save` 能改 `Can`，管家的改不小。
-- `internal/manager` 和 `internal/mcp` 里都没有手写的工具定义；工具只在 `internal/tool`，每个标了能力，`go test ./internal/tool` 用 `CapabilityMembers` 查每种能力都有工具、每个工具都有能力。
+- `apps/server/src/manager` 和 `apps/server/src/mcp` 里都没有手写的工具定义；工具只在 `apps/server/src/tool`，每个标了能力，`tool/tool.test.ts` 查每种能力都有工具、每个工具都有能力（`Record<Capability, …>` 让漏了的编不过）。
 - 经 `/mcp`，一个只有默认能力的 Session 列不出也调不了 `dispatch`；主人给它的档案加上 `dispatch` 后，它能派出一张工单，排队规则和管家派的一样。
 - 干活中把档案的 `Can` 改小，下一次调用被拒。
 - 服务端里 `== protocol.ManagerAgent` 只剩 `agent` 包里，别的地方问 `agent.Service` 是不是常驻，或者查 `Can`。
-- `api.go` 的 `can` 里没有 `manager`、`session`；`protocol` 里没有能力和工具的对应。
+- `packages/protocol/src/api.ts` 的 `can` 里没有 `manager`、`session`；`protocol` 里没有能力和工具的对应。
 - 管家用 `hire` 建的档案是停用的，频道里有一条说明。
-- `go vet ./... && go test ./...`、`go run ./tool/shapegen`、`bun run flutter:check` 通过；改了管家的工具描述，跑一次 `verify-manager-evals`（要花钱，先问主人）。
+- `bun run server:check`、`bun run capabilities`、`bun run web:check` 通过；改了管家的工具描述，跑一次 `verify-manager-evals`（要花钱，先问主人）。
 
 ## Risks
 

@@ -67,10 +67,15 @@ Status: <状态>
 
 ```markdown
 ## Problem
+
 ## Proposal
+
 ……特有章节……
+
 ## Alternatives considered
+
 ## Acceptance criteria
+
 ## Risks
 ```
 
@@ -80,9 +85,13 @@ Status: <状态>
 
 ```markdown
 ## Problem
+
 ## Decision
+
 ……特有章节……
+
 ## Alternatives considered
+
 ## Consequences
 ```
 

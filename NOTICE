@@ -37,7 +37,7 @@ This product includes software from other projects:
     SOFTWARE.
 
 - Fusion Pixel Font (https://github.com/TakWolf/fusion-pixel-font),
-  SIL Open Font License 1.1; app/assets/fonts/fusion-pixel-OFL.txt.
+  SIL Open Font License 1.1; apps/web/public/fonts/fusion-pixel-OFL.txt.
 
 - gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
   server/internal/memory cuts Chinese with it; server/internal/memory/dict/zh_s.txt.gz is its
@@ -54,13 +54,13 @@ This product includes software from other projects:
   Copyright (c) 2021 Tencent
 
 - Hugeicons (https://hugeicons.com, @hugeicons/core-free-icons 4.3.5), MIT License.
-  design/pixel/icons holds its SVGs; the pixel button glyphs in app/assets/pixel are
+  design/pixel/icons holds its SVGs; the pixel button glyphs in apps/web/public/pixel are
   redrawn from their shapes.
   Copyright (c) 2025 Hugeicons
 
 - LobeHub Icons (https://github.com/lobehub/lobe-icons), MIT License.
   design/pixel/logos holds its PNGs of the coding agents' logos; the runtimes' pixel
-  logos in app/assets/pixel are redrawn from them.
+  logos in apps/web/public/pixel are redrawn from them.
   Copyright (c) 2023 LobeHub
 
 The four above are under the MIT License, whose terms are:

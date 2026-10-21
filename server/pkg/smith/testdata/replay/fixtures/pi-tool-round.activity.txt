@@ -1,2 +1,0 @@
-bash                 │ Running command: echo oar-round-one
-bash                 │ Running command: echo oar-round-two

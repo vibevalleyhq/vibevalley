@@ -1,2 +1,0 @@
-mcp__echo__echo      │ Using a tool
-mcp__remote__echo    │ Using a tool

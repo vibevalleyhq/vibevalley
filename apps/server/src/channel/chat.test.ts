@@ -1,0 +1,590 @@
+import { describe, expect, it } from "@effect/vitest";
+import { type ChatMessage, type Conversation, managerAgent, type RunTrigger, type Session } from "@vibevalley/protocol";
+import { conversationOf, generalOf, head, isBusy, messagesIn, wakeBreaker } from "@vibevalley/protocol/rules";
+import { Effect, Layer, PubSub, Stream } from "effect";
+import { SqlClient } from "effect/sql";
+import { type Config, Settings } from "../base/config.ts";
+import { Database } from "../base/db.ts";
+import { Core, layer as coreLayer } from "../core/core.ts";
+import { summaryOf } from "../session/rules.ts";
+import { type Delivered, type InputConsumed, type LaunchActivity, type SessionShape, Sessions } from "../session/session.ts";
+import { testConfig } from "../testing/layers.ts";
+import { Channels, type ManagerNews, layer as channelLayer } from "./chat.ts";
+
+/** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
+class FakeSessions {
+  slow = 1500;
+  stopped = false;
+  inputs = new Map<string, string[]>();
+  steers = new Map<string, string[]>();
+  last = new Map<string, string>();
+  running = new Map<string, string>();
+  n = 0;
+  core!: Core["Service"];
+  launches!: PubSub.PubSub<LaunchActivity>;
+
+  runsOf = (id: string) => [...(this.inputs.get(id) ?? [])];
+  steersOf = (id: string) => [...(this.steers.get(id) ?? [])];
+  private publish = (a: LaunchActivity) => PubSub.publishUnsafe(this.launches, a);
+  private apply = (...f: Parameters<Core["Service"]["apply"]>) => Effect.runSync(this.core.apply(...f));
+
+  deliver = (id: string, text: string): Delivered => {
+    if (!this.core.session(id)) return { kind: "refused", reason: "不在地里" };
+    const launch = this.running.get(id);
+    if (launch) {
+      this.steers.set(id, [...this.steersOf(id), text]);
+      return { kind: "steered", launch };
+    }
+    const fresh = `${id}-${++this.n}`;
+    this.running.set(id, fresh);
+    this.inputs.set(id, [...this.runsOf(id), text]);
+    this.apply({ type: "run", id });
+    void this.run(id, fresh, text);
+    return { kind: "run", launch: fresh, woke: true };
+  };
+
+  private async run(id: string, launch: string, input: string) {
+    if (input.includes("慢慢做")) {
+      const until = Date.now() + this.slow;
+      while (Date.now() < until) {
+        if (this.stopped) return;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    }
+    if (this.stopped) return;
+    const runs = this.runsOf(id).length;
+    if (input.includes("必败")) {
+      this.running.delete(id);
+      this.apply({ type: "report", id, outcome: "failed", summary: "provider said no", runs });
+      this.publish({ kind: "ended", id, launch, outcome: "failed", spoke: false });
+      return;
+    }
+    const line = input.split("\n").find((l) => l.startsWith("[target=")) ?? head(input, 20);
+    this.last.set(id, "结论：收到了（" + line + "）");
+    this.publish({ kind: "spoke", id, launch });
+    this.running.delete(id);
+    this.apply({ type: "report", id, outcome: "completed", summary: "收到了", runs });
+    this.publish({ kind: "ended", id, launch, outcome: "completed", spoke: true });
+  }
+}
+
+const fakeLayer = (x: FakeSessions) =>
+  Layer.effect(
+    Sessions,
+    Effect.gen(function* () {
+      x.core = yield* Core;
+      x.launches = yield* PubSub.unbounded<LaunchActivity>();
+      const consumed = yield* PubSub.unbounded<InputConsumed>();
+      yield* Effect.addFinalizer(() => Effect.sync(() => (x.stopped = true)));
+      return {
+        currentRun: () => "",
+        deliver: (id: string, text: string, _by: RunTrigger) => Effect.sync(() => x.deliver(id, text)),
+        launches: Effect.map(PubSub.subscribe(x.launches), Stream.fromSubscription),
+        inputsConsumed: Effect.map(PubSub.subscribe(consumed), Stream.fromSubscription),
+        find: (id: string) => {
+          const session = x.core.session(id);
+          return session ? { session, place: { project: "", cwd: "" }, lastText: x.last.get(id) ?? "" } : undefined;
+        },
+      } as unknown as SessionShape;
+    }),
+  );
+
+const world = (x: FakeSessions, config: Config = testConfig()) => {
+  const c: Config = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
+  return channelLayer.pipe(
+    Layer.provideMerge(fakeLayer(x)),
+    Layer.provideMerge(coreLayer),
+    Layer.provideMerge(Database),
+    Layer.provideMerge(Layer.succeed(Settings, c)),
+  );
+};
+
+const until = (ok: () => boolean | Promise<boolean>, what: string) =>
+  Effect.promise(async () => {
+    for (let i = 0; i < 500; i++) {
+      if (await ok()) return;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    throw new Error(`waited for ${what}`);
+  });
+
+const settle = Effect.sleep(100);
+
+/** The services of a test, and its helpers. */
+const farm = Effect.gen(function* () {
+  const core = yield* Core;
+  const chat = yield* Channels;
+  const sql = yield* SqlClient.SqlClient;
+  const messagesOf = (conversation: string) => messagesIn(core.state().chat, conversation);
+  const conversation = (id: string | undefined) => (id ? conversationOf(core.state().chat, id) : undefined);
+  const deliveries = (recipient: string) =>
+    Effect.runPromise(
+      sql<{
+        message_id: string;
+        reason: string;
+        wakes: boolean;
+        held_by: string;
+        state: string;
+      }>`select message_id, reason, wakes, coalesce(held_by, '') as held_by, state from channel_delivery where recipient_id = ${recipient} order by message_id`,
+    );
+  const deliveryOf = async (recipient: string, message: string) => (await deliveries(recipient)).find((d) => d.message_id === message);
+  return { core, chat, sql, messagesOf, conversation, deliveries, deliveryOf };
+});
+
+type Farm = Effect.Success<typeof farm>;
+
+const hire = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string, issue?: string) =>
+  Effect.gen(function* () {
+    yield* f.core.apply({
+      type: "hired",
+      session: {
+        id,
+        name: "帮工" + id,
+        agent: "lab",
+        runtime: "pi",
+        brief: task,
+        project,
+        hiredAt: Date.now(),
+        runs: 0,
+        phase: { _tag: "resting" },
+        ...(channel ? { channel } : {}),
+        ...(issue ? { issue } : {}),
+      } as Session,
+    });
+    let thread: Conversation | undefined;
+    yield* until(async () => (thread = f.conversation(await Effect.runPromise(f.chat.jobThread(id)))) !== undefined, "a job thread");
+    return thread!;
+  });
+
+/** Hired, and its first turn reported in its thread. */
+const hireAndRun = (f: Farm, x: FakeSessions, id: string, task: string, project: string, channel?: string) =>
+  Effect.gen(function* () {
+    const thread = yield* hire(f, x, id, task, project, channel);
+    expect(x.deliver(id, task).kind).toBe("run");
+    yield* until(() => f.messagesOf(thread.id).some((m) => m.kind === "report" && m.from === id), "its first report");
+    return thread;
+  });
+
+const news = (f: Farm) =>
+  Effect.gen(function* () {
+    const heard: ManagerNews[] = [];
+    yield* Effect.forkScoped(Stream.runForEach(yield* f.chat.forManager, (n) => Effect.sync(() => heard.push(n))));
+    return {
+      of: (message: string) =>
+        Effect.gen(function* () {
+          yield* until(() => heard.some((n) => n.messages.some((m) => m.id === message)), `the manager hearing of ${message}`);
+          return heard.find((n) => n.messages.some((m) => m.id === message))!;
+        }),
+    };
+  });
+
+const run = <A, E>(
+  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | import("effect").Scope.Scope>,
+  config?: Config,
+) => {
+  const x = new FakeSessions();
+  return Effect.flatMap(farm, (f) => body(f, x)).pipe(Effect.scoped, Effect.provide(world(x, config)));
+};
+
+describe("the chat", () => {
+  it.live("a job opens a thread under its dispatch", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hireAndRun(f, x, "w1", "写 hello", "chat-a");
+        const general = generalOf(f.core.state().chat)!;
+        expect(general.id).toBe(f.chat.general());
+        const dispatch = f.messagesOf(general.id).find((m) => m.kind === "dispatch" && m.session === "w1")!;
+        expect(thread.parent).toBe(dispatch.id);
+        expect(dispatch.text).toContain("派 @w1（帮工w1）去 chat-a：写 hello");
+        const report = f.messagesOf(thread.id).findLast((m) => m.kind === "report")!;
+        expect([report.from, report.fromKind, report.outcome]).toEqual(["w1", "agent", "completed"]);
+        expect(report.text).toContain("收到了");
+        expect(report.text).not.toContain("结论");
+        expect(yield* f.chat.jobThread("w1")).toBe(thread.id);
+      }),
+    ),
+  );
+
+  it.live("a session sent for no issue has a talk thread", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const talk = yield* hireAndRun(f, x, "w1", "写 hello", "chat-t");
+        expect([talk.subjectKind, talk.subjectId]).toEqual(["talk", "w1"]);
+        const job = yield* hire(f, x, "w2", "写 world", "chat-t", undefined, "i1");
+        expect([job.subjectKind, job.subjectId, job.id !== talk.id]).toEqual(["issue", "i1", true]);
+        yield* f.chat.say("把输出改成中文", talk.id, "");
+        yield* until(() => x.runsOf("w1").length >= 2, "a second turn");
+      }),
+    ),
+  );
+
+  it.live("the owner's words in a job thread wake its session", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hireAndRun(f, x, "w2", "写 hello", "chat-b");
+        const { message: said } = yield* f.chat.say("把输出改成中文", thread.id, "");
+        yield* until(() => x.runsOf("w2").length >= 2, "a second turn");
+        expect(x.runsOf("w2")[1]).toContain(`[target=#田头:${thread.parentNumber} msg=${said.number} from=主人] 把输出改成中文`);
+        yield* until(async () => (await f.deliveryOf("w2", said.id))?.state === "seen", "seen");
+        yield* until(() => f.messagesOf(thread.id).filter((m) => m.kind === "report").length >= 2, "its reply in the thread");
+      }),
+    ),
+  );
+
+  it.live("the general channel reaches the manager", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w3", "写 hello", "chat-c");
+        const heard = yield* news(f);
+        const before = x.runsOf("w3").length;
+        const { message: said } = yield* f.chat.say("今天进度怎么样", undefined, "");
+        const n = yield* heard.of(said.id);
+        expect([n.messages.length, n.messages[0]!.text, n.target, n.conversation]).toEqual([1, "今天进度怎么样", "#田头", f.chat.general()]);
+        yield* settle;
+        expect(x.runsOf("w3")).toHaveLength(before);
+        expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({ reason: "general", wakes: false });
+        expect(yield* Effect.promise(() => f.deliveryOf(managerAgent, said.id))).toMatchObject({ state: "seen" });
+      }),
+    ),
+  );
+
+  it.live("channels", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const channel = yield* f.chat.openChannel("#clock-in", "打卡页", "chat-ch");
+        expect(channel).toMatchObject({ name: "clock-in", project: "chat-ch", description: "打卡页" });
+        expect(yield* Effect.flip(f.chat.openChannel("clock-in", "", ""))).toMatchObject({ reason: expect.stringContaining("已经有") });
+        expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["田头", "clock-in"]);
+        const thread = yield* hireAndRun(f, x, "w4", "写 hello", "chat-ch", channel.id);
+        expect(thread.channel).toBe(channel.id);
+        const dispatch = f.messagesOf(channel.id).find((m) => m.kind === "dispatch" && m.session === "w4");
+        expect(thread.parent).toBe(dispatch?.id);
+        yield* hireAndRun(f, x, "w5", "写 hello", "chat-sq");
+        const heard = yield* news(f);
+        const { message: said } = yield* f.chat.say("打卡页今天能好吗", channel.id, "");
+        const n = yield* heard.of(said.id);
+        expect([n.conversation, n.target]).toEqual([channel.id, "#clock-in"]);
+        expect(yield* Effect.promise(() => f.deliveryOf("w4", said.id))).toMatchObject({ reason: "general" });
+        expect(yield* Effect.promise(() => f.deliveryOf("w5", said.id))).toBeUndefined();
+        expect((yield* f.chat.read("w4", { target: "#clock-in" })).target).toBe("#clock-in");
+        expect((yield* f.chat.speak("w4", "今天能好", { target: "#clock-in", anyway: true, confirm: true })).kind).toBe("sent");
+        expect(yield* Effect.flip(f.chat.read("w4", { target: "#nowhere" }))).toMatchObject({ reason: expect.stringContaining("没有叫 #nowhere 的频道") });
+        expect((yield* f.chat.channelOf(thread.id)).name).toBe("clock-in");
+        yield* f.chat.updateChannel(channel.id, undefined, "");
+        expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
+        expect(conversationOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
+      }),
+    ),
+  );
+
+  it.live("a busy session gets one notice for a burst", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hire(f, x, "w6", "慢慢做一个大活", "chat-d");
+        x.deliver("w6", "慢慢做一个大活");
+        expect(isBusy(f.core.session("w6")!)).toBe(true);
+        yield* f.chat.say("补充：顺便写测试", thread.id, "");
+        yield* f.chat.say("还有：写 README", thread.id, "");
+        yield* until(() => x.runsOf("w6").length >= 2, "a second turn");
+        const notices = x.steersOf("w6").filter((s) => s.startsWith("[田头提示]"));
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toContain("2 条");
+        expect(notices[0]).not.toContain("写测试");
+        expect(x.runsOf("w6")[1]).toContain("补充：顺便写测试");
+        expect(x.runsOf("w6")[1]).toContain("还有：写 README");
+      }),
+    ),
+  );
+
+  it.live("helpers calling each other stop at the hop limit", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hireAndRun(f, x, "w7", "写 hello", "chat-e");
+        // The manager is never cooled down, so only the hop limit holds.
+        for (let i = 1; i <= 5; i++) expect((yield* f.chat.speak("w7", `@管家 第 ${i} 次问`, { anyway: true })).kind).toBe("sent");
+        const held = (yield* Effect.promise(() => f.deliveries(managerAgent))).filter((d) => d.reason === "mention").map((d) => d.held_by);
+        expect(held).toEqual(["", "", "", "", "hop_limit"]);
+        const notices = f.messagesOf(thread.id).filter((m) => m.kind === "notice");
+        expect(notices).toHaveLength(1);
+        expect(notices[0]!.text).toContain("来回 4 次");
+      }),
+    ),
+  );
+
+  it.live("a session that fails every wake is not woken again until the owner says so", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const a = yield* hireAndRun(f, x, "w8", "写 hello", "chat-f");
+        yield* hireAndRun(f, x, "w9", "写 world", "chat-g");
+        yield* f.chat.say("@w8 这次必败", undefined, "");
+        yield* until(() => f.messagesOf(a.id).some((m) => m.kind === "notice" && m.text.includes("一叫醒就失败")), "the breaker notice");
+        expect(x.runsOf("w8")).toHaveLength(1 + wakeBreaker);
+        for (const d of yield* Effect.promise(() => f.deliveries("w8"))) if (d.reason === "mention") expect(d.state).toBe("pending");
+        expect((yield* f.chat.speak("w9", "@w8 你那边怎么样", { anyway: true })).kind).toBe("sent");
+        expect((yield* Effect.promise(() => f.deliveries("w8"))).at(-1)?.held_by).toBe("wake_breaker");
+        yield* f.chat.say("@w8 再试一次", undefined, "");
+        yield* until(() => x.runsOf("w8").at(-1)!.includes("再试一次"), "woken by the owner");
+      }),
+    ),
+  );
+
+  it.live("speaking: retries, what it has not seen, confirming a channel, absent names and threads", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hireAndRun(f, x, "w10", "写 hello", "chat-h");
+        const first = yield* f.chat.speak("w10", "我先看看代码");
+        const again = yield* f.chat.speak("w10", "我先看看代码");
+        expect([first.kind, again.kind, again.message?.id]).toEqual(["sent", "sent", first.message?.id]);
+        const { message: words } = yield* f.chat.say("先别动 main", thread.id, "");
+        const held = yield* f.chat.speak("w10", "我改好了");
+        expect([held.kind, held.shown?.map((m) => m.id)]).toEqual(["held", [words.id]]);
+        expect((yield* f.chat.speak("w10", "我改好了")).kind).toBe("sent");
+        yield* f.chat.read("w10");
+        const asked = yield* f.chat.speak("w10", "大家好", { target: "#田头" });
+        expect([asked.kind, asked.lastRead]).toEqual(["confirm", `#田头:${thread.parentNumber}`]);
+        expect((yield* f.chat.speak("w10", "大家好", { target: "#田头", confirm: true, anyway: true })).kind).toBe("sent");
+        const absent = yield* f.chat.speak("w10", "@w99 你在吗", { anyway: true });
+        expect([absent.kind, absent.absent]).toEqual(["sent", ["w99"]]);
+        expect(yield* Effect.flip(f.chat.speak("w10", "hi", { target: "#田头:999999" }))).toMatchObject({
+          reason: expect.stringContaining("没有 999999 这条消息"),
+        });
+        const { message: sq } = yield* f.chat.say("大家早", f.chat.general(), "");
+        const talk = yield* f.chat.speak("w10", "早", { target: `#田头:${sq.number}`, anyway: true });
+        expect([talk.kind, talk.target]).toEqual(["sent", `#田头:${sq.number}`]);
+        const under = f.core.state().chat?.conversations?.find((c) => c.parent === sq.id);
+        expect(under?.subjectKind).toBe("talk");
+      }),
+    ),
+  );
+
+  it.live("the manager's words grow, then are delivered once final", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w11", "写 hello", "chat-k");
+        const general = f.chat.general();
+        yield* f.chat.managerSays(general, "k1", "", false, "");
+        yield* f.chat.managerSays(general, "k1", "好的，", false, "");
+        yield* f.chat.managerSays(general, "k1", "好的，我叫 @w11 去", false, "");
+        const ours = () => f.messagesOf(general).filter((m) => m.from === managerAgent && m.kind === "chat");
+        expect(ours().map((m) => [m.final, m.text])).toEqual([[false, "好的，我叫 @w11 去"]]);
+        expect(yield* Effect.promise(() => f.deliveryOf("w11", ours()[0]!.id))).toBeUndefined();
+        yield* f.chat.managerSays(general, "k1", "好的，我叫 @w11 去看看", true, "");
+        expect(ours().map((m) => [m.final, m.mentions])).toEqual([[true, ["w11"]]]);
+        yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
+        yield* f.chat.notice(general, "定时到了", "schedule");
+        yield* settle;
+        const last = f.messagesOf(general).at(-1)!;
+        expect([last.kind, last.from]).toEqual(["notice", "system"]);
+        expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.message_id).not.toBe(last.id);
+      }),
+    ),
+  );
+
+  it.live("history, pages and marking read", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        const seqs: number[] = [];
+        for (let i = 0; i < 5; i++) seqs.push((yield* f.chat.say(`第 ${i} 句`, general, "")).message.number);
+        const got = yield* f.chat.history(general, seqs[4], 2);
+        expect(got.map((m) => m.number)).toEqual([seqs[2], seqs[3]]);
+        const page = yield* f.chat.read("user", { target: "#田头", before: seqs[4], limit: 2 });
+        expect([page.messages.map((m) => m.number), page.older]).toEqual([[seqs[2], seqs[3]], true]);
+        const older = yield* f.chat.read("user", { target: "#田头", before: page.messages[0]!.number, limit: 2 });
+        expect([older.messages.map((m) => m.number), older.older]).toEqual([[seqs[0], seqs[1]], false]);
+        yield* f.chat.markRead(general, seqs[1]!);
+        expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Refused");
+        expect(generalOf(f.core.state().chat)?.read).toBe(seqs[4]);
+        expect((yield* Effect.flip(f.chat.say("  ", undefined, "")))._tag).toBe("Refused");
+        expect(yield* f.chat.managerDigest()).toEqual([]);
+      }),
+    ),
+  );
+
+  it.live("the inbox and the manager's digest", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const thread = yield* hireAndRun(f, x, "w12", "写 hello", "chat-l");
+        const digest = yield* f.chat.managerDigest();
+        expect(digest.map((d) => [d.from, d.target])).toEqual([["w12", `#田头:${thread.parentNumber}`]]);
+        expect(yield* f.chat.managerDigest()).toHaveLength(1);
+        yield* f.sql`update channel_delivery set state = 'seen' where recipient_id = ${managerAgent} and message_id = ${digest[0]!.id}`.pipe(Effect.orDie);
+        expect(yield* f.chat.managerDigest()).toEqual([]);
+        yield* f.chat.say("大家看一下", f.chat.general(), "");
+        const inbox = yield* f.chat.inbox("w12");
+        expect(inbox).toEqual([{ target: "#田头", unread: 2, mentionsYou: true, latest: "主人" }]);
+        yield* f.chat.read("w12", { target: "#田头" });
+        expect(yield* f.chat.inbox("w12")).toEqual([]);
+      }),
+    ),
+  );
+
+  it.live("a session that leaves has what was for it dropped", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w13", "写 hello", "chat-m");
+        yield* until(() => !isBusy(f.core.session("w13")!), "resting");
+        yield* f.chat.say("随便说说", f.chat.general(), "");
+        yield* f.core.apply({ type: "left", id: "w13" });
+        yield* until(async () => (await f.deliveries("w13")).at(-1)?.state === "dropped", "dropped");
+        const left = yield* f.sql<{ left_at: number | null }>`select left_at from channel_participant where id = 'w13'`;
+        expect(left[0]?.left_at).not.toBeNull();
+      }),
+    ),
+  );
+
+  it.live("after a restart what was handed is given again", () => {
+    const config = { ...testConfig(), db: "" };
+    let thread: Conversation;
+    let said: ChatMessage;
+    return Effect.gen(function* () {
+      yield* run(
+        (f, x) =>
+          Effect.gen(function* () {
+            thread = yield* hireAndRun(f, x, "w14", "写 hello", "chat-i");
+            x.slow = 60_000;
+            said = (yield* f.chat.say("慢慢做：再加一个文件", thread.id, "")).message;
+            yield* until(async () => (await f.deliveryOf("w14", said.id))?.state === "handed", "handed");
+          }),
+        config,
+      );
+      yield* run(
+        (g, y) =>
+          Effect.gen(function* () {
+            y.slow = 10;
+            expect(g.core.session("w14")).toBeDefined();
+            yield* g.core.apply({ type: "report", id: "w14", outcome: "interrupted", summary: "重启了", runs: 1 });
+            yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
+            expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
+            expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
+            expect(g.messagesOf(thread.id).some((m) => m.id === said.id)).toBe(true);
+          }),
+        config,
+      );
+    });
+  });
+
+  it("a report's summary is its verdict", () => {
+    expect(summaryOf("先看看。\n\n**结论：** 改好了，测试通过。\n\n备注：无")).toBe("改好了，测试通过。");
+    expect(summaryOf("做了一些事\n\n- 结论：好了")).toBe("好了");
+    expect(summaryOf("第一段\n\n第二段")).toBe("第一段\n\n第二段");
+    expect(head("😀abc", 1)).toBe("");
+  });
+
+  it.live("a message keeps the run that made it", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        yield* f.chat.managerSays(general, "first-run", "partial", false, "run-first");
+        yield* f.chat.managerSays(general, "first-run", "complete", true, "run-second");
+        yield* f.chat.managerSays(general, "legacy", "unlinked", true, "");
+        const saved = yield* f.chat.history(general);
+        expect(saved.map((m) => [m.text, m.run])).toEqual([
+          ["complete", "run-first"],
+          ["unlinked", undefined],
+        ]);
+        yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
+        yield* f.core.apply({ type: "report", id: "run-helper", outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
+        yield* until(
+          () => (f.core.state().chat?.messages ?? []).some((m) => m.from === "run-helper" && m.run === "finished-run"),
+          "the report carries its run",
+        );
+      }),
+    ),
+  );
+
+  it.live("a send key writes once", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const first = yield* f.chat.say("早", undefined, "k1");
+        const second = yield* f.chat.say("早", undefined, "k1");
+        expect([first.again, second.again, second.message.id, second.message.number]).toEqual([false, true, first.message.id, first.message.number]);
+        expect((yield* f.chat.say("早", undefined, "k2")).again).toBe(false);
+        for (let i = 0; i < 2; i++) expect((yield* f.chat.say("晚", undefined, "")).again).toBe(false);
+        expect(yield* Effect.flip(f.chat.say("早", undefined, "k".repeat(65)))).toMatchObject({ reason: "sendKey 太长" });
+        for (let i = 0; i < 2; i++) yield* f.chat.spoken("user", "电话里说的", "k3");
+        const said: Record<string, number> = {};
+        for (const m of f.messagesOf(f.chat.general())) if (m.from === "user") said[m.text] = (said[m.text] ?? 0) + 1;
+        expect(said).toEqual({ 早: 2, 晚: 2, 电话里说的: 1 });
+        expect(yield* Effect.promise(() => f.deliveries(managerAgent))).toHaveLength(4);
+      }),
+    ),
+  );
+
+  const trigger = (sql: SqlClient.SqlClient, name: string, on: string, when = "") =>
+    Effect.gen(function* () {
+      yield* sql.unsafe(`create function ${name}() returns trigger language plpgsql as $$ begin raise exception '${name}'; end $$`);
+      yield* sql.unsafe(`create trigger ${name} ${on} for each row ${when} execute function ${name}()`);
+    }).pipe(Effect.orDie);
+  const drop = (sql: SqlClient.SqlClient, name: string, table: string) => sql.unsafe(`drop trigger ${name} on ${table}`).pipe(Effect.orDie);
+
+  it.live("a read receipt is written whole or not at all", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        yield* f.chat.managerSays(general, "read", "hello", true, "");
+        const [message] = yield* f.chat.history(general);
+        yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('user', ${message!.id})`.pipe(Effect.orDie);
+        yield* trigger(f.sql, "fail_receipt", "before delete on channel_seen_mark");
+        expect((yield* Effect.exit(f.chat.markRead(general, message!.number)))._tag).toBe("Failure");
+        expect(
+          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
+        ).toEqual([]);
+        yield* drop(f.sql, "fail_receipt", "channel_seen_mark");
+        yield* f.chat.markRead(general, message!.number);
+        expect(
+          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
+        ).toEqual([{ read_number: message!.number }]);
+      }),
+    ),
+  );
+
+  it.live("a job whose thread cannot be followed leaves no dispatch, and a second try writes one", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        yield* trigger(f.sql, "fail_owner", "before insert on channel_follow", "when (new.reason = 'owner')");
+        yield* f.core.apply({
+          type: "hired",
+          session: {
+            id: "w1",
+            name: "helper",
+            agent: "lab",
+            runtime: "pi",
+            brief: "work",
+            hiredAt: Date.now(),
+            runs: 0,
+            phase: { _tag: "resting" },
+          } as Session,
+        });
+        yield* settle;
+        expect(yield* f.chat.history(f.chat.general())).toEqual([]);
+        yield* drop(f.sql, "fail_owner", "channel_follow");
+        // Another hire opens every job on the farm again.
+        yield* f.core.apply({
+          type: "hired",
+          session: { id: "w2", name: "other", agent: "lab", runtime: "pi", brief: "more", hiredAt: Date.now(), runs: 0, phase: { _tag: "resting" } } as Session,
+        });
+        yield* until(() => f.messagesOf(f.chat.general()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
+        const thread = (yield* f.chat.jobThread("w1"))!;
+        expect(
+          (yield* f.sql`select participant_id from channel_follow where conversation_id = ${thread}`.pipe(Effect.orDie)).map((r) => r.participant_id),
+        ).toEqual(["w1"]);
+      }),
+    ),
+  );
+
+  it.live("a streamed message whose end could not be written ends on the next try", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        yield* f.chat.managerSays(general, "stream", "partial", false, "");
+        yield* trigger(f.sql, "fail_final", "before update on channel_message", "when (new.final)");
+        yield* f.chat.managerSays(general, "stream", "complete", true, "");
+        expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[false, "partial"]]);
+        yield* drop(f.sql, "fail_final", "channel_message");
+        yield* f.chat.managerSays(general, "stream", "complete", true, "");
+        expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[true, "complete"]]);
+      }),
+    ),
+  );
+});

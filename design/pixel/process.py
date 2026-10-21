@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (app/assets/pixel).
+"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (apps/web/public/pixel).
 
 The image tool paints "pixel art" whose pixels are blocks of roughly 4 to 8 image pixels, not quite on a grid.
 Every picture is shrunk to the size it is drawn at in the game (one art pixel = one canvas pixel), with box
 averaging, then snapped to a small palette with hard alpha, so the game can scale it up by whole numbers.
 
 Usage: python3 process.py [map plots manager char-bear ui-icons look-farmer ...]   (default: everything in raw/)
-Writes app/assets/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
+Writes apps/web/public/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
 (the point that stands on the ground, from its top-left: the middle of its lowest row, or of its feet when it holds a
 tool to the ground; a character also records hx, hy, the middle of its head), and the sheet it was cut from.
 Sprites take the painted farm's names where they replace one (icon-coin, act-search, manager-face); the client reads
-them through lib/sprites/atlas.dart. ui-cursors becomes the pixel cursors in app/assets/cursors.
+them through apps/web/src/farm/world/sprites.ts. ui-cursors becomes the pixel cursors in apps/web/public/cursors.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from straighten import dirt_of, straighten_field, straighten_plots
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw"
-OUT = HERE.parent.parent / "app" / "assets" / "pixel"
+OUT = HERE.parent.parent / "apps" / "web" / "public" / "pixel"
 # The pixel density: how many of a picture's pixels make one of the village's art pixels. The game's pictures are
 # drawn twice as dense (gen.sh hd-<name>, from raw/hd-<name>.png); by default the density is the one the game's
 # pictures already have (its map's width against the village's 384), so a sheet is never cut to another. A trial
@@ -141,7 +141,7 @@ SHEETS: dict[str, Sheet] = {
     # The runtimes' logos (logos/, LobeHub Icons) as pixel art: logo-<runtime id>, pinned on the machines.
     "logos": Sheet(4, 2, [f"logo-{r}" for r in ["claude", "codex", "opencode", "pi", "cursor", "grok", "kimi", "antigravity"]], height=24, reference=list(range(8)), logos=True),
     "ui-icons-extra": Sheet(3, 2, ["connector-weixin", "connector-feishu", "connector-qq", "icon-deed", "icon-pigeon", "app-sprout"], height=24, reference=list(range(6)), logos=True),
-    # The energy meter's bottles (lib/ui/kit/energy.dart): level and how full, one picture each.
+    # The energy meter's bottles (lib/ui/energy.dart): level and how full, one picture each.
     "energy": Sheet(3, 3, [
         "energy-plenty-100", "energy-plenty-75", "energy-plenty-50",
         "energy-low-40", "energy-low-25", "energy-empty-10",
@@ -168,7 +168,7 @@ SHEETS: dict[str, Sheet] = {
         "button-refresh", "button-folder", "button-search", "button-edit",
         "button-open", "button-filter", "button-settings", "button-more",
     ], height=16, reference=[0, 1, 2, 3], pieces=True),
-    # The owner's face, beside the manager's and the helpers' in the chat (lib/desk/chat/chat_widgets.dart OwnerFace).
+    # The owner's face, beside the manager's and the helpers' in the chat (lib/shared/chat_widgets.dart OwnerFace).
     "owner": Sheet(1, 1, ["owner-face"], height=32, reference=[0]),
     # The projects page's commit calendar: a day's plot, bare to in flower (lib/desk/projects/codebase.dart).
     "calendar": Sheet(3, 2, ["day-0", "day-1", "day-2", "day-3", "day-4", None], height=12, reference=[0, 1, 2, 3, 4]),

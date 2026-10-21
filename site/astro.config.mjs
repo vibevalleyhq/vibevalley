@@ -1,5 +1,5 @@
 // The site at vibevalley.dev: static pages, Chinese at / and English at /en/. The art and the pixel font are the
-// game's own (app/assets), imported from there, so there is one copy of each. Styles are Tailwind (the game's theme
+// game's own (apps/web/public), imported from there, so there is one copy of each. Styles are Tailwind (the game's theme
 // in src/styles/global.css); the parts that move with the page are React islands, rendered at build time like the
 // rest and brought to life in the browser.
 import react from '@astrojs/react'

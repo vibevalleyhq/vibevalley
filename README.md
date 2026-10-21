@@ -33,14 +33,14 @@
 
 ```mermaid
 flowchart LR
-  you([你]) -- 打字 / 语音 --> app[Flutter 客户端<br/>农场画面、田头、配置]
+  you([你]) -- 打字 / 语音 --> app[React 页面<br/>农场画面、田头、配置]
   app -- HTTP 命令 --> server
   server -- SSE：折好的核心状态 --> app
-  subgraph server[Go 服务端 127.0.0.1:8787]
+  subgraph server[TypeScript 服务端 127.0.0.1:8787]
     manager[管家<br/>vibevalley 自己的 agent]
-    chat[田头<br/>SQLite]
+    chat[田头<br/>PGlite]
     site[核心状态<br/>只由事实改变]
-    sessions[帮工<br/>smith]
+    sessions[帮工<br/>oar]
   end
   manager --> sessions
   sessions -- 会话事件 --> site
@@ -48,47 +48,48 @@ flowchart LR
   rt --> repo[(你的项目<br/>每个帮工一个 worktree)]
 ```
 
-- **服务端**（`server/`，Go，不用 cgo）：管家、帮工、田头、项目和收获、种植计划、语音、连接器都在这一个进程里。帮工由 [smith](server/pkg/smith) 驱动，它是 oar 的 Go 移植，统一驱动不同的编码 agent 程序。
-- **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，客户端只读折好的结果。
-- **客户端**（`app/`，Flutter）：农场和像素村（Flame）、田头、配置页、语音。macOS 版把服务端打进了应用里，打开就能用。
-- **形状只写一次**：接口和数据形状写在 Go 里（`server/internal/protocol/shapes.go`、`api.go`），Flutter 的类型和接口客户端由生成器从它写出来，两边不会对不上。
+- **服务端**（`apps/server`，TypeScript，Effect v4，跑在 Node 上）：管家、帮工、田头、项目和收获、种植计划、语音、连接器都在这一个进程里，数据在 PGlite。帮工由 [oar](https://github.com/botiverse/oar) 驱动，它统一驱动不同的编码 agent 程序。
+- **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
+- **页面**（`apps/web`，React）：农场和像素村、田头、工单、文档、配置页、语音，由服务端在 `/` 提供；浏览器直接打开就能用。
+- **桌面版**（`apps/desktop`，Electron）：带着服务端起来、打开它的页面，加上通知、菜单栏和语音的快捷键。
+- **形状只写一次**：接口和数据形状写在 `packages/protocol`（`shapes.ts`、`schema.ts`、`api.ts`），服务端和页面 import 同一份，两边不会对不上。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
 
 ## 快速开始
 
 > [!NOTE]
-> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/Library/Application Support/vibevalley`，单独跑的服务端是 `~/.vibevalley`）。遇到问题欢迎提 issue。
+> 仓库正在密集调整：概念、接口和存盘格式都还会变，可能会有 bug，升级后旧数据也可能要迁移。升级前先备份农场的数据（`~/.vibevalley`）。遇到问题欢迎提 issue。
 
 ### 需要
 
-- macOS（Apple 芯片）。客户端是 Flutter，macOS 应用是主要的形态；手机和别的电脑经「连接到本机」连进来。
+- macOS（Apple 芯片）。macOS 应用是主要的形态，单独跑的服务端也能用浏览器打开；手机版正在换成新的壳，暂时用不了。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
-- 构建要 Go 1.27、Flutter 3.47 和 Xcode。
+- 构建要 Bun 1.4 和 Node 24。
 - 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
 
 ### 打一个 macOS 应用
 
 ```bash
 git clone https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley
-app/tool/agora-voice-only.sh        # 第一次：只留语音要的 Agora 组件
-bun run package:mac                 # 打出 app/build/vibevalley.app 和 .dmg（就是 app/tool/build-macos.sh）
-open app/build/vibevalley.app
+bun install
+bun run package:mac                 # 打出 apps/desktop/dist 里的 VibeValley.app 和 .dmg
+open apps/desktop/dist/mac-arm64/VibeValley.app
 ```
 
 ![首页](docs/images/title.jpg)
 
-应用会在一个空闲的本机端口上启动内置的服务端。农场的数据放在 `~/Library/Application Support/vibevalley`，日志在 `~/Library/Logs/vibevalley/server.log`。
+应用没有签名，第一次打开要在「系统设置 → 隐私与安全性」里放行。它在一个空闲的本机端口上启动内置的服务端；农场的数据放在 `~/.vibevalley`（`VIBEVALLEY_HOME`），服务端的日志在 `~/.vibevalley/logs/desktop-server.log`。
 
 ### 或者分开跑（开发时）
 
 ```bash
-cd server && go run ./cmd/server                                                  # 服务端，127.0.0.1:8787
-cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:8787  # 客户端
+bun install && bun run --filter vibevalley-web build    # 页面
+cd apps/server && npm start -- --web ../web/dist      # 服务端，127.0.0.1:8787，浏览器打开它
 ```
 
-单独跑的服务端，数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙可以放进 `$VIBEVALLEY_HOME/.env`，也可以用 `--env-file` 另给一个文件。
+数据同样在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙可以放进 `$VIBEVALLEY_HOME/.env`，也可以用 `--env-file` 另给一个文件。
 
 ### 第一次打开
 
@@ -102,13 +103,11 @@ cd app && flutter run -d macos --dart-define=VIBEVALLEY_SERVER=http://127.0.0.1:
 ## 目录
 
 ```
-server/            Go 服务端，一个 Go 模块；cmd/server 单独跑它
-  internal/        按概念分的服务：工单、执行、项目、群聊、管家、频道和连接器、游戏……
-  internal/protocol/  形状、接口和规则的唯一来源；tool/shapegen 从它生成 Go 和 Flutter 的代码
-  pkg/smith/       oar 的 Go 移植：驱动 pi、Claude Code、Codex 等编码 agent
-  pkg/             别的能单独拿去用的库：VibeValley 自己的 agent、数据库查询、微信、飞书、QQ、Agora
-  migrations/      SQLite 的迁移
-app/               Flutter 客户端：农场、像素村、田头、配置页、语音；macOS 版带着服务端
+apps/server/       TypeScript 服务端（Effect v4、PGlite）：src/ 按概念分的服务（工单、执行、项目、群聊、管家、频道和连接器、游戏……），db/ 表结构和查询
+apps/web/          React 页面：农场、像素村、田头、工单、文档、配置页、语音；服务端在 / 提供
+apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
+packages/protocol/ 形状、接口和几处共用的规则的唯一来源，服务端和页面都 import 它
+packages/host/     宿主接口：通知、菜单栏、快捷键，没有的是 null
 site/              官网 vibevalley.dev（Astro）
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作
@@ -124,9 +123,9 @@ docs/              文档：现在怎么用、怎么开发、各部分怎么工�
 
 ## 致谢
 
-- [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时，`server/pkg/smith` 是它的 Go 移植。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
-- [Flutter](https://flutter.dev/) 和 [Flame](https://flame-engine.org/)：客户端和像素村。
-- [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写成 Go。
+- [oar](https://github.com/botiverse/oar)（botiverse，Apache-2.0）：驱动编码 agent 的运行时。田头的频道、工单串和外部渠道参照了 botiverse 的 Raft。
+- [Effect](https://effect.website/)、[PGlite](https://pglite.dev/)、[React](https://react.dev/) 和 [Electron](https://www.electronjs.org/)：服务端、数据库、页面和桌面版。
+- [Agora Conversational AI](https://www.agora.io/)：语音管家；服务端照它的官方示例 [agent-quickstart-nextjs](https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs)（MIT）改写。
 - [DeepSeek](https://www.deepseek.com/)：管家用的模型。
 - [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）：像素字体。
 - [Hugeicons](https://hugeicons.com/)（MIT）、[LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）：像素图标和农机 logo 照它们的形状重画。

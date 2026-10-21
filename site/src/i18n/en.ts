@@ -75,9 +75,9 @@ export const en: Copy = {
   },
   devices: {
     title: 'Your farm on every screen',
-    text: 'The app is written in Flutter, so the Mac, the iPhone and Android get the same one. The farm runs on your Mac; VibeValley on your phone scans the yard gate\u2019s QR code and joins the same farm: hand out work in the farm chat, follow the tickets, read the helpers\u2019 reports. Another Mac joins with a pairing link. Away from home, connect the farm chat to WeChat, Feishu or QQ.',
+    text: 'The interface is one React page: the Mac app and a browser open the same one. The farm runs on your Mac: hand out work in the farm chat, follow the tickets, read the helpers\u2019 reports. Away from home, connect the farm chat to WeChat, Feishu or QQ.',
     platforms: ['macOS', 'iPhone', 'Android'],
-    note: 'For now you build the phone app yourself, from the same source. Open the yard gate only on a network you trust.',
+    note: 'The phone app is moving to a new shell and is not available for now. Open the yard gate only on a network you trust.',
     shots: { mac: 'The farm on a Mac', chat: 'The farm chat on a phone', tickets: 'The tickets on a phone' },
   },
   screens: {
@@ -102,7 +102,7 @@ export const en: Copy = {
       'macOS on Apple silicon',
       'At least one coding agent installed and signed in: pi, Claude Code or Codex',
       'A DeepSeek API key, for the manager',
-      'To build it yourself: Go 1.27, Flutter 3.47 and Xcode',
+      'To build it yourself: Bun 1.4 and Node 24',
     ],
     build: 'Build the macOS app',
     more: 'More in the README and docs/ in the repository.',

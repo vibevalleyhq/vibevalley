@@ -3,7 +3,7 @@
 // there. Everything is in the field's own pixels (an art pixel each); the page draws the field two or three times over.
 // The page's scroll through the story runs 0 to 1: a quarter for each place, the first 30% of it walking there.
 
-/** A picture in the field: its address, size, and the point it stands on (from app/assets/pixel/sprites.json). */
+/** A picture in the field: its address, size, and the point it stands on (from apps/web/public/pixel/sprites.json). */
 export interface Art {
   src: string
   w: number

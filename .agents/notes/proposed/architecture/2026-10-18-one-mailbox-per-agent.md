@@ -6,9 +6,9 @@ Status: proposed
 
 给 agent 的话（频道里的消息、交给管家的工单、到点的定时、巡查的发现、计划的进展、外面聊天软件和电话里的话、帮工的汇报）什么时候、以什么方式交到 agent 手里，现在没有一个地方说了算。2026-10-18 数下来：
 
-- **入口至少 7 条，各走各的**：频道投递（`channel/deliver.go` 的 `kicked`）、工单交给管家（`issue/manager.go` 的 `forManager`）、定时（`issue/dispatch.go` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`manager/patrol.go`）、计划（`task.go` 的 `tellManager`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`manager.Call`，直接插进管家，频道里只留记录）。
+- **入口至少 7 条，各走各的**：频道投递（`channel/chat.ts` 的 `kicked`）、工单交给管家（`manager/manager.ts` 的 `forManager`）、定时（`issue/issue.ts` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`manager/manager.ts`）、计划（`tool/tool.ts` 的 `tellManager`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`manager.Call`，直接插进管家，频道里只留记录）。
 - **「插话还是排到这一轮之后」写了三遍，判断依据各不相同**：频道给帮工的（`session.Deliver` → oar 的 `steerOrQueue`，看农机能不能插话）、频道给管家的（`heardInChat`：只有主人的话插话）、管家的脑子（`manager.sendInput` 在 `brain.Send` 和 `brain.Later` 里二选一）。
-- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`manager/patrol.go`）、定时每 20 秒看一次（`schedule`）、排队的工单每 5 秒找一次空地（`issue/dispatch.go`）、管家把这期间的汇报和农场现状拼进一条输入（`manager.news`、`farmNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
+- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`manager/manager.ts`）、定时每 20 秒看一次（`schedule`）、排队的工单每 5 秒找一次空地（`issue/issue.ts`）、管家把这期间的汇报和农场现状拼进一条输入（`manager.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
 - **管家和帮工收话是两套**：帮工经频道投递（`channel_delivery` 表记着谁该收、收没收到），管家经五个 `base.Hub` 订阅，什么也不存，重启前没处理的就没了（巡查过后会再报，计划和工单的消息不会）。
 
 结果：想改一条节奏规则（比如「主人的话总是插话」「帮工忙时别一条一条打断它」），要先找到它在哪几处各写了一份；加一个新入口（比如再接一家聊天软件，或者让领班收到它派出去的工单的进展），又要再写一遍「叫不叫、什么时候叫、怎么叫」。
@@ -25,7 +25,7 @@ Status: proposed
 |---|---|---|
 | 信箱（`Mailbox`） | 一个 agent 还没处理的话，按到达的先后 | 不是 `protocol.Inbox`：那是「要主人处理的事」，从核心状态现算，名字留给它 |
 | 一封（`Mail`） | 信箱里的一条：给谁、从哪来（`Source`）、正文、指向的消息（有的话）、急不急（`Urgency`） | 不是频道消息：频道消息是大家看得见的话，一封是「这条要交给这个 agent」 |
-| 编排层（包 `internal/mailbox`） | 收信、按规则决定什么时候交、交出去、记下交没交到 | 不决定谁该听到（频道的 `chatAudience`），也不决定能不能开工（Session 的同时干活上限） |
+| 编排层（包 `apps/server/src/mailbox`） | 收信、按规则决定什么时候交、交出去、记下交没交到 | 不决定谁该听到（频道的 `chatAudience`），也不决定能不能开工（Session 的同时干活上限） |
 
 农场里画成：帮工头顶的信封、管家桌上的信件堆。
 
@@ -66,7 +66,7 @@ Status: proposed
 | `patrol`、`task` | `digest` | — |
 
 - 照 Hermes 的保护：收件人手上有正在跑的子活（管家或领班派出去、还没交回的），`interrupt` 降成 `queue`，一句追问不该打断整串活。
-- 插话的落点照 Hermes 的 `steer`：不是随时塞进去，而是在这一批工具调用结束、下一次请求模型之前，作为补充交出；VibeValley 自己的 agent（`internal/agent/brain`）按这个时机做，外部农机能插话的交给 oar 的 `steer`，不能的退成 `queue`。
+- 插话的落点照 Hermes 的 `steer`：不是随时塞进去，而是在这一批工具调用结束、下一次请求模型之前，作为补充交出；VibeValley 自己的 agent（`apps/server/src/agent/brain`）按这个时机做，外部农机能插话的交给 oar 的 `steer`，不能的退成 `queue`。
 
 ### 4. 交出去：每个 agent 一个泵
 
@@ -90,7 +90,7 @@ Status: proposed
 - 「谁该听到」（`chatAudience`：@、工单串、跟着的串、田头）留在 `channel`：这是频道的规则。
 - 同时干活的上限（工作区、农机、项目三层）留在 `session`：这是开工的规则。
 - 排队的工单找空地（`issue` 每 5 秒）留在 `issue`：那是派活，不是交话。
-- agent 自己的 Task 里帮手做完了交回结果，是 `internal/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
+- agent 自己的 Task 里帮手做完了交回结果，是 `apps/server/src/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
 - 定时的时钟（`schedule` 每 20 秒）留在 `schedule`：到点只是投一封信。
 - 巡查留着它的「过了宽限期才报」的规则，只把报的方式换成投信；以后可以只是一种 `digest`。
 
@@ -101,7 +101,7 @@ Status: proposed
 
 ### 做的顺序
 
-1. `internal/mailbox`：`Mail`、`Urgency`、规则表、每个 agent 的泵；Session 一侧把 `Deliver` 拆成开一轮、插话、排到后面三个动作；`channel` 改成投信，节流和熔断搬过来。行为对照现在的测试不变，除了默认表里有意改的几格。
+1. `apps/server/src/mailbox`：`Mail`、`Urgency`、规则表、每个 agent 的泵；Session 一侧把 `Deliver` 拆成开一轮、插话、排到后面三个动作；`channel` 改成投信，节流和熔断搬过来。行为对照现在的测试不变，除了默认表里有意改的几格。
 2. 管家接上：五个 Hub 和 `heardInChat`、`onWork` 换成信箱；电话、听写、连接器都投 `owner` 的信。
 3. 落库（第 6 节第二步）。
 4. 客户端：每个 agent 的信箱有几封、最早的等了多久，进核心状态，农场里画出来。
@@ -123,7 +123,7 @@ Status: proposed
 - 冷却、跳数、熔断、攒一批的参数在一处，对管家和帮工都生效，有测试。
 - 管家有正在跑的子活时，`interrupt` 变成 `queue`，有测试。
 - 插话没来得及交的，下一轮开头能看到，有测试。
-- `go vet ./... && go test ./...` 通过；照 `verify-server` 在真服务端上：帮工忙着时在它的工单串里连说三句，它在这一轮里收到一次补充，而不是三次。
+- `bun run server:check` 通过；照 `verify-server` 在真服务端上：帮工忙着时在它的工单串里连说三句，它在这一轮里收到一次补充，而不是三次。
 
 ## Risks
 

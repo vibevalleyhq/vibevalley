@@ -18,7 +18,7 @@ const AT: Record<Scene, string> = { morning: 'morning:opacity-100', day: 'day:op
 /** The hour's own button looks pressed while the farm is at that hour. */
 const PRESSED: Record<Scene, string> = { morning: 'morning:bg-wheat', day: 'day:bg-wheat', evening: 'evening:bg-wheat', night: 'night:bg-wheat' }
 
-/** The plants in front of the camera that frame the village in the game (app/lib/village/game.dart): at the hero's
+/** The plants in front of the camera that frame the village in the game (apps/web/src/farm/canvas): at the hero's
  *  corners, mostly past its edges. Two art pixels a pixel, three on a wide screen. */
 const FRAME = [
   { name: 'branchLeft', className: 'top-[-44px] left-[-60px] w-[206px] lg:top-[-66px] lg:left-[-90px] lg:w-[309px]' },

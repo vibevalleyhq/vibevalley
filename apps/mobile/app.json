@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "VibeValley",
+    "slug": "vibevalley",
+    "scheme": "vibevalley",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2a1d2e"
+    },
+    "ios": {
+      "bundleIdentifier": "dev.vibevalley.mobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSMicrophoneUsageDescription": "和管家打电话要用麦克风",
+        "NSLocalNetworkUsageDescription": "连进同一个网络里那台电脑上的农场",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "dev.vibevalley.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#2a1d2e"
+      },
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.MODIFY_AUDIO_SETTINGS"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "扫「连接到本机」的二维码要用相机",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          },
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ]
+    ]
+  }
+}

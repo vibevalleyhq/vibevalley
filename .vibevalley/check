@@ -7,11 +7,11 @@ main=${main#origin/}
 base=$(git merge-base "$main" HEAD)
 changed=$(git diff --name-only --no-renames "$base")
 server=false
-app=false
+web=false
 docs=false
 while IFS= read -r path; do
-    case "$path" in server/*) server=true ;; esac
-    case "$path" in app/*|server/internal/protocol/*) app=true ;; esac
+    case "$path" in apps/server/*|packages/protocol/*) server=true ;; esac
+    case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
     case "$path" in docs/*|.agents/*|AGENTS.md|*.md) docs=true ;; esac
 done <<PATHS
 $changed
@@ -25,11 +25,10 @@ for key in $(env | cut -d= -f1); do
 done
 
 if "$server"; then
-    (cd server && go vet ./... && go test ./...)
-    bun run go:deadcode
+    bun run server:check
 fi
-if "$app"; then
-    bun run flutter:check
+if "$web"; then
+    bun run web:check
 fi
 if "$docs"; then
     bun run docs:verify

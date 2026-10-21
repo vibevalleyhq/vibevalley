@@ -28,7 +28,7 @@ Workspace（工作目录，一张大地图）
 
 ## Session 和 oar 会话
 
-单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（smith 的 `oar.Session`，重启后会换一个）在代码里只经包名出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](docs/subsystems/session.md)）。
+单写的 Session 只指上面这一层：一个档案为一张工单接的活。农机那一层（oar 的会话，重启后会换一个）在代码里只经 oar 的 import 出现，文档里写「oar 会话」；中文里我们这一层写 Session，不写「会话」（[Worker 改叫 Session](docs/subsystems/session.md)）。
 
 ## 东西
 
@@ -36,17 +36,17 @@ Workspace（工作目录，一张大地图）
 
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
-| Workspace | `Config.WorkRoot`、`Config.Home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
+| Workspace | `Config.workRoot`、`Config.home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
 | 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
-| runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 smith 驱动 |
-| 项目 | `Project` | 一个 git 仓库，和能同时在里面做的工单数（`slots`） |
-| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`Acceptance`）；关上的能重开 |
-| Session | `Session`（服务是 `session.Service`，派活是 `Issue.Hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到收获或收工；跨好几次 run，重启后还是同一个 |
-| Run | `Run`（`session_run` 表）；核心状态里是 `FactRun` 到 `FactReport` | 一次干活：一次触发到一次汇报，包着一个 oar turn |
+| runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
+| 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
+| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`acceptance`）；关上的能重开 |
+| Session | `Session`（服务是 `Sessions`，派活是 `Issues` 的 `hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到收获或收工；跨好几次 run，重启后还是同一个 |
+| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一次干活：一次触发到一次汇报，包着一个 oar turn |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
-| 合并 | `Issue.SetStatus`（挪到 `done`；`issue/merges.go`） | 把工单的分支合进主分支（`github.pr_projects` 里的项目是提 PR，PR 合了才关），关上工单 |
+| 合并 | `issue.status` 挪到 `done`（`issue/issue.ts`） | 把工单的分支合进主分支（`github.pr_projects` 里的项目是提 PR，PR 合了才关），关上工单 |
 | 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 |
 | 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
 | 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |

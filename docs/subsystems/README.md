@@ -12,13 +12,14 @@
 | [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、回头看 |
 | [种植计划](docs/subsystems/task.md) | 带子工单的父工单、按图推进；agent 自己的任务图 |
 | [记性](docs/subsystems/memory.md) | 想起、记下、主动查、外面的来源 |
+| [文档](docs/subsystems/doc.md) | 按块存、按 op 改的文档：块和顺序键、一批一个事务、Markdown |
 | [语音](docs/subsystems/voice.md) | 通话（Agora ConvoAI）、听写、语音管家 |
-| [连接到本机](docs/subsystems/gate.md) | 局域网里配对过的设备用同一个农场 |
+| [连接到本机](docs/subsystems/lan.md) | 局域网里配对过的设备用同一个农场 |
 | [设置](docs/subsystems/setting.md) | settings.json、配置和环境变量、钥匙和打码 |
 | [游戏](docs/subsystems/game.md) | 账本、金币和成就、等级、空地和特效 |
 | [核心状态](docs/subsystems/core.md) | 一份状态只因事实而变、三条流、接口和能力表、重启 |
-| [地基](docs/subsystems/foundation.md) | 一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
-| [客户端](docs/subsystems/app.md) | Flutter、分层、问服务端、macOS 宿主和渠道 |
+| [地基](docs/subsystems/foundation.md) | 一个仓库、一块业务一个服务、Effect 的 layer、形状和规则、effect-sqlc、表结构、测试 |
+| [客户端](docs/subsystems/app.md) | 一份 React 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
 | [农场的皮](docs/subsystems/farm.md) | 像素村、地里长什么、走路、手机、音效、图鉴 |
 | [档案和农机](docs/subsystems/agent.md) | 帮工档案、种子、农机的探测和清单、技能书 |
 | [工程流程](docs/subsystems/process.md) | 文档分层、Note 和子系统、docs:verify、skill、写作规范、素材流水线、名字 |

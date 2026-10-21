@@ -4,7 +4,7 @@ export const GITHUB = 'https://github.com/vibevalleyhq/vibevalley'
 
 export const COMMANDS = [
   'git clone https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley',
-  'app/tool/agora-voice-only.sh',
+  'bun install',
   'bun run package:mac',
-  'open app/build/vibevalley.app',
+  'open apps/desktop/dist/mac-arm64/VibeValley.app',
 ]

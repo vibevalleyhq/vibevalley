@@ -23,13 +23,14 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [schedule.md](docs/subsystems/schedule.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [task.md](docs/subsystems/task.md) | 种植计划：带子工单的父工单、按图推进；agent 自己的任务图 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
+| [doc.md](docs/subsystems/doc.md) | 文档：按块存、按 op 改、一批一个事务、Markdown 导入导出 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
-| [gate.md](docs/subsystems/gate.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
+| [lan.md](docs/subsystems/lan.md) | 「连接到本机」：局域网里配对过的设备用同一个农场 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、三条流、接口和能力表、重启 |
-| [foundation.md](docs/subsystems/foundation.md) | 地基：一个模块、一包一服务、fx、形状和规则、sqlc、表结构、测试 |
-| [app.md](docs/subsystems/app.md) | 客户端：Flutter、分层、问服务端、macOS 宿主和渠道 |
+| [foundation.md](docs/subsystems/foundation.md) | 地基：一个仓库、一块业务一个服务、Effect 的 layer、形状和规则、effect-sqlc、表结构、测试 |
+| [app.md](docs/subsystems/app.md) | 客户端：一份 React 页面、问服务端、宿主接口、Electron 的桌面版和打包 |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：像素村、地里长什么、走路、手机、音效、图鉴 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：帮工档案、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
@@ -40,7 +41,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 文档 | 讲什么 |
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
-| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、「连接到本机」、管家、Session；shapegen 写出 |
+| [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、「连接到本机」、管家；`scripts/capabilities.ts` 写出 |
 | [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
 | [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、精力瓶和计分的表 |
 | [pixel-village.md](docs/reference/pixel-village.md) | 首页、素材的流水线 |
@@ -68,6 +69,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 大地图 | Workspace（`Config.WorkRoot`、`Config.Home`） | 全部项目、工单、群聊和档案；工作台「项目」页的「全部」 | 世界、全图 |
 | 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station（画出来的那块地在客户端叫 `Bed`） | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
+| 播种袋里的种子 | issue template（`IssueTemplate`、`project.templates`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
 | 核心状态 | `CoreState` | 农场上的一切，只有服务端持有 | |
 | 事实 | fact | 改核心状态的一件事 | patch |

@@ -1,0 +1,726 @@
+// The tools agents call, defined once: the manager gets them in process, a session over /mcp. A
+// tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
+// Every tool answers in a sentence, a refusal included: the model acts on it.
+
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import {
+  type Agent,
+  type Block,
+  type BlockAttrs,
+  type GraphAction,
+  generalName,
+  managerAgent,
+  type Memory,
+  type ScheduleWhen,
+  type TaskAction,
+  type TaskEdit,
+} from "@vibevalley/protocol";
+import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText } from "@vibevalley/protocol/rules";
+import { Context, Effect, Layer } from "effect";
+import { Agents } from "../agent/agent.ts";
+import { textTool } from "../agent/brain/tool.ts";
+import { Channels, type Info, type Spoken } from "../channel/chat.ts";
+import { Core } from "../core/core.ts";
+import { Docs } from "../doc/doc.ts";
+import { type ApiError, reasonOf } from "../errors.ts";
+import { Issues } from "../issue/issue.ts";
+import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
+import { Projects } from "../project/project.ts";
+import { Runtimes } from "../runtime/runtime.ts";
+import { Schedules } from "../schedule/schedule.ts";
+import type { ToolStart } from "../session/facts.ts";
+import { chooseAgent } from "../session/rules.ts";
+import { type Roster, Sessions } from "../session/session.ts";
+import { Tasks } from "../task/task.ts";
+import { changesText, mergeNotAsked, parseTime, scheduleLine, sessionLine, startNotAsked, tail } from "./words.ts";
+import { schemas, sessionSchemas } from "./schemas.ts";
+
+/** Who is calling, at the moment of the call. */
+export interface Caller {
+  /** The profile: managerAgent for the manager. */
+  readonly agent: string;
+  /** The session working as agent, and the project it works in; both empty for the manager. */
+  readonly session: string;
+  readonly project: string;
+  /** The conversation the manager is answering. A session's default is its own issue thread, which the channel service knows. */
+  readonly here: string;
+  /** The profile the owner picked for this input, if any: dispatch prefers it. */
+  readonly picked: string;
+  /** The owner's own words are in this input: only then may a merge happen. */
+  readonly owner: boolean;
+}
+
+/** Says who is calling; a throw is told to the model as the tool's answer. */
+export type Who = () => Caller | Promise<Caller>;
+
+export interface ToolShape {
+  /** The manager's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+  readonly manager: (who: Who) => AgentTool[];
+  /** A session's tools, served on /mcp. */
+  readonly session: (who: Who) => AgentTool[];
+  /** How a tool call reads in the manager's trajectory: its label and the first naming argument. */
+  readonly start: (name: string, args: unknown) => ToolStart;
+  readonly sessionLine: (w: Roster) => string;
+}
+
+export class Tools extends Context.Service<Tools, ToolShape>()("vibevalley/Tool") {}
+
+export const labels: Record<string, string> = {
+  dispatch: "派活",
+  projects: "项目",
+  channels: "频道",
+  open_channel: "开频道",
+  channel_settings: "改频道",
+  schedule: "定时",
+  list_schedules: "看定时",
+  cancel_schedule: "取消定时",
+  merge: "收获",
+  accept: "验收",
+  changes: "看改动",
+  roster: "花名册",
+  check: "看进度",
+  tell: "带话",
+  read_chat: "看对话",
+  stop: "叫停",
+  dismiss: "收工",
+  graph_split: "拆计划",
+  graphs: "看计划",
+  task_edit: "改计划",
+  graph_action: "计划",
+  task_action: "计划的一件",
+  issue_split: "拆工单",
+  remember: "记一条",
+  rewrite_memory: "整理记性",
+  search_archive: "翻旧账",
+  memory_search: "翻记性",
+  memory_add: "替帮工记",
+  doc_read: "读文档",
+  doc_append: "往文档里加一块",
+  doc_update: "改文档的一块",
+};
+
+const named = ["agent", "session", "project", "name", "query", "note", "goal"];
+
+export function toolStart(name: string, args: unknown): ToolStart {
+  const fields = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+  let about = "";
+  for (const k of named) {
+    const v = fields[k];
+    if (typeof v === "string" && v.trim() !== "") {
+      about = v;
+      break;
+    }
+  }
+  const label = labels[name] ?? name;
+  if (about.length > 40) about = head(about, 40) + "…";
+  return { text: about ? label + "：" + about : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
+}
+
+const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
+
+const blockLine = (b: Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
+
+const memoryWhere = (m: Memory) => (m.project ? "项目 " + m.project : "所有项目");
+
+const spaces = /\s+/g;
+
+/** A failure as the model reads it. */
+const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
+
+export const make = Effect.gen(function* () {
+  const core = yield* Core;
+  const agents = yield* Agents;
+  const projects = yield* Projects;
+  const memory = yield* Memories;
+  const docs = yield* Docs;
+  const runtimes = yield* Runtimes;
+  const run = yield* Sessions;
+  const chat = yield* Channels;
+  const schedule = yield* Schedules;
+  const issue = yield* Issues;
+  const tasks = yield* Tasks;
+
+  const go = <A, E>(e: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(Effect.mapError(e, toError));
+  /** An answer, or "没成：" and why. */
+  const answered = (e: Effect.Effect<string, unknown>) => go(Effect.catch(e, (err) => Effect.succeed("没成：" + toError(err).message)));
+
+  const tool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
+    textTool<P>({ name, label: labels[name] ?? name, description, parameters: schemas[name]!, run: (p) => runIt(p) });
+  const sessionSchemaTool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
+    textTool<P>({ name, label: labels[name] ?? name, description, parameters: sessionSchemas[name]!, run: (p) => runIt(p) });
+
+  // The manager may name a session by its id, its name, or words that contain its name.
+  const findSession = (key: string) => {
+    const all = run.roster();
+    return all.find((w) => w.session.id === key) ?? all.find((w) => w.session.name === key) ?? all.find((w) => key.includes(w.session.name));
+  };
+  const withSession = async (key: string, f: (w: Roster) => string | Promise<string>) => {
+    const w = findSession(key);
+    return w ? f(w) : "没有叫 " + key + " 的帮工";
+  };
+  const sessionTool = (name: string, description: string, f: (w: Roster) => string | Promise<string>) =>
+    tool<{ session: string }>(name, description, (p) => withSession(p.session, f));
+
+  // Who reads and speaks in a channel: a session as itself, the manager as the manager.
+  const participant = (c: Caller) => c.session || c.agent;
+
+  // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
+  const choose = async (task: string, name: string, picked: string): Promise<Agent | undefined> => {
+    const candidates = [];
+    for (const a of agents.agents()) {
+      const assessed = await go(runtimes.assess(a));
+      candidates.push({ agent: assessed.agent, usable: assessed.agent.enabled && assessed.blocking.length === 0 });
+    }
+    return chooseAgent(candidates, task, name, picked);
+  };
+
+  // The manager may say a profile's name or id.
+  const profile = (key: string): string => {
+    const k = key.trim();
+    if (k === managerAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
+    const a = agents.agents().find((x) => x.id === k || x.name === k);
+    if (!a) throw new Error("没有叫 " + k + " 的帮工档案");
+    return a.id;
+  };
+  const notWorking = "地里没有你：记性只给在干活的帮工用";
+
+  const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", project: "", text: "", kind: "", limit: 0, ...q });
+
+  const projectsTool = tool<object>("projects", "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。", async () => {
+    const all = await go(projects.list());
+    if (all.length === 0) return "工作目录（" + projects.root + "）下还没有项目。";
+    return all.map((p) => "- " + p.name + (p.git ? "" : "（还不是 git 仓库，第一次派活时会建）")).join("\n");
+  });
+
+  const channelsTool = tool<object>("channels", "列出频道：名字、是做什么的、默认项目。频道是安排活的地方，田头是默认的那个。", async () =>
+    (await go(chat.channels()))
+      .map((c) => "- #" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : ""))
+      .join("\n"),
+  );
+
+  const roster = tool<object>("roster", "列出地里所有帮工：在做什么、上一轮的结果。", () => {
+    const all = run.roster();
+    return all.length === 0 ? "地里现在没有帮工。" : all.map((w) => sessionLine(w)).join("\n");
+  });
+
+  const check = sessionTool(
+    "check",
+    "看一个帮工的详细情况和上一轮的完整汇报。",
+    (w) => sessionLine(w) + "\n目录：" + w.place.cwd + "\n上一轮完整汇报（结尾部分）：\n" + (w.lastText ? tail(w.lastText, 2000) : "还没有"),
+  );
+
+  const changes = sessionTool(
+    "changes",
+    "看收获一个帮工会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
+    async (w) => {
+      if (!w.session.issue) return "这个帮工没有工单";
+      try {
+        return changesText(await go(issue.changes(w.session.issue, "manager")));
+      } catch (e) {
+        return "看不了改动：" + toError(e).message;
+      }
+    },
+  );
+
+  const sessionList = sessionSchemaTool<object>("session_list", "地里现在有谁：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
+    // Listed without @: an @ wakes someone, and models copy what they read.
+    const lines = ["地里有主人、管家，和这些帮工："];
+    for (const h of core.state().sessions)
+      lines.push(`- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, Date.now())}）工单：${head(h.brief.replace(spaces, " "), 60)}`);
+    lines.push("要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。");
+    return lines.join("\n");
+  });
+
+  const spokenText = (s: Spoken): string => {
+    switch (s.kind) {
+      case "held": {
+        const shown = s.shown ?? [];
+        const more = s.more ?? 0;
+        return [
+          `先没发：${s.target} 里有 ${shown.length + more} 条你还没看过的新消息${more > 0 ? `（这里是最新的 ${shown.length} 条）` : ""}：`,
+          inboxLines(shown),
+          "",
+          "看过了：要改就改了再发；原样发就加 anyway: true；不用发了就不发。",
+        ].join("\n");
+      }
+      case "confirm":
+        return `先没发：你刚读的是 ${s.lastRead}，这条却要发到 ${s.target} 顶层。要回在那个串里，就把 target 写成 ${s.lastRead}；确实要发到田头，就加 confirm: true。`;
+      default: {
+        const absent = s.absent && s.absent.length > 0 ? "。" + s.absent.map((m) => "@" + m).join("、") + " 不在地里，没送到" : "";
+        return `发出去了：${s.target} msg=${s.message?.number ?? 0}${absent}`;
+      }
+    }
+  };
+
+  const channelSay = (who: Who) =>
+    sessionSchemaTool<{ text: string; target?: string; anyway?: boolean; confirm?: boolean }>(
+      "channel_say",
+      "在农场的群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" +
+        generalName +
+        " 是默认的频道田头）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+      async (p) => {
+        const c = await who();
+        return spokenText(
+          await go(
+            chat.speak(participant(c), p.text, {
+              ...(p.target ? { target: p.target } : {}),
+              ...(p.anyway ? { anyway: true } : {}),
+              ...(p.confirm ? { confirm: true } : {}),
+            }),
+          ),
+        );
+      },
+    );
+
+  const readChat = (who: Who) =>
+    tool<{ target?: string; unread?: boolean; before?: number; limit?: number }>(
+      "read_chat",
+      "读一个频道或一个串里说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+      async (p) => {
+        const c = await who();
+        let where = p.target ?? "";
+        // A session's default is its own thread, which the channel service fills in.
+        if (where === "" && c.session === "") where = "#" + (await go(chat.channelOf(c.here))).name;
+        let r;
+        try {
+          r = await go(
+            chat.read(participant(c), {
+              target: where,
+              ...(p.unread ? { unread: true } : {}),
+              ...(p.before ? { before: Math.trunc(p.before) } : {}),
+              ...(p.limit ? { limit: Math.trunc(p.limit) } : {}),
+            }),
+          );
+        } catch (e) {
+          return "读不了：" + toError(e).message;
+        }
+        if (r.messages.length === 0) return p.unread ? r.target + " 里没有你没读的消息" : r.target + " 里还没有话";
+        const older = r.older ? `（更早的还有：before:${r.messages[0]!.number} 往前翻）` : "";
+        return r.target + older + "：\n" + inboxLines(r.messages);
+      },
+    );
+
+  const channelInbox = (who: Who) =>
+    sessionSchemaTool<object>("channel_inbox", "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。", async () => {
+      const c = await who();
+      const rows = await go(chat.inbox(participant(c)));
+      if (rows.length === 0) return "没有没读的消息。";
+      const lines = rows.map((r) => `- ${r.target}：${r.unread} 条` + (r.mentionsYou ? "，提到了你" : "") + (r.latest ? "，最后是 " + r.latest : ""));
+      lines.push("下一步：read_chat target=" + rows[0]!.target + " unread=true");
+      return lines.join("\n");
+    });
+
+  const dispatch = (who: Who) =>
+    tool<{ brief: string; project?: string; agent?: string; channel?: string }>(
+      "dispatch",
+      "派一个帮工去某个项目里做一件事。brief 是工单：目标、做到什么程度算完。project 是工作目录下的项目文件夹名（新项目就起一个简短的英文名，会新建）；频道有默认项目时可以不填。agent 填帮工的名字或 id，或 runtime 名；不填就按农场的规则挑。活派在你正在回话的频道里（工单串开在那里），要派到别的频道就填 channel。",
+      async (p) => {
+        const c = await who();
+        let channel: Info;
+        if (p.channel) {
+          const byName = await go(chat.channelByName(p.channel));
+          if (!byName) return "没有 " + p.channel + " 这个频道：先用 channels 看看有哪些，或者用 open_channel 开一个。";
+          channel = byName;
+        } else channel = await go(chat.channelOf(c.here));
+        const project = (p.project ?? "").trim() || channel.project;
+        if (!project) return "#" + channel.name + " 没有默认项目：dispatch 时填上 project。";
+        const chosen = await choose(p.brief, p.agent ?? "", c.picked);
+        if (!chosen) return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。";
+        const hired = await go(issue.hire(chosen, p.brief, project, { channel: channel.id }));
+        if (hired.refused || !hired.session) {
+          await go(core.notice("warn", hired.refused ?? ""));
+          return "派不出去：" + (hired.refused ?? "");
+        }
+        const h = hired.session;
+        const branch = h.branch ? "，分支 " + h.branch : "";
+        const evicted = hired.evicted ? "为了腾地方，" + hired.evicted + " 先收工了。" : "";
+        return `已在 #${channel.name} 派 ${h.name}（${h.id}）去 ${h.project ?? project}${branch}。${evicted}`;
+      },
+    );
+
+  const merge = (who: Who) =>
+    tool<{ session: string }>(
+      "merge",
+      "把一个帮工分支上的提交合进它所在项目的主分支，然后让它收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话。",
+      async (p) => {
+        const c = await who();
+        return withSession(p.session, async (w) => {
+          if (!c.owner) return mergeNotAsked;
+          if (!w.session.issue) return "这个帮工没有工单";
+          // Every issue has an acceptance; a required one must have passed before anything is harvested.
+          const t = await go(issue.get(w.session.issue)).catch(() => undefined);
+          if (t && t.acceptance === "required" && !t.acceptedAt) return "这张工单要先过验收：先用 accept 验收通过，才能收获";
+          try {
+            return await go(issue.merge(w.session.issue));
+          } catch (e) {
+            return toError(e).message;
+          }
+        });
+      },
+    );
+
+  // Acceptance is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
+  // the owner's (merge).
+  const accept = tool<{ session: string; pass: boolean; findings?: string[]; text?: string }>(
+    "accept",
+    "验收一个帮工交回来的活：先用 changes 看改动，对着工单要的逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，它会带着这些接着修一轮。",
+    (p) =>
+      withSession(p.session, async (w) => {
+        if (!w.session.issue) return "这个帮工没有工单";
+        try {
+          const t = await go(
+            issue.accept(w.session.issue, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }),
+          );
+          return p.pass ? `「${t.title}」验收过了，等主人收获` : `「${t.title}」没过验收，${openFindings(t)} 处要修，已经交回给它`;
+        } catch (e) {
+          return toError(e).message;
+        }
+      }),
+  );
+
+  const tell = (who: Who) =>
+    tool<{ session: string; message: string }>(
+      "tell",
+      "给一个帮工带话：发在它的工单串里。他正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
+      async (p) => {
+        const c = await who();
+        return withSession(p.session, async (w) => {
+          try {
+            await go(chat.tellSession(participant(c), w.session.id, p.message, ""));
+          } catch (e) {
+            return "没带到：" + toError(e).message;
+          }
+          return "已经在 " + w.session.name + " 的工单串里说了";
+        });
+      },
+    );
+
+  const stop = sessionTool("stop", "叫停一个帮工正在做的这一轮。", async (w) =>
+    (await go(run.stop(w.session.id))) ? w.session.name + " 停下了" : w.session.name + " 现在没在干活",
+  );
+  const dismiss = sessionTool("dismiss", "让一个帮工收工离开农场。", async (w) => {
+    await go(run.dismiss(w.session.id));
+    return w.session.name + " 收工了";
+  });
+
+  const scheduleTool = (who: Who) =>
+    tool<{
+      name: string;
+      text: string;
+      kind: string;
+      at?: string;
+      minutes?: number;
+      time?: string;
+      days?: number[];
+      cron?: string;
+      channel?: string;
+      agent?: string;
+      project?: string;
+      tz?: string;
+    }>(
+      "schedule",
+      "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
+      async (p) => {
+        const c = await who();
+        try {
+          let channel = await go(chat.channelOf(c.here));
+          if (p.channel) {
+            const byName = await go(chat.channelByName(p.channel));
+            if (!byName) throw new Error("没有 " + p.channel + " 这个频道：先用 channels 看看");
+            channel = byName;
+          }
+          let when: ScheduleWhen;
+          switch (p.kind) {
+            case "once": {
+              const at = parseTime(p.at ?? "");
+              if (at === undefined) throw new Error("at 不是一个时间：" + (p.at || "（没填）"));
+              when = { kind: "once", at };
+              break;
+            }
+            case "every":
+              when = { kind: "every", minutes: p.minutes ?? 0 };
+              break;
+            case "daily":
+              when = { kind: "daily", time: p.time ?? "" };
+              break;
+            case "cron":
+              when = { kind: "cron", expr: p.cron ?? "" };
+              break;
+            default:
+              when = { kind: "weekly", days: (p.days ?? []).map((d) => Math.trunc(d)), time: p.time ?? "" };
+          }
+          const made = await go(
+            schedule.add(
+              {
+                name: p.name,
+                text: p.text,
+                channel: channel.id,
+                when,
+                ...(p.agent ? { agent: p.agent } : {}),
+                ...(p.project ? { project: p.project } : {}),
+                ...(p.tz ? { tz: p.tz } : {}),
+              },
+              "manager",
+              c.owner,
+            ),
+          );
+          if (made.pending)
+            return (
+              "定好了，等主人同意才生效：\n" +
+              scheduleLine(made, channel.name) +
+              "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时列表里点「同意」才开始。跟主人说一声它是做什么的。"
+            );
+          return "定好了：\n" + scheduleLine(made, channel.name);
+        } catch (e) {
+          return "没成：" + toError(e).message;
+        }
+      },
+    );
+
+  const listSchedules = tool<object>("list_schedules", "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。", async () => {
+    const all = schedule.list();
+    if (all.length === 0) return "没有定时。";
+    const names = new Map((await go(chat.channels())).map((c) => [c.id, c.name]));
+    return all.map((s) => scheduleLine(s, names.get(s.channel) ?? "?")).join("\n");
+  });
+
+  const cancelSchedule = tool<{ id: string }>("cancel_schedule", "删掉一个定时（编号从 list_schedules 看）。", (p) =>
+    answered(Effect.map(schedule.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
+  );
+
+  const openChannel = tool<{ name: string; description?: string; project?: string }>(
+    "open_channel",
+    "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
+    async (p) => {
+      const c = await go(chat.openChannel(p.name, p.description ?? "", p.project ?? ""));
+      return "开好了 #" + c.name + (c.project ? "，默认项目 " + c.project : "") + "。";
+    },
+  );
+
+  const channelSettings = tool<{ channel: string; description?: string; project?: string }>(
+    "channel_settings",
+    "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
+    async (p) => {
+      const c = await go(chat.channelByName(p.channel));
+      if (!c) throw new Error("没有 " + p.channel + " 这个频道");
+      await go(chat.updateChannel(c.id, p.description, p.project));
+      return "改好了 #" + c.name + "。";
+    },
+  );
+
+  const graphSplit = tool<{ goal: string; project: string; agent?: string }>(
+    "graph_split",
+    "起一个种植计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
+    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "manager")),
+  );
+
+  const graphsTool = tool<{ id?: string }>("graphs", "列出种植计划：每件的状态、谁在做、结论。", (p) => {
+    const texts = graphsOf(core.state())
+      .filter((g) => (p.id ? g.id === p.id : isOpen(g)))
+      .map(graphText);
+    if (texts.length > 0) return texts.join("\n\n");
+    return p.id ? "没有 " + p.id + " 这个计划" : "现在没有种植计划。";
+  });
+
+  const taskEdit = tool<{ graph: string; task: string; title?: string; brief?: string; needs?: string[]; agent?: string; check?: string; remove?: boolean }>(
+    "task_edit",
+    "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
+    (p) => {
+      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "manager"));
+      const edit: TaskEdit = {
+        ...(p.title !== undefined ? { title: p.title } : {}),
+        ...(p.brief !== undefined ? { brief: p.brief } : {}),
+        ...(p.needs !== undefined ? { needs: p.needs } : {}),
+        ...(p.agent !== undefined ? { agent: p.agent } : {}),
+        ...(p.check !== undefined ? { check: p.check } : {}),
+      };
+      return answered(tasks.editTask(p.graph, p.task, edit, "manager"));
+    },
+  );
+
+  const graphAction = (who: Who) =>
+    tool<{ graph: string; action: GraphAction }>(
+      "graph_action",
+      "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 收获（都做完以后，把计划分支合进主分支）。",
+      async (p) => {
+        const c = await who();
+        if (p.action === "merge" && !c.owner) return mergeNotAsked;
+        if (p.action === "start" && !c.owner) return startNotAsked;
+        return answered(tasks.act(p.graph, p.action, "manager"));
+      },
+    );
+
+  const taskAction = tool<{ graph: string; task: string; action: TaskAction }>(
+    "task_action",
+    "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
+    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "manager")),
+  );
+
+  const issueSplit = (who: Who) =>
+    sessionSchemaTool<{
+      title?: string;
+      tasks: { id: string; title?: string; brief: string; needs?: string[]; agent?: string; check?: string; scope?: string[]; acceptance?: boolean }[];
+    }>(
+      "issue_split",
+      `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
+      async (p) => {
+        const c = await who();
+        const steps = (p.tasks ?? []).map((t) => ({
+          id: t.id,
+          title: t.title ?? "",
+          brief: t.brief,
+          ...(t.needs ? { needs: t.needs } : {}),
+          agent: t.agent ?? "",
+          check: t.check ?? "",
+          ...(t.scope ? { scope: t.scope } : {}),
+          ...(t.acceptance ? { acceptance: true } : {}),
+        }));
+        return answered(tasks.splitIssue(c.session, p.title ?? "", steps));
+      },
+    );
+
+  const memorySearch = (who: Who, forManager: boolean) =>
+    forManager
+      ? tool<{ query?: string; agent?: string; project?: string }>(
+          "memory_search",
+          "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
+          async (p) => {
+            try {
+              const q = query({ text: p.query ?? "", project: (p.project ?? "").trim(), ...((p.agent ?? "").trim() ? { agent: profile(p.agent!) } : {}) });
+              return foundText(await go(memory.search(q)), q);
+            } catch (e) {
+              return "没成：" + toError(e).message;
+            }
+          },
+        )
+      : sessionSchemaTool<{ query?: string; all_projects?: boolean }>(
+          "memory_search",
+          "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。只找这个项目的和所有项目都用的；all_projects 也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+          async (p) => {
+            const c = await who();
+            if (!c.agent) throw new Error(notWorking);
+            const q = query({ agent: c.agent, project: p.all_projects ? "" : c.project, text: p.query ?? "" });
+            return foundText(await go(memory.search(q)), q);
+          },
+        );
+
+  const memoryAdd = (who: Who, forManager: boolean) =>
+    forManager
+      ? tool<{ agent: string; text: string; project?: string }>(
+          "memory_add",
+          "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
+          async (p) => {
+            try {
+              const id = profile(p.agent);
+              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "manager" }));
+              return "替 " + id + " 记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
+            } catch (e) {
+              return "没成：" + toError(e).message;
+            }
+          },
+        )
+      : sessionSchemaTool<{ text: string; all_projects?: boolean; agent?: string }>(
+          "memory_add",
+          "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。记这个项目的；all_projects 记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+          async (p) => {
+            const c = await who();
+            if (!c.agent) throw new Error(notWorking);
+            if (p.agent && p.agent !== c.agent) throw new Error("只能记进你自己的档案（" + c.agent + "），" + p.agent + " 的记性不归你写");
+            const m = await go(memory.remember({ agent: c.agent, text: p.text, project: p.all_projects ? "" : c.project, by: "agent", session: c.session }));
+            return "记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
+          },
+        );
+
+  // Documents: a session reads one, appends blocks and rewrites a block's text against the rev it read, through the same
+  // op pipeline the owner's editor uses, written as its profile (its session id when it has none).
+  const writer = (c: Caller) => c.agent || c.session;
+
+  const docRead = (who: Who) =>
+    sessionSchemaTool<{ doc: string }>(
+      "doc_read",
+      "读一篇文档：每一块的 id、第几版、类型和字。改一块之前先读，doc_update 要用这里的 id 和版本。",
+      async (p) => {
+        await who();
+        const snap = await go(docs.get(p.doc.trim()));
+        return ["《" + snap.doc.title + "》，" + snap.blocks.length + " 块：", ...snap.blocks.map(blockLine)].join("\n");
+      },
+    );
+
+  const docAppend = (who: Who) =>
+    sessionSchemaTool<{ doc: string; text: string; type?: string; level?: number }>(
+      "doc_append",
+      "在文档末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 doc_update。",
+      async (p) => {
+        const c = await who();
+        const type = (p.type ?? "").trim() || "paragraph";
+        if (!appendTypes.includes(type)) throw new Error("块的类型只能是 " + appendTypes.join("、"));
+        const attrs: BlockAttrs =
+          type === "heading" ? { level: p.level && p.level >= 1 && p.level <= 3 ? Math.trunc(p.level) : 2 } : type === "todo" ? { checked: false } : {};
+        const [b, r] = await go(docs.append(p.doc.trim(), writer(c), type, attrs, p.text));
+        if (!r || r.status !== "applied" || !b) throw new Error(r?.reason ?? "");
+        return `加了一块〔${b.id}〕，第 ${b.rev} 版。接着改它用 doc_update，block 填 ${b.id}，base_rev 填 ${b.rev}。`;
+      },
+    );
+
+  const docUpdate = (who: Who) =>
+    sessionSchemaTool<{ doc: string; block: string; base_rev: number; text: string }>(
+      "doc_update",
+      "把一块的字整段换成新的。base_rev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
+      async (p) => {
+        const c = await who();
+        const [, r] = await go(docs.updateText(p.doc.trim(), writer(c), p.block.trim(), Math.trunc(p.base_rev ?? 0), p.text));
+        if (r?.status === "applied") return `改好了〔${r.blockId}〕，现在是第 ${r.rev} 版。`;
+        if (r?.status === "conflict") {
+          const now = await go(docs.get(p.doc.trim())).catch(() => undefined);
+          const x = now?.blocks.find((b) => b.id === r.blockId);
+          return `没改：${r.reason}，现在是第 ${r.rev} 版。${x ? "\n现在的字：" + blockLine(x) : ""}`;
+        }
+        throw new Error(r?.reason ?? "");
+      },
+    );
+
+  return Tools.of({
+    manager: (who) => [
+      dispatch(who),
+      projectsTool,
+      channelsTool,
+      scheduleTool(who),
+      listSchedules,
+      cancelSchedule,
+      openChannel,
+      channelSettings,
+      merge(who),
+      accept,
+      changes,
+      roster,
+      check,
+      tell(who),
+      readChat(who),
+      stop,
+      dismiss,
+      graphSplit,
+      graphsTool,
+      taskEdit,
+      graphAction(who),
+      taskAction,
+      memorySearch(who, true),
+      memoryAdd(who, true),
+    ],
+    session: (who) => [
+      channelSay(who),
+      readChat(who),
+      channelInbox(who),
+      sessionList,
+      memorySearch(who, false),
+      memoryAdd(who, false),
+      docRead(who),
+      docAppend(who),
+      docUpdate(who),
+      issueSplit(who),
+    ],
+    start: toolStart,
+    sessionLine: (w) => sessionLine(w),
+  });
+});
+
+export const layer = Layer.effect(Tools, make);

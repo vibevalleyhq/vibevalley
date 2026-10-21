@@ -13,7 +13,7 @@ import { zh } from '../src/i18n/zh'
 import { drawCard } from './card'
 
 const site = resolve(import.meta.dir, '..')
-const app = resolve(site, '../app')
+const pub = resolve(site, '../apps/web/public')
 const out = resolve(site, 'public/gen')
 mkdirSync(out, { recursive: true })
 
@@ -23,16 +23,15 @@ for (let c = 0x20; c < 0x7f; c++) text += String.fromCharCode(c)
 for (const file of new Glob('src/**/*.{astro,ts,tsx,css}').scanSync({ cwd: site })) text += await Bun.file(resolve(site, file)).text()
 const chars = [...new Set(text)].join('')
 
-const font = Buffer.from(await Bun.file(resolve(app, 'assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf')).arrayBuffer())
+const font = Buffer.from(await Bun.file(resolve(pub, 'fonts/fusion-pixel-12px-proportional-zh_hans.otf')).arrayBuffer())
 const woff2 = await subsetFont(font, chars, { targetFormat: 'woff2' })
 await Bun.write(resolve(out, 'pixel.woff2'), woff2)
 // The font's licence (SIL OFL) goes wherever the font does.
-await Bun.write(resolve(out, 'fusion-pixel-OFL.txt'), Bun.file(resolve(app, 'assets/fonts/fusion-pixel-OFL.txt')))
+await Bun.write(resolve(out, 'fusion-pixel-OFL.txt'), Bun.file(resolve(pub, 'fonts/fusion-pixel-OFL.txt')))
 
-const icons = resolve(app, 'macos/Runner/Assets.xcassets/AppIcon.appiconset')
-for (const size of [32, 64, 256]) await Bun.write(resolve(out, `icon-${size}.png`), Bun.file(resolve(icons, `app_icon_${size}.png`)))
+for (const size of [32, 64, 256]) await Bun.write(resolve(out, `icon-${size}.png`), Bun.file(resolve(pub, `icons/app-${size}.png`)))
 
 // Base.astro points og:image at card-<lang>.jpg.
-for (const copy of [zh, en]) await Bun.write(resolve(out, `card-${copy.lang}.jpg`), await drawCard(copy, font, resolve(app, 'assets/pixel/title-evening.jpg')))
+for (const copy of [zh, en]) await Bun.write(resolve(out, `card-${copy.lang}.jpg`), await drawCard(copy, font, resolve(pub, 'pixel/title-evening.jpg')))
 
 console.log(`prepare: pixel.woff2 ${(woff2.length / 1024).toFixed(0)} KB for ${chars.length} characters, icons, share cards`)
