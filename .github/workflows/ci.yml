@@ -46,7 +46,12 @@ jobs:
         with: { node-version: 24 }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       - run: bun install --frozen-lockfile
-      - run: bun run server:check
+      # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
+      # can tell whether db/generated is current. The rest runs against the committed db/generated.
+      - run: bun test src
+        working-directory: packages/protocol
+      - run: bun run check && bun run test
+        working-directory: apps/server
 
   web:
     name: web
