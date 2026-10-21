@@ -4,7 +4,7 @@
 import type { CoreState, Fact, Outcome, Phase, Progress, Session } from "../shapes";
 import { withConversation, withMessage } from "./chat";
 import { withIssue, withIssueStatuses } from "./issues";
-import { freeStation, playedDoing, playedRun, playOf, stationed } from "./play";
+import { farmOf, freeStation, playedDoing, playedRun, playOf, stationed } from "./play";
 import { same } from "./same";
 import { sessionOf, whileWorking, withSession } from "./sessions";
 
@@ -40,7 +40,7 @@ function fold(state: CoreState, f: Fact): [CoreState, boolean] {
     case "hired": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
-      const play = was?.play ?? { ...playOf(f.session), station: freeStation(others) };
+      const play = was?.play ?? { ...playOf(f.session), station: freeStation(others, farmOf(f.session)) };
       const h: Session = { ...f.session, play };
       return [{ ...state, sessions: [...others, h] }, true];
     }

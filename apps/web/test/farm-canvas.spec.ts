@@ -61,14 +61,14 @@ test("the village runs for a while without errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await page.waitForTimeout(3000);
   expect(errors).toEqual([]);
 });
 
 test("the cursor is the tool's, and says whether it can be used where it points", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/farm/");
   const village = page.getByTestId("village");
   await expect(village).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await expect(village).toHaveCSS("cursor", /hand\.png/);
@@ -85,7 +85,7 @@ test("the cursor is the tool's, and says whether it can be used where it points"
 test("helpers walk in, work their plots and the library, and light lanterns at night", async ({ page, server }) => {
   const frame = withHelpers(await firstFrame(server.url));
   await serveFrame(page, frame);
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   // From the gate to their places at 42 art pixels a second.
   await page.waitForTimeout(9000);

@@ -18,7 +18,8 @@ import { textureProgress } from "../world/textures";
 import { createExternal } from "../../data/external";
 import { useRouter } from "../../app/router";
 import { ready, useAgents } from "../../data/query";
-import { commands } from "../state";
+import { commands, farmProject } from "../state";
+import { farmFrameOf } from "../scope";
 import { useVillage } from "../support";
 
 export function VillageCanvas() {
@@ -46,7 +47,7 @@ export function VillageCanvas() {
       let live = true;
       let scene: Scene | undefined;
       let stopFit = () => {};
-      const latest = () => ({ frame: frames.get().frame, agents: agents() });
+      const latest = () => ({ frame: farmFrameOf(frames.get().frame, farmProject()), agents: agents() });
       void startScene(
         host,
         village,

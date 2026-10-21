@@ -1,7 +1,7 @@
 // The page's routes. The farm is full-bleed, outside the workbench's shell; the shell links back to it. Each workbench
 // place gets the rest of the path after its own (/issues/<id> → "<id>").
 
-import { Match, Show, Switch } from "solid-js";
+import { Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { ChatPage } from "../pages/chat/ChatPage";
 import { FarmPage } from "../farm/FarmPage";
@@ -18,6 +18,10 @@ import { ToastHost } from "../ui/ToastHost";
 import { Navigate } from "./A";
 import { Follow } from "./Follow";
 import { Root } from "./Root";
+import { Keyed } from "./util";
+import { ready, useProjects } from "../data/query";
+import { sortProjects } from "../rules/projects";
+import { farmState } from "../farm/store";
 import { useRouter } from "./router";
 import { Shell } from "./Shell";
 
@@ -39,6 +43,26 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
   catalog: (rest) => <CatalogPage rest={rest()} />,
 };
 
+/**
+ * `/`: the farm entered last on this machine (trusted while the projects are still coming); without one, the farm of
+ * the project worked on last, so 回农场 always lands on a farm; with no project yet, the farm of the sessions without one.
+ */
+function Home() {
+  const projects = useProjects();
+  const last = farmState().project;
+  const list = () => ready(projects, undefined);
+  const enter = (name: string) => <Navigate href={`/farm/${encodeURIComponent(name)}`} />;
+  return (
+    <Switch>
+      <Match when={last && (!list() || list()!.some((p) => p.name === last))}>{enter(last!)}</Match>
+      <Match when={list()?.length === 0 || projects.isError}>
+        <FarmPage project="" />
+      </Match>
+      <Match when={list()}>{(all) => enter(sortProjects(all())[0]!.name)}</Match>
+    </Switch>
+  );
+}
+
 function Routes() {
   const router = useRouter();
   const pathname = () => router.path().split("?")[0]!;
@@ -47,7 +71,11 @@ function Routes() {
   return (
     <Switch fallback={<Navigate href="/" />}>
       <Match when={pathname() === "/"}>
-        <FarmPage />
+        <Home />
+      </Match>
+      <Match when={place() === "farm"}>
+        {/* One farm per project: entering another builds its farm anew. */}
+        <Keyed key={decodeURIComponent(rest())}>{() => <FarmPage project={untrack(() => decodeURIComponent(rest()))} />}</Keyed>
       </Match>
       <Match when={pathname() === "/pair"}>
         <PairPage />

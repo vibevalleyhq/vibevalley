@@ -1,23 +1,31 @@
-// The farm: the village canvas full-bleed, the DOM over it, outside the workbench's shell. Each layer is its own
-// folder's; this page only stacks them and owns the keys, the sounds and the phone's calls.
+// One project's farm (/farm/<project>): the village canvas full-bleed, the DOM over it, outside the workbench's shell.
+// Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
+// frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
 
 import { createEffect, Show } from "solid-js";
 import type { FarmSoundInput } from "./sound";
 import { farm } from "./store";
-import { useFrames } from "../data/frame";
+import { FramesContext, useFrames } from "../data/frame";
 import { VillageCanvas } from "./canvas/VillageCanvas";
 import { ChatWindow } from "./chat/ChatWindow";
 import { DebugPanel } from "./debug/DebugPanel";
 import { Hud } from "./hud/Hud";
 import { IssueView } from "./issue/IssueView";
 import { Panels } from "./panels/Panels";
-import { rawFrame, useFarm } from "./state";
+import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
 
-export function FarmPage() {
+/** `project`: whose farm ("" for the sessions without a project). */
+export function FarmPage(props: { project: string }) {
   const frames = useFrames();
-  const raw = rawFrame();
+  const scoped = createFarmFrames(frames, () => props.project);
+  // The farm on the page, and the one `/` opens next time.
+  createEffect(
+    () => props.project,
+    (project) => farm.setProject(project),
+  );
+  const raw = rawFarmFrame();
   const titleOpen = useFarm((s) => s.titleOpen);
   farmKeys();
   feedPhoneCalls(raw);
@@ -28,13 +36,17 @@ export function FarmPage() {
   return (
     <div class="fixed inset-0 overflow-hidden bg-ground font-pixel text-[12px] text-bark-900 select-none" data-testid="farm">
       <FarmSounds />
-      <VillageCanvas />
-      <Hud />
+      <FramesContext value={scoped}>
+        <VillageCanvas />
+        <Hud />
+      </FramesContext>
       <div class="absolute right-3 bottom-3">
         <ChatWindow />
       </div>
-      <IssueView />
-      <Panels />
+      <FramesContext value={scoped}>
+        <IssueView />
+        <Panels />
+      </FramesContext>
       <Show when={!frames.frame}>
         <p role="status" class="absolute inset-x-0 top-1/3 text-center text-cream-200">
           {frames.link === "lost" ? "连不上农场，重连中……（server 开着吗？）" : "在等农场……"}
@@ -50,7 +62,7 @@ export function FarmPage() {
 
 /** What the sounds hear: the tool, the beds' effects, what is open, and each frame as sent. */
 function FarmSounds() {
-  const raw = rawFrame();
+  const raw = rawFarmFrame();
   const tool = useFarm((s) => s.tool);
   const bedFx = useFarm((s) => s.bedFx);
   const overlays = useFarm((s) => s.overlays);

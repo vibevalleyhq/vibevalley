@@ -7,14 +7,14 @@ import { localEffects } from "../effects";
 import { clearingLevels } from "./rules";
 import { subscribeLive } from "../../data/live";
 import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "../kit";
-import { rawFrame } from "../state";
+import { rawFarmFrame } from "../state";
 import { useVillage } from "../support";
 
 const bannerMs = 3400;
 
 export function FxLayer() {
   // The frames as sent: each new frame's effects play once.
-  const raw = rawFrame();
+  const raw = rawFarmFrame();
   const loaded = useVillage();
   const [banner, setBanner] = createSignal<{ id: number; level: number }>();
 

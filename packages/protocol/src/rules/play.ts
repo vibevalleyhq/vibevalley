@@ -11,21 +11,32 @@ export const commandLimit = 12;
 /** One saved before plays were kept has an empty one, with no bed. */
 export const playOf = (h: Session): SessionPlay => h.play ?? { station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] };
 
-export function freeStation(sessions: readonly Session[], prefer?: number): number {
-  const taken = new Set(sessions.map((h) => playOf(h).station));
+/** The farm a session's bed is on: each project has its own, and the sessions without one share one. */
+export const farmOf = (h: Session): string => h.project ?? "";
+
+/** A free bed on `project`'s farm: `prefer` when it is free there, else the first free one, else -1. */
+export function freeStation(sessions: readonly Session[], project: string, prefer?: number): number {
+  const taken = new Set(sessions.filter((h) => farmOf(h) === project).map((h) => playOf(h).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;
   for (let i = 0; i < maxRunning; i++) if (!taken.has(i)) return i;
   return -1;
 }
 
+/** Every session on a bed of its own farm: one without a bed, or on a bed another of its farm holds, moves to a free one. */
 export function withStations(state: CoreState): CoreState {
-  if (!state.sessions.some((h) => playOf(h).station < 0)) return state;
-  const placed = state.sessions.filter((h) => playOf(h).station >= 0);
+  const placed: Session[] = [];
+  let moved = false;
   for (const h of state.sessions) {
-    if (playOf(h).station >= 0) continue;
-    placed.push({ ...h, play: { ...playOf(h), station: freeStation(placed) } });
+    const at = playOf(h).station;
+    const clash = placed.some((x) => farmOf(x) === farmOf(h) && playOf(x).station === at);
+    if (at >= 0 && !clash) {
+      placed.push(h);
+      continue;
+    }
+    moved = true;
+    placed.push({ ...h, play: { ...playOf(h), station: freeStation(placed, farmOf(h)) } });
   }
-  return { ...state, sessions: state.sessions.map((h) => placed.find((x) => x.id === h.id) ?? h) };
+  return moved ? { ...state, sessions: placed } : state;
 }
 
 const remember = (list: readonly string[] | null | undefined, item: string, limit: number) => {
@@ -66,11 +77,11 @@ export function playedDoing(p: SessionPlay, f: FactDoing): SessionPlay {
   return next;
 }
 
-/** Only to a bed that is free; a session already there, or a bed taken, changes nothing. */
+/** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
 export function stationed(state: CoreState, f: FactStation): [CoreState, boolean] {
   const h = sessionOf(state, f.id);
   if (!h || playOf(h).station === f.station) return [state, false];
   const others = state.sessions.filter((x) => x.id !== f.id);
-  if (freeStation(others, f.station) !== f.station) return [state, false];
+  if (freeStation(others, farmOf(h), f.station) !== f.station) return [state, false];
   return withSession(state, f.id, (h) => ({ ...h, play: { ...playOf(h), station: f.station } }));
 }

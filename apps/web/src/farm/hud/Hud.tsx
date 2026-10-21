@@ -22,6 +22,7 @@ import { timeOfDay, useFarm } from "../state";
 import { Friends } from "./Friends";
 import { FxLayer } from "./FxLayer";
 import { Overlay } from "./Overlay";
+import { ProjectSign } from "./ProjectSign";
 import { QuotaPill } from "./QuotaPill";
 
 const edge = 8;
@@ -70,6 +71,7 @@ export function Hud() {
   return (
     <div class="pointer-events-none absolute inset-0" aria-label="农场的 HUD">
       <Overlay />
+      <ProjectSign />
       <Show when={shown()}>
         {(box) => (
           <div class="absolute" style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px` }}>

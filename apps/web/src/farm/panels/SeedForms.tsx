@@ -1,38 +1,31 @@
-// Sowing an empty bed and watering a helper's: the sowing form picks the project, offers the project's seeds (its
-// templates and recent words) or its queued todos, and who sows; the watering form takes a few words to the helper.
+// Sowing an empty bed and watering a helper's: the sowing form sows in the farm's current project (the sign by the
+// mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
+// few words to the helper.
 
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQuery } from "@tanstack/solid-query";
-import { type Issue, managerAgent, type ProjectTemplates, type Session } from "@vibevalley/protocol";
+import { managerAgent, type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
 import { playSound } from "../sound";
-import { farm } from "../store";
 import { newSendKey, writeIssue } from "../../pages/issues/write";
-import { queuedIn } from "../../rules/projects";
 import { aria } from "../../app/util";
 import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
 import { ready, useAgents, useProjects } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
-import { PxButton, PxSegmented, PxTextArea, PxTextInput, SpriteIcon, toasts, ToastType } from "../kit";
+import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
 const byManager = "auto";
 
-/** The bag's seeds under the filter: the recent words, and each kind with the templates that match it or its name. */
-function seedsShown(bag: ProjectTemplates | undefined, filter: string) {
-  const q = filter.trim().toLowerCase();
-  const shown = (title: string) => !q || title.toLowerCase().includes(q);
+/** The bag's seeds: the recent words, and each kind that has templates, with them. */
+function seedsOf(bag: ProjectTemplates | undefined) {
   return {
-    recent: (bag?.recent ?? []).filter(shown),
-    kinds: (bag?.kinds ?? []).flatMap((k) => {
-      const templates = k.templates.filter((s) => shown(s.title) || shown(k.name));
-      return templates.length ? [{ kind: k, templates }] : [];
-    }),
+    recent: bag?.recent ?? [],
+    kinds: (bag?.kinds ?? []).flatMap((k) => (k.templates.length ? [{ kind: k, templates: k.templates }] : [])),
   };
 }
 
@@ -67,32 +60,20 @@ function WhoTile(props: { active: boolean; label: string; onClick: () => void; c
 export function SowForm(props: { station: number; onDone: () => void }) {
   const projectsQuery = useProjects();
   const projects = () => ready(projectsQuery, []).map((p) => p.name);
-  const lastProject = useFarm((s) => s.lastProject);
+  // Every plot here is sown in this farm's project.
+  const farmProject = useFarm((s) => s.project);
+  const project = () => farmProject() || undefined;
   const pick = useFarm((s) => s.pick);
   const agentsQuery = useAgents();
   const agents = () => ready(agentsQuery, []).filter((a) => a.id !== managerAgent && a.enabled);
-  const core = useCore();
   const router = useRouter();
-  const [chosen, setChosen] = createSignal<string>();
-  const [choosing, setChoosing] = createSignal(false);
-  const [pocket, setPocket] = createSignal<"seeds" | "queued">("seeds");
   const [text, setText] = createSignal("");
   const [selection, setSelection] = createSignal<readonly [number, number]>();
-  const [filter, setFilter] = createSignal("");
   const [who, setWho] = createSignal<string>();
   const [refused, setRefused] = createSignal<string>();
   let words: HTMLTextAreaElement | undefined;
 
-  // The project last sown in is trusted while the list loads, dropped once the list says it is gone.
-  const project = () => {
-    const last = lastProject() && (projects().length === 0 || projects().includes(lastProject()!)) ? lastProject()! : undefined;
-    return choosing() ? undefined : (chosen() ?? last ?? (projects().length === 1 ? projects()[0] : undefined));
-  };
   const templates = useQuery(() => ({ queryKey: ["templates", project()], queryFn: () => api.project.templates({ id: project()! }), enabled: !!project() }));
-  const queued = createMemo(() => {
-    const p = project();
-    return p ? queuedIn(core()?.issues ?? [], p) : [];
-  });
   const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byManager);
   const agentOf = (w: string) => (w === byManager ? undefined : w);
   const canSow = () => text().trim() !== "";
@@ -106,7 +87,6 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     const p = project();
     if (!canSow() || !p) return;
     playSound("plant");
-    farm.setLastProject(p);
     fire(commands.plant(text(), { station: props.station, agent: agentOf(sower()), project: p }));
     props.onDone();
   };
@@ -116,49 +96,28 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     try {
       const got = await writeIssue(text(), agentOf(sower()) ?? "", p);
       if (got.refused) toasts.add({ type: ToastType.info, title: "先没起草", description: got.refused });
-      farm.setLastProject(p);
       props.onDone();
       router.navigate(`/issues/${encodeURIComponent(got.issue.id)}`);
     } catch (e) {
       setRefused(reasonOf(e));
     }
   };
-  const start = async (i: Issue) => {
-    const p = project();
-    const got = await commands.startQueued(i.id, props.station);
-    if (got.ok) {
-      if (p) farm.setLastProject(p);
-      playSound("plant");
-      props.onDone();
-    } else setRefused(got.text);
-  };
   const bag = () => ready(templates, undefined);
-  const seeds = () => seedsShown(bag(), filter());
+  const seeds = () => seedsOf(bag());
+  const [kindId, setKindId] = createSignal<string>();
+  // The kind picked, else the first.
+  const kind = () => seeds().kinds.find((k) => k.kind.id === kindId()) ?? seeds().kinds[0];
 
   return (
     <Show
       when={project()}
       fallback={
-        <div class="flex flex-col">
-          <p class="text-[14px] text-bark-900">种在哪个项目？</p>
-          <p class={["mt-1", xs]}>这块空地还不属于哪个项目：先挑一个，种子按它的样子给。</p>
-          <Show when={projects().length === 0}>
-            <p class={["mt-2.5", xs]}>还没有项目：先在工作台的「项目」页开一个。</p>
-          </Show>
-          <div class="mt-2.5 flex flex-wrap gap-1.5">
-            <For each={projects()}>
-              {(p) => (
-                <Chip
-                  text={p}
-                  on={false}
-                  onClick={() => {
-                    setChosen(p);
-                    setChoosing(false);
-                  }}
-                />
-              )}
-            </For>
-          </div>
+        <div class="flex flex-col items-start gap-2.5">
+          <p class="text-[14px] text-bark-900">这座农场不是哪个项目的</p>
+          <p class={xs}>{projects().length > 0 ? "种地要先进一个项目的农场：回地图挑一座岛。" : "工作台里还没有项目：先在「项目」页开一个。"}</p>
+          <PxButton tone="primary" onClick={() => (props.onDone(), router.navigate("/projects"))}>
+            {projects().length > 0 ? "去地图" : "去开一个项目"}
+          </PxButton>
         </div>
       }
     >
@@ -171,121 +130,88 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 <span class={["ml-2", xs]}>{bag()!.stack.label}</span>
               </Show>
             </p>
-            <Show when={projects().length > 1}>
-              <PxButton size="sm" onClick={() => setChoosing(true)}>
-                换个项目
-              </PxButton>
-            </Show>
-          </div>
-          <div class="mt-2">
-            <PxSegmented
-              value={pocket()}
-              options={[
-                { value: "seeds", label: "挑种子" },
-                { value: "queued", label: queued().length ? `开工待办 ${queued().length}` : "开工待办" },
-              ]}
-              onChange={setPocket}
-            />
           </div>
           <div class="mt-3 flex flex-col">
-            <Show
-              when={pocket() === "queued"}
-              fallback={
-                <>
-                  <PxTextInput value={filter()} onChange={setFilter} placeholder="筛一筛：bug、测试、依赖……" label="筛种子" />
-                  <Switch>
-                    <Match when={templates.isPending && !!project()}>
-                      <p class={["mt-2.5", xs]}>在翻种子袋……</p>
-                    </Match>
-                    <Match when={templates.error}>{(e) => <p class="mt-2.5 text-[12px] text-berry">种子袋没拿到：{reasonOf(e())}</p>}</Match>
-                  </Switch>
-                  <Show when={seeds().recent.length > 0}>
-                    <p class={["mt-2.5", xs]}>最近</p>
-                    <div class="mt-1.5 flex flex-wrap gap-1.5">
-                      <For each={seeds().recent}>{(r) => <Chip text={r} on={text() === r} onClick={() => take(r)} />}</For>
-                    </div>
-                  </Show>
-                  <Show when={seeds().kinds.length > 0}>
-                    <p class={["mt-2.5", xs]}>常见的活</p>
-                    <div class="mt-1.5 flex flex-col gap-2">
-                      <For each={seeds().kinds} keyed={(k) => k.kind.id}>
-                        {(k) => (
-                          <div class="flex items-start gap-2">
-                            <span class="flex w-20 shrink-0 items-center gap-1">
-                              <SpriteIcon name={k().kind.icon} size={28} />
-                              <span class="text-[12px] text-bark-800">{k().kind.name}</span>
-                            </span>
-                            <div class="flex flex-wrap gap-1.5">
-                              <For each={k().templates} keyed={(s) => s.id}>
-                                {(s) => <Chip text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
-                              </For>
-                            </div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                  <Show when={bag() && filter().trim() && seeds().recent.length === 0 && seeds().kinds.length === 0}>
-                    <p class={["mt-2.5", xs]}>没有对得上的种子：在下面自己写。</p>
-                  </Show>
-                  <p class={["mt-2.5", xs]}>自己写</p>
-                  <div class="mt-1.5">
-                    <PxTextArea
-                      ref={(el) => (words = el)}
-                      value={text()}
-                      selection={selection()}
-                      onChange={setText}
-                      rows={3}
-                      placeholder="要做什么，做到什么程度算完"
-                      label="工单"
-                    />
-                  </div>
-                  <p class={["mt-3", xs]}>谁来种</p>
-                  <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="谁来种">
-                    <WhoTile active={sower() === byManager} label="管家挑" onClick={() => setWho(byManager)}>
-                      <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-[16px] text-bark-600">?</span>
-                    </WhoTile>
-                    <For each={agents()} keyed={(a) => a.id}>
-                      {(a) => (
-                        <WhoTile active={sower() === a().id} label={a().name} onClick={() => setWho(a().id)}>
-                          <AgentFace agentId={a().id} look={a().look} size={44} />
-                        </WhoTile>
-                      )}
+            <Switch>
+              <Match when={templates.isPending && !!project()}>
+                <p class={["mt-2.5", xs]}>在翻种子袋……</p>
+              </Match>
+              <Match when={templates.error}>{(e) => <p class="mt-2.5 text-[12px] text-berry">种子袋没拿到：{reasonOf(e())}</p>}</Match>
+            </Switch>
+            <Show when={seeds().recent.length > 0}>
+              <p class={["mt-2.5", xs]}>最近</p>
+              <div class="mt-1.5 flex flex-wrap gap-1.5">
+                <For each={seeds().recent}>{(r) => <Chip text={r} on={text() === r} onClick={() => take(r)} />}</For>
+              </div>
+            </Show>
+            <Show when={seeds().kinds.length > 0}>
+              <p class={["mt-2.5", xs]}>常见的活</p>
+              {/* One kind at a time: its tab, then its seeds. */}
+              <div role="tablist" aria-label="常见的活" class="mt-1.5 flex flex-wrap gap-1">
+                <For each={seeds().kinds} keyed={(k) => k.kind.id}>
+                  {(k) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={aria(k().kind.id === kind()?.kind.id)}
+                      onClick={() => setKindId(k().kind.id)}
+                      class={[
+                        "flex cursor-pointer items-center gap-1 border-2 py-0.5 pr-2 pl-1 text-[12px]",
+                        k().kind.id === kind()?.kind.id
+                          ? "border-leaf-500 bg-leaf-300/60 text-bark-900"
+                          : "border-transparent text-bark-800 hover:bg-cream-200",
+                      ]}
+                    >
+                      <SpriteIcon name={k().kind.icon} size={20} />
+                      {k().kind.name}
+                    </button>
+                  )}
+                </For>
+              </div>
+              <Show when={kind()}>
+                {(k) => (
+                  <div role="tabpanel" aria-label={k().kind.name} class="mt-1.5 flex flex-wrap gap-1.5">
+                    <For each={k().templates} keyed={(s) => s.id}>
+                      {(s) => <Chip text={s().title} on={text() === s().text} onClick={() => take(s().text, s().blank)} />}
                     </For>
                   </div>
-                  <div class="mt-3 flex items-center gap-2">
-                    <p class={["min-w-0 flex-1", xs]}>
-                      管家会把这句话交给帮工，派在 {p()} 里；没开工的话会先开工。先起草：帮工读过代码写成工单，你看过再开工。
-                    </p>
-                    <PxButton disabled={!canSow()} onClick={() => void write()}>
-                      先起草
-                    </PxButton>
-                    <PxButton tone="primary" disabled={!canSow()} onClick={sow}>
-                      播种
-                    </PxButton>
-                  </div>
-                </>
-              }
-            >
-              <Show when={queued().length > 0} fallback={<p class={xs}>这个项目没有排着队的待办。院门外的种子袋就是它们。</p>}>
-                <p class={xs}>排着队等空地的待办，按排上的先后；开工的是这张工单本身，不另写一张。</p>
-                <div class="mt-2 flex flex-col gap-1.5">
-                  <For each={queued()}>
-                    {(i) => (
-                      <div class="flex items-center gap-2">
-                        <SpriteIcon name="icon-seeds" size={20} />
-                        <span class="min-w-0 flex-1 truncate text-[13px] text-bark-800">
-                          #{Math.round(i.number)} {i.title}
-                        </span>
-                        <PxButton size="sm" tone="primary" onClick={() => void start(i)}>
-                          开工
-                        </PxButton>
-                      </div>
-                    )}
-                  </For>
-                </div>
+                )}
               </Show>
             </Show>
+            <p class={["mt-2.5", xs]}>自己写</p>
+            <div class="mt-1.5">
+              <PxTextArea
+                ref={(el) => (words = el)}
+                value={text()}
+                selection={selection()}
+                onChange={setText}
+                rows={3}
+                placeholder="要做什么，做到什么程度算完"
+                label="工单"
+              />
+            </div>
+            <p class={["mt-3", xs]}>谁来种</p>
+            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="谁来种">
+              <WhoTile active={sower() === byManager} label="管家挑" onClick={() => setWho(byManager)}>
+                <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-[16px] text-bark-600">?</span>
+              </WhoTile>
+              <For each={agents()} keyed={(a) => a.id}>
+                {(a) => (
+                  <WhoTile active={sower() === a().id} label={a().name} onClick={() => setWho(a().id)}>
+                    <AgentFace agentId={a().id} look={a().look} size={44} />
+                  </WhoTile>
+                )}
+              </For>
+            </div>
+            <div class="mt-3 flex items-center gap-2">
+              <p class={["min-w-0 flex-1", xs]}>开始：管家把这句话交给帮工，在 {p()} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。</p>
+              <PxButton disabled={!canSow()} onClick={() => void write()}>
+                草稿
+              </PxButton>
+              <PxButton tone="primary" disabled={!canSow()} onClick={sow}>
+                开始
+              </PxButton>
+            </div>
             <Show when={refused()}>
               <p class="mt-1.5 text-[12px] text-berry">{refused()}</p>
             </Show>

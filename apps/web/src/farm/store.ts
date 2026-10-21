@@ -80,8 +80,8 @@ export interface FarmUi {
   readonly pet: string;
   /** Who the next job goes to: a profile's id, or "auto" for the manager to choose; this machine's. */
   readonly pick: string;
-  /** The project last sown in from the farm; this machine's. */
-  readonly lastProject: string | null;
+  /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
+  readonly project: string | null;
 }
 
 const titleSeenKey = "vibevalley.title.seen";
@@ -116,11 +116,11 @@ const savedPick = () => {
   }
 };
 
-const lastProjectKey = "vibevalley.farm.lastProject";
+const projectKey = "vibevalley.farm.project";
 
-const savedLastProject = () => {
+const savedProject = () => {
   try {
-    return localStorage.getItem(lastProjectKey);
+    return localStorage.getItem(projectKey);
   } catch {
     return null;
   }
@@ -152,7 +152,7 @@ let state: FarmUi = {
   screen: null,
   ...savedLooks(),
   pick: savedPick(),
-  lastProject: savedLastProject(),
+  project: savedProject(),
 };
 
 const listeners = new Set<() => void>();
@@ -239,10 +239,10 @@ export const farm = {
     set({ managerLook });
     saveLooks({ managerLook, pet: state.pet });
   },
-  setLastProject: (project: string) => {
-    set({ lastProject: project });
+  setProject: (project: string) => {
+    set({ project });
     try {
-      localStorage.setItem(lastProjectKey, project);
+      localStorage.setItem(projectKey, project);
     } catch {
       // No storage: remembered until the page closes.
     }

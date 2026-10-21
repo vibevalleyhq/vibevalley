@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("a call without Agora's keys says why, offers 设置, and the button tries again", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   const chat = page.getByRole("region", { name: "田头" });
   const call = chat.getByRole("button", { name: "语音说话" });
@@ -31,7 +31,7 @@ test("dictation waits for a transcriber to be set in 声音", async ({ page }) =
 });
 
 test("` opens the debug console over the farm, and its level-up shows the banner", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await page.keyboard.press("`");
   const debug = page.getByRole("complementary", { name: "调试台" });

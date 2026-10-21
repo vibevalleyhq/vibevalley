@@ -278,6 +278,8 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
   const at = () => plotsIn(yard(), props.island.spots.length);
   const down = () => props.cellHeight - pic().h;
   const open = () => router.navigate(`/projects/${encodeURIComponent(props.island.project)}`);
+  // 进岛: into this project's own farm.
+  const enter = () => router.navigate(`/farm/${encodeURIComponent(props.island.project)}`);
   const has = (n: string) => props.atlas.has(n);
   const s = () => props.scale;
   const gate = () => ({ x: yard().left + yard().width / 2, y: yard().top + yard().height + down() });
@@ -392,7 +394,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
           }}
         </For>
       </div>
-      <button type="button" onClick={open} aria-label={props.island.project} class="group cursor-pointer">
+      <button type="button" onClick={enter} aria-label={`进${props.island.project}的农场`} class="group cursor-pointer">
         <PixelCard
           center
           maxWidth={pic().w * s() - 24}

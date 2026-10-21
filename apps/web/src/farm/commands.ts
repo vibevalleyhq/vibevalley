@@ -47,8 +47,6 @@ export interface FarmCommands {
   dismiss(sessionId: string): Promise<void>;
   /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The manager is told to sow it. */
   plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
-  /** A queued issue started, on this plot if given. Not ok: still waiting, or refused; the text says why. */
-  startQueued(issue: string, station?: number): Promise<Answer>;
   /** The click's decision, read from one frame, so the page's sound and the command agree. */
   aim(bed: Bed): PlotAim;
   /** Acts on a click; a tool that does not apply says why over the bed. */
@@ -100,10 +98,6 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       const said = text.trim();
       if (!said) return;
       await api.channel.say({ body: { text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() } });
-    },
-    async startQueued(issue, station) {
-      const got = await answer(async () => (await api.issue.dispatch({ id: issue, body: { station } })).queued ?? "");
-      return { ok: got.ok && got.text === "", text: got.text };
     },
     aim(bed) {
       const f = frame();

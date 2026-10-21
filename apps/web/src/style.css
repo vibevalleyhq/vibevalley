@@ -92,9 +92,13 @@ body {
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
 }
-:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
+/* In the base layer, so a utility wins over it: a field drawn in a box that shows the focus itself (outline-none,
+   focus-within on the box) gets no second ring inside. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
 }
 
 /* The yard's signs hop a pixel now and then: one beat in nine of 350 ms. */

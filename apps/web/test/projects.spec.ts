@@ -24,8 +24,11 @@ test("a new plot is opened, shows on the map and opens its deed", async ({ page 
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByText(/\d+ 座岛 · \d+ 座有人 · 在干 \d+\/\d+ 块地/)).toBeVisible();
   await expect(page.getByRole("button", { name: `${name}：在干 0/3` })).toBeVisible();
-  await page.getByRole("button", { name, exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${name}$`));
+  // 进岛: into the project's own farm, its sign saying whose.
+  await page.getByRole("button", { name: `进${name}的农场` }).click();
+  await expect(page).toHaveURL(new RegExp(`/farm/${name}$`));
+  await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: `项目牌：${name}` })).toBeAttached();
 });
 
 test("the GitHub address names the project until the name is typed", async ({ page }) => {
