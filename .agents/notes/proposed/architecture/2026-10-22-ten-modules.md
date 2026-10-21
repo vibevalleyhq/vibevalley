@@ -180,7 +180,7 @@ VibeValley 是一个 AI 原生的 Linear，外面包一层农场游戏的皮。�
 7. **按能力拆大服务**（已做）：只拆有真 seam 的。
    - 工单：起草（Refinement，`issue/draft.ts` 的 `refinement`，连 `pickAgent`）和收获（`issue/harvest.ts` 的 `harvesting`：本地合、PR、合不进去怎么说、PR 的轮询）各成一个文件，工单服务在建的时候把要的几样交给它们；`issue.ts` 剩存取、挪状态、派活和排队、带话、验收。
    - 不拆：执行（`session.ts`）的令牌、存盘、run 都读写同一份 `hands`，拆开只是把这份状态传来传去；田头（`chat.ts`）的投递、提示、刹车也共用一把锁和几张表。它们各自还是一个能力，没有一个能单独换的 seam。
-8. **事件提交和副作用分开**：另写提案评估（参考 T3 Code 的事件溯源和 outbox）。
+8. **事件提交和副作用分开**（提案已写）：[状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)。
 9. **统一词汇**：照上面的「概念」表改名，接口、表名、文档一起改，不留兼容（本机旧库作废重建）；「待定」的三个先和主人定下来。
 10. **挪文件夹**：按模块改成 `src/<模块>/…`，纯机械，单独一个改动。
 
