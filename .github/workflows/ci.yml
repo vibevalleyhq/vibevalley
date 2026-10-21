@@ -35,9 +35,14 @@ jobs:
       - run: pnpm run docs:verify
       - run: pnpm run scripts:test
 
-  server:
-    name: server
+  # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
+  server-tests:
+    name: server ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       # pnpm's version is package.json's packageManager.
@@ -48,10 +53,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
       # can tell whether db/generated is current. The rest runs against the committed db/generated.
-      - run: pnpm run test
+      - if: matrix.shard == 1
+        run: pnpm run test
         working-directory: packages/protocol
-      - run: pnpm run check && pnpm run test
+      - run: pnpm exec vp test run --shard=${{ matrix.shard }}/3
         working-directory: apps/server
+
+  # The one check main requires for the server: it passes only when every part did.
+  server:
+    name: server
+    needs: server-tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.server-tests.result }}" = success
 
   web:
     name: web
@@ -64,7 +79,8 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run web:check
+      # web:check without the packages' tsc: the check job's vp check covers their types.
+      - run: pnpm --filter @vibevalley/host run test && pnpm --filter vibevalley-mobile run test && pnpm --filter vibevalley-web run build
       # Only the page's rule tests: the Playwright suite runs on the owner's machine (cd apps/web && pnpm run test).
       - run: pnpm run test:rules
         working-directory: apps/web
