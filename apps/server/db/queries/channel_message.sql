@@ -35,6 +35,9 @@ select id from channel_message
 where sender_id = sqlc.arg(sender_id) and conversation_id = sqlc.arg(conversation_id) and body = sqlc.arg(body) and created_at > sqlc.arg(since)
 order by id desc limit 1;
 
+-- name: DispatchesIn :one
+select count(*)::int as n from channel_message where conversation_id = sqlc.arg(conversation_id) and kind = 'dispatch';
+
 -- name: LatestNumber :one
 select coalesce(max(number), 0)::int as n from channel_message where conversation_id = sqlc.arg(conversation_id);
 

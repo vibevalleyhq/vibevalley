@@ -111,9 +111,9 @@
 
 ## 和谁打交道
 
-- **工单（`issue`）**：经 `send` 派活、经 `deliver` 带话、经 `handOver` 收获（收法由工单给：`projects.merge`、提 PR 并存下回执、结束 PR）、经 `dismiss` 收工；`report` 带来结果和缺肥，`left` 让工单判断要不要关上；订阅 `finishedRuns` 关上管家答完的工单。`issue.history` 一次返回工单、它真实的 Session（在地里的从核心状态，走了的从 `session` 表）和缺失记录的号（`missingSessions`），查库失败报错，页面对缺失的显示「记录缺失」，不补造歇着的帮工。
-- **田头（`channel`）**：投递经 `deliver`（触发是 `comment`，带消息号）；订阅 `launches`（一次启动 `<id>#<n>` 的 `spoke`、`ended`、`closed`、`compacting`）判断投递收没收到，订阅 `inputsConsumed` 提交管家的摘要回执；汇报由田头贴进工单串。
-- **种植计划（`task`）**：经 `tell` 带话（触发 `task`），经 `handOver`（关成 `merged_into_graph`）用项目的 `mergeInto` 合进计划分支。
+- **工单（`issue`）**：经 `send` 派活、经 `deliver` 带话、经 `handOver` 收获（收法由工单给：`projects.merge`、提 PR 并存下回执、结束 PR）、经 `dismiss` 收工；订阅 `news`（`SessionNews`：`hired`、`reported` 带着那一刻的 Session、`left`，按施加的顺序）：交回带来结果和缺肥，走了让工单判断要不要关上；订阅 `finishedRuns` 关上管家答完的工单。别的模块要看地里的帮工经 `sessionOf`、`presentSessions`，不直接读核心状态里的 `sessions`。`issue.history` 一次返回工单、它真实的 Session（在地里的从核心状态，走了的从 `session` 表）和缺失记录的号（`missingSessions`），查库失败报错，页面对缺失的显示「记录缺失」，不补造歇着的帮工。
+- **田头（`channel`）**：执行模块在田头下面不能被它 import，所以由执行模块推给它：登记 `Helpers`，把 `news` 交给 `sessionNews`；投递经 `deliver`（触发是 `comment`，带消息号）；订阅 `launches`（一次启动 `<id>#<n>` 的 `spoke`、`ended`、`closed`、`compacting`）判断投递收没收到，订阅 `inputsConsumed` 提交管家的摘要回执；汇报由田头贴进工单串。
+- **种植计划（`task`）**：经 `tell` 带话（触发 `task`），经 `handOver`（关成 `merged_into_graph`）用项目的 `mergeInto` 合进计划分支；订阅 `news` 推进计划里的一步。
 - **项目（`project`）**：worktree 的开和放、上限、项目的规矩和合并、PR；Session 只决定在哪干。
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。

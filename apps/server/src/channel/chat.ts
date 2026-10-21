@@ -5,6 +5,7 @@
 // than lost. Everything that changes the chat runs one at a time.
 
 import {
+  type Chat,
   type ChatMessage,
   type Conversation,
   type ConversationKind,
@@ -251,6 +252,8 @@ export interface ChannelShape {
   readonly markRead: (conversation: string, seq: number) => Effect.Effect<void, ApiError>;
   /** The thread of the issue the session works (a talk thread of its own when it works none). */
   readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
+  /** The conversations and messages the core state holds now. */
+  readonly now: () => Chat | undefined;
   /** Subscribed before it returns. */
   readonly forManager: Effect.Effect<Stream.Stream<ManagerNews>, never, Scope.Scope>;
   /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
@@ -320,6 +323,9 @@ export interface Helpers {
   readonly report: (id: string) => string;
   /** The helper working the issue now, if one is. */
   readonly onIssue: (issue: string) => string | undefined;
+  /** A helper on the farm now, and all of them. */
+  readonly sessionOf: (id: string) => Session | undefined;
+  readonly presentSessions: () => readonly Session[];
 }
 
 export const make = Effect.gen(function* () {
@@ -384,8 +390,9 @@ export const make = Effect.gen(function* () {
   const channelTags = () => [...names.keys()].sort().map((id) => "#" + names.get(id));
   const channelOfSession = (h: Session) => (h.channel && names.has(h.channel) ? h.channel : general);
   const channelIdOf = (row: ConvRow) => (row.kind === "thread" ? (row.channel_id ?? general) : row.id);
-  const sessionOf = (id: string) => core.session(id);
-  const presentSessions = () => core.state().sessions;
+  // Before the helpers are back there are none: a job opens for each once they are.
+  const sessionOf = (id: string) => helpers?.sessionOf(id);
+  const presentSessions = () => helpers?.presentSessions() ?? [];
 
   const targetOfRow = (kind: string, parentNumber: number | null, name: string | null, channelId: string | null, channelName: string | null) => {
     const conv = {
@@ -812,13 +819,8 @@ export const make = Effect.gen(function* () {
       const channel = channelOfSession(h);
       const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
       yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
-      let nth = 1;
-      const issue = (core.state().issues ?? []).find((t) => t.id === h.issue);
-      if (issue) {
-        // Linked to the issue or not yet, it is the one after those before it.
-        const at = (issue.sessions ?? []).indexOf(h.id);
-        nth = at >= 0 ? at + 1 : (issue.sessions ?? []).length + 1;
-      }
+      // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
+      const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
       const text = h.draft ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
       yield* write({ conversation: thread, from: managerAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
     });
@@ -855,7 +857,6 @@ export const make = Effect.gen(function* () {
       // A word half said when the server stopped is as said as it got; whatever was handed and not seen goes back.
       yield* db(qm.finalizeAll({ updated_at: Date.now() }));
       yield* db(qd.rollbackAll());
-      for (const h of presentSessions()) yield* openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`)));
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
       for (const c of [...convs].reverse()) apply({ type: "conversation", conversation: yield* toConversation(c) });
       const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
@@ -881,9 +882,10 @@ export const make = Effect.gen(function* () {
         }
       }),
     ).pipe(logged(`after ${n._tag}`));
-  // Whatever was waiting for a session still on the farm goes to it, once the helpers are back.
+  // Once the helpers are back: each on the farm has its job, and whatever was waiting for one goes to it.
   const helpersBack = locked(
     Effect.gen(function* () {
+      for (const h of presentSessions()) yield* openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`)));
       for (const p of yield* db(qp.participants())) if (p.kind === "agent" && p.left_at === null) yield* kick(p.id);
     }),
   );
@@ -928,6 +930,7 @@ export const make = Effect.gen(function* () {
     Effect.flatMap(one(qm.messageByID({ id })), (row) => (row ? Effect.succeed(row) : Effect.fail(refused("写进去了，但读不回来"))));
 
   const shape: ChannelShape = {
+    now: () => core.state().chat,
     general: () => general,
     say: (text, conversation, sendKey) =>
       locked(

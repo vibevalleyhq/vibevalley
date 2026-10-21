@@ -15,7 +15,6 @@ import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/pro
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../schedule/when.ts";
 import { isOpen } from "../task/graph.ts";
-import { graphsOf } from "../task/issues.ts";
 import { graphText } from "../task/rules.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
@@ -432,7 +431,7 @@ export const make = (options: ManagerOptions = {}) =>
       });
       const all = await go(projects.list());
       const folders = all.length > 0 ? all.map((p) => p.name).join("、") : "（还没有）";
-      const open = graphsOf(core.state()).filter(isOpen).map(graphText);
+      const open = tasks.graphs().filter(isOpen).map(graphText);
       const graphs = open.length > 0 ? "\n种植计划：\n" + open.join("\n") : "";
       return (
         "【农场现状】\n项目（工作目录 " +

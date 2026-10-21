@@ -98,6 +98,10 @@ export type Caller = "owner" | "manager";
 
 export interface IssueShape {
   readonly list: () => Effect.Effect<Issue[]>;
+  /** Who the farm sends for a task: the profile named (or the owner's pick) if it can work, else the best that can. */
+  readonly pickAgent: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+  /** The issues the board holds now (open, and the latest closed). */
+  readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
   readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
   readonly edit: (id: string, upd: IssueUpdate) => Effect.Effect<Issue, ApiError>;
@@ -465,7 +469,7 @@ export const make = (options: IssueOptions = {}) =>
         if (full) return { refused: full } as Hired;
         // A full farm sends home whoever has been idle longest.
         let evicted = "";
-        const all = core.state().sessions;
+        const all = sessions.presentSessions();
         if (all.length >= maxRunning) {
           const oldest = all.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
           if (oldest) {
@@ -625,7 +629,7 @@ export const make = (options: IssueOptions = {}) =>
         if (!place) return undefined;
         const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
         const conflict = conflictOf(changes);
-        const session = core.session(id);
+        const session = sessions.sessionOf(id);
         if (session && !sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
         return changes;
       });
@@ -633,7 +637,7 @@ export const make = (options: IssueOptions = {}) =>
     const recheck = (id: string) =>
       Effect.gen(function* () {
         const place = sessions.place(id);
-        const session = core.session(id);
+        const session = sessions.sessionOf(id);
         if (!place || !session) return;
         const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
         if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
@@ -641,7 +645,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const mergeError = (id: string, err: unknown) =>
       Effect.gen(function* () {
-        const session = core.session(id);
+        const session = sessions.sessionOf(id);
         const failure =
           err instanceof MergeFailure
             ? err
@@ -665,7 +669,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const mergeSession = (id: string) =>
       Effect.gen(function* () {
-        const session = core.session(id);
+        const session = sessions.sessionOf(id);
         if (!session) return yield* Effect.fail(missing("帮工 " + id));
         const merged = yield* Effect.result(sessions.handOver(id, "merged", (place) => projects.merge(place)));
         if (merged._tag === "Failure") return yield* Effect.fail(yield* mergeError(id, merged.failure));
@@ -723,10 +727,15 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── drafts ──
 
+    const candidatesNow = Effect.suspend(() =>
+      Effect.forEach(store.agents(), (agent) => Effect.map(runtimes.assess(agent), (a) => ({ agent: a.agent, usable: usable(a) }))),
+    );
+    const pickAgent = (task: string, named: string, picked: string) => Effect.map(candidatesNow, (c) => chooseAgent(c, task, named, picked));
+
     /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
     const drafter = (t: Issue) =>
       Effect.gen(function* () {
-        const candidates = yield* Effect.forEach(store.agents(), (agent) => Effect.map(runtimes.assess(agent), (a) => ({ agent, usable: usable(a) })));
+        const candidates = yield* candidatesNow;
         let named = "";
         if (t.assignee) {
           if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
@@ -809,7 +818,7 @@ export const make = (options: IssueOptions = {}) =>
     /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
     const handedBack = (f: { id: string; outcome: string; summary: string; asks?: readonly Ask[] }) =>
       Effect.gen(function* () {
-        const h = core.session(f.id);
+        const h = sessions.sessionOf(f.id);
         if (!h?.draft || !h.issue) return;
         const id = h.issue;
         const r = sessions.find(f.id);
@@ -984,6 +993,8 @@ export const make = (options: IssueOptions = {}) =>
       });
 
     const shape: IssueShape = {
+      onBoard: () => core.state().issues ?? [],
+      pickAgent,
       list: () => list,
       get,
       timeline,
@@ -1098,7 +1109,7 @@ export const make = (options: IssueOptions = {}) =>
               break;
             case "cure": {
               const last = t.sessions.at(-1);
-              yield* comment(id, cureWords((last !== undefined ? core.session(last)?.brief : undefined) ?? t.title));
+              yield* comment(id, cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title));
               break;
             }
             case "stop":
@@ -1170,7 +1181,7 @@ export const make = (options: IssueOptions = {}) =>
       resolve: (id) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
-          const h = core.session(session);
+          const h = sessions.sessionOf(session);
           if (!h) return yield* Effect.fail(missing("帮工 " + session));
           // A preview that fails (git broken) is said as it is, not taken for no conflict.
           const changes = h.conflict ? undefined : yield* sessionChanges(session);

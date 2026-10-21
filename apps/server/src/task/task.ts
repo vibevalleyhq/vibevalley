@@ -62,7 +62,8 @@ import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
 import { Runtimes, usable } from "../runtime/runtime.ts";
-import { chooseAgent, splitBrief } from "../session/rules.ts";
+import { chooseAgent } from "../session/rules.ts";
+import { splitBrief } from "./rules.ts";
 import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
@@ -77,6 +78,8 @@ export interface TaskShape {
   readonly editTask: (id: string, task: string, edit: TaskEdit, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly removeTask: (id: string, task: string, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
+  /** The task graphs now, as the board has them. */
+  readonly graphs: () => TaskGraph[];
   readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
   /** What the manager is told about graphs, subscribed before it returns. */
   readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
@@ -306,7 +309,7 @@ export const make = (options: TaskOptions = {}) =>
     /** Judged by the farm, not by the step's session. Not verified: it is sent back, and the answer is false. */
     const verified = (graph: TaskGraph, task: Task, sessionId: string) =>
       Effect.gen(function* () {
-        const session = core.session(sessionId);
+        const session = live.sessionOf(sessionId);
         if (!session?.worktree) return { ok: true, frozen: [] as string[] };
         const cwd = session.worktree;
         let changed: string[] = [];
@@ -342,7 +345,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const taskDone = (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) =>
       Effect.gen(function* () {
-        const session = core.session(sessionId);
+        const session = live.sessionOf(sessionId);
         const { ok, frozen } = yield* verified(graph, task, sessionId);
         if (!ok) return;
         if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
@@ -420,7 +423,7 @@ export const make = (options: TaskOptions = {}) =>
           if (task.state !== "working") continue;
           const graph = get(id);
           if (!graph) return;
-          const session = task.session ? core.session(task.session) : undefined;
+          const session = task.session ? live.sessionOf(task.session) : undefined;
           if (!session) {
             yield* putSystem(withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting" })));
             continue;
@@ -455,7 +458,7 @@ export const make = (options: TaskOptions = {}) =>
         for (const graph of graphsOf(core.state())) {
           if (graph.state === "splitting") {
             yield* putSystem(withNote({ ...graph, state: "abandoned" }, "VibeValley 重启了，规划停在了半路：再说一遍要做什么"));
-            for (const h of core.state().sessions) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
+            for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
           } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
             yield* putSystem(withNote({ ...graph, state: "paused" }, "VibeValley 重启过，计划先暂停了；点继续接着做"));
           }
@@ -466,6 +469,7 @@ export const make = (options: TaskOptions = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape: TaskShape = {
+      graphs: () => graphsOf(core.state()),
       comeBack,
       split: (goal, project, agent, by) =>
         lock.withPermits(1)(
@@ -611,7 +615,7 @@ export const make = (options: TaskOptions = {}) =>
             switch (action) {
               case "retry": {
                 if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试"));
-                const session = task.session ? core.session(task.session) : undefined;
+                const session = task.session ? live.sessionOf(task.session) : undefined;
                 if (session && !isBusy(session)) {
                   // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
                   yield* put(

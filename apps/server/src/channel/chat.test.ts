@@ -87,6 +87,8 @@ const fakeHelpers = (x: FakeSessions) =>
         currentRun: () => undefined,
         report: (id) => summaryOf(x.last.get(id) ?? ""),
         onIssue: (issue) => sessionOnIssue(x.core.state(), issue)?.id,
+        sessionOf: (id) => x.core.session(id),
+        presentSessions: () => x.core.state().sessions,
       });
       yield* Effect.forkScoped(Stream.runForEach(Stream.fromSubscription(yield* PubSub.subscribe(x.launches)), chat.activity));
       // As the sessions tell the chat of their own facts.

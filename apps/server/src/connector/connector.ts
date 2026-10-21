@@ -307,7 +307,7 @@ export const make = (options: ConnectorOptions = {}) =>
 
       const status = async (): Promise<ConnectorStatus> => {
         const pending = await run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).catch(() => 0);
-        const state = core.state().chat;
+        const state = chat.now();
         const s: ConnectorStatus = { id, state: "off", pending };
         if (err) s.error = err;
         const a = account;
@@ -339,7 +339,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const rows = await run(outboxQ.messageOfExt({ connector: id, ext_id: ext })).catch(() => []);
         const seq = rows[0]?.message_id;
         if (!seq) return undefined;
-        return core.state().chat?.messages.find((m) => m.id === seq)?.conversation;
+        return chat.now()?.messages.find((m) => m.id === seq)?.conversation;
       };
 
       // The outbox: one drain at a time, in order.
@@ -391,7 +391,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const offer = async (m: ChatMessage) => {
         const a = now();
         if (!a || !a.owner || !forOwner(m)) return;
-        const state = core.state().chat;
+        const state = chat.now();
         const where = conversationOf(state, m.conversation);
         const mine = a.channel ?? generalOf(state)?.id;
         const channel = channelOf(state, where);

@@ -173,7 +173,10 @@ VibeValley 是一个 AI 原生的 Linear，外面包一层农场游戏的皮。�
    - 其余挪回各自的模块：`session/state.ts`、`channel/state.ts`、`issue/{state,standing,moves}.ts`、`task/{graph,issues}.ts`、`schedule/when.ts`、`notice/inbox.ts`、`game/{play,view}.ts`、`agent/seed.ts`（和两个 json）、`base/{text,dag}.ts`；黄金数据和它们的测试在 `core/`。
    - 折法和拼帧在 `projection/`（组装那一层），组装时以 `Projection` 交给 `core`，`core` 不 import 上面的模块。没有拆成每个模块各交一段折法：一个 `reduce` 能看全，黄金数据只比一个函数。
    - 田头问帮工「这张工单现在谁在做」改走 `Helpers.onIssue`。剩下一条反向的（帮工的规矩里写了拆工单的上限 `maxTasks`）记在边界测试里，归第 6 步。
-6. **Assistant 的工具改成用例适配器**；模块之间不再读核心状态里别人的那一块；事件改成带类型。
+6. **Assistant 的工具改成用例适配器**；模块之间不再读核心状态里别人的那一块；事件改成带类型（已做）。
+   - 事件：Agent Sessions 把自己的事实说成 `news`（`SessionNews`：`hired`、`reported`、`left`，带着那一刻的 Session）；工单和种植计划订阅它，田头经 `Helpers` 端口收（`sessionNews`），不再从核心事实里按 `type` 挑。主人在串里的话由田头说成 `ownerInThread`，工单订阅它；工单的两路合成一条按顺序处理。
+   - 读别人的那一块：各模块给自己的一块开查询（`Sessions.sessionOf`、`presentSessions`，`Issues.onBoard`，`Tasks.graphs`，`Channels.now`），别人经它读；田头经 `Helpers.sessionOf`、`presentSessions`、`onIssue`。田头给帮工开工单串挪到 `helpersBack`（帮工接回以后），不再用 `state.json` 里的旧帮工先开；第几次派活照串里的派活消息数。边界测试加了一条：读 `core.state()` 里别人的那一块就失败，没有例外。
+   - 工具：挑帮工档案（`dispatch`、`issue_status` 和起草各有一份）收成 `Issues.pickAgent`；拆计划的规矩 `splitBrief` 挪到 `task/rules.ts`。留在工具里的：主人有没有说过的检查（Assistant 替主人做事的规矩，HTTP 的调用方就是主人），参数的翻译（名字到 id）和给模型看的拼法。
 7. **按能力拆大服务**：`issue.ts`、`session.ts`、`channel/chat.ts` 在各自的文件夹里拆成几个小服务（例如工单的起草、收获和 PR、排队），一个文件一个服务。
 8. **事件提交和副作用分开**：另写提案评估（参考 T3 Code 的事件溯源和 outbox）。
 9. **统一词汇**：照上面的「概念」表改名，接口、表名、文档一起改，不留兼容（本机旧库作废重建）；「待定」的三个先和主人定下来。

@@ -272,6 +272,29 @@ export const recentDuplicate = Effect.fn("RecentDuplicate")(function* (params: R
   })(params)
 })
 
+export const DispatchesInParams = Schema.Struct({
+  ["conversation_id"]: Schema.String,
+})
+export type DispatchesInParams = typeof DispatchesInParams.Type
+
+
+export const DispatchesInResult = Schema.Struct({
+  ["n"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+})
+export type DispatchesInResult = typeof DispatchesInResult.Type
+
+
+export const DispatchesInSql = "-- name: DispatchesIn :one\nselect count(*)::int as n from channel_message where conversation_id = $1 and kind = 'dispatch';"
+
+export const dispatchesIn = Effect.fn("DispatchesIn")(function* (params: DispatchesInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: DispatchesInParams,
+    Result: DispatchesInResult,
+    execute: (p) => sql.unsafe(DispatchesInSql, [p["conversation_id"]]),
+  })(params)
+})
+
 export const LatestNumberParams = Schema.Struct({
   ["conversation_id"]: Schema.String,
 })

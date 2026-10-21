@@ -141,6 +141,9 @@ export interface SessionShape {
   readonly place: (id: string) => Workplace | undefined;
   readonly roster: () => Roster[];
   readonly find: (id: string) => Roster | undefined;
+  /** A session on the farm now, as the core state has it: what another module reads a session by. */
+  readonly sessionOf: (id: string) => Session | undefined;
+  readonly presentSessions: () => readonly Session[];
   /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
    * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
    * it works. A merge that would conflict marks the conflict and keeps the session; so does a pull request left open. */
@@ -1006,6 +1009,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       currentRun: (id) => hands.get(id)?.run ?? executions.get(id)?.() ?? "",
       events: (id, r) => trajectories.events(id, r),
       trajectories,
+      sessionOf: (id) => core.session(id),
+      presentSessions: () => core.state().sessions,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
@@ -1043,6 +1048,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       currentRun: shape.currentRun,
       report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
       onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
+      sessionOf: shape.sessionOf,
+      presentSessions: shape.presentSessions,
     });
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));

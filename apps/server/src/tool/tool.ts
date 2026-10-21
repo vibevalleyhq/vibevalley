@@ -20,7 +20,6 @@ import {
 import { phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
-import { graphsOf } from "../task/issues.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
 import { inboxLines } from "../channel/rules.ts";
@@ -34,10 +33,8 @@ import { type ApiError, reasonOf } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
-import { Runtimes } from "../runtime/runtime.ts";
 import { Schedules } from "../schedule/schedule.ts";
 import type { ToolStart } from "../session/facts.ts";
-import { chooseAgent } from "../session/rules.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
 import {
@@ -158,7 +155,6 @@ export const make = Effect.gen(function* () {
   const projects = yield* Projects;
   const memory = yield* Memories;
   const docs = yield* Docs;
-  const runtimes = yield* Runtimes;
   const run = yield* Sessions;
   const chat = yield* Channels;
   const schedule = yield* Schedules;
@@ -207,20 +203,13 @@ export const make = Effect.gen(function* () {
   const whoOf = (t: Issue) =>
     workerOf(t)?.session.name ?? (t.assignee === managerAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
   const nobodyOn = (t: Issue) => `#${t.number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status 挪到待办`;
-  const numberOf = (w: Roster) => (w.session.issue ? core.state().issues?.find((t) => t.id === w.session.issue)?.number : undefined);
+  const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((t) => t.id === w.session.issue)?.number : undefined);
 
   // Who reads and speaks in a channel: a session as itself, the manager as the manager.
   const participant = (c: Caller) => c.session || c.agent;
 
   // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
-  const choose = async (task: string, name: string, picked: string): Promise<Agent | undefined> => {
-    const candidates = [];
-    for (const a of agents.agents()) {
-      const assessed = await go(runtimes.assess(a));
-      candidates.push({ agent: assessed.agent, usable: assessed.agent.enabled && assessed.blocking.length === 0 });
-    }
-    return chooseAgent(candidates, task, name, picked);
-  };
+  const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(issue.pickAgent(task, name, picked));
 
   // The manager may say a profile's name or id.
   const profile = (key: string): string => {
@@ -279,7 +268,7 @@ export const make = Effect.gen(function* () {
   const sessionList = sessionSchemaTool<object>("session_list", "地里现在有谁：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
     // Listed without @: an @ wakes someone, and models copy what they read.
     const lines = ["地里有主人、管家，和这些帮工："];
-    for (const h of core.state().sessions)
+    for (const h of run.presentSessions())
       lines.push(`- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, Date.now())}）工单：${head(h.brief.replace(spaces, " "), 60)}`);
     lines.push("要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。");
     return lines.join("\n");
@@ -711,7 +700,8 @@ export const make = Effect.gen(function* () {
   );
 
   const graphsTool = tool<{ id?: string }>("graphs", "列出种植计划：每件的状态、谁在做、结论。", (p) => {
-    const texts = graphsOf(core.state())
+    const texts = tasks
+      .graphs()
       .filter((g) => (p.id ? g.id === p.id : isOpen(g)))
       .map(graphText);
     if (texts.length > 0) return texts.join("\n\n");
