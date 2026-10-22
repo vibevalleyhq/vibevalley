@@ -31,7 +31,7 @@ const draftLeftNothing = (work: string, issue: Issue) => {
 
 describe("a drafted issue", () => {
   // The plus makes an unsent issue; a session drafts it to the issue's format and leaves, the issue still in the
-  // backlog. It asks; the owner's answer makes a second draft over the first; sent out, its session is told the criteria.
+  // backlog. It questions; the owner's answer makes a second draft over the first; sent out, its session is told the criteria.
   it.live("is drafted before it is sent", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -59,7 +59,7 @@ describe("a drafted issue", () => {
       );
       expect(issue.description).toBe("为什么：\n看板还在调旧接口\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- board.dart");
       expect(issue.criteria).toEqual(["拖到待办就开工"]);
-      expect(issue.asks).toEqual([{ question: "用 8787 还是 8797？" }]);
+      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
       expect([issue.status, issue.sessions?.length ?? 0]).toEqual(["backlog", 0]);
       yield* until(() => !drafting(core), "the drafter left");
       yield* draftLeftNothing(f.config.workRoot, issue);
@@ -77,7 +77,7 @@ describe("a drafted issue", () => {
         (i) => i.title === "看板拖卡改用 8797 端口" && i.drafting === undefined,
         "the second draft over the first",
       );
-      expect([issue.criteria, issue.asks?.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
+      expect([issue.criteria, issue.questions?.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
       yield* until(() => !drafting(core), "the second drafter left");
 
       issue = yield* issues.setStatus(issue.id, "todo", "", "");

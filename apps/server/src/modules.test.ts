@@ -1,5 +1,5 @@
 // The modules' boundary (modules.ts): every folder and file under src/ is part of one module, no module imports one
-// after it, and none reads another's part of the core state: it asks that module. A test may use any module; so may the
+// after it, and none reads another's part of the core state: it questions that module. A test may use any module; so may the
 // test farm (testing/, flows/).
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

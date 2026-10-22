@@ -530,7 +530,7 @@ export const IssueDrafting: Schema.Codec<T.IssueDrafting> = Schema.Struct({
   name: Schema.String,
 });
 
-export const Ask: Schema.Codec<T.Ask> = Schema.Struct({
+export const Question: Schema.Codec<T.Question> = Schema.Struct({
   question: Schema.String,
   options: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
@@ -599,7 +599,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   acceptance: Acceptance,
   acceptedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
-  asks: Schema.mutable(Schema.Array(Ask)),
+  questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
   drafting: Schema.optionalKey(IssueDrafting),
@@ -1639,7 +1639,7 @@ export const FactReport: Schema.Codec<T.FactReport> = Schema.Struct({
   summary: Schema.String,
   runs: Schema.Number,
   spent: Schema.optionalKey(Spent),
-  asks: Schema.optionalKey(Schema.mutable(Schema.Array(Ask))),
+  questions: Schema.optionalKey(Schema.mutable(Schema.Array(Question))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
 });
 

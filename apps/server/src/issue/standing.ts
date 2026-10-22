@@ -47,7 +47,7 @@ export function standingOf(t: Issue, session: Session | undefined): IssueStandin
         });
       const since = last?.at;
       if (session?.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: ["resolve", "tell", "close"] };
-      if (t.asks.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: ["answer", "close"] };
+      if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: ["answer", "close"] };
       if (last?.outcome === "failed") return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: ["cure", "tell", "close"] };
       // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
       if (last?.outcome === "interrupted")

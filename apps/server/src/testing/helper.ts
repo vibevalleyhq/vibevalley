@@ -27,7 +27,7 @@ const idle = (turn: ScriptedTurn, ms: number) =>
   });
 
 /** A drafting session: 慢慢 takes its time, 顺手提交 changes and commits what it should not, 乱写 hands back no block; the
- * answer 用 8797 makes the second version, which asks nothing. */
+ * answer 用 8797 makes the second version, which questions nothing. */
 async function draft(turn: ScriptedTurn, input: string) {
   if (input.includes("慢慢") && (await idle(turn, 1500))) return;
   if (input.includes("乱写")) return turn.say("看了一圈，不知道写什么。\n\n结论：没写出来");
@@ -42,11 +42,11 @@ async function draft(turn: ScriptedTurn, input: string) {
       return "";
     });
   }
-  let [title, criteria, asks] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"];
-  if (input.includes("主人的回答：用 8797")) [title, criteria, asks] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
+  let [title, criteria, questions] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"];
+  if (input.includes("主人的回答：用 8797")) [title, criteria, questions] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
   turn.say(
     "看过代码了。\n\n" +
-      asks +
+      questions +
       "```json\n" +
       `{"title": "${title}", "why": "看板还在调旧接口", "todo": ["改 board.dart"], "criteria": ${criteria}, "notDoing": [], "files": ["board.dart"]}` +
       "\n```\n\n结论：草稿写好了",
@@ -55,7 +55,7 @@ async function draft(turn: ScriptedTurn, input: string) {
 
 /** The helper every flow hires: what it does is in the words of its job (the part after the reminders). 只起草工单 drafts;
  * 必败 fails; 发呆 idles a while; 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
- * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
+ * clock.ts; 先问清楚 questions the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
  * memories. It answers with its job and persona, and says of each numbered criterion that it was met. */
 export const helper = (turns: ScriptedTurn[] = []): Runtime =>
   scriptedRuntime({

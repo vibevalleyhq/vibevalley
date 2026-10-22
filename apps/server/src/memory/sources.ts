@@ -1,5 +1,5 @@
 // Where memories live: this farm's database, always there and
-// first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read asks them
+// first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read questions them
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
@@ -215,7 +215,7 @@ export class Sources {
     return [...this.all];
   }
 
-  /** Asks every source at once; the local one is waited for, any other only up to the timeout. */
+  /** Questions every source at once; the local one is waited for, any other only up to the timeout. */
   async askAll<T>(what: string, ask: (one: Source, signal: AbortSignal) => Promise<T[]>, sources = this.current()): Promise<T[][]> {
     return Promise.all(
       sources.map(async (one) => {

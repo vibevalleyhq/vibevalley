@@ -21,7 +21,7 @@ export interface FinishedRun {
   readonly summary: string;
 }
 
-/** What a run recalls by. peek only asks: nothing is counted as recalled (the 记性 tab's preview). */
+/** What a run recalls by. peek only questions: nothing is counted as recalled (the 记性 tab's preview). */
 export interface RecallCue {
   readonly agent: string;
   readonly session?: string;

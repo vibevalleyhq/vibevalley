@@ -7,7 +7,7 @@
 
 import {
   type Agent,
-  type Ask,
+  type Question,
   type Changes,
   type CriterionCheck,
   type Dispatched,
@@ -53,7 +53,7 @@ import {
   kept,
   milestonesOf,
   nextTaskId,
-  openAsks,
+  openQuestions,
   resumeWords,
   sentTitles,
   splitJob,
@@ -240,7 +240,7 @@ export const make = (options: IssueOptions = {}) =>
         acceptance: row.acceptance as Issue["acceptance"],
         ...(row.accepted_at !== null ? { acceptedAt: row.accepted_at } : {}),
         findings: json<Finding[]>(row.findings) ?? [],
-        asks: json<Ask[]>(row.asks) ?? [],
+        questions: json<Question[]>(row.questions) ?? [],
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
         ...(handedBack ? { handedBack } : {}),
@@ -364,8 +364,8 @@ export const make = (options: IssueOptions = {}) =>
     const reopenRow = (id: string) => Effect.andThen(db(q.reopenIssue({ id })), publish(id));
 
     /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
-    const asked = (id: string, asks: readonly Ask[] | undefined) =>
-      Effect.andThen(db(q.setIssueAsks({ id, asks: jsonOrNull(openAsks(asks), openAsks(asks).length > 0) })), publish(id));
+    const asked = (id: string, questions: readonly Question[] | undefined) =>
+      Effect.andThen(db(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
     /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
     const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
@@ -675,7 +675,7 @@ export const make = (options: IssueOptions = {}) =>
             // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
             const checks = e.checks ?? [];
             if (issue && checks.length > 0) yield* checked(issue, checks);
-            if (issue) yield* asked(issue, e.asks);
+            if (issue) yield* asked(issue, e.questions);
             yield* handedBack(e);
             if (n.session?.conflict) yield* recheck(e.id);
             return;
@@ -940,7 +940,7 @@ export const make = (options: IssueOptions = {}) =>
           return changes;
         }),
       merge,
-      /** The owner asks the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
+      /** The owner questions the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
       resolve: (id) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);

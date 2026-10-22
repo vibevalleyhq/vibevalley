@@ -78,7 +78,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
 | 验收 | acceptance（`Issue.Acceptance`、`issue.accept`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核、review |
 | 草 | finding（`Issue.Findings`） | 没过验收的一条意见；下次验收通过才拔 | |
-| 缺肥 | asks（`Issue.Asks`） | 帮工问了主人、还没回答的；施肥是回答它 | |
+| 缺肥 | asks（`Issue.Questions`） | 帮工问了主人、还没回答的；施肥是回答它 | |
 | 仓库 | warehouse | 收获了的工单 | |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |

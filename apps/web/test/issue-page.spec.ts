@@ -85,7 +85,7 @@ const scripted: Agent = {
   look: { species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
+test("a real round: the helper questions with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
   const fox = await api.agent.create({ body: scripted });
   const project = await api.project.create({ body: { name: "clock" } });
   const made = await api.issue.create({ body: { title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id } });
@@ -118,7 +118,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
     { state: "asking", since: now - 3 * minute, lead: "answer", acts: ["answer", "close"] },
     {
       status: "in_review",
-      asks: [{ question: "这份评估是全交给 w3，还是我和它分着做？", options: ["全交给 w3", "分着做"] }],
+      questions: [{ question: "这份评估是全交给 w3，还是我和它分着做？", options: ["全交给 w3", "分着做"] }],
       criteria: ["技术栈和代码量", "模块和数据流", "测试和构建现状", "最该推进的三件事"],
     },
     { lastRun: { outcome: "completed", summary: "读完了结构，有一件事要问你", at: now - 3 * minute } },
@@ -163,7 +163,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   await expect.poll(() => said as { act?: string; text?: string } | undefined).toMatchObject({ act: "answer", text: "分着做" });
 });
 
-test("work handed back: 等你验收, the helper's word on each criterion, and 打回 asks what failed", async ({ page, server, api }) => {
+test("work handed back: 等你验收, the helper's word on each criterion, and 打回 questions what failed", async ({ page, server, api }) => {
   const made = await api.issue.create({ body: { title: "把登录页的记住我做完" } });
   const now = Date.now();
   const view = await openIssue(
@@ -225,7 +225,7 @@ test("a failed round: 卡住了, says why and leads with 接着修", async ({ pa
   await page.screenshot({ path: test.info().outputPath("stuck.png") });
 });
 
-test("a harvested issue asks nothing: 收获了, and says it went into main", async ({ page, server, api }) => {
+test("a harvested issue questions nothing: 收获了, and says it went into main", async ({ page, server, api }) => {
   const made = await api.issue.create({ body: { title: "给工单加上验收标准的模板" } });
   const now = Date.now();
   const view = await openIssue(

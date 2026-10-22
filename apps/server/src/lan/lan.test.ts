@@ -52,7 +52,7 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
     const link = new URL(s.pairing!.link);
     expect([link.origin, link.pathname, link.searchParams.get("c")]).toEqual([addr, "/pair", s.pairing!.code]);
     const got = ask(addr, s.pairing!.code.toLowerCase(), name);
-    yield* until(() => lan.status().pairing?.asking !== undefined, "it asks");
+    yield* until(() => lan.status().pairing?.asking !== undefined, "it questions");
     yield* lan.answer(true);
     const paired = JSON.parse(yield* Effect.promise(() => got)) as LanPaired;
     expect(paired.key).not.toBe("");
@@ -130,7 +130,7 @@ describe("lan access", () => {
       const addr = yield* open(lan);
       const s = yield* lan.startPairing();
       const got = ask(addr, s.pairing!.code, "陌生人");
-      yield* until(() => lan.status().pairing?.asking === "陌生人", "it asks");
+      yield* until(() => lan.status().pairing?.asking === "陌生人", "it questions");
       expect(yield* Effect.promise(() => ask(addr, s.pairing!.code, "又一个"))).toContain("另一台设备");
       yield* lan.answer(false);
       const body = yield* Effect.promise(() => got);

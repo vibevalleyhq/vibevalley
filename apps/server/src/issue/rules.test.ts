@@ -51,7 +51,7 @@ describe("an issue as a job", () => {
       moves: [],
       acceptance: "glance",
       findings: [{ id: "f1", text: "少了测试", at: 400 }],
-      asks: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
+      questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
       standing: { state: "asking", acts: [] },
     } as Issue;
     const runs: Run[] = [
@@ -137,7 +137,12 @@ describe("drafts", () => {
     const first = draftBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
     for (const want of [draftOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："]) expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
-    const drafted = { title: "看板拖卡改用 issue.status", description: "为什么：\n旧接口", criteria: ["拖到待办就开工"], asks: [{ question: "端口用哪个？" }] };
+    const drafted = {
+      title: "看板拖卡改用 issue.status",
+      description: "为什么：\n旧接口",
+      criteria: ["拖到待办就开工"],
+      questions: [{ question: "端口用哪个？" }],
+    };
     const answer = draftBrief(drafted, "用 8797", "board");
     for (const want of [
       "上一版草稿",
@@ -148,7 +153,7 @@ describe("drafts", () => {
       "主人的回答：用 8797",
     ])
       expect(answer).toContain(want);
-    const again = draftBrief({ ...drafted, asks: [] }, "也改测试", "board");
+    const again = draftBrief({ ...drafted, questions: [] }, "也改测试", "board");
     expect(again).toContain("主人这次说：也改测试");
     expect(again).not.toContain("主人的回答");
   });

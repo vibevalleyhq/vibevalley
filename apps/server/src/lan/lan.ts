@@ -5,7 +5,7 @@
 // the farm's; a browser pairs on its /pair, the link the owner's QR code says. Opening
 // it, pairing and forgetting devices are this machine's alone. The database keeps only each key's SHA-256. The listener
 // speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
-// server, saying which device asks.
+// server, saying which device questions.
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -97,7 +97,7 @@ const keyOf = (req: IncomingMessage) => {
   return "";
 };
 
-/** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
+/** Never handed on: the device's key stays at the listener, and only the listener says which device questions. */
 const dropped = new Set(["host", "connection", "cookie", "authorization", deviceHeader]);
 
 /** The endpoints a device may call, and the three streams; a request no pattern matches is refused. */
@@ -337,7 +337,7 @@ export const make = (options: LanOptions = {}) =>
           if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
           p.asking = name;
           p.expires = now() + pairingForMs;
-          logs.info(`vibevalley: lan access: "${name}" asks to pair`);
+          logs.info(`vibevalley: lan access: "${name}" questions to pair`);
           const allow = yield* Effect.callback<boolean | "late">((resume) => {
             p.answer = (a) => resume(Effect.succeed(a));
             const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);

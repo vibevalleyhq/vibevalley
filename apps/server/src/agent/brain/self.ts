@@ -7,7 +7,7 @@ import { objectSchema, stringSchema, textTool } from "./tool.ts";
 
 export interface SelfOptions {
   readonly home: string;
-  /** Scanned each time it asks. */
+  /** Scanned each time it questions. */
   readonly skills: () => SkillInfo[];
   readonly memory: boolean;
 }

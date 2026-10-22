@@ -31,5 +31,5 @@ export const actLabel: Record<IssueAct, string> = {
   reopen: "重开",
 };
 
-/** Asks the owner for something: the page leads with it, the board flags it. */
+/** Questions the owner for something: the page leads with it, the board flags it. */
 export const standingWantsOwner = (s: Standing) => s === "asking" || s === "reviewing" || s === "stuck";

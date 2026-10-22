@@ -3,7 +3,7 @@ import { type FromNative, fromNativeKey, mobileHost } from "./mobile";
 export * from "./mobile";
 
 // What the page may ask of the program around it. Every host (desktop/, mobile/, a plain browser) gives the whole
-// interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which host it is in.
+// interface; a capability it lacks is null, and the page draws nothing for it. The page never questions which host it is in.
 
 export interface Notice {
   title: string;

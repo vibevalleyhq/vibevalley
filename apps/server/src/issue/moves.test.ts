@@ -56,7 +56,7 @@ describe("status moves", () => {
 describe("moves and the standing", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "ripe" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
-  const base = { status: "in_review", sessions: ["w1"], asks: [], findings: [], acceptance: "glance", createdAt: 0 } as unknown as Issue;
+  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], acceptance: "glance", createdAt: 0 } as unknown as Issue;
   // One table: an act that takes the issue to done is offered exactly when the move is.
   it("agree on done, whatever the round came to", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [

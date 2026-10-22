@@ -71,7 +71,7 @@ const badgeQuiet: Badge = { text: "没动静", tone: "stuck" };
 const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
 const badgeReview: Badge = { text: standingLabel.reviewing, tone: "wait" };
-const badgeAsks: Badge = { text: standingLabel.asking, tone: "wait" };
+const badgeQuestions: Badge = { text: standingLabel.asking, tone: "wait" };
 
 /**
  * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer
@@ -88,7 +88,7 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
       break;
     case "ripe":
     case "resting":
-      if ((issue.asks ?? []).length > 0) return { crop: "dry", badge: badgeAsks };
+      if ((issue.questions ?? []).length > 0) return { crop: "dry", badge: badgeQuestions };
       if (issue.acceptedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
       if (weeds > 0) return { crop: "weeds", badge: { text: `${weeds} 棵草`, tone: "bug" } };
       if (h.phase._tag === "ripe") return { crop: "flowering", badge: badgeReview };

@@ -3,7 +3,7 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, Ask, CheckResult, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import type { Agent, Question, CheckResult, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
@@ -76,24 +76,24 @@ export interface SessionRead {
   readonly failure: string;
   readonly needsYou: boolean;
   /** The 要问主人： lines: what it cannot go on without. */
-  readonly asks: Ask[];
+  readonly questions: Question[];
   /** The 标准 N： lines: its word on each of the issue's criteria. */
   readonly checks: CriterionCheck[];
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
-const askLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
+const questionLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
 
 /** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
 const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/;
 
-export function asksOf(said: string): Ask[] {
+export function questionsOf(said: string): Question[] {
   return said
     .split("\n")
-    .map((line) => askLine.exec(line)?.[1])
+    .map((line) => questionLine.exec(line)?.[1])
     .filter((q): q is string => q !== undefined)
     .map((q) => q.trim().replace(/\*\*$/, "").trim())
-    .flatMap((q): Ask[] => {
+    .flatMap((q): Question[] => {
       const tail = optionsTail.exec(q);
       const question = tail ? q.slice(0, tail.index).trim() : q;
       const options = (tail?.[1] ?? "")
@@ -105,7 +105,7 @@ export function asksOf(said: string): Ask[] {
     });
 }
 
-/** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
+/** A line on one criterion (the issue's brief questions for them): 「标准 2：做到了 —— bun test 通过」. */
 const checkLine = /^[\s>*#_-]*(?:\*\*)?标准\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定)(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/;
 const checkWords: Record<string, CheckResult> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
 
@@ -136,7 +136,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     summary: clip(summary, summaryMax),
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
-    asks: out === "completed" ? asksOf(text) : [],
+    questions: out === "completed" ? questionsOf(text) : [],
     checks: out === "completed" ? checksOf(text) : [],
   };
 }

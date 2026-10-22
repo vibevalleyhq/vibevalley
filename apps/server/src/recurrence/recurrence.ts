@@ -21,7 +21,7 @@ export interface Due {
 
 export interface RecurrenceShape {
   readonly list: () => Recurrence[];
-  /** by is who asks; ownerInRun, for the manager, whether the owner's words are in the run it asks from (needsOK). */
+  /** by is who questions; ownerInRun, for the manager, whether the owner's words are in the run it questions from (needsOK). */
   readonly add: (req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean) => Effect.Effect<Recurrence, ApiError>;
   /** Turned on is the owner's yes. */
   readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Recurrence, ApiError>;

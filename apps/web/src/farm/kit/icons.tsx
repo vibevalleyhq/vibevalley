@@ -61,7 +61,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
   );
 }
 
-/** Whether the system asks for less motion; it follows the setting while mounted. */
+/** Whether the system questions for less motion; it follows the setting while mounted. */
 export function reducedMotion() {
   const query = "(prefers-reduced-motion: reduce)";
   const [reduced, setReduced] = createSignal(typeof matchMedia === "function" && matchMedia(query).matches);
@@ -75,7 +75,7 @@ export function reducedMotion() {
   return reduced;
 }
 
-/** Two frames, no tween, so the pixels stay whole; still when the system asks for less motion. */
+/** Two frames, no tween, so the pixels stay whole; still when the system questions for less motion. */
 function Bob(props: { children: JSX.Element }) {
   const still = reducedMotion();
   const [up, setUp] = createSignal(false);

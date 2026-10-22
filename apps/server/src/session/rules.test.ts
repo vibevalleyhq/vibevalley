@@ -4,7 +4,7 @@ import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { asksOf, checksOf, chooseAgent, jobBreak, noRoom, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
+import { questionsOf, checksOf, chooseAgent, jobBreak, noRoom, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
 import { shellCommand } from "./shell.ts";
 
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
@@ -171,7 +171,7 @@ describe("a run's report", () => {
       summary: "加好了，commit abc123",
       failure: "",
       needsYou: false,
-      asks: [],
+      questions: [],
       checks: [],
     });
     expect(readReport({ kind: "completed" }, "").summary).toBe("做完了");
@@ -193,17 +193,17 @@ describe("a run's report", () => {
     expect(clip("abcdefghij", 5)).toBe("abcd…");
   });
 
-  it("asks are the lines for the owner", () => {
-    expect(asksOf("看了一下。\n\n要问主人：用 8787 还是 8797？\n- **要问主人**：要不要顺手改文档？\n\n结论：先停下等回答。")).toEqual([
+  it("questions are the lines for the owner", () => {
+    expect(questionsOf("看了一下。\n\n要问主人：用 8787 还是 8797？\n- **要问主人**：要不要顺手改文档？\n\n结论：先停下等回答。")).toEqual([
       { question: "用 8787 还是 8797？" },
       { question: "要不要顺手改文档？" },
     ]);
-    expect(asksOf("结论：做完了")).toEqual([]);
+    expect(questionsOf("结论：做完了")).toEqual([]);
   });
 
   it("a question may end with its options; one option is no choice", () => {
     expect(
-      asksOf("要问主人：全交给 w3，还是分着做？（选项：全交给 w3｜分着做）\n要问主人：端口？(选项: 8787 | 8797 |)\n要问主人：就这样？（选项：好）"),
+      questionsOf("要问主人：全交给 w3，还是分着做？（选项：全交给 w3｜分着做）\n要问主人：端口？(选项: 8787 | 8797 |)\n要问主人：就这样？（选项：好）"),
     ).toEqual([
       { question: "全交给 w3，还是分着做？", options: ["全交给 w3", "分着做"] },
       { question: "端口？", options: ["8787", "8797"] },

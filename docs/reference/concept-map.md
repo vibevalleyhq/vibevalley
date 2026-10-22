@@ -31,7 +31,7 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `pages/chat/WorkLog.tsx`、`pages/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 收成清单、收获 | 收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
-| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、草 | `Issue.acceptance`、`acceptedAt`、`findings`、`asks`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`asks` 来自帮工汇报（`report` 事实的 `asks`） |
+| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、草 | `Issue.acceptance`、`acceptedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`pages/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`CoreState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrences` |

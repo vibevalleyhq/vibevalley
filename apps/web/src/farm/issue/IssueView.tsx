@@ -226,7 +226,7 @@ function IssueBody(props: {
       {a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : actLabel[a]}
     </PxButton>
   );
-  /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
+  /** The block questions for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
   const rowActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
   const boxShown = () => state() === "asking" || state() === "closed" || box() !== undefined;
@@ -256,7 +256,7 @@ function IssueBody(props: {
                 <p class={["mt-1 line-clamp-4 whitespace-pre-wrap", body]}>{ask().line}</p>
               </Show>
               <Show when={state() === "asking"}>
-                <For each={props.issue.asks}>
+                <For each={props.issue.questions}>
                   {(q) => (
                     <div class="mt-2">
                       <p class={body}>{q.question}</p>

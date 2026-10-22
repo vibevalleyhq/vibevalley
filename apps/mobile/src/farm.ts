@@ -1,5 +1,5 @@
 // The farm this phone is paired with, kept in the system's keychain (expo-secure-store): its address, the key the farm
-// gave this phone, and the computer's name. Pairing asks the farm's lan listener (lan.pair) and waits for the owner.
+// gave this phone, and the computer's name. Pairing questions the farm's lan listener (lan.pair) and waits for the owner.
 
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";

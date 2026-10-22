@@ -1,9 +1,9 @@
 // What is waiting on the owner: the inbox the phone rings with, and what the
 // manager's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
-// asks in their place; a quiet one still asks.
+// questions in their place; a quiet one still questions.
 
-import type { Ask, CoreState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
+import type { Question, CoreState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 import { addressOf, channelOf, generalOf, messagesIn } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
@@ -44,12 +44,12 @@ function gathered(state: CoreState): Unworded[] {
     const who = h.name + "（" + h.id + "）";
     switch (want.kind) {
       case "ask": {
-        const question = want.asks[0]?.question ?? "";
+        const question = want.questions[0]?.question ?? "";
         out.push({
           item: { id: `${h.id}:ask:${h.runs}`, kind: "ask", from, text: cut(question, 40), at, target },
           channel,
           since: at,
-          brief: who + "问了主人 " + want.asks.length + " 个问题，{ago}没人回：「" + slice(question, 0, 60) + "」",
+          brief: who + "问了主人 " + want.questions.length + " 个问题，{ago}没人回：「" + slice(question, 0, 60) + "」",
         });
         break;
       }
@@ -122,7 +122,7 @@ function gathered(state: CoreState): Unworded[] {
       case "paused":
         for (const task of graph.tasks) {
           if (task.state !== "failed") continue;
-          // A step retried and failed again asks again: from its second failure the id counts them.
+          // A step retried and failed again questions again: from its second failure the id counts them.
           const failures = task.failures ?? 0;
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
           const why = task.conclusion ? "：" + slice(task.conclusion, 0, 80) : "";
@@ -175,11 +175,11 @@ function gathered(state: CoreState): Unworded[] {
 }
 
 type Want =
-  | { readonly kind: "ask"; readonly asks: readonly Ask[] }
+  | { readonly kind: "ask"; readonly questions: readonly Question[] }
   | { readonly kind: "merge" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session asks of the owner. Its issue's standing says it, the one the issue page and the phone both read; a
+/** What a session questions of the owner. Its issue's standing says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: Session, state: CoreState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues?.find((t) => t.id === h.issue && t.sessions.at(-1) === h.id);
@@ -202,7 +202,7 @@ function wantOf(h: Session, state: CoreState): Want | undefined {
   const st = issue.standing;
   switch (st.state) {
     case "asking":
-      return { kind: "ask", asks: issue.asks };
+      return { kind: "ask", questions: issue.questions };
     case "reviewing":
       return { kind: "merge" };
     case "stuck":

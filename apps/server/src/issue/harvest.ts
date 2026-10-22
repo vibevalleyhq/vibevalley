@@ -112,7 +112,7 @@ export function harvesting(d: HarvestDeps) {
     prLock.withPermits(1)(
       Effect.gen(function* () {
         const issue = yield* get(id);
-        // Whoever asks (the board, the command line, the manager's tool) is held to the same table: a round that
+        // Whoever questions (the board, the command line, the manager's tool) is held to the same table: a round that
         // failed, or a required acceptance not passed, is not harvested.
         if (!issue.graph && !issue.task) {
           const [m, why] = statusMove(issue, "done");

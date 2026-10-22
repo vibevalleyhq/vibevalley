@@ -526,7 +526,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         runs: report.turn,
         ...(spent ? { spent } : {}),
         ...(h.run ? { run: h.run } : {}),
-        ...(read.asks.length > 0 ? { asks: read.asks } : {}),
+        ...(read.questions.length > 0 ? { questions: read.questions } : {}),
         ...(read.checks.length > 0 ? { checks: read.checks } : {}),
       });
       endRun(h, read.outcome, read.summary, spent);

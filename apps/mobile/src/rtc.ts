@@ -1,5 +1,5 @@
 // The phone's own call line (@vibevalley/host's rtc): Agora's native SDK, which goes on with the screen locked (the app
-// keeps an audio background mode, app.json). The page asks over the bridge; what the call hears goes back as events.
+// keeps an audio background mode, app.json). The page questions over the bridge; what the call hears goes back as events.
 
 import { ChannelProfileType, ClientRoleType, createAgoraRtcEngine, type IRtcEngine, type IRtcEngineEventHandler } from "react-native-agora";
 import { PermissionsAndroid, Platform } from "react-native";
@@ -13,7 +13,7 @@ const fail = (code: number, what: string) => {
   if (code < 0) throw new Error(`声网：${what}失败（${code}）`);
 };
 
-/** Joins with the grant; events go to send until leave. iOS asks for the microphone itself (app.json says why). */
+/** Joins with the grant; events go to send until leave. iOS questions for the microphone itself (app.json says why). */
 export async function join(grant: RtcGrant, send: (m: FromNative) => void): Promise<void> {
   if (Platform.OS === "android" && (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) !== PermissionsAndroid.RESULTS.GRANTED)
     throw new Error("没有麦克风权限");

@@ -113,7 +113,7 @@ describe("the golden files", () => {
         const last = t.sessions.at(-1);
         const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
         if (!h || h.graph || t.task || t.graph || t.parent) continue;
-        expect({ line, issue: t.id, asks: asked.has(h.id) }).toEqual({ line, issue: t.id, asks: standingWantsOwner(t.standing.state) });
+        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: standingWantsOwner(t.standing.state) });
       }
       state = next;
     });
@@ -162,7 +162,7 @@ describe("the golden files", () => {
             "ready",
             readyTasks(graph).map((n) => n.id),
           );
-          same("asks", asksForYou(graph));
+          same("questions", asksForYou(graph));
           same("spent", graphSpent(graph));
           same("text", graphText(graph));
           same(

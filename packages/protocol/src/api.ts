@@ -100,7 +100,7 @@ export interface Handlers<R = never> {
    * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
   readonly "issue.status": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
-   * leaves; with asks open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
+   * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
   readonly "issue.draft": (a: { readonly id: string; readonly body: T.IssueDraftRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
   readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;

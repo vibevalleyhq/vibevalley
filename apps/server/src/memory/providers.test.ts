@@ -251,7 +251,7 @@ describe("memory sources", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.live("search asks every source and takes them in turns", () => {
+  it.live("search questions every source and takes them in turns", () => {
     const fake = new Fake("nowledge");
     fake.found = [
       { id: "m1", agent: "lab", kind: "note", text: "这个项目测试用 pnpm test", score: 0.9 } as Found,

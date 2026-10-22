@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
-import type { Acceptance, Ask, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
+import type { Acceptance, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { newSendKey } from "./write";
 import type { Tone } from "../../rules/cards";
@@ -39,7 +39,7 @@ export function IssueDetail(props: {
   const head = () => s().head;
   const [busy, setBusy] = createSignal(false);
   const [text, setText] = createSignal("");
-  /** The box under the block: an answer, the findings of 打回, a word to the helper, or what a reopen asks for. */
+  /** The box under the block: an answer, the findings of 打回, a word to the helper, or what a reopen questions for. */
   const [box, setBox] = createSignal<"reject" | "tell" | undefined>();
   const agents = useAgents();
   const agent = () => ready(agents, []).find((a) => a.id === head().agent);
@@ -178,7 +178,7 @@ export function IssueDetail(props: {
                 <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
               </Show>
               <Show when={s().standing.state === "asking"}>
-                <For each={props.issue.asks}>
+                <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
                 </For>
               </Show>
@@ -425,7 +425,7 @@ const harvestedText = (issue: Issue) =>
   issue.closed === "merged" ? "收获了：改动已经合进主分支。" : issue.closed === "merged_into_graph" ? "合进了种植计划的分支。" : "收获了。";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
-function Question(props: { ask: Ask; busy: boolean; onPick: (words: string) => void }) {
+function Question(props: { ask: Question; busy: boolean; onPick: (words: string) => void }) {
   return (
     <div class="mt-2.5">
       <div>{props.ask.question}</div>

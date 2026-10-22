@@ -30,8 +30,8 @@ export function spanText(ms: number) {
   return `${Math.floor(m / 60 / 24)} 天`;
 }
 
-/** The block that asks the owner for the one thing: its head and what it says under it. */
-export interface OwnerAsk {
+/** The block that questions the owner for the one thing: its head and what it says under it. */
+export interface OwnerQuestion {
   head: string;
   line?: string;
   tone: Tone;
@@ -55,12 +55,12 @@ export function criteriaRows(issue: Issue): CriterionRow[] {
 }
 
 /** The one thing the owner is asked for, worded; undefined when nothing is asked of the owner. */
-function ownerAsk(standing: IssueStanding, issue: Issue, head: Session): OwnerAsk | undefined {
+function ownerQuestion(standing: IssueStanding, issue: Issue, head: Session): OwnerQuestion | undefined {
   const who = head.name;
   const said = head.lastRun?.summary;
   switch (standing.state) {
     case "asking":
-      return { head: `${who}有 ${issue.asks.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
+      return { head: `${who}有 ${issue.questions.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
     case "reviewing":
       return issue.acceptedAt !== undefined
         ? { head: "验收过了，可以收获", ...(said ? { line: said } : {}), tone: "leaf" }
@@ -120,7 +120,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       : !node
         ? `在拆种植计划「${graph.title}」：只读代码，不改文件。`
         : `种植计划「${graph.title}」的一步：${node.title}。做完自动合进计划分支，收获整个计划时才进主分支。`,
-    ask: ownerAsk(standing, issue, head),
+    ask: ownerQuestion(standing, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: standing.lead,
     others: standing.acts.filter((a) => a !== standing.lead),

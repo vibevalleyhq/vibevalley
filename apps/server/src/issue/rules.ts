@@ -4,7 +4,7 @@
 
 import { reportVerdict } from "../session/rules.ts";
 import type {
-  Ask,
+  Question,
   Issue,
   IssueClose,
   IssueStatus,
@@ -69,7 +69,7 @@ export function nextTaskId(ids: readonly string[]): string {
   return "p" + (top + 1n).toString();
 }
 
-/** A draft as its session hands it back, in the json block its brief asks for. A list may come as one string. */
+/** A draft as its session hands it back, in the json block its brief questions for. A list may come as one string. */
 export interface IssueDraft {
   readonly title: string;
   readonly why: string;
@@ -83,7 +83,7 @@ export interface IssueDraft {
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
 
 /** The questions with words in them. */
-export const openAsks = (asks: readonly Ask[] | undefined): Ask[] => (asks ?? []).filter((a) => a.question.trim() !== "");
+export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
 function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
@@ -150,11 +150,15 @@ export const draftOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
-export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly asks?: readonly Ask[] }, word: string, project: string): string {
+export function draftBrief(
+  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
+  word: string,
+  project: string,
+): string {
   word = word.trim();
-  const asks = t.asks ?? [];
+  const questions = t.questions ?? [];
   const criteria = t.criteria ?? [];
-  const answering = word !== "" && asks.length > 0;
+  const answering = word !== "" && questions.length > 0;
   const redraft = !!t.description || criteria.length > 0;
   const example = {
     title: "看板拖卡改用 issue.status",
@@ -171,7 +175,7 @@ export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> 
     if (criteria.length > 0) lines.push("验收标准：", "- " + criteria.join("\n- "));
   }
   if (answering)
-    lines.push("", "你上一版问主人的：", "- " + asks.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
+    lines.push("", "你上一版问主人的：", "- " + questions.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
   else if (redraft && word) lines.push("", "主人这次说：" + word, "", "照主人说的再起草一版，整张重写。");
   else if (redraft) lines.push("", "再起草一版，整张重写。");
   lines.push(
@@ -282,7 +286,8 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     const said = r.summary ? `：${r.summary}` : "";
     switch (r.outcome) {
       case "completed":
-        if (i === lastDone && t.asks.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.asks.map((a) => a.question).join(" / ") });
+        if (i === lastDone && t.questions.length > 0)
+          out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.questions.map((a) => a.question).join(" / ") });
         else out.push({ at: r.endedAt, kind: draft ? "drafted" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
         break;
       case "failed":

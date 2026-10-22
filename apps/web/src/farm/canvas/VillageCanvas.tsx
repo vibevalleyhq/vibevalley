@@ -27,7 +27,7 @@ export function VillageCanvas() {
   const loaded = useVillage();
   const router = useRouter();
   const agentsQuery = useAgents();
-  // The scene asks for these every tick: the frame as sent, the profiles by id.
+  // The scene questions for these every tick: the frame as sent, the profiles by id.
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const hotspotsQuery = useQuery(() => ({
     queryKey: ["cursors"],

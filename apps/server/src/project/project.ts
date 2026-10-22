@@ -1033,5 +1033,5 @@ export const isDir = (path: string) => existsSync(path) && statSync(path).isDire
 
 export const layer = (hooks: ProjectHooks = {}) => Layer.effect(Projects, make(hooks));
 
-/** As the server starts: a first look at GitHub; the page asks again with github.refresh. */
+/** As the server starts: a first look at GitHub; the page questions again with github.refresh. */
 export const start = Layer.effectDiscard(Effect.flatMap(Projects, (p) => Effect.forkScoped(p.refreshGitHub())));

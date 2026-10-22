@@ -3,7 +3,7 @@
 
 import type { Host, Notice, RtcEvents, RtcGrant, RtcLine } from "./index";
 
-/** What the page asks of the shell; each is answered once by its id. */
+/** What the page questions of the shell; each is answered once by its id. */
 export type ToNative =
   | { readonly id: number; readonly call: "notify"; readonly notice: Notice }
   | { readonly id: number; readonly call: "rtc.join"; readonly grant: RtcGrant }
@@ -25,14 +25,14 @@ export type FromNative =
 /** The function on window the shell calls with each FromNative. */
 export const fromNativeKey = "vibevalleyFromHost";
 
-type Ask = ToNative extends infer T ? (T extends { id: number } ? Omit<T, "id"> : never) : never;
+type Question = ToNative extends infer T ? (T extends { id: number } ? Omit<T, "id"> : never) : never;
 
 /** The phone's Host, posting with post; receive takes what the shell sends back. One call at a time, as the page has. */
 export function mobileHost(post: (m: ToNative) => void) {
   let next = 1;
   const waiting = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
   let events: RtcEvents | undefined;
-  const ask = (m: Ask) =>
+  const ask = (m: Question) =>
     new Promise<void>((resolve, reject) => {
       const id = next++;
       waiting.set(id, { resolve, reject });

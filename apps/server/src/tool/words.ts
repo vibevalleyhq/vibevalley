@@ -126,7 +126,7 @@ export function issueLine(t: Issue, who: string, now: number): string {
   return "- " + parts.join(" · ");
 }
 
-/** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
+/** One issue in full: what it questions, its criteria as far as they got, what it waits on, and its story, newest first. */
 export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
   const lines = [issueLine(t, who, now).slice(2)];
   if (t.title !== shortTitle(t.title) || t.description) lines.push("要做的：" + head([t.title, t.description ?? ""].join("\n").trim(), 600));
@@ -139,7 +139,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
       lines.push(`  ${i + 1}. ${c}（${mark}）`);
     });
   }
-  if (t.asks.length > 0) lines.push("在等主人回答：" + t.asks.map((a) => a.question).join("；"));
+  if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
   const weeds = t.findings.filter((f) => !f.pulled);
   if (weeds.length > 0) lines.push("验收没过要修的：" + weeds.map((f) => f.text).join("；"));
   if (t.handedBack) lines.push("管家这一轮" + (t.handedBack.outcome === "completed" ? "答完了" : "没答成") + "，在等主人点头");
@@ -166,7 +166,7 @@ export function parseTime(s: string): number | undefined {
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** Changing an issue or moving it is the owner's call: the manager asks for what it saw itself, as with a merge. */
+/** Changing an issue or moving it is the owner's call: the manager questions for what it saw itself, as with a merge. */
 export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */

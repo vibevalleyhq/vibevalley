@@ -103,7 +103,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const backlog = () => props.item.status === "backlog";
   const drafting = () => props.item.drafting;
   const drafted = () => isDrafted(props.item);
-  const asks = () => props.item.asks;
+  const questions = () => props.item.questions;
   const queued = () => props.item.queuedAt;
   const canSave = () => !busy() && d().title.trim() !== "";
   const canDraft = () => !busy() && !drafting() && (drafted() || word().trim() !== "" || d().title.trim() !== newIssueTitle);
@@ -112,8 +112,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const by = drafting();
     return by
       ? [`${by.name}在起草`, "它在读代码，写好了会填进下面各栏。"]
-      : asks().length > 0
-        ? [`草稿写好了，它有 ${asks().length} 个问题要问你`, "在下面回答，它照你的回答再起草一版。"]
+      : questions().length > 0
+        ? [`草稿写好了，它有 ${questions().length} 个问题要问你`, "在下面回答，它照你的回答再起草一版。"]
         : drafted()
           ? ["草稿写好了", "看一遍、改一改，没问题就开工。"]
           : ["想做什么？", "写一句就行：帮工读过代码，替你写成工单。"];
@@ -206,7 +206,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         <Note tone={drafting() ? "water" : "wheat"}>
           <div class="text-base font-semibold">{said()[0]}</div>
           <div class="mt-1">{said()[1]}</div>
-          <For each={asks()}>
+          <For each={questions()}>
             {(a) => (
               <div class="mt-1.5">
                 <div>· {a.question}</div>
@@ -236,7 +236,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               void draft();
             }
           }}
-          placeholder={asks().length > 0 ? "回答它的问题" : drafted() ? "再起草时要它改什么（可以不写）" : "想做什么，一句话就行"}
+          placeholder={questions().length > 0 ? "回答它的问题" : drafted() ? "再起草时要它改什么（可以不写）" : "想做什么，一句话就行"}
           aria-label="想做什么"
         />
         <div class="mt-2.5">

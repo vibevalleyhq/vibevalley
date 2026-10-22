@@ -18,7 +18,7 @@
 
 - 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`harvest.ts` 收获（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
 - 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForManager`、`openFindings`，`standing.ts` 的 `standingOf`（给主人看的状态和能做的事）和 `standingIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`standing.ts` 的 `standingLabel`、`actLabel`（每个动作叫什么）、`standingWantsOwner`。
-- 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `asks`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
+- 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
@@ -49,7 +49,7 @@
 
 | 段 | 状态 | 地里 |
 |---|---|---|
-| 聊清楚 | `backlog`（草稿，可能正在起草）；帮工问了主人还没答是「缺肥」（`asks`） | 荒地；缺肥是干裂 |
+| 聊清楚 | `backlog`（草稿，可能正在起草）；帮工问了主人还没答是「缺肥」（`questions`） | 荒地；缺肥是干裂 |
 | 安排活 | `todo`（种子袋，排队等空地）→ `in_progress` | 播种、发芽、长叶；验收没过修的时候是「除草中」 |
 | 完成 | `in_review`（等验收）→ 验收过了 → `done` | 开花；没过是杂草（一条意见一棵）；过了结果；收获后是麦茬 |
 
@@ -67,27 +67,27 @@
 **起草**（`issue.draft`，带主人的一句话；工单有没答的问题时这句话就是回答）：
 
 1. 加号直接建一张备选工单（`issue.create`），主人那一句是标题，还没说时标题是「新工单」；带着话就马上起草。只有在备选里、没派过、没在起草的能起草，派给管家的不能。
-2. 谁起草：工单的 `assignee`；没有就是这个项目上次派出去干活的档案（还能派的话，`issue_session` 里最近的那张工单的 `assignee`）；再没有按 `chooseAgent` 挑。项目是工单的，没有就用档案的工作目录，都没有就拒绝。没写的项目和帮工填成这一次的，主人的第一句话写成标题（还没有说明和验收标准时）；回答问题时 `asks` 先清掉。
+2. 谁起草：工单的 `assignee`；没有就是这个项目上次派出去干活的档案（还能派的话，`issue_session` 里最近的那张工单的 `assignee`）；再没有按 `chooseAgent` 挑。项目是工单的，没有就用档案的工作目录，都没有就拒绝。没写的项目和帮工填成这一次的，主人的第一句话写成标题（还没有说明和验收标准时）；回答问题时 `questions` 先清掉。
 3. 在这张工单自己的 worktree 里起草（`project.Workplace` 按工单开，和后面干活是同一块；档案关了 worktree 也照样开），Run 的触发是 `draft`，花费记在这张工单的 run 上。交给它的活（`draftBrief`）：只读代码，不改文件、不提交；拿不准的写「要问主人：」，想得到的回答写在句末「（选项：A｜B）」；`title` 20 个字以内；最后用一个 json 代码块交草稿：`title`、`why`、`todo`、`criteria`、`notDoing`、`files`（列表也可以是一句话）。再起草时附上现在的草稿（主人改过的算数）和上一版的问题、主人的回答或这次的话。
-4. 交回来：读最后一个能读的代码块（`parseDraft`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `asks`（缺肥）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后把 worktree 重置回主分支（`project.Reset`：`checkout -f -B <工单分支> <主分支>`、`git clean -fd`，提交了也清掉），帮工收工；干净的 worktree 和空分支随收工清掉。
+4. 交回来：读最后一个能读的代码块（`parseDraft`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `questions`（缺肥）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后把 worktree 重置回主分支（`project.Reset`：`checkout -f -B <工单分支> <主分支>`、`git clean -fd`，提交了也清掉），帮工收工；干净的 worktree 和空分支随收工清掉。
 5. 主人改各栏、回答问题再起草，满意了挪到待办开工；没开工就取消或删掉的，在起草的帮工收工，`project.Clear` 清掉起草留下的 worktree 和没有提交的分支。
 
 **排队的待办马上开工**（`issue.dispatch`，待办详情的「现在就试」）：只收排着队的待办；有空就照它排队时记下的来源开工，没空就留在队里原来的位置、说为什么，不重新排。和后台每 5 秒的重试共用一把锁，不会派两次。
 
 **验收**（`issue.accept`）：通过记下 `acceptedAt`，原来的草都拔掉；没过至少一条意见，每条记成一棵草，还没拔的草编号写成一句话交给帮工再修一轮。新的一轮开始（带话、再干一轮）验收作废，草留着，下一次通过才拔。
 
-**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅田头的 `ownerInThread`：清掉 `asks`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
+**主人的话从一处进工单**：主人的话不管从哪来（`issue.comment`、在工单串里 `channel.say`、连接器、农场替主人说的冲突和检查没过），写进工单串就有一条带 `thread` 的 `message` 事实，工单服务订阅田头的 `ownerInThread`：清掉 `questions`，作废验收。帮工没有串时 `issue.comment` 直接送到帮工、没有事实，`comment` 自己做这两步。关上的工单不动。农场替主人说的话也算：冲突解决、检查没过修好以后是新的一轮代码，`acceptance: required` 的工单要再验收一次才能收获。管家用 `accept` 工具也能验，收获照旧要主人说一声。
 
-**缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `report` 事实的 `asks`，工单服务记到 `asks`（`{ question, options? }`：句末「（选项：A｜B）」是它想到的回答，少于两个就不算选项）；主人在工单串里说一句就算回答，点一个选项就是把这句原样说出去，问题清掉。
+**缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `report` 事实的 `questions`，工单服务记到 `questions`（`{ question, options? }`：句末「（选项：A｜B）」是它想到的回答，少于两个就不算选项）；主人在工单串里说一句就算回答，点一个选项就是把这句原样说出去，问题清掉。
 
-**给主人看的状态**（`Issue.standing`，`standingOf`）：从 `status`、帮工的阶段、`asks`、冲突、上一轮的结果和验收算出来，`issueOf` 读工单时和核心状态折事实时（`withIssueStatuses`）都填，页面不自己拼。每种状态带开始的时间（`since`），和主人能做的事（`acts`），其中最多一件是主动作（`lead`）：
+**给主人看的状态**（`Issue.standing`，`standingOf`）：从 `status`、帮工的阶段、`questions`、冲突、上一轮的结果和验收算出来，`issueOf` 读工单时和核心状态折事实时（`withIssueStatuses`）都填，页面不自己拼。每种状态带开始的时间（`since`），和主人能做的事（`acts`），其中最多一件是主动作（`lead`）：
 
 | 状态 | 什么时候 | 主动作 |
 |---|---|---|
 | 草稿 `draft` | `backlog`；正在起草时没有动作 | 开工 |
 | 排队 `queued` | `todo`，或计划里还没轮到的一步 | 无（可以关上） |
 | 在做 `working` | 帮工在干活 | 无（可以带话、叫停、关上） |
-| 等你回答 `asking` | 交回来了，有 `asks` | 回答 |
+| 等你回答 `asking` | 交回来了，有 `questions` | 回答 |
 | 等你验收 `reviewing` | 交回来了；`required` 没验过时先验收通过，其余直接收获 | 验收通过 / 收获；可以打回 |
 | 卡住了 `stuck` | 冲突（`conflict`）、没做成（`failed`）、停在半路（`interrupted`）、很久没动静（`quiet`） | 让它解决冲突 / 接着修 / 接着做 / 叫停 |
 | 收获了 `harvested` | `done` | 无（可以重开） |

@@ -344,7 +344,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever asks.
+  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever questions.
   it.live("does not harvest a round that failed", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -382,17 +382,17 @@ describe("an issue", () => {
       yield* w.nextReport;
       issue = yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.asks ?? []).length === 1,
+        (i) => (i.questions ?? []).length === 1,
         "its question kept",
       );
-      expect(issue.asks).toEqual([{ question: "用 8787 还是 8797？" }]);
+      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
       const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
       yield* until(() => crop() === "dry", "缺肥");
 
       yield* issues.comment(issue.id, "用 8797");
       yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.asks ?? []).length === 0,
+        (i) => (i.questions ?? []).length === 0,
         "answered",
       );
       yield* w.nextReport;

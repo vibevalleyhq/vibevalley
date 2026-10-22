@@ -1,7 +1,7 @@
 /**
  * The project's skills in .agents/skills: each folder has a SKILL.md whose frontmatter `name` is the folder's name and
  * whose `description` is not empty; a verification skill (`verify-*`) has the fixed sections create-verification-skill
- * asks for; the README's table lists every skill and nothing else; .claude/skills links to .agents/skills, so Claude Code
+ * questions for; the README's table lists every skill and nothing else; .claude/skills links to .agents/skills, so Claude Code
  * and Codex read the same files. Run as part of `pnpm run docs:verify`; anything wrong exits 1.
  */
 

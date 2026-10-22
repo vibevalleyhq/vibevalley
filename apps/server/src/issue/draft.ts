@@ -2,7 +2,7 @@
 // and how what it hands back is read into the issue; the drafter's worktree goes back to main after, and goes away with
 // the issue. Who the farm sends for any task (pickAgent) is decided here too.
 
-import type { Agent, Ask, Issue } from "@vibevalley/protocol";
+import type { Agent, Question, Issue } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
@@ -17,7 +17,7 @@ import { type RuntimeShape, usable } from "../runtime/runtime.ts";
 import { chooseAgent } from "../session/rules.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
 import { isForManager } from "./state.ts";
-import { draftBrief, draftDescription, type IssueDraft, jsonOrNull, kept, nullText, openAsks, parseDraft, splitJob } from "./rules.ts";
+import { draftBrief, draftDescription, type IssueDraft, jsonOrNull, kept, nullText, openQuestions, parseDraft, splitJob } from "./rules.ts";
 
 /** What drafting needs of the issues around it. */
 export interface RefinementDeps {
@@ -69,7 +69,7 @@ export function refinement(d: RefinementDeps) {
   const beforeDraft = (t: Issue, word: string, agent: string, where: string) =>
     Effect.gen(function* () {
       let [title, description] = [t.title, t.description ?? ""];
-      if (word && t.asks.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
+      if (word && t.questions.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
       yield* inTx(
         Effect.gen(function* () {
           yield* db(
@@ -84,23 +84,23 @@ export function refinement(d: RefinementDeps) {
               id: t.id,
             }),
           );
-          if (word && t.asks.length > 0) yield* db(q.setIssueAsks({ id: t.id, asks: null }));
+          if (word && t.questions.length > 0) yield* db(q.setIssueQuestions({ id: t.id, questions: null }));
         }),
       );
       yield* publish(t.id);
     });
 
-  const drafted = (id: string, d: IssueDraft, asks: readonly Ask[] | undefined) =>
+  const drafted = (id: string, d: IssueDraft, questions: readonly Question[] | undefined) =>
     Effect.gen(function* () {
       const criteria = kept(d.criteria);
-      const open = openAsks(asks);
+      const open = openQuestions(questions);
       yield* db(
         q.draftIssue({
           id,
           title: d.title,
           description: draftDescription(d),
           criteria: jsonOrNull(criteria, criteria.length > 0),
-          asks: jsonOrNull(open, open.length > 0),
+          questions: jsonOrNull(open, open.length > 0),
         }),
       );
       yield* publish(id);
@@ -132,7 +132,7 @@ export function refinement(d: RefinementDeps) {
     );
 
   /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
-  const handedBack = (f: { id: string; outcome: string; summary: string; asks?: readonly Ask[] }) =>
+  const handedBack = (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) =>
     Effect.gen(function* () {
       const h = sessions.sessionOf(f.id);
       if (!h?.draft || !h.issue) return;
@@ -145,7 +145,7 @@ export function refinement(d: RefinementDeps) {
       if (f.outcome === "completed") {
         const { draft: d, problem } = parseDraft(said);
         if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
-        else yield* drafted(id, d, f.asks);
+        else yield* drafted(id, d, f.questions);
       } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
       if (place?.branch) {
         const reset = yield* Effect.result(projects.reset(place));

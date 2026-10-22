@@ -111,7 +111,7 @@ CREATE TABLE issue (
   acceptance  text not null default 'glance' check (acceptance in ('glance', 'required')),
   accepted_at double precision,
   findings    text,
-  asks        text,
+  questions        text,
   criteria    text,
   checks      text,
   handed_back text

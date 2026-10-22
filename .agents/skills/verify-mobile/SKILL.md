@@ -62,7 +62,7 @@ description: 改了手机壳（apps/mobile/**）、宿主的桥（packages/host/
 
 ## 出错时
 
-- **`waited for the phone asks to pair`**：应用没收到链接或没起来：`adb logcat | grep -i vibevalley`；模拟器要能连到这台电脑的局域网地址（脚本打印的 `pairing` 那一行）。
+- **`waited for the phone questions to pair`**：应用没收到链接或没起来：`adb logcat | grep -i vibevalley`；模拟器要能连到这台电脑的局域网地址（脚本打印的 `pairing` 那一行）。
 - **`bridge: not checked`**：应用不是带 `EXPO_PUBLIC_VIBEVALLEY_E2E=1` 构建的（多半是 Gradle 守护进程没停），重来第 1 步。
 - **`the bridge answered "no host"`**：页面没装手机的宿主：`apps/web/dist` 是旧的（重新构建），或者页面没有调 `currentHost()`。
 - **Gradle 失败**：JDK 不对（要 17）；`ANDROID_HOME` 没设时默认 `~/Library/Android/sdk`。

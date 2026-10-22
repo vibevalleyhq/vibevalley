@@ -19,16 +19,16 @@ update issue set title = sqlc.arg(title), description = sqlc.arg(description), p
   priority = sqlc.arg(priority), acceptance = sqlc.arg(acceptance), criteria = sqlc.narg(criteria) where id = sqlc.arg(id);
 
 -- name: DraftIssue :exec
--- A draft handed back: its words, its criteria and what it asks, in one write.
-update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), asks = sqlc.narg(asks)
+-- A draft handed back: its words, its criteria and what it questions, in one write.
+update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), questions = sqlc.narg(questions)
 where id = sqlc.arg(id);
 
 -- name: AcceptIssue :exec
 -- A verdict on what was handed back: passed (accepted_at set) or not (cleared), with the weeds as they stand now.
 update issue set accepted_at = sqlc.narg(accepted_at), findings = sqlc.narg(findings) where id = sqlc.arg(id);
 
--- name: SetIssueAsks :exec
-update issue set asks = sqlc.narg(asks) where id = sqlc.arg(id);
+-- name: SetIssueQuestions :exec
+update issue set questions = sqlc.narg(questions) where id = sqlc.arg(id);
 
 -- name: SetIssueChecks :exec
 update issue set checks = sqlc.narg(checks) where id = sqlc.arg(id);
