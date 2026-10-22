@@ -1,6 +1,6 @@
 // Each handler only forwards to the service that owns the rule.
 
-import { docOwner } from "@vibevalley/protocol";
+import { docOwner, type IssueUpdate } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, reasonOf, refused } from "./errors.ts";
@@ -43,6 +43,8 @@ export const handlers = Effect.gen(function* () {
   const lan = yield* Lan;
   const voice = yield* Voice;
   const connectors = yield* Connectors;
+  /** An issue's id, with the fields the owner changed beside an act saved first. */
+  const edited = (ref: string, edit: IssueUpdate | undefined) => Effect.tap(issues.idOf(ref), (id) => (edit ? issues.edit(id, edit) : Effect.void));
   const done: Handlers = {
     "server.health": () => Effect.succeed({ ok: true, version: config.version }),
     "orchestrator.open": () => core.open(),
@@ -152,9 +154,10 @@ export const handlers = Effect.gen(function* () {
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.act": ({ id, body }) => issues.act(id, body, channels.general()),
     "issue.review": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
-    "issue.refine": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.refine(id, body.text ?? "", channels.general())),
-    "issue.dispatch": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.dispatchQueued(id)),
-    "issue.status": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
+    "issue.refine": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.general())),
+    "issue.dispatch": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.dispatchQueued(id)),
+    "issue.status": ({ id: ref, body }) =>
+      Effect.flatMap(edited(ref, body.edit), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
     "issue.comment": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
     "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, "owner")),
     "issue.resolve": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.resolve(id)),

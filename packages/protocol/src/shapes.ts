@@ -823,6 +823,8 @@ export interface TemplateBlank {
 
 export interface IssueDispatchRequest {
   station?: number;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface LanguageCount {
@@ -1171,6 +1173,8 @@ export interface IssueRefining {
 
 export interface IssueRefineRequest {
   text?: string;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface IssueGraph {
@@ -2023,6 +2027,8 @@ export interface MoveIssueRequest {
 export interface IssueStatusRequest {
   status: IssueStatus;
   text?: string;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface GraphActRequest {

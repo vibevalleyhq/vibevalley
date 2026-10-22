@@ -19,7 +19,7 @@
 - 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`harvest.ts` 收获（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
 - 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
-- 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
+- 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issues/{id}/refine`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/data/issueActs.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
 ## 模型和不变量
@@ -39,6 +39,7 @@
 - **还没派的能改、能删、能排先后**；派出去以后只能改验收方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueJob`）。
 - **备选的工单是草稿**：起草的帮工（`Session.draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
 - **验收标准**（`Issue.criteria`）：一条一个主人能照着验的点。草稿写它，主人在派出去以前用 `issue.update` 改（给一个空列表就是清掉），派活时编好号写在活的最后；验收时详情把它逐条列出来。
+- **改动跟着动作走**：起草、开工、现在就试（`issue.refine`、`issue.status`、`issue.dispatch`）都带一个 `edit`，是主人在详情里改了还没存的那几栏；服务端先存它再做这件事，动作被拒绝时改动也已经存下。页面不先存再做。
 - **帮工的自评**（`Issue.checks`）：汇报里「标准 N：做到了 —— 凭据」这样的行（`checksOf`，N 从 1 数，同一条以最后一行为准），存成 `{ criterion, result, proof }`，`criterion` 是 `criteria` 里的下标；最近一次带了自评的汇报算数，重开时清掉。帮工不写就没有，页面只列标准。
 - **标题一行**：主人写的一句话直接成为工单时（`splitJob`），第一行太长就取它的第一句、放不下就到最后一个停顿（`shortTitle`，40 个字以内），整段放进说明；起草的标题要求 20 个字以内。
 - **排队的上下文和排队一起提交**：首次派发的频道和 `RunTrigger`（定时的 id、是不是补跑）写进 `issue_queue`，和 `issue.queued_at` 同一个事务；重试照它恢复来源，开工成功时同一个事务清掉。

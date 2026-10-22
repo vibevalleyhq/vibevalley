@@ -1135,8 +1135,19 @@ export const ProjectTemplates: Schema.Codec<T.ProjectTemplates> = Schema.Struct(
   kinds: Schema.mutable(Schema.Array(TemplateKind)),
 });
 
+export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+  description: Schema.optionalKey(Schema.String),
+  project: Schema.optionalKey(Schema.String),
+  assignee: Schema.optionalKey(Schema.String),
+  priority: Schema.optionalKey(Priority),
+  review: Schema.optionalKey(Review),
+  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
+
 export const IssueDispatchRequest: Schema.Codec<T.IssueDispatchRequest> = Schema.Struct({
   station: Schema.optionalKey(Schema.Number),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const PullRequestCapability: Schema.Codec<T.PullRequestCapability> = Schema.Struct({
@@ -1291,16 +1302,7 @@ export const IssueHistory: Schema.Codec<T.IssueHistory> = Schema.Struct({
 
 export const IssueRefineRequest: Schema.Codec<T.IssueRefineRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
-});
-
-export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
-  title: Schema.optionalKey(Schema.String),
-  description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
-  priority: Schema.optionalKey(Priority),
-  review: Schema.optionalKey(Review),
-  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const IssueActRequest: Schema.Codec<T.IssueActRequest> = Schema.Struct({
@@ -1790,6 +1792,7 @@ export const MoveIssueRequest: Schema.Codec<T.MoveIssueRequest> = Schema.Struct(
 export const IssueStatusRequest: Schema.Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const GraphActRequest: Schema.Codec<T.GraphActRequest> = Schema.Struct({

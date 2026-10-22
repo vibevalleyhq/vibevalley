@@ -43,5 +43,3 @@ export async function writeIssue(text: string, agent: string, project: string): 
     throw e;
   }
 }
-
-/** A key for one sent word, so a retry is not said twice. */
