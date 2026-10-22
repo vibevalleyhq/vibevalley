@@ -7,16 +7,17 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });
 
-test("a call without Agora's keys says why, offers 设置, and the button tries again", async ({ page }) => {
+test("a call without Agora's keys says why, offers 设置, and the line tries again", async ({ page }) => {
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  // Calling is the phone's: tapping 管家 dials it, and its line's key tries again.
   await page.getByRole("button", { name: "手机" }).click();
-  await page.getByRole("button", { name: /^展开田头/ }).click();
-  const chat = page.getByRole("region", { name: "田头" });
-  const call = chat.getByRole("button", { name: "语音说话" });
-  await expect(call).toHaveAttribute("title", "按一下，和管家语音说话");
-  await call.click();
-  await expect(call).toHaveAttribute("title", /^上次没接通：.+再按一下重试$/, { timeout: 10_000 });
+  const phone = page.getByRole("region", { name: "农场手机" });
+  await phone.getByRole("button", { name: "管家" }).click();
+  await expect(phone.getByText(/^没接通：/)).toBeVisible({ timeout: 10_000 });
+  const again = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
+  await phone.getByRole("button", { name: "打给管家" }).click();
+  await again;
   // The reason under the chat's head, with the way to the setting that fixes it.
   const problem = page.getByRole("alert").filter({ hasText: "语音没接通" });
   await expect(problem).toContainText("Agora");

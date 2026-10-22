@@ -14,7 +14,7 @@ import { Panels } from "./panels/Panels";
 import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
-import { createCall } from "../voice/CallButton";
+import { createCall } from "../voice/createCall";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {

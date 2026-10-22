@@ -1,6 +1,6 @@
 # 语音
 
-主人用嘴和农场说话，分两条路：**电话**（`Voice` 的通话）按田头窗口里的麦克风和管家实时对话，传输、识别、断句、打断和合成都由 Agora 的对话式 AI（ConvoAI）做；**听写**按输入框旁的录音按钮说一段，转成输入框里的字，不经过 Agora。电话里「谁接电话」有两种：管家自己接（经「语音线路」，默认），或一个快嘴模型先答、管家旁听派活。两种下电话里说的话都进田头的主频道。
+主人用嘴和农场说话，分两条路：**电话**（`Voice` 的通话）点农场手机里的「管家」和管家实时对话，传输、识别、断句、打断和合成都由 Agora 的对话式 AI（ConvoAI）做；**听写**按输入框旁的录音按钮说一段，转成输入框里的字，不经过 Agora。电话里「谁接电话」有两种：管家自己接（经「语音线路」，默认），或一个快嘴模型先答、管家旁听派活。两种下电话里说的话都进田头的主频道。
 
 ## 管什么，不管什么
 
@@ -20,7 +20,7 @@
 - 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，没带通话 id 的 `orchestrator.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
-- 页面：`apps/web/src/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`Buttons.tsx` 的 `DictationButton`、`CallButton`）；农场的田头有通话和听写两个按钮，工作台的聊天输入框有听写；设置页 `pages/settings/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
+- 页面：`apps/web/src/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `pages/settings/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
 
 ## 模型和不变量
 
@@ -31,7 +31,7 @@
 - **一通电话记下建立时的决定**：通话存它用的 Agora client、语音线路的释放函数、是不是快嘴（`quick`）和开场白。之后改「谁接电话」、区域、凭据都不改这通电话：字幕怎么分流、停止请求发到哪个区域都按建立时的。
 - **挂断一开始，字幕资格就终止**：挂断先删授予、把通话标成 `ending`，此后 `heard`、`said` 回 `VoiceAgentFailed`（「这通电话已经挂了」）；声网停止失败时保留原 client 供重试，但不再接字幕。
 - **电话里的每句话由服务端记进田头**，带 `spoken`，不叫醒任何人：主人的话快嘴模式下由 `Orchestrator.heard` 记，管家模式下由 `Orchestrator.answerer("phone")` 记；管家的回答照常进田头；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
-- **农场只有一通电话**：页面的 `voiceCall`，田头的通话键、手机的「打给管家」和接听来电都开它、挂它；服务端的 `calls` 里没在挂断的那一通就是「正在通话」。
+- **农场只有一通电话**：页面的 `voiceCall`，点手机的「管家」、它通话屏上的「打给管家」和接听来电都开它、挂它；服务端的 `calls` 里没在挂断的那一通就是「正在通话」。
 - **管家能主动在电话里说**（`Voice.speak`）：有一通电话就用建立时的 client 调声网的 `agents.speak`，`priority: APPEND`（排在正在说的这句之后，不打断主人）、`interruptable`（主人能插话）；一次最多 512 字节，长的在句末切成几段（`speakPieces`，每段不超过 480 字节）。没有电话回 false。念不出来只记日志。
 - **一句话只处理一次**：管家模式下 `/agent/heard` 收下但不转给管家（语音线路已经交过）；`heard` 带 `sendKey`，同一个键再交是已经听过的那句。
 - **语音线路只有一个接口对外**：监听只听 127.0.0.1，只有 `POST /llm/<通话>/chat/completions`；请求要带这通电话的 `Authorization: Bearer <钥匙>`，钥匙随挂断作废。别的路径 404，没钥匙或钥匙不对 401。
@@ -107,7 +107,7 @@
 - **快嘴的回答由页面上报。** 一轮结束的信号只在页面的字幕流里；页面挂得太快会少一条，有意接受，不重试。
 - **一段听写拥有目标，不由停止按钮临时给写字回调。** 在每个回调里查页面存活只挡住销毁后的写字，挡不住在另一输入框按停止换掉目标。每个输入框各开一个听写器会让两处争用麦克风，所以页面里同一时间只有一段，每段管自己的目标。
 - **语音设置和钥匙放在同一个 `settings.json`，只存差异，分两处改。** 单独的接口和文件会让页面两个请求、两套「存好了没」；整份存下来，默认的人设改进了，存过一次的人永远停在旧的上。拆成两份存要多一套默认和覆盖的规则；现在只有管家一个人说话，同一份数据按归属在设置页和管家页两处改就够了。页面只放听、想、说里会改的几样，VAD 阈值、前置填充这些留在代码里。加一家服务就是联合里多一个成员：`tsc` 查声音页和 `vendorsFor` 的 `switch`。
-- **手机和通话键是同一通电话，管家用 `speak` 主动说。** 两处各开一个频道，就是两通电话抢同一个管家和同一个麦克风。线路只在声网来问时回答，管家没法在电话里先开口；`speak` 是声网给的「念一段」，管家的话仍然先进田头，再念出来，所以电话和田头是同一份上下文。放弃了念固定的模板句：主人接着追问「改了什么」，答的要是同一个管家。放弃了每件事打一通新电话：开 agent、接通隧道要几秒到几十秒，没接就白花声网的时长；只在主人接起时开。用 `APPEND` 不用 `INTERRUPT`：主人正说着被打断太粗暴，晚几秒可以接受。
+- **农场只有一处能打电话，管家用 `speak` 主动说。** 两处各开一个频道，就是两通电话抢同一个管家和同一个麦克风。线路只在声网来问时回答，管家没法在电话里先开口；`speak` 是声网给的「念一段」，管家的话仍然先进田头，再念出来，所以电话和田头是同一份上下文。放弃了念固定的模板句：主人接着追问「改了什么」，答的要是同一个管家。放弃了每件事打一通新电话：开 agent、接通隧道要几秒到几十秒，没接就白花声网的时长；只在主人接起时开。用 `APPEND` 不用 `INTERRUPT`：主人正说着被打断太粗暴，晚几秒可以接受。
 - **样音预先生成、放进仓库。** 现场合成要服务端有 MiniMax、OpenAI 的 key，可平时用的是声网托管的合成；借声网录一段要等几秒、花通话时长。列表里的音色是固定的，生成一次最省事；代价是样音念的是默认开场白，OpenAI 和微软的音色没有样音。
 
 ## 还没做的
@@ -120,5 +120,5 @@
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
 - 页面：`apps/web/src/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
 - `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
-- 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；手机的「打给管家」和田头的通话键是同一通，打不通时两处说同一个原因）。
+- 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；点「管家」就拨，打不通时通话屏和田头都说原因）。
 - 真人说话、听到声音要人在桌面版上亲自打一通（`verify-app`）；没有连真的声网的自动测试。`speak` 在真电话上念出来、不打断主人，要在真电话上验。

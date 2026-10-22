@@ -116,22 +116,24 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();
 });
 
-// 管家 on the phone is its line beside 田头, unfolded; a call started folded unfolds it, where what is said shows.
+// Tapping 管家 on the phone dials it: its line beside 田头, unfolded; a call started folded unfolds it, where what is said
+// shows.
 test("calling the orchestrator on the phone is the chat's call: one call, the same answer", async ({ page }) => {
   await openFarm(page);
   await page.getByRole("button", { name: "手机" }).click();
   const phone = page.getByRole("region", { name: "农场手机" });
   const chat = page.getByRole("region", { name: "田头" });
+  const dialed = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
   await phone.getByRole("button", { name: "管家" }).click();
+  await dialed;
   await expect(chat).toBeVisible();
+  await expect(phone.getByText(/^没接通：还没有 Agora 的凭据/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(chat).toHaveCount(0);
+  // After a call that did not get through, the line's own key tries again, and unfolds the phone as it does.
   await phone.getByRole("button", { name: "打给管家" }).click();
   await expect(chat).toBeVisible();
   // The test's server has no Agora credentials: the call does not get through, and both say why.
   await expect(phone.getByText(/^没接通：还没有 Agora 的凭据/)).toBeVisible();
-  await expect(page.getByRole("region", { name: "田头" }).getByRole("button", { name: "语音说话" })).toHaveAttribute(
-    "title",
-    /上次没接通：还没有 Agora 的凭据/,
-  );
+  await expect(page.getByRole("region", { name: "田头" }).getByRole("alert")).toContainText("语音没接通：还没有 Agora 的凭据");
 });

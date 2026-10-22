@@ -1,18 +1,17 @@
-// The farm chat window's input row: the orchestrator's face that opens and folds the window, who the next job goes to, the
-// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the orchestrator thinks. A failed
+// The farm chat's input row, at the foot of the unfolded phone's right screen: who the next job goes to, the box (Enter
+// sends, Shift+Enter starts a line, @ names someone), dictation, and the stop button while the orchestrator thinks. Calling
+// the orchestrator is the phone's (its 管家), so the row has no call key. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { createComposer } from "../../data/composer";
-import { playSound } from "../sound";
 import { farm } from "../store";
-import { threadOwnerOf, typedName } from "../../rules/chat";
+import { threadOwnerOf } from "../../rules/chat";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { CallButton } from "../../voice/CallButton";
+import { AgentFace } from "../../ui/Face";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
 import { useFarm } from "../state";
@@ -46,25 +45,8 @@ function PickChip(props: { named: boolean }) {
 
 export type ChatPhase = "off" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 
-const ring: Record<ChatPhase, string> = {
-  off: "#c8a46e",
-  connecting: "#c8a46e",
-  listening: "#74a046",
-  thinking: "#c8a46e",
-  speaking: "#e5a93c",
-  error: "#c84a3a",
-};
-
-export function FarmComposer(props: {
-  conversation: Conversation | undefined;
-  thread: boolean;
-  phase: ChatPhase;
-  open: boolean;
-  unread: boolean;
-  onProblem: (p: string | undefined) => void;
-}) {
+export function FarmComposer(props: { conversation: Conversation | undefined; thread: boolean; onProblem: (p: string | undefined) => void }) {
   const core = useCore();
-  const look = useFarm((s) => s.orchestratorLook);
   const pick = useFarm((s) => s.pick);
   let input: HTMLTextAreaElement | undefined;
   const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
@@ -75,15 +57,11 @@ export function FarmComposer(props: {
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
     failed: (reason) => props.onProblem(`没发出去：${reason}`),
-    edited: (value, at) => {
-      props.onProblem(undefined);
-      // Naming someone opens the window, to show who can be named.
-      if (!props.open && typedName(value, at)) farm.chatOpen(true);
-    },
+    edited: () => props.onProblem(undefined),
   });
 
   return (
-    <div class={["relative flex items-end gap-1.5 p-1.5", { "border-t border-cream-200": props.open }]}>
+    <div class="relative flex items-end gap-1.5 border-t border-cream-200 p-1.5">
       <Show when={box.offered().length > 0}>
         <div class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px" role="listbox" aria-label="叫谁">
           <For each={box.offered()} keyed={(n) => n.token}>
@@ -103,22 +81,6 @@ export function FarmComposer(props: {
           </For>
         </div>
       </Show>
-      <button
-        type="button"
-        aria-label={props.open ? "收起对话" : "展开对话"}
-        title={props.open ? "收起对话" : props.unread ? "田头有新话，点开看看" : "展开对话"}
-        onClick={() => {
-          playSound(props.open ? "close" : "open");
-          farm.chatOpen(!props.open);
-        }}
-        class="relative shrink-0 cursor-pointer p-0.5 shadow-[inset_0_0_0_2px_#2f1f1340]"
-        style={{ background: ring[props.phase] }}
-      >
-        <OrchestratorFace size={40} look={look()} />
-        <Show when={props.unread}>
-          <span class="absolute -top-0.5 -right-0.5 h-3 w-3 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
-        </Show>
-      </button>
       <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
         <Show when={!props.thread}>
           <PickChip named />
@@ -151,9 +113,6 @@ export function FarmComposer(props: {
           <SpriteIcon name="button-send" size={20} />
         </button>
       </div>
-      <Show when={!props.thread}>
-        <CallButton />
-      </Show>
     </div>
   );
 }
