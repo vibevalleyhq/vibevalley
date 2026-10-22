@@ -6,7 +6,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
-  CallState,
   CommitCount,
   WorkspaceState,
   Fact,
@@ -61,7 +60,6 @@ export interface CoreShape {
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
-  readonly setCall: (state: CallState, reason?: string) => Effect.Effect<void>;
   readonly setOrchestrator: (state: OrchestratorState) => Effect.Effect<void>;
   readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
   /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
@@ -200,7 +198,6 @@ export const make = Effect.gen(function* () {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
-    setCall: (call, reason) => apply(reason ? { type: "call", state: call, reason } : { type: "call", state: call }),
     setOrchestrator: (orchestrator) => apply({ type: "orchestrator", state: orchestrator }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" })),
