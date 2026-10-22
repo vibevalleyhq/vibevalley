@@ -44,7 +44,6 @@ import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../recurrence/rules.ts";
 import {
-  conflictBrief,
   cureWords,
   filledKinds,
   findingsOf,
@@ -78,6 +77,7 @@ import { type Due, Recurrences } from "../recurrence/recurrence.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
+import { conflictBrief, conflictOf } from "../session/rules.ts";
 
 /** An issue for the orchestrator, handed to it. */
 export interface OrchestratorWork {
@@ -604,7 +604,7 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── harvesting ──
 
-    const { merge, sessionChanges, recheck, conflictOf, refreshPullRequests } = harvesting({
+    const { merge, refreshPullRequests } = harvesting({
       core,
       sessions,
       projects,
@@ -677,7 +677,7 @@ export const make = (options: IssueOptions = {}) =>
             if (issue && checks.length > 0) yield* checked(issue, checks);
             if (issue) yield* asked(issue, e.questions);
             yield* handedBack(e);
-            if (n.session?.conflict) yield* recheck(e.id);
+            if (n.session?.conflict) yield* sessions.recheck(e.id);
             return;
           }
           case "hired":
@@ -935,7 +935,7 @@ export const make = (options: IssueOptions = {}) =>
       changes: (id, by) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
-          const changes = yield* sessionChanges(session);
+          const changes = yield* sessions.changes(session);
           if (!changes) return yield* Effect.fail(missing("帮工 " + session));
           if (by === "owner") yield* core.did({ kind: "reviewed", session });
           return changes;
@@ -948,7 +948,7 @@ export const make = (options: IssueOptions = {}) =>
           const h = sessions.sessionOf(session);
           if (!h) return yield* Effect.fail(missing("帮工 " + session));
           // A preview that fails (git broken) is said as it is, not taken for no conflict.
-          const changes = h.conflict ? undefined : yield* sessionChanges(session);
+          const changes = h.conflict ? undefined : yield* sessions.changes(session);
           const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
           if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
           yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");

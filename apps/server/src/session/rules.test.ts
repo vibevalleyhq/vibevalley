@@ -4,7 +4,22 @@ import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { questionsOf, checksOf, chooseAgent, jobBreak, noRoom, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
+import { MergeFailure } from "../project/project.ts";
+import {
+  checksOf,
+  chooseAgent,
+  conflictBrief,
+  conflictOf,
+  jobBreak,
+  noRoom,
+  notTakenIn,
+  questionsOf,
+  readReport,
+  recallHead,
+  sessionName,
+  summaryOf,
+  withRecall,
+} from "./rules.ts";
 import { shellCommand } from "./shell.ts";
 
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
@@ -272,4 +287,21 @@ describe("shell", () => {
     [`/bin/zsh -lc 'unterminated`, `/bin/zsh -lc 'unterminated`],
     [`/bin/zsh -lc 'a' b`, `/bin/zsh -lc 'a' b`],
   ])("%s", (input, want) => expect(shellCommand(input)).toBe(want));
+});
+
+describe("work that does not go in", () => {
+  it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
+    const check = notTakenIn(new MergeFailure("check", "测试没过"), "阿狐", "owner");
+    expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
+    const conflict = new MergeFailure("conflict", "", "main", ["a.ts", "b.ts"]);
+    expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
+    expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
+    expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
+    expect(notTakenIn(new MergeFailure("error", "git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
+  });
+
+  it("reads a conflict off a preview", () => {
+    expect(conflictOf({ base: "main", conflicts: [] })).toBeUndefined();
+    expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({ base: "main", files: ["a.ts"] });
+  });
 });

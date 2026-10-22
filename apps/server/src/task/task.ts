@@ -50,7 +50,6 @@ import {
   taskIssueID,
   withTask,
 } from "./rules.ts";
-import { conflictBrief } from "../issue/rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -64,7 +63,7 @@ import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
 import { Runtimes, usable } from "../runtime/runtime.ts";
 import { chooseAgent } from "../session/rules.ts";
 import { splitBrief } from "./rules.ts";
-import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
@@ -106,7 +105,8 @@ export interface TaskWork {
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
   readonly dismiss: (id: string) => Effect.Effect<boolean>;
   readonly find: (id: string) => Roster | undefined;
-  readonly mergeInto: (id: string, target: string) => Effect.Effect<readonly string[], ApiError | MergeFailure>;
+  /** A step's work into the graph's branch; work that does not go in says what its helper is sent back with. */
+  readonly mergeInto: (id: string, target: string) => Effect.Effect<readonly string[], ApiError | NotTakenIn>;
 }
 
 /** The git a graph's branches live in; tests play it. */
@@ -140,7 +140,7 @@ export const make = (options: TaskOptions = {}) =>
       find: live.find,
       mergeInto: (id, target) =>
         Effect.map(
-          live.handOver(id, "merged_into_graph", (place) => scm.mergeInto(place, target)),
+          live.handOver(id, "merged_into_graph", (place) => scm.mergeInto(place, target), "helper"),
           (m) => m.hashes ?? [],
         ),
     };
@@ -352,12 +352,10 @@ export const make = (options: TaskOptions = {}) =>
         const merged = yield* Effect.result(work.mergeInto(sessionId, graph.branch));
         if (merged._tag === "Failure") {
           const f = merged.failure;
-          if (f instanceof MergeFailure && f.kind === "check")
-            return yield* sendBack(graph, task, sessionId, f.reasonText + "\n请修好检查，再交回来。", "项目检查没通过");
-          // It merges the graph's branch into its own and resolves the conflict; then this runs again.
-          if (f instanceof MergeFailure && f.kind === "conflict")
-            return yield* sendBack(graph, task, sessionId, conflictBrief(f.base, f.files), "合进计划分支会冲突：" + f.files.join("、"));
-          return yield* taskFailed(graph, task, f instanceof MergeFailure ? f.reasonText || f.message : reasonOf(f));
+          // A failed check or a conflict sends the helper back to fix it (a conflict: it merges the graph's branch into its
+          // own); then this runs again.
+          if (f instanceof NotTakenIn) return yield* f.fix ? sendBack(graph, task, sessionId, f.fix, f.short) : taskFailed(graph, task, f.short);
+          return yield* taskFailed(graph, task, reasonOf(f));
         }
         let next = withTask(graph, task.id, (n) => ({
           ...unmanned(n),

@@ -3,11 +3,11 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, Question, CheckResult, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
-import type { Workplace } from "../project/project.ts";
+import type { MergeFailure, Workplace } from "../project/project.ts";
 
 const summaryMax = 160;
 
@@ -264,3 +264,51 @@ export function recalledIn(input: string): string {
 }
 
 export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });
+
+// ── the workplace's outcome ──
+
+/** What a session is told when merging its base in would conflict. */
+export const conflictBrief = (base: string, files: readonly string[]) =>
+  `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;
+
+/** The conflict a preview of the session's branch shows; none when it goes in clean. */
+export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): Conflict | undefined =>
+  changes.conflicts && changes.conflicts.length > 0 ? { base: changes.base, files: [...changes.conflicts] } : undefined;
+
+export const sameConflict = (a: Conflict | undefined, b: Conflict | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Who settles a conflict when the work does not go in: the owner (an issue: told what to tell the helper), or the helper
+ * at once (a task graph's step). */
+export type Settle = "owner" | "helper";
+
+/** What a take-in that did not go through means. The session stays with its branch and worktree either way. fix: what
+ * the helper is sent back with ("" when it is left to the owner); owner: what the owner is told; notice: the farm's line;
+ * short: the line a task graph keeps. */
+export function notTakenIn(
+  f: MergeFailure,
+  name: string,
+  settle: Settle,
+): { readonly fix: string; readonly owner: string; readonly notice: string; readonly short: string } {
+  switch (f.kind) {
+    case "conflict": {
+      const files = f.files.join("、");
+      return {
+        fix: settle === "helper" ? conflictBrief(f.base, f.files) : "",
+        owner: `没收：合进 ${f.base} 会冲突（${files}）。${name} 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：${conflictBrief(f.base, f.files)}`,
+        notice: `${name} 的分支合进 ${f.base} 会冲突（${files}），先没收。可以让它自己把冲突解决掉`,
+        short: `合进 ${f.base} 会冲突：${files}`,
+      };
+    }
+    case "check":
+      return {
+        fix: f.reasonText + "\n请修好检查，再交回来。",
+        owner: `没收进去：${f.reasonText}。${name} 还在地里`,
+        notice: `${name} 的活没收进去：${f.reasonText}`,
+        short: "项目检查没通过",
+      };
+    case "error": {
+      const why = f.reasonText || f.message;
+      return { fix: "", owner: `没收进去：${why}。${name} 还在地里`, notice: `${name} 的活没收进去：${why}`, short: why };
+    }
+  }
+}

@@ -17,7 +17,7 @@ import { createSubagents, type Subagent, type SubagentReport, type Subagents } f
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   type Agent,
-  type WorkspaceState,
+  type Changes,
   dayMs,
   type Fact,
   type IssueClose,
@@ -29,6 +29,7 @@ import {
   type SessionEvent,
   type SessionGraph,
   type Spent,
+  type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
@@ -47,13 +48,17 @@ import { probeInstallation, Runtimes } from "../runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
 import {
+  conflictOf,
   instructions,
   jobBreak,
   noRoom,
+  notTakenIn,
   readReport,
   recallBlock,
+  sameConflict,
   type SessionLimits,
   sessionName,
+  type Settle,
   summaryOf,
   toOarMcp,
   withRecall,
@@ -146,12 +151,19 @@ export interface SessionShape {
   readonly presentSessions: () => readonly Session[];
   /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
    * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
-   * it works. A merge that would conflict marks the conflict and keeps the session; so does a pull request left open. */
-  readonly handOver: <E>(
+   * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
+   * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
+   * open keeps the session too. */
+  readonly handOver: (
     id: string,
     closed: IssueClose,
-    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>,
-  ) => Effect.Effect<Merged, ApiError | E>;
+    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+    settle?: Settle,
+  ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
+  /** What the session's branch would bring now; the conflict it shows is kept on the session. */
+  readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
+  /** A conflict marked on the session is looked at again (after a round, which may have settled it). */
+  readonly recheck: (id: string) => Effect.Effect<void>;
   /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
   readonly list: (agent: string) => Effect.Effect<Session[]>;
   /** A session on the farm, or one that has ended. */
@@ -208,6 +220,26 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
       return undefined;
   }
 }
+
+/** Work that did not go in (see handOver); the session stays. */
+export class NotTakenIn extends Error {
+  readonly _tag = "NotTakenIn";
+  constructor(
+    readonly failure: MergeFailure,
+    /** What the helper is sent back with; "" when the owner settles it. */
+    readonly fix: string,
+    /** What the owner is told. */
+    readonly owner: string,
+    readonly notice: string,
+    readonly short: string,
+  ) {
+    super(owner);
+  }
+}
+
+/** A failure's words, whatever it is. */
+const reasonText = (e: unknown): string =>
+  e instanceof Error ? e.message : typeof e === "object" && e !== null && "_tag" in e ? reasonOf(e as ApiError) : String(e);
 
 export class Sessions extends Context.Service<Sessions, SessionShape>()("vibevalley/Session") {}
 
@@ -767,25 +799,26 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       );
 
-    const harvest = <E>(id: string, closed: IssueClose, merge: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>) =>
+    const harvest = (id: string, closed: IssueClose, use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>, settle: Settle = "owner") =>
       admission.withPermits(1)(
         Effect.gen(function* () {
           const h = hands.get(id);
           const current = core.session(id);
-          if (!h || !current) return yield* Effect.fail<ApiError | E>(missing("帮工 " + id));
+          if (!h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
           if (closed === "merged" && current.graph)
-            return yield* Effect.fail<ApiError | E>(
+            return yield* Effect.fail<ApiError | NotTakenIn>(
               refused(`${current.name} 在做种植计划 ${current.graph.id} 里的活：做完会自动合进计划分支，收获整个计划时再进主分支`),
             );
           if (isBusy(current) || h.triggers.length > 0)
-            return yield* Effect.fail<ApiError | E>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
+            return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
           yield* rest(h);
-          const merged = yield* merge(h.place, h.lastText).pipe(
-            Effect.tapError((e) =>
-              Effect.sync(() => {
-                if (e instanceof MergeFailure && e.kind === "conflict") apply({ type: "conflict", id, conflict: { base: e.base, files: [...e.files] } });
-              }),
-            ),
+          const merged = yield* use(h.place, h.lastText).pipe(
+            Effect.mapError((e) => {
+              const f = e instanceof MergeFailure ? e : new MergeFailure("error", reasonText(e));
+              if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+              const words = notTakenIn(f, current.name, settle);
+              return new NotTakenIn(f, words.fix, words.owner, words.notice, words.short);
+            }),
           );
           if (merged.pullRequest) return merged;
           yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
@@ -793,6 +826,27 @@ export const make = (options: SessionOptionsIn = {}) =>
           return merged;
         }),
       );
+
+    /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
+    const changesOf = (id: string) =>
+      Effect.gen(function* () {
+        const place = hands.get(id)?.place;
+        if (!place) return undefined;
+        const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
+        const conflict = conflictOf(changes);
+        const session = core.session(id);
+        if (session && !sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+        return changes;
+      });
+
+    const recheck = (id: string) =>
+      Effect.gen(function* () {
+        const place = hands.get(id)?.place;
+        const session = core.session(id);
+        if (!place || !session) return;
+        const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
+        if (!sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+      });
 
     // ── bringing the farm back ──
 
@@ -1000,6 +1054,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         return h ? view(h) : undefined;
       },
       handOver: harvest,
+      changes: changesOf,
+      recheck,
       list: (agent) =>
         Effect.gen(function* () {
           const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
