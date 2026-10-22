@@ -169,7 +169,8 @@ describe("voice", () => {
       yield* credentials({ answer: { vendor: "orchestrator" } });
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
-      expect(agent.agentId).toBe("parity-agent");
+      // The page draws what is said live, and leaves out the words the orchestrator puts in 田头 itself.
+      expect([agent.agentId, agent.answeredBy]).toEqual(["parity-agent", "orchestrator"]);
       const props = capture.requests[0]!.properties as Record<string, Record<string, unknown>>;
       expect(String(props.llm!.url).startsWith("https://line.example.com/llm/")).toBe(true);
       expect(props.llm!.api_key).not.toBe("");
@@ -305,6 +306,16 @@ describe("voice", () => {
     for (const p of pieces) expect(Buffer.byteLength(p, "utf8")).toBeLessThanOrEqual(480);
     expect(pieces.every((p) => p.endsWith("。"))).toBe(true);
     expect(pieces.join("")).toBe(long);
+  });
+
+  it.live("says Agora's model answers a call it answers", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      yield* credentials({ answer: { vendor: "agora", model: "gpt-4.1-mini" } });
+      const grant = yield* voice.session();
+      expect((yield* voice.start(grant.channel, grant.uid)).answeredBy).toBe("agora");
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
   it.live("takes no transcripts from a call that is hanging up", () => {

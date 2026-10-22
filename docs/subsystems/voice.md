@@ -53,7 +53,7 @@
    - 成功：记下通话，回 `agentId`；`Core.did` 让账本记一笔语音。
 4. 令牌快过期时（SDK 的 `token-privilege-will-expire`）`POST /api/v1/voice/renew` 换同一组 `channel + uid` 的新令牌；失败在通话上显示原因。
 
-**字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。
+**字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。说着的时候就画在田头最下面（`liveCaptions`，淡色、带光标）：主人这一轮还在说的字随说随长；这一轮说完了留着，等田头有了同样的字（`spoken` 的那一条）就换成它，最多留 `captionLinger`（8 秒）。管家的字只在快嘴模式画：语音线路上管家的话本来就边说边进田头，再画一遍就是两份；开通话的回答 `VoiceAgent.answeredBy`（`orchestrator` 或 `agora`）告诉页面是哪种。
 
 - 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/agent/heard`。快嘴模式下服务端把农场设成开着、交给 `Orchestrator.heard`：记成主人在主频道的发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下收下不转。
 - 快嘴的一轮说完或被打断时（`turn_status` 不为 0），页面把说到的部分交 `POST /api/v1/voice/agent/said`，服务端经田头的 `spoken` 记成管家的话。

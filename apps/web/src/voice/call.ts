@@ -32,6 +32,8 @@ export class VoiceCall {
 
   private line?: RtcLine;
   private agentId?: string;
+  /** Who answers on the call that is on: whose words 田头 gets as they are said (voice/captions.ts liveCaptions). */
+  answeredBy?: "orchestrator" | "agora";
   private starting?: Promise<void>;
   private ending?: Promise<void>;
   private cancel?: () => void;
@@ -149,6 +151,7 @@ export class VoiceCall {
         }),
       );
       this.agentId = agent.agentId;
+      this.answeredBy = agent.answeredBy;
       for (const c of this.pending.splice(0)) this.send(agent.agentId, c);
       this.set("live");
     } catch (e) {
@@ -194,6 +197,7 @@ export class VoiceCall {
   private async teardown() {
     const agent = this.agentId;
     this.agentId = undefined;
+    this.answeredBy = undefined;
     this.pending.length = 0;
     if (agent) await this.stopAgent(agent);
     const line = this.line;
