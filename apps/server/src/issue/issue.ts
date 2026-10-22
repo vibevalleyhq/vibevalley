@@ -667,7 +667,6 @@ export const make = (options: IssueOptions = {}) =>
             if (issue && checks.length > 0) yield* checked(issue, checks);
             if (issue) yield* asked(issue, e.questions);
             yield* handedBack(e);
-            if (n.session?.conflict) yield* sessions.recheck(e.id);
             return;
           }
           case "hired":

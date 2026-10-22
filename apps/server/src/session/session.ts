@@ -167,8 +167,6 @@ export interface SessionShape {
   ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
   /** What the session's branch would bring now; the conflict it shows is kept on the session. */
   readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
-  /** A conflict marked on the session is looked at again (after a round, which may have settled it). */
-  readonly recheck: (id: string) => Effect.Effect<void>;
   /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
   readonly list: (agent: string) => Effect.Effect<Session[]>;
   /** A session on the farm, or one that has ended. */
@@ -1074,7 +1072,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       },
       handOver: harvest,
       changes: changesOf,
-      recheck,
       list: (agent) =>
         Effect.gen(function* () {
           const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
@@ -1119,6 +1116,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       sessionOf: shape.sessionOf,
       presentSessions: shape.presentSessions,
     });
+    // A round reported on a session marked conflicting may have settled it: the mark is looked at again.
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, (n) => (n._tag === "reported" && n.session?.conflict ? recheck(n.report.id) : Effect.void)));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));

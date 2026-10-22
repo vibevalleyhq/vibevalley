@@ -234,6 +234,8 @@ describe("a session's work", () => {
       // The owner's 让它解决冲突: the server says which conflicts, in the owner's words.
       yield* issues.resolve(b.issue!);
       yield* w.nextReport;
+      // The round settled it: the sessions look at the mark again by themselves.
+      yield* until(() => sessions.find(b.id)?.session.conflict === undefined, "the conflict mark cleared");
       expect(yield* issues.merge(b.issue!)).toMatch(/合进了 clash 的 main/);
       const project = join(f.config.workRoot, "projects", "clash");
       expect(git(project, "show", "main:same.ts")).toBe("export const v = 'A+B'");
