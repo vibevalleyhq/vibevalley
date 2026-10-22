@@ -12,7 +12,7 @@ import { aria } from "../../app/util";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
-import { createCall } from "../../voice/CallButton";
+import { createCall } from "../../voice/createCall";
 import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
@@ -286,7 +286,7 @@ const GamesIcon = () => (
   </span>
 );
 
-/** onOrchestrator: the orchestrator's line, with the phone unfolded to 田头 beside it. */
+/** onOrchestrator: calls the orchestrator, its line with the phone unfolded to 田头 beside it. */
 export function HomeScreen(props: {
   missed: number;
   onOpen: (app: PhoneApp) => void;

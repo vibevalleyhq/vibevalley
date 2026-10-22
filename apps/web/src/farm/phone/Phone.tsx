@@ -90,9 +90,12 @@ export function Phone(props: { room: { w: number; h: number } }) {
               <HomeScreen
                 missed={missedOf(phone()).length}
                 onOpen={open}
+                // Tapping 管家 is calling it: its line on the left, 田头 unfolded beside it where what is said shows. A call
+                // already on is not dialed again.
                 onOrchestrator={() => {
                   open("orchestrator");
                   farm.chatOpen(true);
+                  void voiceCall.start();
                 }}
                 onChannels={() => {
                   put();

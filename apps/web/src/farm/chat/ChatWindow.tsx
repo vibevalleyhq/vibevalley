@@ -18,7 +18,7 @@ import { TurnSteps } from "../../pages/chat/WorkLog";
 import { useCore } from "../../data/frame";
 import { ready, useAgents } from "../../data/query";
 import { OrchestratorFace } from "../../ui/Face";
-import { createCall } from "../../voice/CallButton";
+import { createCall } from "../../voice/createCall";
 import { PxButton, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";
@@ -265,7 +265,7 @@ function Window() {
           </div>
         </Show>
         <div class="mt-auto">
-          <FarmComposer conversation={shown()} thread={!!thread()} phase={phase()} open unread={false} onProblem={setProblem} />
+          <FarmComposer conversation={shown()} thread={!!thread()} onProblem={setProblem} />
         </div>
       </div>
     </section>
