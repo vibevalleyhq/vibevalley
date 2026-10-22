@@ -41,7 +41,6 @@ import {
   retryWindowMs,
   summaryConversations,
   type UnreadRow,
-  wakeBreaker,
   wakeInput,
 } from "./rules.ts";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
@@ -49,6 +48,7 @@ import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
+import { WakeBreaker } from "./breaker.ts";
 import { type ApiError, refused } from "../errors.ts";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
@@ -344,8 +344,7 @@ export const make = Effect.gen(function* () {
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();
-  const failures = new Map<string, number>();
-  const broken = new Set<string>();
+  const breaker = new WakeBreaker();
   const lastRead = new Map<string, string>();
   const streaming = new Map<string, string>();
   const notices = new Map<string, NodeJS.Timeout>();
@@ -551,7 +550,7 @@ export const make = Effect.gen(function* () {
         followers,
         hops,
         cooling,
-        broken: [...broken].sort(),
+        broken: breaker.tripped(),
         ...(meta.outcome ? { outcome: meta.outcome } : {}),
         forTask: !!meta.forTask,
         spoken: !!meta.spoken,
@@ -615,10 +614,7 @@ export const make = Effect.gen(function* () {
 
   const after = (conversation: string, written: Written, answers: string | undefined): Effect.Effect<void> =>
     Effect.gen(function* () {
-      for (const r of written.resetWake) {
-        broken.delete(r);
-        failures.delete(r);
-      }
+      for (const r of written.resetWake) breaker.reset(r);
       yield* publishMessage(written.id, answers);
       yield* publishConversation(conversation);
       if (written.thread) yield* publishConversation(written.thread);
@@ -706,7 +702,7 @@ export const make = Effect.gen(function* () {
           );
         return;
       }
-      if (waking.length === 0 || broken.has(recipient)) return;
+      if (waking.length === 0 || breaker.isOpen(recipient)) return;
       const messages = waking.map(asInbox);
       const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
       const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
@@ -735,16 +731,14 @@ export const make = Effect.gen(function* () {
       if (closed) return;
       switch (a.kind) {
         case "spoke":
-          failures.delete(a.id);
+          breaker.spoke(a.id);
           return yield* heardLaunch(a.id, a.launch);
         case "ended": {
           if (!a.spoke) {
             const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
             if (rolled.length > 0) {
-              const failed = (failures.get(a.id) ?? 0) + 1;
-              failures.set(a.id, failed);
-              if (failed >= wakeBreaker && !broken.has(a.id)) {
-                broken.add(a.id);
+              const { count: failed, tripped } = breaker.failed(a.id);
+              if (tripped) {
                 const where = (yield* threadOfSession(a.id)) ?? general;
                 const name = sessionOf(a.id)?.name ?? a.id;
                 yield* write({
@@ -834,8 +828,7 @@ export const make = Effect.gen(function* () {
       yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: p.id }));
       clearTimeout(notices.get(p.id));
       notices.delete(p.id);
-      broken.delete(p.id);
-      failures.delete(p.id);
+      breaker.reset(p.id);
     }
   });
 

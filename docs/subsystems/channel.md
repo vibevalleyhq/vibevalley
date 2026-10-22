@@ -45,7 +45,7 @@
 
   在串里说过话或被 @ 过，就跟着这个串（`channel_follow`）。`@主人` 不产生投递，它进 Inbox。
 
-- **三道刹车**只管 agent 叫醒 agent，主人的话不受限：一个对话里从主人上次说话算起最多叫醒 4 次（`hopLimit`），到了 @ 照记、照显示，不叫醒，对话里贴一句提示（每次主人说话后只贴一次）；同一个帮工被 agent 叫醒至少隔 60 秒（`agentWakeCooldownMs`）；连着 3 次叫醒都在开口前失败（`wakeBreaker`）就不再自动叫它，工单串里贴一句，主人的下一句叫醒它的话解除。被拦下的投递照样记着（`held_by` 是 `hop_limit`、`cooldown`、`wake_breaker`）。来回次数和冷却从 `channel_delivery` 现算；熔断的计数在内存里，重启清零。
+- **三道刹车**只管 agent 叫醒 agent，主人的话不受限：一个对话里从主人上次说话算起最多叫醒 4 次（`hopLimit`），到了 @ 照记、照显示，不叫醒，对话里贴一句提示（每次主人说话后只贴一次）；同一个帮工被 agent 叫醒至少隔 60 秒（`agentWakeCooldownMs`）；连着 3 次叫醒都在开口前失败（`wakeBreaker`）就不再自动叫它，工单串里贴一句，主人的下一句叫醒它的话解除。被拦下的投递照样记着（`held_by` 是 `hop_limit`、`cooldown`、`wake_breaker`）。来回次数和冷却从 `channel_delivery` 现算；熔断归 `apps/server/src/channel/breaker.ts` 的 `WakeBreaker`：计数在内存里，重启清零；开口只清计数，熔断要主人点名或帮工离开才解除。
 - **送达**：每条给帮工的投递走 `pending` → `announced`（插过不带正文的提示）→ `handed`（放进了一轮的输入）→ `seen`；离开的是 `dropped`。这一轮真的开口才算 `seen`；没开口就结束、会话关掉、服务端重启都退回 `pending`，过一会儿再叫。宁可重复给，不会丢。给管家的投递交出去当即算看到。
 - **主人的话重发不成两条**：`channel.say`、`issue.comment`、`orchestrator.hear`、`voice.heard` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。页面为一份草稿生成一个键，发成功才换；发送失败时草稿留在输入框里，重发用同一个键。帮工的 `channel_say` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
 - **消息带着产生它的那次干活**（`meta.run`）：过程面板按这个号取事件；没有号的消息不按时间推测归属。创建频道的接口返回实际的频道号，页面用它跳转，不从名字猜号、不等状态流确认。
