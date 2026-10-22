@@ -4,7 +4,8 @@ test("the runtimes list what oar found, and a runtime's settings are saved and p
   await page.goto("/runtimes");
   const list = page.getByRole("region", { name: "农具列表" });
   await expect(list.getByRole("link").first()).toBeVisible();
-  await list.getByRole("link", { name: /^Pi/ }).click();
+  // Each item is read as its runtime badge, then its name.
+  await list.getByRole("link", { name: /^运行工具：Pi / }).click();
   await expect(page).toHaveURL(/\/runtimes\/pi$/);
   await expect(page.getByRole("heading", { name: "Pi", exact: true })).toBeVisible();
   await expect(page.getByText("能做什么")).toBeVisible();

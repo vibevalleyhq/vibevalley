@@ -77,7 +77,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
             farm.review(s.id);
             props.onDone();
           }}
-          onClose={(s) => api.issue.status({ id: issueOf(s), body: { status: "canceled" } }).then(() => props.onDone())}
+          onClose={(s) => api.issue.act({ id: issueOf(s), body: { act: "close" } }).then(() => props.onDone())}
           onThread={
             hasThread()
               ? () => {
@@ -127,11 +127,10 @@ function IssueBody(props: {
       }
     },
     own: {
-      answer: water,
       tell: water,
       resolve: () => commands.resolve(props.session),
       cure: () => commands.cure(props.session),
-      stop: () => commands.stop(props.session.id),
+      stop: () => commands.stop(props.session),
     },
     harvest: () => props.onHarvest(props.session),
     close: () => props.onClose(props.session),

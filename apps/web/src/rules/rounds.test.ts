@@ -1,13 +1,14 @@
 import { expect, test } from "vite-plus/test";
 import type { EventTokens, SessionEvent, SessionEventType } from "@vibevalley/protocol";
-import { cacheHit, secondsText, summaryOf, tokensText, waterfallOf } from "./rounds";
+import { cacheHit, mergeSteps, secondsText, summaryOf, tokensText, waterfallOf } from "./rounds";
 
 const e = (
   seq: number,
   time: number,
   type: SessionEventType,
   more: { text?: string; call?: number; tool?: string; input?: string; output?: string; ok?: boolean; tokens?: EventTokens } = {},
-): SessionEvent => ({ seq, time, type, text: more.text ?? "", ...more, ...(type === "tool/call" ? { action: "run_command" } : {}) }) as SessionEvent;
+): SessionEvent =>
+  ({ seq, revision: 0, time, type, text: more.text ?? "", ...more, ...(type === "tool/call" ? { action: "run_command" } : {}) }) as SessionEvent;
 
 /** Two rounds: the first thinks, runs a test and answers; the second answers straight away. */
 const log = [
@@ -24,6 +25,13 @@ const log = [
   e(10, 3602000, "assistant/message", { text: "lint 也干净。" }),
   e(11, 3603000, "llm/usage", { tokens: { input: 0, cacheRead: 0, output: 20 } as EventTokens }),
 ];
+
+test("a step keeps its newest revision whichever of the snapshot or live copy arrives last", () => {
+  const older = { ...e(1, 0, "assistant/message", { text: "测试" }), revision: 0 };
+  const newer = { ...older, revision: 1, text: "测试通过" };
+  expect(mergeSteps([newer], [older])).toEqual([newer]);
+  expect(mergeSteps([older], [newer])).toEqual([newer]);
+});
 
 const of = (lane: string, fall = waterfallOf(log, 3603000)) => fall.spans.filter((s) => s.lane === lane).map((s) => [s.start, s.end, s.seq]);
 

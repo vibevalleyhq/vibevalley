@@ -17,6 +17,7 @@ import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { useAgent } from "../../data/agents";
+import { useCore } from "../../data/frame";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -47,10 +48,15 @@ export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
 );
 
 function CallerFace(props: { call: InboxItem; size: number }) {
+  const core = useCore();
+  const session = () => {
+    const from = props.call.from;
+    return from.kind === "session" ? core()?.sessions.find((s) => s.id === from.id) : undefined;
+  };
   const agent = useAgent(() => (props.call.from.kind !== "orchestrator" ? props.call.from.agent : undefined));
   return (
     <Show when={props.call.from.kind !== "orchestrator" ? props.call.from : undefined} fallback={<OrchestratorFace size={props.size} />}>
-      {(from) => <AgentFace agentId={from().agent || from().id} look={agent()?.look} size={props.size} />}
+      {(from) => <AgentFace agentId={from().agent || from().id} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={props.size} />}
     </Show>
   );
 }

@@ -4,37 +4,22 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { type Farm, pair } from "./farm";
-import { deviceName, type PairLink, parsePairLink } from "./rules";
+import type { FarmConnection, Pairing } from "./farm";
+import { parsePairLink } from "./rules";
 import { colors } from "./style";
 
-export function PairScreen({ given, paired }: { given?: PairLink; paired: (farm: Farm) => void }) {
-  const [link, setLink] = useState<PairLink | undefined>(given);
+export function PairScreen({ connection, choice }: { connection: FarmConnection; choice: Pairing }) {
   const [typed, setTyped] = useState("");
-  const [name, setName] = useState(deviceName(Platform.OS, undefined));
   const [scanning, setScanning] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [problem, setProblem] = useState("");
+  const [cameraProblem, setCameraProblem] = useState("");
   const [permission, requestPermission] = useCameraPermissions();
-
-  const ask = async (to: PairLink) => {
-    setAsking(true);
-    setProblem("");
-    try {
-      paired(await pair(to, name.trim()));
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
-      setAsking(false);
-    }
-  };
-
-  // A link opened for the app (vibevalley://pair) is already the owner's choice: it asks at once.
+  const problem = choice.problem || cameraProblem;
   useEffect(() => {
-    if (given) void ask(given);
-  }, []);
+    if (choice.link) setScanning(false);
+  }, [choice.link]);
 
   const scan = async () => {
-    if (!permission?.granted && !(await requestPermission()).granted) return setProblem("没有相机的权限：到系统设置里打开，或者粘贴链接");
+    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem("没有相机的权限：到系统设置里打开，或者粘贴链接");
     setScanning(true);
   };
 
@@ -48,7 +33,7 @@ export function PairScreen({ given, paired }: { given?: PairLink; paired: (farm:
             const found = parsePairLink(data);
             if (!found) return;
             setScanning(false);
-            setLink(found);
+            connection.select(found);
           }}
         />
         <Pressable style={s.cancel} onPress={() => setScanning(false)}>
@@ -62,8 +47,8 @@ export function PairScreen({ given, paired }: { given?: PairLink; paired: (farm:
       <View style={s.card}>
         <Text style={s.title}>连进农场</Text>
         <Text style={s.muted}>在跑农场的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。</Text>
-        {link ? (
-          <Text style={s.mono}>{link.url}</Text>
+        {choice.link ? (
+          <Text style={s.mono}>{choice.link.url}</Text>
         ) : (
           <>
             <Pressable style={s.button} onPress={scan}>
@@ -78,23 +63,28 @@ export function PairScreen({ given, paired }: { given?: PairLink; paired: (farm:
               onChangeText={(t) => {
                 setTyped(t);
                 const found = parsePairLink(t);
-                if (found) setLink(found);
+                if (found) connection.select(found);
               }}
             />
           </>
         )}
         <Text style={s.label}>这台手机叫</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} maxLength={40} />
-        {asking ? (
+        <TextInput style={s.input} value={choice.name} onChangeText={(name) => connection.setName(name)} editable={!choice.asking} maxLength={40} />
+        {choice.asking ? (
           <View style={s.row} accessibilityRole="progressbar">
             <ActivityIndicator color={colors.accent} />
             <Text style={s.muted}>等那台电脑上的主人点头……</Text>
           </View>
         ) : (
-          <Pressable style={[s.button, !link && s.off]} disabled={!link} onPress={() => link && ask(link)}>
+          <Pressable style={[s.button, !choice.link && s.off]} disabled={!choice.link} onPress={() => void connection.pair()}>
             <Text style={s.buttonText}>请主人放行</Text>
           </Pressable>
         )}
+        {choice.link ? (
+          <Pressable onPress={() => void connection.cancel()}>
+            <Text style={s.cancelText}>取消配对</Text>
+          </Pressable>
+        ) : null}
         {problem ? (
           <Text style={s.problem} accessibilityRole="alert">
             {problem}

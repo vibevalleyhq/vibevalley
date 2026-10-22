@@ -44,7 +44,9 @@ export function Phone(props: { room: { w: number; h: number } }) {
   const settle = (call: InboxItem, answered: boolean) => {
     phoneCalls.settle(call, answered);
     if (!answered) return;
-    // Answering is the call: the orchestrator comes on and says what rang; the farm shows it meanwhile.
+    // Answering is the call: the orchestrator comes on and says what rang, on the phone unfolded to 田头; the farm shows
+    // what called beside it.
+    farm.chatOpen(true);
     void voiceCall.start(aboutOf(call));
     switch (call.target.kind) {
       case "session":

@@ -59,7 +59,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
         class={["relative flex w-[72px] cursor-pointer flex-col items-center py-1", picked() ? "bg-leaf-300/60" : "hover:bg-cream-200"]}
       >
         <span class="p-0.5" style={{ background: picked() ? "#74a046" : "#c8a46e" }}>
-          <AgentFace agentId={props.agent.id} look={props.agent.look} size={46} muted={!props.agent.enabled} />
+          <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={46} muted={!props.agent.enabled} />
         </span>
         <span class={["mt-0.5 max-w-[68px] truncate text-[12px]", props.agent.enabled ? "text-bark-900" : "text-bark-400"]}>{props.agent.name}</span>
         <Show when={quota().level !== "unknown"} fallback={<span class="h-[7px]" />}>
@@ -72,7 +72,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
       <Show when={open()}>
         <div class="absolute bottom-full left-0 z-10 mb-2.5 w-72 bg-cream-50 p-3 text-left shadow-px" role="dialog" aria-label={props.agent.name}>
           <div class="flex items-center gap-3">
-            <AgentFace agentId={props.agent.id} look={props.agent.look} size={60} muted={!props.agent.enabled} />
+            <AgentFace agentId={props.agent.id} runtime={props.agent.runtime} look={props.agent.look} size={60} muted={!props.agent.enabled} />
             <div class="min-w-0">
               <p class="truncate text-[16px]">{props.agent.name}</p>
               <p class="text-[12px] text-bark-600">
@@ -161,7 +161,7 @@ export function Friends(props: { height: number }) {
             <For each={sorted().slice(0, 3)} keyed={(a) => a.id}>
               {(a, i) => (
                 <span class="absolute top-0" style={{ left: `${i() * 12}px`, "z-index": 3 - i() }}>
-                  <AgentFace agentId={a().id} look={a().look} size={22} />
+                  <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={22} />
                 </span>
               )}
             </For>

@@ -6,11 +6,12 @@ lan listener (连接到本机) in a WebView, and is that page's host (`@vibevall
 pairing and keys: [连接到本机](docs/subsystems/lan.md).
 
 ```
-App.tsx              paired: the farm; not yet (or the farm forgot this phone): pairing. A vibevalley://pair link pairs again
-src/PairScreen.tsx   the camera reads the QR code, or the link is pasted or arrives; it questions, the owner nods on the computer
-src/FarmScreen.tsx   the WebView: the key as the page's cookie, the bridge's calls answered, the call's events sent back
-src/farm.ts          the paired farm in the keychain (expo-secure-store), and lan.pair
-src/rtc.ts           the call on Agora's native SDK: it goes on with the screen locked (the audio background mode)
+App.tsx              follows the current farm choice; a vibevalley://pair link asks the choice owner to pair again
+src/PairScreen.tsx   camera and form: selects a link, names the phone, asks to pair or cancels
+src/FarmScreen.tsx   the WebView: the key as the page's cookie; loading another page or leaving closes its host
+src/host.ts         one loaded page's native host: answers bridge calls, keeps each call's identity, closes its line
+src/farm.ts          FarmConnection owns the current choice, pending pairing and serialized keychain commits
+src/rtc.ts           the call on Agora's native SDK: owns pending microphone permission, the engine and release
 src/notify.ts        the page's notices as the phone's own (expo-notifications)
 src/rules.ts         pure: pairing links, the phone's name, the key's cookie, levels; with its vitest
 scripts/e2e.ts       pairs a built app on an emulator or simulator with a sandboxed farm, and screenshots it
@@ -27,7 +28,7 @@ Agora's frameworks.
 
 ```bash
 bun run check                                   # types
-bun run test                                    # the rules
+bun run test                                    # farm choice, rules and native call ownership (mock native dependencies)
 CI=1 bunx expo prebuild -p android --no-install # android/, then:
 cd android && JAVA_HOME=<a JDK 17> ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 CI=1 bunx expo prebuild -p ios --no-install && (cd ios && pod install)   # ios/, then:

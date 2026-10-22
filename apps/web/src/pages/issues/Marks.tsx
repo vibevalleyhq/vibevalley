@@ -169,12 +169,12 @@ export function FlagChip(props: { text: string; tone: Tone }) {
 }
 
 /** A helper's head by its id, its look read from the profiles. */
-export function AgentFaceOf(props: { agent: string; size?: number }) {
+export function AgentFaceOf(props: { agent: string; runtime?: string; size?: number }) {
   const found = useAgent(() => props.agent);
   return (
     <Show when={props.agent !== orchestratorAgent} fallback={<OrchestratorFace size={props.size ?? 18} />}>
       <span title={found()?.name ?? props.agent} class="inline-flex">
-        <AgentFace agentId={props.agent} look={found()?.look} size={props.size ?? 18} />
+        <AgentFace agentId={props.agent} runtime={props.runtime ?? found()?.runtime} look={found()?.look} size={props.size ?? 18} />
       </span>
     </Show>
   );
@@ -187,7 +187,13 @@ export function CardFace(props: { card: BoardCard; size?: number }) {
     <Switch
       fallback={
         <Show when={cardAgent(props.card)} fallback={<NoFaceMark size={size() - 2} />}>
-          {(agent) => <AgentFaceOf agent={agent()} size={size()} />}
+          {(agent) => (
+            <AgentFaceOf
+              agent={agent()}
+              runtime={props.card.kind === "issue" ? (props.card.session ?? props.card.sessions.at(-1))?.runtime : undefined}
+              size={size()}
+            />
+          )}
         </Show>
       }
     >

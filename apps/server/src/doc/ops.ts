@@ -4,6 +4,7 @@
 
 import type {
   Block,
+  BlockInput,
   BlockAttrs,
   DocOp,
   DocOpMergeBlocks,
@@ -135,7 +136,7 @@ export class Page {
   }
 
   /** Checks a block the client made, and fills in what the server decides; a string is why it cannot be. */
-  private fresh(b: Block): Block | string {
+  private fresh(b: BlockInput): Block | string {
     if (!b.id) return "新块没有 id";
     if (this.find(b.id) || this.taken(b.id)) return "块 " + b.id + " 已经有了";
     if (!knownType(b.type)) return "不认识的块类型 " + b.type;
@@ -146,9 +147,10 @@ export class Page {
     } catch (e) {
       return (e as Error).message;
     }
-    const { parentId: _, deleted: __, ...rest } = b;
     return {
-      ...rest,
+      id: b.id,
+      orderKey: b.orderKey,
+      type: b.type,
       ...(parent !== undefined ? { parentId: parent } : {}),
       docId: this.doc,
       rev: 0,

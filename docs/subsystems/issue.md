@@ -20,7 +20,7 @@
 - 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issues/{id}/refine`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
-- 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/data/issueActs.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和执行历史都经 `apps/web/src/data/issues.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；帮工的每一步在农场、轨迹和工作记录里经 `apps/web/src/data/sessions.ts` 的 `createSessionEvents`（读一次，再把直播流来的按 `seq` 并进去）；工作台的工单页按帮工的轮次和阶段重读（换成直播流时，压力下时间线读不出来，先留着）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
+- 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/data/issueActs.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和执行历史都经 `apps/web/src/data/issues.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/data/sessions.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
 ## 模型和不变量
 
@@ -31,6 +31,7 @@
 - **动作是服务端的**（`issue.act`，`Issues.act`）：站位给出的每个动作（开工、回答、验收通过、打回、收获、知道了、让它解决冲突、接着做、接着修、带话、叫停、关上、重开）在服务端只有一份实现，带给帮工的话也在这里拼；站位没给的动作拒绝（「#41 现在不能「接着修」：它在做」）。页面只收集要说的话、先开收获清单和关单对话框；命令行的 `issue act` 和管家的工具走同一个入口。
 - **工单认编号**（`Issues.idOf`）：接口里的工单可以写 `#41`、`41`、工单 id 或干过它的帮工 id；命令行、管家的工具都用编号。
 - **一块地最多一个 worktree**：代码活的分支是 `vibevalley/issue-<号>`，worktree 是 `worktrees/<项目>.<号>`；重开、换帮工、重启都还是这一块。
+- **先有工单身份，再派执行**：即时派活也先写工单、取得编号，再开 Session；启动前写不进工单就不派。派不出去时，项目确认现场已释放才撤掉本次新建工单；已有改动或农机没能停止，就保留工单号和现场，下一张工单不会继承它。已有工单和排队来源保留。`hiring` 只登记既有工单和 Session 的关联、重开、出队，不创建工单。删工单时，现场还被执行占用、或清理后仍有分支，都拒绝删掉身份；换项目也先以保留改动的方式释放旧现场，不能把仍有改动的地留给旧项目、把身份移走。
 - **每张工单都有验收**：`in_review` 就是「等验收」。`acceptance` 是 `glance`（收获本身就算验收）或 `required`（没通过 `acceptedAt` 以前不能收获）。
 - **种植计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
 - **已完成只由主人点头。** 一轮怎么结束的（`completed`、`failed`、`interrupted`）只决定工单停在哪、请主人做什么，不决定活成没成：帮工最后一轮没做成（站位「卡住了」，`stuck: failed`）时 `moves` 里没有已完成，`statusMove` 和 `merge` 都拒绝，看板、命令行、管家的工具一样；叫停的一轮还能收。
@@ -69,9 +70,9 @@
 
 1. 加号直接建一张备选工单（`issue.create`），主人那一句是标题，还没说时标题是「新工单」；带着话就马上起草。只有在备选里、没派过、没在起草的能起草，派给管家的不能。
 2. 谁起草：工单的 `assignee`；没有就是这个项目上次派出去干活的档案（还能派的话，`issue_session` 里最近的那张工单的 `assignee`）；再没有按 `chooseAgent` 挑。项目是工单的，没有就用档案的工作目录，都没有就拒绝。没写的项目和帮工填成这一次的，主人的第一句话写成标题（还没有说明和验收标准时）；回答问题时 `questions` 先清掉。
-3. 在这张工单自己的 worktree 里起草（`project.Workplace` 按工单开，和后面干活是同一块；档案关了 worktree 也照样开），Run 的触发是 `draft`，花费记在这张工单的 run 上。交给它的活（`refinementBrief`）：只读代码，不改文件、不提交；拿不准的写「要问主人：」，想得到的回答写在句末「（选项：A｜B）」；`title` 20 个字以内；最后用一个 json 代码块交草稿：`title`、`why`、`todo`、`criteria`、`notDoing`、`files`（列表也可以是一句话）。再起草时附上现在的草稿（主人改过的算数）和上一版的问题、主人的回答或这次的话。
-4. 交回来：读最后一个能读的代码块（`parseRefinement`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `questions`（缺肥）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后把 worktree 重置回主分支（`project.Reset`：`checkout -f -B <工单分支> <主分支>`、`git clean -fd`，提交了也清掉），帮工收工；干净的 worktree 和空分支随收工清掉。
-5. 主人改各栏、回答问题再起草，满意了挪到待办开工；没开工就取消或删掉的，在起草的帮工收工，`project.Clear` 清掉起草留下的 worktree 和没有提交的分支。
+3. 在这张工单自己的 worktree 里起草（`project.workplace` 按工单开，和后面干活是同一块；档案关了 worktree 也照样开），Run 的触发是 `draft`，花费记在这张工单的 run 上。交给它的活（`refinementBrief`）：只读代码，不改文件、不提交；拿不准的写「要问主人：」，想得到的回答写在句末「（选项：A｜B）」；`title` 20 个字以内；最后用一个 json 代码块交草稿：`title`、`why`、`todo`、`criteria`、`notDoing`、`files`（列表也可以是一句话）。再起草时附上现在的草稿（主人改过的算数）和上一版的问题、主人的回答或这次的话。
+4. 交回来：读最后一个能读的代码块（`parseRefinement`），写回工单：`title`，`description` 用固定的小标题拼（为什么、要做的、不做的、可能涉及，空的不写），`criteria`，问题照旧进 `questions`（缺肥）；一次写，第二版整个盖过第一版。读不出来、没做成、被叫停，工单不动，工单串里说一句（串还没开就是一条提醒）。然后请执行带着 `discard` 收工：执行先停止写入，再把 worktree 重置回主分支，提交了也清掉；干净的 worktree 和空分支随收工清掉。
+5. 主人改各栏、回答问题再起草，满意了挪到待办开工；没开工就取消或删掉的，在起草的帮工带着 `discard` 收工，`project.clear` 清掉起草留下的 worktree 和没有提交的分支。
 
 **排队的待办马上开工**（`issue.dispatch`，待办详情的「现在就试」）：只收排着队的待办；有空就照它排队时记下的来源开工，没空就留在队里原来的位置、说为什么，不重新排。和后台每 5 秒的重试共用一把锁，不会派两次。
 
@@ -113,8 +114,8 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：派活经 `Sessions.send` 开一个 Session，起草的带 `HireOptions.draft`、不记关联，它的汇报由工单服务读成草稿；帮工离开（`left`）时，离开的是最后一个就关上工单；汇报（`report`）带来缺肥的问题。
-- **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`、起草后的重置（`reset`）和取消时的清理（`clear`）；工单服务只决定什么时候做。
+- **帮工（`session`）**：派活经 `Sessions.send` 开一个 Session，起草的带 `SendOptions.refining`、不记关联，它的汇报由工单服务读成草稿；帮工离开（`left`）时，离开的是最后一个就关上工单；汇报（`report`）带来缺肥的问题。
+- **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`、取消时的清理（`clear`）；起草后的重置由执行在停止写入以后调用，工单只决定丢弃起草的工作。
 - **田头（`channel`）**：派活时在频道里开工单串，一张工单一个串，重开、换帮工都在这个串里（[田头](docs/subsystems/channel.md)）；带话和验收没过的意见经它交给帮工。
 - **定时（`recurrence`）**：一个定时一张工单，到点是它的一次干活（[定时](docs/subsystems/recurrence.md)）。
 - **种植计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。

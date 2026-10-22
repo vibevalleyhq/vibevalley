@@ -1,8 +1,9 @@
 // The tools the owner holds over the plots, and what a click with one means. aimTool is the
 // rule: the screen shows it while pointing and follows it on a click.
 
-import type { PlotView, Session } from "@vibevalley/protocol";
-import { type Bed, canHarvest, isRipe } from "./world/plots";
+import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
+import { attentionLabel } from "@vibevalley/protocol/rules";
+import { type Bed, isRipe } from "./world/plots";
 
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
 
@@ -25,7 +26,7 @@ export interface Aim {
   readonly text: string;
 }
 
-/** A click's decision, taken once: the page plays its sound and the command acts on the same snapshot. */
+/** The tool and target stay fixed for a click; execution checks the latest issue acts. */
 export interface PlotAim {
   readonly bed: Bed;
   readonly tool: Tool;
@@ -42,27 +43,44 @@ export type ToolResult =
   | { readonly kind: "water"; readonly sessionId: string }
   | { readonly kind: "review"; readonly sessionId: string };
 
-export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot: PlotView, level: number): Aim {
+/** Tools select an offered issue act; the issue owns when it is offered. */
+export function actForTool(tool: Tool, acts: readonly IssueAct[]): IssueAct | undefined {
+  switch (tool) {
+    case "water":
+      return acts.includes("tell") ? "tell" : undefined;
+    case "bug":
+      return acts.includes("cure") ? "cure" : undefined;
+    case "harvest":
+      return acts.includes("harvest") ? "harvest" : undefined;
+    case "shovel":
+      return acts.includes("stop") ? "stop" : acts.includes("close") ? "close" : undefined;
+    case "hand":
+    case "weed":
+      return undefined;
+  }
+}
+
+export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot: PlotView, level: number, issue?: Issue): Aim {
   const unlock = bed.unlockLevel;
   if (unlock !== undefined) return { ok: false, text: level >= unlock ? "开垦好的花坛" : `Lv.${unlock} 开垦这块地` };
   const crop = plot.crop;
+  const act = actForTool(tool, issue?.attention.acts ?? []);
+  const unavailable = issue ? `这张工单${attentionLabel[issue.attention.state]}，先打开地块看看` : "这块地的工单还没读到";
   switch (tool) {
     case "hand":
       return { ok: true, text: session ? "看看这块地" : "播种" };
     case "water":
-      return session ? { ok: true, text: `给${session.name}浇水（带句话）` } : { ok: false, text: "还没种东西，先用手播种" };
+      return session && act ? { ok: true, text: `给${session.name}浇水（带句话）` } : { ok: false, text: session ? unavailable : "还没种东西，先用手播种" };
     case "bug":
-      return session && crop === "withered" ? { ok: true, text: "杀虫：让它接着修" } : { ok: false, text: "这块地没有虫" };
+      return session && act ? { ok: true, text: "杀虫：让它接着修" } : { ok: false, text: session ? unavailable : "这块地没有虫" };
     case "weed":
       return { ok: false, text: crop === "weeds" ? "帮工修完、验收通过草就拔了" : "没有杂草" };
     case "harvest":
-      // A task's step goes into the task's branch by itself; the whole task is harvested on its board.
-      if (session?.graph) return { ok: false, text: "计划里的一步：做完自动合进计划分支" };
-      return session && canHarvest(session)
+      return session && act
         ? { ok: true, text: isRipe(crop) ? "收获，帮工收工" : "收获：看看它改了什么" }
-        : { ok: false, text: session ? "还没熟，等它做完" : "空地没有东西可收" };
+        : { ok: false, text: session ? unavailable : "空地没有东西可收" };
     case "shovel":
-      return session ? { ok: true, text: session.phase._tag === "working" ? "铲除：叫停" : "铲除：请它收工" } : { ok: false, text: "空地不用铲" };
+      return session && act ? { ok: true, text: act === "stop" ? "铲除：叫停" : "铲除：请它收工" } : { ok: false, text: session ? unavailable : "空地不用铲" };
   }
 }
 

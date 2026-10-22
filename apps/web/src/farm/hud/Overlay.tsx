@@ -8,7 +8,7 @@ import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./rules";
 import { farmState } from "../store";
 import { aimTool } from "../tools";
 import { yardPlaces } from "../world/places";
-import { beds, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "../world/plots";
+import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "../world/plots";
 import type { Village } from "../world/load";
 import { plotH } from "../world/world";
 import { useFrames } from "../../data/frame";
@@ -125,7 +125,8 @@ export function Overlay() {
         .filter((f) => f.bed === bed.index && (f.kind === "note" || f.kind === "harvest"))
         .at(-1);
       if (hoverBed() === bed.index) {
-        const aim = aimTool(tool(), bed, session, plot, level);
+        const issue = session ? state.issues?.find((i) => i.id === issueOf(session)) : undefined;
+        const aim = aimTool(tool(), bed, session, plot, level, issue);
         where = "above";
         card = {
           center: true,

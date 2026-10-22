@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -19,6 +19,37 @@ const trajectories = (home = mkdtempSync(join(tmpdir(), "journal-")), push: (id:
 const bash = (text: string, input?: string) => ({ text, action: "run_command" as const, tool: "bash", ...(input ? { input } : {}) });
 
 describe("a session's log", () => {
+  it("discards an obsolete event file and writes the current event shape when the session runs again", () => {
+    const home = mkdtempSync(join(tmpdir(), "journal-"));
+    const dir = join(home, "events");
+    mkdirSync(dir);
+    const file = join(dir, "w1.json");
+    writeFileSync(file, JSON.stringify([{ seq: 4, time: 1, type: "assistant/message", text: "旧记录" }]));
+    const tr = trajectories(home);
+    expect(tr.events("w1")).toEqual([]);
+    expect(existsSync(file)).toBe(false);
+    tr.openLog("w1").said("新的记录");
+    tr.finish("w1");
+    expect(readJournal(file)).toMatchObject([{ seq: 0, revision: 0, text: "新的记录" }]);
+  });
+
+  it("versions a streaming step so a later snapshot cannot be replaced by an earlier live copy", () => {
+    const tr = trajectories();
+    const j = tr.openLog("versioned");
+    j.said("测试");
+    const first = j.events()[0]!;
+    j.said("通过");
+    const grown = j.events()[0]!;
+    expect(first).toMatchObject({ seq: 0, revision: 0, text: "测试" });
+    expect(grown).toMatchObject({ seq: 0, revision: 1, text: "测试通过" });
+    j.toolStarted("c1", bash("读取参数"));
+    const call = j.events()[1]!;
+    j.toolInput("c1", '{"command":"pwd"}', "pwd");
+    expect(j.events()[1]).toMatchObject({ seq: call.seq, revision: 1, input: '{"command":"pwd"}', text: "pwd" });
+    tr.finish("versioned");
+    expect(tr.events("versioned")![0]).toMatchObject({ seq: 0, revision: 1, text: "测试通过" });
+  });
+
   it("is kept, read back from disk once let go, and taken up again where it was", () => {
     const tr = trajectories();
     const j = tr.openLog("w1");

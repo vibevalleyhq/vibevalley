@@ -5,7 +5,7 @@
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { createComposer, say } from "../../data/composer";
+import { createComposer } from "../../data/composer";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { threadOwnerOf, typedName } from "../../rules/chat";
@@ -26,7 +26,7 @@ function PickChip(props: { named: boolean }) {
     <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
       {(a) => (
         <span class="mr-1 flex h-8 shrink-0 items-center gap-1 bg-cream-200 pr-1 pl-0.5" title={`派给${a().name}`}>
-          <AgentFace agentId={a().id} look={a().look} size={26} />
+          <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={26} />
           <Show when={props.named}>
             <span class="max-w-20 truncate text-[12px] text-bark-800">派给{a().name}</span>
           </Show>
@@ -71,8 +71,9 @@ export function FarmComposer(props: {
   const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");
 
   const box = createComposer(core, () => input, {
-    send: (said, sendKey) => say(said, props.conversation, sendKey, props.thread || pick() === "auto" ? undefined : pick()),
-    where: () => props.conversation,
+    target: () => ({ conversation: props.conversation?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
+    // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
+    echo: true,
     failed: (reason) => props.onProblem(`没发出去：${reason}`),
     edited: (value, at) => {
       props.onProblem(undefined);

@@ -1,10 +1,11 @@
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
-import type { Session, StateFrame } from "@vibevalley/protocol";
+import type { IssueActRequest, Session, StateFrame } from "@vibevalley/protocol";
+import { actLabel } from "@vibevalley/protocol/rules";
 import { api, newSendKey } from "../data/api";
 import { farm, farmState } from "./store";
-import { aimTool, type BedFxKind, type PlotAim, type ToolResult } from "./tools";
+import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 import { webRoutes, type YardPlace } from "./world/places";
 
@@ -25,10 +26,10 @@ export interface FarmCommands {
   harvest(s: Session): Promise<void>;
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
-  stop(sessionId: string): Promise<void>;
+  stop(s: Session): Promise<void>;
   /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it. */
   plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
-  /** The click's decision, read from one frame, so the page's sound and the command agree. */
+  /** The pointer's tool, target and hint, read from one frame. */
   aim(bed: Bed): PlotAim;
   /** Acts on a click; a tool that does not apply says why over the bed. */
   act(plot: PlotAim): Promise<ToolResult>;
@@ -38,43 +39,52 @@ export interface FarmCommands {
 
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
+  const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
+  const send = async (s: Session, body: IssueActRequest) => {
+    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(`这张工单现在不能「${actLabel[body.act]}」`);
+    await api.issue.act({ id: issueOf(s), body });
+  };
+  const aimAt = (bed: Bed, tool: Tool): PlotAim => {
+    const f = frame();
+    const session = f ? sessionAtStation(f.state.sessions, bed.station) : undefined;
+    const level = f ? Math.round(f.view.level.level) : 1;
+    const plot = f ? plotOf(f.view, session) : { crop: "empty" as const };
+    const current = session ? f?.state.issues?.find((i) => i.id === issueOf(session)) : undefined;
+    return { bed, tool, session, aim: aimTool(tool, bed, session, plot, level, current) };
+  };
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
-      await api.issue.comment({ id: issueOf(s), body: { text, sendKey } });
+      await send(s, { act: "tell", text, sendKey });
       fx(s, "water");
     },
     async resolve(s) {
-      await api.issue.act({ id: issueOf(s), body: { act: "resolve" } });
+      await send(s, { act: "resolve" });
       fx(s, "water");
     },
     async cure(s) {
-      await api.issue.act({ id: issueOf(s), body: { act: "cure" } });
+      await send(s, { act: "cure" });
       fx(s, "spray");
     },
     async harvest(s) {
-      await api.issue.status({ id: issueOf(s), body: { status: "done" } });
+      await send(s, { act: "harvest" });
       fx(s, "harvest", "收进仓库");
     },
     async shovel(s) {
-      if (s.phase._tag === "working") await api.session.stop({ id: s.id });
-      else await api.issue.status({ id: issueOf(s), body: { status: "canceled" } });
+      const act = actForTool("shovel", issue(s)?.attention.acts ?? []);
+      if (!act) throw new Error("这张工单现在不能铲除");
+      await send(s, { act });
       fx(s, "shovel");
     },
-    stop: (id) => api.session.stop({ id }),
+    stop: (s) => send(s, { act: "stop" }),
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;
       await api.channel.say({ body: { text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() } });
     },
-    aim(bed) {
-      const f = frame();
-      const tool = farmState().tool;
-      const session = f ? sessionAtStation(f.state.sessions, bed.station) : undefined;
-      const level = f ? Math.round(f.view.level.level) : 1;
-      const plot = f ? plotOf(f.view, session) : { crop: "empty" as const };
-      return { bed, tool, session, aim: aimTool(tool, bed, session, plot, level) };
-    },
-    async act({ bed, tool, session, aim }) {
+    aim: (bed) => aimAt(bed, farmState().tool),
+    async act({ bed, tool, session: pointed }) {
+      const { session, aim } = aimAt(bed, tool);
+      if (session?.id !== pointed?.id) return { kind: "refused", text: "这块地已经变了，请重新点一次" };
       if (!aim.ok || !session) {
         if (aim.ok) return { kind: "sow", station: bed.station };
         farm.bedFx(bed.index, "note", aim.text);
@@ -104,8 +114,8 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
 }
 
 /**
- * A click on a bed, as the farm page does it: decide once, then open what the result asks for. Returns the decision so
- * the caller can play its sound (a tap when it applies).
+ * A click keeps its tool and target; the command checks the latest issue before acting. Returns the pointer's decision
+ * so the caller can play its sound (a tap when it applies).
  */
 export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAim> {
   const aim = commands.aim(bed);

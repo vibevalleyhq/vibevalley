@@ -1,9 +1,9 @@
-// The farm this phone is paired with, kept in the system's keychain (expo-secure-store): its address, the key the farm
-// gave this phone, and the computer's name. Pairing asks the farm's lan listener (lan.pair) and waits for the owner.
+// The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
+// cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
 
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";
-import type { PairLink } from "./rules";
+import { type PairLink, parsePairLink } from "./rules";
 
 export interface Farm {
   readonly url: string;
@@ -11,45 +11,198 @@ export interface Farm {
   readonly hostName: string;
 }
 
+export interface Pairing {
+  readonly kind: "pairing";
+  readonly link?: PairLink;
+  readonly name: string;
+  readonly asking: boolean;
+  readonly problem: string;
+}
+
+export type FarmChoice = { readonly kind: "loading" } | { readonly kind: "farm"; readonly farm: Farm } | Pairing;
+
 const where = "vibevalley.farm";
 
-export async function savedFarm(): Promise<Farm | undefined> {
-  const text = await SecureStore.getItemAsync(where).catch(() => null);
+async function readFarm(): Promise<Farm | undefined> {
+  const text = await SecureStore.getItemAsync(where);
   if (!text) return undefined;
   try {
-    const f = JSON.parse(text) as Farm;
-    return f.url && f.key ? f : undefined;
+    const farm = JSON.parse(text) as Farm;
+    return farm.url && farm.key ? farm : undefined;
   } catch {
     return undefined;
   }
 }
 
-export const forgetFarm = () => SecureStore.deleteItemAsync(where).catch(() => undefined);
+const writeFarm = (farm: Farm | undefined) => (farm ? SecureStore.setItemAsync(where, JSON.stringify(farm)) : SecureStore.deleteItemAsync(where));
+const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** Waits while the owner decides (up to two minutes); a refusal is said as the farm said it. */
-export async function pair(link: PairLink, name: string): Promise<Farm> {
-  let res: Response;
-  try {
-    res = await fetch(link.url + "/api/v1/lan/pair", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: link.code, name }),
-    });
-  } catch {
-    throw new Error("连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接");
+export class FarmConnection {
+  private choice: FarmChoice = { kind: "loading" };
+  private committed?: Farm;
+  private active = false;
+  private revision = 0;
+  private request?: AbortController;
+  private writes: Promise<void> = Promise.resolve();
+  private readonly listeners = new Set<() => void>();
+
+  constructor(private readonly defaultName: string) {}
+
+  snapshot = () => this.choice;
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  private publish(choice: FarmChoice) {
+    if (!this.active) return;
+    this.choice = choice;
+    for (const listener of this.listeners) listener();
   }
-  const text = await res.text();
-  if (!res.ok) {
-    let reason = text;
+
+  private pairing(link?: PairLink): Pairing {
+    return { kind: "pairing", ...(link ? { link } : {}), name: this.defaultName, asking: false, problem: "" };
+  }
+
+  private replace() {
+    this.request?.abort();
+    this.request = undefined;
+    return ++this.revision;
+  }
+
+  private owns(revision: number) {
+    return this.active && this.revision === revision;
+  }
+
+  private serialize<A>(work: () => Promise<A>): Promise<A> {
+    const result = this.writes.then(work);
+    this.writes = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  async start() {
+    if (this.active) return;
+    this.active = true;
+    const revision = this.replace();
+    this.publish({ kind: "loading" });
     try {
-      reason = (JSON.parse(text) as { reason?: string }).reason ?? text;
-    } catch {
-      // Not the farm's refusal: its text as it is.
+      await this.serialize(async () => {
+        this.committed = await readFarm();
+      });
+      if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
+    } catch (e) {
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "读不出保存的农场：" + reason(e) });
     }
-    throw new Error(reason || `那台电脑答了 ${res.status}`);
   }
-  const paired = JSON.parse(text) as LanPaired;
-  const farm = { url: link.url, key: paired.key, hostName: paired.hostName };
-  await SecureStore.setItemAsync(where, JSON.stringify(farm));
-  return farm;
+
+  close = () => {
+    this.active = false;
+    this.replace();
+  };
+
+  select(link: PairLink) {
+    this.replace();
+    this.publish(this.pairing(link));
+  }
+
+  setName(name: string) {
+    if (this.choice.kind === "pairing") this.publish({ ...this.choice, name });
+  }
+
+  /** Opening a pairing link is already the owner's request to ask for entry. */
+  async openLink(text: string) {
+    const link = parsePairLink(text);
+    if (!link) return;
+    this.select(link);
+    await this.pair();
+  }
+
+  async pair() {
+    const choice = this.choice;
+    if (!this.active || choice.kind !== "pairing" || !choice.link || choice.asking) return;
+    const revision = this.replace();
+    const request = new AbortController();
+    this.request = request;
+    this.publish({ ...choice, asking: true, problem: "" });
+    try {
+      let response: Response;
+      try {
+        response = await fetch(choice.link.url + "/api/v1/lan/pair", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ code: choice.link.code, name: choice.name.trim() }),
+          signal: request.signal,
+        });
+      } catch {
+        throw new Error("连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接");
+      }
+      const text = await response.text();
+      if (!this.owns(revision)) return;
+      if (!response.ok) {
+        let problem = text;
+        try {
+          problem = (JSON.parse(text) as { reason?: string }).reason ?? text;
+        } catch {
+          // Not the farm's refusal: its text as it is.
+        }
+        throw new Error(problem || `那台电脑答了 ${response.status}`);
+      }
+      const paired = JSON.parse(text) as LanPaired;
+      const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
+      await this.serialize(async () => {
+        if (!this.owns(revision)) return;
+        try {
+          await writeFarm(farm);
+        } catch (e) {
+          throw new Error("保存配对失败：" + reason(e));
+        }
+        if (!this.owns(revision)) {
+          try {
+            await writeFarm(this.committed);
+          } catch (e) {
+            if (this.choice.kind === "pairing") this.publish({ ...this.choice, problem: "恢复保存的农场失败：" + reason(e) });
+          }
+          return;
+        }
+        this.committed = farm;
+        this.publish({ kind: "farm", farm });
+      });
+    } catch (e) {
+      if (this.owns(revision)) this.publish({ ...choice, asking: false, problem: reason(e) });
+    } finally {
+      if (this.owns(revision)) this.request = undefined;
+    }
+  }
+
+  async cancel() {
+    const revision = this.replace();
+    this.publish(this.pairing());
+    try {
+      await this.serialize(async () => {
+        if (!this.owns(revision)) return;
+        await writeFarm(this.committed);
+        if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
+      });
+    } catch (e) {
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "恢复保存的农场失败：" + reason(e) });
+    }
+  }
+
+  async forget() {
+    const revision = this.replace();
+    this.publish(this.pairing());
+    try {
+      await this.serialize(async () => {
+        await writeFarm(undefined);
+        this.committed = undefined;
+      });
+    } catch (e) {
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "忘不掉保存的农场：" + reason(e) });
+    }
+  }
 }

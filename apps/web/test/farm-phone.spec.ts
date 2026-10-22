@@ -99,9 +99,15 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const calling = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
   await phone.getByRole("button", { name: "接听" }).click();
   await calling;
-  await expect(phone).toHaveCount(0);
+  // The call is on the phone, unfolded to 田头 where what is said shows; what called opens beside it.
+  await expect(page.getByRole("region", { name: "田头" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "阿狐的地" })).toBeVisible();
+  // Esc closes what called first (the phone leaves an open dialog its Esc), then the phone goes away by its button.
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "阿狐的地" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "田头" })).toBeVisible();
+  await page.getByRole("button", { name: "手机" }).click();
+  await expect(phone).toHaveCount(0);
   await page.getByRole("button", { name: "手机" }).click();
   await phone.getByRole("button", { name: "记录" }).click();
   await expect(phone.getByText("阿狐 · 活熟了")).toBeVisible();

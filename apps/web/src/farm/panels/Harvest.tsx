@@ -48,15 +48,19 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
 
 function ReadyView(props: { session: Session; changes: Changes; onDone: () => void }) {
   const now = useNow();
+  const core = useCore();
+  const acts = () => core()?.issues?.find((i) => i.id === issueOf(props.session))?.attention.acts ?? [];
   const counts = () => lineCounts(props.changes);
   const empty = () => nothingChanged(props.changes);
   const conflicts = () => props.changes.conflicts;
-  const take = () => {
-    fire(commands.harvest(props.session));
+  const take = async () => {
+    if (!acts().includes("harvest")) return;
+    await commands.harvest(props.session);
     props.onDone();
   };
-  const resolve = () => {
-    fire(commands.resolve(props.session));
+  const resolve = async () => {
+    if (!acts().includes("resolve")) return;
+    await commands.resolve(props.session);
     props.onDone();
   };
   return (
@@ -111,20 +115,21 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         </Tinted>
       </Show>
       <div class="mt-3 flex flex-wrap gap-2">
-        <Show
-          when={conflicts().length > 0}
-          fallback={
-            <PxButton tone="primary" onClick={take}>
-              {empty() ? "请它收工" : `确认收获，合进 ${props.changes.base}`}
-            </PxButton>
-          }
-        >
-          <PxButton tone="danger" onClick={resolve}>
+        <Show when={acts().includes("harvest")}>
+          <PxButton tone="primary" onClick={() => fire(take())}>
+            {empty() ? "请它收工" : `确认收获，合进 ${props.changes.base}`}
+          </PxButton>
+        </Show>
+        <Show when={acts().includes("resolve")}>
+          <PxButton tone="danger" onClick={() => fire(resolve())}>
             让它解决冲突
           </PxButton>
         </Show>
         <PxButton onClick={() => props.onDone()}>先不收</PxButton>
       </div>
+      <Show when={!acts().includes("harvest") && !acts().includes("resolve")}>
+        <p class={["mt-2", xs]}>工单状态变了，先回到地块看看要你做的事。</p>
+      </Show>
       <Show when={props.changes.commits.length > 0}>
         <FarmSection title="提交">
           <For each={props.changes.commits}>

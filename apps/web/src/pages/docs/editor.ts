@@ -5,6 +5,7 @@
 import {
   type Block,
   type BlockAttrs,
+  type BlockInput,
   blockCode,
   blockParagraph,
   blockTodo,
@@ -55,6 +56,7 @@ export class EditBlock {
   type: string;
   attrs: BlockAttrs;
   spans: DocSpan[];
+  /** Zero is local: edits of a new block wait behind its insertion until the server supplies a revision. */
   rev: number;
   updatedBy: string;
   /** The text in its field. */
@@ -70,7 +72,7 @@ export class EditBlock {
   /** Where the caret goes once the field is drawn again: the editor moved the text under it. */
   caret?: number;
 
-  constructor(b: Block) {
+  constructor(b: BlockInput | Block) {
     this.id = b.id;
     this.parentId = b.parentId;
     this.orderKey = b.orderKey;
@@ -78,8 +80,8 @@ export class EditBlock {
     this.attrs = b.attrs;
     this.spans = b.text;
     this.sent = b.text;
-    this.rev = b.rev;
-    this.updatedBy = b.updatedBy;
+    this.rev = "rev" in b ? b.rev : 0;
+    this.updatedBy = "updatedBy" in b ? b.updatedBy : docOwner;
     this.text = plainOf(b.text);
   }
 }
@@ -360,17 +362,13 @@ export class DocEditor {
     const [left, right] = splitSpans(b.spans, at);
     const next = this.nextSibling(b);
     const keepType = listTypes.has(b.type) || b.type === blockQuote;
-    const nb: Block = {
+    const nb: BlockInput = {
       id: newBlockId(),
-      docId: this.docId,
       ...(b.parentId !== undefined ? { parentId: b.parentId } : {}),
       orderKey: keyBetween(b.orderKey, next?.orderKey ?? ""),
       type: keepType ? b.type : blockParagraph,
       attrs: b.type === blockTodo ? { checked: false } : {},
       text: [],
-      rev: 0,
-      updatedBy: docOwner,
-      updated: 0,
     };
     const offset = codePointOffset(plainOf(b.spans), at);
     b.spans = left;
@@ -440,16 +438,12 @@ export class DocEditor {
   /** A new paragraph at the end, focused: what a click below the last block does. */
   append() {
     const last = this.blocks.filter((b) => b.parentId === undefined).at(-1);
-    const nb: Block = {
+    const nb: BlockInput = {
       id: newBlockId(),
-      docId: this.docId,
       orderKey: keyBetween(last?.orderKey ?? "", ""),
       type: blockParagraph,
       attrs: {},
       text: [],
-      rev: 0,
-      updatedBy: docOwner,
-      updated: 0,
     };
     this.byId.set(nb.id, new EditBlock(nb));
     this.reorder();

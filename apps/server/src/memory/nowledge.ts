@@ -7,7 +7,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Memory } from "@vibevalley/protocol";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
-import { memoryNotesOf, recallCount, clip } from "./recall.ts";
+import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source } from "./sources.ts";
 
 const app = "vibevalley";
@@ -30,7 +30,22 @@ const head = (s: string, n: number) => {
 /** Its labels are words without spaces or commas (the list is comma-separated). */
 const label = (kind: string, name: string) => `${app}-${kind}-${name.replace(/[\s,]+/g, "-")}`;
 
-export const nowledgeLabels = (agent: string, project: string) => [app, label("agent", agent), ...(project ? [label("project", project)] : [])].join(",");
+const projectLabel = `${app}-scope-project-`;
+const globalLabel = `${app}-scope-global`;
+export const nowledgeLabels = (agent: string, project: string) =>
+  [app, label("agent", agent), project ? projectLabel + Buffer.from(project, "utf8").toString("hex") : globalLabel].join(",");
+
+const scopeOf = (labels: unknown): MemoryScope => {
+  if (!Array.isArray(labels) || !labels.every((l): l is string => typeof l === "string") || !labels.includes(app)) return { kind: "unknown" };
+  const scopes = labels.filter((l) => l === globalLabel || l.startsWith(projectLabel));
+  if (scopes.length !== 1) return { kind: "unknown" };
+  const only = scopes[0]!;
+  if (only === globalLabel) return { kind: "global" };
+  const encoded = only.slice(projectLabel.length);
+  if (!/^(?:[0-9a-f]{2})+$/.test(encoded)) return { kind: "unknown" };
+  const project = Buffer.from(encoded, "hex").toString("utf8");
+  return Buffer.from(project, "utf8").toString("hex") === encoded ? { kind: "project", project } : { kind: "unknown" };
+};
 
 interface Hit {
   readonly id?: string;
@@ -49,27 +64,43 @@ function hitText(h: Hit): string {
 }
 
 export function nowledge(c: MemorySourceConfig): Source {
+  let closed = false;
+  const life = new AbortController();
   let client: Promise<Client> | undefined;
   let transport: StreamableHTTPClientTransport | undefined;
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
-  const open = () =>
-    (client ??= (async () => {
-      transport = new StreamableHTTPClientTransport(new URL(c.url), { requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined });
+  const open = () => {
+    if (closed) return Promise.reject(new Error("Nowledge source has stopped"));
+    return (client ??= (async () => {
+      const wire = new StreamableHTTPClientTransport(new URL(c.url), { requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined });
+      transport = wire;
       const one = new Client({ name: app, version: "1" });
-      await one.connect(transport, { timeout: prefetchTimeoutMs });
+      try {
+        await one.connect(wire, { timeout: prefetchTimeoutMs, signal: life.signal });
+        life.signal.throwIfAborted();
+      } catch (e) {
+        await one.close().catch(() => {});
+        await wire.close().catch(() => {});
+        throw e;
+      }
       return one;
     })().catch((e: unknown) => {
       client = undefined;
       throw e;
     }));
+  };
 
   /** One tool call; its answer is the text of the result. A session that failed is dropped, so the next call opens another. */
   const call = async (tool: string, args: Record<string, unknown>, signal: AbortSignal) => {
+    signal = AbortSignal.any([signal, life.signal]);
+    signal.throwIfAborted();
     const session = await open();
+    signal.throwIfAborted();
     let res;
     try {
       res = await session.callTool({ name: tool, arguments: args }, undefined, { signal });
+      signal.throwIfAborted();
     } catch (e) {
       if (!signal.aborted) {
         client = undefined;
@@ -115,6 +146,9 @@ export function nowledge(c: MemorySourceConfig): Source {
     unavailable: () => (c.url ? undefined : "没填地址"),
     // Closing the transport ends a connect still waiting on a Nowledge that does not answer.
     stop: async () => {
+      if (closed) return;
+      closed = true;
+      life.abort(new Error("Nowledge source has stopped"));
       const was = transport;
       client = undefined;
       transport = undefined;
@@ -130,12 +164,40 @@ export function nowledge(c: MemorySourceConfig): Source {
     },
     // Its memories are notes; it has no jobs done.
     search: async (q, signal) => {
-      if (!c.read || q.kind === "issue") return [];
+      if (!c.read || q.kind === "issue") return { found: [] };
       const hits = await find(q.agent, q.text, q.limit, !!c.everything, signal);
-      return hits.map(
-        (h) =>
-          ({ id: hitID(h), agent: q.agent, kind: "note", text: hitText(h), at: 0, recalled: 0, source: "nowledge", score: h.relevance_score ?? 0 }) as never,
+      const selected = hits.slice(0, most);
+      const scopes: MemoryScope[] = selected.map(() => ({ kind: "unknown" }));
+      let next = 0;
+      // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
+      await Promise.all(
+        Array.from({ length: Math.min(2, selected.length) }, async () => {
+          for (let index = next++; index < selected.length; index = next++) {
+            if (signal.aborted) return;
+            const id = hitID(selected[index]!);
+            if (!id) continue;
+            try {
+              const detail = JSON.parse(await call("get_memory_by_id", { memory_id: id }, signal)) as { labels?: unknown };
+              scopes[index] = scopeOf(detail.labels);
+            } catch {
+              // An unreadable detail does not turn an unknown project into a global memory.
+            }
+          }
+        }),
       );
+      return {
+        found: selected.map((h, index) => ({
+          id: hitID(h),
+          agent: q.agent,
+          kind: "note" as const,
+          text: hitText(h),
+          at: 0,
+          recalled: 0,
+          source: "nowledge",
+          score: h.relevance_score ?? 0,
+          scope: scopes[index]!,
+        })),
+      };
     },
     // The farm's own; Nowledge does not say which project each is for.
     list: async (agent, signal) => {

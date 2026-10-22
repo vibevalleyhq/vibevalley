@@ -116,6 +116,155 @@ describe("runtime", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
+  it.live("inherited session options are checked before a profile can be chosen", () =>
+    Effect.gen(function* () {
+      const store = yield* Agents;
+      yield* store.saveSettings("antigravity", {
+        ...store.settings("antigravity"),
+        defaultEffort: "high",
+        env: { INHERITED: "set" },
+      });
+      const r = yield* runtimes({
+        registry: new RuntimeRegistry([fake("antigravity", { refusedSessionOptions: { env: "no env" } })]),
+        probe: async (id) => ({ ...(await notFound(id)), installation: { status: "available", via: "bundled", command: id, version: null } }),
+      });
+      const a = agent({ runtime: "antigravity" });
+      const assessed = yield* r.assess(a);
+      expect(assessed.blocking.map((i) => i.field)).toEqual(["effort", "env"]);
+      expect(usable(assessed)).toBe(false);
+      expect(yield* r.check(a)).toEqual(assessed.issues);
+      expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
+  it.live("model effort checks use the inherited effort and allow a profile override", () =>
+    Effect.gen(function* () {
+      const store = yield* Agents;
+      yield* store.saveSettings("pi", {
+        ...store.settings("pi"),
+        defaultModel: "known",
+        defaultEffort: "high",
+        env: { BASE: "kept", OVERRIDE: "default" },
+      });
+      const r = yield* runtimes({
+        registry: new RuntimeRegistry([fake("pi")]),
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          installation: { status: "available", via: "bundled", command: id, version: null },
+          models: [{ id: "known", name: "Known", effortLevels: ["low"], isDefault: true }],
+        }),
+      });
+      expect((yield* r.assess(agent({}))).blocking.map((i) => i.field)).toEqual(["effort"]);
+      const override = agent({ effort: "low", env: { OVERRIDE: "profile" } });
+      expect(usable(yield* r.assess(override))).toBe(true);
+      const sent = yield* r.resolve(override);
+      expect([sent.model, sent.effort, sent.env]).toEqual(["known", "low", { BASE: "kept", OVERRIDE: "profile" }]);
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
+  for (const source of ["profile", "runtime"] as const)
+    it.live(`an unknown ${source} model warns and checks effort against the actual fallback`, () =>
+      Effect.gen(function* () {
+        const store = yield* Agents;
+        yield* store.saveSettings("pi", { ...store.settings("pi"), defaultModel: source === "runtime" ? "missing" : "configured", defaultEffort: "high" });
+        const r = yield* runtimes({
+          registry: new RuntimeRegistry([fake("pi")]),
+          probe: async (id) => ({
+            ...(await notFound(id)),
+            installation: { status: "available", via: "bundled", command: id, version: null },
+            models: [
+              { id: "configured", name: "Configured", effortLevels: ["high"], isDefault: false },
+              { id: "fallback", name: "Fallback", effortLevels: ["low"], isDefault: true },
+            ],
+          }),
+        });
+        const a = agent({ model: source === "profile" ? "missing" : "" });
+        const issues = yield* r.check(a);
+        expect(issues).toEqual([
+          { field: "model", level: "warn", text: "pi 的模型列表里没有 missing" },
+          { field: "effort", level: "error", text: "pi 默认用的 Fallback 没有 high 这一档，可选：low" },
+        ]);
+        expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
+        const sent = yield* r.resolve({ ...a, effort: "low" });
+        expect([sent.model, sent.effort]).toEqual(["", "low"]);
+      }).pipe(Effect.scoped, Effect.provide(world())),
+    );
+
+  it.live("a saved configuration is checked while its refreshed probe is still running", () => {
+    let waiting = false;
+    let release!: () => void;
+    const held = new Promise<void>((done) => (release = done));
+    return Effect.gen(function* () {
+      let probes = 0;
+      const r = yield* runtimes({
+        registry: new RuntimeRegistry([fake("pi")]),
+        probe: async (id) => {
+          if (++probes > 1) {
+            waiting = true;
+            await held;
+          }
+          return {
+            ...(await notFound(id)),
+            installation: { status: "available", via: "bundled", command: id, version: null },
+            models: [{ id: "known", name: "Known", effortLevels: ["low"], isDefault: true }],
+          };
+        },
+      });
+      yield* r.info("pi");
+      const store = yield* Agents;
+      const updating = Effect.runPromise(r.update("pi", { ...store.settings("pi"), defaultEffort: "high" }));
+      yield* Effect.promise(() => until(() => waiting));
+      const a = agent({});
+      expect((yield* r.check(a)).map((i) => i.field)).toEqual(["effort"]);
+      expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
+      release();
+      yield* Effect.promise(() => updating);
+    }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.scoped, Effect.provide(world()));
+  });
+
+  for (const option of ["effort", "env"] as const)
+    it.live(`resolve refuses a newly saved ${option} even after the profile passed its dispatch check`, () =>
+      Effect.gen(function* () {
+        const r = yield* runtimes({
+          registry: new RuntimeRegistry([fake("pi", { refusedSessionOptions: { env: "no env" } })]),
+          probe: async (id) => ({
+            ...(await notFound(id)),
+            installation: { status: "available", via: "bundled", command: id, version: null },
+            models: [{ id: "known", name: "Known", effortLevels: ["low"], isDefault: true }],
+          }),
+        });
+        const a = agent({});
+        expect(yield* r.check(a)).toEqual([]);
+        const store = yield* Agents;
+        yield* r.update("pi", {
+          ...store.settings("pi"),
+          ...(option === "effort" ? { defaultEffort: "high" } : { env: { NEW: "set" } }),
+        });
+        const resolved = yield* Effect.result(r.resolve(a));
+        expect(resolved._tag).toBe("Failure");
+        if (resolved._tag === "Failure")
+          expect(resolved.failure).toEqual({
+            _tag: "Refused",
+            reason: "小禾 派不出去：" + (option === "env" ? "no env" : "pi 默认用的 Known 没有 high 这一档，可选：low"),
+          });
+      }).pipe(Effect.scoped, Effect.provide(world())),
+    );
+
+  it.live("resolving an existing session does not reapply dispatch availability or spending policy", () =>
+    Effect.gen(function* () {
+      const r = yield* runtimes({
+        registry: new RuntimeRegistry([fake("pi")]),
+        probe: async (id) => ({ ...(await notFound(id)), installation: { status: "available", via: "bundled", command: id, version: null } }),
+      });
+      const store = yield* Agents;
+      yield* r.update("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
+      r.spend("pi", 1);
+      const a = agent({ enabled: false });
+      expect(usable(yield* r.assess(a))).toBe(false);
+      expect((yield* r.resolve(a)).runtime.id).toBe("pi");
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
   it.live("the list carries every runtime's preset and facts", () =>
     Effect.gen(function* () {
       const registry = new RuntimeRegistry([

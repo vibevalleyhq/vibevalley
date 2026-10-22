@@ -2,7 +2,7 @@
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
 import type { WorkspaceState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
-import { withConversation, withMessage } from "../channel/state.ts";
+import { withConversation, withMessage, withOwnerMentions } from "../channel/state.ts";
 import { withIssue, withIssueStatuses } from "../issue/state.ts";
 import { farmOf, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
@@ -31,6 +31,8 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "conversation":
       if (state.chat?.conversations?.some((c) => c.id === f.conversation.id && same(c, f.conversation))) return [state, false];
       return [{ ...state, chat: withConversation(state.chat, f.conversation) }, true];
+    case "ownerMentions":
+      return same(state.chat?.ownerMentions ?? [], f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
     case "hired": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);

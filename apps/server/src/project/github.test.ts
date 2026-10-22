@@ -162,7 +162,7 @@ describe("GitHub", () => {
       projectsDir(),
       Effect.gen(function* () {
         const p = yield* Projects;
-        const place = yield* p.workplace("sample", "w1", true, "", 1);
+        const place = yield* p.workplace("sample", 1, true, "");
         gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
         mkdirSync(join(place.cwd, ".vibevalley"));
         const check = join(place.cwd, ".vibevalley/check");
@@ -196,7 +196,7 @@ describe("GitHub", () => {
           projectsDir(),
           Effect.gen(function* () {
             const p = yield* Projects;
-            const place = yield* p.workplace("sample", "w1", true, "", 1);
+            const place = yield* p.workplace("sample", 1, true, "");
             gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
             if (hasCheck) {
               mkdirSync(join(place.cwd, ".vibevalley"));
@@ -259,7 +259,7 @@ describe("GitHub", () => {
               want = old;
             }
             if (mode === "not-enabled") want = old;
-            const place = yield* p.workplace("sample", "w1", true, "", 1);
+            const place = yield* p.workplace("sample", 1, true, "");
             expect([mode, gitSync(place.cwd, "rev-parse", "HEAD")]).toEqual([mode, want]);
             expect([mode, gitSync(path, "rev-parse", "main")]).toEqual([mode, want]);
             if (mode === "checked-out") {

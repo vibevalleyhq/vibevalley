@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer } from "effect";
@@ -100,7 +100,7 @@ describe("projects", () => {
       Effect.gen(function* () {
         const p = yield* Projects;
         yield* p.openBranch("task", "vibevalley/task-1");
-        const place = yield* p.workplace("task", "w1", true, "vibevalley/task-1", 0);
+        const place = yield* p.workplace("task", 1, true, "vibevalley/task-1");
         writeFileSync(join(place.cwd, "a.txt"), "a\n");
         expect((yield* p.mergeInto(place, "vibevalley/task-1")).hashes).toHaveLength(1);
         const changes = yield* p.branchChanges("task", "vibevalley/task-1");
@@ -118,7 +118,7 @@ describe("projects", () => {
       root,
       Effect.gen(function* () {
         const p = yield* Projects;
-        const place = yield* p.workplace("task", "w1", true, "", 0);
+        const place = yield* p.workplace("task", 1, true, "");
         writeFileSync(join(place.cwd, "a.txt"), "before the split\n");
         gitSync(place.cwd, "add", "a.txt");
         gitSync(place.cwd, "commit", "-qm", "a");
@@ -136,7 +136,7 @@ describe("projects", () => {
         const p = yield* Projects;
         yield* p.openBranch("task", "vibevalley/task-1");
         const work = (id: string, ...files: string[]) =>
-          Effect.tap(p.workplace("task", id, true, "vibevalley/task-1", 0), (place) =>
+          Effect.tap(p.workplace("task", Number(id.slice(1)), true, "vibevalley/task-1"), (place) =>
             Effect.sync(() => files.forEach((f) => writeFileSync(join(place.cwd, f), id + "\n"))),
           );
         yield* p.mergeInto(yield* work("w1", "a.txt", "b.txt"), "vibevalley/task-1");
@@ -309,7 +309,7 @@ describe("projects", () => {
       root,
       Effect.gen(function* () {
         const p = yield* Projects;
-        const place = yield* p.workplace("left", "w1", true, "", 0);
+        const place = yield* p.workplace("left", 1, true, "");
         mkdirSync(join(place.cwd, "__pycache__"));
         writeFileSync(join(place.cwd, "__pycache__", "greet.cpython-312.pyc"), "cache");
         writeFileSync(join(place.cwd, "greet.py"), "def greet(): pass\n");
@@ -329,7 +329,7 @@ describe("projects", () => {
             const p = yield* Projects;
             const target = intoTask ? "task" : "main";
             if (intoTask) yield* p.openBranch("demo", target);
-            const place = yield* p.workplace("demo", "w1", true, intoTask ? target : "", 0);
+            const place = yield* p.workplace("demo", 1, true, intoTask ? target : "");
             writeFileSync(join(place.cwd, "result.txt"), "kept");
             gitSync(join(root, "demo"), "worktree", "lock", place.cwd);
             const merged = intoTask ? yield* p.mergeInto(place, target) : yield* p.merge(place);
@@ -354,7 +354,7 @@ describe("projects", () => {
               const p = yield* Projects;
               const target = into ? "vibevalley/task-1" : "main";
               if (into) yield* p.openBranch("checked", target);
-              const place = yield* p.workplace("checked", "w1", true, into ? target : "", 0);
+              const place = yield* p.workplace("checked", 1, true, into ? target : "");
               const path = join(root, "checked");
               const before = gitSync(path, "rev-parse", target);
               writeFileSync(join(place.cwd, "work.txt"), "work");
@@ -391,7 +391,7 @@ describe("projects", () => {
         root,
         Effect.gen(function* () {
           const p = yield* Projects;
-          const place = yield* p.workplace("timeout", "w1", true, "", 0);
+          const place = yield* p.workplace("timeout", 1, true, "");
           mkdirSync(join(place.cwd, ".vibevalley"));
           write(
             join(place.cwd, ".vibevalley/check"),
@@ -418,12 +418,30 @@ describe("projects", () => {
       root,
       Effect.gen(function* () {
         const p = yield* Projects;
-        const place = yield* p.workplace("permissions", "w1", true, "", 0);
+        const place = yield* p.workplace("permissions", 1, true, "");
         mkdirSync(join(place.cwd, ".vibevalley"));
         write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o644);
         const e = yield* Effect.flip(p.merge(place));
         expect(e.kind).toBe("check");
         expect(existsSync(place.cwd)).toBe(true);
+      }),
+    );
+  });
+
+  it.effect("a failed git inspection does not claim an issue's branch was released", () => {
+    const root = projectsDir();
+    return projects(
+      root,
+      Effect.gen(function* () {
+        const p = yield* Projects;
+        yield* p.openBranch("demo", "vibevalley/issue-9");
+        const path = join(root, "demo");
+        renameSync(join(path, ".git"), join(path, ".git-held"));
+        try {
+          expect(yield* p.clear("demo", 9)).toMatchObject({ kept: true });
+        } finally {
+          renameSync(join(path, ".git-held"), join(path, ".git"));
+        }
       }),
     );
   });
@@ -435,7 +453,7 @@ describe("projects", () => {
       Effect.gen(function* () {
         const p = yield* Projects;
         const path = join(root, "demo");
-        const place = yield* p.workplace("demo", "w1", true, "", 7);
+        const place = yield* p.workplace("demo", 7, true, "");
         const main = gitSync(path, "rev-parse", "main");
         writeFileSync(join(place.cwd, "refined.txt"), "x");
         gitSync(place.cwd, "add", ".");
@@ -449,15 +467,17 @@ describe("projects", () => {
         ]);
         yield* Effect.flip(p.reset({ project: "demo", cwd: path }));
         writeFileSync(join(place.cwd, "scratch.txt"), "y");
-        expect(yield* p.clear("demo", 7)).toBe("");
+        expect(yield* p.clear("demo", 7, "preserve")).toMatchObject({ kept: true });
+        expect(existsSync(join(place.cwd, "scratch.txt"))).toBe(true);
+        expect(yield* p.clear("demo", 7)).toEqual({ kept: false });
         expect(existsSync(place.cwd)).toBe(false);
         expect(() => gitSync(path, "show-ref", "--verify", "refs/heads/" + place.branch)).toThrow();
-        const kept = yield* p.workplace("demo", "w2", true, "", 8);
+        const kept = yield* p.workplace("demo", 8, true, "");
         writeFileSync(join(kept.cwd, "work.txt"), "z");
         gitSync(kept.cwd, "add", ".");
         gitSync(kept.cwd, "commit", "-qm", "work");
-        expect(yield* p.clear("demo", 8)).toMatch(/分支留着/);
-        expect(yield* p.clear("missing", 9)).toBe("");
+        expect(yield* p.clear("demo", 8)).toMatchObject({ kept: true, reason: expect.stringMatching(/分支留着/) });
+        expect(yield* p.clear("missing", 9)).toEqual({ kept: false });
       }),
     );
   });
@@ -480,7 +500,7 @@ describe("projects", () => {
               baseHead = gitSync(path, "commit-tree", tree, "-p", "HEAD", "-m", "task only");
               gitSync(path, "update-ref", "refs/heads/" + base, baseHead);
             }
-            const first = yield* p.workplace("demo", "w1", true, base, 42);
+            const first = yield* p.workplace("demo", 42, true, base);
             if (baseHead) expect(gitSync(first.cwd, "rev-parse", "HEAD")).toBe(baseHead);
             expect(first.branch).toBe("vibevalley/issue-42");
             expect(first.cwd).toBe(join(dirname(root), "worktrees", "demo.42"));
@@ -496,7 +516,7 @@ describe("projects", () => {
               gitSync(path, "commit", "--allow-empty", "-m", "later");
               before = gitSync(path, "rev-parse", "HEAD");
             }
-            const second = yield* p.workplace("demo", "w2", true, base, 42);
+            const second = yield* p.workplace("demo", 42, true, base);
             expect(second).toEqual(first);
             expect(gitSync(second.cwd, "rev-parse", "HEAD")).toBe(before);
             expect(readFileSync(join(second.cwd, "previous.txt"), "utf8")).toBe("previous");
@@ -519,7 +539,7 @@ describe("projects", () => {
                 const p = yield* Projects;
                 const target = into ? "vibevalley/task-42" : "main";
                 if (into) yield* p.openBranch("demo", target);
-                const place = yield* p.workplace("demo", "w1", true, into ? target : "", 1);
+                const place = yield* p.workplace("demo", 1, true, into ? target : "");
                 const before = gitSync(join(root, "demo"), "rev-parse", target);
                 const signal = projectsDir();
                 const started = join(signal, "started");
@@ -528,7 +548,7 @@ describe("projects", () => {
                 write(join(place.cwd, ".vibevalley/check"), `#!/bin/sh\ntouch '${started}'\nwhile [ ! -f '${release}' ]; do sleep 0.05; done\n`, 0o755);
                 const merging = yield* Effect.forkChild(Effect.result(into ? p.mergeInto(place, target) : p.merge(place)));
                 while (!existsSync(started)) yield* Effect.sleep(20);
-                yield* p.workplace("demo", "w2", true, "", 2).pipe(Effect.timeout(2000));
+                yield* p.workplace("demo", 2, true, "").pipe(Effect.timeout(2000));
                 if (changed) gitSync(place.cwd, "commit", "--allow-empty", "-m", "changed during check");
                 writeFileSync(release, "");
                 const result = yield* Fiber.join(merging);
@@ -552,7 +572,7 @@ describe("projects", () => {
       root,
       Effect.gen(function* () {
         const p = yield* Projects;
-        const place = yield* p.workplace("combined", "w1", true, "", 1);
+        const place = yield* p.workplace("combined", 1, true, "");
         const path = join(root, "combined");
         writeFileSync(join(path, "main-only"), "main");
         gitSync(path, "add", ".");
@@ -572,7 +592,7 @@ describe("projects", () => {
     return projects(
       root,
       Effect.gen(function* () {
-        expect((yield* Effect.flip((yield* Projects).workplace("linked", "w1", true, "", 0))).message).toMatch(/工作目录里面/);
+        expect((yield* Effect.flip((yield* Projects).workplace("linked", 1, true, ""))).message).toMatch(/工作目录里面/);
       }),
     );
   });

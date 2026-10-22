@@ -14,7 +14,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/doc`（`Docs`）：`doc.ts` 存取和提交，`demo.ts` 是演示（脚本 `demoScript`），`ops.ts` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`text.ts` 按码点切和接文字，`markdown.ts` 导入导出。顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
-- 形状在 `packages/protocol/src/shapes.ts`：`Document`、`Block`、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是常量（`blockParagraph`……），页面 import 同名常量。
+- 形状在 `packages/protocol/src/shapes.ts`：`Document`、`BlockInput`（作者给的新块）、`Block`（服务端保存后的块）、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是常量（`blockParagraph`……），页面 import 同名常量。
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
 - 页面：`apps/web/src/pages/docs/`：`DocsPage.tsx` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边）和块的画法、按键，`editor.ts` 的 `DocEditor` 管本地的块、待发的 op、防抖和问别人写的；不在 `apps/web/src/rules/docBlocks.ts` 以外重写规则：那里只有码点偏移、编辑时保留 marks、编号和行首的 Markdown。
 - 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`apps/server/src/tool/tool.ts`，经 `/mcp` 只给 Session）。
@@ -24,6 +24,7 @@
 
 - **一篇文档是一组扁平的块**：`parentId` 表示嵌套，`orderKey` 表示同级的顺序；同级按 `(orderKey, id)` 排，两端在同一处插入、生成了同一个键时顺序仍然确定。
 - **块 id 由插入它的一方生成**（uuid），之后不变，在所有文档里唯一。
+- **新块命令只带作者决定的内容和位置**：`insert_block.block`、`split_block.newBlock` 都是 `BlockInput`，只含 id、父块、顺序键、类型、属性和文字。文档 id、修订号、墓碑、作者和更新时间由 `Docs` 生成；页面、导入和演示不补假的存盘字段。编辑器待保存块的 rev 0 只是本地占位，后续改字仍等插入回执后才用服务端给的 rev。
 - **顺序键**是 base62 的分数索引：两键之间取中点，在两头插入时首位加一或减一；键不以 `0` 结尾，所以前面总有位置。服务端只校验格式（只有 base62、不以 `0` 结尾、不超过 256 位），自己只在导入 Markdown 和帮工追加时生成；页面用同一个 `keyBetween` 生成。
 - **块的类型**：`paragraph`、`heading`（`level` 1–3）、`bulleted`、`numbered`、`todo`（`checked`）、`quote`、`code`（`language`，字不带 marks）、`divider`、`image`（`src`、`width`、`height`、`alt`）、`issue_ref`（`issueId`）、`memory_item`（`memoryId`，带字）。`divider`、`image`、`issue_ref` 没有字。服务端只收这些；比客户端新的服务端给出它不认识的类型时，客户端画只读的占位块。
 - **marks** 只有 `bold`、`italic`、`code`、`strike`、`link`。字存成 span 的列表，相邻的同样 marks 的 span 合成一个、空的去掉，同一段字只有一种写法。
@@ -45,7 +46,7 @@
 
 **每个 op 的结果**：`applied`；`conflict`（块保留现在的字，`yours` 是发来的，存成 `conflict` 的修订）；`noop`（删已删的、恢复没删的、并进来的块已删）；`rejected`（不在的块、不认识的类型、坏的顺序键、重复的 id、拆分位置不在字里，`reason` 说明）。`merged` 留给三方合并。
 
-**带 `baseRev` 的 op**（`update_text`、`split_block`）：`baseRev` 等于当前 rev，直接施加；落后时，如果这一块的字从那一版到现在没变过（中间只改了勾选、类型这类），照样施加；字变过就是冲突。`update_text` 冲突时不改这一块；`split_block` 冲突时在现在的字的末尾拆开（原块的字不动，新块是空的）。
+**带 `baseRev` 的 op**（`update_text`、`split_block`）：`baseRev` 等于当前 rev，直接施加；落后时，如果这一块的字从那一版到现在没变过（中间只改了勾选、类型这类），照样施加；字变过就是冲突。同一批里先改属性、再按批次开始时的版本改字，也按这条规则判断。`update_text` 冲突时不改这一块；`split_block` 冲突时在现在的字的末尾拆开（原块的字不动，新块是空的）。
 
 **拆分和合并**都是一个 op：`split_block` 把 `offset` 以后的字挪进页面给好 id、父块和顺序键的新块；`merge_blocks` 拿两块现在的字接起来，来源的子块挪到目标下面（排在目标已有的子块后面），来源置墓碑。
 
@@ -101,6 +102,7 @@
 ## 怎么验证
 
 - `apps/server/src/doc/rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
-- `doc/doc.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；导入导出；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
+- `doc/doc.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；导入导出；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
 - `mcp/mcp.test.ts`：帮工经 `/mcp` 写文档。
 - 页面：`apps/web/src/rules/docBlocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/docs.spec.ts`（建一篇、一块一块写、写的留着；演示让帮工写；段首退格并段；整页的样子）。
+- `apps/web/test/doc-commands.spec.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，回读的文档、修订、作者和时间由服务端填入。

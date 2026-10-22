@@ -2,7 +2,7 @@
 // through their tools, all down the same pipeline. One batch at a time for every document: a document's batches are
 // serial and its seq goes up in order.
 
-import type { Agent, Block, BlockAttrs, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
+import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { newId } from "../base/ids.ts";
@@ -135,7 +135,12 @@ export const make = (options: DocOptions = {}) =>
             for (const op of body.ops ?? []) {
               if (op.op !== "update_text" && op.op !== "split_block") continue;
               const b = p.find(op.blockId);
-              if (!b || op.baseRev >= b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
+              if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
+              // An earlier op in this batch can advance rev without changing this text.
+              if (op.baseRev === b.rev) {
+                revisions.set(`${b.id}@${op.baseRev}`, b.text);
+                continue;
+              }
               const raw = yield* db(Effect.option(qr.docBlockRevision({ block_id: b.id, rev: op.baseRev })));
               if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, JSON.parse(raw.value.spans) as DocSpan[]);
             }
@@ -197,7 +202,7 @@ export const make = (options: DocOptions = {}) =>
       lock.withPermits(1)(
         Effect.gen(function* () {
           const last = new Page(doc, actor, 0, yield* blocksOf(doc)).children("").at(-1)?.orderKey ?? "";
-          const b = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) } as Block;
+          const b: BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
           return one(yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
         }),
       );
@@ -228,7 +233,7 @@ export const make = (options: DocOptions = {}) =>
           parents.push(id);
           ops.push({
             op: "insert_block" as const,
-            block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text } as Block,
+            block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
           });
         }
         if (ops.length > 0) yield* submit(created.doc.id, actor, { batchId: newId(), ops });
@@ -242,7 +247,7 @@ export const make = (options: DocOptions = {}) =>
     const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * tick);
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
-    const demoInsert = (doc: string, writer: string, b: Block, at?: { headings: string[]; section: number }) =>
+    const demoInsert = (doc: string, writer: string, b: Omit<BlockInput, "orderKey">, at?: { headings: string[]; section: number }) =>
       lock.withPermits(1)(
         Effect.gen(function* () {
           // Tombstones too: their keys still hold their places.
@@ -268,7 +273,7 @@ export const make = (options: DocOptions = {}) =>
     const demoWrite = (doc: string, writer: string, headings: string[], section: number) =>
       Effect.gen(function* () {
         for (const text of demoScript[section]!.paragraphs) {
-          const b = { id: newId(), type: "paragraph", attrs: {}, text: [] } as unknown as Block;
+          const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
           let rev = yield* demoInsert(doc, writer, b, { headings, section });
           const chars = Array.from(text);
           for (let n = 1; n <= demoPieces; n++) {
@@ -286,7 +291,7 @@ export const make = (options: DocOptions = {}) =>
       Effect.gen(function* () {
         const headings: string[] = [];
         for (const [i, w] of writers.entries()) {
-          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", demoScript[i]!.heading) } as unknown as Block;
+          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", demoScript[i]!.heading) };
           yield* demoInsert(doc, w, b);
           headings.push(b.id);
           yield* wait(0.5);

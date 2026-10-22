@@ -296,7 +296,7 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
           <For each={SpeciesValues}>
             {(species) => (
               <Tile active={cast().species === species} label={speciesLabel[species]} onClick={() => props.onChange({ ...props.draft.look, species })}>
-                <AgentFace agentId={props.draft.id} look={{ ...props.draft.look, species, outfit: cast().outfit }} size={48} />
+                <AgentFace agentId={props.draft.id} runtime={props.draft.runtime} look={{ ...props.draft.look, species, outfit: cast().outfit }} size={48} />
               </Tile>
             )}
           </For>

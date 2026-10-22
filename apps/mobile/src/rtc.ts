@@ -1,83 +1,118 @@
-// The phone's own call line (@vibevalley/host's rtc): Agora's native SDK, which goes on with the screen locked (the app
-// keeps an audio background mode, app.json). The page asks over the bridge; what the call hears goes back as events.
+// Agora exposes one native engine. Each attempt owns it until it ends; late permission replies and callbacks from an
+// ended attempt cannot initialize, release or send events through its successor.
 
-import { ChannelProfileType, ClientRoleType, createAgoraRtcEngine, type IRtcEngine, type IRtcEngineEventHandler } from "react-native-agora";
+import {
+  ChannelProfileType,
+  ClientRoleType,
+  ConnectionStateType,
+  createAgoraRtcEngine,
+  type IRtcEngine,
+  type IRtcEngineEventHandler,
+  type RtcConnection,
+} from "react-native-agora";
 import { PermissionsAndroid, Platform } from "react-native";
-import type { FromNative, RtcGrant } from "@vibevalley/host";
+import type { Rtc, RtcLine } from "@vibevalley/host";
 import { level } from "./rules";
-
-let engine: IRtcEngine | undefined;
-let handler: IRtcEngineEventHandler | undefined;
 
 const fail = (code: number, what: string) => {
   if (code < 0) throw new Error(`声网：${what}失败（${code}）`);
 };
 
-/** Joins with the grant; events go to send until leave. iOS asks for the microphone itself (app.json says why). */
-export async function join(grant: RtcGrant, send: (m: FromNative) => void): Promise<void> {
-  if (Platform.OS === "android" && (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) !== PermissionsAndroid.RESULTS.GRANTED)
-    throw new Error("没有麦克风权限");
-  leave();
-  const e = createAgoraRtcEngine();
-  engine = e;
-  fail(e.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), "初始化");
-  return new Promise((resolve, reject) => {
+let releaseCurrent: (() => void) | undefined;
+
+export function nativeRtc() {
+  let stop: (() => void) | undefined;
+  const join: Rtc = (grant, events) => {
+    releaseCurrent?.();
+    let engine: IRtcEngine | undefined;
+    let handler: IRtcEngineEventHandler | undefined;
+    let closed = false;
     let joined = false;
-    handler = {
-      onJoinChannelSuccess: () => {
-        joined = true;
-        resolve();
-      },
-      onUserJoined: () => send({ event: "rtc.joined" }),
-      onUserOffline: () => send({ event: "rtc.left" }),
-      onStreamMessage: (_c, _uid, _stream, data) => send({ event: "rtc.stream", text: new TextDecoder().decode(data) }),
-      onAudioVolumeIndication: (_c, speakers) => {
-        let mine = 0;
-        let theirs = 0;
-        // uid 0 is this phone.
-        for (const s of speakers) {
-          if (!s.uid) mine = level(s.volume);
-          else theirs = level(s.volume);
-        }
-        send({ event: "rtc.levels", mine, theirs });
-      },
-      onError: (code, msg) => {
-        if (!joined) return reject(new Error(`声网：${code} ${msg}`));
-        send({ event: "rtc.problem", text: `声网：${code} ${msg}` });
-      },
-      onTokenPrivilegeWillExpire: () => send({ event: "rtc.expiring" }),
-    };
-    e.registerEventHandler(handler);
-    e.enableAudio();
-    e.enableAudioVolumeIndication(200, 3, true);
-    // Joined with the number the uid string holds: the agent listens to that uid only.
-    const code = e.joinChannel(grant.token, grant.channel, Number(grant.uid), {
-      clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
-      publishMicrophoneTrack: true,
-      autoSubscribeAudio: true,
+    const owns = (connection: RtcConnection) => !closed && connection.channelId === grant.channel && connection.localUid === Number(grant.uid);
+    let resolveJoin!: (line: RtcLine) => void;
+    let rejectJoin!: (reason: Error) => void;
+    const ready = new Promise<RtcLine>((resolve, reject) => {
+      resolveJoin = resolve;
+      rejectJoin = reject;
     });
-    if (code < 0) {
-      leave();
-      reject(new Error(`声网：加入频道失败（${code}）`));
-    }
-  });
-}
-
-export function mute(on: boolean) {
-  fail(engine?.muteLocalAudioStream(on) ?? 0, on ? "静音" : "取消静音");
-}
-
-export function renew(token: string) {
-  fail(engine?.renewToken(token) ?? 0, "续期");
-}
-
-export function leave() {
-  const e = engine;
-  engine = undefined;
-  if (!e) return;
-  if (handler) e.unregisterEventHandler(handler);
-  handler = undefined;
-  e.leaveChannel();
-  e.release();
+    const close = (reason = new Error("通话已结束")) => {
+      if (closed) return;
+      closed = true;
+      if (stop === close) stop = undefined;
+      if (releaseCurrent === close) releaseCurrent = undefined;
+      rejectJoin(reason);
+      if (!engine) return;
+      if (handler) engine.unregisterEventHandler(handler);
+      engine.leaveChannel();
+      engine.release();
+    };
+    stop = close;
+    releaseCurrent = close;
+    const line: RtcLine = {
+      mute: async (on) => {
+        if (closed || !engine) throw new Error("通话已结束");
+        fail(engine.muteLocalAudioStream(on), on ? "静音" : "取消静音");
+      },
+      renew: async (token) => {
+        if (closed || !engine) throw new Error("通话已结束");
+        fail(engine.renewToken(token), "续期");
+      },
+      leave: async () => close(),
+    };
+    void (async () => {
+      try {
+        if (Platform.OS === "android" && (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) !== PermissionsAndroid.RESULTS.GRANTED)
+          throw new Error("没有麦克风权限");
+        if (closed) return;
+        engine = createAgoraRtcEngine();
+        fail(engine.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), "初始化");
+        handler = {
+          onJoinChannelSuccess: (connection) => {
+            if (!owns(connection)) return;
+            joined = true;
+            resolveJoin(line);
+          },
+          onUserJoined: (connection) => owns(connection) && events.joined(),
+          onUserOffline: (connection) => owns(connection) && events.left(),
+          onStreamMessage: (connection, _uid, _stream, data) => owns(connection) && events.stream(new TextDecoder().decode(data)),
+          onAudioVolumeIndication: (connection, speakers) => {
+            if (!owns(connection)) return;
+            let mine = 0;
+            let theirs = 0;
+            // uid 0 is this phone.
+            for (const s of speakers) {
+              if (!s.uid) mine = level(s.volume);
+              else theirs = level(s.volume);
+            }
+            events.levels(mine, theirs);
+          },
+          // onError has no connection identity; queued errors from a released engine cannot end this attempt.
+          onConnectionStateChanged: (connection, state, reason) => {
+            if (!owns(connection) || state !== ConnectionStateType.ConnectionStateFailed) return;
+            const text = `声网：连接失败（${reason}）`;
+            if (!joined) close(new Error(text));
+            else events.problem(text);
+          },
+          onTokenPrivilegeWillExpire: (connection) => owns(connection) && events.expiring(),
+        };
+        engine.registerEventHandler(handler);
+        fail(engine.enableAudio(), "打开麦克风");
+        fail(engine.enableAudioVolumeIndication(200, 3, true), "读取音量");
+        // The agent listens only to the numeric uid in the grant.
+        fail(
+          engine.joinChannel(grant.token, grant.channel, Number(grant.uid), {
+            clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+            channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting,
+            publishMicrophoneTrack: true,
+            autoSubscribeAudio: true,
+          }),
+          "加入频道",
+        );
+      } catch (e) {
+        close(e instanceof Error ? e : new Error(String(e)));
+      }
+    })();
+    return ready;
+  };
+  return { join, close: () => stop?.() };
 }

@@ -35,8 +35,8 @@ test/             Playwright against a real server per worker (fixtures.ts)
 - **The host** (`@vibevalley/host`, `currentHost()`) is the only way to the machine; a capability that is null is not drawn.
 - **Solid 2, not 1.x and not React.** The package ships its own guide (`node_modules/solid-js/CHEATSHEET.md` and
   `skills/`); `vp check` runs `eslint-plugin-solid`'s v2 rules over `src`. What this page adds to it:
-  - A query's `data` suspends into the nearest `<Loading>` until it first arrives, and the only one is at the root, so the
-    whole page blanks: read it through `ready(query, fallback)`.
+  - `data/query.ts` adapts TanStack's `QueryObserver` snapshots to Solid signals. Pending reads never suspend state-frame
+    updates. Read successful data through `ready(query, fallback)`; `placeholderData` controls a key switch's previous value.
   - A `<Show>` or `<Match>` function child gets an accessor that throws once the branch closes; a computation still
     settling then (a query in the branch) halts every update on the page. A branch holding queries is keyed by a plain
     value (`<Show when={x()?.id} keyed>`) and looks its object up itself, keeping the last one found.

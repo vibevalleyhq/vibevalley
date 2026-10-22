@@ -232,7 +232,7 @@ function SkillEditor(props: { skill?: Skill }) {
             <For each={agents()}>
               {(a) => (
                 <A href={`/agents/${encodeURIComponent(a.id)}`} class="flex items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
-                  <AgentFace agentId={a.id} look={a.look} size={26} />
+                  <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                   <span class="text-sm font-medium">{a.name}</span>
                 </A>
               )}

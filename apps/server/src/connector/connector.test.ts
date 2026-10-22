@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { ConnectorID, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
+import { rmSync } from "node:fs";
+import { type ConnectorID, type ConnectorState, type ConnectorStatus, orchestratorAgent } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Channels } from "../channel/chat.ts";
@@ -386,6 +387,79 @@ describe("the chat apps", () => {
         }, "heard after a restart");
       }).pipe(Effect.scoped, Effect.provide(farm(script, config)));
     });
+  });
+
+  it.live("route quoted replies to an old thread before and after a restart", () => {
+    const config = { ...testConfig(), db: "" };
+    let thread = "";
+    let message = "";
+    const reply = (script: Script, text: string, sent: number) =>
+      Effect.gen(function* () {
+        const chat = yield* Channels;
+        expect(chat.now()?.messages.some((m) => m.id === message)).toBe(false);
+        const inbound = wx(owner, text);
+        script.weixinIn.push({ ...inbound, item_list: [...inbound.item_list!, { ref_msg: { svr_id: "wx1" } }] });
+        yield* nth(script, "weixin", sent, "the quoted reply answered");
+        expect(yield* saidIn(thread)).toContain(text);
+        expect(yield* saidIn(chat.general())).not.toContain(text);
+        const status = yield* statusOf("weixin");
+        yield* until(async () => (await status()).pending === 0, "the reply saved");
+      });
+    return Effect.gen(function* () {
+      const first = new Script();
+      yield* Effect.gen(function* () {
+        const chat = yield* Channels;
+        yield* weixinConnected;
+        const parent = (yield* chat.say("这个话题", undefined, "")).message;
+        const written = yield* chat.speak(orchestratorAgent, "旧的答复", { target: `#田头:${parent.number}`, anyway: true });
+        thread = written.message!.conversation;
+        message = written.message!.id;
+        yield* nth(first, "weixin", 0, "the original answer sent");
+        const status = yield* statusOf("weixin");
+        yield* until(async () => (await status()).pending === 0, "the external identity saved");
+        for (let i = 0; i < 301; i++) yield* chat.notice(chat.general(), `动静 ${i}`, "history");
+        yield* reply(first, "继续这个话题", 1);
+      }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
+      const second = new Script();
+      yield* reply(second, "重启后继续", 0).pipe(Effect.scoped, Effect.provide(farm(second, config)));
+    }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
+  });
+
+  it.live("send an old thread's answer only to its linked channel after a restart", () => {
+    const config = { ...testConfig(), db: "" };
+    let thread = "";
+    return Effect.gen(function* () {
+      const first = new Script();
+      yield* Effect.gen(function* () {
+        const chat = yield* Channels;
+        const c = yield* Connectors;
+        yield* weixinConnected;
+        const linked = yield* chat.openChannel("linked", "", "");
+        yield* c.setChannel("weixin", "linked");
+        const parent = (yield* chat.say("旧话题", linked.id, "")).message;
+        thread = (yield* chat.speak(orchestratorAgent, "旧的答复", { target: `#linked:${parent.number}`, anyway: true })).message!.conversation;
+        yield* nth(first, "weixin", 0, "the old answer sent");
+        const status = yield* statusOf("weixin");
+        yield* until(async () => (await status()).pending === 0, "the old answer saved");
+        for (let i = 0; i < 100; i++) {
+          const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
+          const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.conversation;
+          yield* chat.notice(fresh, "第一条动静", "history");
+          yield* chat.notice(fresh, "第二条动静", "history");
+        }
+        expect(chat.now()?.conversations.some((c) => c.id === thread)).toBe(false);
+      }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
+      const second = new Script();
+      yield* Effect.gen(function* () {
+        const chat = yield* Channels;
+        expect(chat.now()?.conversations.some((c) => c.id === thread)).toBe(false);
+        yield* qqPaired(second);
+        yield* chat.orchestratorSays(thread, "old-thread-answer", "在旧串里继续答复", true, "");
+        expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
+        expect(second.by("weixin")).toHaveLength(1);
+        expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在农场的田头上说的。"]);
+      }).pipe(Effect.scoped, Effect.provide(farm(second, config)));
+    }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
   });
 
   it.live("keep the account when retiring what waited fails", () => {

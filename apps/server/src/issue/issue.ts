@@ -121,7 +121,7 @@ export interface IssueShape {
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
   /** Sends a session for a job that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the job. */
   readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
-  /** A session started on an issue not written down first: the issue is made from its job, in one write with the session. */
+  /** A session starts on an existing issue: open it and link the session in one write. */
   readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
   /** The issues of a task graph as the graph has them now, published as one commit once written. */
   readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
@@ -379,21 +379,13 @@ export const make = (options: IssueOptions = {}) =>
         if (t.reviewedAt !== undefined) yield* judged(id, 0, t.findings);
       });
 
-    /** An issue not written down first is made from the session's job, in one write with its first session; a write that fails says what the database said. */
+    /** The issue already owns its number and workplace before its session starts. */
     const ran = (id: string, session: Session) =>
       Effect.gen(function* () {
-        const [title, description] = splitJob(session.brief);
         yield* sql
           .withTransaction(
             Effect.gen(function* () {
-              yield* q.openIssue({
-                id,
-                title,
-                description,
-                project: nullText(session.project),
-                assignee: nullText(session.agent),
-                created_at: session.hiredAt,
-              });
+              yield* q.reopenIssue({ id });
               yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
               yield* qq.dequeueIssue({ issue: id });
             }),
@@ -450,15 +442,20 @@ export const make = (options: IssueOptions = {}) =>
         const room = yield* sessions.makeRoom(agent.runtime, where);
         if ("refused" in room) return { refused: room.refused } as Hired;
         const evicted = room.evicted ?? "";
-        let options = opt;
-        if (!options.issue) options = { ...options, issue: newId() };
-        else {
-          const known = yield* Effect.option(get(options.issue));
-          if (Option.isSome(known)) options = { ...options, issueNumber: known.value.number };
-        }
+        const prepared = yield* Effect.result(
+          (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
+            Effect.catchDefect((d) => Effect.fail(refused(causeMessage(d)))),
+          ),
+        );
+        if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
+        const issue = prepared.success;
         // A draft's session is not one of the issue's sessions: the issue stays unsent.
-        if (!options.refining) options = { ...options, hiring: (w) => ran(options.issue!, w) };
-        const hired = yield* sessions.send(agent, task, where, options);
+        const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
+        if (!hired.session && !opt.issue && !hired.retainedWork) {
+          yield* db(q.removeIssue({ id: issue.id }));
+          yield* core.apply({ type: "issueGone", id: issue.id });
+        }
+        if (hired.retainedWork) return { ...hired, refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单` };
         return hired.session && evicted ? { ...hired, evicted } : hired;
       });
 
@@ -628,7 +625,6 @@ export const make = (options: IssueOptions = {}) =>
       core,
       store,
       runtimes,
-      projects,
       sessions,
       chat,
       db,
@@ -764,6 +760,10 @@ export const make = (options: IssueOptions = {}) =>
             if (isClosed(was.status)) return yield* Effect.fail(refused("这张工单关上了"));
           } else was = yield* unsent(id);
           const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
+          if (upd.project !== undefined && upd.project !== was.project && was.project) {
+            const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
+            if (released.kept) return yield* Effect.fail(refused(`工单 #${was.number} 还不能换项目：${released.reason}`));
+          }
           const criteria = upd.criteria !== undefined ? kept(upd.criteria) : (was.criteria ?? []);
           yield* db(
             q.editIssue({
@@ -783,7 +783,8 @@ export const make = (options: IssueOptions = {}) =>
       remove: (id) =>
         Effect.gen(function* () {
           const t = yield* unsent(id);
-          yield* clearRefinement(t);
+          const cleared = yield* clearRefinement(t);
+          if (cleared.kept) return yield* Effect.fail(refused(`工单 #${t.number} 还不能删：${cleared.reason}`));
           yield* db(q.removeIssue({ id }));
           yield* core.apply({ type: "issueGone", id } as never);
         }),

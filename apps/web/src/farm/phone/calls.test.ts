@@ -80,14 +80,14 @@ test("a call answered elsewhere stops ringing; one already open stays open", () 
   expect(host.open).toBe(true);
 });
 
-test("answering logs the call, takes it off the missed and puts the phone away; hanging up only logs it", () => {
+test("answering logs the call, takes it off the missed and keeps the phone out; hanging up only logs it", () => {
   const { calls, host } = phone();
   calls.resume();
   calls.calls([]);
   calls.calls([call("a"), call("b")]);
   calls.settle(call("a"), true);
   expect(calls.get().ringing).toBeNull();
-  expect(host.open).toBe(false);
+  expect(host.open).toBe(true);
   calls.settle(call("b"), false);
   expect(missedOf(calls.get())).toEqual([]);
   expect(calls.get().log.map((e) => [e.call.id, e.answered])).toEqual([

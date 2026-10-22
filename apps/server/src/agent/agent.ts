@@ -172,7 +172,12 @@ export const make = Effect.gen(function* () {
         yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
         return created;
       }),
-    deleteSkill: (id) => change((x) => ({ ...x, skills: x.skills.filter((k) => k.id !== id) })),
+    deleteSkill: (id) =>
+      change((x) => ({
+        ...x,
+        skills: x.skills.filter((k) => k.id !== id),
+        agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
+      })),
     saveSettings: (runtime, settings) =>
       Effect.as(
         change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } })),

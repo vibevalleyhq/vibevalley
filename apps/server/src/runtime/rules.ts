@@ -2,7 +2,7 @@
 // gone, what is left of its quota, and what stops a profile on it. agentIssues mirrors the checks oar makes when a session
 // opens, so a profile that would be refused is shown so before it is sent.
 
-import type { AccountUsage, Agent, AgentIssue, AgentIssueLevel, ModelEntry, RuntimeInfo, RuntimeQuota } from "@vibevalley/protocol";
+import type { AccountUsage, Agent, AgentIssue, AgentIssueLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
 
@@ -64,39 +64,49 @@ export function quotaOf(usage: AccountUsage | null | undefined): RuntimeQuota {
 
 const blank = (s: string | undefined) => (s ?? "").trim() === "";
 
-/** The profile's issues against its runtime as it is now; errors stop it being sent. */
-export function agentIssues(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentIssue[] {
+/** Both the dispatch check and session opening validate these choices; availability and spending only gate new work. */
+export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefined, runtime: RuntimeInfo | null | undefined) {
+  const models = runtime?.models;
+  const wanted = agent.model || settings?.defaultModel || "";
+  const missingModel = wanted && models && !models.some((m) => m.id === wanted) ? wanted : "";
+  const options = {
+    model: missingModel ? "" : wanted,
+    effort: agent.effort || settings?.defaultEffort || "",
+    env: { ...settings?.env, ...agent.env },
+    missingModel,
+  };
   const issues: AgentIssue[] = [];
   const add = (field: string, level: AgentIssueLevel, text: string) => issues.push({ field, level, text });
   // The probed facts; seeds.json's for a runtime not probed.
   const facts = runtime?.facts?.refused ? runtime.facts : factsOf(agent.runtime);
   const refused = facts.refused ?? {};
-  if (!runtime) add("runtime", "error", "不认识的 runtime：" + agent.runtime);
-  else if (runtime.installation.status !== "available") add("runtime", "error", "这台机器上找不到这个 runtime");
-  else if (!runtime.settings.enabled) add("runtime", "error", "这个 runtime 在 Runtime 页面里被停用了");
-  const broke = moneyStop(runtime);
-  if (broke) add("runtime", "error", broke);
-
   const promptOption = agent.personaMode === "append" ? "appendSystemPrompt" : agent.personaMode === "replace" ? "systemPrompt" : "";
   if (!blank(agent.persona) && promptOption && refused[promptOption]) add("persona", "error", refused[promptOption] + "。把人设改成「写进工单开头」。");
-  if (agent.effort && refused.effort) add("effort", "error", refused.effort);
-  if (Object.keys(agent.env ?? {}).length > 0 && refused.env) add("env", "error", refused.env);
+  if (options.effort && refused.effort) add("effort", "error", refused.effort);
+  if (Object.keys(options.env).length > 0 && refused.env) add("env", "error", refused.env);
   if ((agent.mcpServers ?? []).length > 0 && refused.mcpServers) add("mcpServers", "error", refused.mcpServers);
   if ((agent.disallowedTools ?? []).length > 0 && refused.disallowedTools) add("disallowedTools", "error", refused.disallowedTools);
-  const models = runtime?.models;
-  if (runtime && models && agent.model) {
-    const model = models.find((m) => m.id === agent.model);
-    if (!model) add("model", "warn", runtime.id + " 的模型列表里没有 " + agent.model);
-    else if (agent.effort && model.effortLevels.length > 0 && !model.effortLevels.includes(agent.effort))
-      add("effort", "error", model.name + " 没有 " + agent.effort + " 这一档，可选：" + model.effortLevels.join("、"));
-  } else if (runtime && models && agent.effort) {
-    // No model named: the runtime's default one (its settings', else the one it says it uses) must take the effort.
-    const wanted = runtime.settings.defaultModel;
-    const model: ModelEntry | undefined = models.find((m) => (wanted ? m.id === wanted : m.isDefault));
-    if (model && model.effortLevels.length > 0 && !model.effortLevels.includes(agent.effort))
-      add("effort", "error", runtime.id + " 默认用的 " + model.name + " 没有 " + agent.effort + " 这一档，可选：" + model.effortLevels.join("、"));
+  if (runtime && options.missingModel) add("model", "warn", runtime.id + " 的模型列表里没有 " + options.missingModel);
+  if (runtime && models && options.effort) {
+    const model = models.find((m) => (options.model ? m.id === options.model : m.isDefault));
+    if (model && model.effortLevels.length > 0 && !model.effortLevels.includes(options.effort)) {
+      const name = agent.model && options.model ? model.name : runtime.id + " 默认用的 " + model.name;
+      add("effort", "error", name + " 没有 " + options.effort + " 这一档，可选：" + model.effortLevels.join("、"));
+    }
   }
-  return issues;
+  return { ...options, issues };
+}
+
+/** The profile's issues against its runtime as it is now; errors stop it being sent. */
+export function agentIssues(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentIssue[] {
+  const issues: AgentIssue[] = [];
+  const add = (text: string) => issues.push({ field: "runtime", level: "error", text });
+  if (!runtime) add("不认识的 runtime：" + agent.runtime);
+  else if (runtime.installation.status !== "available") add("这台机器上找不到这个 runtime");
+  else if (!runtime.settings.enabled) add("这个 runtime 在 Runtime 页面里被停用了");
+  const broke = moneyStop(runtime);
+  if (broke) add(broke);
+  return [...issues, ...sessionOptions(agent, runtime?.settings, runtime).issues];
 }
 
 export interface Candidate {

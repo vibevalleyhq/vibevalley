@@ -28,9 +28,10 @@
 - **工作目录**（`Config.workRoot`，环境变量 `VIBEVALLEY_WORK_ROOT`）：`projects/<名字>` 是项目，`worktrees/` 是 worktree，根上的 `AGENTS.md` 是这台机器上所有项目的约定（`houseRules`），派活时附在帮工的规矩后面。默认是 `~/vibevalley-dev`，桌面版和终端里跑的服务端一样。
 - **一个项目是 `projects/` 的一个直接子文件夹**：名字以字母或数字开头，只含字母、数字、`-`、`_`、`.`，最多 64 个字符（`projectProblem`）；以 `.` 开头的、正在新建的不列出；解析符号链接以后不在 `projects/` 里的拒绝（项目不能链接到外面）。
 - **派到不存在的项目就新建**（`ensure`）：`git init -b main`，没有 `.gitignore` 就写一份（依赖、构建目录、`.env`、缓存），空文件夹加一个 `README.md`，做初始提交；已经是仓库但没有提交的，补一个空的初始提交。机器没有 git 用户时用 `vibevalley <vibevalley@localhost>` 提交。
-- **一张工单一个 worktree、一条分支**（`issueBranch`）：`worktrees/<项目>.<工单号>`，分支 `vibevalley/issue-<工单号>`。worktree 在就复用；只剩分支就在原分支上重建 worktree；都没有就从基分支新开：种植计划给的基分支，或项目在 `github.pr_projects` 里且能提 PR 时先快进的主分支，否则 `HEAD`。不挂工单的直接派活用 `worktrees/<项目>.<帮工>-<时间>` 和 `vibevalley/<帮工>-<时间>`。档案关掉 worktree（`Agent.worktree`）时帮工直接在项目文件夹里干活，没有分支，也就没有可合的。
+- **一张工单一个 worktree、一条分支**（`issueBranch`）：`worktrees/<项目>.<工单号>`，分支 `vibevalley/issue-<工单号>`。worktree 在就复用；只剩分支就在原分支上重建 worktree；都没有就从基分支新开：种植计划给的基分支，或项目在 `github.pr_projects` 里且能提 PR 时先快进的主分支，否则 `HEAD`。即时派活也先取得工单号，不按帮工编号或时间创建另一种工作区。档案关掉 worktree（`Agent.worktree`）时帮工直接在项目文件夹里干活，没有分支，也就没有可合的。
 - **同一个项目里改仓库的操作串行**（`serially`，每个项目一把锁）：新建、开 worktree、合并、清理、开分支、结束 PR。检查在锁外跑，进锁以后再核对。
-- **留着和清掉**（`release`，帮工离开或派不出去时）：worktree 里有没提交的改动就整个留着；否则清掉 worktree；分支上有主分支没有的提交就留着，没有就删掉。合并成功以后强制删掉 worktree 和分支；删不掉只是一条警告，跟着成功的回执走，不把收获变成失败。起草完的 worktree 先 `reset`：在锁里把工单分支 `checkout -f -B` 回主分支、`git clean -fd`，改的和提交的都不留，项目文件夹本身不重置；没开工就取消或删掉的工单 `clear`：强制删掉它的 worktree，分支上没有主分支没有的提交就删掉分支。
+- **释放回执区分现场是否仍在**（`WorkplaceRelease`）：`release`、`clear` 返回 `kept`，保留时带原因。未合的改动、分支或删除失败都不能被调用方当作已释放；工单只在现场释放后才能删掉身份。`clear` 默认丢弃工作区里的未提交文件，`preserve` 用在工单换项目前，未提交的也保留；两种都不丢弃未合的提交。
+- **留着和清掉**（`release`，帮工离开或派不出去时）：worktree 里有没提交的改动就整个留着；否则清掉 worktree；分支上有主分支没有的提交就留着，没有就删掉。合并成功以后强制删掉 worktree 和分支；删不掉只是一条警告，跟着成功的回执走，不把收获变成失败。起草完的 worktree 由执行停止写入后 `reset`：在锁里把工单分支 `checkout -f -B` 回主分支、`git clean -fd`，改的和提交的都不留，项目文件夹本身不重置；没开工就取消或删掉的工单 `clear`：强制删掉它的 worktree，分支上没有主分支没有的提交就删掉分支。
 - **一个项目的上限**：`project.max_sessions`（默认 3）是同时在干活的帮工数，歇着的不算；`maxSessions` 把它夹在 1 到 6（`maxRunning`）之间，0 或比 6 大时是 6，跟着项目列表给页面（`ProjectSummary.maxSessions`）。它是配置，不进核心状态。
 - **收成清单**（`Changes`，只读）：主分支是项目克隆的当前分支；列出 `<主分支>..<分支>` 的提交、`<主分支>...<分支>` 改的文件（不认改名）和行数、worktree 里没提交的（`git status --porcelain`，`??` 记成新增）、主分支多了几个提交（`behind`）、会冲突的文件（`git merge-tree --write-tree --name-only`，不碰工作区）。每个文件的 diff 最多 400 行，全部 diff 最多 40 万个 UTF-16 单位，超了的文件不带 diff。
 - **合并失败分三种**（`mergeFailure.Kind`）：`conflict`（带主分支和冲突的文件）、`check`（检查没过、超时，或分支、主分支在检查后变了）、`error`（git 出错）。会冲突的合并不去试，交回帮工在自己的分支上解决。
@@ -48,7 +49,7 @@
 3. 没给地址就 `ensure`（见上）。给了地址：已登录 `gh` 的用 `gh repo clone <owner/repo> <路径>`，能克隆当前账号看得见的私有仓库；没登录的用禁用凭据的 `git clone`（`credential.helper=`、`core.askPass=`、`GIT_TERMINAL_PROMPT=0`、`GIT_LFS_SKIP_SMUDGE=1`）。检测还没跑完时先同步测一次登录。完整克隆，保留历史和 origin。
 4. 超过 3 分钟或失败：删掉这次建的文件夹，返回能重试的原因。导入只克隆，不派帮工、不装依赖、不跑项目。
 
-**工单的一块地**：帮工开工时 `session` 调 `Workplace(项目, 帮工, worktree, 基分支, 工单号)` 拿到工作目录和分支，帮工的规矩里写明只在这里改、不切分支、不 push；帮工离开时 `release`。取消再重开、换帮工、重启都落在同一个 worktree 和分支上。
+**工单的一块地**：帮工开工时 `session` 调 `workplace(项目, 工单号, worktree, 基分支)` 拿到工作目录和分支，帮工的规矩里写明只在这里改、不切分支、不 push；帮工离开时 `release`。取消再重开、换帮工、重启都落在同一个 worktree 和分支上。
 
 **本地合**（`merge`，工单收获、项目不提 PR 时）：
 

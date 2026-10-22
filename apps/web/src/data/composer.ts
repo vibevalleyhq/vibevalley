@@ -3,8 +3,9 @@
 // someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
-import { createEffect, createMemo, createSignal } from "solid-js";
-import { type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
+import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { type ChatMessage, type Conversation, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
+import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "../rules/chat";
 import { api, newSendKey, reasonOf } from "./api";
 
@@ -29,10 +30,10 @@ export const arrived = (p: PendingLine, messages: readonly ChatMessage[]) =>
   messages.some((m) => m.conversation === p.conversation && m.fromKind === "user" && m.number > p.after && m.text === p.text);
 
 export interface ComposerWays {
-  /** Sends the line with its key. */
-  readonly send: (said: string, sendKey: string) => Promise<void>;
-  /** Where the next line goes, for showing it before the server has it; none: it is not shown until then. */
-  readonly where?: () => Conversation | undefined;
+  /** Every routing field of the next message; its text and retry identity belong to the composer. */
+  readonly target: () => Omit<SayRequest, "text" | "sendKey">;
+  /** The window draws pending lines (`pending`): a line shows at once and the box empties as it is sent. */
+  readonly echo?: boolean;
   readonly failed: (reason: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
@@ -44,8 +45,19 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
-  // One key per draft: sending the same draft again, after a failure, reuses its key.
-  let key: { draft: string; key: string } | undefined;
+  let attempt: { body: Omit<SayRequest, "sendKey">; key: string } | undefined;
+  let edits = 0;
+  let sending = false;
+  let disposed = false;
+  onSettled(() => () => {
+    disposed = true;
+  });
+  const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
+  /** The conversation a line goes to, as the core state has it: none named is the general one. */
+  const conversationOf = (id: string | undefined): Conversation | undefined => {
+    const all = core()?.chat?.conversations ?? [];
+    return id ? all.find((c) => c.id === id) : all.find((c) => c.kind === "general");
+  };
 
   // The lines whose server copy came, worked out where the reads are tracked; the callback only drops them.
   createEffect(
@@ -67,6 +79,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   });
 
   const edit = (value: string, at: number) => {
+    edits++;
     setText(value);
     setCaret(at);
     setActive(0);
@@ -86,27 +99,39 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   };
 
   const send = async () => {
-    const said = text().trim();
-    if (!said || busy()) return;
-    if (key?.draft !== said) key = { draft: said, key: newSendKey() };
-    const sent = key.key;
-    const at = ways.where?.();
-    if (at) setPendingLines((all) => [...all.filter((p) => p.key !== sent), { key: sent, conversation: at.id, text: said, after: at.lastNumber ?? 0 }]);
-    // The box empties at once; a failure puts the line back, with its key, unless something new was typed meanwhile.
-    if (at) edit("", 0);
+    if (disposed || sending) return;
+    const body = intent();
+    if (!body.text) return;
+    if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
+    const sent = attempt;
+    const shown = ways.echo ? conversationOf(body.conversation) : undefined;
+    if (shown) {
+      setPendingLines((all) => [
+        ...all.filter((p) => p.key !== sent.key),
+        { key: sent.key, conversation: shown.id, text: body.text, after: shown.lastNumber ?? 0 },
+      ]);
+      // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.
+      edit("", 0);
+    }
+    const editedAt = edits;
+    sending = true;
     setBusy(true);
     try {
-      await ways.send(said, sent);
-      key = undefined;
-      if (!at) edit("", 0);
+      await api.channel.say({ body: { ...sent.body, sendKey: sent.key } });
+      attempt = undefined;
       // A copy that never comes (the words changed on the way) does not stay forever.
-      setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent)), 15_000);
+      if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);
+      // The user may have edited, or chosen another destination, while this response was in flight.
+      else if (!disposed && edits === editedAt && same(intent(), sent.body)) edit("", 0);
     } catch (e) {
-      setPendingLines((all) => all.filter((p) => p.key !== sent));
-      if (text() === "") edit(said, said.length);
-      ways.failed(reasonOf(e));
+      if (shown) {
+        setPendingLines((all) => all.filter((p) => p.key !== sent.key));
+        if (!disposed && edits === editedAt) edit(sent.body.text, sent.body.text.length);
+      }
+      if (!disposed) ways.failed(reasonOf(e));
     } finally {
-      setBusy(false);
+      sending = false;
+      if (!disposed) setBusy(false);
     }
   };
 

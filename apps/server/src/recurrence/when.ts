@@ -11,24 +11,14 @@ export const recurrenceTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 export const weekdays = ["日", "一", "二", "三", "四", "五", "六"] as const;
 
-const runOffset = /([+-])(\d{2}):(\d{2})$/;
-const givenOffset = /^([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/;
+const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/;
 
 const fixed = (sign: string, hours: string, minutes: string | undefined) =>
   DateTime.zoneMakeOffset((sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0)) * 60_000);
 
 const named = (tz: string) => (tz === "" || tz === "Local" ? undefined : Option.getOrUndefined(DateTime.zoneMakeNamed(tz)));
 
-/** The zone runs are counted in: an offset when it starts with GMT, + or - (GMT+08:00, +08:00), else an IANA name. Fewer offsets than givenZone: not +0800 or +08. */
-function runZone(tz: string): DateTime.TimeZone | undefined {
-  if (tz.startsWith("GMT") || tz.startsWith("+") || tz.startsWith("-")) {
-    const m = runOffset.exec(tz);
-    return m ? fixed(m[1]!, m[2]!, m[3]) : undefined;
-  }
-  return named(tz);
-}
-
-/** The zone a recurrence may be given and its times are written in: an IANA name or an offset (+08:00, +0800, +08). */
+/** One parser for accepted, scheduled and displayed zones: IANA or a fixed offset, optionally prefixed with GMT. */
 export function givenZone(tz: string): DateTime.TimeZone | undefined {
   const m = givenOffset.exec(tz);
   if (m) return fixed(m[1]!, m[2]!, m[3]);
@@ -70,7 +60,7 @@ export function nextRun(s: Recurrence): number | undefined {
 
 export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
   const m = recurrenceTime.exec(at);
-  const timeZone = runZone(tz);
+  const timeZone = givenZone(tz);
   if (!m || !timeZone) return undefined;
   // Cron reads only 0 to 7 (7 is Sunday again); anything else is no cron.
   if (days.some((d) => d < 0 || d > 7)) return undefined;
@@ -188,7 +178,7 @@ export function parseCron(expr: string): CronSpec | string {
 
 function cronNext(from: number, expr: string, tz: string): number | undefined {
   const spec = parseCron(expr);
-  const timeZone = runZone(tz);
+  const timeZone = givenZone(tz);
   if (typeof spec === "string" || !timeZone) return undefined;
   return nextOf(Cron.make({ ...spec, tz: timeZone }), from);
 }

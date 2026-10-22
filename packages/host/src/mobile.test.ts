@@ -28,17 +28,66 @@ test("a call's events reach its listener until it leaves", async () => {
       expiring: () => heard.push("expiring"),
     },
   );
-  expect(sent[0]).toEqual({ id: 1, call: "rtc.join", grant: { appId: "a", channel: "c", uid: "7", token: "t" } });
+  expect(sent[0]).toEqual({ id: 1, call: "rtc.join", line: 1, grant: { appId: "a", channel: "c", uid: "7", token: "t" } });
   receive({ id: 1, ok: true });
   const line = await joining;
-  receive({ event: "rtc.joined" });
-  receive({ event: "rtc.stream", text: "{}" });
-  receive({ event: "rtc.levels", mine: 10, theirs: 40 });
-  receive({ event: "rtc.expiring" });
+  receive({ line: 1, event: "rtc.joined" });
+  receive({ line: 1, event: "rtc.stream", text: "{}" });
+  receive({ line: 1, event: "rtc.levels", mine: 10, theirs: 40 });
+  receive({ line: 1, event: "rtc.expiring" });
   const leaving = line.leave();
   receive({ id: 2, ok: true });
   await leaving;
-  receive({ event: "rtc.left" });
+  receive({ line: 1, event: "rtc.left" });
   expect(heard).toEqual(["joined", "{}", "10/40", "expiring"]);
   expect(host.tray).toBeNull();
+});
+
+test("a cancelled join's late cleanup does not detach the next call", async () => {
+  const sent: ToNative[] = [];
+  const { host, receive } = mobileHost((m) => sent.push(m));
+  const heard: string[] = [];
+  const events = {
+    joined: () => undefined,
+    left: () => undefined,
+    stream: (text: string) => heard.push(text),
+    levels: () => undefined,
+    problem: () => undefined,
+    expiring: () => undefined,
+  };
+  const cancelled = host.rtc!({ appId: "a", channel: "old", uid: "7", token: "t" }, events);
+  const current = host.rtc!({ appId: "a", channel: "new", uid: "7", token: "t" }, events);
+  receive({ id: 2, ok: true });
+  await current;
+  receive({ id: 1, ok: true });
+  const old = await cancelled;
+  const cleaning = old.leave();
+  expect(sent[2]).toEqual({ id: 3, call: "rtc.leave", line: 1 });
+  receive({ id: 3, ok: true });
+  await cleaning;
+  receive({ line: 1, event: "rtc.stream", text: "old call" });
+  receive({ line: 2, event: "rtc.stream", text: "still here" });
+  expect(heard).toEqual(["still here"]);
+});
+
+test("a superseded join's rejection does not detach the next call", async () => {
+  const { host, receive } = mobileHost(() => undefined);
+  const heard: string[] = [];
+  const events = {
+    joined: () => undefined,
+    left: () => undefined,
+    stream: (text: string) => heard.push(text),
+    levels: () => undefined,
+    problem: () => undefined,
+    expiring: () => undefined,
+  };
+  const old = host.rtc!({ appId: "a", channel: "old", uid: "7", token: "t" }, events);
+  const refused = expect(old).rejects.toThrow("ended");
+  const current = host.rtc!({ appId: "a", channel: "new", uid: "7", token: "t" }, events);
+  receive({ id: 2, ok: true });
+  await current;
+  receive({ id: 1, ok: false, error: "ended" });
+  await refused;
+  receive({ line: 2, event: "rtc.stream", text: "still here" });
+  expect(heard).toEqual(["still here"]);
 });

@@ -3,8 +3,8 @@
 // opened with its vibevalley://pair link, the owner lets it in, and the farm then hears from the phone with its key (its
 // page loaded through the lan listener). Leaves a screenshot in apps/mobile/.screens/. Build the app first (README.md).
 //
-//	pnpm exec tsx scripts/verify-server.ts -- pnpm exec tsx apps/mobile/scripts/e2e.ts android
-//	pnpm exec tsx scripts/verify-server.ts -- pnpm exec tsx apps/mobile/scripts/e2e.ts ios
+//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts android
+//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts ios
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -148,16 +148,29 @@ try {
 
   // The page is the phone's host: it has installed the bridge's receiver, and a notice posted over the bridge is answered
   // and shown by the phone.
-  const bridged = await phone.evaluate(`new Promise((resolve) => {
-    if (typeof window.vibevalleyFromHost !== "function") return resolve("no host");
-    const page = window.vibevalleyFromHost;
-    window.vibevalleyFromHost = (m) => (m.id === 9001 ? resolve(m) : page(m));
-    window.ReactNativeWebView.postMessage(JSON.stringify({ id: 9001, call: "notify", notice: { title: "VibeValley", body: "桥通了：端到端" } }));
-  })`);
+  const bridgeNotice = (body: string) =>
+    phone.evaluate(`new Promise((resolve) => {
+      if (typeof window.vibevalleyFromHost !== "function") return resolve("no host");
+      const page = window.vibevalleyFromHost;
+      window.vibevalleyFromHost = (m) => {
+        if (m.id !== 9001) return page(m);
+        window.vibevalleyFromHost = page;
+        resolve(m);
+      };
+      window.ReactNativeWebView.postMessage(JSON.stringify({ id: 9001, call: "notify", notice: { title: "VibeValley", body: ${JSON.stringify(body)} } }));
+    })`);
+  const bridged = await bridgeNotice("桥通了：端到端");
   if (bridged !== undefined) {
     if (JSON.stringify(bridged) !== JSON.stringify({ id: 9001, ok: true })) throw new Error("the bridge answered " + JSON.stringify(bridged));
     await until(() => phone.notified("桥通了：端到端") || undefined, "the phone's notification", 10_000);
     console.log("bridge: the page's notice shown by the phone");
+    await phone.evaluate("setTimeout(() => location.reload(), 0); true");
+    await sleep(1000);
+    await until(async () => ((await phone.evaluate("typeof window.vibevalleyFromHost")) === "function" ? true : undefined), "the reloaded page's host");
+    const reloaded = await bridgeNotice("桥通了：重新加载");
+    if (JSON.stringify(reloaded) !== JSON.stringify({ id: 9001, ok: true })) throw new Error("the reloaded bridge answered " + JSON.stringify(reloaded));
+    await until(() => phone.notified("桥通了：重新加载") || undefined, "the reloaded page's notification", 10_000);
+    console.log("bridge: the reloaded page owns a fresh host");
   } else console.log("bridge: not checked (not an end-to-end build)");
 
   // Started again with no link: the key from the keychain, straight to the farm, nothing asked.

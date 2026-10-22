@@ -13,15 +13,19 @@ import { TextArea } from "../../ui/Field";
 import { run } from "./hooks";
 import { Note } from "./Sheet";
 import { useIssueChanges } from "../../data/issues";
+import { useCore } from "../../data/frame";
 
 /** Closing an issue: harvest it (its checklist first) or let the helper go. `review` opens straight on the checklist. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
-  const working = () => props.session.phase._tag === "working" || props.session.phase._tag === "arriving";
+  const core = useCore();
+  const acts = () => core()?.issues?.find((i) => i.id === props.issue.id)?.attention.acts ?? [];
+  const working = () => acts().includes("stop");
   const cancel = async () => {
+    if (!acts().includes("close")) return;
     const id = props.issue.id;
-    await run(() => api.issue.status({ id, body: { status: "canceled" } }));
-    props.onClose();
+    const closed = await run(() => api.issue.act({ id, body: { act: "close" } }));
+    if (closed) props.onClose();
   };
   return (
     <Dialog open onClose={props.onClose} title={`关上「${issueTitle(props.issue)}」`} wide={reviewing()}>
@@ -30,17 +34,21 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
           <p class="text-base">
             {working()
               ? `${props.session.name} 还在干这张工单。关上就是叫停它、让它收工，分支上的改动不合进主分支。`
-              : `收获就是把 ${props.session.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。`}
+              : acts().includes("harvest")
+                ? `收获就是把 ${props.session.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。`
+                : `这张工单现在不能收获。直接收工会让 ${props.session.name} 离开，改动不合进主分支。`}
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
-            <Show when={!working()}>
+            <Show when={acts().includes("harvest")}>
               <Button tone="primary" onClick={() => setReviewing(true)}>
                 看收成清单，收获
               </Button>
             </Show>
-            <Button tone="danger" onClick={() => void cancel()}>
-              {working() ? "叫停并收工" : "不收，直接收工"}
-            </Button>
+            <Show when={acts().includes("close")}>
+              <Button tone="danger" onClick={() => void cancel()}>
+                {working() ? "叫停并收工" : "不收，直接收工"}
+              </Button>
+            </Show>
             <Button onClick={() => props.onClose()}>算了</Button>
           </div>
         </div>
@@ -52,15 +60,19 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
 /** What the branch brings before it is merged. */
 export function HarvestReview(props: { issue: string; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
-  const take = () => {
+  const core = useCore();
+  const acts = () => core()?.issues?.find((i) => i.id === props.issue)?.attention.acts ?? [];
+  const take = async () => {
+    if (!acts().includes("harvest")) return;
     const id = props.issue;
-    void run(() => api.issue.status({ id, body: { status: "done" } }));
-    props.onDone();
+    const harvested = await run(() => api.issue.act({ id, body: { act: "harvest" } }));
+    if (harvested) props.onDone();
   };
-  const resolve = () => {
+  const resolve = async () => {
+    if (!acts().includes("resolve")) return;
     const id = props.issue;
-    void run(() => api.issue.act({ id, body: { act: "resolve" } }));
-    props.onDone();
+    const resolving = await run(() => api.issue.act({ id, body: { act: "resolve" } }));
+    if (resolving) props.onDone();
   };
   return (
     <Switch>
@@ -123,20 +135,21 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
                 </Note>
               </Show>
               <div class="flex flex-wrap gap-2">
-                <Show
-                  when={c().conflicts.length > 0}
-                  fallback={
-                    <Button tone="primary" onClick={take}>
-                      {empty() ? "请它收工" : `确认收获，合进 ${c().base}`}
-                    </Button>
-                  }
-                >
-                  <Button tone="danger" onClick={resolve}>
+                <Show when={acts().includes("harvest")}>
+                  <Button tone="primary" onClick={() => void take()}>
+                    {empty() ? "请它收工" : `确认收获，合进 ${c().base}`}
+                  </Button>
+                </Show>
+                <Show when={acts().includes("resolve")}>
+                  <Button tone="danger" onClick={() => void resolve()}>
                     让它解决冲突
                   </Button>
                 </Show>
                 <Button onClick={() => props.onDone()}>先不收</Button>
               </div>
+              <Show when={!acts().includes("harvest") && !acts().includes("resolve")}>
+                <p class="text-xs text-muted">工单状态变了，先回到工单看看要你做的事。</p>
+              </Show>
               <ChangesBody changes={c()} />
             </div>
           );

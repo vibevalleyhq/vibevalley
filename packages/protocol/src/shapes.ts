@@ -439,9 +439,16 @@ export interface Recurrence {
 export const RecurrenceByValues = ["owner", "orchestrator"] as const;
 export type RecurrenceBy = (typeof RecurrenceByValues)[number];
 
+export interface OwnerMention {
+  message: ChatMessage;
+  channel: string;
+  address: string;
+}
+
 export interface Chat {
   conversations: Conversation[];
   messages: ChatMessage[];
+  ownerMentions?: OwnerMention[];
 }
 
 export interface WorkspaceState {
@@ -476,6 +483,8 @@ export type ToolAction = (typeof ToolActionValues)[number];
 
 export interface SessionEvent {
   seq: number;
+  /** Increases when this step's streaming text or input changes; independent of transport delivery order. */
+  revision: number;
   time: number;
   type: SessionEventType;
   run?: string;
@@ -1803,6 +1812,7 @@ export type Fact =
   | FactOrchestrator
   | FactMessage
   | FactConversation
+  | FactOwnerMentions
   | FactHired
   | FactStation
   | FactRun
@@ -1845,6 +1855,12 @@ export interface FactConversation {
   type: "conversation";
   at: number;
   conversation: Conversation;
+}
+
+export interface FactOwnerMentions {
+  type: "ownerMentions";
+  at: number;
+  mentions: OwnerMention[];
 }
 
 export interface FactHired {
@@ -1968,6 +1984,7 @@ export type SideEvent =
   | FactOrchestrator
   | FactMessage
   | FactConversation
+  | FactOwnerMentions
   | FactHired
   | FactStation
   | FactRun
@@ -2152,14 +2169,18 @@ export interface BlockAttrs {
   memoryId?: string;
 }
 
-export interface Block {
+/** The content and position decided by the author of a new block. */
+export interface BlockInput {
   id: string;
-  docId: string;
   parentId?: string;
   orderKey: string;
   type: string;
   attrs: BlockAttrs;
   text: DocSpan[];
+}
+
+export interface Block extends BlockInput {
+  docId: string;
   rev: number;
   deleted?: boolean;
   updatedBy: string;
@@ -2198,7 +2219,7 @@ export type DocOp =
 
 export interface DocOpInsertBlock {
   op: "insert_block";
-  block: Block;
+  block: BlockInput;
 }
 
 export interface DocOpUpdateText {
@@ -2244,7 +2265,7 @@ export interface DocOpSplitBlock {
   blockId: string;
   baseRev: number;
   offset: number;
-  newBlock: Block;
+  newBlock: BlockInput;
 }
 
 export interface DocOpMergeBlocks {

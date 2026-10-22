@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { renameSync } from "node:fs";
+import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
@@ -65,12 +65,343 @@ const occupied = (core: Core["Service"], runtime: string) =>
   });
 
 describe("issues", () => {
+  it.live("a prompt that starts then fails keeps the unclosed startup reserved", () => {
+    let turns = 0;
+    let wrote = () => {};
+    const written = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    const cleanups: (() => Promise<void>)[] = [];
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: (turn) =>
+        new Promise<void>((resolve) => {
+          turns++;
+          writeFileSync(join(turn.options.cwd, `owned-${turns}.txt`), "the failed prompt still owns this worktree\n");
+          wrote();
+          turn.signal.addEventListener("abort", () => resolve());
+        }),
+    });
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        cleanups.push(async () => {
+          await session.dispose();
+        });
+        return {
+          ...session,
+          prompt: async (...input: Parameters<typeof session.prompt>) => {
+            await session.prompt(...input);
+            await written;
+            throw new Error("prompt transport dropped");
+          },
+          dispose: async () => {
+            throw new Error("did not stop");
+          },
+        };
+      },
+    };
+    const f = farm([runtime]);
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          for (const cleanup of cleanups) await cleanup();
+        }),
+      );
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      const agent = { ...lab(), worktree: true };
+      const first = yield* issues.hire(agent, "first work", "demo");
+      expect(first.refused).toContain("prompt transport dropped");
+      expect(first.refused).toContain("did not stop");
+      expect(sessions.noRoom("pi", "demo")).not.toBe("");
+      const issue = (yield* issues.list())[0]!;
+      const second = yield* issues.hire(agent, "do not overlap", "demo", { issue: issue.id });
+      expect(second.session).toBeUndefined();
+      expect(turns).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("a refused dispatch whose runtime cannot close keeps its workplace reserved", () => {
+    let turns = 0;
+    let wrote = () => {};
+    const written = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    const cleanups: (() => Promise<void>)[] = [];
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: (turn) =>
+        new Promise<void>((resolve) => {
+          turns++;
+          writeFileSync(join(turn.options.cwd, "still-owned.txt"), "the failed start is still writing\n");
+          wrote();
+          turn.signal.addEventListener("abort", () => resolve());
+        }),
+    });
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        cleanups.push(async () => {
+          await session.dispose();
+        });
+        return {
+          ...session,
+          prompt: async (...input: Parameters<typeof session.prompt>) => {
+            const outcome = await session.prompt(...input);
+            await written;
+            return outcome;
+          },
+          dispose: async () => {
+            throw new Error("did not stop");
+          },
+        };
+      },
+    };
+    const f = farm([runtime]);
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          for (const cleanup of cleanups) await cleanup();
+        }),
+      );
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
+      yield* sql.unsafe("create trigger reject_link before insert on issue_session for each row execute function reject_link()").pipe(Effect.orDie);
+      const agent = { ...lab(), worktree: true };
+      expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("did not stop");
+      const issue = (yield* issues.list())[0]!;
+      expect(issue).toBeDefined();
+      expect((yield* Effect.result(issues.remove(issue.id)))._tag).toBe("Failure");
+      expect(existsSync(join(f.config.workRoot, "worktrees", "demo.1", "still-owned.txt"))).toBe(true);
+      yield* sql.unsafe("drop trigger reject_link on issue_session").pipe(Effect.orDie);
+      const again = yield* issues.hire(agent, "do not overlap", "demo", { issue: issue.id });
+      expect(again.session).toBeUndefined();
+      expect(again.refused).toBeTruthy();
+      expect(sessions.noRoom("pi", "demo")).not.toBe("");
+      expect(turns).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("a refused dispatch keeps the identity of any work it already wrote", () => {
+    let turns = 0;
+    let inherited = false;
+    let wrote = () => {};
+    const written = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        turns++;
+        const cwd = turn.options.cwd;
+        if (turns === 1) {
+          writeFileSync(join(cwd, "failed-dispatch.txt"), "belongs to the failed dispatch\n");
+          git(cwd, "add", "failed-dispatch.txt");
+          git(cwd, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "-qm", "failed dispatch work");
+          wrote();
+        } else inherited = existsSync(join(cwd, "failed-dispatch.txt"));
+        turn.say("结论：做完了");
+      },
+    });
+    const worker = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        return {
+          ...session,
+          prompt: async (...input: Parameters<typeof session.prompt>) => {
+            const outcome = await session.prompt(...input);
+            await written;
+            return outcome;
+          },
+        };
+      },
+    };
+    const f = farm([worker]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.unsafe("create function reject_link() returns trigger language plpgsql as $$ begin raise exception 'link refused'; end $$").pipe(Effect.orDie);
+      yield* sql.unsafe("create trigger reject_link before insert on issue_session for each row execute function reject_link()").pipe(Effect.orDie);
+      const agent = { ...lab(), worktree: true };
+      expect((yield* issues.hire(agent, "first work", "demo")).refused).toContain("link refused");
+      const kept = yield* issues.list();
+      expect(kept).toHaveLength(1);
+      expect(kept[0]).toMatchObject({ number: 1, title: "first work", sessions: [] });
+      expect((yield* Effect.result(issues.edit(kept[0]!.id, { project: "elsewhere" })))._tag).toBe("Failure");
+      expect((yield* issues.get(kept[0]!.id)).project).toBe("demo");
+      expect((yield* Effect.result(issues.remove(kept[0]!.id)))._tag).toBe("Failure");
+      expect((yield* issues.list()).map((i) => i.id)).toEqual([kept[0]!.id]);
+      yield* sql.unsafe("drop trigger reject_link on issue_session").pipe(Effect.orDie);
+      const next = yield* issues.hire(agent, "unrelated work", "demo");
+      expect(next.session?.branch).toBe("vibevalley/issue-2");
+      yield* until(() => turns === 2, "the unrelated dispatch");
+      expect(inherited).toBe(false);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("a draft whose runtime refuses to stop keeps its session and workplace", () => {
+    let stopped = false;
+    let started = false;
+    let disposeCalls = 0;
+    let cleanup = async () => {};
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: (turn) =>
+        new Promise<void>((resolve) => {
+          writeFileSync(join(turn.options.cwd, "still-owned.txt"), "the writer is still alive\n");
+          started = true;
+          turn.signal.addEventListener("abort", () => {
+            stopped = true;
+            resolve();
+          });
+        }),
+    });
+    const worker = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        cleanup = async () => {
+          await session.dispose();
+        };
+        return {
+          ...session,
+          dispose: async () => {
+            disposeCalls++;
+            throw new Error("did not stop");
+          },
+        };
+      },
+    };
+    const f = farm([worker]);
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      yield* (yield* Agents).saveAgent(lab());
+      const issue = yield* issues.add({ title: "draft", project: "demo", assignee: "lab" });
+      yield* issues.refine(issue.id, "keep reading", "");
+      yield* until(() => started, "the writer");
+      const id = (yield* issues.get(issue.id)).refining!.session;
+      const cwd = sessions.find(id)!.place.cwd;
+      for (let n = 0; n < 2; n++) {
+        const result = yield* Effect.result(issues.setStatus(issue.id, "canceled", "", ""));
+        expect(result._tag).toBe("Failure");
+        expect(JSON.stringify(result)).toContain("did not stop");
+        expect(sessions.sessionOf(id)).toBeDefined();
+        expect(existsSync(join(cwd, "still-owned.txt"))).toBe(true);
+        expect(stopped).toBe(false);
+      }
+      expect(disposeCalls).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("canceling a draft stops its writer before discarding the work", () => {
+    let started = false;
+    const worker = scriptedRuntime({
+      id: "pi",
+      turn: (turn) =>
+        new Promise<void>((resolve) => {
+          started = true;
+          turn.signal.addEventListener("abort", () => {
+            const cwd = turn.options.cwd;
+            writeFileSync(join(cwd, "last-write.txt"), "written while stopping\n");
+            git(cwd, "add", "last-write.txt");
+            git(cwd, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "-qm", "last draft write");
+            resolve();
+          });
+        }),
+    });
+    const f = farm([worker]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      yield* (yield* Agents).saveAgent(lab());
+      const issue = yield* issues.add({ title: "draft", project: "demo", assignee: "lab" });
+      yield* issues.refine(issue.id, "read the project", "");
+      yield* until(() => started, "the drafting writer");
+      yield* issues.setStatus(issue.id, "canceled", "", "");
+      noWorktree(f.config.workRoot);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("an immediate dispatch owns its issue's branch before the helper starts, and reopens it", () => {
+    let firstBranch = "";
+    const worker = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        const cwd = turn.options.cwd;
+        if (!firstBranch) {
+          firstBranch = git(cwd, "branch", "--show-current").trim();
+          writeFileSync(join(cwd, "kept.txt"), "keep this work\n");
+          git(cwd, "add", "kept.txt");
+          git(cwd, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "-qm", "first dispatch");
+        }
+        turn.say("结论：做完了");
+      },
+    });
+    const f = farm([worker]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      yield* (yield* Agents).saveAgent(lab());
+      const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
+      expect(hired.session).toBeDefined();
+      const first = hired.session!;
+      yield* until(() => sessions.sessionOf(first.id)?.phase._tag === "ripe", "the dispatch's report");
+      const issue = yield* issues.get(first.issue!);
+      expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
+      const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
+      yield* issues.cancel(issue.id);
+      yield* until(() => Effect.runPromise(issues.get(issue.id)).then((i) => i.status === "canceled"), "the canceled issue");
+      const again = yield* issues.reopen(issue.id, "keep going", "");
+      const reopened = sessions.sessionOf(again)!;
+      expect([reopened.branch, reopened.worktree]).toEqual([first.branch, first.worktree]);
+      expect(git(reopened.worktree!, "rev-parse", "HEAD").trim()).toBe(commit);
+      expect(reopened.brief).toContain("这条分支上已经有上次的提交");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("a session that cannot be opened gives its worktree back", () => {
     const f = farm();
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
-      const got = yield* sessions.send({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo");
+      const got = yield* sessions.send({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", { issue: { id: "i1", number: 1 } });
       expect([got.session, got.refused !== undefined]).toEqual([undefined, true]);
+      noWorktree(f.config.workRoot);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("refused startup removes only the issue made for that dispatch and keeps an existing queue", () => {
+    const f = farm([
+      {
+        ...busy,
+        session: async () => {
+          throw new Error("startup refused");
+        },
+      },
+    ]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const agent = { ...lab(), worktree: true };
+      const refused = yield* issues.hire(agent, "new work", "demo");
+      expect(refused.refused).toContain("startup refused");
+      expect(yield* issues.list()).toEqual([]);
+      expect(core.state().issues).toEqual([]);
+      expect(sessions.roster()).toEqual([]);
+      noWorktree(f.config.workRoot);
+
+      const existing = yield* issues.add({ title: "already queued", project: "demo", assignee: agent.id });
+      const queued = yield* issues.queue(existing.id, true);
+      expect((yield* issues.hire(agent, "new attempt", "demo", { issue: existing.id })).refused).toContain("startup refused");
+      const kept = yield* issues.get(existing.id);
+      expect([kept.number, kept.queuedAt, kept.sessions]).toEqual([existing.number, queued.queuedAt, []]);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -99,7 +430,10 @@ describe("issues", () => {
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       const core = yield* Core;
-      const got = yield* Effect.all([sessions.send(lab(), "test", "demo"), sessions.send(lab(), "test", "demo")], { concurrency: "unbounded" });
+      const got = yield* Effect.all(
+        [sessions.send(lab(), "test", "demo", { issue: { id: "i1", number: 1 } }), sessions.send(lab(), "test", "demo", { issue: { id: "i2", number: 2 } })],
+        { concurrency: "unbounded" },
+      );
       expect(got.filter((h) => h.session).length).toBe(1);
       expect(got.every((h) => h.session || h.refused)).toBe(true);
       expect(core.state().sessions).toHaveLength(1);

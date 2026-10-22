@@ -7,6 +7,8 @@ import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
+test.use({ farm: "farm-chat" });
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
 });

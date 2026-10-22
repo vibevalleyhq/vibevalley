@@ -23,7 +23,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price, type Rate } from "./price.ts";
-import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf } from "./rules.ts";
+import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
 /** Past this a probe counts as unknown. */
@@ -68,6 +68,7 @@ export interface RuntimeShape {
   readonly candidates: Effect.Effect<Candidate[]>;
   /** Who the farm sends for a task now: chooseAgent over the candidates. */
   readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+  /** Validates the effective options on every opening; availability and spending only gate new work. */
   readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
   readonly runtime: (id: string) => Runtime | undefined;
   readonly quote: (id: string, model: string) => Rate | undefined;
@@ -365,9 +366,16 @@ export const make = (options: RuntimeOptions = {}) =>
         ),
       );
 
+    // A saved setting applies before its probe finishes; checks and resolution read the same current settings.
+    const configuration = async (id: string) => {
+      const observed = await info(id);
+      const settings = store.settings(id);
+      return { settings, info: observed ? withSpend({ ...observed, settings }) : undefined };
+    };
+
     const assess = (agent: Agent) =>
       Effect.promise(async (): Promise<Assessment> => {
-        const i = await info(agent.runtime);
+        const { info: i } = await configuration(agent.runtime);
         const issues = agentIssues(agent, i);
         return { agent, info: i, issues, blocking: issues.filter((x) => x.level === "error") };
       });
@@ -403,7 +411,7 @@ export const make = (options: RuntimeOptions = {}) =>
               Effect.promise(() => refresh(id)),
             )
           : Effect.succeed(undefined),
-      check: (agent) => Effect.promise(async () => agentIssues(agent, await info(agent.runtime))),
+      check: (agent) => Effect.map(assess(agent), (a) => a.issues),
       assess,
       candidates,
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
@@ -411,14 +419,11 @@ export const make = (options: RuntimeOptions = {}) =>
         Effect.gen(function* () {
           const runtime = registry.get(agent.runtime);
           if (!runtime) return yield* Effect.fail(refused(`oar 驱动不了 ${agent.runtime}`));
-          const i = yield* Effect.promise(() => info(agent.runtime));
-          const settings = store.settings(agent.runtime);
-          const wanted = agent.model || settings.defaultModel;
-          let model = wanted;
-          if (wanted && i?.models && !i.models.some((m) => m.id === wanted)) {
-            model = "";
-            yield* core.notice("warn", `${runtimeLabel(agent.runtime)} 没有 ${wanted} 这个模型，${agent.name} 先用默认模型`);
-          }
+          const { info: i, settings } = yield* Effect.promise(() => configuration(agent.runtime));
+          const { model, effort, env, missingModel, issues } = sessionOptions(agent, settings, i);
+          const problem = issues.find((i) => i.level === "error");
+          if (problem) return yield* Effect.fail(refused(`${agent.name} 派不出去：${problem.text}`));
+          if (missingModel) yield* core.notice("warn", `${runtimeLabel(agent.runtime)} 没有 ${missingModel} 这个模型，${agent.name} 先用默认模型`);
           const observed = cache.get(agent.runtime);
           const installation = observed?.found && observed.info.settings.binPath === settings.binPath ? structuredClone(observed.found) : undefined;
           return {
@@ -426,8 +431,8 @@ export const make = (options: RuntimeOptions = {}) =>
             ...(installation ? { installation } : {}),
             binPath: settings.binPath,
             model,
-            effort: agent.effort || settings.defaultEffort,
-            env: { ...settings.env, ...agent.env },
+            effort,
+            env,
           };
         }),
       runtime: (id) => registry.get(id),

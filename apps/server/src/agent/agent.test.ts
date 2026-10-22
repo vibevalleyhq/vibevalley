@@ -13,6 +13,37 @@ const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
 const draft = (change: Partial<Agent> = {}) => ({ ...withCast({ id: "x" } as Agent), id: "", name: "同名", runtime: "pi", ...change }) as Agent;
 
 describe("profiles", () => {
+  it.effect("deleting a skill removes profile references and a recreated name does not reattach it", () => {
+    const config = testConfig();
+    let profile = "";
+    return run(
+      config,
+      Effect.gen(function* () {
+        const s = yield* Agents;
+        const skill = yield* s.createSkill({ id: "", name: "Transient Skill", description: "", body: "old" });
+        profile = (yield* s.createAgent(draft({ skills: [skill.id, "other"] }))).id;
+        yield* s.saveAgent({ ...s.agent(orchestratorAgent)!, skills: [skill.id] });
+        yield* s.deleteSkill(skill.id);
+        expect(s.agent(profile)?.skills).toEqual(["other"]);
+        expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
+        const recreated = yield* s.createSkill({ id: "", name: skill.name, description: "", body: "new" });
+        expect(recreated.id).toBe(skill.id);
+        expect(s.agent(profile)?.skills).not.toContain(recreated.id);
+      }),
+    ).pipe(
+      Effect.andThen(
+        run(
+          config,
+          Effect.gen(function* () {
+            const s = yield* Agents;
+            expect(s.agent(profile)?.skills).toEqual(["other"]);
+            expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
+          }),
+        ),
+      ),
+    );
+  });
+
   it.effect("an unreadable config.json is kept aside, and the seeds start", () => {
     const config = testConfig();
     writeFileSync(join(config.home, "config.json"), "{not json");

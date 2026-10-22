@@ -34,9 +34,6 @@ export const issueOf = (s: Session) => s.issue ?? s.id;
 
 export const isBusy = (s: Session) => s.phase._tag === "arriving" || s.phase._tag === "working";
 
-/** A stopped turn may have work too. */
-export const canHarvest = (s: Session) => s.phase._tag === "ripe" || s.phase._tag === "resting";
-
 /** 0..5, or -1 while every bed is taken. */
 export const stationOfSession = (s: Session) => (s.play ? Math.round(s.play.station) : -1);
 

@@ -29,8 +29,8 @@ describe("a session's work", () => {
       expect(report.outcome).toBe("completed");
       expect(text).toMatch(/做完了：写 hello\.py/);
       expect(text).toMatch(/原型/);
-      // The farm's other news (its commits, the issue, 田头) comes and goes beside the session's own.
-      const mine = w.facts.filter((x) => !["commits", "issue", "message", "conversation", "progress"].includes(x.type));
+      // The farm's other news (its commits, the issue, 田头 and the owner's mentions in it) comes and goes beside the session's own.
+      const mine = w.facts.filter((x) => !["commits", "issue", "message", "conversation", "ownerMentions", "progress"].includes(x.type));
       expect([mine[0]!.type, mine.at(-1)!.type]).toEqual(["hired", "left"]);
       expect(mine.some((x) => x.type === "run")).toBe(true);
       expect(mine.some((x: Fact) => x.type === "doing" && x.action === "run_command" && x.label === "echo hi")).toBe(true);

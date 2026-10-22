@@ -48,6 +48,21 @@ test("every and once", () => {
   expect(nextRun(make({ enabled: false }))).toBeUndefined();
 });
 
+test("every accepted spelling of a fixed time zone runs the same calendar recurrence", () => {
+  const times: RecurrenceWhen[] = [
+    { kind: "daily", time: "09:00" },
+    { kind: "weekly", days: [1], time: "09:00" },
+    { kind: "cron", expr: "0 9 * * 1" },
+  ];
+  for (const when of times) {
+    for (const tz of ["+08:00", "+0800", "+08", "GMT+08:00"]) {
+      const s = make({ when, tz });
+      expect(recurrenceProblem(s, s.created)).toBe("");
+      expect([when.kind, tz, nextRun(s), nextText(s)]).toEqual([when.kind, tz, at("2026-10-12T09:00:00"), "10/12 09:00"]);
+    }
+  }
+});
+
 test("what a recurrence asked for gets wrong", () => {
   const now = at("2026-10-12T08:00:00");
   const req = (change: Partial<RecurrenceRequest> = {}): RecurrenceRequest => ({

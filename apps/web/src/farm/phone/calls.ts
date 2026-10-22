@@ -124,11 +124,11 @@ export class PhoneCalls {
       log: [{ call, answered, at: this.host.now() }, ...this.state.log].slice(0, logKeep),
     });
     this.host.play(answered ? "voiceOn" : "voiceOff");
+    // Answered, the phone stays out: the call is on it, and the page unfolds it to 田头, where what is said shows.
     if (this.state.ringing?.id === call.id) {
       if (answered) this.silence();
       else this.endRing();
     }
-    if (answered) this.host.setOpen(false);
   }
 
   putAway() {

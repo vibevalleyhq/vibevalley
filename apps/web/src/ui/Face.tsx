@@ -4,9 +4,10 @@ import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "../rules/cast";
 import { ready, useSprites } from "../data/query";
+import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
-export function AgentFace(props: { agentId: string; look?: Look; size?: number; muted?: boolean }) {
+export function AgentFace(props: { agentId: string; runtime?: string; look?: Look; size?: number; muted?: boolean }) {
   const sprites = useSprites();
   const size = () => props.size ?? 24;
   const cut = () => {
@@ -20,22 +21,21 @@ export function AgentFace(props: { agentId: string; look?: Look; size?: number; 
     return { name, left: size() / 2 - cx * k, top: size() / 2 - cy * k, width: sp.w * k, height: sp.h * k };
   };
   return (
-    <span
-      class={["relative inline-block shrink-0 overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !!props.muted }]}
-      style={{ width: `${size()}px`, height: `${size()}px` }}
-      aria-hidden="true"
-    >
-      <Show when={cut()}>
-        {(c) => (
-          <img
-            src={`/pixel/${c().name}.png`}
-            alt=""
-            draggable="false"
-            class="absolute max-w-none [image-rendering:pixelated]"
-            style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
-          />
-        )}
-      </Show>
+    <span class="relative inline-block shrink-0" style={{ width: `${size()}px`, height: `${size()}px` }}>
+      <span class={["relative block h-full w-full overflow-hidden rounded-sm bg-[#b4cb7c99]", { "opacity-60 grayscale": !!props.muted }]} aria-hidden="true">
+        <Show when={cut()}>
+          {(c) => (
+            <img
+              src={`/pixel/${c().name}.png`}
+              alt=""
+              draggable="false"
+              class="absolute max-w-none [image-rendering:pixelated]"
+              style={{ left: `${c().left}px`, top: `${c().top}px`, width: `${c().width}px`, height: `${c().height}px` }}
+            />
+          )}
+        </Show>
+      </span>
+      <Show when={props.runtime}>{(runtime) => <RuntimeBadge runtime={runtime()} size={Math.max(10, Math.min(24, Math.round(size() * 0.4)))} />}</Show>
     </span>
   );
 }
