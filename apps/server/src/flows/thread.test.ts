@@ -43,7 +43,7 @@ describe("an issue's thread", () => {
       yield* sessions.dismiss(first);
       yield* await_(
         () => issues.get(issue.id),
-        (i) => i.closed !== undefined,
+        (i) => i.closedAt !== undefined,
         "cancelled",
       );
       const kept = yield* channels.say("先记一下：时区用东八区", thread!.id, "");

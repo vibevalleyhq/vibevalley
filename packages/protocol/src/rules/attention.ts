@@ -21,6 +21,7 @@ export const actLabel: Record<IssueAct, string> = {
   accept: "验收通过",
   reject: "打回",
   harvest: "收获",
+  keep: "完成，分支留着",
   acknowledge: "知道了",
   resolve: "让它解决冲突",
   resume: "接着做",

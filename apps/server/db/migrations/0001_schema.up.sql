@@ -106,7 +106,9 @@ CREATE TABLE issue (
   created_at  double precision not null,
   queued_at   double precision,
   closed_at   double precision,
-  closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
+  -- Closed, an issue is done with what it delivered, or canceled with why; never both.
+  delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'kept', 'none')),
+  canceled    text check (canceled in ('dismissed', 'lost')),
   pull_request text,
   review  text not null default 'glance' check (review in ('glance', 'required')),
   reviewed_at double precision,
@@ -114,7 +116,8 @@ CREATE TABLE issue (
   questions        text,
   criteria    text,
   checks      text,
-  handed_back text
+  handed_back text,
+  check (delivered is null or canceled is null)
 );
 CREATE INDEX issue_by_parent on issue (parent);
 CREATE TABLE issue_session (
@@ -266,7 +269,7 @@ CREATE TABLE session (
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,
-  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
+  closed    text check (closed in ('merged', 'merged_into_graph', 'completed', 'dismissed', 'lost')),
   place       text,
   oar_session text,
   last_text   text,

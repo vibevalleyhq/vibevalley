@@ -15,9 +15,9 @@ export function clockText(tod: number) {
 
 export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-/** The issues harvested into their main branch, newest first: the warehouse. */
+/** The issues harvested into their main branch (merged here, or by a pull request), newest first: the warehouse. */
 export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
-  (s?.issues ?? []).filter((i) => i.closed === "merged").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
+  (s?.issues ?? []).filter((i) => i.delivered === "merged" || i.delivered === "pull_request").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
 /** A switched-off runtime's account is not the farm's business. */
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);

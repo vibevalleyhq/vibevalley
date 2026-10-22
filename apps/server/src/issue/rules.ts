@@ -6,7 +6,8 @@ import { reportVerdict } from "../session/rules.ts";
 import type {
   Question,
   Issue,
-  IssueClose,
+  Delivery,
+  IssueCanceled,
   IssueStatus,
   IssueTemplate,
   IssueTimeline,
@@ -247,13 +248,22 @@ function firstBlank(text: string): TemplateBlank | undefined {
 
 // ── the issue's story ──
 
-const closedWords: Record<IssueClose, string> = {
+const deliveredWords: Record<Delivery, string> = {
   merged: "收获了，合进了主分支",
-  merged_into_graph: "合进了种植计划",
+  merged_into_parent: "完成了，合进了种植计划",
+  pull_request: "收获了，PR 合进去了",
+  kept: "完成了，分支留着没合",
+  none: "完成了，没有改动要合",
+};
+
+const canceledWords: Record<IssueCanceled, string> = {
   dismissed: "没收就关了",
   lost: "丢了",
-  answered: "管家答完了",
 };
+
+/** What its close says: done with what it delivered, or canceled and why. */
+export const closedText = (t: Pick<Issue, "delivered" | "canceled">): string =>
+  t.delivered ? deliveredWords[t.delivered] : t.canceled ? canceledWords[t.canceled] : "关了";
 
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (t.kind) {
@@ -303,7 +313,7 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
   for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: "打回：" + lines.join("；") });
   if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: "验收通过" });
-  if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: t.closed ? closedWords[t.closed] : "关了" });
+  if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: closedText(t) });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
     .map((m, i) => [m, i] as const)

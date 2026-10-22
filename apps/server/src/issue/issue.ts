@@ -16,7 +16,9 @@ import {
   type Issue,
   type IssueReviewRequest,
   type IssueActRequest,
-  type IssueClose,
+  type Delivery,
+  type IssueCanceled,
+  type SessionClose,
   type IssueGraph,
   type IssueHistory,
   type IssueRequest,
@@ -103,8 +105,9 @@ export interface IssueShape {
   readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
   readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. */
-  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, agent?: string) => Effect.Effect<Issue, ApiError>;
+  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. keepBranch: moving
+   * to done, completed with its branch kept, not merged. */
+  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
   /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
    * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
   readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
@@ -134,6 +137,11 @@ export interface IssueShape {
   readonly tryQueued: Effect.Effect<void>;
 }
 
+export interface StatusOptions {
+  readonly agent?: string;
+  readonly keepBranch?: boolean;
+}
+
 export class Issues extends Context.Service<Issues, IssueShape>()("vibevalley/Issue") {}
 
 type Row = q.GetIssueResult;
@@ -149,12 +157,24 @@ const json = <T>(text: string | null): T | undefined => {
 
 /** Empty is none. */
 
-const closedText: Readonly<Partial<Record<IssueClose, string>>> = {
+const leftText: Readonly<Record<SessionClose, string>> = {
   merged: "收获了，改动已经合进项目的主分支",
   merged_into_graph: "做完了，改动合进了种植计划的分支",
+  completed: "工单完成了，改动没有合进主分支",
   dismissed: "没收获就收工了，改动没有合进主分支",
   lost: "干活的目录丢了，改动可能不在了",
 };
+
+/** What a session's leaving says of its issue, when the issue is still open then: its work merged is done, the rest is
+ * canceled. A completion the owner chose (kept, none) is written before its session leaves, so it is not this. */
+const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
+  closed === "merged"
+    ? { delivered: "merged" }
+    : closed === "merged_into_graph"
+      ? { delivered: "merged_into_parent" }
+      : closed === "completed"
+        ? { delivered: "none" }
+        : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 const outcomeText = { completed: "做完了", failed: "没做成", interrupted: "被叫停了" } as const;
 
@@ -165,7 +185,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   const how = handedOver ? `这张工单换你接手了，之前是 ${last.name}（${last.id}）在做` : `这张工单重开了，上一次是 ${last.name}（${last.id}）做的`;
   let out = (text.trim() || reopenDefault) + `\n\n（${how}。）`;
   out += "\n这张工单原来是：" + cut(issueJob(issue), askedMax);
-  if (last.phase._tag === "closed") out += "\n它是怎么关的：" + (closedText[last.phase.closed] ?? "");
+  if (last.phase._tag === "closed") out += "\n它是怎么关的：" + leftText[last.phase.closed];
   if (last.lastRun) out += `\n最后一轮${outcomeText[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
   if (previous) out += "\n这条分支上已经有上次的提交，接着做。";
   return out + "\n先看看项目现在的样子，再接着做。";
@@ -228,7 +248,8 @@ export const make = (options: IssueOptions = {}) =>
         ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
         sessions: [...(runs ?? [])],
         ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
-        ...(row.closed !== null ? { closed: row.closed as IssueClose } : {}),
+        ...(row.delivered !== null ? { delivered: row.delivered as Delivery } : {}),
+        ...(row.canceled !== null ? { canceled: row.canceled as IssueCanceled } : {}),
         ...(row.parent !== null ? { parent: row.parent } : {}),
         ...(blockedBy ? { blockedBy } : {}),
         ...(graph ? { graph } : {}),
@@ -345,7 +366,10 @@ export const make = (options: IssueOptions = {}) =>
         return yield* get(id);
       });
 
-    const closeAs = (id: string, how: IssueClose) => Effect.andThen(db(q.closeIssue({ closed_at: Date.now(), closed: how, id })), publish(id));
+    /** Done, with what it delivered. */
+    const complete = (id: string, delivered: Delivery) => Effect.andThen(db(q.completeIssue({ closed_at: Date.now(), delivered, id })), publish(id));
+    /** Not done, and why. */
+    const cancelAs = (id: string, canceled: IssueCanceled) => Effect.andThen(db(q.cancelIssue({ closed_at: Date.now(), canceled, id })), publish(id));
 
     /** The orchestrator's turn on its issue ended; a session's run on one is not this. */
     const handBack = (id: string, h: HandedBack) =>
@@ -354,7 +378,7 @@ export const make = (options: IssueOptions = {}) =>
         if (!isForOrchestrator(t)) return;
         // A turn cut off by a restart closed its issue as lost; the turn it goes on in hands back all the same.
         if (isClosed(t.status)) {
-          if (t.closed !== "lost") return;
+          if (t.canceled !== "lost") return;
           yield* db(q.reopenIssue({ id }));
         }
         yield* db(q.setHandedBack({ id, handed_back: JSON.stringify(h) }));
@@ -427,9 +451,12 @@ export const make = (options: IssueOptions = {}) =>
       Effect.gen(function* () {
         yield* unsent(id);
         yield* inTx(
-          Effect.all([db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id })), db(q.closeIssue({ closed_at: Date.now(), closed: "dismissed", id }))], {
-            discard: true,
-          }),
+          Effect.all(
+            [db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id })), db(q.cancelIssue({ closed_at: Date.now(), canceled: "dismissed", id }))],
+            {
+              discard: true,
+            },
+          ),
         );
         yield* publish(id);
       });
@@ -538,7 +565,7 @@ export const make = (options: IssueOptions = {}) =>
     const reopen = (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) =>
       Effect.gen(function* () {
         const issue = yield* get(id);
-        if (issue.graph || issue.task || issue.closed === "merged_into_graph")
+        if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
           return yield* Effect.fail(refused("这是种植计划的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
         if (issue.sessions.length === 0) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
         const last = yield* sessions.get(issue.sessions.at(-1)!);
@@ -619,6 +646,12 @@ export const make = (options: IssueOptions = {}) =>
         if (!said) yield* ownerSaid(id);
       });
 
+    /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
+    const commitsOf = (t: Issue) =>
+      t.project
+        ? Effect.map(Effect.option(projects.branchChanges(t.project, issueBranch(t.number))), (c) => (Option.isSome(c) ? c.value.commits.length : 0))
+        : Effect.succeed(0);
+
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
      * moves, so a handover never leaves its session gone and no one sent. */
     const takerOf = (t: Issue, to: IssueStatus, key: string) =>
@@ -668,8 +701,14 @@ export const make = (options: IssueOptions = {}) =>
             const row = yield* one(q.getIssue({ id: issue }));
             if (!row || row.graph !== null || row.task !== null) return;
             const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
-            if (runs.at(-1) !== e.id) return;
-            yield* db(q.closeIssue({ closed_at: Date.now(), closed: e.closed ?? null, id: issue }));
+            // Closed already (completed by the owner before its session went home): the verdict stands.
+            if (runs.at(-1) !== e.id || row.closed_at !== null) return;
+            const closing = closingOf(e.closed);
+            yield* db(
+              "delivered" in closing
+                ? q.completeOpenIssue({ closed_at: Date.now(), delivered: closing.delivered, id: issue })
+                : q.cancelOpenIssue({ closed_at: Date.now(), canceled: closing.canceled, id: issue }),
+            );
             yield* publish(issue);
             return;
           }
@@ -702,7 +741,7 @@ export const make = (options: IssueOptions = {}) =>
     const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
     // The orchestrator's turn on its issues stopped with the server; one it had answered still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
+    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) if (r.handed_back === null) yield* cancelAs(r.id, "lost");
 
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
@@ -865,6 +904,9 @@ export const make = (options: IssueOptions = {}) =>
             case "acknowledge":
               yield* shape.setStatus(id, "done", said, channel);
               break;
+            case "keep":
+              yield* shape.setStatus(id, "done", said, channel, { keepBranch: true });
+              break;
             case "close":
               yield* shape.setStatus(id, "canceled", said, channel);
               break;
@@ -889,8 +931,9 @@ export const make = (options: IssueOptions = {}) =>
           }
           return yield* get(id);
         }),
-      setStatus: (id, to, text, channel, agent) =>
+      setStatus: (id, to, text, channel, opt = {}) =>
         Effect.gen(function* () {
+          const agent = opt.agent;
           if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
           const t = yield* get(id);
           const taker = agent ? yield* takerOf(t, to, agent) : undefined;
@@ -910,7 +953,7 @@ export const make = (options: IssueOptions = {}) =>
             case "round":
               if (taker) {
                 yield* cancel(id);
-                yield* closeAs(id, "dismissed");
+                yield* cancelAs(id, "dismissed");
                 yield* reopen(id, said, channel, { kind: "comment" }, taker);
                 break;
               }
@@ -923,26 +966,36 @@ export const make = (options: IssueOptions = {}) =>
             case "revive":
               yield* reopenRow(id);
               break;
-            // The session's leaving closes the issue too, but later: closed here, the answer already says so.
-            case "merge": {
+            // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
+            // touches no git and opens no pull request; the rest is harvested into the main branch or by a pull request.
+            case "complete": {
+              const commits = yield* commitsOf(t);
+              if (opt.keepBranch || commits === 0) {
+                // Written down before its session goes home, so that leaving does not take it for canceled.
+                yield* complete(id, opt.keepBranch && commits > 0 ? "kept" : "none");
+                const last = t.sessions.at(-1);
+                if (last !== undefined && sessions.find(last)) yield* sessions.dismiss(last, "keep", "completed");
+                break;
+              }
+              // The session's leaving closes the issue too, but later: closed here, the answer already says so.
               yield* merge(id);
               const updated = yield* get(id);
-              if (updated.pullRequest?.state !== "open") yield* closeAs(id, "merged");
+              if (updated.pullRequest?.state !== "open") yield* complete(id, updated.pullRequest ? "pull_request" : "merged");
               break;
             }
             case "cancel":
               yield* cancel(id);
-              yield* closeAs(id, "dismissed");
+              yield* cancelAs(id, "dismissed");
               break;
             case "drop":
               yield* clearRefinement(t);
               yield* drop(id);
               break;
             case "answered":
-              yield* closeAs(id, "answered");
+              yield* complete(id, "none");
               break;
             case "putAway":
-              yield* closeAs(id, "dismissed");
+              yield* cancelAs(id, "dismissed");
               break;
           }
           return yield* get(id);
@@ -1044,7 +1097,8 @@ export const make = (options: IssueOptions = {}) =>
                     rank: t.rank ?? 0,
                     created_at: t.createdAt,
                     closed_at: t.closedAt ?? null,
-                    closed: t.closed ?? null,
+                    delivered: t.delivered ?? null,
+                    canceled: t.canceled ?? null,
                     parent: nullText(t.parent),
                     blocked_by: jsonOrNull(t.blockedBy, (t.blockedBy ?? []).length > 0),
                     graph: jsonOrNull(t.graph, !!t.graph),

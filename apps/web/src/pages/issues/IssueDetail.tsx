@@ -355,8 +355,21 @@ export function IssueDetail(props: {
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
 
-const harvestedText = (issue: Issue) =>
-  issue.closed === "merged" ? "收获了：改动已经合进主分支。" : issue.closed === "merged_into_graph" ? "合进了种植计划的分支。" : "收获了。";
+const harvestedText = (issue: Issue) => {
+  switch (issue.delivered) {
+    case "merged":
+      return "收获了：改动已经合进主分支。";
+    case "pull_request":
+      return "收获了：PR 合进去了。";
+    case "merged_into_parent":
+      return "合进了种植计划的分支。";
+    case "kept":
+      return "完成了：分支留着，没有合进主分支。";
+    case "none":
+    case undefined:
+      return "完成了：没有改动要合。";
+  }
+};
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 function Question(props: { ask: Question; busy: boolean; onPick: (words: string) => void }) {

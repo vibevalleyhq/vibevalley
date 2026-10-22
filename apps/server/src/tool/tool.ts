@@ -564,9 +564,9 @@ export const make = Effect.gen(function* () {
     );
 
   const issueStatus = (who: Who) =>
-    tool<{ issue: string; to: string; text?: string; agent?: string }>(
+    tool<{ issue: string; to: string; text?: string; agent?: string; keep_branch?: boolean }>(
       "issue_status",
-      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是收获；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成：照工单交付，有提交就合进主分支或开 PR，没有改动不碰 git，keep_branch 是完成但分支留着不合；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
       async (p) => {
         const c = await who();
         if (!c.owner) return changeNotAsked;
@@ -581,7 +581,9 @@ export const make = Effect.gen(function* () {
               if (typeof chosen === "string") return "没挪：" + chosen;
               agent = chosen.id;
             }
-            const done = await go(issue.setStatus(t.id, to, p.text ?? "", c.here, agent));
+            const done = await go(
+              issue.setStatus(t.id, to, p.text ?? "", c.here, { ...(agent ? { agent } : {}), ...(p.keep_branch ? { keepBranch: true } : {}) }),
+            );
             return "挪好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
           } catch (e) {
             return "没挪：" + toError(e).message;

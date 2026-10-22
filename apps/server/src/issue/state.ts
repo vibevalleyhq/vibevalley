@@ -1,19 +1,17 @@
 // An issue in the core state: its status, who drafts it, its place in the list and its findings left attention.
 
-import { type WorkspaceState, type Issue, type IssueClose, type IssueRefining, type IssueStatus, orchestratorAgent } from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus, orchestratorAgent } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
 import { attentionIn } from "./attention.ts";
 import { compare, compareText, or } from "../base/text.ts";
 
-/** Done is what was asked for: merged, or answered by the orchestrator. The rest, and a close that does not say how, is canceled. */
-const closedStatus = (c: IssueClose | undefined): IssueStatus => (c === "merged" || c === "merged_into_graph" || c === "answered" ? "done" : "canceled");
-
 /** An issue for the orchestrator is in progress while the orchestrator is on it, and waits on the owner once its turn ended,
  * however it ended: only the owner closes it. */
 export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
-  if (t.closed !== undefined || t.closedAt !== undefined) return closedStatus(t.closed);
+  // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
+  if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
   if (isForOrchestrator(t)) return t.handedBack ? "in_review" : "in_progress";
   if (t.graph) {
     switch (t.graph.state) {

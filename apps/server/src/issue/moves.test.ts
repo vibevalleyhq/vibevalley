@@ -49,7 +49,7 @@ describe("status moves", () => {
     expect(statusMove(orchestrator({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
     expect(statusMove(orchestrator({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
     for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(orchestrator({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("done", false, { assignee: orchestratorAgent, closed: "answered" }))).toEqual([]);
+    expect(statusMoves(issue("done", false, { assignee: orchestratorAgent, delivered: "none" }))).toEqual([]);
   });
 });
 

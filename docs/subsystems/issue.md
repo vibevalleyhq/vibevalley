@@ -25,7 +25,7 @@
 ## 模型和不变量
 
 - **一张工单一个 id**，从写下到关上不变；重开是同一张工单的下一个帮工，不是新工单。
-- **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、怎么关的 `closed`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
+- **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、关的结论：完成了交付了什么 `delivered`，或不做了为什么 `canceled`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
 - **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `WorkspaceState.issues`，`Issues` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
 - **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `attention.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。
 - **动作是服务端的**（`issue.act`，`Issues.act`）：站位给出的每个动作（开工、回答、验收通过、打回、收获、知道了、让它解决冲突、接着做、接着修、带话、叫停、关上、重开）在服务端只有一份实现，带给帮工的话也在这里拼；站位没给的动作拒绝（「#41 现在不能「接着修」：它在做」）。页面只收集要说的话、先开收获清单和关单对话框；命令行的 `issue act` 和管家的工具走同一个入口。
@@ -35,7 +35,7 @@
 - **每张工单都有验收**：`in_review` 就是「等验收」。`acceptance` 是 `glance`（收获本身就算验收）或 `required`（没通过 `acceptedAt` 以前不能收获）。
 - **种植计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
 - **已完成只由主人点头。** 一轮怎么结束的（`completed`、`failed`、`interrupted`）只决定工单停在哪、请主人做什么，不决定活成没成：帮工最后一轮没做成（站位「卡住了」，`stuck: failed`）时 `moves` 里没有已完成，`statusMove` 和 `merge` 都拒绝，看板、命令行、管家的工具一样；叫停的一轮还能收。
-- **派给管家的工单**：管家在答时 `in_progress`；这一轮结束，不管怎么结束，结局记在 `handedBack`（`{ at, outcome }`，表的 `handed_back`）、工单进 `in_review`。答完了（`completed`）主人能挪到已完成（关成 `answered`，页面上是「知道了」）或已取消（`dismissed`）；没答成只能挪到已取消。再交给管家（定时又到点、重开）清掉 `handedBack`。服务端开机时只把还在答的关成 `lost`，等你看的留着；接着做的那一轮结束时，`lost` 的工单重新打开、记下结局。
+- **派给管家的工单**：管家在答时 `in_progress`；这一轮结束，不管怎么结束，结局记在 `handedBack`（`{ at, outcome }`，表的 `handed_back`）、工单进 `in_review`。答完了（`completed`）主人能挪到已完成（完成、交付 `none`，页面上是「知道了」）或已取消（`dismissed`）；没答成只能挪到已取消。再交给管家（定时又到点、重开）清掉 `handedBack`。服务端开机时只把还在答的关成 `lost`，等你看的留着；接着做的那一轮结束时，`lost` 的工单重新打开、记下结局。
 - **子工单**带 `parent`、`blockedBy`：种植计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
 - **还没派的能改、能删、能排先后**；派出去以后只能改验收方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueJob`）。
 - **备选的工单是草稿**：起草的帮工（`Session.draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
@@ -101,7 +101,16 @@
 
 **时间线**（`issue.timeline`，`milestonesOf`）：从已经存着的事实拼，不另存：开单；每次干活的开始（开工、你带了话、重开、定时、起草）和结束（交回来了、问你、没做成、停在了半路、起草好了）；打回（同一时刻的意见合成一条）；验收通过；关单。新的在上，带时间和是哪个帮工；同时给出所有干活加起来花了多少（`spent`）。
 
-**收获**（挪到已完成）：
+**完成和交付**：已完成是主人对工单的结论，合并只是交付的一种。关上的工单存结论和交付两个字段，不再是一个「怎么关的」：
+
+| 结论 | 字段 | 取值 |
+|---|---|---|
+| 完成 | `delivered` | `merged`（合进项目的主分支）、`merged_into_parent`（种植计划的一步合进计划的分支）、`pull_request`（PR 合了）、`kept`（分支留着不合）、`none`（没有改动要合，或管家的回答） |
+| 不做了 | `canceled` | `dismissed`（主人关的、PR 没合就关了）、`lost`（干活的目录丢了） |
+
+挪到已完成只有一个挪法 `complete`，交付由工单算，不由谁来挪算：分支上没有主分支没有的提交，交付 `none`，不碰 git、不开空 PR；主人选「完成，分支留着」（`keep`，`IssueStatusRequest.keepBranch`）且有提交，交付 `kept`，分支和提交留着、帮工收工；其余照下面收获，合进主分支或开 PR。不合并的两种先写下结论再让帮工收工（帮工的离开记成 `completed`），所以帮工离开时不会把它当成「不做了」。帮工离开时工单还开着，才按它离开的方式关工单（合进去了是完成，其余是不做了）。
+
+**收获**（有提交、不留分支的完成）：
 
 1. 还在干的不收；关掉会话，没提交的改动替它提交（缓存和依赖目录不提交）。
 2. 会冲突就不合：标上 `conflict`，「让它解决冲突」发一句固定的话（`conflictTask`）交回帮工，在自己的分支上把主分支合进来，下一轮结束时再查。
@@ -110,7 +119,7 @@
    - **本地合**（项目不在 `github.pr_projects` 里，或 `pullRequest.available` 为假）：合进项目克隆的主分支，删掉 worktree 和分支，帮工离开，账本记 `harvested`。
    - **提 PR**：农场 `git push -u origin <工单分支>`，用工单标题、编号、帮工最后一轮的「结论：」那一段（找不到就放最后一轮原话）和检查结果开 PR；已有开着的 PR 只推分支，开完没存下回执的重试先查已有的 PR。推送或 `gh` 失败就拒绝这次收获。`pullRequest` 记 `url`、`number`、`state`；PR 开着时工单留在等验收，再干一轮再收获更新同一个 PR。
 
-**PR 的结局**：农场每 `github.pr_poll_seconds` 秒（默认 180，`github refresh` 手动）查开着的 PR：合了关成 `merged`、没合就关掉关成 `dismissed`，清掉 worktree 和本地分支，帮工离开；帮工还在干或有待开始的一轮就留着现场，下次再结。远端分支归 GitHub。开新分支或结束 PR 前先 `git fetch origin <主分支>` 快进本地主分支，不干净或不能快进就保留本地的、记日志。
+**PR 的结局**：农场每 `github.pr_poll_seconds` 秒（默认 180，`github refresh` 手动）查开着的 PR：合了就完成、交付 `pull_request`，没合就关掉是不做了（`dismissed`），清掉 worktree 和本地分支，帮工离开；帮工还在干或有待开始的一轮就留着现场，下次再结。远端分支归 GitHub。开新分支或结束 PR 前先 `git fetch origin <主分支>` 快进本地主分支，不干净或不能快进就保留本地的、记日志。
 
 **收工**：关掉会话、帮工离开；分支上有没合的提交就留着，重开接着做。
 
@@ -123,7 +132,7 @@
 - **种植计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。
 - **管家（`tool`）**：派活、带话、验收、收获都是同一个服务的方法，收获要主人说一声。
 - **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `project.pullRequest`；收获只读缓存决定走哪条路。
-- **农场的皮（`plotOf`、`game`）**：`FarmView.plots` 按工单做键（`plotKey`），地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是关成 `merged` 的工单。游戏只读事实算画面和账本，不调工单。
+- **农场的皮（`plotOf`、`game`）**：`FarmView.plots` 按工单做键（`plotKey`），地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是交付 `merged` 或 `pull_request` 的工单。游戏只读事实算画面和账本，不调工单。
 
 ## 为什么这样
 

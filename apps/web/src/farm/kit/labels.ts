@@ -1,13 +1,13 @@
-import type { IssueClose, OrchestratorState, Outcome, Phase } from "@vibevalley/protocol";
+import type { OrchestratorState, Outcome, Phase, SessionClose } from "@vibevalley/protocol";
 
 export { ago, numberText } from "../../rules/time";
 
-const closedLabel: Record<IssueClose, string> = {
+const closedLabel: Record<SessionClose, string> = {
   merged: "收获了",
   merged_into_graph: "合进计划了",
+  completed: "完成了",
   dismissed: "收工了",
   lost: "目录丢了",
-  answered: "答完了",
 };
 
 export function phaseLabel(phase: Phase): string {

@@ -263,12 +263,14 @@ export const PhaseResting: Schema.Codec<T.PhaseResting> = Schema.Struct({
   _tag: Schema.Literal("resting"),
 });
 
-export const IssueClose: Schema.Codec<T.IssueClose> = Schema.Literals(T.IssueCloseValues);
+export const SessionClose: Schema.Codec<T.SessionClose> = Schema.Literals(T.SessionCloseValues);
+export const Delivery: Schema.Codec<T.Delivery> = Schema.Literals(T.DeliveryValues);
+export const IssueCanceled: Schema.Codec<T.IssueCanceled> = Schema.Literals(T.IssueCanceledValues);
 
 export const PhaseClosed: Schema.Codec<T.PhaseClosed> = Schema.Struct({
   _tag: Schema.Literal("closed"),
   at: Schema.Number,
-  closed: IssueClose,
+  closed: SessionClose,
 });
 
 export const Phase: Schema.Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseRipe, PhaseFailed, PhaseResting, PhaseClosed]);
@@ -593,7 +595,8 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   queuedAt: Schema.optionalKey(Schema.Number),
   sessions: Schema.mutable(Schema.Array(Schema.String)),
   closedAt: Schema.optionalKey(Schema.Number),
-  closed: Schema.optionalKey(IssueClose),
+  delivered: Schema.optionalKey(Delivery),
+  canceled: Schema.optionalKey(IssueCanceled),
   parent: Schema.optionalKey(Schema.String),
   blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   graph: Schema.optionalKey(IssueGraph),
@@ -1669,7 +1672,7 @@ export const FactLeft: Schema.Codec<T.FactLeft> = Schema.Struct({
   type: Schema.Literal("left"),
   at: Schema.Number,
   id: Schema.String,
-  closed: Schema.optionalKey(IssueClose),
+  closed: Schema.optionalKey(SessionClose),
   merged: Schema.optionalKey(Schema.Number),
 });
 
@@ -1807,6 +1810,7 @@ export const MoveIssueRequest: Schema.Codec<T.MoveIssueRequest> = Schema.Struct(
 export const IssueStatusRequest: Schema.Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
+  keepBranch: Schema.optionalKey(Schema.Boolean),
   agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
 });

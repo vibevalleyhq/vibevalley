@@ -1067,7 +1067,10 @@ export interface Issue {
   queuedAt?: number;
   sessions: string[];
   closedAt?: number;
-  closed?: IssueClose;
+  /** Done: what it delivered. Its verdict is the status; how its work went in is this. */
+  delivered?: Delivery;
+  /** Canceled: why. */
+  canceled?: IssueCanceled;
   parent?: string;
   blockedBy?: string[];
   graph?: IssueGraph;
@@ -1124,6 +1127,7 @@ export const IssueActValues = [
   "accept",
   "reject",
   "harvest",
+  "keep",
   "acknowledge",
   "resolve",
   "resume",
@@ -1257,8 +1261,19 @@ export interface IssueRequest {
   review?: Review;
 }
 
-export const IssueCloseValues = ["merged", "merged_into_graph", "dismissed", "lost", "answered"] as const;
-export type IssueClose = (typeof IssueCloseValues)[number];
+/** What a completed issue delivered: its branch merged into the project's main branch, into its parent's branch (a step of
+ * a task graph), by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
+export const DeliveryValues = ["merged", "merged_into_parent", "pull_request", "kept", "none"] as const;
+export type Delivery = (typeof DeliveryValues)[number];
+
+/** Why an issue is not done: the owner closed it, or its workplace was lost. */
+export const IssueCanceledValues = ["dismissed", "lost"] as const;
+export type IssueCanceled = (typeof IssueCanceledValues)[number];
+
+/** How a session left: its work merged (into the main branch, or a task graph's branch), its issue completed without a
+ * merge, sent home, or its workplace lost. */
+export const SessionCloseValues = ["merged", "merged_into_graph", "completed", "dismissed", "lost"] as const;
+export type SessionClose = (typeof SessionCloseValues)[number];
 
 export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
@@ -1435,7 +1450,7 @@ export interface PhaseResting {
 export interface PhaseClosed {
   _tag: "closed";
   at: number;
-  closed: IssueClose;
+  closed: SessionClose;
 }
 
 export interface Repo {
@@ -1937,7 +1952,7 @@ export interface FactLeft {
   type: "left";
   at: number;
   id: string;
-  closed?: IssueClose;
+  closed?: SessionClose;
   merged?: number;
 }
 
@@ -2043,6 +2058,8 @@ export interface MoveIssueRequest {
 export interface IssueStatusRequest {
   status: IssueStatus;
   text?: string;
+  /** Moving to done: complete it with its branch kept, not merged. */
+  keepBranch?: boolean;
   /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
    * kept, and this one goes on in the same issue. */
   agent?: string;

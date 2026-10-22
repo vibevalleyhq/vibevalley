@@ -336,17 +336,18 @@ describe("the orchestrator", () => {
         "the merge refused",
       );
       expect(refused.text).toBe("合并：没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。");
-      expect((yield* issues.get(hired.session!.issue!)).closed).toBeUndefined();
+      expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
       const merged = yield* Effect.promise(async () => {
         for (let i = 0; i < 500; i++) {
           const t = await Effect.runPromise(issues.get(hired.session!.issue!));
-          if (t.closed) return t;
+          if (t.closedAt !== undefined) return t;
           await new Promise((r) => setTimeout(r, 10));
         }
         throw new Error("never merged");
       });
-      expect(merged.closed).toBe("merged");
+      // The helper said its words and committed nothing: done, with nothing to merge.
+      expect(merged.delivered).toBe("none");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -428,12 +429,12 @@ describe("the orchestrator", () => {
       const core = yield* Core;
       const handed = yield* until(() => core.state().issues?.find((t) => t.recurrence === s.id && t.status === "in_review"), "handed back");
       const id = handed.id;
-      expect(handed.closed).toBeUndefined();
+      expect(handed.closedAt).toBeUndefined();
       expect(handed.handedBack?.outcome).toBe("completed");
       expect(handed.attention).toMatchObject({ state: "reviewing", lead: "acknowledge" });
       expect(handed.moves).toEqual(["done", "canceled"]);
       const done = yield* issues.setStatus(id, "done", "", "");
-      expect([done.status, done.closed]).toEqual(["done", "answered"]);
+      expect([done.status, done.delivered]).toEqual(["done", "none"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
