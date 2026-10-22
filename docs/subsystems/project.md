@@ -72,7 +72,7 @@
 3. 登录了就对每个项目读 `origin`（GitHub 的 HTTPS、`ssh://`、`git@github.com:` 地址），不是 GitHub 仓库就说不是；是就 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算能提 PR，别的是「没有写权限」。
 4. 结果整份替换缓存；几次刷新排队，不让旧结果盖掉新的。
 
-`github.status`、`setting.check` 的 `github` 读同一份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
+`github.status` 读这份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
 
 **地契**（每次打开现算，不缓存）：
 

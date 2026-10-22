@@ -89,7 +89,7 @@ export const handlers = Effect.gen(function* () {
         ),
       ),
     "setting.load": () => Effect.sync(setting.status),
-    "setting.check": ({ body }) => Effect.sync(() => ({ ...setting.check(body), github: projects.githubStatus() })),
+    "setting.check": ({ body }) => Effect.sync(() => setting.check(body)),
     "setting.save": ({ body }) => setting.save(body).pipe(Effect.mapError((e) => refused(e.message))),
     "github.status": () => Effect.sync(projects.githubStatus),
     "project.list": () => projects.summaries(),

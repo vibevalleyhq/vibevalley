@@ -95,7 +95,6 @@ export interface ServerReady {
 }
 
 export interface SettingsCheck {
-  github?: GitHubStatus;
   problem?: string;
 }
 

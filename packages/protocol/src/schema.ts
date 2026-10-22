@@ -19,7 +19,6 @@ export const GitHubStatus: Schema.Codec<T.GitHubStatus> = Schema.Struct({
 });
 
 export const SettingsCheck: Schema.Codec<T.SettingsCheck> = Schema.Struct({
-  github: Schema.optionalKey(GitHubStatus),
   problem: Schema.optionalKey(Schema.String),
 });
 

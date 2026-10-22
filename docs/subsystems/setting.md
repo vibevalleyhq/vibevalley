@@ -12,7 +12,7 @@
 | 日志和送出农场的文字里抹密钥（`base/redact.ts`） | 档案、技能书、农机的设置：`config.json`（`agent` 包） |
 | | oar 的 `OAR_*`、各家农机自己的环境变量和配置（`CODEX_HOME`、pi 的 `models.json`） |
 | | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`apps/web/src/pages/settings/SettingsForm.tsx`） |
-| | GitHub 检测（`project`，[工单](docs/subsystems/issue.md)「和谁打交道」）；`setting.check` 顺带回它的结果 |
+| | GitHub 检测（`project`，[工单](docs/subsystems/issue.md)「和谁打交道」） |
 
 ## 在哪
 
@@ -42,7 +42,7 @@
 - **只在设置里有的**：语音服务的 ASR、LLM、TTS key，听写（地址、模型、key），记性的来源（地址、key、开关）。听写没填地址就是关着（`dictation()` 是 `undefined`）。
 - **钥匙不出服务端**：`status()` 对每把钥匙只给来源和末四位（`keyHint`：`…` 加最后 4 个 UTF-16 码元）；Agora 的 App ID 不算钥匙，整串给。
 - **一次更新**：没给的字段不动，给了空字符串就清掉（清掉后露出配置里的那把）；值去掉两头空白。听写的地址和模型都空时整项删掉；记性来源整张换掉，没给 key 的来源沿用这一种原来存的 key。
-- **格式不对就一样都不存**（`settingsProblem`）：DeepSeek 的钥匙带空格或不到 8 个字；Agora 的 App ID、Certificate 不是 32 位十六进制；语音服务的 key 带空格；听写的地址不是 `http(s)://` 开头或没填模型；记性来源不认识、同一种接了两个、打开了却没地址、地址不对、key 带空格；语音设置不对（`voiceProblem`）。`setting.check` 只回这句话（顺带 GitHub 的状态），`setting.save` 把它当 409 拒绝。不调 DeepSeek、Agora 去验证钥匙。
+- **格式不对就一样都不存**（`settingsProblem`）：DeepSeek 的钥匙带空格或不到 8 个字；Agora 的 App ID、Certificate 不是 32 位十六进制；语音服务的 key 带空格；听写的地址不是 `http(s)://` 开头或没填模型；记性来源不认识、同一种接了两个、打开了却没地址、地址不对、key 带空格；语音设置不对（`voiceProblem`）。`setting.check` 只回这句话，`setting.save` 把它当 409 拒绝。不调 DeepSeek、Agora 去验证钥匙。
 - **语音只存和默认不同的**：默认是 `defaultVoice()`，配置的 `voice.id` 改它的音色；存的时候只留和默认不同的项，全一样就不存。以后改了默认，主人没动过的那几项跟着变；「恢复默认」回到它。
 - **一次取齐**：`voiceConfig()`（语音设置、三把 key 和 DeepSeek 钥匙）、`dictation()`（地址和 key）、`memorySources()`（地址和 key）各从同一份设置里一次读出，地址不会和另一次保存的 key 配在一起。
 
