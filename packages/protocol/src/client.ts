@@ -28,19 +28,19 @@ export class VibeValleyApi {
     health: (): Promise<T.Health> => this.call("GET", "/api/v1/health", undefined, undefined) as Promise<T.Health>,
   };
 
-  readonly assistant = {
-    open: (): Promise<void> => this.call("POST", "/api/v1/assistant/open", undefined, undefined) as Promise<void>,
-    /** Ends the assistant's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (): Promise<void> => this.call("POST", "/api/v1/assistant/stop", undefined, undefined) as Promise<void>,
+  readonly orchestrator = {
+    open: (): Promise<void> => this.call("POST", "/api/v1/orchestrator/open", undefined, undefined) as Promise<void>,
+    /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
+    stop: (): Promise<void> => this.call("POST", "/api/v1/orchestrator/stop", undefined, undefined) as Promise<void>,
     /** The v1 caption relay without a call id is accepted only with one active call. */
-    hear: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/assistant/hear", undefined, a.body) as Promise<void>,
+    hear: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/orchestrator/hear", undefined, a.body) as Promise<void>,
     listArchive: (a: { q?: string }): Promise<T.ArchiveListing> =>
-      this.call("GET", "/api/v1/assistant/archive", { q: a.q }, undefined) as Promise<T.ArchiveListing>,
+      this.call("GET", "/api/v1/orchestrator/archive", { q: a.q }, undefined) as Promise<T.ArchiveListing>,
     getArchive: (a: { name: string }): Promise<string> =>
-      this.call("GET", "/api/v1/assistant/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
-    /** Saves the turn begun at a step of the assistant's log as a case for its evals, with what it should have done. */
-    markWrong: (a: { body: T.AssistantEvalRequest }): Promise<T.AssistantEval> =>
-      this.call("POST", "/api/v1/assistant/evals", undefined, a.body) as Promise<T.AssistantEval>,
+      this.call("GET", "/api/v1/orchestrator/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
+    /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
+    markWrong: (a: { body: T.OrchestratorEvalRequest }): Promise<T.OrchestratorEval> =>
+      this.call("POST", "/api/v1/orchestrator/evals", undefined, a.body) as Promise<T.OrchestratorEval>,
   };
 
   readonly setting = {
@@ -80,9 +80,6 @@ export class VibeValleyApi {
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/comment", undefined, a.body) as Promise<void>,
     changes: (a: { id: string }): Promise<T.Changes> =>
       this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<T.Changes>,
-    /** Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask). */
-    resolve: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/resolve", undefined, undefined) as Promise<void>,
     /** One joined read of issues and their real sessions, including explicit missing records. */
     history: (): Promise<T.IssueHistory[]> => this.call("GET", "/api/v1/issues/history", undefined, undefined) as Promise<T.IssueHistory[]>,
     list: (): Promise<T.Issue[]> => this.call("GET", "/api/v1/issues", undefined, undefined) as Promise<T.Issue[]>,
@@ -111,10 +108,6 @@ export class VibeValleyApi {
     /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
     dispatch: (a: { id: string; body: T.IssueDispatchRequest }): Promise<T.Dispatched> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,
-    /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
-     * another round. */
-    review: (a: { id: string; body: T.IssueReviewRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/review", undefined, a.body) as Promise<T.Issue>,
     /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
     act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,
@@ -127,7 +120,7 @@ export class VibeValleyApi {
     list: (a: { agent?: string }): Promise<T.Session[]> => this.call("GET", "/api/v1/sessions", { agent: a.agent }, undefined) as Promise<T.Session[]>,
     get: (a: { id: string }): Promise<T.Session> =>
       this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.Session>,
-    /** Its log, oldest first; run gives one run's only. The assistant's log is session assistant's. */
+    /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
     events: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> =>
       this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/events", { run: a.run }, undefined) as Promise<T.SessionEvent[]>,
   };
@@ -195,11 +188,11 @@ export class VibeValleyApi {
   };
 
   readonly memory = {
-    /** An agent's memories: the assistant's (agent assistant) are the lines of its MEMORY.md, with the file and how many of the newest
+    /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
      * its prompt carries; every other agent's are rows. */
     list: (a: { agent: string }): Promise<T.MemoryList> =>
       this.call("GET", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, undefined) as Promise<T.MemoryList>,
-    /** What the agent would be reminded of on its next start; the assistant is not reminded, it carries its whole file. */
+    /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
     recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> =>
       this.call(
         "GET",

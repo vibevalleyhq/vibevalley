@@ -90,6 +90,13 @@ test("starting an issue with no helper asks for one", async ({ page, api }) => {
   expect((await api.issue.get({ id: made.id })).status).toBe("backlog");
 });
 
+test("an act carries the fields not saved yet, saved before it is tried", async ({ api }) => {
+  const made = await issue(api, "带着改动开工之前");
+  await expect(api.issue.status({ id: made.id, body: { status: "todo", edit: { title: "带着改动开工", priority: "high" } } })).rejects.toThrow();
+  const got = await api.issue.get({ id: made.id });
+  expect([got.title, got.priority, got.status]).toEqual(["带着改动开工", "high", "backlog"]);
+});
+
 test("a todo dragged onto another goes before it", async ({ page, api }) => {
   const first = await issue(api, "排先后甲");
   const second = await issue(api, "排先后乙");

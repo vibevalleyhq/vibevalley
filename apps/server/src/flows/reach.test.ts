@@ -2,7 +2,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { Issues } from "../issue/issue.ts";
-import { Sessions } from "../session/session.ts";
+import { Sessions, type SessionsInside } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { farm, lab, mustHire, watch } from "./farm.ts";
 
@@ -23,7 +23,7 @@ describe("a session", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      expect(sessions.mcpUrl()).toBe("http://127.0.0.1:8787/mcp");
+      expect((sessions as SessionsInside).mcpUrl()).toBe("http://127.0.0.1:8787/mcp");
       const first = mustHire(yield* issues.hire(lab(), "看看", "reach"));
       yield* w.nextReport;
       sessions.setAddress("127.0.0.1:54321");

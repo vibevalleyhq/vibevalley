@@ -1,4 +1,4 @@
-// The title screen over the farm (src/farm/title): the menu by mouse and keys, 开始游戏 asking for the assistant's key
+// The title screen over the farm (src/farm/title): the menu by mouse and keys, 开始游戏 asking for the orchestrator's key
 // first (the test server has none), 继续游戏 once there is a farm, and not showing again once left.
 
 import { expect, test } from "./fixtures";
@@ -24,7 +24,7 @@ test("a new farm: 继续游戏 is off, 开始游戏 asks for the key first, 设�
 });
 
 test("with a farm, 继续游戏 is picked and Enter goes in", async ({ page, api }) => {
-  await api.assistant.open();
+  await api.orchestrator.open();
   await api.channel.say({ body: { text: "早", sendKey: "title-test-1" } });
   await page.goto("/?tod=0.4");
   const title = page.getByRole("dialog", { name: "码农场物语 首页" });

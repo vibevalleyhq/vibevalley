@@ -58,7 +58,7 @@ export function changesText(c: Changes): string {
   return lines.join("\n");
 }
 
-/** How a session reads to the assistant, in its situation as in roster; number is its issue's. */
+/** How a session reads to the orchestrator, in its situation as in roster; number is its issue's. */
 export function sessionLine(w: Roster, now = Date.now(), number?: number): string {
   const h = w.session;
   let last = "";
@@ -73,9 +73,9 @@ export function sessionLine(w: Roster, now = Date.now(), number?: number): strin
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-// ── issues, as the assistant reads them ──
+// ── issues, as the orchestrator reads them ──
 
-/** The words the owner and the assistant use for a status, and its own name. */
+/** The words the owner and the orchestrator use for a status, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
   备选: "backlog",
   草稿: "backlog",
@@ -104,6 +104,23 @@ export const priorityOf = (word: string): Priority | undefined => priorityNames[
 
 const priorityWords: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
+/** How a status is said back when the word for it is not known: the first word for each. */
+const statusWords: Readonly<Record<IssueStatus, string>> = {
+  backlog: "备选",
+  todo: "待办",
+  in_progress: "处理中",
+  in_review: "等你看",
+  done: "已完成",
+  canceled: "已取消",
+};
+
+export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusWords[s]).join("、");
+export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityWords[p]).join("、");
+
+/** A channel in one line: its name, what it is for, its default project. */
+export const channelLine = (c: { readonly name: string; readonly description?: string; readonly project?: string }) =>
+  "#" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
+
 const stuckWords: Readonly<Record<StuckReason, string>> = { failed: "没做成", conflict: "有冲突", interrupted: "停在半路", quiet: "没动静" };
 
 /** How long, in round words. */
@@ -114,7 +131,7 @@ export function spanWords(ms: number): string {
   return `${Math.floor(m / 60 / 24)} 天`;
 }
 
-/** One line: its number and short title first, so the assistant names it by them; who is the one doing it, when any. */
+/** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
   const st = t.attention;
   const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
@@ -166,7 +183,7 @@ export function parseTime(s: string): number | undefined {
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** Changing an issue or moving it is the owner's call: the assistant asks for what it saw itself, as with a merge. */
+/** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself, as with a merge. */
 export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */

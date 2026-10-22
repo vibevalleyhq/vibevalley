@@ -17,11 +17,11 @@ import { BugSnakeGame } from "./games/BugSnakeGame";
 import { DinoGame } from "./games/DinoGame";
 import { MergeGame } from "./games/MergeGame";
 import { SokobanGame } from "./games/SokobanGame";
-import { HomeScreen, ListScreen, AssistantScreen, type PhoneApp, RingingScreen } from "./screens";
+import { HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
-/** What rang, for the assistant to open the call with. */
+/** What rang, for the orchestrator to open the call with. */
 const aboutOf = (call: InboxItem) => `${call.who}：${call.words.label}。${call.text}`;
 
 export function Phone() {
@@ -37,7 +37,7 @@ export function Phone() {
   const settle = (call: InboxItem, answered: boolean) => {
     phoneCalls.settle(call, answered);
     if (!answered) return;
-    // Answering is the call: the assistant comes on and says what rang; the farm shows it meanwhile.
+    // Answering is the call: the orchestrator comes on and says what rang; the farm shows it meanwhile.
     void voiceCall.start(aboutOf(call));
     switch (call.target.kind) {
       case "session":
@@ -82,10 +82,10 @@ export function Phone() {
               />
             </Match>
             <Match when={app() === "missed" || app() === "log"}>
-              <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("assistant")} />
+              <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />
             </Match>
-            <Match when={app() === "assistant"}>
-              <AssistantScreen />
+            <Match when={app() === "orchestrator"}>
+              <OrchestratorScreen />
             </Match>
             <Match when={app() === "blocks"}>
               <BlocksGame big />

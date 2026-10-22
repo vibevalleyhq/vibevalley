@@ -6,7 +6,7 @@ import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { channelsOf } from "../../rules/chat";
+import { channelLabel, channelsOf } from "../../rules/chat";
 import { momentText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../app/util";
@@ -222,7 +222,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   const act = useConnectorAction();
   const [error, setError] = createSignal<string>();
   const options = () => {
-    const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? "田头", label: c.kind === "general" ? "田头" : `#${c.name}` }));
+    const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? "田头", label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
     if (!all.some((o) => o.value === props.current)) all.push({ value: props.current, label: props.current });
     return all;

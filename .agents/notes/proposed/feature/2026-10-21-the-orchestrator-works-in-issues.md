@@ -118,12 +118,12 @@ Status: proposed
 - **`packages/protocol`**：`Issue.kind`、`Issue.answer`；`Issue.relations`（`{ kind: "duplicate" | "related"; issue: string }[]`，存在 `issue` 表的一列 JSON）；健康度的规则（`rules/health.ts`）和它的黄金数据；`IssueAct` 加 `acknowledge`、`spinoff`。和工单页共用站位（`packages/protocol/src/rules/attention.ts`），那边先落地。
 - **`apps/server/src/tool`**：按工单点名；新的七个工具；`Caller.Owner` 挡「定主意」和「落地」两档；`testdata/tool_schemas.json` 跟着改。
 - **`apps/server/src/issue`**：查询的派活（和起草共用「只读 worktree + 交回就重置」，抽成一个函数）、`questionBrief`、`parseAnswer`、查询的 `statusMove`、`relations` 的读写。
-- **`apps/server/src/assistant`**：提示改成以工单为单位，加记、找、改、问、报的说法和分寸；「农场现状」里的帮工带上它的工单编号；样例进 `testdata/evals`。
+- **`apps/server/src/orchestrator`**：提示改成以工单为单位，加记、找、改、问、报的说法和分寸；「农场现状」里的帮工带上它的工单编号；样例进 `testdata/evals`。
 - **页面**：工单页上查询的「做出了什么」是答案；看板上查询有自己的标记；项目页画健康度。
 
 按这个顺序做，每一步单独能上线：
 
-1. 按工单点名，`issues`（`issue_get` 并进了它：填编号就是一张）、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/assistant.md)「管家以工单为单位」；还差 `verify-assistant-evals` 的样例。
+1. 按工单点名，`issues`（`issue_get` 并进了它：填编号就是一张）、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」；还差 `verify-orchestrator-evals` 的样例。
 2. 主人的 Inbox 和早报：规则已经有，只差管家能问和固定格式。
 3. 查询工单。
 4. 查重和关系、项目健康度。
@@ -158,7 +158,7 @@ Status: proposed
 - 「clock-in 怎么样了」：说的健康度和项目页画的是同一个，理由是规则给的那几张工单。
 - 「为什么 X」：派一张查询工单，不是改代码的；交回后 worktree 回到主分支、没有提交；读得出答案就「等你看」，读不出就「卡住了」、不能挪到已完成；「照这个改」起一张带 `parent` 的改代码工单。
 - 农场自己能答的（现状、花费、工单历史）管家直接答，不派帮工。
-- `verify-assistant-evals` 里每一节至少一条样例：记一下、哪些在等我、按编号问、改优先级要不要问、查询、早报。
+- `verify-orchestrator-evals` 里每一节至少一条样例：记一下、哪些在等我、按编号问、改优先级要不要问、查询、早报。
 
 ## Risks
 

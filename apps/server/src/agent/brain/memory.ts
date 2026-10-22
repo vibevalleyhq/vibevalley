@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
 export const memoryPromptChars = 8_000;
 
-/** Where an agent with this home keeps its memory; the assistant page reads it there. */
+/** Where an agent with this home keeps its memory; the orchestrator page reads it there. */
 export const memoryFile = (home: string) => join(home, "MEMORY.md");
 
 /** `- YYYY-MM-DD note`, or whatever the agent wrote when it tidied. id is stable while the line is unchanged. */

@@ -112,7 +112,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
   return out;
 }
 
-export const actorText: Record<GraphActor, string> = { user: "主人", assistant: "管家", system: "农场", session: "帮工" };
+export const actorText: Record<GraphActor, string> = { user: "主人", orchestrator: "管家", system: "农场", session: "帮工" };
 
 export function graphEventText(e: GraphChange, titleOf: (task: string) => string = (id) => id): string {
   const step = e.task ? "「" + titleOf(e.task) + "」" : "「」";

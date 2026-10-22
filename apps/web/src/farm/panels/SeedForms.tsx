@@ -5,21 +5,23 @@
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { assistantAgent, type ProjectTemplates, type Session } from "@vibevalley/protocol";
+import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
 import { playSound } from "../sound";
-import { newSendKey, writeIssue } from "../../pages/issues/write";
+import { newSendKey } from "../../data/api";
+import { writeIssue } from "../../pages/issues/write";
 import { aria } from "../../app/util";
 import { useRouter } from "../../app/router";
-import { ready, useAgents, useProjects, useQuery } from "../../data/query";
+import { ready, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";
+import { useWorkAgents } from "../../data/agents";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
-const byAssistant = "auto";
+const byOrchestrator = "auto";
 
 /** The bag's seeds: the recent words, and each kind that has templates, with them. */
 function seedsOf(bag: ProjectTemplates | undefined) {
@@ -64,8 +66,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const farmProject = useFarm((s) => s.project);
   const project = () => farmProject() || undefined;
   const pick = useFarm((s) => s.pick);
-  const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== assistantAgent && a.enabled);
+  const agents = useWorkAgents(true);
   const router = useRouter();
   const [text, setText] = createSignal("");
   const [selection, setSelection] = createSignal<readonly [number, number]>();
@@ -74,8 +75,8 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   let words: HTMLTextAreaElement | undefined;
 
   const templates = useQuery(() => ({ queryKey: ["templates", project()], queryFn: () => api.project.templates({ id: project()! }), enabled: !!project() }));
-  const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byAssistant);
-  const agentOf = (w: string) => (w === byAssistant ? undefined : w);
+  const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byOrchestrator);
+  const agentOf = (w: string) => (w === byOrchestrator ? undefined : w);
   const canSow = () => text().trim() !== "";
 
   const take = (t: string, blank?: { start: number; end: number }) => {
@@ -192,7 +193,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
             </div>
             <p class={["mt-3", xs]}>谁来种</p>
             <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="谁来种">
-              <WhoTile active={sower() === byAssistant} label="管家挑" onClick={() => setWho(byAssistant)}>
+              <WhoTile active={sower() === byOrchestrator} label="管家挑" onClick={() => setWho(byOrchestrator)}>
                 <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-[16px] text-bark-600">?</span>
               </WhoTile>
               <For each={agents()} keyed={(a) => a.id}>

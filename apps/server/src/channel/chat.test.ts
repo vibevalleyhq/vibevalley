@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { type ChatMessage, type Conversation, assistantAgent, type Session } from "@vibevalley/protocol";
+import { type ChatMessage, type Conversation, orchestratorAgent, type Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { conversationOf, generalOf, messagesIn } from "./state.ts";
 import { head } from "../base/text.ts";
@@ -14,7 +14,7 @@ import { sessionOnIssue } from "../session/state.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type AssistantNews } from "./chat.ts";
+import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -181,12 +181,12 @@ const hireAndRun = (f: Farm, x: FakeSessions, id: string, task: string, project:
 
 const news = (f: Farm) =>
   Effect.gen(function* () {
-    const heard: AssistantNews[] = [];
-    yield* Effect.forkScoped(Stream.runForEach(yield* f.chat.forAssistant, (n) => Effect.sync(() => heard.push(n))));
+    const heard: OrchestratorNews[] = [];
+    yield* Effect.forkScoped(Stream.runForEach(yield* f.chat.forOrchestrator, (n) => Effect.sync(() => heard.push(n))));
     return {
       of: (message: string) =>
         Effect.gen(function* () {
-          yield* until(() => heard.some((n) => n.messages.some((m) => m.id === message)), `the assistant hearing of ${message}`);
+          yield* until(() => heard.some((n) => n.messages.some((m) => m.id === message)), `the orchestrator hearing of ${message}`);
           return heard.find((n) => n.messages.some((m) => m.id === message))!;
         }),
     };
@@ -245,7 +245,7 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("the general channel reaches the assistant", () =>
+  it.live("the general channel reaches the orchestrator", () =>
     run((f, x) =>
       Effect.gen(function* () {
         yield* hireAndRun(f, x, "w3", "写 hello", "chat-c");
@@ -257,7 +257,7 @@ describe("the chat", () => {
         yield* settle;
         expect(x.runsOf("w3")).toHaveLength(before);
         expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({ reason: "general", wakes: false });
-        expect(yield* Effect.promise(() => f.deliveryOf(assistantAgent, said.id))).toMatchObject({ state: "seen" });
+        expect(yield* Effect.promise(() => f.deliveryOf(orchestratorAgent, said.id))).toMatchObject({ state: "seen" });
       }),
     ),
   );
@@ -314,9 +314,9 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w7", "写 hello", "chat-e");
-        // The assistant is never cooled down, so only the hop limit holds.
+        // The orchestrator is never cooled down, so only the hop limit holds.
         for (let i = 1; i <= 5; i++) expect((yield* f.chat.speak("w7", `@管家 第 ${i} 次问`, { anyway: true })).kind).toBe("sent");
-        const held = (yield* Effect.promise(() => f.deliveries(assistantAgent))).filter((d) => d.reason === "mention").map((d) => d.held_by);
+        const held = (yield* Effect.promise(() => f.deliveries(orchestratorAgent))).filter((d) => d.reason === "mention").map((d) => d.held_by);
         expect(held).toEqual(["", "", "", "", "hop_limit"]);
         const notices = f.messagesOf(thread.id).filter((m) => m.kind === "notice");
         expect(notices).toHaveLength(1);
@@ -371,18 +371,18 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("the assistant's words grow, then are delivered once final", () =>
+  it.live("the orchestrator's words grow, then are delivered once final", () =>
     run((f, x) =>
       Effect.gen(function* () {
         yield* hireAndRun(f, x, "w11", "写 hello", "chat-k");
         const general = f.chat.general();
-        yield* f.chat.assistantSays(general, "k1", "", false, "");
-        yield* f.chat.assistantSays(general, "k1", "好的，", false, "");
-        yield* f.chat.assistantSays(general, "k1", "好的，我叫 @w11 去", false, "");
-        const ours = () => f.messagesOf(general).filter((m) => m.from === assistantAgent && m.kind === "chat");
+        yield* f.chat.orchestratorSays(general, "k1", "", false, "");
+        yield* f.chat.orchestratorSays(general, "k1", "好的，", false, "");
+        yield* f.chat.orchestratorSays(general, "k1", "好的，我叫 @w11 去", false, "");
+        const ours = () => f.messagesOf(general).filter((m) => m.from === orchestratorAgent && m.kind === "chat");
         expect(ours().map((m) => [m.final, m.text])).toEqual([[false, "好的，我叫 @w11 去"]]);
         expect(yield* Effect.promise(() => f.deliveryOf("w11", ours()[0]!.id))).toBeUndefined();
-        yield* f.chat.assistantSays(general, "k1", "好的，我叫 @w11 去看看", true, "");
+        yield* f.chat.orchestratorSays(general, "k1", "好的，我叫 @w11 去看看", true, "");
         expect(ours().map((m) => [m.final, m.mentions])).toEqual([[true, ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
         yield* f.chat.notice(general, "定时到了", "recurrence");
@@ -410,20 +410,20 @@ describe("the chat", () => {
         expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Refused");
         expect(generalOf(f.core.state().chat)?.read).toBe(seqs[4]);
         expect((yield* Effect.flip(f.chat.say("  ", undefined, "")))._tag).toBe("Refused");
-        expect(yield* f.chat.assistantDigest()).toEqual([]);
+        expect(yield* f.chat.orchestratorDigest()).toEqual([]);
       }),
     ),
   );
 
-  it.live("the inbox and the assistant's digest", () =>
+  it.live("the inbox and the orchestrator's digest", () =>
     run((f, x) =>
       Effect.gen(function* () {
         const thread = yield* hireAndRun(f, x, "w12", "写 hello", "chat-l");
-        const digest = yield* f.chat.assistantDigest();
+        const digest = yield* f.chat.orchestratorDigest();
         expect(digest.map((d) => [d.from, d.target])).toEqual([["w12", `#田头:${thread.parentNumber}`]]);
-        expect(yield* f.chat.assistantDigest()).toHaveLength(1);
-        yield* f.sql`update channel_delivery set state = 'seen' where recipient_id = ${assistantAgent} and message_id = ${digest[0]!.id}`.pipe(Effect.orDie);
-        expect(yield* f.chat.assistantDigest()).toEqual([]);
+        expect(yield* f.chat.orchestratorDigest()).toHaveLength(1);
+        yield* f.sql`update channel_delivery set state = 'seen' where recipient_id = ${orchestratorAgent} and message_id = ${digest[0]!.id}`.pipe(Effect.orDie);
+        expect(yield* f.chat.orchestratorDigest()).toEqual([]);
         yield* f.chat.say("大家看一下", f.chat.general(), "");
         const inbox = yield* f.chat.inbox("w12");
         expect(inbox).toEqual([{ target: "#田头", unread: 2, mentionsYou: true, latest: "主人" }]);
@@ -489,9 +489,9 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const general = f.chat.general();
-        yield* f.chat.assistantSays(general, "first-run", "partial", false, "run-first");
-        yield* f.chat.assistantSays(general, "first-run", "complete", true, "run-second");
-        yield* f.chat.assistantSays(general, "legacy", "unlinked", true, "");
+        yield* f.chat.orchestratorSays(general, "first-run", "partial", false, "run-first");
+        yield* f.chat.orchestratorSays(general, "first-run", "complete", true, "run-second");
+        yield* f.chat.orchestratorSays(general, "legacy", "unlinked", true, "");
         const saved = yield* f.chat.history(general);
         expect(saved.map((m) => [m.text, m.run])).toEqual([
           ["complete", "run-first"],
@@ -520,7 +520,7 @@ describe("the chat", () => {
         const said: Record<string, number> = {};
         for (const m of f.messagesOf(f.chat.general())) if (m.from === "user") said[m.text] = (said[m.text] ?? 0) + 1;
         expect(said).toEqual({ 早: 2, 晚: 2, 电话里说的: 1 });
-        expect(yield* Effect.promise(() => f.deliveries(assistantAgent))).toHaveLength(4);
+        expect(yield* Effect.promise(() => f.deliveries(orchestratorAgent))).toHaveLength(4);
       }),
     ),
   );
@@ -536,7 +536,7 @@ describe("the chat", () => {
     run((f) =>
       Effect.gen(function* () {
         const general = f.chat.general();
-        yield* f.chat.assistantSays(general, "read", "hello", true, "");
+        yield* f.chat.orchestratorSays(general, "read", "hello", true, "");
         const [message] = yield* f.chat.history(general);
         yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('user', ${message!.id})`.pipe(Effect.orDie);
         yield* trigger(f.sql, "fail_receipt", "before delete on channel_seen_mark");
@@ -591,12 +591,12 @@ describe("the chat", () => {
     run((f) =>
       Effect.gen(function* () {
         const general = f.chat.general();
-        yield* f.chat.assistantSays(general, "stream", "partial", false, "");
+        yield* f.chat.orchestratorSays(general, "stream", "partial", false, "");
         yield* trigger(f.sql, "fail_final", "before update on channel_message", "when (new.final)");
-        yield* f.chat.assistantSays(general, "stream", "complete", true, "");
+        yield* f.chat.orchestratorSays(general, "stream", "complete", true, "");
         expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[false, "partial"]]);
         yield* drop(f.sql, "fail_final", "channel_message");
-        yield* f.chat.assistantSays(general, "stream", "complete", true, "");
+        yield* f.chat.orchestratorSays(general, "stream", "complete", true, "");
         expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[true, "complete"]]);
       }),
     ),

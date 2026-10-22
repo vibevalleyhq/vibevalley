@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 
-test("the assistant's memory takes a note and forgets it", async ({ page }) => {
-  await page.goto("/assistant");
+test("the orchestrator's memory takes a note and forgets it", async ({ page }) => {
+  await page.goto("/orchestrator");
   await expect(page.getByRole("heading", { name: "管家" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "记性" })).toHaveAttribute("aria-selected", "true");
   await page.getByLabel("替它记一条").fill("提交信息写中文");
@@ -14,10 +14,10 @@ test("the assistant's memory takes a note and forgets it", async ({ page }) => {
   await expect(notes.getByText("提交信息写中文")).toBeHidden();
 });
 
-test("the assistant's trajectory shows what it was told, and a round it never heard cannot be marked wrong", async ({ page, api }) => {
-  // Without the model's key the assistant cannot start: the line is in its log, not in its conversation.
+test("the orchestrator's trajectory shows what it was told, and a round it never heard cannot be marked wrong", async ({ page, api }) => {
+  // Without the model's key the orchestrator cannot start: the line is in its log, not in its conversation.
   await api.channel.say({ body: { text: "帮我看看打卡页" } });
-  await page.goto("/assistant/trajectory");
+  await page.goto("/orchestrator/trajectory");
   const row = page.getByRole("button", { name: /^收到 .*帮我看看打卡页/ });
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/^\d+ 轮 · \d+ 步/)).toBeVisible();
@@ -30,11 +30,11 @@ test("the assistant's trajectory shows what it was told, and a round it never he
   await expect(page.getByText("没有对得上的步骤。")).toBeVisible();
 });
 
-test("the archive and the assistant's voice", async ({ page }) => {
-  await page.goto("/assistant/archive");
+test("the archive and the orchestrator's voice", async ({ page }) => {
+  await page.goto("/orchestrator/archive");
   await expect(page.getByText("还没有：管家的对话还没长到要压缩。")).toBeVisible();
   await page.getByRole("tab", { name: "声音" }).click();
-  await expect(page).toHaveURL(/\/assistant\/voice$/);
+  await expect(page).toHaveURL(/\/orchestrator\/voice$/);
   const greeting = page.getByLabel("开场白");
   const before = await greeting.inputValue();
   await greeting.fill("来啦，今天种什么？");
@@ -47,13 +47,13 @@ test("the archive and the assistant's voice", async ({ page }) => {
   await expect(page.getByText("存好了，下一通电话就用上。")).toBeVisible();
 });
 
-test("the assistant's page as it looks", async ({ page, api }) => {
+test("the orchestrator's page as it looks", async ({ page, api }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await api.channel.say({ body: { text: "看看今天地里怎么样" } });
-  await page.goto("/assistant/trajectory");
+  await page.goto("/orchestrator/trajectory");
   await expect(page.getByRole("button", { name: /^收到 .*看看今天地里怎么样/ })).toBeVisible({ timeout: 15_000 });
-  await page.screenshot({ path: test.info().outputPath("assistant-trajectory.png") });
-  await page.goto("/assistant/voice");
+  await page.screenshot({ path: test.info().outputPath("orchestrator-trajectory.png") });
+  await page.goto("/orchestrator/voice");
   await expect(page.getByLabel("开场白")).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("assistant-voice.png") });
+  await page.screenshot({ path: test.info().outputPath("orchestrator-voice.png") });
 });

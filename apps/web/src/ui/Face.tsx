@@ -40,8 +40,8 @@ export function AgentFace(props: { agentId: string; look?: Look; size?: number; 
   );
 }
 
-/** The assistant's head (assistant-<look>-face; the farmer's until looks are picked). */
-export function AssistantFace(props: { size?: number; look?: string }) {
+/** The orchestrator's head (orchestrator-<look>-face; the farmer's until looks are picked). */
+export function OrchestratorFace(props: { size?: number; look?: string }) {
   const sprites = useSprites();
   const size = () => props.size ?? 24;
   const cut = () => {

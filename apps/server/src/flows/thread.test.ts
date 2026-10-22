@@ -15,7 +15,7 @@ describe("an issue's thread", () => {
   // One issue, one thread: sent out, cancelled and reopened, both sessions' dispatch, reports and the person's words are
   // in the same thread; the person's words wake the session working the issue now, and only keep when none is.
   it.live("is one across its sessions", () => {
-    // Says only that it is done: echoing its input would @ the assistant, who would then follow the thread.
+    // Says only that it is done: echoing its input would @ the orchestrator, who would then follow the thread.
     const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }) });
     return Effect.gen(function* () {
       const issues = yield* Issues;

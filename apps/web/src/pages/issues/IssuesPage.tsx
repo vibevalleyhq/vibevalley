@@ -17,7 +17,7 @@ import { IconButton, IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
 import { run, useGraphs, useNameOf } from "./hooks";
-import { IssueDetail, AssistantIssueDetail } from "./IssueDetail";
+import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { TaskDetail } from "./TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
@@ -213,8 +213,8 @@ function Detail(props: {
           />
         )}
       </Match>
-      <Match when={shows("assistant")} keyed>
-        {() => <AssistantIssueDetail issue={as("assistant").issue} />}
+      <Match when={shows("orchestrator")} keyed>
+        {() => <OrchestratorIssueDetail issue={as("orchestrator").issue} />}
       </Match>
       <Match when={shows("missing")} keyed>
         {() => (

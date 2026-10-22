@@ -9,14 +9,14 @@ Status: proposed
 **现在默认接电话的不是管家。** 「谁接电话」（`VoiceSettings.answer`）的默认是 `agora`（`defaultVoice`：`{ vendor: "agora", model: "gpt-4.1-mini" }`），主人的 `settings.json` 里 `voice` 是空的，所以每通电话都是这个「快嘴」在答：
 
 - 回答的是声网托管的 `gpt-4.1-mini`，它只有语音设置里的人设、开场白，和这通电话里最近 15 轮。它看不到农场：帮工、工单、田头里说过的话、管家的记性，它都不知道。人设本身就写着「看不到地里，派活由本机的管家做」。
-- 真管家只是旁听：页面把主人定稿的一句交 `/voice/agent/heard`，服务端经 `Assistant.heard` 记进田头，并提示管家「语音那边已经回答了，你只要按需派活，派了就说一句派给了谁，没派就什么都不说」。
+- 真管家只是旁听：页面把主人定稿的一句交 `/voice/agent/heard`，服务端经 `Orchestrator.heard` 记进田头，并提示管家「语音那边已经回答了，你只要按需派活，派了就说一句派给了谁，没派就什么都不说」。
 - 结果是两个脑子：电话里开口的那个不知道农场，派活的那个不开口。快嘴会答应管家没做的事，或者不知道刚派出去了什么；主人在电话里听到的和田头里管家的上下文对不上。
 
-**主人描述的接法已经有了，只是不是默认，也没有在真电话上验过。** 「谁接电话」选 `assistant` 时：
+**主人描述的接法已经有了，只是不是默认，也没有在真电话上验过。** 「谁接电话」选 `orchestrator` 时：
 
-1. 声网的对话式 AI（ConvoAI）管听（识别、VAD 断句）、打断和说（合成），把「想」交给一个 OpenAI 兼容的大模型，地址是我们的语音线路 `POST /llm/<通话>/chat/completions`，模型名 `vibevalley-assistant`，每通电话一把钥匙。
+1. 声网的对话式 AI（ConvoAI）管听（识别、VAD 断句）、打断和说（合成），把「想」交给一个 OpenAI 兼容的大模型，地址是我们的语音线路 `POST /llm/<通话>/chat/completions`，模型名 `vibevalley-orchestrator`，每通电话一把钥匙。
 2. 声网的云要连到本机，所以线路经隧道出去：设了 `voice.line.url` 就用它，没设时第一通电话开 cloudflared 的临时隧道（这台电脑装了 cloudflared 2026.10.0）。
-3. 每说完一句，声网来一个请求。`agent/brain/openai.ts` 只取 `messages` 里最后一条 `user`，交给 `Assistant.call`：先把这句记进田头，再带「电话里说的、要口语、一两句、不念代码」的提示，作为主人在田头的一句交给管家这一轮（`ask`，`now`），管家的字边长边以 SSE 流回去给声网念。
+3. 每说完一句，声网来一个请求。`agent/brain/openai.ts` 只取 `messages` 里最后一条 `user`，交给 `Orchestrator.call`：先把这句记进田头，再带「电话里说的、要口语、一两句、不念代码」的提示，作为主人在田头的一句交给管家这一轮（`ask`，`now`），管家的字边长边以 SSE 流回去给声网念。
 4. 声网历史和系统提示不用：管家有自己的历史（田头那一份）和人设，再让声网留一份就是两份上下文，正是现在对不上的根源。
 
 这条线是对的接法：电话只是管家的一张嘴，上下文和田头是同一份。但它有几处没验证过、可能出问题的地方（见 Risks），而默认值让主人根本走不到它。
@@ -25,9 +25,9 @@ Status: proposed
 
 ### 1. 默认由管家自己接电话
 
-已做：`defaultVoice.answer` 是 `assistant`，配置的 `voice.model` 去掉了（它只是把默认改回快嘴）；管家接时管家页不显示人设。线路的公网地址用 Tailscale Funnel（`tailscale funnel --bg 8788`），设成 `voice.line.url`，第一通电话不再开 cloudflared。
+已做：`defaultVoice.answer` 是 `orchestrator`，配置的 `voice.model` 去掉了（它只是把默认改回快嘴）；管家接时管家页不显示人设。线路的公网地址用 Tailscale Funnel（`tailscale funnel --bg 8788`），设成 `voice.line.url`，第一通电话不再开 cloudflared。
 
-- `defaultVoice.answer` 改成 `{ vendor: "assistant" }`。快嘴（`agora`、`deepseek`、`openai`）留作选项：给没有隧道、或者更在乎延迟的人。
+- `defaultVoice.answer` 改成 `{ vendor: "orchestrator" }`。快嘴（`agora`、`deepseek`、`openai`）留作选项：给没有隧道、或者更在乎延迟的人。
 - 设置页「谁接电话」把管家放在第一个，说明写清两种的区别：管家接是「同一个管家、看得到农场、派活和回答是一回事」，快嘴是「另一个模型先答，管家旁听派活，答得快但不知道农场」。
 - 管家页「声音」里的「人设」只对快嘴有用（现在已经这么说明），管家接时不显示人设这一栏，免得主人以为改了它管家就会变。
 

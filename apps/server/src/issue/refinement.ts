@@ -1,6 +1,6 @@
 // Refinement: an issue in the backlog refined by a helper before anyone works it. Who drafts, what the refiner is told,
 // and how what it hands back is read into the issue; the refiner's worktree goes back to main after, and goes away with
-// the issue. Who the farm sends for any task (pickAgent) is decided here too.
+// the issue.
 
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
@@ -13,10 +13,10 @@ import type { ChannelShape } from "../channel/chat.ts";
 import type { CoreShape } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import type { ProjectShape, Workplace } from "../project/project.ts";
-import { type RuntimeShape, usable } from "../runtime/runtime.ts";
-import { chooseAgent } from "../session/rules.ts";
+import { chooseAgent } from "../runtime/rules.ts";
+import type { RuntimeShape } from "../runtime/runtime.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
-import { isForAssistant } from "./state.ts";
+import { isForOrchestrator } from "./state.ts";
 import { refinementBrief, refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
 
 /** What drafting needs of the issues around it. */
@@ -43,15 +43,10 @@ export function refinement(d: RefinementDeps) {
   /** One draft starts at a time: two clicks do not send two sessions. */
   const drafting = Semaphore.makeUnsafe(1);
 
-  const candidatesNow = Effect.suspend(() =>
-    Effect.forEach(store.agents(), (agent) => Effect.map(runtimes.assess(agent), (a) => ({ agent: a.agent, usable: usable(a) }))),
-  );
-  const pickAgent = (task: string, named: string, picked: string) => Effect.map(candidatesNow, (c) => chooseAgent(c, task, named, picked));
-
   /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
   const refiner = (t: Issue) =>
     Effect.gen(function* () {
-      const candidates = yield* candidatesNow;
+      const candidates = yield* runtimes.candidates;
       let named = "";
       if (t.assignee) {
         if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
@@ -110,7 +105,7 @@ export function refinement(d: RefinementDeps) {
     drafting.withPermits(1)(
       Effect.gen(function* () {
         const t = yield* unsent(id);
-        if (isForAssistant(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
+        if (isForOrchestrator(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
         if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
         if (t.refining) return yield* Effect.fail(refused(t.refining.name + " 正在起草：等它交回来"));
         const chosen = yield* refiner(t);
@@ -169,5 +164,5 @@ export function refinement(d: RefinementDeps) {
       }
     });
 
-  return { pickAgent, draft, handedBack, clearRefinement };
+  return { draft, handedBack, clearRefinement };
 }

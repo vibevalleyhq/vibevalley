@@ -1,9 +1,9 @@
 // The profiles work is sent to, the skills and each runtime's settings: config.json in
-// the home. The assistant is a profile every farm has, built in, never deleted, on VibeValley's own agent.
+// the home. The orchestrator is a profile every farm has, built in, never deleted, on VibeValley's own agent.
 
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { type Agent, assistantAgent, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
+import { type Agent, orchestratorAgent, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
@@ -16,15 +16,15 @@ interface Stored {
   readonly settings: Readonly<Record<string, RuntimeSettings>>;
 }
 
-/** The runtime id of VibeValley's own agent, the one the assistant runs on. */
-export const assistantRuntime = "vibevalley";
+/** The runtime id of VibeValley's own agent, the one the orchestrator runs on. */
+export const orchestratorRuntime = "vibevalley";
 
-const assistantProfile = (): Agent => ({
-  id: assistantAgent,
+const orchestratorProfile = (): Agent => ({
+  id: orchestratorAgent,
   name: "管家",
   role: "替主人派活、转告结果",
   enabled: true,
-  runtime: assistantRuntime,
+  runtime: orchestratorRuntime,
   model: "",
   effort: "",
   persona: "",
@@ -61,11 +61,13 @@ export function withCast(a: Agent): Agent {
 }
 
 export interface AgentShape {
-  /** The profiles work is sent to: every one but the assistant's. */
+  /** The profiles work is sent to: every one but the orchestrator's. */
   readonly agents: () => Agent[];
-  /** All the profiles, the assistant's too. */
+  /** All the profiles, the orchestrator's too. */
   readonly all: () => Agent[];
   readonly agent: (id: string) => Agent | undefined;
+  /** A profile work is sent to, by its id or its name, as a person or a model says it. */
+  readonly named: (key: string) => Agent | undefined;
   readonly skills: () => Skill[];
   readonly settings: (runtime: string) => RuntimeSettings;
   readonly saveAgent: (a: Agent) => Effect.Effect<Agent, ApiError>;
@@ -103,7 +105,7 @@ export const make = Effect.gen(function* () {
       s = seed;
     }
   }
-  const agents = s.agents.some((a) => a.id === assistantAgent) ? s.agents : [...s.agents, assistantProfile()];
+  const agents = s.agents.some((a) => a.id === orchestratorAgent) ? s.agents : [...s.agents, orchestratorProfile()];
   s = { agents: agents.map(withCast), skills: s.skills ?? [], settings: s.settings ?? {} };
   disk.write(() => JSON.stringify(s));
 
@@ -119,17 +121,23 @@ export const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
+  /** The profiles work is sent to: every one but the orchestrator's. */
+  const sendable = () => all().filter((a) => a.id !== orchestratorAgent);
 
   const shape: AgentShape = {
-    agents: () => all().filter((a) => a.id !== assistantAgent),
+    agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
+    named: (key) => {
+      const k = key.trim();
+      return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
+    },
     skills: () => structuredClone([...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     saveAgent: (a) =>
       Effect.gen(function* () {
-        if (a.id === assistantAgent && a.runtime !== assistantRuntime)
-          return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + assistantRuntime));
+        if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
+          return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
         const cast = withCast(a);
         yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
         return cast;
@@ -144,7 +152,7 @@ export const make = Effect.gen(function* () {
         return created;
       }),
     deleteAgent: (id) =>
-      id === assistantAgent ? Effect.fail(refused("管家是每个农场都有的，删不了")) : change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
+      id === orchestratorAgent ? Effect.fail(refused("管家是每个农场都有的，删不了")) : change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
@@ -175,3 +183,8 @@ export const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(Agents, make);
+
+/** A profile's role and the work it suits, in words: 「职责：…；适合的活：…」, without a half that is not filled in. 适合的活
+ * is its tags, which chooseAgent matches and the prompts tell a model to pick by. */
+export const traitsOf = (a: Agent) =>
+  [...(a.role ? ["职责：" + a.role] : []), ...((a.tags ?? []).length > 0 ? ["适合的活：" + a.tags!.join("、")] : [])].join("；");

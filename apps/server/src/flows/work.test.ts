@@ -8,7 +8,7 @@ import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { Sessions } from "../session/session.ts";
+import { Sessions, type SessionsInside } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
@@ -186,7 +186,7 @@ describe("a session's work", () => {
       yield* until(() => {
         const need = needOf(sessions.find(session.id)!.session);
         return need?.kind === "quiet" && Date.now() - need.since >= 500;
-      }, "the assistant sees it has been quiet half a second");
+      }, "the orchestrator sees it has been quiet half a second");
       yield* w.nextReport;
       const steps = sessions.events(session.id)!;
       yield* sessions.dismiss(session.id);
@@ -203,7 +203,7 @@ describe("a session's work", () => {
       const sessions = yield* Sessions;
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "preview"));
       yield* w.nextReport;
-      const changes = yield* issues.changes(session.issue!, "assistant");
+      const changes = yield* issues.changes(session.issue!, "orchestrator");
       yield* sessions.dismiss(session.id);
       expect(changes.base).toBe("main");
       expect(changes.commits.map((c) => c.subject)).toEqual(["加上打卡"]);
@@ -225,7 +225,7 @@ describe("a session's work", () => {
       yield* w.nextReport;
       yield* w.nextReport;
       expect(yield* issues.merge(a.issue!)).toMatch(/个提交合进了 clash 的 main/);
-      expect((yield* issues.changes(b.issue!, "assistant")).conflicts).toEqual(["same.ts"]);
+      expect((yield* issues.changes(b.issue!, "orchestrator")).conflicts).toEqual(["same.ts"]);
       const failed = yield* Effect.flip(issues.merge(b.issue!));
       expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
       const stayed = sessions.find(b.id)!;
@@ -234,6 +234,8 @@ describe("a session's work", () => {
       // The owner's 让它解决冲突: the server says which conflicts, in the owner's words.
       yield* issues.resolve(b.issue!);
       yield* w.nextReport;
+      // The round settled it: the sessions look at the mark again by themselves.
+      yield* until(() => sessions.find(b.id)?.session.conflict === undefined, "the conflict mark cleared");
       expect(yield* issues.merge(b.issue!)).toMatch(/合进了 clash 的 main/);
       const project = join(f.config.workRoot, "projects", "clash");
       expect(git(project, "show", "main:same.ts")).toBe("export const v = 'A+B'");
@@ -292,7 +294,7 @@ describe("a session's work", () => {
       id = session.id;
       yield* until(() => kinds.includes("ended"), "the turn ended");
       expect(kinds.filter((k) => k === "spoke" || k === "ended")).toEqual(["spoke", "ended"]);
-      const token = sessions.issueToken(session.id);
+      const token = (sessions as SessionsInside).issueToken(session.id);
       expect(sessions.who(token)).toBe(session.id);
       expect((yield* sessions.deliver(session.id, "再看看", { kind: "comment" })).kind).toBe("run");
       yield* w.nextReport;

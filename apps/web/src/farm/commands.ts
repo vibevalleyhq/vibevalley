@@ -1,32 +1,15 @@
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
-import type { GraphActRequest, GraphSplitRequest, Session, StateFrame, TaskActRequest, TaskEdit } from "@vibevalley/protocol";
-import { api, reasonOf } from "../data/api";
+import type { Session, StateFrame } from "@vibevalley/protocol";
+import { api, newSendKey } from "../data/api";
 import { farm, farmState } from "./store";
 import { aimTool, type BedFxKind, type PlotAim, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
 import { webRoutes, type YardPlace } from "./world/places";
 
-/** The server's answer to a command that may be refused: ok, or the reason in its words. */
-export interface Answer {
-  readonly ok: boolean;
-  readonly text: string;
-}
-
-/** 16 random bytes in hex: one per draft, so sending it again after a failure is not said twice. */
-export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
-
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});
-
-const answer = async (call: () => Promise<string>): Promise<Answer> => {
-  try {
-    return { ok: true, text: await call() };
-  } catch (e) {
-    return { ok: false, text: reasonOf(e) };
-  }
-};
 
 const fx = (s: Session, kind: BedFxKind, text?: string) => {
   const bed = bedOfStation(stationOfSession(s));
@@ -43,35 +26,25 @@ export interface FarmCommands {
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(sessionId: string): Promise<void>;
-  stopAssistant(): Promise<void>;
-  dismiss(sessionId: string): Promise<void>;
-  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The assistant is told to sow it. */
+  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it. */
   plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
   /** The click's decision, read from one frame, so the page's sound and the command agree. */
   aim(bed: Bed): PlotAim;
   /** Acts on a click; a tool that does not apply says why over the bed. */
   act(plot: PlotAim): Promise<ToolResult>;
-  split(request: GraphSplitRequest): Promise<Answer>;
-  editTask(graph: string, task: string, edit: TaskEdit): Promise<Answer>;
-  removeTask(graph: string, task: string): Promise<Answer>;
-  actOnGraph(graph: string, action: GraphActRequest["action"]): Promise<Answer>;
-  actOnTask(graph: string, task: string, action: TaskActRequest["action"]): Promise<Answer>;
   chooseTitle(achievement?: string, tier?: number): Promise<void>;
   refreshRuntime(id: string): Promise<void>;
-  /** Leaves the title screen; `start` opens the assistant's day too. */
-  enterFarm(start: boolean): void;
 }
 
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
-  const sessions = () => frame()?.state.sessions ?? [];
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
       await api.issue.comment({ id: issueOf(s), body: { text, sendKey } });
       fx(s, "water");
     },
     async resolve(s) {
-      await api.issue.resolve({ id: issueOf(s) });
+      await api.issue.act({ id: issueOf(s), body: { act: "resolve" } });
       fx(s, "water");
     },
     async cure(s) {
@@ -88,12 +61,6 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "shovel");
     },
     stop: (id) => api.session.stop({ id }),
-    stopAssistant: () => api.assistant.stop(),
-    async dismiss(id) {
-      const s = sessions().find((x) => x.id === id);
-      if (!s) throw new Error(`no session ${id}`);
-      await api.issue.status({ id: issueOf(s), body: { status: "canceled" } });
-    },
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;
@@ -130,17 +97,8 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
           return { kind: "done" };
       }
     },
-    split: (request) => answer(() => api.graph.split({ body: request })),
-    editTask: (graph, task, edit) => answer(() => api.graph.updateTask({ id: graph, task, body: edit })),
-    removeTask: (graph, task) => answer(() => api.graph.deleteTask({ id: graph, task })),
-    actOnGraph: (graph, action) => answer(() => api.graph.act({ id: graph, body: { action } })),
-    actOnTask: (graph, task, action) => answer(() => api.graph.taskAct({ id: graph, task, body: { action } })),
     chooseTitle: (achievement, tier) => api.game.chooseTitle({ body: { achievement, tier } }),
     refreshRuntime: async (id) => void (await api.runtime.refresh({ id })),
-    enterFarm(start) {
-      farm.closeTitle();
-      if (start) fire(api.assistant.open());
-    },
   };
   return commands;
 }

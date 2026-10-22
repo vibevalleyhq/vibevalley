@@ -110,7 +110,7 @@ test("nothing rings while the farm is away, and coming back primes again", () =>
   expect(calls.get().ringing?.id).toBe("b");
 });
 
-test("on a call nothing rings: the assistant says it there, and the call waits among the missed", () => {
+test("on a call nothing rings: the orchestrator says it there, and the call waits among the missed", () => {
   const { calls, host, rings } = phone();
   calls.resume();
   calls.calls([]);

@@ -1,7 +1,7 @@
 // Where an issue may be moved: the table, and how it reads the attention.
 
 import { describe, expect, it } from "vite-plus/test";
-import { type Fact, type Issue, type IssueStatus, assistantAgent, type Session } from "@vibevalley/protocol";
+import { type Fact, type Issue, type IssueStatus, orchestratorAgent, type Session } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { attentionOf } from "./attention.ts";
 import { statusMove, statusMoves } from "./moves.ts";
@@ -31,11 +31,11 @@ describe("status moves", () => {
     expect(statusMoves(required)).toEqual(["todo", "canceled"]);
     expect(statusMoves({ ...required, reviewedAt: 1 })).toEqual(["todo", "done", "canceled"]);
     expect(statusMoves(issue("backlog", false, { refining: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("in_progress", false, { assignee: assistantAgent }))).toEqual([]);
+    expect(statusMoves(issue("in_progress", false, { assignee: orchestratorAgent }))).toEqual([]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
   });
 
-  it("a round that failed is not harvested, from the board, the command line or the assistant alike", () => {
+  it("a round that failed is not harvested, from the board, the command line or the orchestrator alike", () => {
     const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
@@ -43,13 +43,13 @@ describe("status moves", () => {
     expect(statusMoves(issue("in_review", true, { attention: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
   });
 
-  it("the assistant's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
-    const assistant = (more: Partial<Issue>) => issue("in_review", false, { assignee: assistantAgent, ...more });
-    expect(statusMoves(assistant({ handedBack: { at: 1, outcome: "completed" } }))).toEqual(["done", "canceled"]);
-    expect(statusMove(assistant({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
-    expect(statusMove(assistant({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
-    for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(assistant({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("done", false, { assignee: assistantAgent, closed: "answered" }))).toEqual([]);
+  it("the orchestrator's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
+    const orchestrator = (more: Partial<Issue>) => issue("in_review", false, { assignee: orchestratorAgent, ...more });
+    expect(statusMoves(orchestrator({ handedBack: { at: 1, outcome: "completed" } }))).toEqual(["done", "canceled"]);
+    expect(statusMove(orchestrator({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
+    expect(statusMove(orchestrator({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
+    for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(orchestrator({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
+    expect(statusMoves(issue("done", false, { assignee: orchestratorAgent, closed: "answered" }))).toEqual([]);
   });
 });
 
@@ -65,8 +65,8 @@ describe("moves and the attention", () => {
       [{}, session("interrupted")],
       [{ review: "required" }, session("completed")],
       [{ review: "required", reviewedAt: 5 }, session("completed")],
-      [{ assignee: assistantAgent, sessions: [], handedBack: { at: 1, outcome: "completed" } }, undefined],
-      [{ assignee: assistantAgent, sessions: [], handedBack: { at: 1, outcome: "failed" } }, undefined],
+      [{ assignee: orchestratorAgent, sessions: [], handedBack: { at: 1, outcome: "completed" } }, undefined],
+      [{ assignee: orchestratorAgent, sessions: [], handedBack: { at: 1, outcome: "failed" } }, undefined],
     ];
     for (const [more, s] of cases) {
       const t = { ...base, ...more } as Issue;

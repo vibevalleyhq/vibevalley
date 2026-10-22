@@ -51,11 +51,11 @@ test("what waits for the owner's yes", () => {
   const daily: RecurrenceWhen = { kind: "daily", time: "09:00" };
   const req = (when: RecurrenceWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as RecurrenceRequest;
   expect(needsOK(req(daily, "lab"), "owner", false)).toBe(false);
-  expect(needsOK(req(daily, "lab"), "assistant", true)).toBe(false);
-  expect(needsOK(req(once), "assistant", false)).toBe(false);
-  expect(needsOK(req(daily), "assistant", false)).toBe(true);
-  expect(needsOK(req(once, "lab"), "assistant", false)).toBe(true);
-  expect(needsOK(req(once, " "), "assistant", false)).toBe(false);
+  expect(needsOK(req(daily, "lab"), "orchestrator", true)).toBe(false);
+  expect(needsOK(req(once), "orchestrator", false)).toBe(false);
+  expect(needsOK(req(daily), "orchestrator", false)).toBe(true);
+  expect(needsOK(req(once, "lab"), "orchestrator", false)).toBe(true);
+  expect(needsOK(req(once, " "), "orchestrator", false)).toBe(false);
 });
 
 /** The farm with recurrences on a clock turned by hand. */
@@ -171,15 +171,15 @@ describe("recurrences", () => {
     });
   });
 
-  it.live("one the assistant set alone waits for the owner's yes, through restarts", () => {
+  it.live("one the orchestrator set alone waits for the owner's yes, through restarts", () => {
     const config = { ...testConfig(), db: "" };
     const clock = { now: 1_800_000_000_000 };
     let id = "";
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const s = yield* Recurrences;
-        const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), "assistant", false);
-        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "assistant", "等主人同意"]);
+        const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), "orchestrator", false);
+        expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "orchestrator", "等主人同意"]);
         id = made.id;
         const due = yield* collect;
         clock.now += 10 * 60_000;
@@ -189,7 +189,7 @@ describe("recurrences", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
         const s = yield* Recurrences;
-        expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "assistant"]]);
+        expect(s.list().map((x) => [x.enabled, x.pending, x.by])).toEqual([[false, true, "orchestrator"]]);
         const on = yield* s.setEnabled(id, true);
         expect([on.enabled, on.pending]).toEqual([true, undefined]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));

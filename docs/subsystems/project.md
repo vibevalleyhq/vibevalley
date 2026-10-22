@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[architecture.md](docs/architecture.md)「配置」） |
-| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/assistant.md)；档案的默认项目在帮工档案上） |
+| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工档案上） |
 | 一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
 | 收成清单：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 收获的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 种植计划的分支和每一件的检查什么时候跑（[种植计划](docs/subsystems/task.md)） |
@@ -72,7 +72,7 @@
 3. 登录了就对每个项目读 `origin`（GitHub 的 HTTPS、`ssh://`、`git@github.com:` 地址），不是 GitHub 仓库就说不是；是就 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算能提 PR，别的是「没有写权限」。
 4. 结果整份替换缓存；几次刷新排队，不让旧结果盖掉新的。
 
-`github.status`、`setting.check` 的 `github` 读同一份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
+`github.status` 读这份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
 
 **地契**（每次打开现算，不缓存）：
 
@@ -88,7 +88,7 @@
 - **工单（`issue`）**：决定什么时候收获、走本地合还是 PR（`usesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **种植计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的收成清单。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。
-- **管家（`assistant`、`tool`）**：农场现状和 `look` 工具列出 `list` 和 `root`。
+- **管家（`orchestrator`、`tool`）**：农场现状和 `look` 工具列出 `list` 和 `root`。
 - **HTTP（`handler`）**：只转发；`github.refresh` 先刷新检测，再调工单的 `refreshPullRequests`。
 
 ## 为什么这样
@@ -104,7 +104,7 @@
 - **数代码用 tokei，没装就说怎么装。** 自己按扩展名数要维护语言表、注释语法和生成文件的判断，结果也没 tokei 准；当后备并存就是两套结果。scc 差不多但主人要的是 tokei；GitHub linguist 要 Ruby，本地太重。占比按代码加注释算：按字节会让长行的 JSON、压缩文件占太多，只按代码行 tokei 会把 Markdown 正文算成注释、文档就没了。
 - **提交算所有分支、不算合并。** 只算主分支（GitHub 的算法）时，帮工还没收的活要等收获才进日历；合并提交会让收获的那天重复算。
 - **经验是工作目录里你名下的 commit。** 按完成的工单算奖励的是忙，失败重试也能刷；算这台机器上所有仓库会把和 VibeValley 无关的工作算进来；算所有作者会把别人的提交算成你的。帮工用这台机器的 git 用户提交，所以它们的提交算你的。
-- **项目的上限是配置，跟着项目列表走，不进核心状态。** 它开机读一次、不随事实变；放进核心状态要改折法和黄金数据，只换来少问一次项目列表。地图的空位是上限减去在干活的（也不超过农场空着的地），和 `noRoom` 一致：歇着的帮工占着 worktree 但不占上限。
+- **项目的上限是配置，跟着项目列表走，不进核心状态。** 它开机读一次、不随事实变；放进核心状态要改折法和黄金数据，只换来少问一次项目列表。地图的空位是上限减去在干活的（也不超过农场空着的地），和 `noRoom` 同一条规则 `roomLeft`：歇着的帮工占着 worktree 但不占上限。
 
 ## 还没做的
 

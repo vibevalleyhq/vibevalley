@@ -6,7 +6,7 @@ import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
 import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
-import { AgentFace, AssistantFace, OwnerFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { PxMarkdown, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 
@@ -50,15 +50,15 @@ function DispatchNote(props: { text: string }) {
 }
 
 export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agent>; size?: number }) {
-  const look = useFarm((s) => s.assistantLook);
+  const look = useFarm((s) => s.orchestratorLook);
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={props.m.agent ?? props.m.from} look={props.agents.get(props.m.agent ?? props.m.from)?.look} size={size()} />}>
       <Match when={props.m.fromKind === "user"}>
         <OwnerFace size={size()} />
       </Match>
-      <Match when={props.m.fromKind === "assistant"}>
-        <AssistantFace size={size()} look={look()} />
+      <Match when={props.m.fromKind === "orchestrator"}>
+        <OrchestratorFace size={size()} look={look()} />
       </Match>
     </Switch>
   );

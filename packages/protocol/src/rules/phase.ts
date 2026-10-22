@@ -20,6 +20,15 @@ export const actionText: Readonly<Record<SessionAction, string>> = {
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
 
+/** How many more may start working now: on the whole farm (workspace at once), and in the project (perProject at once,
+ * 0 for no limit of its own). except is a session about to work again, which does not count against itself. The server
+ * refuses a start by it (noRoom) and the map draws its open plots by it. */
+export function roomLeft(sessions: readonly Session[], project: string, workspace: number, perProject: number, except = "") {
+  const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
+  const inProject = busy.filter((h) => h.project === project).length;
+  return { farm: Math.max(0, workspace - busy.length), project: perProject > 0 ? Math.max(0, perProject - inProject) : Infinity, busy: busy.length, inProject };
+}
+
 export type Need =
   | { readonly kind: "quiet"; readonly since: number }
   | { readonly kind: "retrying"; readonly retry: Retry }

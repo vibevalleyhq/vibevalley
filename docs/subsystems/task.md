@@ -14,7 +14,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 | 每一件做完的验证：检查命令、验收、冻结的文件 | 帮工怎么跑一轮、汇报怎么读（[帮工](docs/subsystems/session.md)） |
 | 计划分支：开、合进去、收获进主分支 | git 操作本身：冲突预检、合并、`.vibevalley/check`（`project`，[项目](docs/subsystems/project.md)） |
 | 计划的经过（`task_event`） | 计划板怎么画（[farm-ui.md](docs/reference/farm-ui.md) 第 18 项、`apps/web/src/farm/panels/TaskBoard.tsx`） |
-| 什么时候告诉管家一句 | 管家怎么回话、它的工具怎么包装（`assistant`、`tool/tool.ts`） |
+| 什么时候告诉管家一句 | 管家怎么回话、它的工具怎么包装（`orchestrator`、`tool/tool.ts`） |
 
 ## 在哪
 
@@ -23,7 +23,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
-- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/rules/cards.ts`），子工单的标题前加计划名（`rules/issues.ts` 的 `issueTitle`）；工单详情里的一件是 `pages/issues/TaskDetail.tsx`。
+- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/rules/cards.ts`），子工单的标题前加计划名（`rules/issues.ts` 的 `issueTitle`）；工单详情里的一件是 `pages/issues/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/data/graphs.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
 
 ## 模型和不变量
 
@@ -93,9 +93,9 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务图是另一�
 - **工单（`issue`）**：`putTask` 写整家工单，`nextTaskId` 给下一个计划号，`hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](docs/subsystems/issue.md)）。
 - **帮工（`session`）**：派规划的、做件的帮工，`tell` 带话（触发是 `task`），`dismiss` 请走，`mergeInto` 在收获动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`report`（一轮结束）和 `left`（帮工离开）。
 - **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.changes` 的收成清单）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
-- **管家（`assistant`、`tool`）**：五个工具起头、看、改、动作；计划的新闻进管家的输入（来源 `graph`）；管家的农场现状写着开着的计划。
+- **管家（`orchestrator`、`tool`）**：五个工具起头、看、改、动作；计划的新闻进管家的输入（来源 `graph`）；管家的农场现状写着开着的计划。
 - **田头（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。
-- **Inbox（`apps/server/src/notice/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/assistant.md)）。
+- **Inbox（`apps/server/src/notice/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/orchestrator.md)）。
 - **游戏（`game`）**：收获一个计划记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。
 
 ## 为什么这样

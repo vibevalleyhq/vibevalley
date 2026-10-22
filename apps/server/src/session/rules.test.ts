@@ -1,10 +1,25 @@
 import type { Event } from "@botiverse/oar";
-import type { Agent, Doing, Session } from "@vibevalley/protocol";
+import type { Doing, Session } from "@vibevalley/protocol";
 import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { questionsOf, checksOf, chooseAgent, jobBreak, noRoom, readReport, recallHead, sessionName, summaryOf, withRecall } from "./rules.ts";
+import { MergeFailure } from "../project/project.ts";
+import {
+  checksOf,
+  conflictBrief,
+  conflictOf,
+  jobBreak,
+  noRoom,
+  notTakenIn,
+  questionsOf,
+  readReport,
+  recallHead,
+  sessionName,
+  summaryOf,
+  whoMakesRoom,
+  withRecall,
+} from "./rules.ts";
 import { shellCommand } from "./shell.ts";
 
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
@@ -243,20 +258,6 @@ describe("room and names", () => {
     expect(sessionName([h("w1", "pi", "a", true)], "zhou", "老周")).toBe("老周 2");
     expect(sessionName([h("w1", "pi", "a", true), h("w2", "pi", "a", true)], "zhou", "老周")).toBe("老周 3");
   });
-
-  it("choose a profile", () => {
-    const a = { id: "a", name: "甲", runtime: "pi", tags: ["前端"] } as Agent;
-    const b = { id: "b", name: "乙", runtime: "claude", tags: ["测试", "后端"] } as Agent;
-    const candidates = [
-      { agent: a, usable: true },
-      { agent: b, usable: true },
-    ];
-    expect(chooseAgent(candidates, "随便", "乙", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "claude", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "", "b")?.id).toBe("b");
-    expect(chooseAgent(candidates, "补后端测试", "", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "", "")?.id).toBe("a");
-  });
 });
 
 describe("shell", () => {
@@ -272,4 +273,29 @@ describe("shell", () => {
     [`/bin/zsh -lc 'unterminated`, `/bin/zsh -lc 'unterminated`],
     [`/bin/zsh -lc 'a' b`, `/bin/zsh -lc 'a' b`],
   ])("%s", (input, want) => expect(shellCommand(input)).toBe(want));
+});
+
+describe("work that does not go in", () => {
+  it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
+    const check = notTakenIn(new MergeFailure("check", "测试没过"), "阿狐", "owner");
+    expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
+    const conflict = new MergeFailure("conflict", "", "main", ["a.ts", "b.ts"]);
+    expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
+    expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
+    expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
+    expect(notTakenIn(new MergeFailure("error", "git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
+  });
+
+  it("reads a conflict off a preview", () => {
+    expect(conflictOf({ base: "main", conflicts: [] })).toBeUndefined();
+    expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({ base: "main", files: ["a.ts"] });
+  });
+});
+
+it("makes room with whoever has been idle longest", () => {
+  const s = (id: string, hiredAt: number, tag: string) => ({ id, hiredAt, phase: { _tag: tag } }) as unknown as Session;
+  const farm = [s("a", 3, "ripe"), s("b", 1, "working"), s("c", 2, "resting")];
+  expect(whoMakesRoom(farm, 4)).toBeUndefined();
+  expect(whoMakesRoom(farm, 3)?.id).toBe("c");
+  expect(whoMakesRoom([s("b", 1, "working")], 1)).toBeUndefined();
 });

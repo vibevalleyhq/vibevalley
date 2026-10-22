@@ -18,16 +18,16 @@
 |---|---|---|---|---|
 | `server.health` | `GET /api/v1/health` | ✓ | ✓ |   |
 
-## assistant
+## orchestrator
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `assistant.open` | `POST /api/v1/assistant/open` | ✓ | ✓ |   |
-| `assistant.stop` | `POST /api/v1/assistant/stop` | ✓ | ✓ |   |
-| `assistant.hear` | `POST /api/v1/assistant/hear` | ✓ | ✓ |   |
-| `assistant.listArchive` | `GET /api/v1/assistant/archive` | ✓ | ✓ | ✓ |
-| `assistant.getArchive` | `GET /api/v1/assistant/archive/{name}` | ✓ | ✓ |   |
-| `assistant.markWrong` | `POST /api/v1/assistant/evals` | ✓ | ✓ |   |
+| `orchestrator.open` | `POST /api/v1/orchestrator/open` | ✓ | ✓ |   |
+| `orchestrator.stop` | `POST /api/v1/orchestrator/stop` | ✓ | ✓ |   |
+| `orchestrator.hear` | `POST /api/v1/orchestrator/hear` | ✓ | ✓ |   |
+| `orchestrator.listArchive` | `GET /api/v1/orchestrator/archive` | ✓ | ✓ | ✓ |
+| `orchestrator.getArchive` | `GET /api/v1/orchestrator/archive/{name}` | ✓ | ✓ |   |
+| `orchestrator.markWrong` | `POST /api/v1/orchestrator/evals` | ✓ | ✓ |   |
 
 ## setting
 
@@ -62,7 +62,6 @@
 |---|---|---|---|---|
 | `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |
 | `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |
-| `issue.resolve` | `POST /api/v1/issues/{id}/resolve` | ✓ | ✓ |   |
 | `issue.history` | `GET /api/v1/issues/history` | ✓ | ✓ | ✓ |
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |   |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |   |
@@ -75,7 +74,6 @@
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
 | `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
-| `issue.review` | `POST /api/v1/issues/{id}/review` | ✓ | ✓ | ✓ |
 | `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
 
 ## session

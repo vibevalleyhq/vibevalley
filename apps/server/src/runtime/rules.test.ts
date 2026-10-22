@@ -1,7 +1,7 @@
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { agentIssues, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
+import { agentIssues, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("runtime");
@@ -33,4 +33,18 @@ test("quota in words", () => {
   expect(quotaLeft(ok(["", 30], ["", 120]))).toBe(0);
   expect(quotaOf(ok(["5 小时", 40]))).toEqual({ left: 60, text: "5 小时 剩 60%" });
   expect(quotaOf({ status: "login_required" }).left).toBeUndefined();
+});
+
+test("choose a profile", () => {
+  const a = { id: "a", name: "甲", runtime: "pi", tags: ["前端"] } as Agent;
+  const b = { id: "b", name: "乙", runtime: "claude", tags: ["测试", "后端"] } as Agent;
+  const candidates = [
+    { agent: a, usable: true },
+    { agent: b, usable: true },
+  ];
+  expect(chooseAgent(candidates, "随便", "乙", "")?.id).toBe("b");
+  expect(chooseAgent(candidates, "随便", "claude", "")?.id).toBe("b");
+  expect(chooseAgent(candidates, "随便", "", "b")?.id).toBe("b");
+  expect(chooseAgent(candidates, "补后端测试", "", "")?.id).toBe("b");
+  expect(chooseAgent(candidates, "随便", "", "")?.id).toBe("a");
 });

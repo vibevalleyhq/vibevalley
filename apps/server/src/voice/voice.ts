@@ -1,12 +1,12 @@
 // The owner's calls: Agora RTC grants, the voice agent Agora runs for a call, the voice line the
-// assistant answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
+// orchestrator answers it on, and dictation. A grant is signed for one channel and uid and lives as long as its token, or the
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { type AgoraGrant, type Area, type Dictated, assistantAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
+import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
@@ -15,8 +15,8 @@ import { chatCompletions } from "../agent/brain/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { Assistant } from "../assistant/assistant.ts";
-import { assistantModel } from "../assistant/rules.ts";
+import { Orchestrator } from "../orchestrator/orchestrator.ts";
+import { orchestratorModel } from "../orchestrator/rules.ts";
 import { Notices } from "../notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
 import { callbackLog } from "../base/log.ts";
@@ -60,7 +60,7 @@ export const voiceUnknown = "服务端还不会用";
 type Vendors = { stt: AresSTT | DeepgramSTT | MicrosoftSTT; llm: OpenAI; tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS };
 
 /** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need
- * no key of their own. line undefined: the assistant does not answer the call itself. */
+ * no key of their own. line undefined: the orchestrator does not answer the call itself. */
 export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: string, line?: CallLine): Vendors | VoiceUnavailable {
   const speech = {
     greetingMessage: voice.greeting,
@@ -88,9 +88,9 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
     let llm: OpenAI;
     const answer = voice.answer;
     switch (answer.vendor) {
-      case "assistant":
+      case "orchestrator":
         if (!line) return unavailable("管家的语音线路没接通");
-        llm = new OpenAI({ apiKey: line.key, url: line.url, model: assistantModel, ...speech });
+        llm = new OpenAI({ apiKey: line.key, url: line.url, model: orchestratorModel, ...speech });
         break;
       case "agora":
         llm = new OpenAI({ model: answer.model, ...speech });
@@ -187,7 +187,7 @@ interface Call {
   readonly grant: string;
   readonly client: AgoraClient;
   readonly release: () => void;
-  /** Agora's model answers, so its words reach 田头 only through said; the assistant's own reach it as it says them. */
+  /** Agora's model answers, so its words reach 田头 only through said; the orchestrator's own reach it as it says them. */
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in 田头. */
   readonly greeting: string;
@@ -199,10 +199,10 @@ interface Call {
 export interface VoiceShape {
   readonly session: () => Effect.Effect<AgoraGrant, ApiError>;
   readonly renew: (channel: string, uid: string) => Effect.Effect<AgoraGrant, ApiError>;
-  /** about: what rang, when the call answers a ring: the assistant says it first, in place of the greeting. */
+  /** about: what rang, when the call answers a ring: the orchestrator says it first, in place of the greeting. */
   readonly start: (channel: string, uid: string, about?: string) => Effect.Effect<VoiceAgent, ApiError>;
   readonly stop: (agentId: string) => Effect.Effect<void, ApiError>;
-  /** What the owner said on a call: the assistant overhears it when Agora's model answers. */
+  /** What the owner said on a call: the orchestrator overhears it when Agora's model answers. */
   readonly heard: (agentId: string, text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** The relay without a call id: the one call on. */
   readonly heardCurrent: (text: string, picked: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -239,7 +239,7 @@ export function speakPieces(text: string, max = 480): string[] {
 
 const spoken = "口语，先说结论；不念代码、路径、命令和长列表。";
 
-/** What the assistant is given to tell the owner on the call: everything that waited, as one; ring is what rang, when the
+/** What the orchestrator is given to tell the owner on the call: everything that waited, as one; ring is what rang, when the
  * owner just picked the call up for it. What it answers is read out. */
 export function onCallLine(texts: readonly string[], ring?: string): string {
   const list = texts.map((t) => "- " + t).join("\n");
@@ -269,7 +269,7 @@ export interface VoiceOptions {
   readonly now?: () => number;
   /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
   readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
-  /** How long what is to be told waits for others to join it before the assistant is asked; 3 s when absent. */
+  /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
 }
 
@@ -335,7 +335,7 @@ export const make = (options: VoiceOptions = {}) =>
     const notices = yield* Notices;
     const settings = yield* Setting;
     const chat = yield* Channels;
-    const assistant = yield* Assistant;
+    const orchestrator = yield* Orchestrator;
     const now = options.now ?? Date.now;
 
     const grants = new Map<string, Grant>();
@@ -362,7 +362,7 @@ export const make = (options: VoiceOptions = {}) =>
     let tunnel: { url: string; close: () => void } | undefined;
     let closing: NodeJS.Timeout | undefined;
     const answer = chatCompletions({
-      answerer: (model) => (model === assistantModel ? (text, signal) => assistant.call(text, signal) : undefined),
+      answerer: orchestrator.answerer("phone"),
       misheard: lineMisheard,
       log: (l) => logs.info(l),
     });
@@ -489,12 +489,12 @@ export const make = (options: VoiceOptions = {}) =>
           await call.client.agents.speak({ appid: call.appId, agentId, text: piece, priority: "APPEND", interruptable: true });
         return true;
       } catch (e) {
-        logs.warn("vibevalley: voice: the assistant's words were not read out: " + message(e));
+        logs.warn("vibevalley: voice: the orchestrator's words were not read out: " + message(e));
         return false;
       }
     };
 
-    // What is to be told on the call waits in one queue, so that it never crowds itself: the assistant is asked once at a
+    // What is to be told on the call waits in one queue, so that it never crowds itself: the orchestrator is asked once at a
     // time, with everything that came meanwhile (after gatherMs, for what comes together), and its answer is read out
     // (queued after what is being said) before it is asked again. With no call on, what waits is dropped: it is on the
     // phone and in the inbox. An answer with no words puts its things back.
@@ -517,7 +517,7 @@ export const make = (options: VoiceOptions = {}) =>
           const texts = waiting.splice(0);
           const ring = rang;
           rang = undefined;
-          const said = await assistant.brief(onCallLine(texts, ring));
+          const said = await orchestrator.brief(onCallLine(texts, ring));
           if (said) {
             tries = 0;
             await speakOn(on, said);
@@ -534,7 +534,7 @@ export const make = (options: VoiceOptions = {}) =>
       }
     };
 
-    // What came into the inbox: with a call on, the assistant says it on the call; with none, the page's phone rings
+    // What came into the inbox: with a call on, the orchestrator says it on the call; with none, the page's phone rings
     // with the same items.
     yield* Effect.forkScoped(
       Stream.runForEach(yield* notices.news, (items) =>
@@ -549,8 +549,7 @@ export const make = (options: VoiceOptions = {}) =>
         const call = yield* callOf(agentId);
         // Both transcript directions use the answer mode captured by this call, never the current settings.
         if (!call.quick) return;
-        yield* core.open();
-        yield* assistant.heard(text, picked, sendKey);
+        yield* orchestrator.heard(text, picked, sendKey);
       });
 
     return Voice.of({
@@ -586,7 +585,7 @@ export const make = (options: VoiceOptions = {}) =>
           const started = Effect.gen(function* () {
             const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
             let callLine: CallLine | undefined;
-            if (voice.answer.vendor === "assistant") {
+            if (voice.answer.vendor === "orchestrator") {
               callLine = yield* Effect.tryPromise({ try: openLine, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
               const opened = callLine;
               let once = false;
@@ -596,7 +595,7 @@ export const make = (options: VoiceOptions = {}) =>
                 closeLine(opened.id);
               };
             }
-            // Answering a ring, the assistant's first words are what rang: no greeting before them.
+            // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
             const forCall = about ? { ...voice, greeting: "" } : voice;
             const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
             if ("_tag" in vendors) return yield* Effect.fail(vendors);
@@ -663,11 +662,11 @@ export const make = (options: VoiceOptions = {}) =>
           if (live.length === 0) return Effect.fail(failed("没有正在接通的电话"));
           return heard(live[0]![0], text, picked, sendKey);
         }),
-      // Only a call still on, that Agora's model answers: a late turn after hangup, or the assistant's words, are not kept twice.
+      // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
       said: (agentId, text) =>
         Effect.gen(function* () {
           const call = yield* callOf(agentId);
-          if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(assistantAgent, text, ""));
+          if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(orchestratorAgent, text, ""));
         }),
       dictate: (audio64, given) =>
         Effect.gen(function* () {

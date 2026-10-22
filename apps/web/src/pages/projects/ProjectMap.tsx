@@ -438,7 +438,7 @@ function NoProjects() {
   );
 }
 
-/** A seed for this project, no bed to choose: planted now (the assistant sends a helper), or kept as a todo to fill in. */
+/** A seed for this project, no bed to choose: planted now (the orchestrator sends a helper), or kept as a todo to fill in. */
 function SowHere(props: { project: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);

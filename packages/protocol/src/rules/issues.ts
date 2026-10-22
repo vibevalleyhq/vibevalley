@@ -1,4 +1,4 @@
-// An issue's title in one short line, as the board, the phone and the assistant say it.
+// An issue's title in one short line, as the board, the phone and the orchestrator say it.
 
 const titleMax = 40;
 

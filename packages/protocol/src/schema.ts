@@ -19,7 +19,6 @@ export const GitHubStatus: Schema.Codec<T.GitHubStatus> = Schema.Struct({
 });
 
 export const SettingsCheck: Schema.Codec<T.SettingsCheck> = Schema.Struct({
-  github: Schema.optionalKey(GitHubStatus),
   problem: Schema.optionalKey(Schema.String),
 });
 
@@ -168,7 +167,7 @@ export const RuntimeFacts: Schema.Codec<T.RuntimeFacts> = Schema.Struct({
 
 export const CallState: Schema.Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
-export const AssistantState: Schema.Codec<T.AssistantState> = Schema.Literals(T.AssistantStateValues);
+export const OrchestratorState: Schema.Codec<T.OrchestratorState> = Schema.Literals(T.OrchestratorStateValues);
 
 export const SenderKind: Schema.Codec<T.SenderKind> = Schema.Literals(T.SenderKindValues);
 
@@ -610,7 +609,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
 export const WorkspaceState: Schema.Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  assistant: AssistantState,
+  orchestrator: OrchestratorState,
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -773,11 +772,11 @@ export const InboxFromSession: Schema.Codec<T.InboxFromSession> = Schema.Struct(
   agent: Schema.String,
 });
 
-export const InboxFromAssistant: Schema.Codec<T.InboxFromAssistant> = Schema.Struct({
-  kind: Schema.Literal("assistant"),
+export const InboxFromOrchestrator: Schema.Codec<T.InboxFromOrchestrator> = Schema.Struct({
+  kind: Schema.Literal("orchestrator"),
 });
 
-export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromAssistant]);
+export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromOrchestrator]);
 
 export const InboxTargetSession: Schema.Codec<T.InboxTargetSession> = Schema.Struct({
   kind: Schema.Literal("session"),
@@ -1135,8 +1134,19 @@ export const ProjectTemplates: Schema.Codec<T.ProjectTemplates> = Schema.Struct(
   kinds: Schema.mutable(Schema.Array(TemplateKind)),
 });
 
+export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+  description: Schema.optionalKey(Schema.String),
+  project: Schema.optionalKey(Schema.String),
+  assignee: Schema.optionalKey(Schema.String),
+  priority: Schema.optionalKey(Priority),
+  review: Schema.optionalKey(Review),
+  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
+
 export const IssueDispatchRequest: Schema.Codec<T.IssueDispatchRequest> = Schema.Struct({
   station: Schema.optionalKey(Schema.Number),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const PullRequestCapability: Schema.Codec<T.PullRequestCapability> = Schema.Struct({
@@ -1165,12 +1175,12 @@ export const Skill: Schema.Codec<T.Skill> = Schema.Struct({
   body: Schema.String,
 });
 
-export const AssistantEvalRequest: Schema.Codec<T.AssistantEvalRequest> = Schema.Struct({
+export const OrchestratorEvalRequest: Schema.Codec<T.OrchestratorEvalRequest> = Schema.Struct({
   on: Schema.Number,
   want: Schema.String,
 });
 
-export const AssistantEval: Schema.Codec<T.AssistantEval> = Schema.Struct({
+export const OrchestratorEval: Schema.Codec<T.OrchestratorEval> = Schema.Struct({
   id: Schema.String,
   file: Schema.String,
 });
@@ -1291,16 +1301,7 @@ export const IssueHistory: Schema.Codec<T.IssueHistory> = Schema.Struct({
 
 export const IssueRefineRequest: Schema.Codec<T.IssueRefineRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
-});
-
-export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
-  title: Schema.optionalKey(Schema.String),
-  description: Schema.optionalKey(Schema.String),
-  project: Schema.optionalKey(Schema.String),
-  assignee: Schema.optionalKey(Schema.String),
-  priority: Schema.optionalKey(Priority),
-  review: Schema.optionalKey(Review),
-  criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const IssueActRequest: Schema.Codec<T.IssueActRequest> = Schema.Struct({
@@ -1416,8 +1417,8 @@ export const VoiceASRMicrosoft: Schema.Codec<T.VoiceASRMicrosoft> = Schema.Struc
 
 export const VoiceASR: Schema.Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
 
-export const VoiceAnswerAssistant: Schema.Codec<T.VoiceAnswerAssistant> = Schema.Struct({
-  vendor: Schema.Literal("assistant"),
+export const VoiceAnswerOrchestrator: Schema.Codec<T.VoiceAnswerOrchestrator> = Schema.Struct({
+  vendor: Schema.Literal("orchestrator"),
 });
 
 export const VoiceAnswerAgoraModel: Schema.Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
@@ -1438,7 +1439,7 @@ export const VoiceAnswerOpenai: Schema.Codec<T.VoiceAnswerOpenai> = Schema.Struc
   model: Schema.String,
 });
 
-export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerAssistant, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerOrchestrator, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
 
 export const VoiceTTSMinimaxModel: Schema.Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 
@@ -1560,10 +1561,10 @@ export const FactCall: Schema.Codec<T.FactCall> = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
-export const FactAssistant: Schema.Codec<T.FactAssistant> = Schema.Struct({
-  type: Schema.Literal("assistant"),
+export const FactOrchestrator: Schema.Codec<T.FactOrchestrator> = Schema.Struct({
+  type: Schema.Literal("orchestrator"),
   at: Schema.Number,
-  state: AssistantState,
+  state: OrchestratorState,
 });
 
 export const FactMessage: Schema.Codec<T.FactMessage> = Schema.Struct({
@@ -1697,7 +1698,7 @@ export const FactRecurrenceGone: Schema.Codec<T.FactRecurrenceGone> = Schema.Str
 
 export const Fact: Schema.Codec<T.Fact> = Schema.Union([
   FactCall,
-  FactAssistant,
+  FactOrchestrator,
   FactMessage,
   FactConversation,
   FactHired,
@@ -1746,7 +1747,7 @@ export const SideEventRuntime: Schema.Codec<T.SideEventRuntime> = Schema.Struct(
 
 export const SideEvent: Schema.Codec<T.SideEvent> = Schema.Union([
   FactCall,
-  FactAssistant,
+  FactOrchestrator,
   FactMessage,
   FactConversation,
   FactHired,
@@ -1790,6 +1791,7 @@ export const MoveIssueRequest: Schema.Codec<T.MoveIssueRequest> = Schema.Struct(
 export const IssueStatusRequest: Schema.Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
+  edit: Schema.optionalKey(IssueUpdate),
 });
 
 export const GraphActRequest: Schema.Codec<T.GraphActRequest> = Schema.Struct({

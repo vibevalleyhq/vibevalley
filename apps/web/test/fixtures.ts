@@ -31,7 +31,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
       const work = join(dir, "work");
       // Set by global-setup.ts, whose environment the workers inherit.
       const out = process.env.VIBEVALLEY_TEST_OUT!;
-      // Without the model's key: the assistant answers that it has none, and no test reaches a real model.
+      // Without the model's key: the orchestrator answers that it has none, and no test reaches a real model.
       const env = {
         ...cleanEnv(),
         HOME: dir,

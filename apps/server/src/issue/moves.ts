@@ -1,9 +1,9 @@
-// Where an issue may be moved, and what each move does: the table the board, the command line, the assistant's tools and
+// Where an issue may be moved, and what each move does: the table the board, the command line, the orchestrator's tools and
 // the server's refusals all go by. Worked out with the issue's status and attention in reduce (withIssueStatuses), so a
 // round that ends changes what the issue may do at once, wherever it is read.
 
 import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
-import { isForAssistant } from "./state.ts";
+import { isForOrchestrator } from "./state.ts";
 
 /** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -24,9 +24,9 @@ export type Move =
   | "cancel"
   /** backlog, todo → canceled: never sent */
   | "drop"
-  /** the assistant's issue, in_review → done: the owner takes its answer */
+  /** the orchestrator's issue, in_review → done: the owner takes its answer */
   | "answered"
-  /** the assistant's issue, in_review → canceled */
+  /** the orchestrator's issue, in_review → canceled */
   | "putAway";
 
 export const statusWords: Readonly<Record<IssueStatus, string>> = {
@@ -41,7 +41,7 @@ export const statusWords: Readonly<Record<IssueStatus, string>> = {
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const from = t.status;
-  if (isForAssistant(t)) return assistantMove(t, to);
+  if (isForOrchestrator(t)) return orchestratorMove(t, to);
   if (t.graph || t.task || t.closed === "merged_into_graph") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
   if (from === to) return ["none", "它已经是这个状态了"];
   if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
@@ -76,8 +76,8 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   return ["none", "不能从" + statusWords[from] + "挪到" + statusWords[to]];
 }
 
-/** The assistant closes nothing: it answers, and the owner takes the answer as done or puts it away. */
-function assistantMove(t: Issue, to: IssueStatus): [Move, string] {
+/** The orchestrator closes nothing: it answers, and the owner takes the answer as done or puts it away. */
+function orchestratorMove(t: Issue, to: IssueStatus): [Move, string] {
   if (t.status === "in_progress") return ["none", "管家还在答：等它答完"];
   if (t.status !== "in_review") return ["none", "这是派给管家的工单：再问管家一次就开了"];
   if (to === "canceled") return ["putAway", ""];

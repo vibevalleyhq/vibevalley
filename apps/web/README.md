@@ -12,8 +12,8 @@ src/data/         what comes from the server: the state stream (frames.ts, frame
                   API client (api.ts), the live stream (live.ts), REST queries (query.ts, agents.ts, issues.ts), external.ts
 src/ui/           pieces every page uses: Icon, Face, Button, Field, Dialog, Markdown, ToastHost, Segmented, Qr, Chips
 src/rules/        pure functions the pages share (what a lane holds, how a feed is ordered, a round's waterfall), each with its test
-src/pages/<place>/  one folder per place: issues, chat, docs, settings, assistant, agents, runtimes, projects, catalog; kit.tsx is their layout
-src/voice/        the call to the assistant (Agora), its captions, and dictation
+src/pages/<place>/  one folder per place: issues, chat, docs, settings, orchestrator, agents, runtimes, projects, catalog; kit.tsx is their layout
+src/voice/        the call to the orchestrator (Agora), its captions, and dictation
 src/farm/         the pixel farm at /, outside the shell (its README: who owns which folder, the store, the canvas's screen)
 test/             Playwright against a real server per worker (fixtures.ts)
 ```

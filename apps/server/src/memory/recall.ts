@@ -136,7 +136,7 @@ export const noteMaxChars = noteMax;
 
 // ── memory_search ──
 
-/** What memory_search questions. agent "": every profile (only the assistant may ask so); project "": every project; kind "": any. */
+/** What memory_search questions. agent "": every profile (only the orchestrator may ask so); project "": every project; kind "": any. */
 export interface SearchQuery {
   readonly agent: string;
   readonly project: string;

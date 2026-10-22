@@ -1,10 +1,10 @@
-// What an agent remembers: a profile's shared memory, the assistant's memory, and the assistant's archive of conversations
+// What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
 
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { type Memory, type MemorySourceInfo, assistantAgent, memoryKeep } from "@vibevalley/protocol";
+import { type Memory, type MemorySourceInfo, orchestratorAgent, memoryKeep } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
 import { ago } from "../rules/time";
 import { toast } from "../ui/toasts";
@@ -93,7 +93,13 @@ export function MemoryPanel(props: { agent: string }) {
   const projects = () => [...new Set(all().flatMap((m) => (m.project ? [m.project] : [])))].sort();
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
   const whose = (m: Memory) =>
-    m.author === "owner" ? "你记的" : m.author === "assistant" ? "管家替它记的" : m.session ? `${sessions().get(m.session) ?? m.session} 记的` : "它自己记的";
+    m.author === "owner"
+      ? "你记的"
+      : m.author === "orchestrator"
+        ? "管家替它记的"
+        : m.session
+          ? `${sessions().get(m.session) ?? m.session} 记的`
+          : "它自己记的";
   return (
     <div class="flex flex-col gap-4">
       <p class="text-sm text-muted">
@@ -235,10 +241,10 @@ function RecallPreview(props: { agent: string }) {
   );
 }
 
-export function AssistantMemoryPanel() {
-  const viewQuery = useMemory(() => assistantAgent);
+export function OrchestratorMemoryPanel() {
+  const viewQuery = useMemory(() => orchestratorAgent);
   const view = () => ready(viewQuery, undefined);
-  const act = memoryActions(assistantAgent);
+  const act = memoryActions(orchestratorAgent);
   const now = useNow();
   return (
     <Show when={view()} fallback={<Quiet>在读管家的记性……</Quiet>}>
@@ -256,7 +262,7 @@ export function AssistantMemoryPanel() {
                       memory={m()}
                       faded={i() >= carried()}
                       onForget={() => void act.forget(m().id)}
-                      meta={[m().session === assistantAgent ? "管家自己记的" : "你交代的", ago(m().at, now())]}
+                      meta={[m().session === orchestratorAgent ? "管家自己记的" : "你交代的", ago(m().at, now())]}
                       warning={i() >= carried() ? "太旧了，带不进系统提示" : undefined}
                     />
                   )}
@@ -276,14 +282,14 @@ export function ArchivePanel() {
   const [open, setOpen] = createSignal<{ name: string; text: string }>();
   const listing = useQuery(() => ({
     queryKey: ["archive", asked() ?? ""],
-    queryFn: () => api.assistant.listArchive(asked() ? { q: asked() } : {}),
+    queryFn: () => api.orchestrator.listArchive(asked() ? { q: asked() } : {}),
   }));
   const now = useNow();
   const show = async (name: string) => {
     if (open()?.name === name) return setOpen(undefined);
     let text: string;
     try {
-      text = await api.assistant.getArchive({ name });
+      text = await api.orchestrator.getArchive({ name });
     } catch (e) {
       text = reasonOf(e);
     }

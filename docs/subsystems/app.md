@@ -29,7 +29,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 ## 模型和不变量
 
 - **服务端是核心状态唯一的持有者。** 页面经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。页面不读事实，`/api/v1/events` 留给命令行和调试。
-- **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突 `POST /api/v1/issues/{id}/resolve`、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
+- **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突是工单的动作 `resolve`（`POST /api/v1/issues/{id}/act`）、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
 - **`src/rules/` 只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、看板怎么分栏，只给页面用；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在页面。
 - **一条状态流**：`data/frames.ts` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
 - **REST 的读取经 Solid Query**（`data/query.ts`）：一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关的查询失效再读，不在页面里另存一份。查询的 `data` 第一次到之前会挂进 `<Loading>`，页面只在根上有一个，所以一律经 `ready(query, fallback)` 读。
@@ -56,7 +56,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
-**工作台的路由**（`app/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/assistant` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
+**工作台的路由**（`app/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
 
 **通知和菜单栏**（`src/app/Follow.tsx`，挂在每一页上）：
 

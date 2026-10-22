@@ -1,5 +1,5 @@
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
-// the assistant's line. The web has no voice yet, so calling the assistant says so and points to 田头 instead of dialing.
+// the orchestrator's line. The web has no voice yet, so calling the orchestrator says so and points to 田头 instead of dialing.
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -9,16 +9,16 @@ import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
 import { aria } from "../../app/util";
-import { ready, useAgents } from "../../data/query";
-import { AgentFace, AssistantFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
 import { createCall } from "../../voice/CallButton";
 import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
+import { useAgent } from "../../data/agents";
 
-export type PhoneApp = "home" | "missed" | "log" | "assistant" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
+export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
 const cream = "#f7e8c4";
 const bark = "#2f1f13";
@@ -47,10 +47,10 @@ export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
 );
 
 function CallerFace(props: { call: InboxItem; size: number }) {
-  const agents = useAgents();
+  const agent = useAgent(() => (props.call.from.kind !== "orchestrator" ? props.call.from.agent : undefined));
   return (
-    <Show when={props.call.from.kind !== "assistant" ? props.call.from : undefined} fallback={<AssistantFace size={props.size} />}>
-      {(from) => <AgentFace agentId={from().agent || from().id} look={ready(agents, []).find((a) => a.id === from().agent)?.look} size={props.size} />}
+    <Show when={props.call.from.kind !== "orchestrator" ? props.call.from : undefined} fallback={<OrchestratorFace size={props.size} />}>
+      {(from) => <AgentFace agentId={from().agent || from().id} look={agent()?.look} size={props.size} />}
     </Show>
   );
 }
@@ -116,7 +116,7 @@ function RoundKey(props: { answer: boolean; label: string; onClick: () => void }
   );
 }
 
-function CallAssistant(props: { onCall: () => void }) {
+function CallOrchestrator(props: { onCall: () => void }) {
   return (
     <button
       type="button"
@@ -209,14 +209,14 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           </Show>
         </Show>
       </ul>
-      <CallAssistant onCall={() => props.onCall()} />
+      <CallOrchestrator onCall={() => props.onCall()} />
     </>
   );
 }
 
-/** The assistant's line: on the web it cannot be dialed yet, so it sends you to 田头. */
+/** The orchestrator's line: on the web it cannot be dialed yet, so it sends you to 田头. */
 /** The farm's one call, the chat's call button's too: calling, on it, or why it did not get through. */
-export function AssistantScreen() {
+export function OrchestratorScreen() {
   const call = createCall();
   const phase = () => call().phase;
   const line = () => {
@@ -235,7 +235,7 @@ export function AssistantScreen() {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
       <BigFace shake={phase() === "connecting"}>
-        <AssistantFace size={60} />
+        <OrchestratorFace size={60} />
       </BigFace>
       <p class="mt-2 text-[24px] leading-none">管家</p>
       <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
@@ -252,7 +252,7 @@ export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => v
   const apps: { label: string; icon: () => JSX.Element; badge?: () => number; go: () => void }[] = [
     { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
     { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: "管家", icon: () => <AssistantFace size={28} />, go: () => props.onOpen("assistant") },
+    { label: "管家", icon: () => <OrchestratorFace size={28} />, go: () => props.onOpen("orchestrator") },
     { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
     { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
     { label: "方块", icon: () => <BlocksIcon />, go: () => props.onOpen("blocks") },

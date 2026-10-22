@@ -1,26 +1,13 @@
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
-import { type ChatMessage, type ConnectorID, type Conversation, everyone } from "@vibevalley/protocol";
+import { type ChatMessage, type ConnectorID, type Conversation } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
 
 /** In UTF-16 units; longer ones are cut. */
 export const maxChars: Record<ConnectorID, number> = { weixin: 1800, feishu: 4000, qq: 2000 };
 
 export const digestOver = 3;
-
-/** Only once a message is final: the assistant's grow while he speaks. */
-export function forOwner(m: ChatMessage): boolean {
-  if (!m.final || m.from === "user") return false;
-  switch (m.kind) {
-    case "report":
-    case "dispatch":
-      return true;
-    case "chat":
-      return m.fromKind === "assistant" || (m.mentions ?? []).includes("user") || (m.mentions ?? []).includes(everyone);
-  }
-  return false;
-}
 
 export function plainText(markdown: string): string {
   return markdown
@@ -38,7 +25,7 @@ export function plainText(markdown: string): string {
 
 /** The owner sees one chat, the farm has many threads. */
 export function ownerLine(m: ChatMessage, where: Conversation | undefined): string {
-  const who = m.fromKind === "assistant" ? "管家" : m.name;
+  const who = m.fromKind === "orchestrator" ? "管家" : m.name;
   const what =
     m.kind === "report"
       ? m.outcome === "completed"

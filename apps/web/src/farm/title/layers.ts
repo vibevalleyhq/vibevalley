@@ -77,13 +77,13 @@ export const puffs: readonly { readonly sprite: string; readonly scale: number }
 export const puffSeconds = 8;
 
 /** Where the farmer and the pet stand (their feet's middle), and how big they are drawn: as they were painted. */
-export const assistant = { x: 1327 / sceneW, bottom: 898 / sceneH, scale: 0.73 } as const;
+export const orchestrator = { x: 1327 / sceneW, bottom: 898 / sceneH, scale: 0.73 } as const;
 export const petSpot = { x: 1212 / sceneW, bottom: 918 / sceneH } as const;
 /** Each pet's frames drawn sitting about as tall as the dog was painted. */
 export const petScale: Readonly<Record<string, number>> = { dog: 0.59, ragdoll: 0.69, bluecat: 0.55 };
 
 /** The farmer's pose at each hour: stretching at dawn, shading his eyes at noon, at ease at dusk, a lantern at night. */
-export const assistantPose: Readonly<Record<TitleScene, string>> = {
+export const orchestratorPose: Readonly<Record<TitleScene, string>> = {
   morning: "manager-morning",
   day: "manager-day",
   evening: "manager-evening",

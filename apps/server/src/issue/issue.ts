@@ -1,8 +1,8 @@
 // Issues: what the owner wants done, each worked by sessions one after another. An issue closes
 // when its last session leaves, as the fact that the session left says how, and opens again with another session; a
 // task's issues open and close as the task says. An issue may be refined first: a session reads the code and writes it in
-// the issue's format, then leaves, the issue still unsent. One for the assistant is handed to the assistant, not to a session,
-// and waits on the owner once the assistant's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
+// the issue's format, then leaves, the issue still unsent. One for the orchestrator is handed to the orchestrator, not to a session,
+// and waits on the owner once the orchestrator's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
 // with its branch and worktree, and the state says which files.
 
 import {
@@ -25,8 +25,7 @@ import {
   type IssueTask,
   type IssueTimeline,
   type IssueUpdate,
-  assistantAgent,
-  maxRunning,
+  orchestratorAgent,
   type Priority,
   type ProjectTemplates,
   type PullRequest,
@@ -35,8 +34,8 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { actLabel, isBusy, attentionLabel } from "@vibevalley/protocol/rules";
-import { isForAssistant, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
+import { actLabel, attentionLabel } from "@vibevalley/protocol/rules";
+import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
 import { attentionIn } from "./attention.ts";
@@ -44,7 +43,6 @@ import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../recurrence/rules.ts";
 import {
-  conflictBrief,
   cureWords,
   filledKinds,
   findingsOf,
@@ -78,9 +76,10 @@ import { type Due, Recurrences } from "../recurrence/recurrence.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
+import { conflictBrief, conflictOf } from "../session/rules.ts";
 
-/** An issue for the assistant, handed to it. */
-export interface AssistantWork {
+/** An issue for the orchestrator, handed to it. */
+export interface OrchestratorWork {
   readonly issue: Issue;
   readonly channel: string;
   readonly by: RunTrigger;
@@ -88,13 +87,11 @@ export interface AssistantWork {
   readonly recurrence?: Recurrence;
 }
 
-/** Who looked at changes: the owner's look counts for the game, the assistant's does not. */
-export type Caller = "owner" | "assistant";
+/** Who looked at changes: the owner's look counts for the game, the orchestrator's does not. */
+export type Caller = "owner" | "orchestrator";
 
 export interface IssueShape {
   readonly list: () => Effect.Effect<Issue[]>;
-  /** Who the farm sends for a task: the profile named (or the owner's pick) if it can work, else the best that can. */
-  readonly pickAgent: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
   /** The issues the board holds now (open, and the latest closed). */
   readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
@@ -108,9 +105,9 @@ export interface IssueShape {
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
   readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string) => Effect.Effect<Issue, ApiError>;
   /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
-   * page, the command line and the assistant's tools all go by it. Any act the attention does not offer is refused. */
+   * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
   readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
-  /** An issue's id from what the owner and the assistant call it: #41 or 41, its id, or the id of a session that worked it. */
+  /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
   readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
   readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
   readonly changes: (id: string, by: Caller) => Effect.Effect<Changes, ApiError>;
@@ -122,15 +119,15 @@ export interface IssueShape {
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
-  /** Sends a session for a job that is not written down first (the assistant sending someone at once, a task's step): its issue is made from the job. */
+  /** Sends a session for a job that is not written down first (the orchestrator sending someone at once, a task's step): its issue is made from the job. */
   readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
   /** A session started on an issue not written down first: the issue is made from its job, in one write with the session. */
   readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
   /** The issues of a task graph as the graph has them now, published as one commit once written. */
   readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
   readonly nextTaskId: () => Effect.Effect<string>;
-  /** Issues for the assistant, subscribed before it returns. */
-  readonly forAssistant: Effect.Effect<Stream.Stream<AssistantWork>, never, Scope.Scope>;
+  /** Issues for the orchestrator, subscribed before it returns. */
+  readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorWork>, never, Scope.Scope>;
   readonly ofRecurrence: (id: string) => Effect.Effect<Issue | undefined>;
   readonly refreshPullRequests: Effect.Effect<void>;
   readonly tryQueued: Effect.Effect<void>;
@@ -201,7 +198,7 @@ export const make = (options: IssueOptions = {}) =>
     const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
     const inTx = <A, E>(e: Effect.Effect<A, E>) =>
       sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-    const assistantHub = yield* PubSub.unbounded<AssistantWork>();
+    const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
     /** One round of the queue at a time. */
     const trying = Semaphore.makeUnsafe(1);
 
@@ -347,11 +344,11 @@ export const make = (options: IssueOptions = {}) =>
 
     const closeAs = (id: string, how: IssueClose) => Effect.andThen(db(q.closeIssue({ closed_at: Date.now(), closed: how, id })), publish(id));
 
-    /** The assistant's turn on its issue ended; a session's run on one is not this. */
+    /** The orchestrator's turn on its issue ended; a session's run on one is not this. */
     const handBack = (id: string, h: HandedBack) =>
       Effect.gen(function* () {
         const t = yield* get(id);
-        if (!isForAssistant(t)) return;
+        if (!isForOrchestrator(t)) return;
         // A turn cut off by a restart closed its issue as lost; the turn it goes on in hands back all the same.
         if (isClosed(t.status)) {
           if (t.closed !== "lost") return;
@@ -445,23 +442,14 @@ export const make = (options: IssueOptions = {}) =>
 
     const hire = (agent: Agent, task: string, project: string, opt: HireOptions = {}) =>
       Effect.gen(function* () {
-        if (agent.id === assistantAgent) return { refused: "管家不下地：派给一个帮工档案" } as Hired;
+        if (agent.id === orchestratorAgent) return { refused: "管家不下地：派给一个帮工档案" } as Hired;
         if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
         for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
         const where = project.trim() || (agent.workdir ?? "").trim();
         if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" } as Hired;
-        const full = sessions.noRoom(agent.runtime, where);
-        if (full) return { refused: full } as Hired;
-        // A full farm sends home whoever has been idle longest.
-        let evicted = "";
-        const all = sessions.presentSessions();
-        if (all.length >= maxRunning) {
-          const oldest = all.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
-          if (oldest) {
-            evicted = oldest.name;
-            yield* sessions.dismiss(oldest.id);
-          }
-        }
+        const room = yield* sessions.makeRoom(agent.runtime, where);
+        if ("refused" in room) return { refused: room.refused } as Hired;
+        const evicted = room.evicted ?? "";
         let options = opt;
         if (!options.issue) options = { ...options, issue: newId() };
         else {
@@ -489,19 +477,19 @@ export const make = (options: IssueOptions = {}) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去")),
       );
 
-    const toAssistant = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence) =>
+    const toOrchestrator = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence) =>
       Effect.gen(function* () {
         if (isClosed(issue.status)) yield* reopenRow(issue.id);
         else if (issue.handedBack) yield* Effect.andThen(db(q.setHandedBack({ id: issue.id, handed_back: null })), publish(issue.id));
-        PubSub.publishUnsafe(assistantHub, { issue, channel, by, ...(due ? { recurrence: due } : {}) });
+        PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}) });
       });
 
     /** by undefined: the issue sent out. */
     const start = (id: string, channel: string, by?: RunTrigger): Effect.Effect<Dispatched, ApiError> =>
       Effect.gen(function* () {
         const mine = yield* Effect.option(get(id));
-        if (Option.isSome(mine) && isForAssistant(mine.value)) {
-          yield* toAssistant(mine.value, channel, by ?? { kind: "issue" });
+        if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
+          yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" });
           return {};
         }
         const [issue, agent, project] = yield* ready(id);
@@ -564,7 +552,7 @@ export const make = (options: IssueOptions = {}) =>
         return hired.session.id;
       });
 
-    /** A recurrence has one issue, for the session it names or for the assistant; each time it comes due is a run of that issue. */
+    /** A recurrence has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
     const scheduled = (due: Due) =>
       Effect.gen(function* () {
         const s = due.recurrence;
@@ -575,7 +563,7 @@ export const make = (options: IssueOptions = {}) =>
         if (!issue) {
           const project = s.project ?? (channel.project || undefined);
           const made = yield* Effect.result(
-            add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? assistantAgent }, s.id),
+            add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? orchestratorAgent }, s.id),
           );
           if (made._tag === "Failure")
             return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
@@ -585,7 +573,7 @@ export const make = (options: IssueOptions = {}) =>
         const t = issue;
         const result = yield* Effect.result(
           Effect.gen(function* () {
-            if (isForAssistant(t)) return yield* toAssistant(t, channel.id, by, s);
+            if (isForOrchestrator(t)) return yield* toOrchestrator(t, channel.id, by, s);
             if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
             if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
             const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
@@ -604,7 +592,7 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── harvesting ──
 
-    const { merge, sessionChanges, recheck, conflictOf, refreshPullRequests } = harvesting({
+    const { merge, refreshPullRequests } = harvesting({
       core,
       sessions,
       projects,
@@ -636,7 +624,7 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── drafts ──
 
-    const { pickAgent, draft, handedBack, clearRefinement } = refinement({
+    const { draft, handedBack, clearRefinement } = refinement({
       core,
       store,
       runtimes,
@@ -677,7 +665,6 @@ export const make = (options: IssueOptions = {}) =>
             if (issue && checks.length > 0) yield* checked(issue, checks);
             if (issue) yield* asked(issue, e.questions);
             yield* handedBack(e);
-            if (n.session?.conflict) yield* recheck(e.id);
             return;
           }
           case "hired":
@@ -698,8 +685,8 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
-    // The assistant's turn on its issues stopped with the server; one it had answered still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: assistantAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
+    // The orchestrator's turn on its issues stopped with the server; one it had answered still waits on the owner.
+    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
 
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
@@ -723,7 +710,7 @@ export const make = (options: IssueOptions = {}) =>
       ),
     );
     yield* Effect.forkScoped(
-      // However the assistant's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
+      // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
         Effect.forEach(run.issues, (id) => handBack(id, { at: Date.now(), outcome: run.outcome }).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
           discard: true,
@@ -757,7 +744,6 @@ export const make = (options: IssueOptions = {}) =>
 
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
-      pickAgent,
       list: () => list,
       get,
       timeline,
@@ -818,7 +804,7 @@ export const make = (options: IssueOptions = {}) =>
         trying.withPermits(1)(
           Effect.gen(function* () {
             const issue = yield* get(id);
-            if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForAssistant(issue))
+            if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
               return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
             const [, agent, project] = yield* ready(id);
             const full = sessions.noRoom(agent.runtime, project);
@@ -935,7 +921,7 @@ export const make = (options: IssueOptions = {}) =>
       changes: (id, by) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
-          const changes = yield* sessionChanges(session);
+          const changes = yield* sessions.changes(session);
           if (!changes) return yield* Effect.fail(missing("帮工 " + session));
           if (by === "owner") yield* core.did({ kind: "reviewed", session });
           return changes;
@@ -948,7 +934,7 @@ export const make = (options: IssueOptions = {}) =>
           const h = sessions.sessionOf(session);
           if (!h) return yield* Effect.fail(missing("帮工 " + session));
           // A preview that fails (git broken) is said as it is, not taken for no conflict.
-          const changes = h.conflict ? undefined : yield* sessionChanges(session);
+          const changes = h.conflict ? undefined : yield* sessions.changes(session);
           const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
           if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
           yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");
@@ -958,7 +944,7 @@ export const make = (options: IssueOptions = {}) =>
       review: (id, req) =>
         Effect.gen(function* () {
           const t = yield* get(id);
-          const why = isForAssistant(t)
+          const why = isForOrchestrator(t)
             ? "这是派给管家的工单：管家答完就关"
             : t.graph || t.task
               ? "这是种植计划的工单，跟着计划走：在计划里验收"
@@ -1049,7 +1035,7 @@ export const make = (options: IssueOptions = {}) =>
           yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
         }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
-      forAssistant: Effect.map(PubSub.subscribe(assistantHub), Stream.fromSubscription),
+      forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
       ofRecurrence,
       refreshPullRequests,
       tryQueued,

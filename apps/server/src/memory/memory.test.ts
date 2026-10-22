@@ -11,7 +11,7 @@ import { Settings } from "../base/config.ts";
 import { Database } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
-import { assistantHome, Memories, make } from "./memory.ts";
+import { orchestratorHome, Memories, make } from "./memory.ts";
 import { memoryIsNewNote, memoryJobText, memoryNotesOf, recallChars } from "./recall.ts";
 
 const world = (config = testConfig()) =>
@@ -94,50 +94,50 @@ describe("memory", () => {
     }).pipe(Effect.provide(world())),
   );
 
-  it.effect("the assistant's MEMORY.md: its lines, the owner's marked, dated, forgotten", () => {
+  it.effect("the orchestrator's MEMORY.md: its lines, the owner's marked, dated, forgotten", () => {
     const config = testConfig();
-    const folder = assistantHome(config.home);
+    const folder = orchestratorHome(config.home);
     return Effect.gen(function* () {
       const m = yield* Memories;
-      expect((yield* m.memoriesOf("assistant")).memories).toEqual([]);
+      expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
       remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
-      const written = yield* m.remember({ agent: "assistant", text: "  周末别派夜班\n真的  ", project: "", by: "owner" });
+      const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: "owner" });
       expect([written.text, written.session]).toEqual(["周末别派夜班 真的", undefined]);
       expect(readFileSync(join(folder, "MEMORY.md"), "utf8")).toContain("主人交代：周末别派夜班 真的");
-      const view = yield* m.memoriesOf("assistant");
+      const view = yield* m.memoriesOf("orchestrator");
       expect(view.memories.map((x) => [x.text, x.session])).toEqual([
         ["周末别派夜班 真的", undefined],
-        ["主人喜欢早上收到汇报", "assistant"],
+        ["主人喜欢早上收到汇报", "orchestrator"],
       ]);
       expect(view.memories[1]!.at).toBe(new Date(2026, 9, 12).getTime());
       expect(view.carried).toBe(2);
-      yield* m.forgetOf("assistant", view.memories[1]!.id);
-      expect((yield* m.memoriesOf("assistant")).memories.map((x) => x.text)).toEqual(["周末别派夜班 真的"]);
-      expect(yield* Effect.flip(m.remember({ agent: "assistant", text: "  ", project: "", by: "owner" }))).toMatchObject({
+      yield* m.forgetOf("orchestrator", view.memories[1]!.id);
+      expect((yield* m.memoriesOf("orchestrator")).memories.map((x) => x.text)).toEqual(["周末别派夜班 真的"]);
+      expect(yield* Effect.flip(m.remember({ agent: "orchestrator", text: "  ", project: "", by: "owner" }))).toMatchObject({
         _tag: "Refused",
         reason: "要记的话是空的",
       });
       rewriteMemory(folder, ("- 2026-10-13 " + "字".repeat(100) + "\n").repeat(100));
-      const carried = (yield* m.memoriesOf("assistant")).carried!;
+      const carried = (yield* m.memoriesOf("orchestrator")).carried!;
       expect(carried > 0 && carried < 100).toBe(true);
       rewriteMemory(folder, "# header\n- first\n* second\nplain third\n");
-      expect((yield* m.memoriesOf("assistant")).carried).toBe(3);
-      expect(yield* Effect.flip(m.recallOf("assistant", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/) });
+      expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
+      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/) });
     }).pipe(Effect.provide(world(config)));
   });
 
-  it.effect("the assistant's archive", () => {
+  it.effect("the orchestrator's archive", () => {
     const config = testConfig();
-    const folder = assistantHome(config.home);
+    const folder = orchestratorHome(config.home);
     mkdirSync(join(folder, "archive"), { recursive: true });
-    writeFileSync(join(folder, "archive", "assistant-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
+    writeFileSync(join(folder, "archive", "orchestrator-2026-10-12.md"), "主人：给 clock-in 加分页\n管家：派给老周了\n");
     return Effect.gen(function* () {
       const m = yield* Memories;
       const listing = m.archive("CLOCK-IN");
-      expect(listing.files.map((f) => f.name)).toEqual(["assistant-2026-10-12.md"]);
-      expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["assistant-2026-10-12.md", 1]]);
+      expect(listing.files.map((f) => f.name)).toEqual(["orchestrator-2026-10-12.md"]);
+      expect(listing.hits.map((h) => [h.file, h.line])).toEqual([["orchestrator-2026-10-12.md", 1]]);
       expect(m.archive("").hits).toEqual([]);
-      expect(m.archiveFile("assistant-2026-10-12.md")).toContain("派给老周");
+      expect(m.archiveFile("orchestrator-2026-10-12.md")).toContain("派给老周");
       expect(m.archiveFile("../MEMORY.md")).toBeUndefined();
     }).pipe(Effect.provide(world(config)));
   });

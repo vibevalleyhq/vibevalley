@@ -1,34 +1,19 @@
 import { createSignal, For, Show } from "solid-js";
 
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { reasonOf } from "../../data/api";
 import type { Tone } from "../../rules/cards";
 import { taskLine } from "../../rules/issues";
 import { wallClockText } from "../../rules/time";
-import { ready, useQuery } from "../../data/query";
+import { ready } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { reloadIssues, useNameOf } from "./hooks";
+import { useNameOf } from "./hooks";
 import { Fold, IssueSheet, More, Note, Property } from "./Sheet";
-
-/** What the server said to an action: ok, or why not. */
-interface Said {
-  ok: boolean;
-  text: string;
-}
-
-async function answer(call: () => Promise<string>): Promise<Said> {
-  try {
-    return { ok: true, text: await call() };
-  } catch (e) {
-    return { ok: false, text: reasonOf(e) };
-  } finally {
-    void reloadIssues();
-  }
-}
+import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
 
 const spentText = (s: Spent) =>
   [s.cny !== undefined ? `¥${s.cny.toFixed(2)}` : undefined, s.tokens > 0 ? `${Math.round(s.tokens)} token` : undefined].filter(Boolean).join(" · ") || "—";
@@ -38,7 +23,7 @@ const stepTone: Record<TaskState, Tone> = { waiting: "faint", working: "water", 
 /** A task (计划 on screen): an issue whose work is split into steps, each its own issue, run in the order their needs
  * allow. `stepIssues` is a step's own issue by the step's id, once a helper has worked it. */
 export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string, string>; onOpen: (id: string) => void }) {
-  const [said, setSaid] = createSignal<Said | null>(null);
+  const [said, setSaid] = createSignal<Answer | null>(null);
   const [reviewing, setReviewing] = createSignal(false);
   const [abandoning, setAbandoning] = createSignal(false);
   const nameOf = useNameOf();
@@ -52,11 +37,11 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
   const word = (a: GraphAction) => g().actionText?.[a] ?? "";
   const act = async (a: GraphAction) => {
     const id = g().id;
-    setSaid(await answer(() => api.graph.act({ id, body: { action: a } })));
+    setSaid(await graphs.act(id, a));
   };
   const actOnStep = async (t: Task, a: TaskAction) => {
     const id = g().id;
-    setSaid(await answer(() => api.graph.taskAct({ id, task: t.id, body: { action: a } })));
+    setSaid(await graphs.taskAct(id, t.id, a));
   };
 
   const heading = (
@@ -265,11 +250,11 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
 }
 
 /** A ripe task's changes before they go into the main branch: its commits and files, and the merge. */
-function TaskHarvest(props: { graph: TaskGraph; onDone: (said: Said | null) => void }) {
-  const changes = useQuery(() => ({ queryKey: ["issues", "graph-changes", props.graph.id], queryFn: () => api.graph.changes({ id: props.graph.id }) }));
+function TaskHarvest(props: { graph: TaskGraph; onDone: (said: Answer | null) => void }) {
+  const changes = useGraphChanges(() => props.graph.id);
   const merge = async () => {
     const id = props.graph.id;
-    props.onDone(await answer(() => api.graph.act({ id, body: { action: "merge" } })));
+    props.onDone(await graphs.act(id, "merge"));
   };
   return (
     <div class="mt-4 rounded-lg border border-line p-3">

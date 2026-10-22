@@ -3,7 +3,7 @@ import type { ConnectorID, ConnectorState, ConnectorStatus } from "@vibevalley/p
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { Channels } from "../channel/chat.ts";
-import { layer as assistant } from "../assistant/assistant.ts";
+import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Connectors, layer } from "./connector.ts";
@@ -131,7 +131,7 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
 });
 
 let says = 0;
-/** The assistant, played: what it hears goes into the channel, and it answers 收到 at once. */
+/** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
   layer({
     weixin: script.weixin,
@@ -140,9 +140,9 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
     ...retry,
     say: (text, conversation, chat) =>
       Effect.flatMap(chat.say(text, conversation, ""), ({ message }) =>
-        chat.assistantSays(message.conversation, `k${++says}`, "收到：**" + text + "**", true, ""),
+        chat.orchestratorSays(message.conversation, `k${++says}`, "收到：**" + text + "**", true, ""),
       ),
-  }).pipe(Layer.provideMerge(assistant({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
+  }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const until = <A>(get: () => Promise<A | undefined | false>, what: string) =>
   Effect.promise(async () => {
@@ -221,7 +221,7 @@ describe("the chat apps", () => {
       const channel = yield* chat.openChannel("clock-in", "", "");
       expect((yield* c.setChannel("weixin", "#clock-in")).channel).toBe("clock-in");
       expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({ reason: expect.stringContaining("没有叫") });
-      yield* chat.assistantSays(chat.general(), "sq", "田头上的话", true, "");
+      yield* chat.orchestratorSays(chat.general(), "sq", "田头上的话", true, "");
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       expect(yield* nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
         app: "weixin",

@@ -22,8 +22,8 @@ import { FileWriter } from "../base/files.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
-import { inCny, type Price, price, type Rate } from "./price.ts";
-import { agentIssues, moneyStop, quotaOf } from "./rules.ts";
+import { inCny, price, type Rate } from "./price.ts";
+import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
 /** Past this a probe counts as unknown. */
@@ -64,14 +64,16 @@ export interface RuntimeShape {
   /** The profile's issues as it would be dispatched now. */
   readonly check: (agent: Agent) => Effect.Effect<AgentIssue[]>;
   readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
+  /** Every profile, and whether it can be sent now. */
+  readonly candidates: Effect.Effect<Candidate[]>;
+  /** Who the farm sends for a task now: chooseAgent over the candidates. */
+  readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
   readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
   readonly runtime: (id: string) => Runtime | undefined;
-  readonly price: (id: string, model: string) => Price | undefined;
   readonly quote: (id: string, model: string) => Rate | undefined;
   readonly spend: (id: string, cny: number) => void;
   /** Reads the runtime's quota a little after a run, several runs sharing one read. */
   readonly usageSoon: (id: string) => void;
-  readonly usageAsked: (id: string) => number;
 }
 
 export class Runtimes extends Context.Service<Runtimes, RuntimeShape>()("vibevalley/Runtime") {}
@@ -179,7 +181,6 @@ export const make = (options: RuntimeOptions = {}) =>
     const reads = new Map<string, number>();
     const pending = new Map<string, NodeJS.Timeout>();
     const pushes = new Map<string, NodeJS.Timeout>();
-    const asked = new Map<string, number>();
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");
@@ -371,6 +372,8 @@ export const make = (options: RuntimeOptions = {}) =>
         return { agent, info: i, issues, blocking: issues.filter((x) => x.level === "error") };
       });
 
+    const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
+
     const shape: RuntimeShape = {
       list: () =>
         runtimeIds().map((id) => {
@@ -402,6 +405,8 @@ export const make = (options: RuntimeOptions = {}) =>
           : Effect.succeed(undefined),
       check: (agent) => Effect.promise(async () => agentIssues(agent, await info(agent.runtime))),
       assess,
+      candidates,
+      choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
       resolve: (agent) =>
         Effect.gen(function* () {
           const runtime = registry.get(agent.runtime);
@@ -426,7 +431,6 @@ export const make = (options: RuntimeOptions = {}) =>
           };
         }),
       runtime: (id) => registry.get(id),
-      price,
       quote: (id, model) => {
         const p = price(id, model);
         return p ? inCny(p, config.cnyPerUsd) : undefined;
@@ -453,7 +457,6 @@ export const make = (options: RuntimeOptions = {}) =>
           );
       },
       usageSoon: (id) => {
-        asked.set(id, (asked.get(id) ?? 0) + 1);
         if (closed || pending.has(id)) return;
         pending.set(
           id,
@@ -463,7 +466,6 @@ export const make = (options: RuntimeOptions = {}) =>
           }, usageAfterRunMs),
         );
       },
-      usageAsked: (id) => asked.get(id) ?? 0,
     };
     return Object.assign(shape, { refreshUsage, cached: cache, spent: () => spent, setSpent: (s: Spent) => (spent = s) });
   });

@@ -21,17 +21,17 @@ import { ago, tookText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { createSessionEvents } from "./data";
+import { createSessionEvents } from "../../data/sessions";
 
-/** Under a report or the assistant's answer: the run behind it, folded to one line until opened. */
-export function TurnSteps(props: { session: string; run: string | undefined; assistant?: boolean }) {
+/** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
+export function TurnSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
   const [open, setOpen] = createSignal(false);
   const all = createSessionEvents(
     () => props.session,
     () => !!props.run,
   );
   const steps = () => all().filter((e) => e.run === props.run);
-  const label = () => (props.run ? turnLabel(steps(), props.assistant ?? false) : undefined);
+  const label = () => (props.run ? turnLabel(steps(), props.orchestrator ?? false) : undefined);
   const now = useNow();
   return (
     <Show when={label()}>

@@ -1,4 +1,4 @@
-import { type Issue, assistantAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
+import { type Issue, orchestratorAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
 import { templateCatalog } from "../agent/seed.ts";
 import { graphsOf } from "../task/issues.ts";
 import { describe, expect, it, test } from "vite-plus/test";
@@ -213,7 +213,7 @@ describe("templates", () => {
       issue("没派过", "app", 8, { sessions: [] }),
       issue("计划里的一步", "app", 8, { parent: "g" }),
       issue("定时", "app", 8, { recurrence: "s1" }),
-      issue("给管家", "app", 8, { assignee: assistantAgent }),
+      issue("给管家", "app", 8, { assignee: orchestratorAgent }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),

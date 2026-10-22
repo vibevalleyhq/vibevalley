@@ -11,7 +11,7 @@ import { Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
-import { Sessions } from "./session.ts";
+import { Sessions, type SessionsInside } from "./session.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -60,7 +60,7 @@ describe("sessions", () => {
         id,
       );
       expect(turns[0]!.input).toContain("给打卡接口加分页");
-      expect(turns[0]!.options.cwd).toBe(sessions.place(id)!.cwd);
+      expect(turns[0]!.options.cwd).toBe((sessions as SessionsInside).place(id)!.cwd);
 
       const events = sessions.events(id)!;
       expect(events.map((e) => e.type)).toEqual(
@@ -73,7 +73,7 @@ describe("sessions", () => {
         runs = yield* sessions.runs("i1");
       }
       expect(runs.map((r) => [r.triggeredBy.kind, r.outcome])).toEqual([["issue", "completed"]]);
-      expect(sessions.currentRun(id)).toBe("");
+      expect((sessions as SessionsInside).currentRun(id)).toBe("");
 
       const told = yield* sessions.tell(id, "再加个测试", { kind: "comment", message: "m1" });
       expect(told).toBe("老实人 开始新的一轮".replace("老实人", session.name));
@@ -97,27 +97,22 @@ describe("sessions", () => {
     Effect.gen(function* () {
       const sessions = yield* Sessions;
       const core = yield* Core;
-      const s = sessions as typeof sessions & {
-        hands: Map<string, unknown>;
-        expect: (h: unknown, by: unknown) => void;
-        unexpect: (h: unknown) => void;
-        hired: () => number;
-      };
+      const s = sessions as SessionsInside;
       yield* core.apply({
         type: "hired",
         session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "ripe" } } as Session,
       });
-      const h = {
+      const h: Parameters<typeof s.expect>[0] = {
         id: "w1",
         place: { project: "demo", cwd: "/nowhere" },
-        journal: sessions.trajectories.openLog("w1"),
+        journal: s.trajectories.openLog("w1"),
         oarSessionId: "",
         lastText: "",
         tracking: {},
         launch: "",
         spoke: false,
         recalled: new Set(),
-        triggers: [] as unknown[],
+        triggers: [],
         run: "",
         heard: [],
       };

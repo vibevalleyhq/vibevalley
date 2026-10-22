@@ -42,6 +42,3 @@ export async function writeIssue(text: string, agent: string, project: string): 
     throw e;
   }
 }
-
-/** A key for one sent word, so a retry is not said twice. */
-export const newSendKey = () => `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

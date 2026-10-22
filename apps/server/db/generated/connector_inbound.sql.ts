@@ -13,7 +13,7 @@ export const AcceptInboundParams = Schema.Struct({
 export type AcceptInboundParams = typeof AcceptInboundParams.Type
 
 
-export const AcceptInboundSql = "-- Durable platform acceptance and assistant delivery (connector/inbox.ts).\n\n-- name: AcceptInbound :exec\ninsert into connector_inbound (connector, ext_id, message_id, created_at, payload, delivered)\nvalues ($1, $2, null, $3, $4, false) on conflict (connector, ext_id) do nothing;"
+export const AcceptInboundSql = "-- Durable platform acceptance and orchestrator delivery (connector/inbox.ts).\n\n-- name: AcceptInbound :exec\ninsert into connector_inbound (connector, ext_id, message_id, created_at, payload, delivered)\nvalues ($1, $2, null, $3, $4, false) on conflict (connector, ext_id) do nothing;"
 
 export const acceptInbound = Effect.fn("AcceptInbound")(function* (params: AcceptInboundParams) {
   const sql = yield* SqlClient.SqlClient

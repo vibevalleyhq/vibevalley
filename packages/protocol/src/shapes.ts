@@ -1,8 +1,8 @@
 // The shapes the server and the page share: every type on the wire and on disk, and the closed sets' members. schema.ts
 // holds a Schema for each, typed by it (Schema.Codec<T.X>), so the two cannot drift apart; api.ts the endpoints.
 
-/** The assistant's participant id, and the agent of an issue for it. No agent profile has this id. */
-export const assistantAgent = "assistant";
+/** The orchestrator's participant id, and the agent of an issue for it. No agent profile has this id. */
+export const orchestratorAgent = "orchestrator";
 
 /** Who @所有人 is. */
 export const everyone = "everyone";
@@ -95,7 +95,6 @@ export interface ServerReady {
 }
 
 export interface SettingsCheck {
-  github?: GitHubStatus;
   problem?: string;
 }
 
@@ -190,10 +189,10 @@ export type RuntimeCapability = (typeof RuntimeCapabilityValues)[number];
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
 
-export const AssistantStateValues = ["idle", "listening", "thinking", "speaking"] as const;
-export type AssistantState = (typeof AssistantStateValues)[number];
+export const OrchestratorStateValues = ["idle", "listening", "thinking", "speaking"] as const;
+export type OrchestratorState = (typeof OrchestratorStateValues)[number];
 
-export const SenderKindValues = ["user", "assistant", "agent", "system"] as const;
+export const SenderKindValues = ["user", "orchestrator", "agent", "system"] as const;
 export type SenderKind = (typeof SenderKindValues)[number];
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -437,7 +436,7 @@ export interface Recurrence {
   nextText?: string;
 }
 
-export const RecurrenceByValues = ["owner", "assistant"] as const;
+export const RecurrenceByValues = ["owner", "orchestrator"] as const;
 export type RecurrenceBy = (typeof RecurrenceByValues)[number];
 
 export interface Chat {
@@ -448,7 +447,7 @@ export interface Chat {
 export interface WorkspaceState {
   call: CallState;
   callReason?: string;
-  assistant: AssistantState;
+  orchestrator: OrchestratorState;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -581,7 +580,7 @@ export const InboxKindValues = [
 export type InboxKind = (typeof InboxKindValues)[number];
 
 /** Told apart by `kind`. */
-export type InboxFrom = InboxFromSession | InboxFromAssistant;
+export type InboxFrom = InboxFromSession | InboxFromOrchestrator;
 
 /** Told apart by `kind`. */
 export type InboxTarget = InboxTargetSession | InboxTargetGraph | InboxTargetChat;
@@ -673,7 +672,7 @@ export const GraphEventKindValues = [
 ] as const;
 export type GraphEventKind = (typeof GraphEventKindValues)[number];
 
-export const GraphActorValues = ["user", "assistant", "system", "session"] as const;
+export const GraphActorValues = ["user", "orchestrator", "system", "session"] as const;
 export type GraphActor = (typeof GraphActorValues)[number];
 
 export interface TaskFieldChange {
@@ -823,6 +822,8 @@ export interface TemplateBlank {
 
 export interface IssueDispatchRequest {
   station?: number;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface LanguageCount {
@@ -868,12 +869,12 @@ export interface Skill {
   body: string;
 }
 
-export interface AssistantEvalRequest {
+export interface OrchestratorEvalRequest {
   on: number;
   want: string;
 }
 
-export interface AssistantEval {
+export interface OrchestratorEval {
   id: string;
   file: string;
 }
@@ -910,7 +911,7 @@ export interface Memory {
   source?: string;
 }
 
-export const MemoryAuthorValues = ["owner", "agent", "assistant", "system"] as const;
+export const MemoryAuthorValues = ["owner", "agent", "orchestrator", "system"] as const;
 export type MemoryAuthor = (typeof MemoryAuthorValues)[number];
 
 export const MemoryKindValues = ["note", "issue"] as const;
@@ -1073,7 +1074,7 @@ export interface Issue {
   criteria?: string[];
   checks?: CriterionCheck[];
   refining?: IssueRefining;
-  /** An issue for the assistant: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
+  /** An issue for the orchestrator: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
   handedBack?: HandedBack;
   attention: IssueAttention;
 }
@@ -1107,7 +1108,7 @@ export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] 
 export type StuckReason = (typeof StuckReasonValues)[number];
 
 /** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
- * reject sends it back with findings; acknowledge takes what the assistant answered as done. */
+ * reject sends it back with findings; acknowledge takes what the orchestrator answered as done. */
 export const IssueActValues = [
   "start",
   "answer",
@@ -1171,6 +1172,8 @@ export interface IssueRefining {
 
 export interface IssueRefineRequest {
   text?: string;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface IssueGraph {
@@ -1514,8 +1517,8 @@ export interface InboxFromSession {
   agent: string;
 }
 
-export interface InboxFromAssistant {
-  kind: "assistant";
+export interface InboxFromOrchestrator {
+  kind: "orchestrator";
 }
 
 export interface InboxTargetSession {
@@ -1721,10 +1724,10 @@ export interface VoiceASRMicrosoft {
 }
 
 /** Told apart by `vendor`. */
-export type VoiceAnswer = VoiceAnswerAssistant | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
+export type VoiceAnswer = VoiceAnswerOrchestrator | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
 
-export interface VoiceAnswerAssistant {
-  vendor: "assistant";
+export interface VoiceAnswerOrchestrator {
+  vendor: "orchestrator";
 }
 
 export const VoiceAnswerAgoraModelValues = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-5-mini"] as const;
@@ -1797,7 +1800,7 @@ export interface Roots {
 /** Told apart by `type`. */
 export type Fact =
   | FactCall
-  | FactAssistant
+  | FactOrchestrator
   | FactMessage
   | FactConversation
   | FactHired
@@ -1824,10 +1827,10 @@ export interface FactCall {
   reason?: string;
 }
 
-export interface FactAssistant {
-  type: "assistant";
+export interface FactOrchestrator {
+  type: "orchestrator";
   at: number;
-  state: AssistantState;
+  state: OrchestratorState;
 }
 
 export interface FactMessage {
@@ -1962,7 +1965,7 @@ export interface FactRecurrenceGone {
 /** Told apart by `type`. */
 export type SideEvent =
   | FactCall
-  | FactAssistant
+  | FactOrchestrator
   | FactMessage
   | FactConversation
   | FactHired
@@ -2023,6 +2026,8 @@ export interface MoveIssueRequest {
 export interface IssueStatusRequest {
   status: IssueStatus;
   text?: string;
+  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
+  edit?: IssueUpdate;
 }
 
 export interface GraphActRequest {
@@ -2071,7 +2076,7 @@ export interface VoiceHeard {
 export interface StartRequest {
   channel: string;
   uid: string;
-  /** The call answers a ring: what rang, which the assistant says first instead of the greeting. */
+  /** The call answers a ring: what rang, which the orchestrator says first instead of the greeting. */
   about?: string;
 }
 

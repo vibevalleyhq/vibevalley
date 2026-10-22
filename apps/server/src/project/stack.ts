@@ -35,7 +35,7 @@ export function stackOf(dir: string): ProjectStack {
   return empty;
 }
 
-/** The package assistant is the lockfile's; a command is there only when package.json has that script, always as `<pm> run <script>`. */
+/** The package orchestrator is the lockfile's; a command is there only when package.json has that script, always as `<pm> run <script>`. */
 function nodeStack(pkg: string, has: (name: string) => boolean): ProjectStack {
   const pm = has("bun.lock") || has("bun.lockb") ? "bun" : has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm";
   let scripts: Record<string, string> = {};

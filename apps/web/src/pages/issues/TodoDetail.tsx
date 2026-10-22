@@ -55,8 +55,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const [busy, setBusy] = createSignal(false);
   const [word, setWord] = createSignal("");
   const [newProject, setNewProject] = createSignal(false);
-  const workAgents = useWorkAgents();
-  const agents = () => workAgents().filter((a) => a.enabled);
+  const agents = useWorkAgents(true);
   const projectList = useProjects();
   const projects = () => ready(projectList, []).map((p) => p.name);
 
@@ -86,13 +85,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     };
   };
 
-  // Given the id and the draft as they were when asked, so a call that waits on it does not read them later.
-  async function save(id: string, x: Draft) {
-    const got = await api.issue.update({ id, body: update(x) });
+  // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
+  // that waits does not read them later.
+  const unsaved = (): IssueUpdate | undefined => {
+    if (!edited()) return undefined;
+    const x = d();
     rememberPick(x.agent, x.project);
+    return update(x);
+  };
+  const saved = <T,>(got: T) => {
     setEdited(false);
     return got;
-  }
+  };
 
   async function busyWith(act: () => Promise<unknown>) {
     setBusy(true);
@@ -122,29 +126,27 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const draft = () => {
     const id = props.item.id;
     const text = word().trim();
-    const unsaved = edited() ? d() : undefined;
+    const edit = unsaved();
     return busyWith(async () => {
-      if (unsaved) await save(id, unsaved);
-      await api.issue.refine({ id, body: { text } });
+      saved(await api.issue.refine({ id, body: { text, edit } }));
       setWord("");
     });
   };
   const start = () => {
     const id = props.item.id;
     const x = d();
+    rememberPick(x.agent, x.project);
     const told = dispatchedNotice(props.onDone);
     return busyWith(async () => {
-      await save(id, x);
-      told(await api.issue.status({ id, body: { status: "todo" } }));
+      told(saved(await api.issue.status({ id, body: { status: "todo", edit: update(x) } })));
     });
   };
   const tryNow = () => {
     const id = props.item.id;
-    const unsaved = edited() ? d() : undefined;
+    const edit = unsaved();
     const done = props.onDone;
     return busyWith(async () => {
-      if (unsaved) await save(id, unsaved);
-      const got = await api.issue.dispatch({ id, body: {} });
+      const got = saved(await api.issue.dispatch({ id, body: { edit } }));
       if (got.queued) throw new Error(got.queued);
       done(id);
     });
@@ -325,8 +327,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           disabled={!canSave() || !edited()}
           onClick={() => {
             const id = props.item.id;
-            const x = d();
-            void busyWith(() => save(id, x));
+            const edit = unsaved();
+            if (edit) void busyWith(async () => saved(await api.issue.update({ id, body: edit })));
           }}
         >
           存下改动

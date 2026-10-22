@@ -46,7 +46,7 @@ export class VillageWorld {
   readonly plots: ReadonlyMap<number, Point>;
   readonly gate: Point;
   readonly queue: Point;
-  readonly assistant: Point;
+  readonly orchestrator: Point;
   readonly dog: Point;
   readonly lawn: readonly Point[];
   readonly lights: readonly { readonly at: Point; readonly r: number }[];
@@ -61,7 +61,7 @@ export class VillageWorld {
     this.plots = new Map(level.thingsOf("Plot").map((t) => [Number(t.field("index")), t.at]));
     this.gate = level.theThing("Gate").at;
     this.queue = level.theThing("Queue").at;
-    this.assistant = level.theThing("Manager").at;
+    this.orchestrator = level.theThing("Manager").at;
     this.dog = level.theThing("Dog").at;
     this.lawn = [...level.thingsOf("Rest")].sort((a, b) => Number(a.field("n")) - Number(b.field("n"))).map((t) => t.at);
     this.lights = level.thingsOf("Light").map((t) => ({ at: t.at, r: Number(t.field("r")) }));

@@ -1,6 +1,6 @@
 // The phone's calls: the calls are the server's inbox; which were answered or hung up on, the
 // call log, and which rings now are the page's, kept for this page's life. The phone and the chat's call button are one
-// call (voice/call.ts): answering a ring opens it, and while it is on nothing rings: the assistant says it on the call.
+// call (voice/call.ts): answering a ring opens it, and while it is on nothing rings: the orchestrator says it on the call.
 
 import type { InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
@@ -32,7 +32,7 @@ export interface PhoneHost {
   isOpen(): boolean;
   setOpen(open: boolean): void;
   play(sound: "ring" | "voiceOn" | "voiceOff"): void;
-  /** The call is on (or getting on): the assistant tells it there, so the phone does not ring. */
+  /** The call is on (or getting on): the orchestrator tells it there, so the phone does not ring. */
   inCall(): boolean;
   every(ms: number, f: () => void): () => void;
   after(ms: number, f: () => void): () => void;

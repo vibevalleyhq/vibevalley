@@ -77,9 +77,9 @@ the top and bottom, bars filled with the dimmed map.
 
 ## Commands (`commands.ts`)
 
-`commands` (`state.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: `water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`,
-`stopManager`, `dismiss`, `plant`, `aim`, `act`, `split`, `editTask`, `removeTask`, `actOnGraph`,
-`actOnTask`, `chooseTitle`, `refreshRuntime`, `enterFarm`. Each calls the API and then plays the bed's effect.
+`commands` (`state.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: what a plot does with its effect on the bed
+(`water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`, `plant`, `aim`, `act`), and `chooseTitle`, `refreshRuntime`. Each calls
+the API and then plays the bed's effect. A task graph's calls are `data/graphs.ts`, shared with the workbench.
 `clickBed(commands, bed)` is a plot click as the farm page does it; `openPlace(place, navigate)` a yard place's click
 (a panel, or a workbench page the web page has: `webRoutes`). `fire(promise)`: the server's notice tells a refusal.
 

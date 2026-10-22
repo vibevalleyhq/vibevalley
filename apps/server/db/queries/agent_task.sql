@@ -1,4 +1,4 @@
--- An agent's own task graph (agent/brain/taskStore.ts): an owner is whoever keeps it, a session id or the assistant.
+-- An agent's own task graph (agent/brain/taskStore.ts): an owner is whoever keeps it, a session id or the orchestrator.
 
 -- name: OpenGraphTasks :many
 select * from agent_task where owner = sqlc.arg(owner) and finished_at is null order by position;

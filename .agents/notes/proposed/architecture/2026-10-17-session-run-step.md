@@ -16,7 +16,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 ### 日志：Session、Run、事件，照 DeepSeek Harness
 
-2026-10-17 做了第一半：`Activity` 是 `SessionEvent`（`seq`、`time`、`type`），类型照 DeepSeek Harness 写成 `<主体>/<做了什么>`（`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`、`llm/retry`、`run/error`）；每个 Run 由 `run/start` 和 `run/end`（带结果）围起来，中间的事件带 `run`；家目录 `activities/` 是 `events/`，旧的记录加载时改好（`session/session.ts`）。
+2026-10-17 做了第一半：`Activity` 是 `SessionEvent`（`seq`、`time`、`type`），类型照 DeepSeek Harness 写成 `<主体>/<做了什么>`（`user/message`、`memory/recalled`、`orchestrator/thinking`、`orchestrator/message`、`tool/call`、`llm/retry`、`run/error`）；每个 Run 由 `run/start` 和 `run/end`（带结果）围起来，中间的事件带 `run`；家目录 `activities/` 是 `events/`，旧的记录加载时改好（`session/session.ts`）。
 
 日志只追加也做了：写下的一条不再改，流式的话和还没拿到输入的调用是草稿，带着将来的 `seq` 实时推、下一条事件之前写下；工具的结果是另一条 `tool/result`（`call` 指它的调用）；旧日志里带着输出的调用拆开、重新编号一次（`splitAllResults`）。还没做：事件的内容放进按 `type` 分的 `data`；Step 这一层（一次调模型和它要的工具）等农机报得出这条边界再加（我们自己的 agent 有，外面的农机多半没有），事件带一个可空的 `step`。照 DeepSeek Harness 的规矩，每个事件都落在一个 Run 里：现在开工前想起的记忆（`memory/recalled`）还在第一个 `run/start` 之前。
 
@@ -28,7 +28,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 
 - 删掉 `Trajectory`、`TrajectoryHead` 和 `*.head.json`。已有的头文件搬进 `session` 表一次；旧的事件没有 Run，按时间落进对应的 Run，落不进的留空。走了的 Session 也是 `Session`：`Phase` 加一个 `closed`（结束的时间和怎么关的）。
 - 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.events <id> [--run]` 返回事件。
-- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-assistant-is-an-agent.md) 它是档案 `assistant`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
+- 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md) 它是档案 `orchestrator`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
 
 ### 和消息之间只有两个口子，都在服务端
 

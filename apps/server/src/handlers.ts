@@ -1,6 +1,6 @@
 // Each handler only forwards to the service that owns the rule.
 
-import { docOwner } from "@vibevalley/protocol";
+import { docOwner, type IssueUpdate } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, reasonOf, refused } from "./errors.ts";
@@ -17,7 +17,7 @@ import { Recurrences } from "./recurrence/recurrence.ts";
 import { Sessions } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tasks } from "./task/task.ts";
-import { Assistant } from "./assistant/assistant.ts";
+import { Orchestrator } from "./orchestrator/orchestrator.ts";
 import { Game } from "./game/game.ts";
 import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Voice } from "./voice/voice.ts";
@@ -38,15 +38,17 @@ export const handlers = Effect.gen(function* () {
   const recurrences = yield* Recurrences;
   const issues = yield* Issues;
   const tasks = yield* Tasks;
-  const assistant = yield* Assistant;
+  const orchestrator = yield* Orchestrator;
   const game = yield* Game;
   const lan = yield* Lan;
   const voice = yield* Voice;
   const connectors = yield* Connectors;
+  /** An issue's id, with the fields the owner changed beside an act saved first. */
+  const edited = (ref: string, edit: IssueUpdate | undefined) => Effect.tap(issues.idOf(ref), (id) => (edit ? issues.edit(id, edit) : Effect.void));
   const done: Handlers = {
     "server.health": () => Effect.succeed({ ok: true, version: config.version }),
-    "assistant.open": () => core.open(),
-    "assistant.stop": () => assistant.stop(),
+    "orchestrator.open": () => core.open(),
+    "orchestrator.stop": () => orchestrator.stop(),
     "game.achievements": () => Effect.sync(game.achievements),
     "voice.session": () => voice.session(),
     "voice.renew": ({ body }) => voice.renew(body.channel, body.uid),
@@ -55,7 +57,7 @@ export const handlers = Effect.gen(function* () {
     "voice.heard": ({ body }) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
     "voice.said": ({ body }) => voice.said(body.agentId, body.text),
     "voice.dictate": ({ body }) => voice.dictate(body.audio, body.format),
-    "assistant.hear": ({ body }) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
+    "orchestrator.hear": ({ body }) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
     "connector.list": () => connectors.list(),
     "connector.login": ({ id, body }) => connectors.login(id, body),
     "connector.verify": ({ id, body }) => connectors.verify(id, body.code),
@@ -75,14 +77,11 @@ export const handlers = Effect.gen(function* () {
       ),
     "game.chooseTitle": ({ body }) => game.chooseTitle(body.achievement, body.tier),
     "github.refresh": () => Effect.flatMap(projects.refreshGitHub(), (status) => Effect.as(issues.refreshPullRequests, status)),
-    "assistant.markWrong": ({ body }) => assistant.markWrong(body.on, body.want),
+    "orchestrator.markWrong": ({ body }) => orchestrator.markWrong(body.on, body.want),
     "channel.say": ({ body }) =>
       Effect.andThen(
-        Effect.andThen(
-          Effect.sync(() => body.station !== undefined && game.want(body.station)),
-          core.open(),
-        ),
-        assistant.say(
+        Effect.sync(() => body.station !== undefined && game.want(body.station)),
+        orchestrator.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
           body.conversation,
@@ -90,7 +89,7 @@ export const handlers = Effect.gen(function* () {
         ),
       ),
     "setting.load": () => Effect.sync(setting.status),
-    "setting.check": ({ body }) => Effect.sync(() => ({ ...setting.check(body), github: projects.githubStatus() })),
+    "setting.check": ({ body }) => Effect.sync(() => setting.check(body)),
     "setting.save": ({ body }) => setting.save(body).pipe(Effect.mapError((e) => refused(e.message))),
     "github.status": () => Effect.sync(projects.githubStatus),
     "project.list": () => projects.summaries(),
@@ -118,8 +117,8 @@ export const handlers = Effect.gen(function* () {
     "memory.recall": ({ agent, project, text }) => memory.recallOf(agent, project ?? "", text ?? ""),
     "memory.create": ({ agent, body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: "owner" }),
     "memory.delete": ({ agent, memory: id }) => memory.forgetOf(agent, id),
-    "assistant.listArchive": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
-    "assistant.getArchive": ({ name }) =>
+    "orchestrator.listArchive": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
+    "orchestrator.getArchive": ({ name }) =>
       Effect.suspend(() => {
         const text = memory.archiveFile(name);
         return text !== undefined ? Effect.succeed(text) : Effect.fail(missing("旧账 " + name));
@@ -151,13 +150,12 @@ export const handlers = Effect.gen(function* () {
     "issue.move": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.move(id, body.before ?? "")),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.act": ({ id, body }) => issues.act(id, body, channels.general()),
-    "issue.review": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
-    "issue.refine": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.refine(id, body.text ?? "", channels.general())),
-    "issue.dispatch": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.dispatchQueued(id)),
-    "issue.status": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
+    "issue.refine": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.general())),
+    "issue.dispatch": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.dispatchQueued(id)),
+    "issue.status": ({ id: ref, body }) =>
+      Effect.flatMap(edited(ref, body.edit), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
     "issue.comment": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
     "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, "owner")),
-    "issue.resolve": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.resolve(id)),
     "project.templates": ({ id }) => issues.templates(id),
     "graph.split": ({ body }) => tasks.split(body.goal, body.project, body.agent ?? "", "user"),
     "graph.updateTask": ({ id, task, body }) => tasks.editTask(id, task, body, "user"),

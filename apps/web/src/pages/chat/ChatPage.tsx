@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Conversation, generalName, type AssistantState, type Session } from "@vibevalley/protocol";
+import { type Conversation, generalName, type OrchestratorState, type Session } from "@vibevalley/protocol";
 import {
   channelName,
   channelOf,
@@ -18,7 +18,7 @@ import {
 import { aria, autofocus, Keyed, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
-import { AssistantFace } from "../../ui/Face";
+import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer } from "./Composer";
@@ -228,7 +228,7 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
       </div>
-      <AssistantLine mood={core()?.assistant ?? "idle"} />
+      <OrchestratorLine mood={core()?.orchestrator ?? "idle"} />
     </aside>
   );
 }
@@ -305,12 +305,12 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversati
   );
 }
 
-const mood: Record<AssistantState, string> = { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" };
+const mood: Record<OrchestratorState, string> = { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" };
 
-function AssistantLine(props: { mood: AssistantState }) {
+function OrchestratorLine(props: { mood: OrchestratorState }) {
   return (
     <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label="管家">
-      <AssistantFace size={32} />
+      <OrchestratorFace size={32} />
       管家
       <Dot tone={props.mood === "idle" ? "idle" : props.mood === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[props.mood]}</span>

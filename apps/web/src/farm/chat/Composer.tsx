@@ -1,28 +1,27 @@
-// The farm chat window's input row: the assistant's face that opens and folds the window, who the next job goes to, the
-// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the assistant thinks. A failed
+// The farm chat window's input row: the orchestrator's face that opens and folds the window, who the next job goes to, the
+// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the orchestrator thinks. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
-import { newSendKey, say } from "./say";
+import { api } from "../../data/api";
+import { createComposer, say } from "../../data/composer";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { insertName, type Nameable, nameables, offeredFor, threadOwnerOf, typedName } from "../../rules/chat";
+import { threadOwnerOf, typedName } from "../../rules/chat";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { ready, useAgents } from "../../data/query";
-import { AgentFace, AssistantFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { CallButton } from "../../voice/CallButton";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
 import { useFarm } from "../state";
+import { useAgent } from "../../data/agents";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
   const pick = useFarm((s) => s.pick);
-  const agents = useAgents();
-  const agent = () => ready(agents, []).find((a) => a.id === pick());
+  const agent = useAgent(pick);
   return (
     <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
       {(a) => (
@@ -65,101 +64,35 @@ export function FarmComposer(props: {
   onProblem: (p: string | undefined) => void;
 }) {
   const core = useCore();
-  const look = useFarm((s) => s.assistantLook);
+  const look = useFarm((s) => s.orchestratorLook);
   const pick = useFarm((s) => s.pick);
   let input: HTMLTextAreaElement | undefined;
-  const [text, setText] = createSignal("");
-  const [caret, setCaret] = createSignal(0);
-  const [active, setActive] = createSignal(0);
-  const [closed, setClosed] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
-  let key: { draft: string; key: string } | undefined;
-  const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
-  const offered = createMemo(() => {
-    const t = typing();
-    return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
-  });
-  const stoppable = () => core()?.assistant === "thinking" || core()?.assistant === "speaking";
   const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
   const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");
 
-  const edit = (value: string, at: number) => {
-    setText(value);
-    setCaret(at);
-    setActive(0);
-    setClosed(false);
-    props.onProblem(undefined);
-    // Naming someone opens the window, to show who can be named.
-    if (!props.open && typedName(value, at)) farm.chatOpen(true);
-  };
-  const choose = (n: Nameable) => {
-    const t = typing();
-    if (!t) return;
-    const next = insertName(text(), caret(), t.start, n.token);
-    edit(next.text, next.caret);
-    requestAnimationFrame(() => {
-      input?.focus();
-      input?.setSelectionRange(next.caret, next.caret);
-    });
-  };
-  const send = async () => {
-    const said = text().trim();
-    if (!said || busy()) return;
-    if (key?.draft !== said) key = { draft: said, key: newSendKey() };
-    setBusy(true);
-    try {
-      await say(said, props.conversation, key.key, props.thread || pick() === "auto" ? undefined : pick());
-      key = undefined;
-      edit("", 0);
-    } catch (e) {
-      props.onProblem(`没发出去：${reasonOf(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.isComposing) return;
-    const list = offered();
-    if (list.length > 0) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setActive((a) => (a + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length);
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        const n = list[active()];
-        if (n) choose(n);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setClosed(true);
-        return;
-      }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void send();
-    }
-  };
-  // The caret moves without typing too (arrow keys, a click): the @ menu follows it.
-  const follow = (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart);
+  const box = createComposer(core, () => input, {
+    send: (said, sendKey) => say(said, props.conversation, sendKey, props.thread || pick() === "auto" ? undefined : pick()),
+    failed: (reason) => props.onProblem(`没发出去：${reason}`),
+    edited: (value, at) => {
+      props.onProblem(undefined);
+      // Naming someone opens the window, to show who can be named.
+      if (!props.open && typedName(value, at)) farm.chatOpen(true);
+    },
+  });
 
   return (
     <div class={["relative flex items-end gap-1.5 p-1.5", { "border-t border-cream-200": props.open }]}>
-      <Show when={offered().length > 0}>
+      <Show when={box.offered().length > 0}>
         <div class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px" role="listbox" aria-label="叫谁">
-          <For each={offered()} keyed={(n) => n.token}>
+          <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <button
                 type="button"
                 role="option"
-                aria-selected={aria(i() === active())}
+                aria-selected={aria(i() === box.active())}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(n())}
-                class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === active() }]}
+                onClick={() => box.choose(n())}
+                class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === box.active() }]}
               >
                 <span class="text-bark-900">{n().name}</span>
                 <span class="truncate text-bark-500">{n().note}</span>
@@ -179,7 +112,7 @@ export function FarmComposer(props: {
         class="relative shrink-0 cursor-pointer p-0.5 shadow-[inset_0_0_0_2px_#2f1f1340]"
         style={{ background: ring[props.phase] }}
       >
-        <AssistantFace size={40} look={look()} />
+        <OrchestratorFace size={40} look={look()} />
         <Show when={props.unread}>
           <span class="absolute -top-0.5 -right-0.5 h-3 w-3 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
         </Show>
@@ -191,28 +124,28 @@ export function FarmComposer(props: {
         <textarea
           ref={(el) => (input = el)}
           rows={1}
-          value={text()}
+          value={box.text()}
           placeholder={placeholder()}
           aria-label={placeholder()}
-          onInput={(e) => edit(e.currentTarget.value, e.currentTarget.selectionStart)}
-          onKeyUp={follow}
-          onClick={follow}
-          onKeyDown={onKey}
+          onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+          onKeyUp={box.follow}
+          onClick={box.follow}
+          onKeyDown={box.onKey}
           class="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 font-pixel text-[12px] leading-4 text-bark-900 outline-none placeholder:text-bark-400"
         />
-        <Show when={stoppable()}>
+        <Show when={box.stoppable()}>
           <button
             type="button"
             aria-label="叫管家停下"
             title="叫管家停下这一轮，派出去的帮工照常干活"
-            onClick={() => void api.assistant.stop().catch(() => {})}
+            onClick={() => void api.orchestrator.stop().catch(() => {})}
             class="cursor-pointer p-1"
           >
             <SpriteIcon name="button-stop" size={24} />
           </button>
         </Show>
-        <DictationButton field={() => input} value={text()} onValue={edit} />
-        <button type="button" aria-label="发送" disabled={!text().trim() || busy()} onClick={() => void send()} class="cursor-pointer p-1 disabled:opacity-40">
+        <DictationButton field={() => input} value={box.text()} onValue={box.edit} />
+        <button type="button" aria-label="发送" disabled={!box.canSend()} onClick={() => void box.send()} class="cursor-pointer p-1 disabled:opacity-40">
           <SpriteIcon name="button-send" size={20} />
         </button>
       </div>

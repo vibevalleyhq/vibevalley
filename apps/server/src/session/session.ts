@@ -17,7 +17,7 @@ import { createSubagents, type Subagent, type SubagentReport, type Subagents } f
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   type Agent,
-  type WorkspaceState,
+  type Changes,
   dayMs,
   type Fact,
   type IssueClose,
@@ -29,6 +29,7 @@ import {
   type SessionEvent,
   type SessionGraph,
   type Spent,
+  type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
@@ -46,16 +47,22 @@ import { type Merged, MergeFailure, Projects, type Workplace } from "../project/
 import { probeInstallation, Runtimes } from "../runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
+import { AgentHost, type HostOptions } from "./host.ts";
 import {
+  conflictOf,
   instructions,
   jobBreak,
   noRoom,
+  notTakenIn,
   readReport,
   recallBlock,
+  sameConflict,
   type SessionLimits,
   sessionName,
+  type Settle,
   summaryOf,
   toOarMcp,
+  whoMakesRoom,
   withRecall,
   workplaceRules,
 } from "./rules.ts";
@@ -132,13 +139,15 @@ interface Hand {
 
 export interface SessionShape {
   readonly noRoom: (runtime: string, project: string) => string;
+  /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
+   * been idle longest, and says who. */
+  readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
   readonly send: (agent: Agent, task: string, where: string, opt?: HireOptions) => Effect.Effect<Hired>;
   readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
   /** deliver, in words for whoever sent it. */
   readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
   readonly stop: (id: string) => Effect.Effect<boolean>;
   readonly dismiss: (id: string) => Effect.Effect<boolean>;
-  readonly place: (id: string) => Workplace | undefined;
   readonly roster: () => Roster[];
   readonly find: (id: string) => Roster | undefined;
   /** A session on the farm now, as the core state has it: what another module reads a session by. */
@@ -146,37 +155,36 @@ export interface SessionShape {
   readonly presentSessions: () => readonly Session[];
   /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
    * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
-   * it works. A merge that would conflict marks the conflict and keeps the session; so does a pull request left open. */
-  readonly handOver: <E>(
+   * it works. Work that does not go in keeps the session and its branch, marks a conflict, and says in NotTakenIn what
+   * the helper is sent back with and what the owner is told; settle says who settles a conflict. A pull request left
+   * open keeps the session too. */
+  readonly handOver: (
     id: string,
     closed: IssueClose,
-    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>,
-  ) => Effect.Effect<Merged, ApiError | E>;
+    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+    settle?: Settle,
+  ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
+  /** What the session's branch would bring now; the conflict it shows is kept on the session. */
+  readonly changes: (id: string) => Effect.Effect<Changes | undefined, ApiError>;
   /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
   readonly list: (agent: string) => Effect.Effect<Session[]>;
   /** A session on the farm, or one that has ended. */
   readonly get: (id: string) => Effect.Effect<Session | undefined>;
   readonly runs: (issue: string) => Effect.Effect<Run[]>;
-  readonly currentRun: (id: string) => string;
   /** A session's log, oldest first; a run's only when run is given. */
   readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
-  readonly trajectories: Trajectories;
   /** These four are subscribed before they return: nothing published after is missed. */
   readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
   /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
   readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
   readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
   readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-  /** A session's token for the farm's MCP server; a new one stops the old working. */
-  readonly issueToken: (session: string) => string;
-  readonly revokeToken: (session: string) => void;
   /** Whose token it is; "" when nobody's. */
   readonly who: (token: string) => string;
   /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
   readonly setAddress: (address: string) => void;
-  readonly mcpUrl: () => string;
-  /** Records a run of an in-process agent (the assistant's) as its own; execution.ts. */
-  readonly runStore: RunStore;
+  /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
+  readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
   /** Brings back the sessions the farm had when it stopped, once every service is ready. */
   readonly restore: Effect.Effect<void>;
 }
@@ -208,6 +216,26 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
       return undefined;
   }
 }
+
+/** Work that did not go in (see handOver); the session stays. */
+export class NotTakenIn extends Error {
+  readonly _tag = "NotTakenIn";
+  constructor(
+    readonly failure: MergeFailure,
+    /** What the helper is sent back with; "" when the owner settles it. */
+    readonly fix: string,
+    /** What the owner is told. */
+    readonly owner: string,
+    readonly notice: string,
+    readonly short: string,
+  ) {
+    super(owner);
+  }
+}
+
+/** A failure's words, whatever it is. */
+const reasonText = (e: unknown): string =>
+  e instanceof Error ? e.message : typeof e === "object" && e !== null && "_tag" in e ? reasonOf(e as ApiError) : String(e);
 
 export class Sessions extends Context.Service<Sessions, SessionShape>()("vibevalley/Session") {}
 
@@ -412,8 +440,20 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     // ── runs ──
 
-    const finishRun = (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
-      logged(`run ${id}`, qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id }));
+    // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
+    const runs = {
+      start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
+        tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() })),
+      /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
+      link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
+      heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
+      issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
+      finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
+        tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+    };
+    /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
+    const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>
+      Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */
     const expect = (h: Hand, by: RunTrigger) => void h.triggers.push(by);
@@ -422,19 +462,19 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const startRun = (h: Hand) => {
       const by = h.triggers.shift() ?? { kind: "runtime" };
-      const issue = core.session(h.id)?.issue ?? null;
+      const issue = core.session(h.id)?.issue ?? "";
       const id = newId();
       // Known at once, so a report that follows closely finds the run; its row follows.
       h.run = id;
       h.heard = [];
       h.journal.runStarted(id);
-      fire(logged(`${h.id}'s run not kept`, qr.startRun({ id, session: h.id, issue, triggered_by: JSON.stringify(by), started_at: Date.now() })));
+      fire(keptRun(`${h.id}'s run not kept`, runs.start(id, h.id, issue, by)));
     };
 
     const heardInRun = (h: Hand, message: string) => {
       if (!h.run) return;
       h.heard.push(message);
-      fire(logged(`run ${h.run}`, qr.heardInRun({ heard: JSON.stringify(h.heard), id: h.run })));
+      fire(keptRun(`run ${h.run}`, runs.heard(h.run, h.heard)));
     };
 
     const endRun = (h: Hand, outcome: Outcome, summary: string, spent?: Spent) => {
@@ -443,7 +483,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.heard = [];
       if (!id) return;
       h.journal.runEnded(id, outcome);
-      fire(finishRun(id, outcome, summary, spent));
+      fire(keptRun(`run ${id}`, runs.finish(id, outcome, summary, spent)));
     };
 
     // ── following a session ──
@@ -755,25 +795,26 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       );
 
-    const harvest = <E>(id: string, closed: IssueClose, merge: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>) =>
+    const harvest = (id: string, closed: IssueClose, use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>, settle: Settle = "owner") =>
       admission.withPermits(1)(
         Effect.gen(function* () {
           const h = hands.get(id);
           const current = core.session(id);
-          if (!h || !current) return yield* Effect.fail<ApiError | E>(missing("帮工 " + id));
+          if (!h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
           if (closed === "merged" && current.graph)
-            return yield* Effect.fail<ApiError | E>(
+            return yield* Effect.fail<ApiError | NotTakenIn>(
               refused(`${current.name} 在做种植计划 ${current.graph.id} 里的活：做完会自动合进计划分支，收获整个计划时再进主分支`),
             );
           if (isBusy(current) || h.triggers.length > 0)
-            return yield* Effect.fail<ApiError | E>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
+            return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
           yield* rest(h);
-          const merged = yield* merge(h.place, h.lastText).pipe(
-            Effect.tapError((e) =>
-              Effect.sync(() => {
-                if (e instanceof MergeFailure && e.kind === "conflict") apply({ type: "conflict", id, conflict: { base: e.base, files: [...e.files] } });
-              }),
-            ),
+          const merged = yield* use(h.place, h.lastText).pipe(
+            Effect.mapError((e) => {
+              const f = e instanceof MergeFailure ? e : new MergeFailure("error", reasonText(e));
+              if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+              const words = notTakenIn(f, current.name, settle);
+              return new NotTakenIn(f, words.fix, words.owner, words.notice, words.short);
+            }),
           );
           if (merged.pullRequest) return merged;
           yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
@@ -781,6 +822,27 @@ export const make = (options: SessionOptionsIn = {}) =>
           return merged;
         }),
       );
+
+    /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
+    const changesOf = (id: string) =>
+      Effect.gen(function* () {
+        const place = hands.get(id)?.place;
+        if (!place) return undefined;
+        const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
+        const conflict = conflictOf(changes);
+        const session = core.session(id);
+        if (session && !sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+        return changes;
+      });
+
+    const recheck = (id: string) =>
+      Effect.gen(function* () {
+        const place = hands.get(id)?.place;
+        const session = core.session(id);
+        if (!place || !session) return;
+        const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
+        if (!sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+      });
 
     // ── bringing the farm back ──
 
@@ -794,7 +856,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns())) yield* finishRun(r.id, "interrupted", "VibeValley 重启了，这一轮停在了半路");
+      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", "VibeValley 重启了，这一轮停在了半路"));
       const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
@@ -869,8 +931,24 @@ export const make = (options: SessionOptionsIn = {}) =>
       return session ? { session, place: h.place, lastText: h.lastText } : undefined;
     };
 
+    const currentRun = (id: string) => hands.get(id)?.run ?? executions.get(id)?.() ?? "";
+    const runStore: RunStore = {
+      ...runs,
+      finished: (r) => PubSub.publishUnsafe(finishedHub, r),
+      consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
+      register: (session, current) => void executions.set(session, current),
+    };
     const shape: SessionShape = {
       noRoom: roomFor,
+      makeRoom: (runtime, project) =>
+        Effect.gen(function* () {
+          const full = roomFor(runtime, project);
+          if (full) return { refused: full };
+          const oldest = whoMakesRoom(core.state().sessions, maxRunning);
+          if (!oldest) return {};
+          yield* shape.dismiss(oldest.id);
+          return { evicted: oldest.name };
+        }),
       send: (agent, task, where, opt = {}) =>
         admission.withPermits(1)(
           Effect.gen(function* () {
@@ -975,7 +1053,6 @@ export const make = (options: SessionOptionsIn = {}) =>
             return true;
           }),
         ),
-      place: (id) => hands.get(id)?.place,
       roster: () =>
         [...hands.values()]
           .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -988,6 +1065,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         return h ? view(h) : undefined;
       },
       handOver: harvest,
+      changes: changesOf,
       list: (agent) =>
         Effect.gen(function* () {
           const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
@@ -1006,59 +1084,53 @@ export const make = (options: SessionOptionsIn = {}) =>
           return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
         }),
       runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
-      currentRun: (id) => hands.get(id)?.run ?? executions.get(id)?.() ?? "",
       events: (id, r) => trajectories.events(id, r),
-      trajectories,
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
-      issueToken,
-      revokeToken,
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      mcpUrl: () => mcpUrl,
-      runStore: {
-        start: (id, session, issue, trigger) =>
-          tried(
-            sql.withTransaction(
-              Effect.gen(function* () {
-                yield* qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() });
-                if (issue) yield* qi.linkRunIssue({ run: id, issue });
-              }),
-            ),
-          ),
-        link: (r, issue) => tried(qi.linkRunIssue({ run: r, issue })),
-        heard: (r, heard) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
-        issues: (r) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
-        finish: (id, outcome, summary, spent) =>
-          tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
-        finished: (r) => PubSub.publishUnsafe(finishedHub, r),
-        consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
-        register: (session, current) => void executions.set(session, current),
-      },
+      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
     chat.useHelpers({
       present: (id) => hands.has(id),
       deliver,
-      currentRun: shape.currentRun,
+      currentRun,
       report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
       onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
       sessionOf: shape.sessionOf,
       presentSessions: shape.presentSessions,
     });
+    // A round reported on a session marked conflicting may have settled it: the mark is looked at again.
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, (n) => (n._tag === "reported" && n.session?.conflict ? recheck(n.report.id) : Effect.void)));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
-    return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run });
+    return Object.assign(shape, {
+      hands,
+      expect,
+      unexpect,
+      hired: () => hired,
+      run,
+      trajectories,
+      runStore,
+      currentRun,
+      issueToken,
+      place: (id: string) => hands.get(id)?.place,
+      mcpUrl: () => mcpUrl,
+    });
   });
 
 export const layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
+
+/** The sessions as a test sees them: the shape, and what is inside it. */
+export type SessionsInside = Effect.Success<ReturnType<typeof make>>;
 
 /** Brings the sessions back once every service is built. */
 export const ready = Layer.effectDiscard(Effect.flatMap(Sessions, (s) => s.restore));

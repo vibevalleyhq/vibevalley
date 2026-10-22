@@ -11,12 +11,12 @@
 | oar 事件读成核心状态的事实；干活过程（事件日志） | 农机的发现、模型、设置页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「在用的农机」「农具」） |
 | 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
-| 管家那一个 agent loop 的 run 和日志（`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/assistant.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
+| 进程内的 agent（管家）怎么跑：起大脑、排输入、边说边写、记 run 和日志、重启后接着做、做错的一轮存成评测（`session/host.ts`、`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
 | | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/pages/chat/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/pages/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/rules/rounds.ts`） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`、`chooseAgent`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`execution.ts` 管家的 run；`shell.ts` 读汇报里给主人的问题。
+- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `ai/models.ts`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
@@ -44,8 +44,8 @@
 - **起草的 Session**（`Session.draft`，派活时 `HireOptions.draft`）：为一张备选工单写草稿，不是这张工单的帮工；它带着 `issue`（工单串、run 都记在这张工单上），但不进 `issue_session`。交回来以后由工单服务重置它的 worktree、请它收工（[工单](docs/subsystems/issue.md#怎么走)「起草」）。田头的派活消息写「看代码，起草这张工单」，再起草写「再起草一版」。
 - **干活时插进来的话不开新的 run**，记在这一轮的 `heard` 里；不能插话的农机排队，是下一次 run 的触发。叫不醒、被拒的不算 run。
 - **一次 run 的花费从这一次算**：`spent` 事实是这个 Session 的累计，按 oar 报的 token 总数和上一次的差算；换了 oar 会话从零算。汇报带上这一轮开始以来的差（`spent`）。
-- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `actionText`，页面不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给页面（合并到 0.3 秒一次），下一条事件之前写下。
-- **日志的大小**：一个 Session 留最近 240 条，管家（id `assistant`）留 1000 条；工具输入留 4000 字，输出留开头 2000、结尾 4000 字（按 UTF-16 数）。日志不进核心状态。
+- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`orchestrator/thinking`、`orchestrator/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `actionText`，页面不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给页面（合并到 0.3 秒一次），下一条事件之前写下。
+- **日志的大小**：一个 Session 留最近 240 条，管家（id `orchestrator`）留 1000 条；工具输入留 4000 字，输出留开头 2000、结尾 4000 字（按 UTF-16 数）。日志不进核心状态。
 - **走了的 Session 一直是 `session` 表的一行**；它的日志在走了 `session.trajectory_days` 天（默认 30，0 是一直留）后、下次开机时删掉。
 - **评论对整张工单说**（`issue.comment`），不挂在某一条事件上。
 
@@ -98,7 +98,7 @@
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 
-**离开**（收获时 `handOver`、收工 `dismiss`）：先关 oar 会话；收获时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么收（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，执行不知道 PR 和计划；收的那一步失败（冲突施加 `conflict`）Session 和分支都留着；成功或收工才关上日志、`session` 表记上结束和怎么关的、作废令牌、记性收尾、施加 `left`。收工时分支上有提交就留着分支。
+**离开**（收获时 `handOver`、收工 `dismiss`）：先关 oar 会话；收获时在干或有待开始的一轮就拒绝；`handOver` 只管让帮工歇下、交出现场（worktree 和它最后说的话）、按给的关法离开，怎么收（本地合、提 PR、结束 PR、合进计划分支）由调它的人给，执行不知道 PR 和计划；收的那一步失败，Session 和分支都留着：冲突施加 `conflict`，失败照种类说成 `NotTakenIn`（`rules.ts` 的 `notTakenIn`：帮工要带回去修的话、给主人的话、农场的通知、计划记的一行）；冲突由谁解决由调用方说（`settle`：工单交给主人决定，计划直接让帮工修），带话的路也由调用方定。腾位置也归执行：`makeRoom` 在农机或项目到了上限时拒绝，整片地满了就请最久没干活的那个收工（`whoMakesRoom`），并说请走了谁。帮工分支的冲突也归执行：`changes` 看一眼分支会带来什么并更新冲突，标着冲突的帮工交回一轮，执行自己再查一次（那一轮可能已经解决了），工单不用叫它。成功或收工才关上日志、`session` 表记上结束和怎么关的、作废令牌、记性收尾、施加 `left`。收工时分支上有提交就留着分支。
 
 **重启**（`restore`，开机时 `session` 的 `ready` 跑它）：
 
@@ -118,7 +118,7 @@
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。
 - **核心状态（`core`）**：`apply` 施加 `hired`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`；日志的事件推给页面；提醒经核心状态的 side event 发。
-- **管家（`assistant`）**：用 `execution.ts` 记它的 run 和日志（`session.events assistant`）。
+- **管家（`orchestrator`）**：向 `Sessions.host` 要一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；日志和记 run 的地方由 `Sessions` 配上，管家碰不到：run 和日志经 `execution.ts` 记，和帮工的放在一起（`session.events orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
 - **`/mcp`（`mcp`）**：凭 `Sessions.who` 认出调工具的是哪个 Session。
 
 ## 为什么这样

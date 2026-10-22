@@ -6,13 +6,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
-  CallState,
   CommitCount,
   WorkspaceState,
   Fact,
   GameEffect,
   LiveEvent,
-  AssistantState,
+  OrchestratorState,
   NoticeLevel,
   RuntimeInfo,
   Session,
@@ -24,7 +23,7 @@ import { Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effec
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", assistant: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
@@ -61,8 +60,7 @@ export interface CoreShape {
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
-  readonly setCall: (state: CallState, reason?: string) => Effect.Effect<void>;
-  readonly setAssistant: (state: AssistantState) => Effect.Effect<void>;
+  readonly setOrchestrator: (state: OrchestratorState) => Effect.Effect<void>;
   readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
   /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
   readonly open: () => Effect.Effect<void>;
@@ -79,7 +77,6 @@ export interface CoreShape {
   readonly facts: Stream.Stream<Fact>;
   readonly live: Stream.Stream<LiveEvent>;
   readonly owner: Stream.Stream<OwnerDid>;
-  readonly effects: Stream.Stream<GameEffect>;
   /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
   readonly states: Stream.Stream<StateFrame>;
 }
@@ -89,8 +86,8 @@ export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") 
 /** What state.json keeps: the chat, progress, recurrences and issues are the database's. */
 const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: WorkspaceState): WorkspaceState => kept;
 
-/** Started again, nobody is on the call and the assistant is not mid-sentence. */
-const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, assistant: "idle" });
+/** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
+const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, orchestrator: "idle" });
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -142,7 +139,6 @@ export const make = Effect.gen(function* () {
 
   const events = yield* PubSub.unbounded<SideEvent>();
   const transitions = yield* PubSub.unbounded<Transition>();
-  const effects = yield* PubSub.unbounded<GameEffect>();
   const owner = yield* PubSub.unbounded<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
   const changes = yield* PubSub.unbounded<GameEffect | undefined>();
@@ -173,7 +169,6 @@ export const make = Effect.gen(function* () {
         PubSub.publishUnsafe(transitions, t);
       }
       for (const e of made) {
-        PubSub.publishUnsafe(effects, e);
         PubSub.publishUnsafe(changes, e);
       }
     });
@@ -200,8 +195,7 @@ export const make = Effect.gen(function* () {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
-    setCall: (call, reason) => apply(reason ? { type: "call", state: call, reason } : { type: "call", state: call }),
-    setAssistant: (assistant) => apply({ type: "assistant", state: assistant }),
+    setOrchestrator: (orchestrator) => apply({ type: "orchestrator", state: orchestrator }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" })),
     sessionEvent: (id, activity) => side({ type: "event", at: Date.now(), id, activity }),
@@ -225,7 +219,6 @@ export const make = Effect.gen(function* () {
       Stream.filter((e): e is LiveEvent => e !== undefined),
     ),
     owner: Stream.fromPubSub(owner),
-    effects: Stream.fromPubSub(effects),
     states,
   };
   return shape;

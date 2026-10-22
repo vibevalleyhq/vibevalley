@@ -1,6 +1,6 @@
 import { createEffect, createMemo, deep } from "solid-js";
 
-import type { IssueHistory } from "@vibevalley/protocol";
+import type { Issue, IssueHistory } from "@vibevalley/protocol";
 import { api } from "./api";
 import { useCore } from "./frame";
 import { queries, ready, useQuery } from "./query";
@@ -27,3 +27,25 @@ export function useIssueHistory(older: () => boolean) {
   });
   return { rows, loading: () => history.isPending || core() === undefined, error: () => history.error };
 }
+
+// An issue's reads, keyed under "issues" so that whatever reloads the issues reads them again too.
+
+/** What harvesting the issue would take in; read only while it is shown. */
+export const useIssueChanges = (id: () => string, shown: () => boolean = () => true) =>
+  useQuery(() => ({ queryKey: ["issues", "changes", id()], queryFn: () => api.issue.changes({ id: id() }), enabled: shown() }));
+
+/** The issue's timeline, read again as it moves on: where it stands, its helper's rounds, the findings it was sent back with. */
+export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>
+  useQuery(() => ({
+    queryKey: ["issues", "timeline", issue().id, issue().attention.state, rounds(), issue().findings.length],
+    queryFn: () => api.issue.timeline({ id: issue().id }),
+    placeholderData: <T>(prev: T) => prev,
+  }));
+
+/** The issue's runs, read again whenever version changes. */
+export const useIssueRuns = (id: () => string, version: () => string) =>
+  useQuery(() => ({
+    queryKey: ["issues", "runs", id(), version()],
+    queryFn: () => api.issue.runs({ id: id() }),
+    placeholderData: <T>(prev: T) => prev,
+  }));

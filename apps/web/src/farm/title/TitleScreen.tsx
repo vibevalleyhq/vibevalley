@@ -1,13 +1,13 @@
 // The title screen over the farm: the farm at the hour it is, slowly moving; the game's name; the menu: 开始游戏,
 // 继续游戏 (when there is a farm to go back to), 设置. Arrow keys and Enter work as in a game; leaving it, it does not
-// show again on this machine. Without the assistant's key 开始游戏 says so in place: the workbench pages have no toasts to
+// show again on this machine. Without the orchestrator's key 开始游戏 says so in place: the workbench pages have no toasts to
 // carry it there.
 
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "../../data/api";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { hasFarm, assistantReady } from "./rules";
+import { hasFarm, orchestratorReady } from "./rules";
 import { startScene } from "./scene";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
@@ -38,10 +38,10 @@ export function TitleScreen() {
     playSound("tap");
     switch (item) {
       case "start":
-        // The assistant cannot think without DeepSeek's key: say so under the menu, where 设置 is.
-        if (!assistantReady(ready(settings, undefined))) return setNote("先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。");
+        // The orchestrator cannot think without DeepSeek's key: say so under the menu, where 设置 is.
+        if (!orchestratorReady(ready(settings, undefined))) return setNote("先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。");
         farm.closeTitle();
-        return void api.assistant.open().catch(() => {});
+        return void api.orchestrator.open().catch(() => {});
       case "continue":
         return canContinue() ? farm.closeTitle() : undefined;
       case "settings":

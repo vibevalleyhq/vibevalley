@@ -5,7 +5,7 @@ import { type Effect, Schema } from "effect";
 import type * as T from "./shapes";
 import * as S from "./schema";
 
-export type Caller = "owner" | "remote" | "assistant" | "session";
+export type Caller = "owner" | "remote" | "orchestrator" | "session";
 
 export interface Refused {
   readonly _tag: "Refused";
@@ -57,9 +57,9 @@ export const errorStatus: Readonly<Record<ApiError["_tag"], number>> = {
 /** One answer per route: the server's Handlers. */
 export interface Handlers<R = never> {
   readonly "server.health": () => Effect.Effect<T.Health, ApiError, R>;
-  readonly "assistant.open": () => Effect.Effect<void, ApiError, R>;
-  /** Ends the assistant's run under way and drops what waits for it; the sessions it sent keep working. */
-  readonly "assistant.stop": () => Effect.Effect<void, ApiError, R>;
+  readonly "orchestrator.open": () => Effect.Effect<void, ApiError, R>;
+  /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
+  readonly "orchestrator.stop": () => Effect.Effect<void, ApiError, R>;
   readonly "setting.load": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
   /** The first thing Save would refuse in these settings, without saving them. */
   readonly "setting.check": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.SettingsCheck, ApiError, R>;
@@ -73,17 +73,15 @@ export interface Handlers<R = never> {
   readonly "recurrence.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "channel.update": (a: { readonly id: string; readonly body: T.ChannelUpdate }) => Effect.Effect<void, ApiError, R>;
   /** The v1 caption relay without a call id is accepted only with one active call. */
-  readonly "assistant.hear": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
+  readonly "orchestrator.hear": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment": (a: { readonly id: string; readonly body: T.CommentRequest }) => Effect.Effect<void, ApiError, R>;
   readonly "issue.changes": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
-  /** Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask). */
-  readonly "issue.resolve": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** Stops a session's turn; it stays, and a comment starts the next. */
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "session.list": (a: { readonly agent?: string }) => Effect.Effect<T.Session[], ApiError, R>;
   readonly "session.get": (a: { readonly id: string }) => Effect.Effect<T.Session, ApiError, R>;
-  /** Its log, oldest first; run gives one run's only. The assistant's log is session assistant's. */
+  /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
   readonly "session.events": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
   readonly "issue.history": () => Effect.Effect<T.IssueHistory[], ApiError, R>;
@@ -104,9 +102,6 @@ export interface Handlers<R = never> {
   readonly "issue.refine": (a: { readonly id: string; readonly body: T.IssueRefineRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
   readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;
-  /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
-   * another round. */
-  readonly "issue.review": (a: { readonly id: string; readonly body: T.IssueReviewRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
   readonly "issue.act": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
@@ -132,17 +127,17 @@ export interface Handlers<R = never> {
   readonly "agent.create": (a: { readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.save": (a: { readonly id: string; readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
-  /** An agent's memories: the assistant's (agent assistant) are the lines of its MEMORY.md, with the file and how many of the newest
+  /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
    * its prompt carries; every other agent's are rows. */
   readonly "memory.list": (a: { readonly agent: string }) => Effect.Effect<T.MemoryList, ApiError, R>;
-  /** What the agent would be reminded of on its next start; the assistant is not reminded, it carries its whole file. */
+  /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
   readonly "memory.recall": (a: { readonly agent: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.RecallPreview, ApiError, R>;
   readonly "memory.create": (a: { readonly agent: string; readonly body: T.MemoryRequest }) => Effect.Effect<T.Memory, ApiError, R>;
   readonly "memory.delete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<void, ApiError, R>;
-  readonly "assistant.listArchive": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
-  readonly "assistant.getArchive": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
-  /** Saves the turn begun at a step of the assistant's log as a case for its evals, with what it should have done. */
-  readonly "assistant.markWrong": (a: { readonly body: T.AssistantEvalRequest }) => Effect.Effect<T.AssistantEval, ApiError, R>;
+  readonly "orchestrator.listArchive": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
+  readonly "orchestrator.getArchive": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
+  /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
+  readonly "orchestrator.markWrong": (a: { readonly body: T.OrchestratorEvalRequest }) => Effect.Effect<T.OrchestratorEval, ApiError, R>;
   readonly "skill.list": () => Effect.Effect<T.Skill[], ApiError, R>;
   /** Create allocates an identity; callers with an existing identity use save. */
   readonly "skill.create": (a: { readonly body: T.Skill }) => Effect.Effect<T.Skill, ApiError, R>;
@@ -211,9 +206,9 @@ export interface Endpoint {
 export const endpoints: readonly Endpoint[] = [
   { op: "server.health", method: "GET", path: "/api/v1/health", pathParams: [], query: [], body: undefined, result: S.Health, can: ["owner", "remote"] },
   {
-    op: "assistant.open",
+    op: "orchestrator.open",
     method: "POST",
-    path: "/api/v1/assistant/open",
+    path: "/api/v1/orchestrator/open",
     pathParams: [],
     query: [],
     body: undefined,
@@ -221,9 +216,9 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "assistant.stop",
+    op: "orchestrator.stop",
     method: "POST",
-    path: "/api/v1/assistant/stop",
+    path: "/api/v1/orchestrator/stop",
     pathParams: [],
     query: [],
     body: undefined,
@@ -260,7 +255,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.ChannelRequest,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.create",
@@ -270,7 +265,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.RecurrenceRequest,
     result: S.Recurrence,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.list",
@@ -280,7 +275,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: Schema.mutable(Schema.Array(S.Recurrence)),
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.update",
@@ -300,7 +295,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: undefined,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.update",
@@ -310,12 +305,12 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.ChannelUpdate,
     result: undefined,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "assistant.hear",
+    op: "orchestrator.hear",
     method: "POST",
-    path: "/api/v1/assistant/hear",
+    path: "/api/v1/orchestrator/hear",
     pathParams: [],
     query: [],
     body: S.SayRequest,
@@ -330,7 +325,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.CommentRequest,
     result: undefined,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.changes",
@@ -340,17 +335,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: S.Changes,
-    can: ["owner", "remote", "assistant"],
-  },
-  {
-    op: "issue.resolve",
-    method: "POST",
-    path: "/api/v1/issues/{id}/resolve",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
-    result: undefined,
-    can: ["owner", "remote"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "session.stop",
@@ -360,7 +345,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: undefined,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "session.list",
@@ -400,7 +385,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: Schema.mutable(Schema.Array(S.IssueHistory)),
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.list",
@@ -504,16 +489,6 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "issue.review",
-    method: "POST",
-    path: "/api/v1/issues/{id}/review",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueReviewRequest,
-    result: S.Issue,
-    can: ["owner", "remote", "assistant"],
-  },
-  {
     op: "issue.act",
     method: "POST",
     path: "/api/v1/issues/{id}/act",
@@ -531,7 +506,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.GraphSplitRequest,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.updateTask",
@@ -544,7 +519,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.TaskEdit,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.deleteTask",
@@ -557,7 +532,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.act",
@@ -567,7 +542,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.GraphActRequest,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.taskAct",
@@ -580,7 +555,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.TaskActRequest,
     result: Schema.String,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.history",
@@ -593,7 +568,7 @@ export const endpoints: readonly Endpoint[] = [
     ],
     body: undefined,
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.markRead",
@@ -706,7 +681,7 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.AgentCheck)),
     can: ["owner", "remote"],
   },
-  { op: "agent.create", method: "POST", path: "/api/v1/agents", pathParams: [], query: [], body: S.Agent, result: S.Agent, can: ["owner", "assistant"] },
+  { op: "agent.create", method: "POST", path: "/api/v1/agents", pathParams: [], query: [], body: S.Agent, result: S.Agent, can: ["owner", "orchestrator"] },
   {
     op: "agent.save",
     method: "PUT",
@@ -758,7 +733,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.MemoryRequest,
     result: S.Memory,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "memory.delete",
@@ -774,19 +749,19 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "assistant.listArchive",
+    op: "orchestrator.listArchive",
     method: "GET",
-    path: "/api/v1/assistant/archive",
+    path: "/api/v1/orchestrator/archive",
     pathParams: [],
     query: [{ name: "q", number: false }],
     body: undefined,
     result: S.ArchiveListing,
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "assistant.getArchive",
+    op: "orchestrator.getArchive",
     method: "GET",
-    path: "/api/v1/assistant/archive/{name}",
+    path: "/api/v1/orchestrator/archive/{name}",
     pathParams: [{ name: "name", number: false }],
     query: [],
     body: undefined,
@@ -794,13 +769,13 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "assistant.markWrong",
+    op: "orchestrator.markWrong",
     method: "POST",
-    path: "/api/v1/assistant/evals",
+    path: "/api/v1/orchestrator/evals",
     pathParams: [],
     query: [],
-    body: S.AssistantEvalRequest,
-    result: S.AssistantEval,
+    body: S.OrchestratorEvalRequest,
+    result: S.OrchestratorEval,
     can: ["owner", "remote"],
   },
   {
@@ -813,7 +788,7 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.Skill)),
     can: ["owner", "remote"],
   },
-  { op: "skill.create", method: "POST", path: "/api/v1/skills", pathParams: [], query: [], body: S.Skill, result: S.Skill, can: ["owner", "assistant"] },
+  { op: "skill.create", method: "POST", path: "/api/v1/skills", pathParams: [], query: [], body: S.Skill, result: S.Skill, can: ["owner", "orchestrator"] },
   {
     op: "skill.save",
     method: "PUT",
@@ -842,7 +817,7 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: Schema.mutable(Schema.Array(S.ProjectSummary)),
-    can: ["owner", "remote", "assistant"],
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "project.check",

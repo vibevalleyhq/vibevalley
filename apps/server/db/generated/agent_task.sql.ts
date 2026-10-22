@@ -28,7 +28,7 @@ export const OpenGraphTasksResult = Schema.Struct({
 export type OpenGraphTasksResult = typeof OpenGraphTasksResult.Type
 
 
-export const OpenGraphTasksSql = "-- An agent's own task graph (agent/brain/taskStore.ts): an owner is whoever keeps it, a session id or the assistant.\n\n-- name: OpenGraphTasks :many\nselect \"agent_task\".\"graph\", \"agent_task\".\"owner\", \"agent_task\".\"id\", \"agent_task\".\"position\", \"agent_task\".\"title\", \"agent_task\".\"brief\", \"agent_task\".\"after\", \"agent_task\".\"executor\", \"agent_task\".\"state\", \"agent_task\".\"result\", \"agent_task\".\"tries\", \"agent_task\".\"updated_at\", \"agent_task\".\"finished_at\" from agent_task where owner = $1 and finished_at is null order by position;"
+export const OpenGraphTasksSql = "-- An agent's own task graph (agent/brain/taskStore.ts): an owner is whoever keeps it, a session id or the orchestrator.\n\n-- name: OpenGraphTasks :many\nselect \"agent_task\".\"graph\", \"agent_task\".\"owner\", \"agent_task\".\"id\", \"agent_task\".\"position\", \"agent_task\".\"title\", \"agent_task\".\"brief\", \"agent_task\".\"after\", \"agent_task\".\"executor\", \"agent_task\".\"state\", \"agent_task\".\"result\", \"agent_task\".\"tries\", \"agent_task\".\"updated_at\", \"agent_task\".\"finished_at\" from agent_task where owner = $1 and finished_at is null order by position;"
 
 export const openGraphTasks = Effect.fn("OpenGraphTasks")(function* (params: OpenGraphTasksParams) {
   const sql = yield* SqlClient.SqlClient
