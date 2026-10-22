@@ -362,9 +362,9 @@ const iconTiles: readonly (readonly string[])[] = [
 ];
 
 /** Four tiles, seed, sprout, flower and wheat: each a dark frame round a 4×4 crop on the screen's paper. */
-export function MergeIcon() {
+export function MergeIcon(props: { size?: number }) {
   return (
-    <svg width="28" height="28" viewBox="0 0 13 13" shape-rendering="crispEdges" aria-hidden="true">
+    <svg width={props.size ?? 28} height={props.size ?? 28} viewBox="0 0 13 13" shape-rendering="crispEdges" aria-hidden="true">
       <For each={iconTiles}>
         {(rows, t) => (
           <g>

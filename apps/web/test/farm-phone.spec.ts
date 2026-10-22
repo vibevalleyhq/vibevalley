@@ -24,6 +24,7 @@ test("the phone opens over its button, a game takes the pad, and Esc puts it awa
   await expect(phone.getByText("农场通")).toBeVisible();
   // The pad shows only while a game takes it.
   await expect(phone.getByRole("button", { name: "上" })).toHaveCount(0);
+  await phone.getByRole("button", { name: "游戏" }).click();
   await phone.getByRole("button", { name: "方块" }).click();
   await expect(phone.getByText("按 A 开始")).toBeVisible();
   await expect(phone.getByRole("button", { name: "上" })).toBeVisible();
@@ -109,15 +110,20 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();
 });
 
+// 管家 on the phone is its line beside 田头, unfolded; a call started folded unfolds it, where what is said shows.
 test("calling the orchestrator on the phone is the chat's call: one call, the same answer", async ({ page }) => {
   await openFarm(page);
   await page.getByRole("button", { name: "手机" }).click();
   const phone = page.getByRole("region", { name: "农场手机" });
+  const chat = page.getByRole("region", { name: "田头" });
   await phone.getByRole("button", { name: "管家" }).click();
+  await expect(chat).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(chat).toHaveCount(0);
   await phone.getByRole("button", { name: "打给管家" }).click();
+  await expect(chat).toBeVisible();
   // The test's server has no Agora credentials: the call does not get through, and both say why.
-  await expect(phone.getByText(/没接通：还没有 Agora 的凭据/)).toBeVisible();
-  await phone.getByRole("button", { name: /^展开田头/ }).click();
+  await expect(phone.getByText(/^没接通：还没有 Agora 的凭据/)).toBeVisible();
   await expect(page.getByRole("region", { name: "田头" }).getByRole("button", { name: "语音说话" })).toHaveAttribute(
     "title",
     /上次没接通：还没有 Agora 的凭据/,

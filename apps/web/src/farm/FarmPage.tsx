@@ -14,6 +14,7 @@ import { Panels } from "./panels/Panels";
 import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
+import { createCall } from "../voice/CallButton";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {
@@ -28,6 +29,15 @@ export function FarmPage(props: { project: string }) {
   const titleOpen = useFarm((s) => s.titleOpen);
   farmKeys();
   feedPhoneCalls(raw);
+  // A call starting (the chat's call button, a ring answered, the desktop's shortcut) brings the phone out unfolded: what
+  // is said on it is written into 田头 as it is said. Folded during the call, it stays folded.
+  const call = createCall();
+  createEffect(
+    () => call().phase === "connecting" || call().phase === "live",
+    (on) => {
+      if (on) farm.chatOpen(true);
+    },
+  );
   // A new frame's rewards go on the plots for a few seconds.
   createEffect(raw, (frame) => {
     for (const e of frame?.effects ?? []) if (e.kind === "reward") farm.reward(e);

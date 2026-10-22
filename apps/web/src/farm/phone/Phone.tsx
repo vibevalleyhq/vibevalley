@@ -23,7 +23,7 @@ import { BugSnakeGame } from "./games/BugSnakeGame";
 import { DinoGame } from "./games/DinoGame";
 import { MergeGame } from "./games/MergeGame";
 import { SokobanGame } from "./games/SokobanGame";
-import { HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
+import { GamesScreen, HomeScreen, ListScreen, OrchestratorScreen, type PhoneApp, RingingScreen } from "./screens";
 
 const games: ReadonlySet<PhoneApp> = new Set(["blocks", "dino", "sokoban", "bugs", "merge"]);
 
@@ -74,7 +74,8 @@ export function Phone(props: { room: { w: number; h: number } }) {
         playSound("tap");
         if (app() === "home" && ringing() === null) put();
         else {
-          setApp("home");
+          // A game goes back to the games folder, the rest to the home screen.
+          setApp(ringing() === null && games.has(app()) ? "games" : "home");
           phoneCalls.silence();
         }
       }}
@@ -87,6 +88,10 @@ export function Phone(props: { room: { w: number; h: number } }) {
               <HomeScreen
                 missed={missedOf(phone()).length}
                 onOpen={open}
+                onOrchestrator={() => {
+                  open("orchestrator");
+                  farm.chatOpen(true);
+                }}
                 onChannels={() => {
                   put();
                   router.navigate("/chat");
@@ -96,6 +101,9 @@ export function Phone(props: { room: { w: number; h: number } }) {
                   farm.openTaskBoard();
                 }}
               />
+            </Match>
+            <Match when={app() === "games"}>
+              <GamesScreen onOpen={open} />
             </Match>
             <Match when={app() === "missed" || app() === "log"}>
               <ListScreen screen={app() as "missed" | "log"} onScreen={setApp} onAnswer={(c) => settle(c, true)} onCall={() => open("orchestrator")} />

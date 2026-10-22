@@ -18,7 +18,7 @@ import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { useAgent } from "../../data/agents";
 
-export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
+export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
 const cream = "#f7e8c4";
 const bark = "#2f1f13";
@@ -248,30 +248,65 @@ export function OrchestratorScreen() {
   );
 }
 
-export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => void; onChannels: () => void; onTaskBoard: () => void }) {
-  const apps: { label: string; icon: () => JSX.Element; badge?: () => number; go: () => void }[] = [
+interface App {
+  readonly label: string;
+  readonly icon: () => JSX.Element;
+  readonly badge?: () => number;
+  readonly go: () => void;
+}
+
+const SokobanIcon = () => (
+  <span class="grid size-7 place-items-center text-[18px] leading-none" style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
+    ×
+  </span>
+);
+
+/** The games, in one folder on the home screen. */
+const games = (open: (app: PhoneApp) => void): App[] => [
+  { label: "方块", icon: () => <BlocksIcon />, go: () => open("blocks") },
+  { label: "推箱子", icon: SokobanIcon, go: () => open("sokoban") },
+  { label: "小恐龙", icon: () => <DinoIcon />, go: () => open("dino") },
+  { label: "贪吃虫", icon: () => <BugSnakeIcon />, go: () => open("bugs") },
+  { label: "种田 2048", icon: () => <MergeIcon />, go: () => open("merge") },
+];
+
+/** The games folder's icon: four of them small, as a folder shows what is in it. */
+const GamesIcon = () => (
+  <span class="grid grid-cols-2 gap-px" aria-hidden="true">
+    <BlocksIcon size={12} />
+    <DinoIcon size={12} />
+    <BugSnakeIcon size={12} />
+    <MergeIcon size={12} />
+  </span>
+);
+
+/** onOrchestrator: the orchestrator's line, with the phone unfolded to 田头 beside it. */
+export function HomeScreen(props: {
+  missed: number;
+  onOpen: (app: PhoneApp) => void;
+  onOrchestrator: () => void;
+  onChannels: () => void;
+  onTaskBoard: () => void;
+}) {
+  const apps: App[] = [
     { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
     { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: "管家", icon: () => <OrchestratorFace size={28} />, go: () => props.onOpen("orchestrator") },
+    { label: "管家", icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
     { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
     { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
-    { label: "方块", icon: () => <BlocksIcon />, go: () => props.onOpen("blocks") },
-    {
-      label: "推箱子",
-      icon: () => (
-        <span class="grid size-7 place-items-center text-[18px] leading-none" style={{ "box-shadow": `inset 0 0 0 2px ${lcd.ink}` }}>
-          ×
-        </span>
-      ),
-      go: () => props.onOpen("sokoban"),
-    },
-    { label: "小恐龙", icon: () => <DinoIcon />, go: () => props.onOpen("dino") },
-    { label: "贪吃虫", icon: () => <BugSnakeIcon />, go: () => props.onOpen("bugs") },
-    { label: "种田 2048", icon: () => <MergeIcon />, go: () => props.onOpen("merge") },
+    { label: "游戏", icon: GamesIcon, go: () => props.onOpen("games") },
   ];
+  return <AppGrid apps={apps} />;
+}
+
+export function GamesScreen(props: { onOpen: (app: PhoneApp) => void }) {
+  return <AppGrid apps={games(props.onOpen)} />;
+}
+
+function AppGrid(props: { apps: readonly App[] }) {
   return (
     <div class="grid grid-cols-3 content-start gap-y-3 px-2 pt-4">
-      <For each={apps}>
+      <For each={props.apps}>
         {(a) => (
           <button type="button" onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
             <span
@@ -293,7 +328,7 @@ export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => v
   );
 }
 
-function BlocksIcon() {
+function BlocksIcon(props: { size?: number }) {
   return (
     <Cells
       cells={[
@@ -305,7 +340,7 @@ function BlocksIcon() {
         [4, 5, 1, 1, lcd.paper],
       ]}
       grid={[7, 7]}
-      size={[28, 28]}
+      size={[props.size ?? 28, props.size ?? 28]}
     />
   );
 }
@@ -316,4 +351,4 @@ const dinoCells: GlyphCell[] = [
   [-1, 8, 8, 1, lcd.dark],
 ];
 
-const DinoIcon = () => <Cells cells={dinoCells} grid={[8, 10]} size={[28, 28]} origin={[-1, -1]} />;
+const DinoIcon = (props: { size?: number }) => <Cells cells={dinoCells} grid={[8, 10]} size={[props.size ?? 28, props.size ?? 28]} origin={[-1, -1]} />;
