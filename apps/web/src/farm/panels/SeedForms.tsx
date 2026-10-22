@@ -18,6 +18,8 @@ import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";
 import { useWorkAgents } from "../../data/agents";
+import { useCore } from "../../data/frame";
+import { issueOf } from "../world/plots";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -137,7 +139,16 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               <Match when={templates.isPending && !!project()}>
                 <p class={["mt-2.5", xs]}>在翻种子袋……</p>
               </Match>
-              <Match when={templates.error}>{(e) => <p class="mt-2.5 text-[12px] text-berry">种子袋没拿到：{reasonOf(e())}</p>}</Match>
+              <Match when={templates.error}>
+                {(e) => (
+                  <div class="mt-2.5 flex flex-wrap items-center gap-2">
+                    <p class="text-[12px] text-berry">种子袋没拿到：{reasonOf(e())}</p>
+                    <PxButton size="sm" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
+                      重新拿种子袋
+                    </PxButton>
+                  </div>
+                )}
+              </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
               <p class={["mt-2.5", xs]}>最近</p>
@@ -199,7 +210,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               <For each={agents()} keyed={(a) => a.id}>
                 {(a) => (
                   <WhoTile active={sower() === a().id} label={a().name} onClick={() => setWho(a().id)}>
-                    <AgentFace agentId={a().id} look={a().look} size={44} />
+                    <AgentFace agentId={a().id} runtime={a().runtime} look={a().look} size={44} />
                   </WhoTile>
                 )}
               </For>
@@ -226,11 +237,16 @@ export function SowForm(props: { station: number; onDone: () => void }) {
 const dropsOfAdvice = ["改动小一点", "先别动测试", "做完跟我说一声", "顺便补个测试"];
 
 export function WaterForm(props: { session: Session; onDone: () => void }) {
+  const core = useCore();
+  const canTell = () =>
+    core()
+      ?.issues?.find((i) => i.id === issueOf(props.session))
+      ?.attention.acts.includes("tell") ?? false;
   const [text, setText] = createSignal("");
   const sendKey = newSendKey();
   const [refused, setRefused] = createSignal<string>();
   const water = async () => {
-    if (!text().trim()) return;
+    if (!text().trim() || !canTell()) return;
     try {
       await commands.water(props.session, text(), sendKey);
       props.onDone();
@@ -252,10 +268,13 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
         <div class="flex-1">
           <PxTextArea value={text()} onChange={setText} rows={2} placeholder="带句话……" label={`给${props.session.name}带句话`} autoFocus />
         </div>
-        <PxButton tone="primary" disabled={!text().trim()} onClick={() => void water()}>
+        <PxButton tone="primary" disabled={!text().trim() || !canTell()} onClick={() => void water()}>
           浇水
         </PxButton>
       </div>
+      <Show when={!canTell()}>
+        <p class="mt-1.5 text-[12px] text-bark-600">工单状态变了，先回到地块看看要你做的事。</p>
+      </Show>
       <Show when={refused()}>
         <p class="mt-1.5 text-[12px] text-berry">{refused()}</p>
       </Show>

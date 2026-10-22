@@ -11,7 +11,7 @@
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { channelOf, conversationOf, generalOf } from "../channel/state.ts";
+import { conversationOf, generalOf } from "../channel/state.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
@@ -337,9 +337,9 @@ export const make = (options: ConnectorOptions = {}) =>
       const quotedConversation = async (ext: string | undefined) => {
         if (!ext) return undefined;
         const rows = await run(outboxQ.messageOfExt({ connector: id, ext_id: ext })).catch(() => []);
-        const seq = rows[0]?.message_id;
-        if (!seq) return undefined;
-        return chat.now()?.messages.find((m) => m.id === seq)?.conversation;
+        const message = rows[0]?.message_id;
+        if (!message) return undefined;
+        return (await runHere(chat.messageLocation(message)))?.conversation.id;
       };
 
       // The outbox: one drain at a time, in order.
@@ -391,15 +391,12 @@ export const make = (options: ConnectorOptions = {}) =>
       const offer = async (m: ChatMessage) => {
         const a = now();
         if (!a || !a.owner) return;
-        const state = chat.now();
-        const where = conversationOf(state, m.conversation);
-        const mine = a.channel ?? generalOf(state)?.id;
-        const channel = channelOf(state, where);
-        if ((channel === undefined) !== (mine === undefined) || (channel && channel.id !== mine)) return;
         try {
+          const place = await runHere(chat.messageLocation(m.id));
+          if (!place || place.channel !== (a.channel ?? general)) return;
           await inTx(
             Effect.forEach(
-              splitText(ownerLine(m, where), maxChars[id]),
+              splitText(ownerLine(m, place.conversation), maxChars[id]),
               (piece) => outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: Date.now() }),
               {
                 discard: true,

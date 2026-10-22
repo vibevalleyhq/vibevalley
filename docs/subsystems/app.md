@@ -18,7 +18,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 ## 在哪
 
 - **组合**：`apps/web/src/main.tsx`：没配对的远端浏览器先去 `/pair`，再画 `app/App.tsx`：`Root`（路由、状态流、农场的 store、查询的缓存、一个 `<Loading>`）里是 `Follow`（通知、菜单栏、快捷键）、路由和 `ToastHost`。
-- **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
+- **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`sessionLogs.ts`（每个 Session 的快照、增量与重连补读）、`sessions.ts`（页面的日志订阅）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
 - **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
@@ -32,7 +32,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突是工单的动作 `resolve`（`POST /api/v1/issues/{id}/act`）、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
 - **`src/rules/` 只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、看板怎么分栏，只给页面用；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在页面。
 - **一条状态流**：`data/frames.ts` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
-- **REST 的读取经 Solid Query**（`data/query.ts`）：一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关的查询失效再读，不在页面里另存一份。查询的 `data` 第一次到之前会挂进 `<Loading>`，页面只在根上有一个，所以一律经 `ready(query, fallback)` 读。
+- **REST 的读取经查询模块**（`data/query.ts`）：`QueryClient` 和 `QueryObserver` 拥有缓存、重试、轮询和请求去重，Solid 只订阅观察者的结果。一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关查询失效再读。等待、失败是结果值，`ready(query, fallback)` 选择成功数据；重新读取不挂起状态帧，换查询键时的旧值由 `placeholderData` 决定。卸载页面先退订观察者，请求回来只更新缓存。
+- **干活过程由一个读取模块持有**：`SessionLogs` 为正在看的每个 Session 共享一份日志，先订阅再读快照；直播流每次连上都补读，断线期间已经完成、不再发事件的步骤也能回来。快照替换保留窗口，读取期间收到的步骤按 `seq` 和 `revision` 合并，旧直播片段不能盖掉新快照。最后一个读者离开就释放日志；工作台、农场、轨迹和消息下的步骤都经 `createSessionEvents` 读，不按帮工的阶段猜刷新时机。日志的信号不挂起同页的时间线和改动查询。
 - **界面读按 id 合并的帧**：`createFrames` 把每一帧按 id `reconcile` 进 Solid 的 store，只有变了的字段触发更新；要比前后两帧的（音效、画布、来电、特效）读原始的帧（`rawFrame()`）。农场的 store、toast、通话、听写是和框架无关的模块，经 `createExternal` 接进来。
 - **一处响应性出错，整页停住**：一个错误逃出所有边界时 Solid 停掉整页的更新（`REACTIVITY_HALTED`），页面看着还在、不再动。`<Show>`、`<Match>` 的函数子节点拿到的值在分支收起后一读就抛，分支里还在结算的查询会读到它，所以带查询的面板按普通值 keyed、自己记住最后找到的那个；`ref` 的回调不读 `<For>` 每一项的值。Playwright 里逃出页面的错误让用例失败（`test/fixtures.ts`）。
 - **宿主接口是封闭的**：每个宿主实现全部方法，没有的能力是 null，页面据此决定画不画，不问「我在哪个壳里」。桌面壳经 preload 的 `contextBridge` 给（`contextIsolation`、`sandbox`，页面碰不到 Node 和 Electron）；手机壳的 WebView 带着 `ReactNativeWebView`，`currentHost()` 见到它就建 `mobileHost`：页面把要的东西写成 JSON 发过去，壳按 id 答，通话的事件也这样送回（`window.vibevalleyFromHost`）；浏览器全是 null。
@@ -65,6 +66,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - ⌥⇧Space 切换和管家的通话（`voiceCall.toggle`）。
 
 **手机壳**：第一次开（或者农场忘了这台手机）是配对页：相机扫「连接到本机」的二维码，或粘贴链接，或打开 `vibevalley://pair?u=<地址>&c=<码>` 这种链接（这一种当场就请主人放行）；那台电脑点头后，钥匙和地址存进系统钥匙串（`expo-secure-store`），之后直接是 WebView。WebView 在页面加载前把钥匙写进 `vibevalley_lan_key` 的 cookie，和浏览器配对后一样；页面要去自己的 `/pair` 时（钥匙不认了），壳忘掉这个农场、回到配对页。iOS 开着 audio 后台模式和 `NSAllowsLocalNetworking`（「连接到本机」是局域网里的明文 HTTP），安卓开着明文流量。
+
+手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 
 **打包**：`bun run package:mac` 构建页面和壳，把 `apps/server` 连同生产依赖放进 `dist/stage/server`（`packages/protocol` 拷成真的文件夹），electron-builder 打出 `apps/desktop/dist` 里的 `.app` 和 `.dmg`，`web/` 放进资源，`server/` 在 `afterPack` 里整个拷进去（electron-builder 的 extraResources 会丢掉 `node_modules`）。没有签名和公证。
 

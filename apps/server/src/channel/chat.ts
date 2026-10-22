@@ -249,6 +249,8 @@ export interface ChannelShape {
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
   readonly inbox: (who: string) => Effect.Effect<UnreadRow[]>;
   readonly history: (conversation: string, before?: number, limit?: number) => Effect.Effect<ChatMessage[]>;
+  /** A message's durable location; the recent state may hold neither the message nor its thread. */
+  readonly messageLocation: (id: string) => Effect.Effect<{ readonly conversation: Conversation; readonly channel: string } | undefined>;
   readonly markRead: (conversation: string, seq: number) => Effect.Effect<void, ApiError>;
   /** The thread of the issue the session works (a talk thread of its own when it works none). */
   readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
@@ -925,6 +927,13 @@ export const make = Effect.gen(function* () {
   const shape: ChannelShape = {
     now: () => core.state().chat,
     general: () => general,
+    messageLocation: (id) =>
+      Effect.gen(function* () {
+        const message = yield* one(qm.messageByID({ id }));
+        if (!message) return undefined;
+        const row = yield* one(qc.conversationByID({ id: message.conversation_id }));
+        return row ? { conversation: yield* toConversation(row), channel: channelIdOf(row) } : undefined;
+      }),
     say: (text, conversation, sendKey) =>
       locked(
         Effect.gen(function* () {

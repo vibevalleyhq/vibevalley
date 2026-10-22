@@ -219,7 +219,7 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                   href={`/agents/${encodeURIComponent(a.id)}`}
                   class="flex items-center gap-1.5 rounded-md border border-line py-1 pr-3 pl-1 text-sm hover:bg-hover"
                 >
-                  <AgentFace agentId={a.id} look={a.look} size={26} />
+                  <AgentFace agentId={a.id} runtime={a.runtime} look={a.look} size={26} />
                   {a.name}
                 </A>
               )}

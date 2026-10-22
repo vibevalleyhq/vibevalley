@@ -94,6 +94,25 @@ describe("doc", () => {
     ).pipe(Effect.provide(on())),
   );
 
+  it.live("attribute changes in the same batch do not conflict with a text edit", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const s = yield* make();
+        const id = (yield* s.create("待办")).doc.id;
+        yield* submit(s, id, "insert", { op: "insert_block", block: { ...para("a", "V", "原文"), type: "todo", attrs: { checked: false } } });
+        const ack = yield* submit(
+          s,
+          id,
+          "check-and-edit",
+          { op: "set_attrs", blockId: "a", attrs: { checked: true } },
+          { op: "update_text", blockId: "a", baseRev: 1, text: [span("新文")] },
+        );
+        expect(ack.results.map((r) => r.status)).toEqual(["applied", "applied"]);
+        expect((yield* s.get(id)).blocks[0]).toMatchObject({ attrs: { checked: true }, text: [span("新文")], rev: 3 });
+      }),
+    ).pipe(Effect.provide(on())),
+  );
+
   it.live("import and export", () =>
     Effect.scoped(
       Effect.gen(function* () {

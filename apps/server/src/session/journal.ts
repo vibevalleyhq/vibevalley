@@ -6,7 +6,9 @@
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
+import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 import { actionText } from "@vibevalley/protocol/rules";
+import { Schema } from "effect";
 import { cut } from "../base/text.ts";
 import { FileWriter } from "../base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
@@ -21,6 +23,7 @@ const outputHead = 2000;
 const outputTail = 4000;
 const pushAfterMs = 300;
 const saveAfterMs = 1500;
+const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
 
 export function clipOutput(text: string): string {
   const n = text.length;
@@ -30,9 +33,21 @@ export function clipOutput(text: string): string {
 
 export function readJournal(file: string): SessionEvent[] | undefined {
   if (!existsSync(file)) return undefined;
+  let body: string;
   try {
-    return JSON.parse(readFileSync(file, "utf8")) as SessionEvent[];
+    body = readFileSync(file, "utf8");
   } catch {
+    return undefined;
+  }
+  try {
+    return [...decodeEvents(JSON.parse(body))];
+  } catch {
+    // Persisted shapes have no compatibility path: the next run starts a new current-format log.
+    try {
+      unlinkSync(file);
+    } catch {
+      // Another reader may already have removed it.
+    }
     return undefined;
   }
 }
@@ -123,10 +138,11 @@ class FileJournal implements Journal {
   }
 
   /** The next seq, the time, the call it is under and the open run. */
-  private stamp(step: Omit<SessionEvent, "seq" | "time">, from: From | undefined): SessionEvent {
+  private stamp(step: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined): SessionEvent {
     const under = this.under(from);
     const out: SessionEvent = {
       seq: this.next++,
+      revision: 0,
       time: Date.now(),
       ...step,
       ...(under !== undefined ? { under } : {}),
@@ -145,7 +161,7 @@ class FileJournal implements Journal {
     this.append(d);
   }
 
-  private add(step: Omit<SessionEvent, "seq" | "time">, from?: From): number {
+  private add(step: Omit<SessionEvent, "seq" | "revision" | "time">, from?: From): number {
     this.seal();
     const s = this.stamp(step, from);
     this.append(s);
@@ -159,7 +175,7 @@ class FileJournal implements Journal {
   }
 
   /** Makes e the draft, sealing the one before; it is pushed live from now on. */
-  private makeDraft(e: Omit<SessionEvent, "seq" | "time">, from: From | undefined, call: string) {
+  private makeDraft(e: Omit<SessionEvent, "seq" | "revision" | "time">, from: From | undefined, call: string) {
     this.seal();
     this.draft = this.stamp(e, from);
     this.draftWho = who(from);
@@ -188,6 +204,7 @@ class FileJournal implements Journal {
     const d = this.draft;
     if (d && d.type === kind && this.draftWho === who(from)) {
       d.text = cut(d.text + text, textMax);
+      d.revision++;
       this.changed(d.seq);
       return;
     }
@@ -203,7 +220,7 @@ class FileJournal implements Journal {
   }
 
   toolStarted(callId: string, start: ToolStart, from?: From) {
-    const step: Omit<SessionEvent, "seq" | "time"> = {
+    const step: Omit<SessionEvent, "seq" | "revision" | "time"> = {
       type: "tool/call",
       text: start.text,
       action: start.action,
@@ -230,6 +247,7 @@ class FileJournal implements Journal {
     if (d && this.draftCall === callKey(from, callId)) {
       d.input = cut(input, inputMax);
       if (text) d.text = text;
+      d.revision++;
       this.seal();
     }
   }

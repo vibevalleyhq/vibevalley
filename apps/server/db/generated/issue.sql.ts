@@ -348,27 +348,6 @@ export const closeIssue = Effect.fn("CloseIssue")(function* (params: CloseIssueP
   })(params)
 })
 
-export const OpenIssueParams = Schema.Struct({
-  ["id"]: Schema.String,
-  ["title"]: Schema.String,
-  ["description"]: Schema.String,
-  ["project"]: Schema.NullOr(Schema.String),
-  ["assignee"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
-})
-export type OpenIssueParams = typeof OpenIssueParams.Type
-
-
-export const OpenIssueSql = "-- name: OpenIssue :exec\n-- A session starts on it: made from the session's job when it is new, else open again and out of the queue.\ninsert into issue (id, number, title, description, project, assignee, created_at)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4, $5, $6)\non conflict (id) do update set queued_at = null, closed_at = null, closed = null;"
-
-export const openIssue = Effect.fn("OpenIssue")(function* (params: OpenIssueParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: OpenIssueParams,
-    execute: (p) => sql.unsafe(OpenIssueSql, [p["id"], p["title"], p["description"], p["project"], p["assignee"], p["created_at"]]),
-  })(params)
-})
-
 export const KeptIssuesParams = Schema.Struct({
   ["closed"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })

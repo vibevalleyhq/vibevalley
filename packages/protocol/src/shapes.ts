@@ -476,6 +476,8 @@ export type ToolAction = (typeof ToolActionValues)[number];
 
 export interface SessionEvent {
   seq: number;
+  /** Increases when this step's streaming text or input changes; independent of transport delivery order. */
+  revision: number;
   time: number;
   type: SessionEventType;
   run?: string;

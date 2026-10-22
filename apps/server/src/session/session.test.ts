@@ -1,13 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
 import { seedAgents } from "../agent/seed.ts";
-import { Effect, Fiber, Stream } from "effect";
+import { Agents } from "../agent/agent.ts";
+import { Effect, Fiber, Semaphore, Stream } from "effect";
 import { Core } from "../core/core.ts";
-import { Projects } from "../project/project.ts";
+import { MergeFailure, Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
@@ -40,6 +41,158 @@ const worker = (turns: ScriptedTurn[]) =>
 const phase = (core: Core["Service"], id: string) => core.session(id)?.phase._tag;
 
 describe("sessions", () => {
+  it.live("a released failed resume can fall back without reserving its old allocation", () => {
+    let opens = 0;
+    const base = worker([]);
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const number = ++opens;
+        const session = await base.session(...args);
+        return {
+          ...session,
+          prompt: async (...input: Parameters<typeof session.prompt>) => {
+            const outcome = await session.prompt(...input);
+            if (number === 2) throw new Error("resume transport dropped");
+            return outcome;
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      yield* (yield* Agents).saveAgent(lab());
+      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const id = sent.session!.id;
+      yield* until(() => phase(core, id) === "ripe", "the initial report");
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
+      expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
+      yield* until(() => phase(core, id) === "ripe" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
+      expect(opens).toBe(3);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+      expect((yield* sessions.list("lab")).map((s) => s.id)).toEqual([id]);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+    );
+  });
+
+  it.live("a failed resume that cannot stop never falls back to a second writer", () => {
+    let opens = 0;
+    let turns = 0;
+    let wrote = () => {};
+    const written = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    const cleanups: (() => Promise<void>)[] = [];
+    const base = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        turns++;
+        if (turns === 1) return turn.say("结论：等下一轮");
+        writeFileSync(join(turn.options.cwd, `owned-${turns}.txt`), "the failed resume owns this worktree\n");
+        wrote();
+        await new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve()));
+      },
+    });
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        const broken = ++opens > 1;
+        cleanups.push(async () => {
+          await session.dispose();
+        });
+        return {
+          ...session,
+          prompt: async (...input: Parameters<typeof session.prompt>) => {
+            const outcome = await session.prompt(...input);
+            if (!broken) return outcome;
+            await written;
+            throw new Error("resume transport dropped");
+          },
+          dispose: async () => {
+            if (broken) throw new Error("did not stop");
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          for (const cleanup of cleanups) await cleanup();
+        }),
+      );
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      yield* (yield* Agents).saveAgent(lab());
+      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const id = sent.session!.id;
+      yield* until(() => phase(core, id) === "ripe", "the initial report");
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
+      const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
+      expect(resumed.kind).toBe("refused");
+      expect(JSON.stringify(resumed)).toContain("did not stop");
+      expect(opens).toBe(2);
+      expect(sessions.noRoom("pi", "demo")).not.toBe("");
+      expect((yield* sessions.deliver(id, "do not start again", { kind: "comment" })).kind).toBe("refused");
+      expect(opens).toBe(2);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+    );
+  });
+
+  it.live("handover never uses a workplace whose runtime failed to close", () => {
+    let cleanup = async () => {};
+    let used = false;
+    let closes = 0;
+    const base = worker([]);
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const session = await base.session(...args);
+        cleanup = async () => {
+          await session.dispose();
+        };
+        return {
+          ...session,
+          dispose: async () => {
+            closes++;
+            throw new Error("did not stop");
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const id = sent.session!.id;
+      yield* until(() => phase(core, id) === "ripe", "the report");
+      const before = sessions.find(id)!;
+      for (let n = 0; n < 2; n++) {
+        const result = yield* Effect.result(
+          sessions.handOver(id, "merged", () =>
+            Effect.sync(() => {
+              used = true;
+              return { text: "", commits: 1 };
+            }),
+          ),
+        );
+        expect(result._tag).toBe("Failure");
+        expect(JSON.stringify(result)).toContain("did not stop");
+        expect(sessions.find(id)?.lastText).toBe(before.lastText);
+        expect(existsSync(before.place.cwd)).toBe(true);
+      }
+      expect(used).toBe(false);
+      expect(closes).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
   it.live("a session is sent, works its run, reports, takes a word and is harvested", () => {
     const turns: ScriptedTurn[] = [];
     return Effect.gen(function* () {
@@ -49,7 +202,7 @@ describe("sessions", () => {
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
       yield* Effect.sleep(5);
 
-      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: "i1", worktree: true });
+      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = hired.session!.id;
       expect(id).toBe("w1");
       yield* until(() => phase(core, id) === "ripe", "the first run's report");
@@ -105,6 +258,7 @@ describe("sessions", () => {
       const h: Parameters<typeof s.expect>[0] = {
         id: "w1",
         place: { project: "demo", cwd: "/nowhere" },
+        access: Semaphore.makeUnsafe(1),
         journal: s.trajectories.openLog("w1"),
         oarSessionId: "",
         lastText: "",
@@ -128,7 +282,7 @@ describe("sessions", () => {
           yield* core.apply({ type: "run", id: "w1" });
           s.unexpect(h);
         }
-        const got = yield* sessions.send(lab(), "another", "demo");
+        const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i2", number: 2 } });
         expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
       }
       yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "", runs: 1 });

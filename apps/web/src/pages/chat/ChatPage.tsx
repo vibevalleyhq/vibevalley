@@ -292,7 +292,7 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversati
       class={["flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm enabled:cursor-pointer", props.active ? "bg-selected" : "hover:bg-hover"]}
     >
       <span class="relative shrink-0">
-        <HelperFace agent={props.h.agent} size={24} />
+        <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={24} />
         <Dot tone={phaseDot(props.h.phase)} class="absolute -right-0.5 -bottom-0.5" />
       </span>
       <span class="shrink-0">{props.h.name}</span>
@@ -335,7 +335,7 @@ function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
       <header class={[head, "gap-2.5 px-4"]}>
         <span class="flex size-8 shrink-0 items-center justify-center">
           <Show when={session()} fallback={<Icon name="button-thread" size={16} />}>
-            {(s) => <HelperFace agent={s().agent} size={32} />}
+            {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
           </Show>
         </span>
         <div class="flex min-w-0 flex-1 flex-col">

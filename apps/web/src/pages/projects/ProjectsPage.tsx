@@ -2,7 +2,7 @@
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import { type UseQueryResult, useQueryClient } from "@tanstack/solid-query";
+import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import {
@@ -35,7 +35,7 @@ import { Segmented } from "../../ui/Segmented";
 import { Card, ListCard, ListRow, Quiet } from "../kit";
 import { IslandDetail, ProjectMap, useIslands } from "./ProjectMap";
 
-type Asked<A> = UseQueryResult<A>;
+type Asked<A> = QueryObserverResult<A>;
 
 const useSurvey = (project: () => string) => ({
   languages: useQuery(() => ({
@@ -450,7 +450,7 @@ function Hands(props: { activity?: ProjectActivity }) {
                       </span>
                     }
                   >
-                    {(a) => <AgentFace agentId={a().id} look={a().look} size={32} />}
+                    {(a) => <AgentFace agentId={a().id} look={a().look} runtime={a().runtime} size={32} />}
                   </Show>
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <span class="flex text-sm">

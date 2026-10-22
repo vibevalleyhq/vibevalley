@@ -59,11 +59,11 @@ import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
-import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
+import { MergeFailure, ProjectError, type ProjectShape, Projects } from "../project/project.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { splitBrief } from "./rules.ts";
-import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "../session/session.ts";
+import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, type SessionShape, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
@@ -103,10 +103,9 @@ const unmanned = (n: Task): Task => {
 export interface TaskWork {
   readonly hire: (agent: Agent, task: string, project: string, opt: HireOptions) => Effect.Effect<Hired>;
   readonly tell: (id: string, text: string) => Effect.Effect<string>;
-  readonly dismiss: (id: string) => Effect.Effect<boolean>;
+  readonly dismiss: SessionShape["dismiss"];
   readonly find: (id: string) => Roster | undefined;
-  /** A step's work into the graph's branch; work that does not go in says what its helper is sent back with. */
-  readonly mergeInto: (id: string, target: string) => Effect.Effect<readonly string[], ApiError | NotTakenIn>;
+  readonly handOver: SessionShape["handOver"];
 }
 
 /** The git a graph's branches live in; tests play it. */
@@ -116,6 +115,7 @@ export interface TaskGit {
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
   readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes, ProjectError>;
   readonly changedFiles: (cwd: string, base: string) => Effect.Effect<string[], ProjectError>;
+  readonly mergeInto: ProjectShape["mergeInto"];
 }
 
 export interface TaskOptions {
@@ -125,6 +125,11 @@ export interface TaskOptions {
   readonly git?: TaskGit;
 }
 
+interface Verification {
+  readonly frozen: string[];
+  readonly rejected?: { readonly why: string; readonly fix: string };
+}
+
 export const make = (options: TaskOptions = {}) =>
   Effect.gen(function* () {
     const core = yield* Core;
@@ -132,17 +137,12 @@ export const make = (options: TaskOptions = {}) =>
     const store = yield* Agents;
     const runtimes = yield* Runtimes;
     const live = yield* Sessions;
-    const scm = yield* Projects;
     const work: TaskWork = options.work ?? {
       hire: issues.hire,
       tell: (id, text) => live.tell(id, text, { kind: "task" }),
       dismiss: live.dismiss,
       find: live.find,
-      mergeInto: (id, target) =>
-        Effect.map(
-          live.handOver(id, "merged_into_graph", (place) => scm.mergeInto(place, target), "helper"),
-          (m) => m.hashes ?? [],
-        ),
+      handOver: live.handOver,
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
     const sql = yield* SqlClient.SqlClient;
@@ -305,51 +305,53 @@ export const make = (options: TaskOptions = {}) =>
         yield* tell(session, text);
       });
 
-    /** Judged by the farm, not by the step's session. Not verified: it is sent back, and the answer is false. */
-    const verified = (graph: TaskGraph, task: Task, sessionId: string) =>
+    /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
+    const verified = (graph: TaskGraph, task: Task, cwd: string): Effect.Effect<Verification> =>
       Effect.gen(function* () {
-        const session = live.sessionOf(sessionId);
-        if (!session?.worktree) return { ok: true, frozen: [] as string[] };
-        const cwd = session.worktree;
+        const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
         let changed: string[] = [];
         if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
           const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-          if (files._tag === "Failure") {
-            yield* taskFailed(graph, task, "看不出它改了哪些文件：" + files.failure.message);
-            return { ok: false, frozen: [] };
-          }
+          if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
           changed = files.success;
         }
         if (isAcceptance(task) && task.check) {
-          if ((yield* projects.run(cwd, task.check)).ok) {
-            yield* sendBack(graph, task, sessionId, acceptancePassedText(task.check), "验收 " + task.check + " 现在就通过了");
-            return { ok: false, frozen: [] };
-          }
-          return { ok: true, frozen: changed };
+          if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
+          return { frozen: changed };
         }
         const touched = frozenTouched(graph, task, changed);
-        if (touched.length > 0) {
-          yield* sendBack(graph, task, sessionId, frozenTouchedText(touched), "改了冻结的验收：" + touched.join("、"));
-          return { ok: false, frozen: [] };
-        }
+        if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
         for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
           const ran = yield* projects.run(cwd, check);
-          if (!ran.ok) {
-            yield* sendBack(graph, task, sessionId, checkFailedText(check, ran.output), "做完跑 " + check + " 没通过");
-            return { ok: false, frozen: [] };
-          }
+          if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
         }
-        return { ok: true, frozen: [] };
+        return { frozen: [] };
       });
 
     const taskDone = (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) =>
       Effect.gen(function* () {
         const session = live.sessionOf(sessionId);
-        const { ok, frozen } = yield* verified(graph, task, sessionId);
-        if (!ok) return;
         if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
-        const merged = yield* Effect.result(work.mergeInto(sessionId, graph.branch));
+        const target = graph.branch;
+        let verification: Verification | undefined;
+        const merged = yield* Effect.result(
+          work.handOver(
+            sessionId,
+            "merged_into_graph",
+            (place) =>
+              Effect.gen(function* () {
+                verification = yield* verified(graph, task, place.cwd);
+                if (verification.rejected) return yield* Effect.fail(new MergeFailure("check", verification.rejected.why));
+                return yield* projects.mergeInto(place, target);
+              }),
+            "helper",
+          ),
+        );
         if (merged._tag === "Failure") {
+          if (verification?.rejected) {
+            const { why, fix } = verification.rejected;
+            return yield* fix ? sendBack(graph, task, sessionId, fix, why) : taskFailed(graph, task, why);
+          }
           const f = merged.failure;
           // A failed check or a conflict sends the helper back to fix it (a conflict: it merges the graph's branch into its
           // own); then this runs again.
@@ -360,8 +362,8 @@ export const make = (options: TaskOptions = {}) =>
           ...unmanned(n),
           state: "merged",
           conclusion,
-          commits: [...merged.success],
-          ...(isAcceptance(n) ? { frozen } : {}),
+          commits: [...(merged.success.hashes ?? [])],
+          ...(isAcceptance(n) ? { frozen: verification?.frozen ?? [] } : {}),
           ...(session?.spent ? { spent: { ...session.spent } } : {}),
         }));
         if (allSettled(next)) next = withNote({ ...next, state: "ripe" }, "");

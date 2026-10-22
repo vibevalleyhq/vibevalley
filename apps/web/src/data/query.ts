@@ -1,30 +1,48 @@
-// The one wrapper of TanStack's useQuery (below); the page imports that one.
+// QueryObserver owns cache, fetching and retry policy; this adapter publishes its settled snapshots without suspending
+// the state stream's updates while a REST read is in flight.
 // oxlint-disable-next-line no-restricted-imports
-import { QueryClient, useQuery as tanstackQuery } from "@tanstack/solid-query";
-import { untrack } from "solid-js";
+import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
+import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
 import { api } from "./api";
 
 /** REST reads besides the state stream (history, changes, …); a frame that changes what they show invalidates them. */
 export const queries = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
-/**
- * TanStack's useQuery, its fetch run untracked: the options are read in a tracking scope (a key that changes is a new
- * query), and the fetch reads the same props and signals once, when it runs, inside TanStack's own callback. The page
- * imports this one (lint refuses @tanstack/solid-query's).
- */
-export const useQuery: typeof tanstackQuery = ((options: Parameters<typeof tanstackQuery>[0], client?: Parameters<typeof tanstackQuery>[1]) =>
-  tanstackQuery(() => {
+/** REST reads never hold the state stream's frame: pending and failures are result values, and ready() selects data. */
+export function useQuery<TQueryFnData, TError = Error, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
+  options: Accessor<QueryObserverOptions<TQueryFnData, TError, TData, TQueryFnData, TQueryKey>>,
+  client: Accessor<QueryClient> = () => queries,
+): QueryObserverResult<TData, TError> {
+  const optionsNow = () => {
     const o = options();
     const fetch = o.queryFn;
     if (typeof fetch !== "function") return o;
     return { ...o, queryFn: (context: Parameters<typeof fetch>[0]) => untrack(() => fetch(context)) };
-  }, client)) as typeof tanstackQuery;
+  };
+  const observer = new QueryObserver(untrack(client), untrack(optionsNow));
+  const [result, setResult] = createSignal(observer.getCurrentResult());
+  createEffect(optionsNow, (next) => {
+    observer.setOptions(next);
+    setResult(observer.getCurrentResult());
+  });
+  onSettled(() => {
+    const stop = observer.subscribe(setResult);
+    setResult(observer.getCurrentResult());
+    return () => {
+      stop();
+      observer.destroy();
+    };
+  });
+  return new Proxy(observer.getCurrentResult(), {
+    get: (_, key) => result()[key as keyof ReturnType<typeof observer.getCurrentResult>],
+  });
+}
 
 /**
- * A query's data once it has arrived, else `fallback`. Reading `data` itself before then suspends into the nearest
- * <Loading> (and a disabled query's never arrives): ready() gives "nothing yet" instead.
+ * A query's successful data once it has arrived, else `fallback` (including disabled and failed queries).
  */
-export const ready = <T, F>(q: { readonly isSuccess: boolean; readonly data: T }, fallback: F): T | F => (q.isSuccess ? q.data : fallback);
+export const ready = <T, F>(q: { readonly isSuccess: boolean; readonly data: T | undefined }, fallback: F): T | F =>
+  q.isSuccess && q.data !== undefined ? q.data : fallback;
 
 export type Sprites = Record<string, { w: number; h: number; ax?: number; ay?: number }>;
 

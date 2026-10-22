@@ -11,7 +11,9 @@ import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { splitBrief } from "./rules.ts";
-import type { Hired, HireOptions, Roster } from "../session/session.ts";
+import { type Hired, type HireOptions, type Roster, NotTakenIn, type SessionShape } from "../session/session.ts";
+import { MergeFailure, type Workplace } from "../project/project.ts";
+import { notTakenIn } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
@@ -149,7 +151,14 @@ class FakeWork implements TaskWork {
     return session ? { session, place: { project: "", cwd: "" }, lastText: this.last.get(id) ?? "" } : undefined;
   };
 
-  mergeInto = (id: string) => Effect.succeed(["c0ffee-" + id]);
+  handOver: SessionShape["handOver"] = (id, _closed, use, settle = "owner") =>
+    use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
+      Effect.mapError((e) => {
+        const failure = e instanceof MergeFailure ? e : new MergeFailure("error", String(e));
+        const words = notTakenIn(failure, id, settle);
+        return new NotTakenIn(failure, words.fix, words.owner, words.notice, words.short);
+      }),
+    );
 }
 
 class FakeGit implements TaskGit {
@@ -173,6 +182,7 @@ class FakeGit implements TaskGit {
       this.from.set(branch, from);
     });
   mergeBranch = (project: string) => Effect.succeed("合进了 " + project + " 的 main");
+  mergeInto = (place: Workplace) => Effect.succeed({ text: "", commits: 1, hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//, "")] });
   branchChanges = (project: string, branch: string) => Effect.succeed({ project, base: "main", branch } as unknown as Changes);
 }
 

@@ -43,7 +43,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
                 class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === box.active() }]}
               >
                 <Show when={n().session} fallback={n().name === "管家" ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
-                  {(s) => <HelperFace agent={s().agent} size={20} />}
+                  {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
                 <span class="font-mono text-xs">{n().token}</span>
                 <Show when={n().session}>

@@ -10,6 +10,7 @@ import { ready, useRuntimes } from "../../data/query";
 import { CardColors, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
 import { HudCard } from "./Hud";
+import { RuntimeBadge } from "../../ui/RuntimeBadge";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
 
@@ -19,13 +20,7 @@ export function RuntimeIcon(props: { runtime: string; size: number }) {
       <Show when={machineOf(props.runtime)} fallback={<span class="block h-full w-full bg-cream-200" />}>
         {(machine) => <SpriteIcon name={machine()} size={props.size} />}
       </Show>
-      <img
-        src={`/pixel/logo-${props.runtime}.png`}
-        alt=""
-        onError={(e) => (e.currentTarget.style.display = "none")}
-        class="absolute -right-1 -bottom-1 [image-rendering:pixelated]"
-        style={{ width: `${Math.round(props.size * 0.46)}px`, height: `${Math.round(props.size * 0.46)}px` }}
-      />
+      <RuntimeBadge runtime={props.runtime} size={Math.max(10, Math.round(props.size * 0.46))} />
     </span>
   );
 }

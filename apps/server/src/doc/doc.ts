@@ -135,7 +135,12 @@ export const make = (options: DocOptions = {}) =>
             for (const op of body.ops ?? []) {
               if (op.op !== "update_text" && op.op !== "split_block") continue;
               const b = p.find(op.blockId);
-              if (!b || op.baseRev >= b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
+              if (!b || op.baseRev > b.rev || revisions.has(`${b.id}@${op.baseRev}`)) continue;
+              // An earlier op in this batch can advance rev without changing this text.
+              if (op.baseRev === b.rev) {
+                revisions.set(`${b.id}@${op.baseRev}`, b.text);
+                continue;
+              }
               const raw = yield* db(Effect.option(qr.docBlockRevision({ block_id: b.id, rev: op.baseRev })));
               if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, JSON.parse(raw.value.spans) as DocSpan[]);
             }

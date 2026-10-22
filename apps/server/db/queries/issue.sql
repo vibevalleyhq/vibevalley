@@ -48,12 +48,6 @@ update issue set queued_at = null where id = sqlc.arg(id);
 -- name: CloseIssue :exec
 update issue set closed_at = sqlc.arg(closed_at), closed = sqlc.narg(closed) where id = sqlc.arg(id);
 
--- name: OpenIssue :exec
--- A session starts on it: made from the session's job when it is new, else open again and out of the queue.
-insert into issue (id, number, title, description, project, assignee, created_at)
-values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee), sqlc.arg(created_at))
-on conflict (id) do update set queued_at = null, closed_at = null, closed = null;
-
 -- name: KeptIssues :many
 -- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.
 with latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit sqlc.arg(closed)::int)

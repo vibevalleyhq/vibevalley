@@ -5,6 +5,7 @@ import { type DotTone, phaseIcon } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useAgent } from "../../data/agents";
+import { useCore } from "../../data/frame";
 
 const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };
 
@@ -31,13 +32,15 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
 }
 
 /** A helper's face by its profile's look; for a sender without a profile, by its id. */
-export function HelperFace(props: { agent: string; size?: number; muted?: boolean }) {
+export function HelperFace(props: { agent: string; runtime?: string; size?: number; muted?: boolean }) {
   const agent = useAgent(() => props.agent);
   const look = () => agent()?.look;
-  return <AgentFace agentId={props.agent} look={look()} size={props.size ?? 24} muted={props.muted} />;
+  return <AgentFace agentId={props.agent} look={look()} runtime={props.runtime ?? agent()?.runtime} size={props.size ?? 24} muted={props.muted} />;
 }
 
 export function SenderFace(props: { m: ChatMessage; size?: number }) {
+  const core = useCore();
+  const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
   return (
     <Switch>
       <Match when={props.m.fromKind === "user"}>
@@ -47,7 +50,7 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
         <OrchestratorFace size={props.size ?? 36} />
       </Match>
       <Match when={props.m.fromKind === "agent" || props.m.fromKind === "system"}>
-        <HelperFace agent={props.m.agent ?? props.m.from} size={props.size ?? 36} />
+        <HelperFace agent={props.m.agent ?? session()?.agent ?? props.m.from} runtime={session()?.runtime} size={props.size ?? 36} />
       </Match>
     </Switch>
   );

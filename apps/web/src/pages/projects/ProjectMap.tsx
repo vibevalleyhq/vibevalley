@@ -421,7 +421,7 @@ function Homeless(props: { sessions: Session[] }) {
       <For each={props.sessions}>
         {(h) => (
           <button type="button" onClick={() => go(router.navigate, h.id)} class="flex cursor-pointer items-center gap-1 text-sm underline">
-            <AgentFace agentId={h.agent} size={20} />
+            <AgentFace agentId={h.agent} runtime={h.runtime} size={20} />
             {h.name}
           </button>
         )}
@@ -522,7 +522,7 @@ export function IslandDetail(props: { island: Island }) {
                 aria-label={`${t.session.name}：${phaseText(t.session, now())}`}
                 class="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-left hover:bg-hover"
               >
-                <AgentFace agentId={t.session.agent} size={32} />
+                <AgentFace agentId={t.session.agent} runtime={t.session.runtime} size={32} />
                 <span class="flex min-w-0 flex-1 flex-col">
                   <span class="text-sm font-medium">{t.session.name}</span>
                   <span class="line-clamp-2 text-xs text-muted">{phaseText(t.session, now())}</span>

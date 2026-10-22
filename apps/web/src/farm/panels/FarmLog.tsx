@@ -5,6 +5,7 @@ import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { generalOf, messagesIn, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
+import { useAgent } from "../../data/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../kit";
 import { useFarm } from "../state";
@@ -83,10 +84,14 @@ function Said(props: { m: ChatMessage; look: string }) {
 }
 
 function Report(props: { r: ChatMessage; issue?: Issue }) {
+  const core = useCore();
+  const session = () => core()?.sessions.find((s) => s.id === (props.r.session ?? props.r.from));
+  const agentId = () => props.r.agent ?? session()?.agent;
+  const agent = useAgent(agentId);
   const outcome = () => props.r.outcome ?? "completed";
   return (
     <>
-      <AgentFace agentId={props.r.agent ?? ""} size={32} />
+      <AgentFace agentId={agentId() ?? ""} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={32} />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
           <span class="text-[13px]">{props.r.name}</span>

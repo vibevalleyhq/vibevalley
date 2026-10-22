@@ -259,7 +259,7 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
     <div data-block={r().block.id} class={["flex items-start pb-0.5", r().type === blockHeading ? "pt-2.5" : "pt-0.5"]}>
       <span class="w-[22px] shrink-0 pt-[3px]">
         <Show when={r().showFace}>
-          <AgentFace agentId={r().updatedBy} look={props.agent?.look} size={18} />
+          <AgentFace agentId={r().updatedBy} look={props.agent?.look} runtime={props.agent?.runtime} size={18} />
         </Show>
       </span>
       <span

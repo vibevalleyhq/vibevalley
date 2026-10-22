@@ -44,6 +44,10 @@ export interface Workplace {
   readonly branch?: string;
 }
 
+/** A retained branch or worktree still belongs to its issue, even after a failed dispatch. */
+export type WorkplaceRelease = { readonly kept: false } | { readonly kept: true; readonly reason: string };
+export type WorkplaceCleanup = "discard" | "preserve";
+
 export interface Project {
   readonly name: string;
   readonly path: string;
@@ -320,7 +324,7 @@ export interface ProjectShape {
   readonly languages: (name: string) => Effect.Effect<ProjectLanguages | undefined, ProjectError>;
   readonly activity: (name: string) => Effect.Effect<ProjectActivity | undefined>;
   readonly contributions: (extra: readonly string[]) => Effect.Effect<Repo[]>;
-  readonly workplace: (project: string, session: string, worktree: boolean, baseBranch: string, issueNumber: number) => Effect.Effect<Workplace, ProjectError>;
+  readonly workplace: (project: string, issueNumber: number, worktree: boolean, baseBranch: string) => Effect.Effect<Workplace, ProjectError>;
   readonly changes: (place: Workplace) => Effect.Effect<Changes, ProjectError>;
   readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes, ProjectError>;
   readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
@@ -328,9 +332,9 @@ export interface ProjectShape {
   readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
   readonly mergeInto: (place: Workplace, target: string) => Effect.Effect<Merged, MergeFailure>;
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
-  readonly release: (place: Workplace) => Effect.Effect<string>;
+  readonly release: (place: Workplace) => Effect.Effect<WorkplaceRelease>;
   readonly reset: (place: Workplace) => Effect.Effect<void, ProjectError>;
-  readonly clear: (project: string, issueNumber: number) => Effect.Effect<string>;
+  readonly clear: (project: string, issueNumber: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease>;
   readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
   readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
   readonly houseRules: () => string;
@@ -699,21 +703,16 @@ export const make = (hooks: ProjectHooks = {}) =>
           }
           return out;
         }),
-      workplace: (project, session, worktree, baseBranch, issueNumber) =>
+      workplace: (project, issueNumber, worktree, baseBranch) =>
         serially(
           project,
           Effect.gen(function* () {
             const path = yield* ensure(project);
             if (!worktree) return { project, cwd: path };
-            const stamp = Date.now().toString(36);
-            let branch = `vibevalley/${session}-${stamp}`;
-            let cwd = join(trees, `${project}.${session}-${stamp}`);
-            if (issueNumber > 0) {
-              const place = issueWorkplace(project, issueNumber);
-              branch = place.branch!;
-              cwd = place.cwd;
-              if (existsSync(cwd)) return { project, cwd, branch };
-            }
+            const place = issueWorkplace(project, issueNumber);
+            const branch = place.branch!;
+            const cwd = place.cwd;
+            if (existsSync(cwd)) return place;
             mkdirSync(trees, { recursive: true });
             const branchThere = yield* gitOk(path, "show-ref", "--verify", "refs/heads/" + branch);
             let from = baseBranch;
@@ -721,7 +720,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               const main = yield* syncMain(project);
               from ||= main;
             }
-            const args = issueNumber > 0 && branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
+            const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
             yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError(reason(e))));
             return { project, cwd, branch };
           }),
@@ -814,19 +813,20 @@ export const make = (hooks: ProjectHooks = {}) =>
         serially(
           place.project,
           Effect.gen(function* () {
-            if (!place.branch) return "";
+            if (!place.branch) return { kept: false };
             const path = join(root, place.project);
             // A worktree with changes stays where it is: removing it would lose them.
-            if (!(yield* gitOk(path, "worktree", "remove", place.cwd))) return `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}`;
+            if (!(yield* gitOk(path, "worktree", "remove", place.cwd)))
+              return { kept: true, reason: `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}` };
             // A branch with nothing new on it is clutter; one with commits is kept, so nothing is lost.
             const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
             const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
             const ahead = count.code === 0 ? Number(count.stdout.trim()) || 0 : 1;
             if (ahead === 0) {
-              yield* gitRun(path, "branch", "-D", place.branch);
-              return "";
+              const removed = yield* gitRun(path, "branch", "-D", place.branch);
+              return removed.code === 0 ? { kept: false } : { kept: true, reason: `${place.branch} 没清掉：${reason(removed.stderr)}` };
             }
-            return `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了`;
+            return { kept: true, reason: `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了` };
           }),
         ),
       reset: (place) =>
@@ -841,22 +841,26 @@ export const make = (hooks: ProjectHooks = {}) =>
             }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
           );
         }),
-      clear: (project, issueNumber) =>
+      clear: (project, issueNumber, work = "discard") =>
         serially(
           project,
           Effect.gen(function* () {
             const path = join(root, project);
             const place = issueWorkplace(project, issueNumber);
             if (existsSync(place.cwd)) {
-              const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
-              if (removed.code !== 0) return `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}`;
+              const removed = yield* gitRun(path, "worktree", "remove", ...(work === "discard" ? ["--force"] : []), place.cwd);
+              if (removed.code !== 0) return { kept: true, reason: `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}` };
             }
-            if (!(yield* gitOk(path, "show-ref", "--verify", "refs/heads/" + place.branch))) return "";
+            const branch = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + place.branch);
+            if (branch.code !== 0) {
+              if (branch.code === 1 || !existsSync(path)) return { kept: false };
+              return { kept: true, reason: `没能确认 ${place.branch} 已清掉：${reason(branch.stderr)}` };
+            }
             const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
             const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
-            if (count.code !== 0 || count.stdout.trim() !== "0") return `${place.branch} 上有没合的提交，分支留着`;
-            yield* gitRun(path, "branch", "-D", place.branch!);
-            return "";
+            if (count.code !== 0 || count.stdout.trim() !== "0") return { kept: true, reason: `${place.branch} 上有没合的提交，分支留着` };
+            const removed = yield* gitRun(path, "branch", "-D", place.branch!);
+            return removed.code === 0 ? { kept: false } : { kept: true, reason: `${place.branch} 没清掉：${reason(removed.stderr)}` };
           }),
         ),
       openBranch: (project, branch, from = "") =>

@@ -442,7 +442,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
         {props.node.brief}
       </p>
       <div class="mt-1.5 flex items-center gap-1">
-        <Show when={agent()}>{(a) => <AgentFace agentId={a().id} look={a().look} size={18} />}</Show>
+        <Show when={agent()}>{(a) => <AgentFace agentId={a().id} runtime={session()?.runtime ?? a().runtime} look={a().look} size={18} />}</Show>
         <span class="text-[12px] text-bark-600">{agent()?.name ?? "按规则挑"}</span>
         <Show when={props.node.check}>
           <span title={`做完跑 ${props.node.check}`} class="ml-auto truncate bg-cream-50/80 px-1 font-mono text-[10px] text-bark-900">

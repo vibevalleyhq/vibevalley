@@ -630,6 +630,7 @@ export const EventTokens: Schema.Codec<T.EventTokens> = Schema.Struct({
 
 export const SessionEvent: Schema.Codec<T.SessionEvent> = Schema.Struct({
   seq: Schema.Number,
+  revision: Schema.Number,
   time: Schema.Number,
   type: SessionEventType,
   run: Schema.optionalKey(Schema.String),

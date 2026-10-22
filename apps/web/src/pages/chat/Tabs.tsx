@@ -26,7 +26,7 @@ export function Jobs(props: { channel: Conversation }) {
             const thread = () => jobThreadOf(core()?.chat, h);
             return (
               <div class={[card, "flex items-center gap-3"]}>
-                <HelperFace agent={h.agent} size={36} />
+                <HelperFace agent={h.agent} runtime={h.runtime} size={36} />
                 <div class="flex min-w-0 flex-1 flex-col">
                   <span class="truncate text-sm">
                     <span class="font-semibold">{h.name}</span>

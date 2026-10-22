@@ -7,10 +7,13 @@ import { tookText } from "./time";
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;
 
-/** By seq, the newer copy of a step winning; the last stepLimit kept. */
+/** By seq and revision, independent of HTTP/live arrival order; the last stepLimit kept. */
 export function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
   const bySeq = new Map(log.map((s) => [s.seq, s]));
-  for (const s of incoming) bySeq.set(s.seq, s);
+  for (const s of incoming) {
+    const before = bySeq.get(s.seq);
+    if (!before || s.revision > before.revision) bySeq.set(s.seq, s);
+  }
   const all = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
   return all.length > stepLimit ? all.slice(all.length - stepLimit) : all;
 }

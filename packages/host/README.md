@@ -12,7 +12,8 @@ null, and the page draws by that, never by asking which host it is in ([the clie
 
 `currentHost()` is the one the page runs in: the preload's on the desktop; on the phone, built over the WebView's
 bridge (`src/mobile.ts`: what the page asks goes out as `ToNative` and is answered by id, the call's events come back as
-`FromNative`); `browserHost` otherwise.
+`FromNative`); `browserHost` otherwise. Each `RtcLine` keeps its own identity across the phone's bridge: its controls and
+events cannot act on a later call, including a join that finishes after the page cancelled it.
 
 ```bash
 bun run check
