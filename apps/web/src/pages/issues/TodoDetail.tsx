@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Acceptance, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { rememberPick } from "./write";
-import { isDrafted, newIssueTitle, priorityLabel } from "../../rules/issues";
+import { isRefined, newIssueTitle, priorityLabel } from "../../rules/issues";
 import { ago, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { autofocus } from "../../app/util";
@@ -46,7 +46,7 @@ export const dispatchedNotice = (open: (id: string | undefined) => void) => (got
   else open(got.id);
 };
 
-/** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its drafter asked)
+/** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked)
  * and sends a helper to draft it; the fields are the draft, each editable; 开工 sends it out. */
 export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined) => void }) {
   const [d, setD] = createSignal(untrack(() => draftOf(props.item)));
@@ -101,12 +101,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   }
 
   const backlog = () => props.item.status === "backlog";
-  const drafting = () => props.item.drafting;
-  const drafted = () => isDrafted(props.item);
+  const drafting = () => props.item.refining;
+  const refined = () => isRefined(props.item);
   const questions = () => props.item.questions;
   const queued = () => props.item.queuedAt;
   const canSave = () => !busy() && d().title.trim() !== "";
-  const canDraft = () => !busy() && !drafting() && (drafted() || word().trim() !== "" || d().title.trim() !== newIssueTitle);
+  const canRefine = () => !busy() && !drafting() && (refined() || word().trim() !== "" || d().title.trim() !== newIssueTitle);
   const startable = () => canSave() && !drafting() && d().agent !== "";
   const said = (): [string, string] => {
     const by = drafting();
@@ -114,7 +114,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       ? [`${by.name}在起草`, "它在读代码，写好了会填进下面各栏。"]
       : questions().length > 0
         ? [`草稿写好了，它有 ${questions().length} 个问题要问你`, "在下面回答，它照你的回答再起草一版。"]
-        : drafted()
+        : refined()
           ? ["草稿写好了", "看一遍、改一改，没问题就开工。"]
           : ["想做什么？", "写一句就行：帮工读过代码，替你写成工单。"];
   };
@@ -125,7 +125,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const unsaved = edited() ? d() : undefined;
     return busyWith(async () => {
       if (unsaved) await save(id, unsaved);
-      await api.issue.draft({ id, body: { text } });
+      await api.issue.refine({ id, body: { text } });
       setWord("");
     });
   };
@@ -231,17 +231,17 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           value={word()}
           onInput={(e) => setWord(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.isComposing && canDraft()) {
+            if (e.key === "Enter" && !e.shiftKey && !e.isComposing && canRefine()) {
               e.preventDefault();
               void draft();
             }
           }}
-          placeholder={questions().length > 0 ? "回答它的问题" : drafted() ? "再起草时要它改什么（可以不写）" : "想做什么，一句话就行"}
+          placeholder={questions().length > 0 ? "回答它的问题" : refined() ? "再起草时要它改什么（可以不写）" : "想做什么，一句话就行"}
           aria-label="想做什么"
         />
         <div class="mt-2.5">
-          <Button tone={drafted() ? "plain" : "primary"} disabled={!canDraft()} onClick={() => void draft()}>
-            {drafted() ? "再起草" : "起草"}
+          <Button tone={refined() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
+            {refined() ? "再起草" : "起草"}
           </Button>
         </div>
       </Show>
@@ -312,7 +312,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </Show>
       <div class="mt-4 flex flex-col gap-2">
         <Show when={backlog()}>
-          <Button tone={drafted() ? "primary" : "plain"} disabled={!startable()} title={d().agent ? undefined : "先选好帮工"} onClick={() => void start()}>
+          <Button tone={refined() ? "primary" : "plain"} disabled={!startable()} title={d().agent ? undefined : "先选好帮工"} onClick={() => void start()}>
             开工
           </Button>
         </Show>

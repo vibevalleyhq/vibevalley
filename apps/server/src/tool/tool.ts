@@ -505,11 +505,11 @@ export const make = Effect.gen(function* () {
             }),
           );
           if (!p.draft) return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里`;
-          const drafted = await go(issue.draft(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
+          const refined = await go(issue.refine(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
             () => "，帮工在起草",
             (e: unknown) => "；起草没开始：" + toError(e).message,
           );
-          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${drafted}`;
+          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${refined}`;
         } catch (e) {
           return "没记下：" + toError(e).message;
         }

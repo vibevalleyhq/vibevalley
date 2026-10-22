@@ -794,7 +794,7 @@ export const make = Effect.gen(function* () {
         ? `做种植计划 ${h.graph.id} 的「${h.graph.task}」`
         : h.graph
           ? "拆种植计划 " + h.graph.id
-          : h.draft
+          : h.refining
             ? "看代码，起草这张工单"
             : head(h.brief.replace(/\s+/g, " "), 80);
       yield* write({
@@ -821,7 +821,7 @@ export const make = Effect.gen(function* () {
       yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
       // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
       const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
-      const text = h.draft ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
+      const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
       yield* write({ conversation: thread, from: managerAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
     });
 

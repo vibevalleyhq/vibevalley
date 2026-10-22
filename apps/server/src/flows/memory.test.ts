@@ -12,7 +12,7 @@ import { testConfig } from "../testing/layers.ts";
 import { await_, farm, type Farm, lab, mustHire, watch } from "./farm.ts";
 
 const scribe = (): Agent => ({ ...lab(), id: "scribe", name: "记录员" });
-const drafter = (): Agent => ({ ...lab(), id: "drafter", name: "起草员" });
+const refiner = (): Agent => ({ ...lab(), id: "refiner", name: "起草员" });
 
 /** Each turn's input in order, as its session was prompted. */
 const prompts = (f: Farm) => {
@@ -117,10 +117,10 @@ describe("memory", () => {
       expect([recalled, asked]).toEqual([["- （所有项目）提交信息写中文"], "写一篇博客"]);
       yield* w.nextReport;
 
-      const other = mustHire(yield* issues.hire(drafter(), "跑一遍 pnpm test 测试，看看上班打卡", "memo"));
+      const other = mustHire(yield* issues.hire(refiner(), "跑一遍 pnpm test 测试，看看上班打卡", "memo"));
       expect(yield* nextPrompt(f, next, 4)).toBe("跑一遍 pnpm test 测试，看看上班打卡");
       yield* w.nextReport;
-      const theirs = yield* kept("drafter", 1);
+      const theirs = yield* kept("refiner", 1);
       expect(theirs.map((m) => [m.kind, m.session])).toEqual([["issue", other.id]]);
       for (const h of core.state().sessions) yield* sessions.dismiss(h.id);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

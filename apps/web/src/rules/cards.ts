@@ -144,7 +144,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
   switch (c.kind) {
     case "todo": {
       const item = c.issue;
-      if (item.drafting) flags.push({ text: `${item.drafting.name}在起草`, tone: "water" });
+      if (item.refining) flags.push({ text: `${item.refining.name}在起草`, tone: "water" });
       else if (item.status === "backlog") flags.push({ text: "草稿", tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: "排队中", tone: "water" });
       if (item.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });

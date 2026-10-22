@@ -327,7 +327,7 @@ export interface Session {
   channel?: string;
   play?: SessionPlay;
   issue?: string;
-  draft?: boolean;
+  refining?: boolean;
   phaseText?: string;
 }
 
@@ -1072,7 +1072,7 @@ export interface Issue {
   questions: Question[];
   criteria?: string[];
   checks?: CriterionCheck[];
-  drafting?: IssueDrafting;
+  refining?: IssueRefining;
   /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
   handedBack?: HandedBack;
   attention: IssueAttention;
@@ -1137,7 +1137,7 @@ export interface IssueAttention {
 
 export const MilestoneKindValues = [
   "opened",
-  "drafted",
+  "refined",
   "started",
   "reported",
   "asked",
@@ -1164,12 +1164,12 @@ export interface IssueTimeline {
   spent?: Spent;
 }
 
-export interface IssueDrafting {
+export interface IssueRefining {
   session: string;
   name: string;
 }
 
-export interface IssueDraftRequest {
+export interface IssueRefineRequest {
   text?: string;
 }
 
@@ -1248,7 +1248,7 @@ export interface IssueRequest {
 export const IssueCloseValues = ["merged", "merged_into_graph", "dismissed", "lost", "answered"] as const;
 export type IssueClose = (typeof IssueCloseValues)[number];
 
-export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "draft", "runtime"] as const;
+export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
 export interface RunTrigger {

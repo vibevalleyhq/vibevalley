@@ -48,7 +48,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const sent = t.sessions.length > 0;
   switch (from) {
     case "backlog":
-      if (to === "todo") return t.drafting ? ["none", t.drafting.name + " 正在起草：等它交回来再开工"] : ["start", ""];
+      if (to === "todo") return t.refining ? ["none", t.refining.name + " 正在起草：等它交回来再开工"] : ["start", ""];
       if (to === "canceled") return ["drop", ""];
       break;
     case "todo":

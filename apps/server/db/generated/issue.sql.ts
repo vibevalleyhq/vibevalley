@@ -192,23 +192,23 @@ export const editIssue = Effect.fn("EditIssue")(function* (params: EditIssuePara
   })(params)
 })
 
-export const DraftIssueParams = Schema.Struct({
+export const RefineIssueParams = Schema.Struct({
   ["title"]: Schema.String,
   ["description"]: Schema.String,
   ["criteria"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
-export type DraftIssueParams = typeof DraftIssueParams.Type
+export type RefineIssueParams = typeof RefineIssueParams.Type
 
 
-export const DraftIssueSql = "-- name: DraftIssue :exec\n-- A draft handed back: its words, its criteria and what it questions, in one write.\nupdate issue set title = $1, description = $2, criteria = $3, questions = $4\nwhere id = $5;"
+export const RefineIssueSql = "-- name: RefineIssue :exec\n-- A draft handed back: its words, its criteria and what it questions, in one write.\nupdate issue set title = $1, description = $2, criteria = $3, questions = $4\nwhere id = $5;"
 
-export const draftIssue = Effect.fn("DraftIssue")(function* (params: DraftIssueParams) {
+export const refineIssue = Effect.fn("RefineIssue")(function* (params: RefineIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: DraftIssueParams,
-    execute: (p) => sql.unsafe(DraftIssueSql, [p["title"], p["description"], p["criteria"], p["questions"], p["id"]]),
+    Request: RefineIssueParams,
+    execute: (p) => sql.unsafe(RefineIssueSql, [p["title"], p["description"], p["criteria"], p["questions"], p["id"]]),
   })(params)
 })
 

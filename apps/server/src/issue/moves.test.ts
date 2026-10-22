@@ -30,7 +30,7 @@ describe("status moves", () => {
     const required = issue("in_review", true, { acceptance: "required" });
     expect(statusMoves(required)).toEqual(["todo", "canceled"]);
     expect(statusMoves({ ...required, acceptedAt: 1 })).toEqual(["todo", "done", "canceled"]);
-    expect(statusMoves(issue("backlog", false, { drafting: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
+    expect(statusMoves(issue("backlog", false, { refining: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { assignee: managerAgent }))).toEqual([]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
   });

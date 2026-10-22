@@ -1,5 +1,5 @@
-// Refinement: an issue in the backlog drafted by a helper before anyone works it. Who drafts, what the drafter is told,
-// and how what it hands back is read into the issue; the drafter's worktree goes back to main after, and goes away with
+// Refinement: an issue in the backlog refined by a helper before anyone works it. Who drafts, what the refiner is told,
+// and how what it hands back is read into the issue; the refiner's worktree goes back to main after, and goes away with
 // the issue. Who the farm sends for any task (pickAgent) is decided here too.
 
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
@@ -17,7 +17,7 @@ import { type RuntimeShape, usable } from "../runtime/runtime.ts";
 import { chooseAgent } from "../session/rules.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
 import { isForManager } from "./state.ts";
-import { draftBrief, draftDescription, type IssueDraft, jsonOrNull, kept, nullText, openQuestions, parseDraft, splitJob } from "./rules.ts";
+import { refinementBrief, refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
 
 /** What drafting needs of the issues around it. */
 export interface RefinementDeps {
@@ -49,7 +49,7 @@ export function refinement(d: RefinementDeps) {
   const pickAgent = (task: string, named: string, picked: string) => Effect.map(candidatesNow, (c) => chooseAgent(c, task, named, picked));
 
   /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
-  const drafter = (t: Issue) =>
+  const refiner = (t: Issue) =>
     Effect.gen(function* () {
       const candidates = yield* candidatesNow;
       let named = "";
@@ -65,8 +65,8 @@ export function refinement(d: RefinementDeps) {
       return chosen;
     });
 
-  /** Before its session is sent: the owner's first word is its title, the drafter and the project are its own unless it names them, and an answer clears what it asked. */
-  const beforeDraft = (t: Issue, word: string, agent: string, where: string) =>
+  /** Before its session is sent: the owner's first word is its title, the refiner and the project are its own unless it names them, and an answer clears what it asked. */
+  const beforeRefinement = (t: Issue, word: string, agent: string, where: string) =>
     Effect.gen(function* () {
       let [title, description] = [t.title, t.description ?? ""];
       if (word && t.questions.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
@@ -90,15 +90,15 @@ export function refinement(d: RefinementDeps) {
       yield* publish(t.id);
     });
 
-  const drafted = (id: string, d: IssueDraft, questions: readonly Question[] | undefined) =>
+  const refined = (id: string, d: IssueRefinement, questions: readonly Question[] | undefined) =>
     Effect.gen(function* () {
       const criteria = kept(d.criteria);
       const open = openQuestions(questions);
       yield* db(
-        q.draftIssue({
+        q.refineIssue({
           id,
           title: d.title,
-          description: draftDescription(d),
+          description: refinementDescription(d),
           criteria: jsonOrNull(criteria, criteria.length > 0),
           questions: jsonOrNull(open, open.length > 0),
         }),
@@ -112,18 +112,18 @@ export function refinement(d: RefinementDeps) {
         const t = yield* unsent(id);
         if (isForManager(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
         if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
-        if (t.drafting) return yield* Effect.fail(refused(t.drafting.name + " 正在起草：等它交回来"));
-        const chosen = yield* drafter(t);
+        if (t.refining) return yield* Effect.fail(refused(t.refining.name + " 正在起草：等它交回来"));
+        const chosen = yield* refiner(t);
         const where = t.project ?? (chosen.workdir ?? "").trim();
         if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：先选一个项目"));
         const said = word.trim();
-        const brief = draftBrief(t, said, where);
-        yield* beforeDraft(t, said, chosen.id, where);
-        // A draft cut short (a restart) may have left the worktree as its drafter had it: each draft starts from main.
+        const brief = refinementBrief(t, said, where);
+        yield* beforeRefinement(t, said, chosen.id, where);
+        // A draft cut short (a restart) may have left the worktree as its refiner had it: each draft starts from main.
         const kept = yield* projects.clear(where, t.number);
         if (kept) yield* Effect.logInfo(`vibevalley: issue ${t.id}: before its draft: ${kept}`);
         // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
-        const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "draft" }, draft: true });
+        const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
         if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
         // Its moves no longer hold todo while it drafts.
         yield* publish(id);
@@ -135,17 +135,17 @@ export function refinement(d: RefinementDeps) {
   const handedBack = (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) =>
     Effect.gen(function* () {
       const h = sessions.sessionOf(f.id);
-      if (!h?.draft || !h.issue) return;
+      if (!h?.refining || !h.issue) return;
       const id = h.issue;
       const r = sessions.find(f.id);
       const said = r?.lastText ?? "";
       const place: Workplace | undefined = r?.place;
       const thread = yield* chat.jobThread(f.id);
-      const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_draft") : core.notice("warn", text));
+      const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
       if (f.outcome === "completed") {
-        const { draft: d, problem } = parseDraft(said);
+        const { draft: d, problem } = parseRefinement(said);
         if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
-        else yield* drafted(id, d, f.questions);
+        else yield* refined(id, d, f.questions);
       } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
       if (place?.branch) {
         const reset = yield* Effect.result(projects.reset(place));
@@ -156,12 +156,12 @@ export function refinement(d: RefinementDeps) {
     });
 
   /** An unsent issue going away takes its draft with it: whoever drafts it goes home, and what drafts left is removed. */
-  const clearDraft = (t: Issue) =>
+  const clearRefinement = (t: Issue) =>
     Effect.gen(function* () {
-      if (t.drafting) {
-        const r = sessions.find(t.drafting.session);
+      if (t.refining) {
+        const r = sessions.find(t.refining.session);
         if (r?.place.branch) yield* Effect.ignore(projects.reset(r.place));
-        yield* sessions.dismiss(t.drafting.session);
+        yield* sessions.dismiss(t.refining.session);
       }
       if (t.project) {
         const kept = yield* projects.clear(t.project, t.number);
@@ -169,5 +169,5 @@ export function refinement(d: RefinementDeps) {
       }
     });
 
-  return { pickAgent, draft, handedBack, clearDraft };
+  return { pickAgent, draft, handedBack, clearRefinement };
 }

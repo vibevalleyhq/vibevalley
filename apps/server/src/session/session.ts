@@ -93,7 +93,7 @@ export interface HireOptions {
   /** What its first run is for; the issue sent out when none. */
   readonly trigger?: RunTrigger;
   /** It drafts the issue rather than works it. */
-  readonly draft?: boolean;
+  readonly refining?: boolean;
   /** Called with the session just before it goes on the farm, so what must know of it first (its issue's link) is written before anyone can see it. */
   readonly hiring?: (s: Session) => Effect.Effect<void, unknown>;
 }
@@ -905,7 +905,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               phase: { _tag: "arriving" },
               ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
               ...(opt.channel ? { channel: opt.channel } : {}),
-              ...(opt.draft ? { draft: true } : {}),
+              ...(opt.refining ? { refining: true } : {}),
               ...(opt.issue ? { issue: opt.issue } : {}),
               ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
             };

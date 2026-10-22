@@ -70,7 +70,7 @@ export function nextTaskId(ids: readonly string[]): string {
 }
 
 /** A draft as its session hands it back, in the json block its brief questions for. A list may come as one string. */
-export interface IssueDraft {
+export interface IssueRefinement {
   readonly title: string;
   readonly why: string;
   readonly todo: string[];
@@ -98,15 +98,15 @@ function textOf(v: unknown, field: string): string {
   throw new Error(`${field}：要是字符串`);
 }
 
-const draftBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
 /** The last block that reads as a draft with a title; problem says why none did. */
-export function parseDraft(text: string): { draft?: IssueDraft; problem: string } {
-  const blocks = [...text.matchAll(draftBlock)].map((m) => m[1]!);
+export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
+  const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
   if (blocks.length === 0) return { problem: "没找到草稿：要用一个 json 代码块给出" };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
-    let d: IssueDraft;
+    let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
       if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
@@ -133,7 +133,7 @@ export function parseDraft(text: string): { draft?: IssueDraft; problem: string 
 }
 
 /** The issue's description from a draft, under the same headings every time; a heading with nothing under it is left out. */
-export function draftDescription(d: IssueDraft): string {
+export function refinementDescription(d: IssueRefinement): string {
   const parts: string[] = [];
   const why = d.why.trim();
   if (why) parts.push("为什么：\n" + why);
@@ -146,11 +146,11 @@ export function draftDescription(d: IssueDraft): string {
   return parts.join("\n\n");
 }
 
-export const draftOpening =
+export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
-export function draftBrief(
+export function refinementBrief(
   t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
   word: string,
   project: string,
@@ -168,7 +168,7 @@ export function draftBrief(
     notDoing: ["不改看板的样子"],
     files: ["app/lib/workbench/issues/board.dart"],
   };
-  const lines = [draftOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
+  const lines = [refinementOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
   if (redraft) {
     lines.push("", "上一版草稿（主人可能改过，以这一版为准）：", "标题：" + t.title);
     if (t.description) lines.push(t.description);
@@ -256,7 +256,7 @@ const closedWords: Record<IssueClose, string> = {
 
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (t.kind) {
-    case "draft":
+    case "refine":
       return ["started", "开始起草"];
     case "comment":
       return ["told", "你带了话，接着做一轮"];
@@ -279,8 +279,8 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   runs.forEach((r, i) => {
     const who = names.get(r.session);
     const by = who !== undefined ? { who } : {};
-    const draft = r.triggeredBy.kind === "draft";
-    const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "draft"));
+    const draft = r.triggeredBy.kind === "refine";
+    const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
     const said = r.summary ? `：${r.summary}` : "";
@@ -288,7 +288,7 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
       case "completed":
         if (i === lastDone && t.questions.length > 0)
           out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.questions.map((a) => a.question).join(" / ") });
-        else out.push({ at: r.endedAt, kind: draft ? "drafted" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
+        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
         break;
       case "failed":
         out.push({ at: r.endedAt, kind: "failed", ...by, text: "没做成" + said });

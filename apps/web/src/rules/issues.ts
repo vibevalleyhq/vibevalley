@@ -120,7 +120,7 @@ export function stageOf(s: IssueStatus): Stage {
 export const newIssueTitle = "新工单";
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
-export const isDrafted = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
+export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
 
 export function laneOf(s: IssueStatus): Lane {
   if (s === "backlog" || s === "todo") return "todo";
@@ -165,7 +165,7 @@ export function runTriggerText(t: RunTrigger) {
       return "种植计划";
     case "recurrence":
       return t.missed ? "定时（补跑）" : "定时";
-    case "draft":
+    case "refine":
       return "起草";
     case "runtime":
       return "农机自己";

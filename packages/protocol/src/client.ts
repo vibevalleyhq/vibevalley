@@ -106,8 +106,8 @@ export class VibeValleyApi {
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status", undefined, a.body) as Promise<T.Issue>,
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
      * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-    draft: (a: { id: string; body: T.IssueDraftRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/draft", undefined, a.body) as Promise<T.Issue>,
+    refine: (a: { id: string; body: T.IssueRefineRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/refine", undefined, a.body) as Promise<T.Issue>,
     /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
     dispatch: (a: { id: string; body: T.IssueDispatchRequest }): Promise<T.Dispatched> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,

@@ -6,15 +6,15 @@ import { checkCases, goldenCases } from "../testing/golden.ts";
 import {
   pullRequestConclusion,
   criteriaHead,
-  draftBrief,
-  draftDescription,
-  draftOpening,
+  refinementBrief,
+  refinementDescription,
+  refinementOpening,
   filledKinds,
   filledTemplate,
   issueJob,
   kept,
   nextTaskId,
-  parseDraft,
+  parseRefinement,
   sentTitles,
   milestonesOf,
   splitJob,
@@ -117,33 +117,34 @@ describe("drafts", () => {
       '看过了。\n\n```json\n{"title": "旧的"}\n```\n\n要问主人：端口用哪个？\n\n```json\n' +
       `{"title": " 看板拖卡改用 issue.status ", "why": "旧接口收不了", "todo": ["改 board.dart", " "], "criteria": "拖到待办就开工", "notDoing": [], "files": ["app/lib/workbench/issues/board.dart"]}` +
       "\n```\n\n结论：写好了";
-    const { draft, problem } = parseDraft(said);
+    const { draft, problem } = parseRefinement(said);
     expect(problem).toBe("");
     expect(draft!.title).toBe("看板拖卡改用 issue.status");
     expect(kept(draft!.criteria)).toEqual(["拖到待办就开工"]);
-    expect(draftDescription(draft!)).toBe("为什么：\n旧接口收不了\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- app/lib/workbench/issues/board.dart");
+    expect(refinementDescription(draft!)).toBe("为什么：\n旧接口收不了\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- app/lib/workbench/issues/board.dart");
     for (const [said, problem] of [
       ["草稿写好了", "没找到草稿"],
       ["```json\n{title: 1}\n```", "json 读不了"],
       ['```json\n{"why": "x"}\n```', "草稿没有标题"],
       ['```json\n{"title": "x", "todo": [1]}\n```', "json 读不了"],
     ])
-      expect(parseDraft(said!).problem.startsWith(problem!)).toBe(true);
-    const later = parseDraft('```json\n{"title": "x"}\n```\n```\n不是 json\n```');
+      expect(parseRefinement(said!).problem.startsWith(problem!)).toBe(true);
+    const later = parseRefinement('```json\n{"title": "x"}\n```\n```\n不是 json\n```');
     expect([later.draft?.title, later.problem]).toEqual(["x", ""]);
   });
 
   it("briefs", () => {
-    const first = draftBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
-    for (const want of [draftOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："]) expect(first).toContain(want);
+    const first = refinementBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
+    for (const want of [refinementOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
+      expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
-    const drafted = {
+    const refined = {
       title: "看板拖卡改用 issue.status",
       description: "为什么：\n旧接口",
       criteria: ["拖到待办就开工"],
       questions: [{ question: "端口用哪个？" }],
     };
-    const answer = draftBrief(drafted, "用 8797", "board");
+    const answer = refinementBrief(refined, "用 8797", "board");
     for (const want of [
       "上一版草稿",
       "标题：看板拖卡改用 issue.status",
@@ -153,7 +154,7 @@ describe("drafts", () => {
       "主人的回答：用 8797",
     ])
       expect(answer).toContain(want);
-    const again = draftBrief({ ...drafted, questions: [] }, "也改测试", "board");
+    const again = refinementBrief({ ...refined, questions: [] }, "也改测试", "board");
     expect(again).toContain("主人这次说：也改测试");
     expect(again).not.toContain("主人的回答");
   });

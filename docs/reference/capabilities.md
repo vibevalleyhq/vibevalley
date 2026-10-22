@@ -73,7 +73,7 @@
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |   |
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
-| `issue.draft` | `POST /api/v1/issues/{id}/draft` | ✓ | ✓ |   |
+| `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
 | `issue.accept` | `POST /api/v1/issues/{id}/accept` | ✓ | ✓ | ✓ |
 | `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |

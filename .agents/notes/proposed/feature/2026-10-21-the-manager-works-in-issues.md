@@ -69,7 +69,7 @@ Status: proposed
 
 - 能做：读代码、`git log`/`blame`/`diff`、跑只读的命令和测试、上网查文档、用 `vibevalley` 命令行读农场自己的数据。
 - 不做：改文件、提交、装依赖、推送；改了也会被重置。
-- 交回：最后一个 json 代码块，服务端读（`parseAnswer`，和 `parseDraft` 一样）：
+- 交回：最后一个 json 代码块，服务端读（`parseAnswer`，和 `parseRefinement` 一样）：
 
 ```json
 {

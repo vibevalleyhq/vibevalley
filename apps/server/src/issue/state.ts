@@ -1,6 +1,6 @@
 // An issue in the core state: its status, who drafts it, its place in the list and its findings left attention.
 
-import { type WorkspaceState, type Issue, type IssueClose, type IssueDrafting, type IssueStatus, managerAgent } from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueClose, type IssueRefining, type IssueStatus, managerAgent } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
@@ -77,8 +77,8 @@ export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] 
 }
 
 /** The session drafting an unsent issue: the one on the farm for it with draft set. */
-export function issueDraftingOf(t: Issue, state: WorkspaceState): IssueDrafting | undefined {
-  const h = state.sessions.find((h) => h.draft && h.issue === t.id);
+export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining | undefined {
+  const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
 }
 
@@ -87,13 +87,13 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   let next: Issue[] | undefined;
   (state.issues ?? []).forEach((t, i) => {
     const status = issueStatusOf(t, state);
-    const drafting = issueDraftingOf(t, state);
-    const attention = attentionIn({ ...t, status, drafting }, state);
+    const drafting = issueRefiningOf(t, state);
+    const attention = attentionIn({ ...t, status, refining: drafting }, state);
     // The moves read the attention: a round that failed is not harvested, from the moment it fails.
-    const moves = statusMoves({ ...t, status, drafting, attention });
-    if (status === t.status && same(drafting, t.drafting) && same(attention, t.attention) && same(moves, t.moves)) return;
+    const moves = statusMoves({ ...t, status, refining: drafting, attention });
+    if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
     next ??= [...state.issues!];
-    next[i] = { ...t, status, drafting, attention, moves };
+    next[i] = { ...t, status, refining: drafting, attention, moves };
   });
   return next ? { ...state, issues: next } : state;
 }

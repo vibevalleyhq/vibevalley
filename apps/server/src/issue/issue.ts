@@ -1,6 +1,6 @@
 // Issues: what the owner wants done, each worked by sessions one after another. An issue closes
 // when its last session leaves, as the fact that the session left says how, and opens again with another session; a
-// task's issues open and close as the task says. An issue may be drafted first: a session reads the code and writes it in
+// task's issues open and close as the task says. An issue may be refined first: a session reads the code and writes it in
 // the issue's format, then leaves, the issue still unsent. One for the manager is handed to the manager, not to a session,
 // and waits on the owner once the manager's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
 // with its branch and worktree, and the state says which files.
@@ -36,7 +36,7 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { actLabel, isBusy, attentionLabel } from "@vibevalley/protocol/rules";
-import { isForManager, issueDraftingOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
+import { isForManager, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
 import { attentionIn } from "./attention.ts";
@@ -70,7 +70,7 @@ import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
 import { issueBranch, Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { harvesting } from "./harvest.ts";
-import { refinement } from "./draft.ts";
+import { refinement } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
 import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
@@ -118,7 +118,7 @@ export interface IssueShape {
   readonly resolve: (id: string) => Effect.Effect<void, ApiError>;
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
   readonly accept: (id: string, req: IssueAcceptRequest) => Effect.Effect<Issue, ApiError>;
-  readonly draft: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
@@ -248,8 +248,8 @@ export const make = (options: IssueOptions = {}) =>
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
       out.status = issueStatusOf(out, state);
-      const drafter = issueDraftingOf(out, state);
-      if (drafter) out.drafting = drafter;
+      const refiner = issueRefiningOf(out, state);
+      if (refiner) out.refining = refiner;
       // The moves read the attention: a round that failed is not harvested.
       out.attention = attentionIn(out, state);
       out.moves = statusMoves(out);
@@ -469,7 +469,7 @@ export const make = (options: IssueOptions = {}) =>
           if (Option.isSome(known)) options = { ...options, issueNumber: known.value.number };
         }
         // A draft's session is not one of the issue's sessions: the issue stays unsent.
-        if (!options.draft) options = { ...options, hiring: (w) => ran(options.issue!, w) };
+        if (!options.refining) options = { ...options, hiring: (w) => ran(options.issue!, w) };
         const hired = yield* sessions.send(agent, task, where, options);
         return hired.session && evicted ? { ...hired, evicted } : hired;
       });
@@ -477,7 +477,7 @@ export const make = (options: IssueOptions = {}) =>
     const ready = (id: string) =>
       Effect.gen(function* () {
         const issue = yield* unsent(id);
-        if (issue.drafting) return yield* Effect.fail(refused(issue.drafting.name + " 正在起草：等它交回来再开工"));
+        if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
         if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案"));
         const agent = store.agent(issue.assignee);
         if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了"));
@@ -636,7 +636,7 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── drafts ──
 
-    const { pickAgent, draft, handedBack, clearDraft } = refinement({
+    const { pickAgent, draft, handedBack, clearRefinement } = refinement({
       core,
       store,
       runtimes,
@@ -797,7 +797,7 @@ export const make = (options: IssueOptions = {}) =>
       remove: (id) =>
         Effect.gen(function* () {
           const t = yield* unsent(id);
-          yield* clearDraft(t);
+          yield* clearRefinement(t);
           yield* db(q.removeIssue({ id }));
           yield* core.apply({ type: "issueGone", id } as never);
         }),
@@ -919,7 +919,7 @@ export const make = (options: IssueOptions = {}) =>
               yield* closeAs(id, "dismissed");
               break;
             case "drop":
-              yield* clearDraft(t);
+              yield* clearRefinement(t);
               yield* drop(id);
               break;
             case "answered":
@@ -984,7 +984,7 @@ export const make = (options: IssueOptions = {}) =>
           yield* comment(id, failedText(findings, text));
           return yield* get(id);
         }),
-      draft,
+      refine: draft,
       /** Every issue with its sessions, live and ended, once; a session with no record is named as missing, not given a phase. */
       history: () =>
         Effect.gen(function* () {

@@ -525,7 +525,7 @@ export const Finding: Schema.Codec<T.Finding> = Schema.Struct({
   pulled: Schema.optionalKey(Schema.Boolean),
 });
 
-export const IssueDrafting: Schema.Codec<T.IssueDrafting> = Schema.Struct({
+export const IssueRefining: Schema.Codec<T.IssueRefining> = Schema.Struct({
   session: Schema.String,
   name: Schema.String,
 });
@@ -602,7 +602,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
-  drafting: Schema.optionalKey(IssueDrafting),
+  drafting: Schema.optionalKey(IssueRefining),
   handedBack: Schema.optionalKey(HandedBack),
   attention: IssueAttention,
 });
@@ -1289,7 +1289,7 @@ export const IssueHistory: Schema.Codec<T.IssueHistory> = Schema.Struct({
   missingSessions: Schema.mutable(Schema.Array(Schema.String)),
 });
 
-export const IssueDraftRequest: Schema.Codec<T.IssueDraftRequest> = Schema.Struct({
+export const IssueRefineRequest: Schema.Codec<T.IssueRefineRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
 });
 

@@ -19,7 +19,7 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
     case "backlog":
       if (t.task?.state === "waiting") return own({ state: "queued", since: t.createdAt, acts: [] });
       return own(
-        t.drafting ? { state: "draft", since: t.createdAt, acts: [] } : { state: "draft", since: t.createdAt, lead: "start", acts: ["start", "close"] },
+        t.refining ? { state: "draft", since: t.createdAt, acts: [] } : { state: "draft", since: t.createdAt, lead: "start", acts: ["start", "close"] },
       );
     case "todo":
       return own({ state: "queued", since: t.queuedAt ?? t.createdAt, acts: ["close"] });

@@ -101,7 +101,7 @@ export interface Handlers<R = never> {
   readonly "issue.status": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
    * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-  readonly "issue.draft": (a: { readonly id: string; readonly body: T.IssueDraftRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.refine": (a: { readonly id: string; readonly body: T.IssueRefineRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
   readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;
   /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
@@ -466,12 +466,12 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "issue.draft",
+    op: "issue.refine",
     method: "POST",
-    path: "/api/v1/issues/{id}/draft",
+    path: "/api/v1/issues/{id}/refine",
     pathParams: [{ name: "id", number: false }],
     query: [],
-    body: S.IssueDraftRequest,
+    body: S.IssueRefineRequest,
     result: S.Issue,
     can: ["owner", "remote"],
   },
