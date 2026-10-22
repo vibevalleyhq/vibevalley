@@ -38,6 +38,9 @@ export function channelOf(chat: Chat | undefined, c: Conversation | undefined) {
 
 export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : generalName);
 
+/** A channel as it is said in a line: #name, the general one 田头. */
+export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : generalName);
+
 /** Where the page shows a conversation: the general is /chat. */
 export const chatPath = (c: Conversation | undefined) => (!c || c.kind === "general" ? "/chat" : `/chat/${c.id}`);
 

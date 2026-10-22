@@ -6,15 +6,12 @@ import type { Conversation } from "@vibevalley/protocol";
 import { createChannelForm } from "../../data/channelForm";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { channelsOf, chatPath, unreadUnder } from "../../rules/chat";
+import { channelLabel, channelsOf, chatPath, unreadUnder } from "../../rules/chat";
 import { aria, useClickAway } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
 import { ready, useProjects } from "../../data/query";
 import { PxButton, PxTextInput, SpriteIcon } from "../kit";
-
-/** A channel's name as the farm says it: #name, the general one 田头. */
-export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : "田头");
 
 type Mode = "list" | "create" | "settings";
 

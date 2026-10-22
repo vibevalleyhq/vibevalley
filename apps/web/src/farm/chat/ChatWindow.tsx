@@ -9,7 +9,19 @@ import { newSendKey } from "../../data/api";
 import { say } from "../../data/composer";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { channelOf, conversationOf, feedOf, generalOf, parentOf, phaseText, threadOwnerOf, threadTitle, unreadIn, unreadTotal } from "../../rules/chat";
+import {
+  channelLabel,
+  channelOf,
+  conversationOf,
+  feedOf,
+  generalOf,
+  parentOf,
+  phaseText,
+  threadOwnerOf,
+  threadTitle,
+  unreadIn,
+  unreadTotal,
+} from "../../rules/chat";
 import { voiceCall, type VoiceCall } from "../../voice/call";
 import { useRouter } from "../../app/router";
 import { useNow, useViewport } from "../../app/util";
@@ -21,7 +33,7 @@ import { OrchestratorFace } from "../../ui/Face";
 import { createCall } from "../../voice/CallButton";
 import { PxButton, PxWindow, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
-import { ChannelMenu, channelLabel } from "./ChannelMenu";
+import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
 
