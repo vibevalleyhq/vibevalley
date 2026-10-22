@@ -26,7 +26,6 @@ import {
   type IssueTimeline,
   type IssueUpdate,
   orchestratorAgent,
-  maxRunning,
   type Priority,
   type ProjectTemplates,
   type PullRequest,
@@ -35,7 +34,7 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { actLabel, isBusy, attentionLabel } from "@vibevalley/protocol/rules";
+import { actLabel, attentionLabel } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
@@ -450,18 +449,9 @@ export const make = (options: IssueOptions = {}) =>
         for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
         const where = project.trim() || (agent.workdir ?? "").trim();
         if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" } as Hired;
-        const full = sessions.noRoom(agent.runtime, where);
-        if (full) return { refused: full } as Hired;
-        // A full farm sends home whoever has been idle longest.
-        let evicted = "";
-        const all = sessions.presentSessions();
-        if (all.length >= maxRunning) {
-          const oldest = all.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
-          if (oldest) {
-            evicted = oldest.name;
-            yield* sessions.dismiss(oldest.id);
-          }
-        }
+        const room = yield* sessions.makeRoom(agent.runtime, where);
+        if ("refused" in room) return { refused: room.refused } as Hired;
+        const evicted = room.evicted ?? "";
         let options = opt;
         if (!options.issue) options = { ...options, issue: newId() };
         else {

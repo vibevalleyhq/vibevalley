@@ -61,6 +61,7 @@ import {
   type Settle,
   summaryOf,
   toOarMcp,
+  whoMakesRoom,
   withRecall,
   workplaceRules,
 } from "./rules.ts";
@@ -137,6 +138,9 @@ interface Hand {
 
 export interface SessionShape {
   readonly noRoom: (runtime: string, project: string) => string;
+  /** Room for one more on runtime in project: refused when either is at its limit; a full farm sends home whoever has
+   * been idle longest, and says who. */
+  readonly makeRoom: (runtime: string, project: string) => Effect.Effect<{ readonly refused: string } | { readonly evicted?: string }>;
   readonly send: (agent: Agent, task: string, where: string, opt?: HireOptions) => Effect.Effect<Hired>;
   readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
   /** deliver, in words for whoever sent it. */
@@ -937,6 +941,15 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const shape: SessionShape = {
       noRoom: roomFor,
+      makeRoom: (runtime, project) =>
+        Effect.gen(function* () {
+          const full = roomFor(runtime, project);
+          if (full) return { refused: full };
+          const oldest = whoMakesRoom(core.state().sessions, maxRunning);
+          if (!oldest) return {};
+          yield* shape.dismiss(oldest.id);
+          return { evicted: oldest.name };
+        }),
       send: (agent, task, where, opt = {}) =>
         admission.withPermits(1)(
           Effect.gen(function* () {

@@ -18,6 +18,7 @@ import {
   recallHead,
   sessionName,
   summaryOf,
+  whoMakesRoom,
   withRecall,
 } from "./rules.ts";
 import { shellCommand } from "./shell.ts";
@@ -304,4 +305,12 @@ describe("work that does not go in", () => {
     expect(conflictOf({ base: "main", conflicts: [] })).toBeUndefined();
     expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({ base: "main", files: ["a.ts"] });
   });
+});
+
+it("makes room with whoever has been idle longest", () => {
+  const s = (id: string, hiredAt: number, tag: string) => ({ id, hiredAt, phase: { _tag: tag } }) as unknown as Session;
+  const farm = [s("a", 3, "ripe"), s("b", 1, "working"), s("c", 2, "resting")];
+  expect(whoMakesRoom(farm, 4)).toBeUndefined();
+  expect(whoMakesRoom(farm, 3)?.id).toBe("c");
+  expect(whoMakesRoom([s("b", 1, "working")], 1)).toBeUndefined();
 });

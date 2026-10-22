@@ -312,3 +312,10 @@ export function notTakenIn(
     }
   }
 }
+
+/** Who goes home so one more can come, when the farm holds max: whoever has been idle longest; none while there is room,
+ * or when every one is at work. */
+export function whoMakesRoom(sessions: readonly Session[], max: number): Session | undefined {
+  if (sessions.length < max) return undefined;
+  return sessions.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
+}
