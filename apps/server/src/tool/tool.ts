@@ -4,16 +4,17 @@
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
-  type Review,
   type Agent,
   type Block,
   type BlockAttrs,
   generalName,
   type GraphAction,
   type Issue,
-  orchestratorAgent,
+  IssueStatusValues,
   type Memory,
+  orchestratorAgent,
   type RecurrenceWhen,
+  type Review,
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
@@ -40,9 +41,12 @@ import { Tasks } from "../task/task.ts";
 import {
   changeNotAsked,
   changesText,
+  channelLine,
   issueDetail,
   issueLine,
   mergeNotAsked,
+  noSuchPriority,
+  noSuchStatus,
   parseTime,
   priorityOf,
   recurrenceLine,
@@ -215,7 +219,7 @@ export const make = Effect.gen(function* () {
   const profile = (key: string): string => {
     const k = key.trim();
     if (k === orchestratorAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
-    const a = agents.agents().find((x) => x.id === k || x.name === k);
+    const a = agents.named(k);
     if (!a) throw new Error("没有叫 " + k + " 的帮工档案");
     return a.id;
   };
@@ -230,9 +234,7 @@ export const make = Effect.gen(function* () {
   });
 
   const channelsTool = tool<object>("channels", "列出频道：名字、是做什么的、默认项目。频道是安排活的地方，田头是默认的那个。", async () =>
-    (await go(chat.channels()))
-      .map((c) => "- #" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : ""))
-      .join("\n"),
+    (await go(chat.channels())).map((c) => "- " + channelLine(c)).join("\n"),
   );
 
   const roster = tool<object>("roster", "列出地里所有帮工：在做什么、上一轮的结果。", () => {
@@ -455,7 +457,7 @@ export const make = Effect.gen(function* () {
     async (p) => {
       if (p.issue) return withIssue(p.issue, async (t) => issueDetail(t, whoOf(t), await go(issue.timeline(t.id)).catch(() => undefined), Date.now()));
       const status = p.status ? statusOf(p.status) : undefined;
-      if (p.status && !status) return "没有「" + p.status + "」这个状态：备选、待办、处理中、等你看、已完成、已取消";
+      if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
       const words = (p.text ?? "").split(spaces).filter(Boolean);
       const now = Date.now();
       let found = (await go(issue.list())).filter(
@@ -487,10 +489,10 @@ export const make = Effect.gen(function* () {
         const channel = await go(chat.channelOf(c.here));
         const project = (p.project ?? "").trim() || channel.project;
         const priority = p.priority ? priorityOf(p.priority) : undefined;
-        if (p.priority && !priority) return "没有「" + p.priority + "」这个优先级：紧急、高、普通、低";
+        if (p.priority && !priority) return noSuchPriority(p.priority);
         let assignee: string | undefined;
         if (p.agent) {
-          const a = agents.agents().find((x) => x.id === p.agent!.trim() || x.name === p.agent!.trim());
+          const a = agents.named(p.agent!);
           if (!a) return "没有叫 " + p.agent + " 的帮工档案";
           assignee = a.id;
         }
@@ -534,11 +536,11 @@ export const make = Effect.gen(function* () {
         if (!c.owner) return changeNotAsked;
         return withIssue(p.issue, async (t) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
-          if (p.priority && !priority) return "没有「" + p.priority + "」这个优先级：紧急、高、普通、低";
+          if (p.priority && !priority) return noSuchPriority(p.priority);
           if (p.acceptance && p.acceptance !== "glance" && p.acceptance !== "required") return "验收方式只有 glance 和 required";
           let assignee: string | undefined;
           if (p.agent) {
-            const a = agents.agents().find((x) => x.id === p.agent!.trim() || x.name === p.agent!.trim());
+            const a = agents.named(p.agent!);
             if (!a) return "没有叫 " + p.agent + " 的帮工档案";
             assignee = a.id;
           }
@@ -570,7 +572,7 @@ export const make = Effect.gen(function* () {
         const c = await who();
         if (!c.owner) return changeNotAsked;
         const to = statusOf(p.to);
-        if (!to) return "没有「" + p.to + "」这个状态：备选、待办、已完成、已取消";
+        if (!to) return noSuchStatus(p.to, ["backlog", "todo", "done", "canceled"]);
         return withIssue(p.issue, async (t) => {
           try {
             // Sent out with nobody named yet: chosen as dispatch would, the owner's pick first.

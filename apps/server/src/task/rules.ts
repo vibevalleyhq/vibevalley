@@ -17,6 +17,7 @@ import { isForOrchestrator } from "../issue/state.ts";
 import { slice } from "../base/text.ts";
 import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, maxTasks, taskOf, taskStateText } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
+import { traitsOf } from "../agent/agent.ts";
 
 /** The farm's limits come on top. */
 export function startable(graph: TaskGraph): Task[] {
@@ -441,9 +442,7 @@ export function splitBrief(goal: string, project: string, agents: readonly Agent
   if (agents.length > 0) {
     lines.push("- 能派的帮工（agent 填 id；不填就按「适合的活」挑）：");
     for (const a of agents) {
-      // 职责 is the profile's role; 适合的活 its tags, which chooseAgent matches.
-      const about = [...(a.role ? ["职责：" + a.role] : []), ...((a.tags ?? []).length > 0 ? ["适合的活：" + a.tags!.join("、")] : [])];
-      lines.push(`  - ${a.id}：${a.name}，${about.join("；")}`);
+      lines.push(`  - ${a.id}：${a.name}，${traitsOf(a)}`);
     }
   }
   lines.push(

@@ -66,6 +66,8 @@ export interface AgentShape {
   /** All the profiles, the orchestrator's too. */
   readonly all: () => Agent[];
   readonly agent: (id: string) => Agent | undefined;
+  /** A profile work is sent to, by its id or its name, as a person or a model says it. */
+  readonly named: (key: string) => Agent | undefined;
   readonly skills: () => Skill[];
   readonly settings: (runtime: string) => RuntimeSettings;
   readonly saveAgent: (a: Agent) => Effect.Effect<Agent, ApiError>;
@@ -119,11 +121,17 @@ export const make = Effect.gen(function* () {
     });
 
   const all = () => structuredClone([...s.agents]);
+  /** The profiles work is sent to: every one but the orchestrator's. */
+  const sendable = () => all().filter((a) => a.id !== orchestratorAgent);
 
   const shape: AgentShape = {
-    agents: () => all().filter((a) => a.id !== orchestratorAgent),
+    agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
+    named: (key) => {
+      const k = key.trim();
+      return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
+    },
     skills: () => structuredClone([...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     saveAgent: (a) =>
@@ -175,3 +183,8 @@ export const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(Agents, make);
+
+/** A profile's role and the work it suits, in words: 「职责：…；适合的活：…」, without a half that is not filled in. 适合的活
+ * is its tags, which chooseAgent matches and the prompts tell a model to pick by. */
+export const traitsOf = (a: Agent) =>
+  [...(a.role ? ["职责：" + a.role] : []), ...((a.tags ?? []).length > 0 ? ["适合的活：" + a.tags!.join("、")] : [])].join("；");

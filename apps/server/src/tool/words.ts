@@ -104,6 +104,23 @@ export const priorityOf = (word: string): Priority | undefined => priorityNames[
 
 const priorityWords: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
+/** How a status is said back when the word for it is not known: the first word for each. */
+const statusWords: Readonly<Record<IssueStatus, string>> = {
+  backlog: "备选",
+  todo: "待办",
+  in_progress: "处理中",
+  in_review: "等你看",
+  done: "已完成",
+  canceled: "已取消",
+};
+
+export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusWords[s]).join("、");
+export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityWords[p]).join("、");
+
+/** A channel in one line: its name, what it is for, its default project. */
+export const channelLine = (c: { readonly name: string; readonly description?: string; readonly project?: string }) =>
+  "#" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
+
 const stuckWords: Readonly<Record<StuckReason, string>> = { failed: "没做成", conflict: "有冲突", interrupted: "停在半路", quiet: "没动静" };
 
 /** How long, in round words. */

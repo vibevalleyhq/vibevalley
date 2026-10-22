@@ -12,7 +12,7 @@ import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
-import { Agents } from "../agent/agent.ts";
+import { Agents, traitsOf } from "../agent/agent.ts";
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
 import { localeMinute } from "../agent/brain/recurrences.ts";
 import { selfTools } from "../agent/brain/self.ts";
@@ -31,6 +31,7 @@ import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
 import { Tasks } from "../task/task.ts";
 import { Tools } from "../tool/tool.ts";
+import { channelLine } from "../tool/words.ts";
 import { deepseekModel, intake, orchestratorInboxLines, orchestratorModel, patrolText, quotaText, situationDelta, type Source } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
@@ -220,10 +221,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       for (const a of store.agents()) {
         const assessed = await go(runtimes.assess(a));
         const p = assessed.agent;
-        // 职责 is the profile's role; 适合的活 its tags, which chooseAgent matches and the prompt tells it to pick by.
-        let line = `- ${p.name}（id ${p.id}，${runtimeLabel(p.runtime)}）`;
-        if (p.role) line += "职责：" + p.role;
-        if (p.tags && p.tags.length > 0) line += (p.role ? "；" : "") + "适合的活：" + p.tags.join("、");
+        let line = `- ${p.name}（id ${p.id}，${runtimeLabel(p.runtime)}）` + traitsOf(p);
         if (p.enabled && assessed.blocking.length === 0) line += "；" + quotaText(assessed.info);
         else if (assessed.blocking.length > 0) line += "；现在派不了：" + assessed.blocking[0]!.text;
         else line += "；现在派不了：停用了";
@@ -240,7 +238,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const here = await go(chat.channelOf(conversation));
       const byChannel = (await go(chat.channels())).map((c) => {
         const theirs = roster.filter((w) => (w.session.channel ?? general) === c.id).map((w) => tool.sessionLine(w));
-        const head = "#" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "；默认项目 " + c.project : "");
+        const head = channelLine(c);
         return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : "  （没有帮工）");
       });
       const all = await go(projects.list());
