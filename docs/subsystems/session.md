@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
+- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、只读一轮之后把 worktree 重置回主分支 `discardWork`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `ai/models.ts`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
@@ -95,6 +95,7 @@
 - 摘要取最后一个「结论：」那一段（可以加粗、在列表里；后面的补充不算），没写就取最后几段（凑够 80 字），最长 160 字；空的说「做完了」或「没做完」。
 - 失败按 oar 的失败分类（`@botiverse/oar/observe` 的 `failureAdvice`）说人话：登录或密钥、额度、限流、余额、模型用不了、上下文太长、请求被拒、服务商太忙、服务商出错、进程退出；带 HTTP 状态码和原因（最长 200 字），加上怎么办（再试一次、过一阵再试、要你先处理）。失败的汇报原话以失败原因开头。登录、余额、额度、模型这四类另发一条醒目的提醒。
 - 做完的一轮里以「要问主人：」开头的行进 `report` 事实的 `questions`，工单服务记成问题（等你回答）。
+- 做完的一轮里最后一个读得出结论（`conclusion` 不空、`evidence` 至少一条）的 json 代码块进 `report` 事实的 `answer`（`parseAnswer`），折进 `lastRun.answer`：交付物是结论的工单看它判这一轮交没交出结论，不等工单服务写库。
 
 **没动静**：`session.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
 

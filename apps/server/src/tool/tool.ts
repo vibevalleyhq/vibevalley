@@ -7,6 +7,7 @@ import {
   type Agent,
   type Block,
   type BlockAttrs,
+  DeliverableValues,
   generalName,
   type GraphAction,
   type Issue,
@@ -440,7 +441,17 @@ export const make = Effect.gen(function* () {
   );
 
   const issueCreate = (who: Who) =>
-    tool<{ title: string; description?: string; project?: string; agent?: string; priority?: string; draft?: boolean; start?: boolean; channel?: string }>(
+    tool<{
+      title: string;
+      description?: string;
+      project?: string;
+      agent?: string;
+      priority?: string;
+      draft?: boolean;
+      start?: boolean;
+      channel?: string;
+      deliver?: string;
+    }>(
       "issue_create",
       "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
       async (p) => {
@@ -456,6 +467,8 @@ export const make = Effect.gen(function* () {
         if (p.start && !project) return "#" + channel.name + " 没有默认项目：填上 project。";
         const priority = p.priority ? priorityOf(p.priority) : undefined;
         if (p.priority && !priority) return noSuchPriority(p.priority);
+        const deliver = p.deliver ? DeliverableValues.find((d) => d === p.deliver) : undefined;
+        if (p.deliver && !deliver) return "没记：deliver 是 change（改代码）或 answer（只查、交结论）";
         let assignee: string | undefined;
         if (p.agent || p.start) {
           const a = await choose(p.title + "\n" + (p.description ?? ""), p.agent ?? "", p.start ? c.picked : "");
@@ -471,12 +484,13 @@ export const make = Effect.gen(function* () {
               ...(project ? { project } : {}),
               ...(assignee ? { assignee } : {}),
               ...(priority ? { priority } : {}),
+              ...(deliver ? { deliver } : {}),
             }),
           );
         } catch (e) {
           return "没记下：" + toError(e).message;
         }
-        const noted = `记下了：#${t.number}「${shortTitle(t.title)}」`;
+        const noted = `记下了：#${t.number}「${shortTitle(t.title)}」` + (t.deliver === "answer" ? "（只查、交结论，不改代码）" : "");
         if (p.start) {
           // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
           try {

@@ -119,6 +119,8 @@ CREATE TABLE issue (
   checks      text,
   -- An in-process agent's latest run on it (JSON IssueRun): no end while it goes on.
   last_run text,
+  -- An answer issue's conclusion (JSON IssueAnswer), read from its latest round's report.
+  answer   text,
   check (delivered is null or canceled is null)
 );
 CREATE INDEX issue_by_parent on issue (parent);

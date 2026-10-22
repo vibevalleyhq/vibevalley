@@ -12,6 +12,7 @@ import {
   jobBreak,
   noRoom,
   notTakenIn,
+  parseAnswer,
   questionsOf,
   readReport,
   recallHead,
@@ -29,6 +30,27 @@ const base = (): Session =>
 const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", doing } }) as Session;
 const thinking: Doing = { action: "thinking", label: "" };
 const none: Tracking = {};
+
+describe("an answer handed back", () => {
+  const block = (o: unknown) => "查过了。\n\n```json\n" + JSON.stringify(o) + "\n```\n\n结论：查清楚了";
+  it("reads the last block with a conclusion and what it rests on", () => {
+    const text = block({ conclusion: "旧的", evidence: ["a.ts:1"] }) + "\n\n" + block({ conclusion: " 新的 ", evidence: "b.ts:2", next: ["  ", "接着改"] });
+    expect(parseAnswer(text)).toEqual({ answer: { conclusion: "新的", evidence: ["b.ts:2"], unsure: [], next: ["接着改"] }, problem: "" });
+    // A later block that is not an answer does not hide an earlier one that is.
+    expect(parseAnswer(text + '\n\n```json\n{"title": 1\n```').answer?.conclusion).toBe("新的");
+  });
+  it("says why there is none", () => {
+    expect(parseAnswer("说不清").problem).toBe("没找到结论：要用一个 json 代码块给出");
+    expect(parseAnswer(block({ conclusion: "", evidence: ["a.ts"] })).problem).toBe("结论是空的");
+    expect(parseAnswer(block({ conclusion: "猜的", evidence: [] })).problem).toBe("结论没有依据：evidence 至少一条");
+    expect(parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem).toBe("json 读不了：evidence：要是字符串或字符串的数组");
+  });
+  it("a completed report carries it; a failed one does not", () => {
+    const said = block({ conclusion: "慢在读配置", evidence: ["clock.ts:1"] });
+    expect(readReport({ kind: "completed" } as never, said).answer).toEqual({ conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] });
+    expect(readReport({ kind: "interrupted" } as never, said).answer).toBeUndefined();
+  });
+});
 
 describe("a session's events", () => {
   it("a run starts with the job and counts from what was spent", () => {

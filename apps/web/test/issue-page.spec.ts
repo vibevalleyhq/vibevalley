@@ -207,6 +207,31 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
   await page.screenshot({ path: test.info().outputPath("reviewing.png") });
 });
 
+test("an answer handed back: its conclusion on the page, 知道了 completes it, nothing to merge", async ({ page, server, api }) => {
+  const made = await api.issue.create({ body: { title: "查一下打卡为什么慢", deliver: "answer" } });
+  expect(made.deliver).toBe("answer");
+  const now = Date.now();
+  const answer = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
+  const view = await openIssue(
+    page,
+    server,
+    made,
+    { state: "reviewing", since: now - minute, lead: "acknowledge", acts: ["acknowledge", "reject", "tell", "close"] },
+    { status: "in_review", answer },
+    { lastRun: { outcome: "completed", summary: "查清楚了", at: now - minute, answer } },
+    { milestones: [{ at: now - minute, kind: "reported", who: "阿狐", text: "交回来了：查清楚了" }] },
+  );
+  const delivered = view.getByRole("region", { name: "做出了什么" });
+  await expect(delivered).toContainText("打卡慢是因为每次都重读配置");
+  await expect(delivered).toContainText("clock.ts:1 每次调用都读一遍配置");
+  await expect(delivered).toContainText("把配置读一次缓存起来");
+  const ask = view.getByRole("region", { name: "要你做的" });
+  await expect(ask.getByRole("button", { name: "知道了", exact: true })).toBeVisible();
+  await expect(view.getByRole("button", { name: "完成，分支留着" })).toHaveCount(0);
+  await expect(view.getByRole("combobox", { name: "交付" })).toHaveValue("answer");
+  await page.screenshot({ path: test.info().outputPath("answer.png") });
+});
+
 test("a failed round: 卡住了, says why and leads with 接着修", async ({ page, server, api }) => {
   const made = await api.issue.create({ body: { title: "修好打卡页的夜间模式" } });
   const now = Date.now();

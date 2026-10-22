@@ -36,8 +36,8 @@
 
 ## 在哪
 
-- 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和问题、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`merge.ts` 合并（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
-- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题）和状态的词表（`statusLabel`、`deliveredLabel`、`canceledLabel`、`closedText`），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
+- 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和问题、执行历史、派给管家的工单；`refinement.ts` 起草（谁来起草、交回来的草稿怎么读进工单）；`merge.ts` 合并（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
+- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活（交付物是结论时带上只读的规矩和结论的格式，`answerOpening`）、`answerCureWords` 结论读不出来时「接着修」带的话、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题）和状态的词表（`statusLabel`、`deliveredLabel`、`canceledLabel`、`closedText`），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issues/{id}/refine`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/data/issueActs.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和执行历史都经 `apps/web/src/data/issues.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/data/sessions.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
@@ -56,6 +56,7 @@
 - **计划里的工单 `moves` 是空的**，验收和挪状态都拒绝。
 - **已完成只由主人点头。** 一轮怎么结束的（`completed`、`failed`、`interrupted`）只决定工单停在哪、请主人做什么，不决定活成没成：帮工最后一轮没做成（站位「卡住了」，`stuck: failed`）时 `moves` 里没有已完成，`statusMove` 和完成都拒绝，看板、命令行、管家的工具一样；叫停的一轮还能完成。
 - **谁干活不改变工单怎么走**：派给管家的工单和帮工的工单是同一套状态、站位和挪法（`statusMove` 里没有按做活的人分的支）。工单写明交付物 `deliver`：`change`（改动，进项目）或 `answer`（结论，留在工单上）；派给管家的默认是 `answer`，管家不改代码。完成的动作跟着交付物：结论是「知道了」（`acknowledge`），改动是「完成」（`complete`），「完成，分支留着」只给改动。没有帮工在做的工单（管家在自己的进程里答）由它自己的 `lastRun`（`{ startedAt, endedAt?, outcome? }`，表的 `last_run`）说站在哪：交给管家时记下开始（进 `in_progress`），这一轮结束时记下结局（进 `in_review`），不管怎么结束都等主人：没做成的不能完成，叫停的能完成；挪回待办、重开是带着主人的话再交给管家（`OrchestratorWork.said`），关上不用请谁回家。服务端开机时只把还在答的关成 `lost`，等你看的留着；接着做的那一轮结束时，`lost` 的工单重新打开、记下结局。
+- **交付物是结论的工单只读**（`deliver: answer`）：交给帮工的活前面写明只读代码、跑只读的命令、不改文件不提交，最后要一个 json 代码块交结论：`conclusion`、`evidence`（依据，至少一条：文件和行号、命令和输出）、`unsure`、`next`（`issueJob`）。汇报怎么读归执行：`readReport` 读最后一个读得出结论又有依据的代码块（`session/rules.ts` 的 `parseAnswer`），放进 `report` 事实的 `answer`，折进帮工的 `lastRun.answer`；工单服务把它记到 `Issue.answer`（表的 `answer`），再请执行把这张工单的 worktree 重置回主分支（`Sessions.discardWork`：帮工留着，不在干活时才重置），所以它改了什么、提交了什么都不出这张工单，完成时交付总是 `none`。做完的一轮读不出结论，站位是「卡住了」（`stuck: failed`），不能完成，「接着修」带上读不出来的原因和格式（`answerCureWords`）。交付物在工单开着时能改（`issue.update` 的 `deliver`），下一轮照新的走。
 - **子工单**带 `parent`、`blockedBy`：计划用它，计划里的工单跟着计划走，看板不能单独开工、重开。
 - **还没派的能改、能删、能排先后**；派出去以后只能改验收方式。交给帮工的是标题，空一行，再是说明，最后是编了号的验收标准，要它交活时逐条写「标准 N：做到了｜没做到｜不确定」和凭据（`issueJob`）。
 - **备选的工单是草稿**：起草的帮工（`Session.draft`）只为写这张工单来，不是工单的帮工：不进 `issue_session`，`Issue.Sessions` 一直是空的，工单一直在 `backlog`。谁在起草（`Issue.drafting`）和状态一样从核心状态里的帮工现算，不另存；起草时不能开工（`moves` 里没有待办，`ready` 也拒绝），一张工单同时只有一个起草的。
@@ -119,7 +120,7 @@
 | 已完成 `done` | `done` | 无（可以重开） |
 | 已取消 `canceled` | `canceled` | 重开 |
 
-冲突排在问题前面，问题排在没做成前面。计划里的工单有状态、没有动作：在计划那边操作。没有帮工在做的工单（派给管家的）在答时只能「取消」；答完了是「等你看」（交付物是结论时主动作「知道了」），没答成是「卡住了」（只能「取消」），叫停的仍能完成。每种组合钉在 `apps/server/src/core/testdata/rules.jsonl.gz`（`attentionOf`）。
+冲突排在问题前面，问题排在没做成前面；交付物是结论的工单，做完的一轮没交出读得出的结论也算没做成。计划里的工单有状态、没有动作：在计划那边操作。没有帮工在做的工单（派给管家的）在答时只能「取消」；答完了是「等你看」（交付物是结论时主动作「知道了」），没答成是「卡住了」（只能「取消」），叫停的仍能完成。每种组合钉在 `apps/server/src/core/testdata/rules.jsonl.gz`（`attentionOf`）。
 
 **时间线**（`issue.timeline`，`milestonesOf`）：从已经存着的事实拼，不另存：开单；每次干活的开始（开工、你带了话、重开、定时、起草）和结束（交回来了、问你、没做成、停在了半路、起草好了）；打回（同一时刻的意见合成一条）；验收通过；关单。新的在上，带时间和是哪个帮工；同时给出所有干活加起来花了多少（`spent`）。
 
@@ -175,6 +176,7 @@
 
 ## 还没做的
 
+- 管家答的工单还没把回答记成 `Issue.answer`：回答在它的频道里，工单页写「回答：在它的频道里」。
 - 不起草，直接写（省钱）；验收时勾过的标准记下来：现在只在这一页上勾。
 - 几个人一起种、派一个看地的、验收标准逐条打勾记进工单：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
 - 农场里回答问题和验收的农具（肥料袋、稻草人）：现在回答是带话，验收在地块详情里点。
@@ -183,6 +185,6 @@
 
 - `apps/server/src/issue/rules.test.ts`：黄金数据；标题和活；一行太长的话取第一句当标题；活的最后是编了号的验收标准；时间线；下一件的 id；读最后一个能读的块；起草的规矩（第一版、回答问题、再起草）；每个状态能挪到哪；工单模板的目录、按栈填、每个都填得满、最近的标题是这个项目自己派过的。
 - `issue/issue.test.ts`（oar 的 `scriptedRuntime`、真的 git 仓库）：开不了会话就交回 worktree；写不进的工单不发布、不留 Session；同时两次派活守住项目的空位；挪工单不动计划里的先后；交代冲突时 git 失败照原话说；工单的动作找它最新的帮工；排队的工单记着第一次从哪个频道派的、定时的触发和补跑；排着队的待办从播种袋开工；执行历史把还在的和走了的合起来，列出缺了记录的。
-- 流程（`src/flows`，照字眼干活的帮工、真的 git 仓库）：`issue.test.ts`（关上再重开、写下来再派、等空位、知道自己是计划的哪一件、定时只有一张工单、只改给出的字段、挪状态就是派活、检查没过不让收、取消再重开留着 worktree、验收：缺肥 → 回答 → 等验收 → 没过长草 → 修 → 通过 → 收获、钱用完不派）；`draft.test.ts`（派之前起草、第二版盖过第一版、起草不留东西、读不出来的草稿不改工单）；`pull_request.test.ts`（推送、开 PR、重启后 PR 合了或关了才关单并清掉 worktree 和分支）。
+- 流程（`src/flows`，照字眼干活的帮工、真的 git 仓库）：`issue.test.ts`（关上再重开、写下来再派、等空位、知道自己是计划的哪一件、定时只有一张工单、只改给出的字段、挪状态就是派活、检查没过不让收、取消再重开留着 worktree、交付物是结论的工单（结论记在工单上、分支上什么都不留、读不出结论卡住再接着修）、验收：缺肥 → 回答 → 等验收 → 没过长草 → 修 → 通过 → 收获、钱用完不派）；`draft.test.ts`（派之前起草、第二版盖过第一版、起草不留东西、读不出来的草稿不改工单）；`pull_request.test.ts`（推送、开 PR、重启后 PR 合了或关了才关单并清掉 worktree 和分支）。
 - `apps/server/src/core/golden.test.ts`：工单的状态、谁在起草、地的样子（`rules.jsonl.gz`、`reduce.jsonl.gz`）。
 - 页面：`apps/web/test/issues.spec.ts`（快速新建、列表和分组刷新后还在、工单有自己的地址和保存、没帮工时开工先问、拖着排序、搜索、截图）；`farm-hud.spec.ts`（播种袋的「草稿」写进备选）；`farm-chat.spec.ts`（点帮工的地打开它的工单）。

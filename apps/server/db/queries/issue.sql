@@ -16,7 +16,7 @@ values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
-  priority = sqlc.arg(priority), review = sqlc.arg(review), criteria = sqlc.narg(criteria) where id = sqlc.arg(id);
+  priority = sqlc.arg(priority), review = sqlc.arg(review), criteria = sqlc.narg(criteria), deliver = sqlc.arg(deliver) where id = sqlc.arg(id);
 
 -- name: RefineIssue :exec
 -- A draft handed back: its words, its criteria and what it asks, in one write.
@@ -96,6 +96,9 @@ update issue set closed_at = null, delivered = null, canceled = null, queued_at 
 
 -- name: OpenOf :many
 select id, last_run from issue where assignee = sqlc.arg(assignee) and closed_at is null;
+
+-- name: SetIssueAnswer :exec
+update issue set answer = sqlc.narg(answer) where id = sqlc.arg(id);
 
 -- name: SetLastRun :exec
 update issue set last_run = sqlc.narg(last_run) where id = sqlc.arg(id);

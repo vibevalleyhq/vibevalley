@@ -3,7 +3,7 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, IssueAnswer, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
@@ -79,6 +79,45 @@ export interface SessionRead {
   readonly questions: Question[];
   /** The 标准 N： lines: its word on each of the issue's criteria. */
   readonly checks: CriterionCheck[];
+  /** The conclusion block an answer issue asks for (parseAnswer), when one can be read. */
+  readonly answer?: IssueAnswer;
+}
+
+/** A json block in what a session said: the last one wins. */
+const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+
+const answerLines = (v: unknown, field: string): string[] => {
+  if (v === undefined || v === null) return [];
+  if (typeof v === "string") return [v.trim()].filter(Boolean);
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return (v as string[]).map((l) => l.trim()).filter(Boolean);
+  throw new Error(`${field}：要是字符串或字符串的数组`);
+};
+
+/** The last block that reads as an answer with a conclusion and something it rests on; problem says why none did. */
+export function parseAnswer(text: string): { answer?: IssueAnswer; problem: string } {
+  const blocks = [...text.matchAll(jsonBlock)].map((m) => m[1]!);
+  if (blocks.length === 0) return { problem: "没找到结论：要用一个 json 代码块给出" };
+  let problem = "";
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    let a: IssueAnswer;
+    try {
+      const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
+      a = {
+        conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
+        evidence: answerLines(raw.evidence, "evidence"),
+        unsure: answerLines(raw.unsure, "unsure"),
+        next: answerLines(raw.next, "next"),
+      };
+    } catch (e) {
+      problem = "json 读不了：" + (e instanceof Error ? e.message : String(e));
+      continue;
+    }
+    if (!a.conclusion) problem = "结论是空的";
+    else if (a.evidence.length === 0) problem = "结论没有依据：evidence 至少一条";
+    else return { answer: a, problem: "" };
+  }
+  return { problem };
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
@@ -130,6 +169,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
   // A failed run leads with why it failed; what the session said before that follows.
   const whole = failed && text ? failed + "\n\n" + text : failed || text;
   const summary = failed || summaryOf(text) || (out === "completed" ? "做完了" : "没做完");
+  const answer = out === "completed" ? parseAnswer(text).answer : undefined;
   return {
     outcome: out,
     text: whole,
@@ -138,6 +178,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
     questions: out === "completed" ? questionsOf(text) : [],
     checks: out === "completed" ? checksOf(text) : [],
+    ...(answer ? { answer } : {}),
   };
 }
 

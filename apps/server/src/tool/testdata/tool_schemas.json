@@ -453,6 +453,14 @@
         "description": "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
         "type": "string"
       },
+      "deliver": {
+        "description": "交付什么：change 是改代码、合进项目（不填就是它）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
+        "enum": [
+          "change",
+          "answer"
+        ],
+        "type": "string"
+      },
       "description": {
         "description": "说明：主人说的原话和你补的背景；主人没说的写成建议或待定，不写成要求",
         "type": "string"

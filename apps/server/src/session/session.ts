@@ -169,6 +169,9 @@ export interface SessionShape {
   /** Discard resets its branch only after the runtime has stopped writing. */
   /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
   readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
+  /** A read-only round's leftovers go: its worktree back to the main branch, what it changed or committed gone; the
+   * session stays. Not while a round goes on (the next report resets it). */
+  readonly discardWork: (id: string) => Effect.Effect<void>;
   /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
   readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
   readonly roster: () => Roster[];
@@ -594,6 +597,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         ...(h.run ? { run: h.run } : {}),
         ...(read.questions.length > 0 ? { questions: read.questions } : {}),
         ...(read.checks.length > 0 ? { checks: read.checks } : {}),
+        ...(read.answer ? { answer: read.answer } : {}),
       });
       endRun(h, read.outcome, read.summary, spent);
       fire(
@@ -1154,6 +1158,19 @@ export const make = (options: SessionOptionsIn = {}) =>
               const kept = yield* projects.release(h.place);
               if (kept.kept) notice("info", `${name} 收工了：${kept.reason}`);
               return true;
+            }),
+          );
+        }),
+      discardWork: (id) =>
+        Effect.gen(function* () {
+          const h = hands.get(id);
+          if (!h?.place.branch) return;
+          yield* h.access.withPermits(1)(
+            Effect.gen(function* () {
+              const s = core.session(id);
+              if (hands.get(id) !== h || !s || isBusy(s)) return;
+              const reset = yield* Effect.result(projects.reset(h.place));
+              if (reset._tag === "Failure") notice("warn", `${s.name} 的工作目录没能重置：${reset.failure.message}`);
             }),
           );
         }),

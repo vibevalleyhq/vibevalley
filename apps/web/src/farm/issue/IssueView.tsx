@@ -260,7 +260,10 @@ function IssueBody(props: {
           <Show when={s().inTask}>
             <p class={xs}>{s().taskText}</p>
           </Show>
-          <Show when={s().criteria.length > 0} fallback={<p class={xs}>这张工单没写做完的标准：交回来时看改动判断。</p>}>
+          <Show
+            when={s().criteria.length > 0}
+            fallback={<p class={xs}>这张工单没写做完的标准：交回来时看{props.issue.deliver === "answer" ? "结论" : "改动"}判断。</p>}
+          >
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().weeds.length > 0}>
@@ -271,7 +274,16 @@ function IssueBody(props: {
         </FarmSection>
 
         <div class="mt-4">
-          <Show when={s().showsChanges}>
+          <Show when={props.issue.deliver === "answer" ? props.issue.answer : undefined}>
+            {(a) => (
+              <FarmSection title="结论">
+                <p class={body}>{a().conclusion}</p>
+                <For each={a().evidence}>{(l) => <p class={xs}>依据 · {l}</p>}</For>
+                <For each={a().next}>{(l) => <p class={xs}>接着做 · {l}</p>}</For>
+              </FarmSection>
+            )}
+          </Show>
+          <Show when={s().showsChanges && props.issue.deliver !== "answer"}>
             <Fold
               label={changed() ? (nothingChanged(changed()!) ? "做出了什么：还没有改动" : `做出了什么（${changed()!.files.length} 个文件）`) : "做出了什么"}
             >
