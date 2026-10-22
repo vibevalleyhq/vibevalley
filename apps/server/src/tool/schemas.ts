@@ -134,7 +134,7 @@ export const schemas: Record<string, Schema> = {
     additionalProperties: true,
     properties: {
       id: {
-        description: "计划 id，比如 p1；不填列出所有没收完的",
+        description: "计划 id，比如 p1；不填列出所有还没合进主分支的",
         type: "string",
       },
     },
@@ -168,7 +168,7 @@ export const schemas: Record<string, Schema> = {
         type: "string",
       },
       start: {
-        description: "记下就开工（没空地就排队）：只在主人要马上做时填 true；记一下、先别开始、只是指派都不填",
+        description: "记下就开工（没空位就排队）：只在主人要马上做时填 true；记一下、先别开始、只是指派都不填",
         type: "boolean",
       },
       title: {
@@ -210,7 +210,7 @@ export const schemas: Record<string, Schema> = {
     additionalProperties: true,
     properties: {
       acceptance: {
-        description: "验收方式：glance（收获就算验收）或 required（先验收通过才能收获）",
+        description: "验收方式：glance（完成就算验收）或 required（先验收通过才能完成）",
         type: "string",
       },
       agent: {

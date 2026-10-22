@@ -276,7 +276,7 @@ export interface Doing {
 }
 
 /** Told apart by `_tag`. */
-export type Phase = PhaseArriving | PhaseWorking | PhaseRipe | PhaseFailed | PhaseResting | PhaseClosed;
+export type Phase = PhaseArriving | PhaseWorking | PhaseDone | PhaseFailed | PhaseResting | PhaseClosed;
 
 export interface LastRun {
   outcome: Outcome;
@@ -335,7 +335,7 @@ export interface CommitCount {
   repos: Repo[];
 }
 
-export const GraphStateValues = ["splitting", "draft", "running", "paused", "ripe", "done", "abandoned"] as const;
+export const GraphStateValues = ["splitting", "draft", "running", "paused", "ready", "done", "abandoned"] as const;
 export type GraphState = (typeof GraphStateValues)[number];
 
 export const TaskStateValues = ["waiting", "working", "merged", "failed", "skipped"] as const;
@@ -574,14 +574,14 @@ export interface FarmLevel {
 }
 
 export const InboxKindValues = [
-  "merge",
+  "review",
   "ask",
   "fix",
   "interrupted",
   "conflict",
   "quiet",
   "graph-draft",
-  "graph-ripe",
+  "graph-ready",
   "task-failed",
   "mention",
   "recurrence-ask",
@@ -664,7 +664,7 @@ export const GraphEventKindValues = [
   "started",
   "paused",
   "resumed",
-  "ripe",
+  "ready",
   "merged",
   "abandoned",
   "noted",
@@ -1120,7 +1120,7 @@ export interface CriterionCheck {
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
-export const AttentionValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
+export const AttentionValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"] as const;
 export type Attention = (typeof AttentionValues)[number];
 
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
@@ -1133,7 +1133,7 @@ export const IssueActValues = [
   "answer",
   "accept",
   "reject",
-  "harvest",
+  "complete",
   "keep",
   "acknowledge",
   "resolve",
@@ -1447,8 +1447,8 @@ export interface PhaseWorking {
   retry?: Retry;
 }
 
-export interface PhaseRipe {
-  _tag: "ripe";
+export interface PhaseDone {
+  _tag: "done";
 }
 
 export interface PhaseFailed {

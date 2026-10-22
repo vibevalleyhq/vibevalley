@@ -345,7 +345,7 @@ export function GitHub() {
   return (
     <div class="flex flex-col gap-1.5">
       <For each={lines()}>{(l) => <p class="text-sm">{l}</p>}</For>
-      <p class="text-xs text-muted">能提 PR 的项目在「项目」里看；收获时提 PR 要在配置里打开（github.pr_projects）。</p>
+      <p class="text-xs text-muted">能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。</p>
       <Show when={error()}>
         <p class="text-sm text-berry">{error()}</p>
       </Show>

@@ -10,14 +10,14 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
   const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined;
   const own = (s: IssueAttention): IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
-  // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change harvested.
-  const finish: IssueAct = t.deliver === "answer" ? "acknowledge" : "harvest";
+  // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed (merged, or kept).
+  const finish: IssueAct = t.deliver === "answer" ? "acknowledge" : "complete";
   const keep: IssueAct[] = t.deliver === "answer" ? [] : ["keep"];
   switch (t.status) {
     case "done":
-      return own({ state: "harvested", ...at(t.closedAt), acts: t.delivered === "merged_into_parent" ? [] : ["reopen"] });
+      return own({ state: "done", ...at(t.closedAt), acts: t.delivered === "merged_into_parent" ? [] : ["reopen"] });
     case "canceled":
-      return own({ state: "closed", ...at(t.closedAt), lead: "reopen", acts: ["reopen"] });
+      return own({ state: "canceled", ...at(t.closedAt), lead: "reopen", acts: ["reopen"] });
     case "backlog":
       if (t.task?.state === "waiting") return own({ state: "queued", since: t.createdAt, acts: [] });
       return own(
@@ -54,10 +54,10 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       if (session?.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: ["resolve", "tell", "close"] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: ["answer", "close"] };
       if (last?.outcome === "failed") return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: ["cure", "tell", "close"] };
-      // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
+      // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be completed.
       if (last?.outcome === "interrupted")
         return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: ["resume", finish, ...keep, "tell", "close"] };
-      // A required acceptance passes before the harvest (the server's statusMove); a glance one is passed by the harvest.
+      // A required acceptance passes before completing (the server's statusMove); a glance one is passed by completing.
       // Keep is the same completion with the branch left unmerged.
       const lead: IssueAct = t.review === "required" && t.reviewedAt === undefined ? "accept" : finish;
       const acts: IssueAct[] =

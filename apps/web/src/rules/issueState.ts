@@ -1,5 +1,5 @@
 // What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
-// it is against its criteria; and what a bug on its plot is, and the harvest's checklist. Where it stands (and what the
+// it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
@@ -15,8 +15,8 @@ export const attentionTone: Record<Attention, Tone> = {
   asking: "wheat",
   reviewing: "wheat",
   stuck: "berry",
-  harvested: "leaf",
-  closed: "faint",
+  done: "leaf",
+  canceled: "faint",
 };
 
 export { attentionLabel };
@@ -63,7 +63,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
       return { head: `${who}有 ${issue.questions.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
     case "reviewing":
       return issue.reviewedAt !== undefined
-        ? { head: "验收过了，可以收获", ...(said ? { line: said } : {}), tone: "leaf" }
+        ? { head: "验收过了，可以完成", ...(said ? { line: said } : {}), tone: "leaf" }
         : { head: `${who}交回来了，等你验收`, ...(said ? { line: said } : {}), tone: "wheat" };
     case "stuck":
       switch (attention.stuck) {
@@ -79,12 +79,12 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
           return { head: "卡住了", tone: "berry" };
       }
       break;
-    case "closed":
-      return attention.lead === "reopen" ? { head: "关上了", line: "要它接着做就重开：写一句这次要做什么。", tone: "faint" } : undefined;
+    case "canceled":
+      return attention.lead === "reopen" ? { head: "已取消", line: "要它接着做就重开：写一句这次要做什么。", tone: "faint" } : undefined;
     case "draft":
     case "queued":
     case "working":
-    case "harvested":
+    case "done":
       return undefined;
   }
 }
@@ -110,16 +110,16 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     session,
     attention,
     inTask: issueInTask(issue, session),
-    open: attention.state !== "harvested" && attention.state !== "closed",
+    open: attention.state !== "done" && attention.state !== "canceled",
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     project: issue.project ?? head.project,
     taskText: !graph
-      ? "这是种植计划里的一步，跟着计划走。"
+      ? "这是计划里的一步，跟着计划走。"
       : !node
-        ? `在拆种植计划「${graph.title}」：只读代码，不改文件。`
-        : `种植计划「${graph.title}」的一步：${node.title}。做完自动合进计划分支，收获整个计划时才进主分支。`,
+        ? `在拆计划「${graph.title}」：只读代码，不改文件。`
+        : `计划「${graph.title}」的一步：${node.title}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。`,
     ask: ownerQuestion(attention, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: attention.lead,
@@ -161,7 +161,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       ].join(" · ");
     },
     /** What it made, while there is a worktree to read it from. */
-    showsChanges: session !== undefined && attention.state !== "harvested" && attention.state !== "closed",
+    showsChanges: session !== undefined && attention.state !== "done" && attention.state !== "canceled",
   };
 }
 
@@ -183,7 +183,7 @@ export function changesLine(c: Changes) {
 export const noStepsText = (head: Session) =>
   endedAt(head) === undefined ? "还没有步骤。" : "干活过程只留 30 天（配置里的 session.trajectory_days），这张工单的已经清掉了。";
 
-/** Nothing to merge: harvesting only lets the helper go. */
+/** Nothing to merge: completing only lets the helper go. */
 export const nothingChanged = (c: Changes) => c.commits.length === 0 && c.uncommitted.length === 0;
 
 /** What a git status letter is, as a mark and a word; an unknown one is itself. */

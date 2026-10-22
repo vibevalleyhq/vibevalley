@@ -76,7 +76,7 @@ test("the harvest tool waits for acceptance and its open confirmation follows th
   await api.issue.act({ id, body: { act: "accept" } });
   await expect(take).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("farm-harvest.png") });
-  const harvest = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "harvest");
+  const harvest = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "complete");
   await take.click();
   await harvest;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");
@@ -86,33 +86,33 @@ test("the workbench close dialog only offers the issue's current acts and closes
   const id = await handBack(api, "close-accept");
   await page.goto(`/issues/${id}`);
   const detail = page.getByRole("dialog", { name: "工单", exact: true });
-  await detail.getByRole("button", { name: "关上", exact: true }).click();
+  await detail.getByRole("button", { name: "取消", exact: true }).click();
   const closing = page.getByRole("dialog", { name: /^关上「/ });
   await expect(closing).toBeVisible();
-  const harvest = closing.getByRole("button", { name: "看收成清单，收获" });
-  await expect(harvest).toHaveCount(0);
+  const complete = closing.getByRole("button", { name: "看改动，完成" });
+  await expect(complete).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath("close-awaiting-acceptance.png") });
   await api.issue.act({ id, body: { act: "accept" } });
-  await expect(harvest).toBeVisible();
+  await expect(complete).toBeVisible();
   await api.issue.act({ id, body: { act: "tell", text: "发呆后再看看" } });
-  await expect(harvest).toHaveCount(0);
+  await expect(complete).toHaveCount(0);
   await expect.poll(async () => (await api.issue.get({ id })).attention.acts).toContain("accept");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: test.info().outputPath("close-awaiting-acceptance-narrow.png") });
   const close = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "close");
-  await closing.getByRole("button", { name: "不收，直接收工" }).click();
+  await closing.getByRole("button", { name: "取消工单" }).click();
   await close;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("canceled");
 });
 
-test("the workbench harvest confirmation withdraws harvest while a new round requires acceptance", async ({ page, api }) => {
+test("the workbench completion withdraws completing while a new round requires acceptance", async ({ page, api }) => {
   const id = await handBack(api, "review-accept");
   await api.issue.act({ id, body: { act: "accept" } });
   await page.goto(`/issues/${id}`);
   const detail = page.getByRole("dialog", { name: "工单", exact: true });
-  await detail.getByRole("button", { name: "收获", exact: true }).click();
+  await detail.getByRole("button", { name: "完成", exact: true }).click();
   const review = page.getByRole("dialog", { name: /^关上「/ });
-  const take = review.getByRole("button", { name: /确认收获/ });
+  const take = review.getByRole("button", { name: /^完成，合进/ });
   await expect(take).toBeVisible();
   await api.issue.act({ id, body: { act: "tell", text: "发呆后再检查" } });
   await expect.poll(async () => (await api.issue.get({ id })).attention.acts).toContain("accept");
@@ -121,8 +121,8 @@ test("the workbench harvest confirmation withdraws harvest while a new round req
   await page.screenshot({ path: test.info().outputPath("workbench-awaiting-acceptance.png") });
   await api.issue.act({ id, body: { act: "accept" } });
   await expect(take).toBeVisible();
-  const harvest = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "harvest");
+  const completed = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "complete");
   await take.click();
-  await harvest;
+  await completed;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");
 });

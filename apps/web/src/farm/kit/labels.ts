@@ -1,6 +1,9 @@
-import type { OrchestratorState, Outcome, Phase, SessionClose } from "@vibevalley/protocol";
+import type { IssueAct, OrchestratorState, Outcome, Phase, SessionClose } from "@vibevalley/protocol";
 
 export { ago, numberText } from "../../rules/time";
+
+/** The farm's words for an issue's acts where they are its own: completing a change is a harvest here. */
+export const farmActWords: Partial<Record<IssueAct, string>> = { complete: "收获" };
 
 const closedLabel: Record<SessionClose, string> = {
   merged: "收获了",
@@ -16,7 +19,7 @@ export function phaseLabel(phase: Phase): string {
       return "进场";
     case "working":
       return "干活中";
-    case "ripe":
+    case "done":
       return "完工";
     case "failed":
       return "出故障";

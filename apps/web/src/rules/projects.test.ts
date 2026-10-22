@@ -123,7 +123,7 @@ describe("islands", () => {
     const islands = islandsOf({
       projects,
       sessions: [
-        hired("w2", "clock-in", { _tag: "ripe" } as Phase, 2),
+        hired("w2", "clock-in", { _tag: "done" } as Phase, 2),
         hired("w1", "clock-in", working, 1),
         hired("w4", "clock-in", { _tag: "resting" } as Phase, 4),
         hired("w5", "docs", working),
@@ -160,7 +160,7 @@ describe("islands", () => {
   });
 
   test("a project gone from the list keeps its helpers and takes no more", () => {
-    const gone = islandsOf({ projects: [], sessions: [hired("w1", "old", { _tag: "ripe" } as Phase)], plots: {}, issues: [] });
+    const gone = islandsOf({ projects: [], sessions: [hired("w1", "old", { _tag: "done" } as Phase)], plots: {}, issues: [] });
     expect(gone).toHaveLength(1);
     expect(gone[0]!.summary).toBeUndefined();
     expect(kinds(gone[0]!)).toEqual(["w1"]);
@@ -209,7 +209,7 @@ describe("the yard", () => {
   test("how a helper looks on its plot", () => {
     expect(mapPose(hired("a", "p", working))).toBe("work");
     expect(mapPose(hired("a", "p", { _tag: "working", since: 0, doing: { action: "thinking", label: "" } } as Phase))).toBe("think");
-    expect(mapPose(hired("a", "p", { _tag: "ripe" } as Phase))).toBe("cheer");
+    expect(mapPose(hired("a", "p", { _tag: "done" } as Phase))).toBe("cheer");
     expect(mapPose(hired("a", "p", { _tag: "failed" } as Phase))).toBe("worry");
     expect(mapPose(hired("a", "p", { _tag: "resting" } as Phase, 0, { conflict: { base: "main", files: ["a.ts"] } } as Partial<Session>))).toBe("worry");
   });

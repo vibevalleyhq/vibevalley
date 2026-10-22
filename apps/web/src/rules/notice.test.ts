@@ -24,9 +24,9 @@ describe("the tray", () => {
   test("says whether the farm is open, what waits and what is unread", () => {
     expect(traySummary(state("idle", 0), [])).toEqual({ title: "", lines: ["还没开工"] });
     expect(traySummary(state("live", 0), [])).toEqual({ title: "", lines: ["开工了，没有在干的活"] });
-    expect(traySummary(state("live", 2), [call("a", "merge", "小吴 做完了，可以收"), call("b", "mention")])).toEqual({
+    expect(traySummary(state("live", 2), [call("a", "review", "小吴 做完了，等你看"), call("b", "mention")])).toEqual({
       title: "2 · 1!",
-      lines: ["2 个帮工在干活", "小吴 做完了，可以收"],
+      lines: ["2 个帮工在干活", "小吴 做完了，等你看"],
     });
   });
 });

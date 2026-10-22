@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 文档和块的模型、块的类型和 marks、顺序键 | 一篇文章怎么分给几个帮工写（[种植计划](docs/subsystems/task.md)，还没接上） |
+| 文档和块的模型、块的类型和 marks、顺序键 | 一篇文章怎么分给几个帮工写（[计划](docs/subsystems/task.md)，还没接上） |
 | op 管线：一批 op 一个事务、批号去重、文档的 seq、每个 op 的结果 | 帮工怎么拿到工具、是谁在调（[田头](docs/subsystems/channel.md) 的 `/mcp`，`mcp`） |
 | 块的修订（每一版的字、没被采用的冲突版本） | 工单和记性本身：`issue_ref`、`memory_item` 块只存它们的 id |
 | Markdown 导入和导出 | |

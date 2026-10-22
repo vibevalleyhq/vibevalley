@@ -45,7 +45,7 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
           <SpriteIcon name={`act-${doing()}`} size={size()} />
         </Bob>
       </Match>
-      <Match when={props.phase._tag === "ripe"}>
+      <Match when={props.phase._tag === "done"}>
         <SpriteIcon name="icon-harvest" size={size()} />
       </Match>
       <Match when={props.phase._tag === "failed"}>

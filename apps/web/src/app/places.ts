@@ -10,7 +10,7 @@ export interface Place {
 
 export const places: readonly Place[] = [
   { id: "chat", label: "聊天", hint: "频道和串", icon: "icon-board", path: "/chat" },
-  { id: "issues", label: "工单", hint: "每次种植的全过程", icon: "icon-tasks", path: "/issues" },
+  { id: "issues", label: "工单", hint: "每张工单从写下到关上", icon: "icon-tasks", path: "/issues" },
   { id: "docs", label: "文档", hint: "主人和帮工一起写的文档", icon: "icon-deed", path: "/docs" },
   { id: "agents", label: "帮工", hint: "帮工档案", icon: "raccoon-farmer-down", path: "/agents" },
   { id: "runtimes", label: "农具", hint: "机器上的编码 agent", icon: "machine-tractor", path: "/runtimes" },

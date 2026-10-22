@@ -18,9 +18,8 @@ import {
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
-import { closedText } from "../issue/rules.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
@@ -263,7 +262,7 @@ export const make = Effect.gen(function* () {
 
   const changes = issueTool(
     "changes",
-    "看收获一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
+    "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
     async (t) => {
       try {
         return changesText(await go(issue.changes(t.id, "orchestrator")));
@@ -365,12 +364,12 @@ export const make = Effect.gen(function* () {
   // the owner's (issue_status to done).
   const accept = tool<{ issue: string; pass: boolean; findings?: string[]; text?: string }>(
     "accept",
-    "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
+    "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能完成；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
     (p) =>
       withIssue(p.issue, async (t) => {
         try {
           const done = await go(issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
-          return p.pass ? `#${done.number} 验收过了，等主人收获` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
+          return p.pass ? `#${done.number} 验收过了，等主人点完成` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
         } catch (e) {
           return toError(e).message;
         }
@@ -443,7 +442,7 @@ export const make = Effect.gen(function* () {
   const issueCreate = (who: Who) =>
     tool<{ title: string; description?: string; project?: string; agent?: string; priority?: string; draft?: boolean; start?: boolean; channel?: string }>(
       "issue_create",
-      "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空地就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
+      "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
       async (p) => {
         const c = await who();
         if (p.draft && p.start) return "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。";
@@ -548,7 +547,7 @@ export const make = Effect.gen(function* () {
   const issueStatus = (who: Who) =>
     tool<{ issue: string; to: string; text?: string; agent?: string; keep_branch?: boolean }>(
       "issue_status",
-      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成：照工单交付，有提交就合进主分支或开 PR，没有改动不碰 git，keep_branch 是完成但分支留着不合；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成：照工单交付，有提交就合进主分支或开 PR，没有改动不碰 git，keep_branch 是完成但分支留着不合；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
       async (p) => {
         const c = await who();
         if (!c.owner) return changeNotAsked;
@@ -684,17 +683,17 @@ export const make = Effect.gen(function* () {
 
   const graphSplit = tool<{ goal: string; project: string; agent?: string }>(
     "graph_split",
-    "起一个种植计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
+    "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
     (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "orchestrator")),
   );
 
-  const graphsTool = tool<{ id?: string }>("graphs", "列出种植计划：每件的状态、谁在做、结论。", (p) => {
+  const graphsTool = tool<{ id?: string }>("graphs", "列出计划：每件的状态、谁在做、结论。", (p) => {
     const texts = tasks
       .graphs()
       .filter((g) => (p.id ? g.id === p.id : isOpen(g)))
       .map(graphText);
     if (texts.length > 0) return texts.join("\n\n");
-    return p.id ? "没有 " + p.id + " 这个计划" : "现在没有种植计划。";
+    return p.id ? "没有 " + p.id + " 这个计划" : "现在没有计划。";
   });
 
   const taskEdit = tool<{ graph: string; task: string; title?: string; brief?: string; needs?: string[]; agent?: string; check?: string; remove?: boolean }>(
@@ -716,7 +715,7 @@ export const make = Effect.gen(function* () {
   const graphAction = (who: Who) =>
     tool<{ graph: string; action: GraphAction }>(
       "graph_action",
-      "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 收获（都做完以后，把计划分支合进主分支）。",
+      "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 合进主分支（都做完以后，把计划的分支合进主分支）。",
       async (p) => {
         const c = await who();
         if (p.action === "merge" && !c.owner) return mergeNotAsked;

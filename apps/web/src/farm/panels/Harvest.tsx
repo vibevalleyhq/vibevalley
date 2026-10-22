@@ -54,7 +54,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
   const empty = () => nothingChanged(props.changes);
   const conflicts = () => props.changes.conflicts;
   const take = async () => {
-    if (!acts().includes("harvest")) return;
+    if (!acts().includes("complete")) return;
     await commands.harvest(props.session);
     props.onDone();
   };
@@ -115,7 +115,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         </Tinted>
       </Show>
       <div class="mt-3 flex flex-wrap gap-2">
-        <Show when={acts().includes("harvest")}>
+        <Show when={acts().includes("complete")}>
           <PxButton tone="primary" onClick={() => fire(take())}>
             {empty() ? "请它收工" : `确认收获，合进 ${props.changes.base}`}
           </PxButton>
@@ -127,7 +127,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         </Show>
         <PxButton onClick={() => props.onDone()}>先不收</PxButton>
       </div>
-      <Show when={!acts().includes("harvest") && !acts().includes("resolve")}>
+      <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
         <p class={["mt-2", xs]}>工单状态变了，先回到地块看看要你做的事。</p>
       </Show>
       <Show when={props.changes.commits.length > 0}>

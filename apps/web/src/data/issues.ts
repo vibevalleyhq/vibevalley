@@ -30,7 +30,7 @@ export function useIssueHistory(older: () => boolean) {
 
 // An issue's reads, keyed under "issues" so that whatever reloads the issues reads them again too.
 
-/** What harvesting the issue would take in; read only while it is shown. */
+/** What completing the issue would merge; read only while it is shown. */
 export const useIssueChanges = (id: () => string, shown: () => boolean = () => true) =>
   useQuery(() => ({ queryKey: ["issues", "changes", id()], queryFn: () => api.issue.changes({ id: id() }), enabled: shown() }));
 

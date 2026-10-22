@@ -251,8 +251,8 @@ export const PhaseWorking: Schema.Codec<T.PhaseWorking> = Schema.Struct({
   retry: Schema.optionalKey(Retry),
 });
 
-export const PhaseRipe: Schema.Codec<T.PhaseRipe> = Schema.Struct({
-  _tag: Schema.Literal("ripe"),
+export const PhaseDone: Schema.Codec<T.PhaseDone> = Schema.Struct({
+  _tag: Schema.Literal("done"),
 });
 
 export const PhaseFailed: Schema.Codec<T.PhaseFailed> = Schema.Struct({
@@ -273,7 +273,7 @@ export const PhaseClosed: Schema.Codec<T.PhaseClosed> = Schema.Struct({
   closed: SessionClose,
 });
 
-export const Phase: Schema.Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseRipe, PhaseFailed, PhaseResting, PhaseClosed]);
+export const Phase: Schema.Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
 export const LastRun: Schema.Codec<T.LastRun> = Schema.Struct({
   outcome: Outcome,

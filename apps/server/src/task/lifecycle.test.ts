@@ -52,7 +52,7 @@ describe("a task's workplace", () => {
         tasks: [{ id: "only", title: "one step", brief: "write fixed work", needs: [], state: "waiting", tries: 0, agent: "lab", check: "test -f fixed.txt" }],
       });
       yield* tasks.act("p1", "start", "user");
-      yield* until(() => tasks.graphs()[0]?.state === "ripe", "the same session fixing its rejected work");
+      yield* until(() => tasks.graphs()[0]?.state === "ready", "the same session fixing its rejected work");
       expect(turns).toBe(2);
       expect(tasks.graphs()[0]!.tasks[0]).toMatchObject({ state: "merged", tries: 1 });
       expect((yield* tasks.events("p1")).some((event) => event.kind === "task_sent_back" && event.detail === "做完跑 test -f fixed.txt 没通过")).toBe(true);
@@ -87,7 +87,7 @@ describe("a task's workplace", () => {
       const agent = seedAgents().find((a) => a.id === "lab")!;
       yield* (yield* Agents).saveAgent({ ...agent, effort: "" });
       const other = (yield* issues.hire({ ...agent, effort: "" }, "other session", "other")).session!;
-      yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "ripe", "the other session's first report");
+      yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "done", "the other session's first report");
       yield* issues.putTask({
         id: "p1",
         title: "checked work",
@@ -121,7 +121,7 @@ describe("a task's workplace", () => {
       // A delivery can complete here only if acceptance does not own the session.
       yield* Effect.sleep(200);
       writeFileSync(release, "release\n");
-      yield* until(() => tasks.graphs()[0]?.state === "ripe", "the checked step being merged");
+      yield* until(() => tasks.graphs()[0]?.state === "ready", "the checked step being merged");
       expect((yield* Fiber.join(delivery)).kind).toBe("refused");
       const graph = tasks.graphs()[0]!;
       expect(git(join(config.workRoot, "projects", "demo"), "ls-tree", "--name-only", graph.branch!)).not.toContain("unchecked.txt");

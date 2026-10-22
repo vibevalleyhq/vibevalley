@@ -802,9 +802,9 @@ export const make = Effect.gen(function* () {
       const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
       yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
       const what = h.graph?.task
-        ? `做种植计划 ${h.graph.id} 的「${h.graph.task}」`
+        ? `做计划 ${h.graph.id} 的「${h.graph.task}」`
         : h.graph
-          ? "拆种植计划 " + h.graph.id
+          ? "拆计划 " + h.graph.id
           : h.refining
             ? "看代码，起草这张工单"
             : head(h.brief.replace(/\s+/g, " "), 80);

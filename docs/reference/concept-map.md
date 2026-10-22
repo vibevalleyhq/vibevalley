@@ -26,12 +26,12 @@
 | 记性 | 记性 | 档案页和管家页（`pages/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `orchestrator`） |
 | 管家 | 管家 | `/orchestrator`（`pages/orchestrator`） | `WorkspaceState.orchestrator`（管家的状态） | `/api/v1/say`、`/api/v1/orchestrator/...` |
 | 工单 | 看板上的卡片 | `/issues`（`pages/issues`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issues` |
-| 种植计划 | 图纸桌、计划板 | `farm/panels/TaskBoard.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graphs` |
+| 计划 | 种植计划：图纸桌、计划板 | `farm/panels/TaskBoard.tsx`、工作台 `pages/issues/TaskDetail.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graphs` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`WorkspaceState.sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `pages/chat/WorkLog.tsx`、`pages/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
-| 收成清单、收获 | 收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
-| 验收、草、缺肥 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、草 | `Issue.acceptance`、`acceptedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
+| 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
+| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`pages/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrences` |
@@ -55,11 +55,11 @@
 | 记性 | `Memories` | `memory` 表；管家的在 `orchestrator/MEMORY.md` | |
 | 管家 | `Orchestrator` | `orchestrator/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
 | 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
-| 种植计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
+| 计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Sessions`（`session/session.ts`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一次干活（run） | `Sessions`（`session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 干活过程 | `Sessions`（`session/journal.ts`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
-| 收成清单、收获 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 工单的分支和 worktree | |
+| 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 工单的分支和 worktree | |
 | 田头、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Recurrences` | `recurrence` 表 | |
 | 巡查 | `Orchestrator`（规则在 `orchestrator/rules.ts`） | 不存：每轮从核心状态算 | |

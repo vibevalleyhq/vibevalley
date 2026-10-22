@@ -41,7 +41,7 @@ function withHelpers(frame: StateFrame): StateFrame {
   const helpers = [
     helper("a", 0, doing("edit_file"), "leafy"),
     helper("b", 1, doing("read_file"), "sprout"),
-    helper("c", 2, { _tag: "ripe" }, "wheat"),
+    helper("c", 2, { _tag: "done" }, "wheat"),
     helper("d", 4, { _tag: "resting" }, "withered"),
   ];
   return {

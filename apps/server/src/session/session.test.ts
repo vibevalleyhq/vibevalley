@@ -65,10 +65,10 @@ describe("sessions", () => {
       yield* (yield* Agents).saveAgent(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = sent.session!.id;
-      yield* until(() => phase(core, id) === "ripe", "the initial report");
+      yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
       expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
-      yield* until(() => phase(core, id) === "ripe" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
+      yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
       expect(opens).toBe(3);
       expect(sessions.noRoom("pi", "demo")).toBe("");
       expect((yield* sessions.list("lab")).map((s) => s.id)).toEqual([id]);
@@ -130,7 +130,7 @@ describe("sessions", () => {
       yield* (yield* Agents).saveAgent(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = sent.session!.id;
-      yield* until(() => phase(core, id) === "ripe", "the initial report");
+      yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
       expect(resumed.kind).toBe("refused");
@@ -172,7 +172,7 @@ describe("sessions", () => {
       const core = yield* Core;
       const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = sent.session!.id;
-      yield* until(() => phase(core, id) === "ripe", "the report");
+      yield* until(() => phase(core, id) === "done", "the report");
       const before = sessions.find(id)!;
       for (let n = 0; n < 2; n++) {
         const result = yield* Effect.result(
@@ -193,7 +193,7 @@ describe("sessions", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
   });
 
-  it.live("a session is sent, works its run, reports, takes a word and is harvested", () => {
+  it.live("a session is sent, works its run, reports, takes a word and is merged", () => {
     const turns: ScriptedTurn[] = [];
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
@@ -205,7 +205,7 @@ describe("sessions", () => {
       const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = hired.session!.id;
       expect(id).toBe("w1");
-      yield* until(() => phase(core, id) === "ripe", "the first run's report");
+      yield* until(() => phase(core, id) === "done", "the first run's report");
       const session = core.session(id)!;
       expect([session.lastRun?.outcome, session.lastRun?.summary, session.runs]).toEqual(["completed", "做完了第 1 轮", 1]);
       expect(turns[0]!.options.mcpServers?.[0]).toMatchObject({ name: "vibevalley", type: "http" });
@@ -230,7 +230,7 @@ describe("sessions", () => {
 
       const told = yield* sessions.tell(id, "再加个测试", { kind: "comment", message: "m1" });
       expect(told).toBe("老实人 开始新的一轮".replace("老实人", session.name));
-      yield* until(() => core.session(id)?.runs === 2 && phase(core, id) === "ripe", "the second run");
+      yield* until(() => core.session(id)?.runs === 2 && phase(core, id) === "done", "the second run");
       expect((yield* sessions.runs("i1")).map((r) => r.triggeredBy.kind)).toEqual(["issue", "comment"]);
       expect(seen.some((a) => a.kind === "ended" && a.id === id)).toBe(true);
 
@@ -253,7 +253,7 @@ describe("sessions", () => {
       const s = sessions as SessionsInside;
       yield* core.apply({
         type: "hired",
-        session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "ripe" } } as Session,
+        session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "done" } } as Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
         id: "w1",
@@ -273,7 +273,7 @@ describe("sessions", () => {
       s.hands.set("w1", h);
       s.expect(h, { kind: "comment" });
       expect(sessions.noRoom("pi", "demo")).not.toBe("");
-      expect(phase(core, "w1")).toBe("ripe");
+      expect(phase(core, "w1")).toBe("done");
       expect((yield* Effect.flip(sessions.handOver("w1", "merged", () => Effect.succeed({ text: "", commits: 0 })))) as { _tag: string }).toMatchObject({
         _tag: "Refused",
       });

@@ -24,6 +24,7 @@ import { useCore, useFrames } from "../../data/frame";
 import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";
 import { ready } from "../../data/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
+import { farmActWords } from "../kit/labels";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
 import { useVillage } from "../support";
@@ -132,8 +133,9 @@ function IssueBody(props: {
       cure: () => commands.cure(props.session),
       stop: () => commands.stop(props.session),
     },
-    harvest: () => props.onHarvest(props.session),
+    complete: () => props.onHarvest(props.session),
     close: () => props.onClose(props.session),
+    words: farmActWords,
     told: (title, description) => toasts.add({ type: ToastType.info, title, description }),
   });
   const { busy, text, setText, box, go } = acts;
@@ -167,7 +169,7 @@ function IssueBody(props: {
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
   const rowActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
-  const boxShown = () => state() === "asking" || state() === "closed" || box() !== undefined;
+  const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
 
   return (
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -227,13 +229,15 @@ function IssueBody(props: {
                   ? "哪里没过，一行一条"
                   : state() === "asking"
                     ? "自己说……"
-                    : state() === "closed"
+                    : state() === "canceled"
                       ? "这次要它做什么（不填就是接着做完）"
                       : props.session.phase._tag === "working"
                         ? "干着活也能收到这句话"
                         : "说一句，它接着做一轮"
               }
-              label={box() === "reject" ? "哪里没过" : state() === "asking" ? "回答" : state() === "closed" ? "重开这张工单" : `给${props.session.name}带句话`}
+              label={
+                box() === "reject" ? "哪里没过" : state() === "asking" ? "回答" : state() === "canceled" ? "重开这张工单" : `给${props.session.name}带句话`
+              }
               disabled={busy()}
             />
           </div>

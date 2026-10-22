@@ -880,7 +880,12 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       });
 
-    const harvest = (id: string, closed: SessionClose, use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>, settle: Settle = "owner") =>
+    const handOver = (
+      id: string,
+      closed: SessionClose,
+      use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
+      settle: Settle = "owner",
+    ) =>
       Effect.gen(function* () {
         const h = hands.get(id);
         if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
@@ -890,7 +895,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
             if (closed === "merged" && current.graph)
               return yield* Effect.fail<ApiError | NotTakenIn>(
-                refused(`${current.name} 在做种植计划 ${current.graph.id} 里的活：做完会自动合进计划分支，收获整个计划时再进主分支`),
+                refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`),
               );
             if (isBusy(current) || h.triggers.length > 0)
               return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
@@ -1172,7 +1177,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const h = hands.get(id);
         return h ? view(h) : undefined;
       },
-      handOver: harvest,
+      handOver,
       changes: changesOf,
       list: (agent) =>
         Effect.gen(function* () {

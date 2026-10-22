@@ -350,7 +350,7 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
     for (const s of next.sessions) {
       const was = before.get(s.id);
       if (!was) cues.push({ name: "arrive" });
-      else if (s.phase._tag === "ripe" && was.phase._tag !== "ripe") cues.push({ name: "ripe", hold: 220 });
+      else if (s.phase._tag === "done" && was.phase._tag !== "done") cues.push({ name: "ripe", hold: 220 });
       else if (s.phase._tag === "failed" && was.phase._tag !== "failed") cues.push({ name: "bug" });
     }
   }

@@ -38,7 +38,7 @@
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
 - **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Notifications、Orchestrator、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Sessions.sessionOf`、`Issues.onBoard`、`Tasks.graphs`、`Channels.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Sessions.news`、`Channels.ownerInThread`、`Notices.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（田头的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
-- **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的种植计划、定时开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
+- **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的计划、定时开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
 - **折法和拼帧在组装那一层**：`projection/` 的 `reduce`、`frameOf` 读每个模块的规则，组装时以 `Projection` 交给 Platform 里的 `core`，`core` 不 import 上面的模块。
 - **一个家目录一个服务端**：`base/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
 
@@ -62,7 +62,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演：同样的记录、折叠和控制，没有程序、登录和模型；项目用临时目录里真的 git 仓库；模型用 pi-ai 的假模型；声网和三家聊天软件是本地假服务；测试里不探测本机的农机，`gh` 回答它不在（`noGitHub`）。
-- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、收获、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用轮询到期限的 `until`，不用 `sleep` 赌时间。
+- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用轮询到期限的 `until`，不用 `sleep` 赌时间。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
 
 ## 怎么走
@@ -102,7 +102,7 @@
 ## 为什么这样
 
 - **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调执行、合并写在执行里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（执行同时被工单、田头、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
-- **端口只在有两个适配器、或方向必须倒过来时才立。** 田头的 `Helpers` 是因为田头在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和收获）；执行和田头的几块共用同一份状态，拆开只是把状态传来传去。
+- **端口只在有两个适配器、或方向必须倒过来时才立。** 田头的 `Helpers` 是因为田头在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和合并）；执行和田头的几块共用同一份状态，拆开只是把状态传来传去。
 - **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。

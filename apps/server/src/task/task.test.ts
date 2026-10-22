@@ -230,7 +230,7 @@ const run = <A, E>(
 ) => Effect.flatMap(farm, body).pipe(Effect.scoped, Effect.provide(worldBelowTasks({ config })));
 
 describe("task graphs", () => {
-  it.live("a diamond is split, worked side by side, and harvested", () =>
+  it.live("a diamond is split, worked side by side, and merged", () =>
     run((f) =>
       Effect.gen(function* () {
         const id = yield* f.split("菱形", "diamond");
@@ -241,15 +241,15 @@ describe("task graphs", () => {
           ["c", "a"],
           ["d", "b,c"],
         ]);
-        expect(f.news[0]).toMatch(new RegExp("^【种植计划】" + id + " 拆好了"));
+        expect(f.news[0]).toMatch(new RegExp("^【计划】" + id + " 拆好了"));
         yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "orchestrator");
         expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
-        const ripe = yield* f.until(id, (g) => g.state === "ripe");
+        const ready = yield* f.until(id, (g) => g.state === "ready");
         const mine = f.states.filter((g) => g.id === id);
         expect(mine.some((g) => state(g, "b") === "working" && state(g, "c") === "working")).toBe(true);
         const d = mine.find((g) => state(g, "d") === "working")!;
         expect([state(d, "b"), state(d, "c")]).toEqual(["merged", "merged"]);
-        for (const n of ripe.tasks)
+        for (const n of ready.tasks)
           expect([n.state, (n.commits ?? []).length > 0, n.conclusion, n.session]).toEqual(["merged", true, "写好了 steps/" + n.id + ".txt", undefined]);
         expect(yield* f.tasks.act(id, "merge", "user")).toContain("合进了 diamond 的 main");
         yield* f.until(id, (g) => g.state === "done");
@@ -259,7 +259,7 @@ describe("task graphs", () => {
             .filter((e) => !e.task)
             .map((e) => e.kind + "/" + e.actor)
             .join(" "),
-        ).toBe("splitting/user drafted/system started/user ripe/system merged/user");
+        ).toBe("splitting/user drafted/system started/user ready/system merged/user");
         const edit = history.find((e) => e.kind === "task_edited")!;
         expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "orchestrator", "管家", 1, "检查"]);
         expect(edit.text).toMatch(/^改了「.+」的检查$/);
@@ -284,9 +284,9 @@ describe("task graphs", () => {
         const draft = yield* f.until(id, (g) => g.state === "draft");
         expect([isAcceptance(taskOf(draft, "repro")!), isAcceptance(taskOf(draft, "fix")!)]).toEqual([true, false]);
         yield* f.tasks.act(id, "start", "user");
-        const ripe = yield* f.until(id, (g) => g.state === "ripe");
-        const repro = taskOf(ripe, "repro")!;
-        const fix = taskOf(ripe, "fix")!;
+        const ready = yield* f.until(id, (g) => g.state === "ready");
+        const repro = taskOf(ready, "repro")!;
+        const fix = taskOf(ready, "fix")!;
         expect([repro.frozen, fix.frozen, repro.tries, fix.tries]).toEqual([["steps/repro_test.txt"], undefined, 1, 1]);
         const told = (s: string) =>
           [...f.work.told.entries()]
@@ -296,7 +296,7 @@ describe("task graphs", () => {
         expect(told("repro")).toContain("现在就通过了");
         expect(told("fix")).toContain("steps/repro_test.txt");
         expect(told("fix")).toContain("冻结");
-        const brief = taskBrief(ripe, fix);
+        const brief = taskBrief(ready, fix);
         expect(brief).toContain("冻结的，不能改：steps/repro_test.txt");
         expect(brief).toContain("收尾的一步");
       }),
@@ -323,12 +323,12 @@ describe("task graphs", () => {
         expect([after.state, blockedBy(stuck, after), stuck.state]).toEqual(["waiting", ["boom"], "running"]);
         expect(yield* Effect.flip(f.tasks.taskAct(id, "nope", "skip", "user"))).toMatchObject({ reason: expect.stringContaining("没有「nope」") });
         expect(yield* f.tasks.taskAct(id, "boom", "skip", "user")).toContain("跳过了");
-        const ripe = yield* f.until(id, (g) => g.state === "ripe");
-        expect(ripe.tasks.map((n) => n.state)).toEqual(["skipped", "merged", "merged"]);
+        const ready = yield* f.until(id, (g) => g.state === "ready");
+        expect(ready.tasks.map((n) => n.state)).toEqual(["skipped", "merged", "merged"]);
         const said = yield* f.tasks.act(id, "abandon", "user");
         const gone = yield* f.until(id, (g) => g.state === "abandoned");
         expect(said).toContain("分支 " + gone.branch + " 留着");
-        expect(yield* Effect.flip(f.tasks.act(id, "merge", "user"))).toMatchObject({ reason: expect.stringContaining("不能收获") });
+        expect(yield* Effect.flip(f.tasks.act(id, "merge", "user"))).toMatchObject({ reason: expect.stringContaining("不能合进主分支") });
       }),
     ),
   );
@@ -375,8 +375,8 @@ describe("task graphs", () => {
             yield* f.core.apply({ type: "report", id: session, outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
             f.work.release();
             yield* f.tasks.act(id, "resume", "user");
-            const ripe = yield* f.until(id, (g) => g.state === "ripe");
-            expect(state(ripe, "slow")).toBe("merged");
+            const ready = yield* f.until(id, (g) => g.state === "ready");
+            expect(state(ready, "slow")).toBe("merged");
             expect((yield* f.tasks.events(id))[0]!.kind).toBe("splitting");
           }),
         config,
@@ -420,7 +420,7 @@ describe("task graphs", () => {
         expect((yield* Effect.flip(f.issues.edit(d.id, { title: "改" })))._tag).toBe("Refused");
         expect((yield* Effect.flip(f.issues.start(d.id, "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "start", "user");
-        yield* f.until(id, (g) => g.state === "ripe");
+        yield* f.until(id, (g) => g.state === "ready");
         const a = yield* f.issues.get(taskIssueID(id, "a"));
         expect([a.sessions.length, a.delivered]).toEqual([1, "merged_into_parent"]);
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
@@ -431,7 +431,7 @@ describe("task graphs", () => {
             if ((await Effect.runPromise(f.issues.get(id))).delivered === "merged") return;
             await new Promise((r) => setTimeout(r, 10));
           }
-          throw new Error("the graph's issue never closed as harvested");
+          throw new Error("the graph's issue never closed as merged");
         });
       }),
     ),

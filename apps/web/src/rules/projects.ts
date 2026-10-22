@@ -333,14 +333,14 @@ export function plotsIn(yard: Rect, n: number): { x: number; y: number }[] {
 /** Where a helper stands from its plot's foot. */
 export const sessionInPlot = { x: 0, y: -10 };
 
-const harvestable = (h: Session) => h.phase._tag === "ripe" || h.phase._tag === "resting";
+const handedBack = (h: Session) => h.phase._tag === "done" || h.phase._tag === "resting";
 
 export function mapPose(h: Session): Pose {
-  if ((harvestable(h) && h.conflict) || h.phase._tag === "failed") return "worry";
+  if ((handedBack(h) && h.conflict) || h.phase._tag === "failed") return "worry";
   switch (h.phase._tag) {
     case "working":
       return h.phase.doing.action === "thinking" || h.phase.doing.action === "speaking_text" ? "think" : "work";
-    case "ripe":
+    case "done":
       return "cheer";
     default:
       return "idle";

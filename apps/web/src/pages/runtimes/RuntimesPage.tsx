@@ -449,7 +449,10 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
             />
           </div>
         </Field>
-        <Field label="最多同时干活" hint="用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受农场自己的上限（6 块地）。">
+        <Field
+          label="最多同时干活"
+          hint="用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受农场自己的上限（同时 6 张工单）。"
+        >
           <NumberInput
             label="最多同时干活"
             placeholder="不另设"

@@ -8,7 +8,7 @@ import { farmOf, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
 import { sessionOf, whileWorking, withSession } from "../session/state.ts";
 
-const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "ripe" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
+const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
 /** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
 export function reduce(state: WorkspaceState, fact: Fact): [WorkspaceState, boolean] {

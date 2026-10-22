@@ -86,12 +86,12 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
     case "working":
       if (weeds > 0 && plot.badge === undefined) return { crop: "weeds", badge: { text: `除草中 ${weeds}`, tone: "bug" } };
       break;
-    case "ripe":
+    case "done":
     case "resting":
       if ((issue.questions ?? []).length > 0) return { crop: "dry", badge: badgeQuestions };
       if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
       if (weeds > 0) return { crop: "weeds", badge: { text: `${weeds} 棵草`, tone: "bug" } };
-      if (h.phase._tag === "ripe") return { crop: "flowering", badge: badgeReview };
+      if (h.phase._tag === "done") return { crop: "flowering", badge: badgeReview };
       break;
   }
   return plot;
@@ -107,7 +107,7 @@ export function plotOfSession(h: Session): PlotView {
       if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet };
       if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying };
       return { crop: growth(h) };
-    case "ripe":
+    case "done":
       return { crop: ripeCrop(h), badge: conflict ? badgeConflict : badgeRipe };
     case "failed":
       return { crop: "withered", badge: badgeBugs };

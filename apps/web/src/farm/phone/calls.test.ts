@@ -4,7 +4,7 @@ import { missedOf, PhoneCalls, ringEvery, ringFor } from "./calls";
 
 const call = (id: string): InboxItem => ({
   id,
-  kind: "merge",
+  kind: "review",
   from: { kind: "session", id: "s1", name: "阿狐", agent: "fox" },
   who: "阿狐",
   text: "做完了",

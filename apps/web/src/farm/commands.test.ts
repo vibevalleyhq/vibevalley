@@ -15,7 +15,7 @@ const helper: Session = {
   brief: "提交打卡页",
   hiredAt: 0,
   runs: 1,
-  phase: { _tag: "ripe" },
+  phase: { _tag: "done" },
   issue: "clock",
   play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
@@ -53,7 +53,7 @@ const aim = (f: StateFrame, tool: Tool) => {
 test("a ripe crop cannot be harvested before the issue accepts it, then can after acceptance", () => {
   const f = frame({ state: "reviewing", lead: "accept", acts: ["accept", "reject", "tell", "close"] });
   expect(aim(f, "harvest").aim.ok).toBe(false);
-  f.state.issues![0]!.attention = { state: "reviewing", lead: "harvest", acts: ["harvest", "tell", "close"] };
+  f.state.issues![0]!.attention = { state: "reviewing", lead: "complete", acts: ["complete", "tell", "close"] };
   expect(aim(f, "harvest").aim.ok).toBe(true);
 });
 
@@ -74,11 +74,11 @@ test("an issue in a task graph offers no farm actions even while its helper is w
 
 test("watering offers a word only when the issue allows tell", () => {
   expect(aim(frame({ state: "asking", lead: "answer", acts: ["answer", "close"] }), "water").aim.ok).toBe(false);
-  expect(aim(frame({ state: "reviewing", acts: ["harvest", "tell", "close"] }), "water").aim.ok).toBe(true);
+  expect(aim(frame({ state: "reviewing", acts: ["complete", "tell", "close"] }), "water").aim.ok).toBe(true);
 });
 
 test("a click is refused when the issue stops allowing its action after aiming", async () => {
-  const f = frame({ state: "reviewing", acts: ["harvest", "tell", "close"] });
+  const f = frame({ state: "reviewing", acts: ["complete", "tell", "close"] });
   farm.hold("harvest");
   const commands = farmCommands(() => f);
   const pointed = commands.aim(beds[0]!);

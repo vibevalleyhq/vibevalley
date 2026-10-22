@@ -215,7 +215,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 <button type="button" class="min-w-0 flex-1 cursor-pointer truncate text-left hover:text-hat" onClick={() => farm.select(h.id)}>
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
-                <Show when={h.phase._tag === "ripe"}>
+                <Show when={h.phase._tag === "done"}>
                   <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status({ id: issueOf(h), body: { status: "done" } }))}>
                     收获
                   </button>

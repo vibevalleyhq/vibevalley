@@ -39,7 +39,7 @@ describe("farmCues", () => {
   });
 
   test("sessions arrive, ripen and fail, but not in the first state", () => {
-    const next = [session("a", "working"), session("b", "ripe"), session("c", "failed")];
+    const next = [session("a", "working"), session("b", "done"), session("c", "failed")];
     expect(farmCues(base, { ...base, sessions: next })).toEqual([]);
     const prev = [session("b", "working"), session("c", "working")];
     expect(farmCues({ ...base, sessions: prev }, { ...base, sessions: next })).toEqual([{ name: "arrive" }, { name: "ripe", hold: 220 }, { name: "bug" }]);

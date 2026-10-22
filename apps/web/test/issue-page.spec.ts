@@ -41,12 +41,12 @@ async function openIssue(
     brief: made.title,
     hiredAt: now - 10 * minute,
     runs: 1,
-    phase: { _tag: "ripe" },
+    phase: { _tag: "done" },
     issue: made.id,
     branch: "vibevalley/1",
     ...helper,
   };
-  const closed = attention.state === "harvested" || attention.state === "closed";
+  const closed = attention.state === "done" || attention.state === "canceled";
   const issue: Issue = { ...made, sessions: ["w1"], project: "farm-site", attention, ...more };
   const fixture: StateFrame = { ...frame, state: { ...frame.state, sessions: closed ? [] : [session], issues: [issue] } };
   const history: IssueHistory[] = [
@@ -101,7 +101,7 @@ test("a real round: the helper asks with options, one click answers, and it hand
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
   // Exact: the folded steps hold the helper's whole last message, which says it too.
   await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
-  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "收获" })).toBeVisible();
+  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成", exact: true })).toBeVisible();
   // Done need not be a merge: the branch can be kept.
   await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成，分支留着" })).toBeVisible();
   await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
@@ -110,7 +110,7 @@ test("a real round: the helper asks with options, one click answers, and it hand
 
 const longJob = "通读 farm-site 项目，给主人一份整体架构和当前进度的评估。1）技术栈和代码量 2）模块和数据流 3）测试和构建现状 4）最该推进的三件事";
 
-test("a helper waiting on a question: 等你回答, its options answer it, and nothing offers a harvest", async ({ page, server, api }) => {
+test("a helper waiting on a question: 等你回答, its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {
   const made = await api.issue.create({ body: { title: longJob } });
   const now = Date.now();
   const view = await openIssue(
@@ -141,7 +141,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   await expect(status).toContainText("¥0.42");
   const ask = view.getByRole("region", { name: "要你做的" });
   await expect(ask.getByText("这份评估是全交给 w3，还是我和它分着做？")).toBeVisible();
-  await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
+  await expect(view.getByRole("button", { name: "完成", exact: true })).toHaveCount(0);
   await expect(view.getByRole("button", { name: "验收通过" })).toHaveCount(0);
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("0 / 4 条做到了");
   await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("还没有改动");
@@ -196,7 +196,7 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 2 条做到了");
   await expect(view.getByText("bun test auth 通过")).toBeVisible();
   await expect(ask.getByRole("button", { name: "验收通过" })).toBeVisible();
-  await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
+  await expect(view.getByRole("button", { name: "完成", exact: true })).toHaveCount(0);
   await view.getByRole("checkbox", { name: "看过了：勾上后重开浏览器还登着" }).check();
   const findings = ask.getByRole("textbox", { name: "哪里没过" });
   await ask.getByRole("button", { name: "打回", exact: true }).click();
@@ -227,26 +227,26 @@ test("a failed round: 卡住了, says why and leads with 接着修", async ({ pa
   await page.screenshot({ path: test.info().outputPath("stuck.png") });
 });
 
-test("a harvested issue asks nothing: 收获了, and says it went into main", async ({ page, server, api }) => {
+test("a done issue asks nothing: 已完成, and says it went into main", async ({ page, server, api }) => {
   const made = await api.issue.create({ body: { title: "给工单加上验收标准的模板" } });
   const now = Date.now();
   const view = await openIssue(
     page,
     server,
     made,
-    { state: "harvested", since: now - 2 * minute, acts: ["reopen"] },
+    { state: "done", since: now - 2 * minute, acts: ["reopen"] },
     { status: "done", delivered: "merged", closedAt: now - 2 * minute, criteria: ["模板能选"], checks: [{ criterion: 0, result: "met" }] },
     {},
     {
       milestones: [
-        { at: now - 2 * minute, kind: "closed", text: "收获了，合进了主分支" },
+        { at: now - 2 * minute, kind: "closed", text: "已完成，合进了主分支" },
         { at: now - 4 * minute, kind: "reported", who: "阿狐", text: "交回来了" },
       ],
     },
   );
-  await expect(view.getByLabel("现在怎样")).toContainText("收获了");
+  await expect(view.getByLabel("现在怎样")).toContainText("已完成");
   await expect(view.getByRole("region", { name: "要你做的" })).toHaveCount(0);
-  await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("合进主分支");
+  await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("合进了主分支");
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 1 条做到了");
-  await page.screenshot({ path: test.info().outputPath("harvested.png") });
+  await page.screenshot({ path: test.info().outputPath("done.png") });
 });

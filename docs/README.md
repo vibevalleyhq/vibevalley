@@ -6,7 +6,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 讲什么 |
 |---|---|
-| [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，收获，处理冲突和失败，管住花费，用语音 |
+| [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，完成它，处理冲突和失败，管住花费，用语音 |
 | [development.md](docs/development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
 | [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
 | [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口、存储、配置。改 `server/`、`app/` 之前读 |
@@ -21,7 +21,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [channel.md](docs/subsystems/channel.md) | 田头：频道、谁听见、工单串、连接器、Inbox |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 管家：自己的 agent、提示和工具、来源、巡查、评测 |
 | [schedule.md](docs/subsystems/recurrence.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
-| [task.md](docs/subsystems/task.md) | 种植计划：带子工单的父工单、按图推进；agent 自己的任务图 |
+| [task.md](docs/subsystems/task.md) | 计划：带子工单的父工单、按图推进；agent 自己的任务图 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
 | [doc.md](docs/subsystems/doc.md) | 文档：按块存、按 op 改、一批一个事务、Markdown 导入导出 |
 | [voice.md](docs/subsystems/voice.md) | 语音：通话（Agora ConvoAI）、听写、语音管家 |
@@ -55,7 +55,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ## 用语
 
-界面用农场的叫法，代码和讲服务端的文档按实际的概念来（[concepts.md](docs/concepts.md)）。界面上的字用左边一列，不用最右一列。
+叫法分两张表。下面这张是活本身的叫法：工作台、命令行、管家、工具和提醒都用它，界面上的字用左边一列，不用最右一列；代码和讲服务端的文档按实际的概念来（[concepts.md](docs/concepts.md)）。工单的状态和动作只有一套词，词表在 `packages/protocol/src/rules`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。
 
 | 叫法 | 代码里 | 意思 | 不用 |
 |---|---|---|---|
@@ -64,29 +64,29 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己；农场里是一季庄稼 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
-| 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；在做时是一块地，每派一次是一个帮工 | job、ticket |
+| 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
 | 项目 | project | 工作目录 `projects/` 下的一个 git 仓库；农场里是一座岛，工作台的「项目」页（`/projects`，「全部」是整张地图） | 一块地 |
 | 大地图 | Workspace（`Config.WorkRoot`、`Config.Home`） | 全部项目、工单、群聊和档案；工作台「项目」页的「全部」 | 世界、全图 |
-| 地 | issue（`Issue`；`FarmView.Plots` 按工单做键）；代码活的 worktree 是 `project.IssueBranch`；像素村里的位置是 station（画出来的那块地在客户端叫 `Bed`） | 一张工单；代码相关的带一个 worktree。帮工在上面干活；一座岛上的空位是这个项目同时在做的工单数 | 工位、帮工的地、并发位 |
-| 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
-| 播种袋里的种子 | issue template（`IssueTemplate`、`project.templates`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
-| 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
+| 空位 | `project.max_sessions`、农场的上限 | 一个项目（和整个农场）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
+| 工单模板 | issue template（`IssueTemplate`、`project.templates`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
+| 阶段 | phase（`Session.phase`） | 帮工到哪了：刚派出去、在干活、交回来了、没做成、歇着、走了 | 状态 |
 | 核心状态 | `WorkspaceState` | 农场上的一切，只有服务端持有 | |
 | 事实 | fact | 改核心状态的一件事 | patch |
-| 收成清单 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情 |
-| 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |
-| 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
-| 验收 | review（`Issue.review`；动作 `accept`、`reject`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核 |
-| 草 | finding（`Issue.Findings`） | 没过验收的一条意见；下次验收通过才拔 | |
-| 缺肥 | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；施肥是回答它 | |
-| 仓库 | warehouse | 收获了的工单 | |
+| 改动 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情、收成清单 |
+| 完成 | 动作 `complete`；工单挪到 `done`（已完成） | 主人点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获；合并只是交付的一种 |
+| 取消 | 动作 `close`；工单挪到 `canceled`（已取消） | 不做了：帮工收工，分支上有提交就留着 | 收工（那是帮工离开） |
+| 关上 | `isClosed`：`done` 或 `canceled` | 已完成和已取消的合称：看板的「已关」一列 | |
+| 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一张工单的三段 | |
+| 验收 | review（`Issue.review`；动作 `accept`、`reject`） | 每张工单都有：判交回来的活过没过；`glance` 是完成就算，`required` 是先过验收才能完成 | 审核 |
+| 验收意见 | finding（`Issue.findings`） | 没过验收的一条意见；下次验收通过才算解决 | 草 |
+| 问题 | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；有问题时工单「等你回答」 | 缺肥 |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |
 | 干活过程 | `SessionEvent`（一个帮工的日志） | 帮工每一轮收到的话、想、说、工具调用和结果 | 日志、trace |
 | 记性 | memory | 一个帮工档案记得的事 | 记忆库 |
 | 技能书 | skill（`Skill`） | 帮工档案能带的技能 | 插件 |
-| 种植计划 | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进 | 工作流、playbook、plan |
-| 一件 | task（`Task`，带 `task` 的子工单） | 种植计划里的一件，一个帮工做 | 步骤、step、节点、node |
+| 计划 | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
+| 一件 | task（`Task`，带 `task` 的子工单） | 计划里的一件，一个帮工做 | 步骤、step、节点、node |
 | 主人 | user | 你 | |
 | 田头 | general | 默认的频道：你、管家和帮工都在 | 群 |
 | 频道 | channel | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群 |
@@ -95,3 +95,22 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 来电 | inbox | 要你处理的事 | 通知 |
 | 巡查 | patrol | 定时看 Inbox，放久了叫醒管家 | |
 | 连接到本机 | lan | 让局域网里的设备用这个农场的监听，默认关 | 远程模式 |
+
+### 农场的皮
+
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`apps/server/src/game`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和管家的话都不用；`scripts/stale-names.ts` 查。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+
+| 农场里 | 实际是 | 代码里 |
+|---|---|---|
+| 地 | 一张工单（代码活带一个 worktree）；一座岛上的空位是这个项目的空位 | `FarmView.plots` 按工单做键；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
+| 种子袋 | 待办（排队等空位的工单） | `todo`、`queued_at` |
+| 播种袋里的种子 | 工单模板 | `IssueTemplate` |
+| 播种、发芽、长叶 | 处理中 | `in_progress`，帮工 `working` |
+| 开花 | 等你看 | `in_review`，帮工 `done` |
+| 缺肥（地干裂）、施肥 | 等你回答、回答 | `questions` |
+| 草、除草中 | 验收意见、带着意见再修一轮 | `findings` |
+| 收获、收成清单 | 完成、改动 | 动作 `complete`、`Changes` |
+| 麦茬 | 已完成 | `done` |
+| 仓库 | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
+| 种植计划、图纸桌 | 计划 | `TaskGraph` |
+| 一季庄稼 | 一次干活 | `Run` |

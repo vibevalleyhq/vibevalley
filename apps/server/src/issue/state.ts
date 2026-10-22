@@ -20,7 +20,7 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
         return "in_progress";
       case "draft":
       case "paused":
-      case "ripe":
+      case "ready":
         return "in_review";
       case "done":
         return "done";
@@ -88,7 +88,7 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
     const status = issueStatusOf(t, state);
     const drafting = issueRefiningOf(t, state);
     const attention = attentionIn({ ...t, status, refining: drafting }, state);
-    // The moves read the attention: a round that failed is not harvested, from the moment it fails.
+    // The moves read the attention: a round that failed is not completed, from the moment it fails.
     const moves = statusMoves({ ...t, status, refining: drafting, attention });
     if (status === t.status && same(drafting, t.refining) && same(attention, t.attention) && same(moves, t.moves)) return;
     next ??= [...state.issues!];

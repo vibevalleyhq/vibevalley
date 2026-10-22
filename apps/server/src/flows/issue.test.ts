@@ -68,10 +68,10 @@ describe("an issue", () => {
       expect(mainLog()).toBe(before);
       expect(git(project, "branch", "--list", `vibevalley/issue-${keptIssue.number}`)).not.toBe("");
 
-      const harvested = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      const completed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
-      yield* issues.setStatus(harvested.issue!, "done", "", "");
-      expect((yield* closed(harvested.issue!)).delivered).toBe("merged");
+      yield* issues.setStatus(completed.issue!, "done", "", "");
+      expect((yield* closed(completed.issue!)).delivered).toBe("merged");
       expect(mainLog()).not.toBe(before);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -117,13 +117,13 @@ describe("an issue", () => {
       ]);
       const reopened = (yield* sessions.get(again))!;
       expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`));
-      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：收获了/);
+      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：完成了/);
       refusedWith(yield* Effect.flip(issues.reopen(session.issue!, "", "")));
       expect((yield* Effect.flip(issues.reopen("w404", "", "")))._tag).toBe("Missing");
       yield* sessions.dismiss(again);
       yield* closedAs("dismissed");
       yield* sql`update issue set delivered = 'merged_into_parent', canceled = null, closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
-      refusedWith(yield* Effect.flip(issues.reopen(issue.id, "", "")), "种植计划");
+      refusedWith(yield* Effect.flip(issues.reopen(issue.id, "", "")), "计划里的工单");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -189,7 +189,7 @@ describe("an issue", () => {
           phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
         } as Session,
       });
-      const issue = yield* issues.add({ title: "等空地的活", project: "queue", assignee: "lab" });
+      const issue = yield* issues.add({ title: "等空位的活", project: "queue", assignee: "lab" });
       const got = yield* issues.start(issue.id, "");
       expect(got.session).toBeUndefined();
       expect(got.queued).toContain("排上队了");
@@ -201,7 +201,7 @@ describe("an issue", () => {
       yield* issues.tryQueued;
       yield* w.nextReport;
       expect(yield* status()).toBe("in_review");
-      expect((yield* sessions.list("lab")).some((s) => s.brief === "等空地的活")).toBe(true);
+      expect((yield* sessions.list("lab")).some((s) => s.brief === "等空位的活")).toBe(true);
       const other = yield* issues.add({ title: "别排了" });
       const queued = yield* issues.queue(other.id, true);
       const unqueued = yield* issues.queue(other.id, false);
@@ -313,14 +313,14 @@ describe("an issue", () => {
       yield* w.nextReport;
       const place = (sessions as SessionsInside).place(helper.id)!;
       mkdirSync(join(place.cwd, ".vibevalley"), { recursive: true });
-      write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\necho harvest-check-failed\nexit 1\n", 0o755);
+      write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\necho merge-check-failed\nexit 1\n", 0o755);
       const project = join(f.config.workRoot, "projects", "clock");
       const before = git(project, "rev-parse", "main");
-      refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "")), "harvest-check-failed");
+      refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "")), "merge-check-failed");
       expect((yield* issues.get(helper.issue!)).status).toBe("in_review");
       yield* until(() => {
         const got = sessions.find(helper.id);
-        return got !== undefined && got.lastText.includes("harvest-check-failed") && !isBusy(got.session);
+        return got !== undefined && got.lastText.includes("merge-check-failed") && !isBusy(got.session);
       }, "the helper hears the check's output");
       expect((yield* issues.get(helper.issue!)).status).toBe("in_review");
       expect(git(project, "rev-parse", "main")).toBe(before);
@@ -390,7 +390,7 @@ describe("an issue", () => {
         (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
-      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "harvest" }, "")), "现在不能「收获」");
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "complete" }, "")), "现在不能「完成」");
       refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "")), "「带话」要说一句");
       yield* issues.act("#" + issue.number, { act: "cure" }, "");
       const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
@@ -401,8 +401,8 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever asks.
-  it.live("does not harvest a round that failed", () => {
+  // Done is what was asked for, not how a round ended: a round that failed is not completed, whoever asks.
+  it.live("does not complete a round that failed", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
@@ -424,7 +424,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Every issue has an acceptance: one that must pass waits for it; a fail grows weeds and another round; a pass is ripe.
+  // Every issue has an acceptance: one that must pass waits for it; a fail grows weeds and another round; a pass is ready to complete.
   // A question in a report leaves the plot short of fertilizer until the owner answers.
   it.live("grows through its acceptance", () => {
     const f = farm();
@@ -444,7 +444,7 @@ describe("an issue", () => {
       );
       expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
       const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
-      yield* until(() => crop() === "dry", "缺肥");
+      yield* until(() => crop() === "dry", "the plot waiting on an answer");
 
       yield* issues.comment(issue.id, "用 8797");
       yield* await_(

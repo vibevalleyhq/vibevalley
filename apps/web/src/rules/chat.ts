@@ -231,7 +231,7 @@ export function phaseDot(p: Phase): DotTone {
       return "leaf";
     case "failed":
       return "berry";
-    case "ripe":
+    case "done":
     case "resting":
     case "closed":
       return "wheat";
@@ -245,7 +245,7 @@ export function phaseIcon(p: Phase): string | undefined {
       return "icon-seeds";
     case "working":
       return p.doing.action === "none" ? undefined : `act-${p.doing.action}`;
-    case "ripe":
+    case "done":
       return "icon-harvest";
     case "failed":
       return "icon-bug";

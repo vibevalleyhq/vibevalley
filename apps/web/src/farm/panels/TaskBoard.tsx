@@ -27,7 +27,7 @@ const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   draft: ["#efd08f", "#2f1f13"],
   running: ["#74a046", "#f7e8c4"],
   paused: ["#c8a46e", "#46301d"],
-  ripe: ["#e5a93c", "#2f1f13"],
+  ready: ["#e5a93c", "#2f1f13"],
   done: ["#e2c995", "#67482d"],
   abandoned: ["#e2c995", "#7f5b3b"],
 };
@@ -212,7 +212,7 @@ function TaskView(props: { graph: TaskGraph }) {
                 {actionText(props.graph, "resume")}
               </PxButton>
             </Show>
-            <Show when={props.graph.state === "ripe"}>
+            <Show when={props.graph.state === "ready"}>
               <PxButton tone="primary" onClick={() => setReviewing(true)}>
                 看改动，{actionText(props.graph, "merge")}…
               </PxButton>

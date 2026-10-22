@@ -21,11 +21,11 @@ const quiet = (cwd: string, ...args: string[]) => {
 };
 
 describe("a pull request", () => {
-  // In a project that harvests by pull request, done pushes the branch and opens one; the issue waits in review. A second
+  // In a project that merges by pull request, done pushes the branch and opens one; the issue waits in review. A second
   // round only pushes. After a restart the PR is still the issue's; once GitHub merges or closes it, the issue closes and
   // its helper, worktree and branch go.
   for (const ending of ["MERGED", "CLOSED"] as const) {
-    it.live(`harvests, and closes when the PR is ${ending.toLowerCase()}`, () => {
+    it.live(`merges by PR, and closes when the PR is ${ending.toLowerCase()}`, () => {
       const base = testConfig();
       const config = { ...base, db: join(base.home, "db"), github: { ...base.github, prProjects: ["clock"] } };
       const work = config.workRoot;

@@ -38,7 +38,7 @@ export function OrchestratorPage(props: { rest: string }) {
         </A>
         <h1 class="text-2xl font-semibold">管家</h1>
         <p class="text-sm text-muted">
-          管家不下地：听你说要做什么，派帮工去做，盯着进度，转告结果。{look() ? `长相是${look()!.name}，在农场的管家面板里换。` : ""}
+          管家不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。{look() ? `长相是${look()!.name}，在农场的管家面板里换。` : ""}
         </p>
       </div>
     </div>

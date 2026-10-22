@@ -71,7 +71,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
 import { issueBranch, Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { harvesting } from "./harvest.ts";
+import { merging } from "./merge.ts";
 import { refinement } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
@@ -162,10 +162,10 @@ const json = <T>(text: string | null): T | undefined => {
 /** Empty is none. */
 
 const leftText: Readonly<Record<SessionClose, string>> = {
-  merged: "收获了，改动已经合进项目的主分支",
-  merged_into_graph: "做完了，改动合进了种植计划的分支",
+  merged: "完成了，改动已经合进项目的主分支",
+  merged_into_graph: "完成了，改动合进了计划的分支",
   completed: "工单完成了，改动没有合进主分支",
-  dismissed: "没收获就收工了，改动没有合进主分支",
+  dismissed: "取消了，改动没有合进主分支",
   lost: "干活的目录丢了，改动可能不在了",
 };
 
@@ -276,7 +276,7 @@ export const make = (options: IssueOptions = {}) =>
       out.status = issueStatusOf(out, state);
       const refiner = issueRefiningOf(out, state);
       if (refiner) out.refining = refiner;
-      // The moves read the attention: a round that failed is not harvested.
+      // The moves read the attention: a round that failed is not completed.
       out.attention = attentionIn(out, state);
       out.moves = statusMoves(out);
       return out;
@@ -331,7 +331,7 @@ export const make = (options: IssueOptions = {}) =>
     const unsent = (id: string) =>
       Effect.flatMap(get(id), (issue) =>
         issue.graph || issue.task
-          ? Effect.fail(refused("这是种植计划的工单：在计划里改"))
+          ? Effect.fail(refused("这是计划里的工单：在计划里改"))
           : issue.sessions.length > 0
             ? Effect.fail(refused("这张工单已经开工了"))
             : Effect.succeed(issue),
@@ -473,7 +473,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const hire = (agent: Agent, task: string, project: string, opt: HireOptions = {}) =>
       Effect.gen(function* () {
-        if (agent.id === orchestratorAgent) return { refused: "管家不下地：派给一个帮工档案" } as Hired;
+        if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" } as Hired;
         if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
         for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
         const where = project.trim() || (agent.workdir ?? "").trim();
@@ -538,7 +538,7 @@ export const make = (options: IssueOptions = {}) =>
         const full = sessions.noRoom(agent.runtime, project);
         if (full) {
           yield* queueRow(issue.id, true, (yield* chat.channelOf(where)).id, trigger);
-          return { queued: full + "：排上队了，有空地就自动开工" };
+          return { queued: full + "：排上队了，有空位就自动开工" };
         }
         return { session: yield* send(issue, agent, project, where, trigger) };
       });
@@ -577,7 +577,7 @@ export const make = (options: IssueOptions = {}) =>
       Effect.gen(function* () {
         const issue = yield* get(id);
         if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
-          return yield* Effect.fail(refused("这是种植计划的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
+          return yield* Effect.fail(refused("这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
         if (issue.sessions.length === 0) {
           // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
           if (!issue.lastRun) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
@@ -637,9 +637,9 @@ export const make = (options: IssueOptions = {}) =>
         return Option.getOrUndefined(yield* Effect.option(get(row.id)));
       });
 
-    // ── harvesting ──
+    // ── merging ──
 
-    const { merge, refreshPullRequests } = harvesting({
+    const { merge, refreshPullRequests } = merging({
       core,
       sessions,
       projects,
@@ -891,7 +891,7 @@ export const make = (options: IssueOptions = {}) =>
               return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
             const [, agent, project] = yield* ready(id);
             const full = sessions.noRoom(agent.runtime, project);
-            if (full) return { queued: full + "：还在排队，有空地就自动开工" };
+            if (full) return { queued: full + "：还在排队，有空位就自动开工" };
             return yield* start(id, "");
           }),
         ),
@@ -923,7 +923,7 @@ export const make = (options: IssueOptions = {}) =>
               yield* shape.review(id, { pass: false, findings });
               break;
             }
-            case "harvest":
+            case "complete":
             case "acknowledge":
               yield* shape.setStatus(id, "done", said, channel);
               break;
@@ -992,7 +992,7 @@ export const make = (options: IssueOptions = {}) =>
               yield* reopenRow(id);
               break;
             // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
-            // touches no git and opens no pull request; the rest is harvested into the main branch or by a pull request.
+            // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
             case "complete": {
               const commits = yield* commitsOf(t);
               if (opt.keepBranch || commits === 0) {
@@ -1049,7 +1049,7 @@ export const make = (options: IssueOptions = {}) =>
           const why = isForOrchestrator(t)
             ? "这是派给管家的工单：管家答完就关"
             : t.graph || t.task
-              ? "这是种植计划的工单，跟着计划走：在计划里验收"
+              ? "这是计划里的工单，跟着计划走：在计划里验收"
               : t.status !== "in_review"
                 ? "还没交回来，没有东西可验收"
                 : "";

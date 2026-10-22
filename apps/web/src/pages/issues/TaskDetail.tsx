@@ -92,7 +92,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
         )}
       </Show>
       <Show when={reviewing()}>
-        <TaskHarvest
+        <GraphMerge
           graph={g()}
           onDone={(a) => {
             setReviewing(false);
@@ -195,7 +195,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
             {word("resume")}
           </Button>
         </Show>
-        <Show when={g().state === "ripe"}>
+        <Show when={g().state === "ready"}>
           <Button tone="primary" onClick={() => setReviewing(true)}>
             看改动，{word("merge")}…
           </Button>
@@ -249,8 +249,8 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
 
-/** A ripe task's changes before they go into the main branch: its commits and files, and the merge. */
-function TaskHarvest(props: { graph: TaskGraph; onDone: (said: Answer | null) => void }) {
+/** A finished graph's changes before they go into the main branch: its commits and files, and the merge. */
+function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => void }) {
   const changes = useGraphChanges(() => props.graph.id);
   const merge = async () => {
     const id = props.graph.id;
@@ -264,7 +264,7 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (said: Answer | null) =>
           <>
             <p class="text-sm text-berry">看不了改动：{reasonOf(changes.error)}</p>
             <Button class="mt-2" onClick={() => props.onDone(null)}>
-              先不收
+              先放着
             </Button>
           </>
         }
@@ -280,14 +280,14 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (said: Answer | null) =>
               </Show>
               <Show when={c().conflicts.length > 0}>
                 <Note tone="berry">
-                  合进 {c().base} 会冲突：{c().conflicts.join("、")}。先不收，等 {c().base} 上的改动处理好。
+                  合进 {c().base} 会冲突：{c().conflicts.join("、")}。先不合，等 {c().base} 上的改动处理好。
                 </Note>
               </Show>
               <ChangesBody changes={c()} />
               <div class="mt-2 flex justify-end gap-2">
-                <Button onClick={() => props.onDone(null)}>先不收</Button>
+                <Button onClick={() => props.onDone(null)}>先放着</Button>
                 <Button tone="primary" disabled={c().conflicts.length > 0} onClick={() => void merge()}>
-                  确认收获，合进 {c().base}
+                  合进 {c().base}
                 </Button>
               </div>
             </div>

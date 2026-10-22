@@ -3,7 +3,7 @@
  * shapes'. Run as part of `pnpm run docs:verify`; a hit names the file, the line, and what to say instead.
  *
  * A name belongs here when renaming it was a decision (a note says why), not when the old word still means something:
- * `t.Helper`, the farm's helpers on screen and the game's harvest are not stale.
+ * `t.Helper`, the farm's helpers on screen and the game's harvest are not stale; an issue's state in farm words is.
  */
 
 import { globSync, readFileSync } from "node:fs";
@@ -157,6 +157,13 @@ const RULES: readonly Rule[] = [
     name: "the orchestrator under the assistant name",
     pattern: /\b(Assistant(?!Message)[A-Z]\w*|assistant(?!Message)[A-Z]\w*|\w+Assistant(?!Message)\w*)\b/,
     says: 'Orchestrator, orchestratorAgent, OrchestratorShape, forOrchestrator; a model\'s message role stays assistant (AssistantMessage, role: "assistant")',
+  },
+  {
+    name: "an issue's state in farm words",
+    pattern: /收获|收成|缺肥|种植计划|活熟了|\bPhaseRipe\b|_tag (?:===|!==|:) "ripe"|"graph-ripe"|act: "harvest"|\bHarvest(?:Deps|Review)\b|\bharvesting\(/,
+    says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
+    // The farm's skin and the game say it their way.
+    except: /^apps\/(web\/src\/farm\/|web\/test\/farm-|server\/src\/game\/)/,
   },
   {
     name: "a business name in farm words",

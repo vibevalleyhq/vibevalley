@@ -1,4 +1,4 @@
-// Harvesting an issue: its session's work taken into the main branch, by a local merge or a pull request, and the pull
+// Merging an issue's work: its session's commits taken into the main branch, by a local merge or a pull request, and the pull
 // requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
 // here, for the board, the command line and the orchestrator's tool alike.
 
@@ -14,8 +14,8 @@ import { NotTakenIn, type SessionShape } from "../session/session.ts";
 import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 
-/** What harvesting needs of the issues around it. */
-export interface HarvestDeps {
+/** What merging needs of the issues around it. */
+export interface MergeDeps {
   readonly core: CoreShape;
   readonly sessions: SessionShape;
   readonly projects: ProjectShape;
@@ -32,9 +32,9 @@ export interface HarvestDeps {
   readonly publish: (id: string) => Effect.Effect<void>;
 }
 
-export function harvesting(d: HarvestDeps) {
+export function merging(d: MergeDeps) {
   const { core, sessions, projects, chat, db, inTx, get, list, latest, liveSession, publish } = d;
-  /** Harvests by pull request and the poll of their states, one at a time. */
+  /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = Semaphore.makeUnsafe(1);
 
   /** Work that did not go in: the helper is sent back with what it is to fix, in the issue's thread as from the owner;
@@ -59,13 +59,13 @@ export function harvesting(d: HarvestDeps) {
       const session = sessions.sessionOf(id);
       if (!session) return yield* Effect.fail(missing("帮工 " + id));
       const merged = yield* handedOver(id, (place) => projects.merge(place));
-      yield* core.notice("info", `收了 ${session.name} 的活：${merged.text}`);
+      yield* core.notice("info", `${session.name} 的活合进去了：${merged.text}`);
       return merged.text;
     });
 
   const savePullRequest = (id: string, pr: PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
 
-  /** The harvest as a pull request: opened (or the open one pushed to) with the session's conclusion, and kept on the issue. */
+  /** The merge as a pull request: opened (or the open one pushed to) with the session's conclusion, and kept on the issue. */
   const pullRequestOf = (place: Workplace, issue: Issue, said: string) =>
     Effect.gen(function* () {
       const pr = yield* projects
@@ -80,7 +80,7 @@ export function harvesting(d: HarvestDeps) {
       Effect.gen(function* () {
         const issue = yield* get(id);
         // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table: a round that
-        // failed, or a required acceptance not passed, is not harvested.
+        // failed, or a required acceptance not passed, is not merged.
         if (!issue.graph && !issue.task) {
           const [m, why] = statusMove(issue, "done");
           if (m === "none") return yield* Effect.fail(refused(why));

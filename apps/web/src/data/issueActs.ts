@@ -16,10 +16,12 @@ export interface ActWays {
   readonly run: (f: () => Promise<unknown>) => Promise<boolean>;
   /** Acts the page carries out its own way, given the box's words; the rest go to issue.act as they are. */
   readonly own?: Partial<Record<IssueAct, (words: string) => Promise<unknown>>>;
-  /** harvest and close open the page's own dialogs. */
-  readonly harvest: () => void;
+  /** complete and close open the page's own dialogs. */
+  readonly complete: () => void;
   readonly close: () => unknown;
   readonly told: (title: string, description: string) => void;
+  /** A skin's own words for some acts (the farm's for complete); the rest are the issue's (actLabel). */
+  readonly words?: Partial<Record<IssueAct, string>>;
 }
 
 export function createIssueActs(issue: () => Issue, ways: ActWays) {
@@ -67,8 +69,8 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
 
   const go = (a: IssueAct): void => {
     switch (a) {
-      case "harvest":
-        return ways.harvest();
+      case "complete":
+        return ways.complete();
       case "close":
         return void act(async () => ways.close());
       case "answer":
@@ -101,7 +103,8 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     /** Runs something beside the acts (a review choice) under the same busy flag. */
     act,
     /** What a button says: with its box open, what pressing it again does. */
-    label: (a: IssueAct) => (a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : actLabel[a]),
+    label: (a: IssueAct) =>
+      a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : (ways.words?.[a] ?? actLabel[a]),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),
     /** 打回 with its box open is the red one. */

@@ -108,7 +108,7 @@ function OrchestratorCard() {
         </span>
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="text-base font-semibold">管家</span>
-          <span class="line-clamp-2 text-sm text-muted">不下地：派活、盯进度、转告结果，也接电话。</span>
+          <span class="line-clamp-2 text-sm text-muted">不当帮工：派活、盯进度、转告结果，也接电话。</span>
         </span>
       </div>
       <div class={footer}>
@@ -181,7 +181,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
           雇过 <span class="font-medium text-ink">{Math.round(props.tally?.hired ?? 0)}</span>
         </span>
         <span>
-          收成 <span class="font-medium text-[#3f6427]">{Math.round(props.tally?.harvested ?? 0)}</span>
+          合进 <span class="font-medium text-[#3f6427]">{Math.round(props.tally?.harvested ?? 0)}</span>
         </span>
         <Show when={props.errors.length > 0} fallback={<span class="min-w-0 flex-1 truncate text-right">{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
           <span class="min-w-0 flex-1 truncate text-right text-berry" title={props.errors.join("\n")}>

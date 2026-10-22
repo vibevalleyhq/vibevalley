@@ -42,7 +42,7 @@ const criteriaList = (text: string) =>
 
 /** Moved to todo: it is either worked already, or waits there for room. */
 export const dispatchedNotice = (open: (id: string | undefined) => void) => (got: Issue) => {
-  if (got.status === "todo") toast("排上队了：地都满了，有空地就自动开工。");
+  if (got.status === "todo") toast("排上队了：空位都满了，有空位就自动开工。");
   else open(got.id);
 };
 
@@ -288,14 +288,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         />
       </Property>
       <More>
-        {/* Every issue has an acceptance; this is who must pass it before the harvest. */}
+        {/* Every issue has an acceptance; this is who must pass it before it is completed. */}
         <Property label="验收">
           <Pick
             label="验收"
             value={d().acceptance}
             onChange={(v) => edit({ acceptance: v as Review })}
             options={[
-              { value: "glance", label: "看一眼就收" },
+              { value: "glance", label: "看一眼就算" },
               { value: "required", label: "必须过验收" },
             ]}
           />
@@ -305,7 +305,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Show when={queued()}>
         {(at) => (
           <Note tone="water" class="mt-2 !p-2.5">
-            <div>排队中：{ago(at(), Date.now())}排上的，有空地就按看板上的先后自动开工。</div>
+            <div>排队中：{ago(at(), Date.now())}排上的，有空位就按看板上的先后自动开工。</div>
             <Button class="mt-1.5" disabled={busy()} onClick={() => void unqueue()}>
               不排了
             </Button>

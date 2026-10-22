@@ -139,12 +139,12 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     brief: made.title,
     hiredAt: Date.now() - 600_000,
     runs: 1,
-    phase: { _tag: "ripe" },
+    phase: { _tag: "done" },
     issue: made.id,
     lastRun: { outcome: "completed", summary: "做完了，测试全过", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as never,
   };
-  // What the server would say of an issue handed back: it may be harvested (done) or closed.
+  // What the server would say of an issue handed back: it may be completed (done) or canceled.
   const issue: Issue = {
     ...made,
     sessions: ["w1"],
