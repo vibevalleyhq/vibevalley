@@ -13,11 +13,11 @@ import { Docs } from "./doc/doc.ts";
 import { Issues } from "./issue/issue.ts";
 import { Memories } from "./memory/memory.ts";
 import { Runtimes } from "./runtime/runtime.ts";
-import { Schedules } from "./schedule/schedule.ts";
+import { Recurrences } from "./recurrence/recurrence.ts";
 import { Sessions } from "./session/session.ts";
 import { Setting } from "./setting/setting.ts";
 import { Tasks } from "./task/task.ts";
-import { Manager } from "./manager/manager.ts";
+import { Assistant } from "./assistant/assistant.ts";
 import { Game } from "./game/game.ts";
 import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Voice } from "./voice/voice.ts";
@@ -35,27 +35,27 @@ export const handlers = Effect.gen(function* () {
   const runtimes = yield* Runtimes;
   const sessions = yield* Sessions;
   const channels = yield* Channels;
-  const schedules = yield* Schedules;
+  const recurrences = yield* Recurrences;
   const issues = yield* Issues;
   const tasks = yield* Tasks;
-  const manager = yield* Manager;
+  const assistant = yield* Assistant;
   const game = yield* Game;
   const lan = yield* Lan;
   const voice = yield* Voice;
   const connectors = yield* Connectors;
   const done: Handlers = {
     "server.health": () => Effect.succeed({ ok: true, version: config.version }),
-    "manager.open": () => core.open(),
-    "manager.stop": () => manager.stop(),
+    "assistant.open": () => core.open(),
+    "assistant.stop": () => assistant.stop(),
     "game.achievements": () => Effect.sync(game.achievements),
     "voice.session": () => voice.session(),
     "voice.renew": ({ body }) => voice.renew(body.channel, body.uid),
-    "voice.start": ({ body }) => voice.start(body.channel, body.uid),
+    "voice.start": ({ body }) => voice.start(body.channel, body.uid, body.about),
     "voice.stop": ({ body }) => voice.stop(body.agentId),
     "voice.heard": ({ body }) => voice.heard(body.agentId, body.text, body.agent ?? "", body.sendKey ?? ""),
     "voice.said": ({ body }) => voice.said(body.agentId, body.text),
     "voice.dictate": ({ body }) => voice.dictate(body.audio, body.format),
-    "manager.hear": ({ body }) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
+    "assistant.hear": ({ body }) => voice.heardCurrent(body.text, body.agent ?? "", body.sendKey ?? ""),
     "connector.list": () => connectors.list(),
     "connector.login": ({ id, body }) => connectors.login(id, body),
     "connector.verify": ({ id, body }) => connectors.verify(id, body.code),
@@ -75,14 +75,14 @@ export const handlers = Effect.gen(function* () {
       ),
     "game.chooseTitle": ({ body }) => game.chooseTitle(body.achievement, body.tier),
     "github.refresh": () => Effect.flatMap(projects.refreshGitHub(), (status) => Effect.as(issues.refreshPullRequests, status)),
-    "manager.markWrong": ({ body }) => manager.markWrong(body.on, body.want),
+    "assistant.markWrong": ({ body }) => assistant.markWrong(body.on, body.want),
     "channel.say": ({ body }) =>
       Effect.andThen(
         Effect.andThen(
           Effect.sync(() => body.station !== undefined && game.want(body.station)),
           core.open(),
         ),
-        manager.say(
+        assistant.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
           body.conversation,
@@ -118,8 +118,8 @@ export const handlers = Effect.gen(function* () {
     "memory.recall": ({ agent, project, text }) => memory.recallOf(agent, project ?? "", text ?? ""),
     "memory.create": ({ agent, body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: "owner" }),
     "memory.delete": ({ agent, memory: id }) => memory.forgetOf(agent, id),
-    "manager.listArchive": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
-    "manager.getArchive": ({ name }) =>
+    "assistant.listArchive": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
+    "assistant.getArchive": ({ name }) =>
       Effect.suspend(() => {
         const text = memory.archiveFile(name);
         return text !== undefined ? Effect.succeed(text) : Effect.fail(missing("旧账 " + name));
@@ -137,26 +137,27 @@ export const handlers = Effect.gen(function* () {
     "channel.update": ({ id, body }) => channels.updateChannel(id, body.description, body.project),
     "channel.history": ({ id, before, limit }) => channels.history(id, before, limit),
     "channel.markRead": ({ id, body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e)))),
-    "schedule.create": ({ body }) => schedules.add(body, "owner", true),
-    "schedule.list": () => Effect.sync(schedules.list),
-    "schedule.update": ({ id, body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(schedules.setEnabled(id, body.enabled))),
-    "schedule.delete": ({ id }) => Effect.asVoid(schedules.remove(id)),
+    "recurrence.create": ({ body }) => recurrences.add(body, "owner", true),
+    "recurrence.list": () => Effect.sync(recurrences.list),
+    "recurrence.update": ({ id, body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),
+    "recurrence.delete": ({ id }) => Effect.asVoid(recurrences.remove(id)),
     "issue.list": () => issues.list(),
     "issue.history": () => issues.history(),
-    "issue.get": ({ id }) => issues.get(id),
-    "issue.runs": ({ id }) => Effect.andThen(issues.get(id), sessions.runs(id)),
-    "issue.timeline": ({ id }) => issues.timeline(id),
+    "issue.get": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.get(id)),
+    "issue.runs": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => Effect.andThen(issues.get(id), sessions.runs(id))),
+    "issue.timeline": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.timeline(id)),
     "issue.create": ({ body }) => issues.add(body),
-    "issue.update": ({ id, body }) => issues.edit(id, body),
-    "issue.move": ({ id, body }) => issues.move(id, body.before ?? ""),
-    "issue.delete": ({ id }) => issues.remove(id),
-    "issue.accept": ({ id, body }) => issues.accept(id, body),
-    "issue.draft": ({ id, body }) => issues.draft(id, body.text ?? "", channels.general()),
-    "issue.dispatch": ({ id }) => issues.dispatchQueued(id),
-    "issue.status": ({ id, body }) => issues.setStatus(id, body.status, body.text ?? "", channels.general()),
-    "issue.comment": ({ id, body }) => issues.comment(id, body.text, body.sendKey ?? ""),
-    "issue.changes": ({ id }) => issues.changes(id, "owner"),
-    "issue.resolve": ({ id }) => issues.resolve(id),
+    "issue.update": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body)),
+    "issue.move": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.move(id, body.before ?? "")),
+    "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
+    "issue.act": ({ id, body }) => issues.act(id, body, channels.general()),
+    "issue.review": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.review(id, body)),
+    "issue.refine": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.refine(id, body.text ?? "", channels.general())),
+    "issue.dispatch": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.dispatchQueued(id)),
+    "issue.status": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
+    "issue.comment": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
+    "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, "owner")),
+    "issue.resolve": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.resolve(id)),
     "project.templates": ({ id }) => issues.templates(id),
     "graph.split": ({ body }) => tasks.split(body.goal, body.project, body.agent ?? "", "user"),
     "graph.updateTask": ({ id, task, body }) => tasks.editTask(id, task, body, "user"),

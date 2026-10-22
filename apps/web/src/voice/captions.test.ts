@@ -24,11 +24,11 @@ test("a turn's text is replaced as it grows, and ends with final or turn_status"
   c.apply({ object: "assistant.transcription", turn_id: 1, text: "挺好的，地里有一个帮工。", turn_status: 1 });
   expect(c.turns.map((t) => [t.speaker, t.text, t.done])).toEqual([
     ["you", "你好，农场怎么样", true],
-    ["manager", "挺好的，地里有一个帮工。", true],
+    ["assistant", "挺好的，地里有一个帮工。", true],
   ]);
 });
 
-test("talking over the manager stops its turn where it was; later text of that turn is ignored", () => {
+test("talking over the assistant stops its turn where it was; later text of that turn is ignored", () => {
   const c = new LiveCaptions();
   c.apply({ object: "assistant.transcription", turn_id: 2, text: "今天地里", turn_status: 0 });
   c.apply({ object: "message.interrupt", turn_id: 2 });

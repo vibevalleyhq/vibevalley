@@ -9,20 +9,20 @@
 // the sender leaves its trigger on the hand first and the turn takes the oldest. Admission (room, opening a turn,
 // harvesting) is one at a time, so two callers cannot claim the same room.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
-import type { Event, Session as RuntimeSession, Runtime, SessionOptions } from "@botiverse/oar";
+import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
 import { createSubagents, type Subagent, type SubagentReport, type Subagents } from "@botiverse/oar/agents";
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   type Agent,
+  type WorkspaceState,
   dayMs,
-  type Issue,
+  type Fact,
   type IssueClose,
   maxRunning,
   type Outcome,
-  type PullRequest,
   type Run,
   type RunTrigger,
   type Session,
@@ -33,12 +33,11 @@ import {
 import { isBusy } from "@vibevalley/protocol/rules";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import * as qr from "../../db/generated/session_run.sql.ts";
-import * as qi from "../../db/generated/session_run_issue.sql.ts";
-import * as qs from "../../db/generated/session.sql.ts";
 import { Agents } from "../agent/agent.ts";
+import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
+
+export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
 import { newId } from "../base/ids.ts";
 import { Core, type FactIn } from "../core/core.ts";
 import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
@@ -51,16 +50,19 @@ import {
   instructions,
   jobBreak,
   noRoom,
-  pullRequestConclusion,
   readReport,
   recallBlock,
-  sessionName,
   type SessionLimits,
+  sessionName,
+  summaryOf,
   toOarMcp,
   withRecall,
   workplaceRules,
 } from "./rules.ts";
-import { callbackLog } from "../base/log.ts";
+import { sessionOnIssue } from "./state.ts";
+import * as qr from "../../db/generated/session_run.sql.ts";
+import * as qi from "../../db/generated/session_run_issue.sql.ts";
+import * as qs from "../../db/generated/session.sql.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -91,33 +93,15 @@ export interface HireOptions {
   /** What its first run is for; the issue sent out when none. */
   readonly trigger?: RunTrigger;
   /** It drafts the issue rather than works it. */
-  readonly draft?: boolean;
+  readonly refining?: boolean;
   /** Called with the session just before it goes on the farm, so what must know of it first (its issue's link) is written before anyone can see it. */
   readonly hiring?: (s: Session) => Effect.Effect<void, unknown>;
 }
-
-export interface Delivered {
-  readonly kind: "run" | "steered" | "queued" | "refused";
-  readonly launch?: string;
-  readonly woke?: boolean;
-  readonly reason?: string;
-}
-
-export type LaunchActivity =
-  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
-  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: Outcome; readonly spoke: boolean }
-  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
-  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
 
 export interface RunFinished {
   readonly id: string;
   readonly issues: string[];
   readonly outcome: Outcome;
-}
-
-export interface InputConsumed {
-  readonly session: string;
-  readonly messages: string[];
 }
 
 interface OarSession {
@@ -146,11 +130,6 @@ interface Hand {
   heard: string[];
 }
 
-interface Saved {
-  hired: number;
-  hands: { id: string; place: Workplace; oarSessionId?: string; lastText?: string; recalled?: string[] }[];
-}
-
 export interface SessionShape {
   readonly noRoom: (runtime: string, project: string) => string;
   readonly send: (agent: Agent, task: string, where: string, opt?: HireOptions) => Effect.Effect<Hired>;
@@ -162,15 +141,17 @@ export interface SessionShape {
   readonly place: (id: string) => Workplace | undefined;
   readonly roster: () => Roster[];
   readonly find: (id: string) => Roster | undefined;
-  readonly merge: (id: string) => Effect.Effect<Merged, ApiError | MergeFailure>;
-  readonly mergeInto: (id: string, target: string) => Effect.Effect<readonly string[], ApiError | MergeFailure>;
-  readonly submitPullRequest: (
+  /** A session on the farm now, as the core state has it: what another module reads a session by. */
+  readonly sessionOf: (id: string) => Session | undefined;
+  readonly presentSessions: () => readonly Session[];
+  /** The session hands its workplace over and leaves as closed says: use takes the work in (Source Control's merge, pull
+   * request, merge into a task graph's branch), given the workplace and the session's last words in full. Refused while
+   * it works. A merge that would conflict marks the conflict and keeps the session; so does a pull request left open. */
+  readonly handOver: <E>(
     id: string,
-    issue: Issue,
-    save: (pr: PullRequest) => Effect.Effect<void, unknown>,
-  ) => Effect.Effect<Merged, ApiError | MergeFailure>;
-  /** issue: the issue's number, which names its worktree and branch (not the pull request's). */
-  readonly finishPullRequest: (id: string, issue: number, closed: IssueClose) => Effect.Effect<void, ApiError | MergeFailure>;
+    closed: IssueClose,
+    use: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>,
+  ) => Effect.Effect<Merged, ApiError | E>;
   /** Every session of the agent, or of every agent when it is empty: on the farm and ended, newest first. */
   readonly list: (agent: string) => Effect.Effect<Session[]>;
   /** A session on the farm, or one that has ended. */
@@ -180,8 +161,10 @@ export interface SessionShape {
   /** A session's log, oldest first; a run's only when run is given. */
   readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
   readonly trajectories: Trajectories;
-  /** These three are subscribed before they return: nothing published after is missed. */
+  /** These four are subscribed before they return: nothing published after is missed. */
   readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
+  /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
+  readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
   readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
   readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
   /** A session's token for the farm's MCP server; a new one stops the old working. */
@@ -192,7 +175,7 @@ export interface SessionShape {
   /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
   readonly setAddress: (address: string) => void;
   readonly mcpUrl: () => string;
-  /** Records a run of an in-process agent (the manager's) as its own; execution.ts. */
+  /** Records a run of an in-process agent (the assistant's) as its own; execution.ts. */
   readonly runStore: RunStore;
   /** Brings back the sessions the farm had when it stopped, once every service is ready. */
   readonly restore: Effect.Effect<void>;
@@ -208,6 +191,22 @@ export interface RunStore {
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
   readonly register: (session: string, currentRun: () => string) => void;
+}
+
+/** A session's own fact as news; the rest are not the sessions'. */
+export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefined {
+  switch (fact.type) {
+    case "hired": {
+      const session = after.sessions.find((h) => h.id === fact.session.id);
+      return session ? { _tag: "hired", session } : undefined;
+    }
+    case "report":
+      return { _tag: "reported", report: fact, session: after.sessions.find((h) => h.id === fact.id) };
+    case "left":
+      return { _tag: "left", left: fact };
+    default:
+      return undefined;
+  }
 }
 
 export class Sessions extends Context.Service<Sessions, SessionShape>()("vibevalley/Session") {}
@@ -303,11 +302,11 @@ function watchStalls(session: RuntimeSession, stallMs: number, onStall: (silentF
 
 export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
-    const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
     const memories = yield* Memories;
+    const chat = yield* Channels;
     const projects = yield* Projects;
     const runtimes = yield* Runtimes;
     const sql = yield* SqlClient.SqlClient;
@@ -329,15 +328,22 @@ export const make = (options: SessionOptionsIn = {}) =>
     const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
 
     const root = resolve(projects.root);
-    const file = join(config.home, "sessions.json");
     const logDir = join(config.home, "logs");
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
-    const disk = new FileWriter(file);
     const trajectories = new Trajectories(config.home, (id, e) => Effect.runSync(core.sessionEvent(id, e)));
     const admission = Semaphore.makeUnsafe(1);
 
     const launchesHub = yield* PubSub.unbounded<LaunchActivity>();
+    // The sessions' own facts, told as news in the order they were applied.
+    const newsHub = yield* PubSub.unbounded<SessionNews>();
+    const [, moves] = yield* core.transitions;
+    yield* Effect.forkScoped(
+      Stream.runForEach(moves, ({ fact, after }) => {
+        const news = newsOf(fact, after);
+        return news ? PubSub.publish(newsHub, news) : Effect.void;
+      }),
+    );
     const finishedHub = yield* PubSub.unbounded<RunFinished>();
     const consumedHub = yield* PubSub.unbounded<InputConsumed>();
     const signal = (a: LaunchActivity) => PubSub.publishUnsafe(launchesHub, a);
@@ -362,36 +368,26 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     // ── what is kept ──
 
-    const body = () => {
-      const saved: Saved = {
-        hired,
-        hands: [...hands.values()]
-          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-          .map((h) => {
-            const live = h.sess?.agent.session.id;
-            const oar = live || h.oarSessionId;
-            return {
-              id: h.id,
-              place: h.place,
-              ...(oar ? { oarSessionId: oar } : {}),
-              ...(h.lastText ? { lastText: h.lastText } : {}),
-              ...(h.recalled.size > 0 ? { recalled: [...h.recalled].sort() } : {}),
-            };
-          }),
+    // A session's own row keeps what taking it up again needs, so it goes with the database: one made again from a new
+    // schema brings back no session (and none on an issue the database no longer has).
+    const handRow = (h: Hand) => {
+      const oar = h.sess?.agent.session.id || h.oarSessionId;
+      return {
+        id: h.id,
+        place: JSON.stringify(h.place),
+        oar_session: oar || null,
+        last_text: h.lastText || null,
+        recalled: h.recalled.size > 0 ? JSON.stringify([...h.recalled].sort()) : null,
       };
-      return JSON.stringify(saved);
     };
+    const keepHands = Effect.suspend(() =>
+      Effect.forEach([...hands.values()], (h) => logged(`session ${h.id}: what brings it back not kept`, qs.keepHand(handRow(h))), { discard: true }),
+    );
 
     const save = () => {
       if (closing) return;
       clearTimeout(pending);
-      pending = setTimeout(() => {
-        try {
-          disk.write(body);
-        } catch (e) {
-          logs.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
-        }
-      }, saveAfterMs);
+      pending = setTimeout(() => fire(keepHands), saveAfterMs);
     };
 
     const keep = (s: Session) =>
@@ -530,7 +526,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         runs: report.turn,
         ...(spent ? { spent } : {}),
         ...(h.run ? { run: h.run } : {}),
-        ...(read.asks.length > 0 ? { asks: read.asks } : {}),
+        ...(read.questions.length > 0 ? { questions: read.questions } : {}),
         ...(read.checks.length > 0 ? { checks: read.checks } : {}),
       });
       endRun(h, read.outcome, read.summary, spent);
@@ -759,7 +755,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       );
 
-    const harvest = <E>(id: string, closed: IssueClose, merge: (place: Workplace) => Effect.Effect<Merged, E>) =>
+    const harvest = <E>(id: string, closed: IssueClose, merge: (place: Workplace, lastText: string) => Effect.Effect<Merged, E>) =>
       admission.withPermits(1)(
         Effect.gen(function* () {
           const h = hands.get(id);
@@ -772,7 +768,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           if (isBusy(current) || h.triggers.length > 0)
             return yield* Effect.fail<ApiError | E>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
           yield* rest(h);
-          const merged = yield* merge(h.place).pipe(
+          const merged = yield* merge(h.place, h.lastText).pipe(
             Effect.tapError((e) =>
               Effect.sync(() => {
                 if (e instanceof MergeFailure && e.kind === "conflict") apply({ type: "conflict", id, conflict: { base: e.base, files: [...e.files] } });
@@ -799,35 +795,35 @@ export const make = (options: SessionOptionsIn = {}) =>
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
       for (const r of yield* db(qr.openRuns())) yield* finishRun(r.id, "interrupted", "VibeValley 重启了，这一轮停在了半路");
-      let saved: Saved = { hired: 0, hands: [] };
-      if (existsSync(file)) saved = json<Saved>(readFileSync(file, "utf8")) ?? saved;
+      const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
-        saved.hired ?? 0,
-        ...core
-          .state()
-          .sessions.map((s) => Number.parseInt(s.id.replace(/^w/, ""), 10))
+        0,
+        ...[...(yield* db(qs.sessionIDs())).map((r) => r.id), ...core.state().sessions.map((s) => s.id)]
+          .map((id) => Number.parseInt(id.replace(/^w/, ""), 10))
           .filter((n) => Number.isFinite(n)),
       );
       for (const session of core.state().sessions) {
-        const s = (saved.hands ?? []).find((x) => x.id === session.id);
-        if (!s || !existsSync(s.place.cwd)) {
+        const row = kept.get(session.id);
+        const place = row?.place ? json<Workplace>(row.place) : undefined;
+        if (!row || !place || !existsSync(place.cwd)) {
           apply({ type: "left", id: session.id, closed: "lost" });
           trajectories.finish(session.id);
           yield* ended(session.id, "lost");
-          notice("warn", `${session.name} 干活的目录不见了${s ? "（" + s.place.cwd + "）" : ""}，没接回来`);
+          notice("warn", `${session.name} 没接回来：${place ? "干活的目录不见了（" + place.cwd + "）" : "库里没有它的记录"}`);
           continue;
         }
+        const s = { place, oarSessionId: row.oar_session ?? "", lastText: row.last_text ?? "", recalled: json<string[]>(row.recalled) ?? [] };
         hands.set(session.id, {
           id: session.id,
           place: s.place,
           journal: yield* logOf(session),
-          oarSessionId: s.oarSessionId ?? "",
-          lastText: s.lastText ?? "",
+          oarSessionId: s.oarSessionId,
+          lastText: s.lastText,
           tracking: {},
           launch: "",
           spoke: false,
-          recalled: new Set(s.recalled ?? []),
+          recalled: new Set(s.recalled),
           triggers: [],
           run: "",
           heard: [],
@@ -838,32 +834,34 @@ export const make = (options: SessionOptionsIn = {}) =>
         }
       }
       if (hands.size > 0) yield* Effect.logInfo(`vibevalley: 接回 ${hands.size} 个帮工`);
+      yield* chat.helpersBack;
     });
 
     // The sessions are let go first: a turn cut off by the shutdown is reported when the farm comes back, not on the way out.
+    // The database closes after this layer: what brings the sessions back is written while it is still open.
     yield* Effect.addFinalizer(() =>
-      Effect.promise(async () => {
-        closing = true;
-        clearTimeout(pending);
-        try {
-          disk.finish(body);
-        } catch (e) {
-          logs.warn(`vibevalley: could not save sessions.json: ${String(e)}`);
-        }
-        const all = [...hands.values()];
-        for (const h of all) h.journal.close();
-        await Promise.race([
-          Promise.all(
-            all.map((h) => {
-              const s = h.sess;
-              release(h);
-              return s ? s.subagents.close().catch(() => {}) : Promise.resolve();
-            }),
-          ),
-          new Promise((r) => setTimeout(r, closeWaitMs).unref()),
-        ]);
-        trajectories.close();
-      }),
+      Effect.andThen(
+        Effect.suspend(() => {
+          closing = true;
+          clearTimeout(pending);
+          return keepHands;
+        }),
+        Effect.promise(async () => {
+          const all = [...hands.values()];
+          for (const h of all) h.journal.close();
+          await Promise.race([
+            Promise.all(
+              all.map((h) => {
+                const s = h.sess;
+                release(h);
+                return s ? s.subagents.close().catch(() => {}) : Promise.resolve();
+              }),
+            ),
+            new Promise((r) => setTimeout(r, closeWaitMs).unref()),
+          ]);
+          trajectories.close();
+        }),
+      ),
     );
 
     const view = (h: Hand): Roster | undefined => {
@@ -907,7 +905,7 @@ export const make = (options: SessionOptionsIn = {}) =>
               phase: { _tag: "arriving" },
               ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
               ...(opt.channel ? { channel: opt.channel } : {}),
-              ...(opt.draft ? { draft: true } : {}),
+              ...(opt.refining ? { refining: true } : {}),
               ...(opt.issue ? { issue: opt.issue } : {}),
               ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
             };
@@ -989,27 +987,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const h = hands.get(id);
         return h ? view(h) : undefined;
       },
-      merge: (id) => harvest(id, "merged", projects.merge),
-      mergeInto: (id, target) =>
-        Effect.map(
-          harvest(id, "merged_into_graph", (place) => projects.mergeInto(place, target)),
-          (m) => m.hashes ?? [],
-        ),
-      submitPullRequest: (id, issue, savePr) =>
-        harvest(id, "merged", (place) =>
-          Effect.gen(function* () {
-            const conclusion = pullRequestConclusion(hands.get(id)?.lastText ?? "");
-            const pr = yield* projects
-              .submitPullRequest(place, issue, conclusion)
-              .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : new MergeFailure("error", e.message))));
-            yield* savePr(pr).pipe(Effect.mapError((e) => new MergeFailure("error", e instanceof Error ? e.message : String(e))));
-            return { pullRequest: pr, text: "PR：" + pr.url, commits: 0 } as Merged;
-          }),
-        ),
-      finishPullRequest: (id, issue, closed) =>
-        Effect.asVoid(
-          harvest(id, closed, (place) => projects.finishPullRequest(place.project, issue).pipe(Effect.mapError((e) => new MergeFailure("error", e.message)))),
-        ),
+      handOver: harvest,
       list: (agent) =>
         Effect.gen(function* () {
           const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
@@ -1031,7 +1009,10 @@ export const make = (options: SessionOptionsIn = {}) =>
       currentRun: (id) => hands.get(id)?.run ?? executions.get(id)?.() ?? "",
       events: (id, r) => trajectories.events(id, r),
       trajectories,
+      sessionOf: (id) => core.session(id),
+      presentSessions: () => core.state().sessions,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
+      news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       issueToken,
@@ -1060,6 +1041,19 @@ export const make = (options: SessionOptionsIn = {}) =>
       },
       restore,
     };
+    // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
+    chat.useHelpers({
+      present: (id) => hands.has(id),
+      deliver,
+      currentRun: shape.currentRun,
+      report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
+      onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
+      sessionOf: shape.sessionOf,
+      presentSessions: shape.presentSessions,
+    });
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.launches, chat.activity));
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
+    yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
     return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run });
   });

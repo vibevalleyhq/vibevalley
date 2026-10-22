@@ -1,13 +1,13 @@
-// The agent's own task graph (task/engine.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
+// The agent's own task graph (taskGraph.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
 // the whole graph back after each call. The runner moves it along: a helper's task whose waits are settled goes to a
 // helper in the background, at most max at once; what the helper says comes back to the agent as an input. The agent's
 // own tasks are its to do; nothing here does them.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect } from "effect";
-import { head } from "@vibevalley/protocol/rules";
-import * as engine from "../../task/engine.ts";
-import type { TaskStore } from "../../task/store.ts";
+import { head } from "../../base/text.ts";
+import * as engine from "./taskGraph.ts";
+import type { TaskStore } from "./taskStore.ts";
 import type { Helper } from "./self.ts";
 import { objectSchema, type Schema, stringSchema, textTool } from "./tool.ts";
 
@@ -110,7 +110,7 @@ export class TaskRunner {
 
   constructor(
     private readonly store: TaskStore,
-    /** Undefined: this agent cannot send helpers (a helper itself, or the manager). */
+    /** Undefined: this agent cannot send helpers (a helper itself, or the assistant). */
     private readonly helper: Helper | undefined,
     private readonly life: AbortSignal,
     private readonly tell: (text: string) => void,

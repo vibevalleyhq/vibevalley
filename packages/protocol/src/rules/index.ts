@@ -1,24 +1,11 @@
-// The rules over the shapes: how the core state folds facts, and the pure rules the server and the page both use. The
-// golden files (testdata) hold them to their recorded answers (golden.test.ts).
+// The pure rules the server and the page both run: what a session is doing in words, an issue's short title and its
+// attention's labels, what in the inbox is news, which farm a session is on, the doc's order keys, deep equality. A rule
+// only the server runs is its module's (apps/server/src).
 
-export * from "./chat";
-export * from "./core";
-export * from "./dag";
-export * from "./frame";
 export * from "./inbox";
 export * from "./issues";
-export * from "./money";
 export * from "./phase";
 export * from "./play";
-export * from "./schedules";
-export * from "./seeds";
-export * from "./sessions";
-export * from "./standing";
-export * from "./taskChanges";
-export * from "./taskIssues";
-export * from "./tasks";
-export * from "./view";
+export * from "./attention";
 export * from "./order";
 export * from "./same";
-export * from "./text";
-export * from "./voice";

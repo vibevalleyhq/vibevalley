@@ -1,11 +1,12 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
-import type { Acceptance, Ask, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
+import type { Review, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { newSendKey } from "./write";
 import type { Tone } from "../../rules/cards";
 import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules/issues";
-import { actLabel, bugText, changesLine, type CriterionRow, findingsOf, issueState, noStepsText, resumeWords, standingTone } from "../../rules/issueState";
+import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
+import { actLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready, useAgents, useQuery } from "../../data/query";
@@ -55,7 +56,7 @@ export function IssueDetail(props: {
   }));
   const changes = () => ready(changesQuery, undefined);
   const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.standing.state, head().runs, props.issue.findings.length],
+    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, head().runs, props.issue.findings.length],
     queryFn: () => api.issue.timeline({ id: props.issue.id }),
     placeholderData: <T,>(prev: T) => prev,
   }));
@@ -71,10 +72,18 @@ export function IssueDetail(props: {
     return done;
   }
 
-  const say = (words: string) => {
+  /** An act is the server's (issue.act); the page gathers the words some take and shows the harvest's checklist and the
+   * close dialog first. */
+  const doAct = (a: IssueAct, words = "") => {
     const id = props.issue.id;
-    if (!words.trim()) return;
-    void act(() => api.issue.comment({ id, body: { text: words.trim(), sendKey: newSendKey() } })).then((ok) => {
+    return act(() => api.issue.act({ id, body: { act: a, ...(words ? { text: words, sendKey: newSendKey() } : {}) } }));
+  };
+
+  /** answer, tell, reject: what the box says (reject: one weed a line); nothing said, nothing sent. */
+  const sayAct = (a: IssueAct) => {
+    const words = text().trim();
+    if (!words) return;
+    void doAct(a, words).then((ok) => {
       if (!ok) return;
       setText("");
       setBox(undefined);
@@ -84,10 +93,8 @@ export function IssueDetail(props: {
   const reopen = async () => {
     const id = props.issue.id;
     const words = text().trim();
-    // Never sent: back to the backlog; sent: another round.
-    const status = props.issue.sessions.length > 0 ? "todo" : "backlog";
     setBusy(true);
-    const got = await run(() => api.issue.status({ id, body: { status, text: words } }));
+    const got = await run(() => api.issue.act({ id, body: { act: "reopen", ...(words ? { text: words } : {}) } }));
     setBusy(false);
     const last = got?.sessions[got.sessions.length - 1];
     if (last) {
@@ -96,47 +103,28 @@ export function IssueDetail(props: {
     }
   };
 
-  /** 打回: what the box says is the findings, one weed a line. */
-  const reject = async () => {
-    const lines = findingsOf(text());
-    if (lines.length === 0) return;
-    const id = props.issue.id;
-    if (await act(() => api.issue.accept({ id, body: { pass: false, findings: lines } }))) {
-      setText("");
-      setBox(undefined);
-    }
-  };
-
   const go = (a: IssueAct) => {
-    const id = props.issue.id;
     const h = props.session ?? head();
     switch (a) {
-      case "start":
-        return void act(() => api.issue.status({ id, body: { status: "todo" } }));
-      case "answer":
-        return say(text());
-      case "accept":
-        return void act(() => api.issue.accept({ id, body: { pass: true } }));
-      case "reject":
-        return box() === "reject" ? void reject() : void setBox("reject");
       case "harvest":
         return props.onClose(h, true);
-      case "acknowledge":
-        return void act(() => api.issue.status({ id, body: { status: "done" } }));
-      case "resolve":
-        return void act(() => api.issue.resolve({ id }));
-      case "resume":
-        return void act(() => api.issue.comment({ id, body: { text: resumeWords } }));
-      case "cure":
-        return void act(() => api.issue.comment({ id, body: { text: bugText(h.brief) } }));
-      case "tell":
-        return box() === "tell" ? say(text()) : void setBox("tell");
-      case "stop":
-        return void act(() => api.session.stop({ id: h.id }));
       case "close":
         return props.onClose(h, false);
+      case "answer":
+        return sayAct(a);
+      case "reject":
+      case "tell":
+        return box() === a ? sayAct(a) : void setBox(a);
       case "reopen":
         return void reopen();
+      case "start":
+      case "accept":
+      case "acknowledge":
+      case "resolve":
+      case "resume":
+      case "cure":
+      case "stop":
+        return void doAct(a);
     }
   };
 
@@ -152,7 +140,7 @@ export function IssueDetail(props: {
   );
 
   const parent = () => graphs().find((g) => g.id === props.issue.parent);
-  const tone = () => standingTone[s().standing.state];
+  const tone = () => attentionTone[s().attention.state];
   const heading = (
     <div class="pr-10">
       <Show when={s().inTask ? props.onTask : undefined}>
@@ -189,11 +177,13 @@ export function IssueDetail(props: {
               <Show when={ask().line}>
                 <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
               </Show>
-              <Show when={s().standing.state === "asking"}>
-                <For each={props.issue.asks}>{(a) => <Question ask={a} busy={busy()} onPick={say} />}</For>
+              <Show when={s().attention.state === "asking"}>
+                <For each={props.issue.questions}>
+                  {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
+                </For>
               </Show>
             </Note>
-            <Show when={s().standing.state === "asking" || s().standing.state === "closed" || box()}>
+            <Show when={s().attention.state === "asking" || s().attention.state === "closed" || box()}>
               <TextArea
                 class="mt-2.5"
                 rows={box() === "reject" ? 3 : 2}
@@ -201,26 +191,26 @@ export function IssueDetail(props: {
                 disabled={busy()}
                 onInput={(e) => setText(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().standing.state !== "closed") {
+                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().attention.state !== "closed") {
                     e.preventDefault();
-                    say(text());
+                    sayAct(box() === "tell" ? "tell" : "answer");
                   }
                 }}
                 placeholder={
                   box() === "reject"
                     ? "哪里没过，一行一条"
-                    : s().standing.state === "asking"
+                    : s().attention.state === "asking"
                       ? "自己说……"
-                      : s().standing.state === "closed"
+                      : s().attention.state === "closed"
                         ? "这次要它做什么（不填就是接着做完）"
                         : `给${head().name}带句话`
                 }
                 aria-label={
                   box() === "reject"
                     ? "哪里没过"
-                    : s().standing.state === "asking"
+                    : s().attention.state === "asking"
                       ? "回答"
-                      : s().standing.state === "closed"
+                      : s().attention.state === "closed"
                         ? "重开这张工单"
                         : `给${head().name}带句话`
                 }
@@ -245,7 +235,7 @@ export function IssueDetail(props: {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
-                say(text());
+                sayAct("tell");
               }
             }}
             placeholder={head().phase._tag === "working" ? "干着活也能收到这句话" : "说一句，它接着做一轮"}
@@ -277,7 +267,7 @@ export function IssueDetail(props: {
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
         <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看改动判断。</p>}>
-          <Criteria rows={s().criteria} checking={s().standing.state === "reviewing" && props.issue.acceptedAt === undefined} />
+          <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().weeds.length > 0}>
           <div class="mt-2">
@@ -289,7 +279,7 @@ export function IssueDetail(props: {
 
       <section aria-label="做出了什么">
         <SheetLabel>做出了什么</SheetLabel>
-        <Switch fallback={<p class="text-sm text-muted">{s().standing.state === "harvested" ? harvestedText(props.issue) : "没有可看的改动。"}</p>}>
+        <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "harvested" ? harvestedText(props.issue) : "没有可看的改动。"}</p>}>
           <Match when={s().showsChanges && changes()}>
             {(c) => (
               <Show
@@ -341,7 +331,7 @@ export function IssueDetail(props: {
             </Show>
           </Fold>
           <Fold label="每次干活" summary={s().historyLine}>
-            <Runs issue={props.issue.id} version={`${props.issue.standing.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
+            <Runs issue={props.issue.id} version={`${props.issue.attention.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>
         </div>
       </section>
@@ -349,7 +339,7 @@ export function IssueDetail(props: {
   );
 
   // The acts the block above does not offer: a word, a stop, a close.
-  const sideActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
+  const sideActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
   const side = (
     <>
       <Show when={sideActs().length > 0}>
@@ -360,8 +350,8 @@ export function IssueDetail(props: {
       <SheetLabel>时间</SheetLabel>
       <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>
       <Property label="开工">{wallClockText(props.sessions[0]!.hiredAt)}</Property>
-      <Show when={s().ask && s().standing.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
-      <Show when={props.issue.acceptedAt}>
+      <Show when={s().ask && s().attention.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
+      <Show when={props.issue.reviewedAt}>
         {(at) => (
           <Property label="验收过">
             <span class="text-accent">{wallClockText(at())}</span>
@@ -378,11 +368,11 @@ export function IssueDetail(props: {
         <Property label="验收">
           <Pick
             label="验收"
-            value={props.issue.acceptance}
+            value={props.issue.review}
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, body: { acceptance: v as Acceptance } }));
+              void act(() => api.issue.update({ id, body: { review: v as Review } }));
             }}
             options={[
               { value: "glance", label: "看一眼就收" },
@@ -435,7 +425,7 @@ const harvestedText = (issue: Issue) =>
   issue.closed === "merged" ? "收获了：改动已经合进主分支。" : issue.closed === "merged_into_graph" ? "合进了种植计划的分支。" : "收获了。";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
-function Question(props: { ask: Ask; busy: boolean; onPick: (words: string) => void }) {
+function Question(props: { ask: Question; busy: boolean; onPick: (words: string) => void }) {
   return (
     <div class="mt-2.5">
       <div>{props.ask.question}</div>
@@ -592,15 +582,15 @@ function WorkLog(props: { steps: SessionEvent[] }) {
   );
 }
 
-/** An issue for the manager: what it was asked, and its runs; the answers are in its channel. */
-export function ManagerIssueDetail(props: { issue: Issue }) {
+/** An issue for the assistant: what it was asked, and its runs; the answers are in its channel. */
+export function AssistantIssueDetail(props: { issue: Issue }) {
   const tag = () => issueTag(props.issue);
   const [busy, setBusy] = createSignal(false);
-  // The manager's answer is the owner's to take as done or put away; one that did not end well can only be put away.
+  // The assistant's answer is the owner's to take as done or put away; one that did not end well can only be put away.
   const go = async (a: IssueAct) => {
     const id = props.issue.id;
     setBusy(true);
-    await run(() => api.issue.status({ id, body: { status: a === "acknowledge" ? "done" : "canceled" } }));
+    await run(() => api.issue.act({ id, body: { act: a } }));
     setBusy(false);
   };
   return (
@@ -609,14 +599,14 @@ export function ManagerIssueDetail(props: { issue: Issue }) {
         <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
         <span class="mt-1.5 text-xs text-muted">{tagLabel[tag()]}</span>
       </div>
-      <Show when={props.issue.standing.acts.length > 0}>
+      <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <Show when={props.issue.standing.state === "stuck"}>
+          <Show when={props.issue.attention.state === "stuck"}>
             <span class="text-sm text-berry">管家这一轮没答成：在频道里看它说了什么</span>
           </Show>
-          <For each={props.issue.standing.acts}>
+          <For each={props.issue.attention.acts}>
             {(a) => (
-              <Button tone={a === props.issue.standing.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
+              <Button tone={a === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
                 {actLabel[a]}
               </Button>
             )}
@@ -630,7 +620,7 @@ export function ManagerIssueDetail(props: { issue: Issue }) {
             <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
-        <Show when={props.issue.schedule}>
+        <Show when={props.issue.recurrence}>
           <Property label="来自">定时：每次到点交给管家，答完等你看</Property>
         </Show>
         <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>

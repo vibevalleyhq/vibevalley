@@ -34,7 +34,7 @@ const frameSummary = (f: StateFrame) => {
   const s = f.state;
   const sessions = s.sessions.map((h) => `${h.id}:${h.phase._tag}`).join(" ");
   const effects = f.effects.length === 0 ? "" : ` · ${f.effects.map((e) => e.kind).join(" ")}`;
-  return `call=${s.call} manager=${s.manager} sessions=${sessions || "0"}${effects}`;
+  return `call=${s.call} assistant=${s.assistant} sessions=${sessions || "0"}${effects}`;
 };
 
 export function DebugPanel() {
@@ -127,12 +127,12 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           title="通话"
           aside={
             <span>
-              call={core()?.call} manager={core()?.manager}
+              call={core()?.call} assistant={core()?.assistant}
             </span>
           }
         >
           <div class="flex gap-1.5">
-            <button type="button" class={btn("hat")} onClick={() => void run(() => api.manager.open())}>
+            <button type="button" class={btn("hat")} onClick={() => void run(() => api.assistant.open())}>
               开工
             </button>
             <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>

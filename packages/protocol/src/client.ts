@@ -28,19 +28,19 @@ export class VibeValleyApi {
     health: (): Promise<T.Health> => this.call("GET", "/api/v1/health", undefined, undefined) as Promise<T.Health>,
   };
 
-  readonly manager = {
-    open: (): Promise<void> => this.call("POST", "/api/v1/manager/open", undefined, undefined) as Promise<void>,
-    /** Ends the manager's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (): Promise<void> => this.call("POST", "/api/v1/manager/stop", undefined, undefined) as Promise<void>,
+  readonly assistant = {
+    open: (): Promise<void> => this.call("POST", "/api/v1/assistant/open", undefined, undefined) as Promise<void>,
+    /** Ends the assistant's run under way and drops what waits for it; the sessions it sent keep working. */
+    stop: (): Promise<void> => this.call("POST", "/api/v1/assistant/stop", undefined, undefined) as Promise<void>,
     /** The v1 caption relay without a call id is accepted only with one active call. */
-    hear: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/manager/hear", undefined, a.body) as Promise<void>,
+    hear: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/assistant/hear", undefined, a.body) as Promise<void>,
     listArchive: (a: { q?: string }): Promise<T.ArchiveListing> =>
-      this.call("GET", "/api/v1/manager/archive", { q: a.q }, undefined) as Promise<T.ArchiveListing>,
+      this.call("GET", "/api/v1/assistant/archive", { q: a.q }, undefined) as Promise<T.ArchiveListing>,
     getArchive: (a: { name: string }): Promise<string> =>
-      this.call("GET", "/api/v1/manager/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
-    /** Saves the turn begun at a step of the manager's log as a case for its evals, with what it should have done. */
-    markWrong: (a: { body: T.ManagerEvalRequest }): Promise<T.ManagerEval> =>
-      this.call("POST", "/api/v1/manager/evals", undefined, a.body) as Promise<T.ManagerEval>,
+      this.call("GET", "/api/v1/assistant/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
+    /** Saves the turn begun at a step of the assistant's log as a case for its evals, with what it should have done. */
+    markWrong: (a: { body: T.AssistantEvalRequest }): Promise<T.AssistantEval> =>
+      this.call("POST", "/api/v1/assistant/evals", undefined, a.body) as Promise<T.AssistantEval>,
   };
 
   readonly setting = {
@@ -64,14 +64,14 @@ export class VibeValleyApi {
       this.call("POST", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/read", undefined, a.body) as Promise<void>,
   };
 
-  readonly schedule = {
-    create: (a: { body: T.ScheduleRequest }): Promise<T.Schedule> => this.call("POST", "/api/v1/schedules", undefined, a.body) as Promise<T.Schedule>,
-    list: (): Promise<T.Schedule[]> => this.call("GET", "/api/v1/schedules", undefined, undefined) as Promise<T.Schedule[]>,
+  readonly recurrence = {
+    create: (a: { body: T.RecurrenceRequest }): Promise<T.Recurrence> => this.call("POST", "/api/v1/recurrences", undefined, a.body) as Promise<T.Recurrence>,
+    list: (): Promise<T.Recurrence[]> => this.call("GET", "/api/v1/recurrences", undefined, undefined) as Promise<T.Recurrence[]>,
     /** Only what the body gives changes. */
-    update: (a: { id: string; body: T.ScheduleUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
+    update: (a: { id: string; body: T.RecurrenceUpdate }): Promise<void> =>
+      this.call("PUT", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
     delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+      this.call("DELETE", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
   };
 
   readonly issue = {
@@ -105,16 +105,19 @@ export class VibeValleyApi {
     status: (a: { id: string; body: T.IssueStatusRequest }): Promise<T.Issue> =>
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status", undefined, a.body) as Promise<T.Issue>,
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
-     * leaves; with asks open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-    draft: (a: { id: string; body: T.IssueDraftRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/draft", undefined, a.body) as Promise<T.Issue>,
+     * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
+    refine: (a: { id: string; body: T.IssueRefineRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/refine", undefined, a.body) as Promise<T.Issue>,
     /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
     dispatch: (a: { id: string; body: T.IssueDispatchRequest }): Promise<T.Dispatched> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,
     /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
      * another round. */
-    accept: (a: { id: string; body: T.IssueAcceptRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/accept", undefined, a.body) as Promise<T.Issue>,
+    review: (a: { id: string; body: T.IssueReviewRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/review", undefined, a.body) as Promise<T.Issue>,
+    /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
+    act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,
   };
 
   readonly session = {
@@ -124,7 +127,7 @@ export class VibeValleyApi {
     list: (a: { agent?: string }): Promise<T.Session[]> => this.call("GET", "/api/v1/sessions", { agent: a.agent }, undefined) as Promise<T.Session[]>,
     get: (a: { id: string }): Promise<T.Session> =>
       this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.Session>,
-    /** Its log, oldest first; run gives one run's only. The manager's log is session manager's. */
+    /** Its log, oldest first; run gives one run's only. The assistant's log is session assistant's. */
     events: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> =>
       this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/events", { run: a.run }, undefined) as Promise<T.SessionEvent[]>,
   };
@@ -192,11 +195,11 @@ export class VibeValleyApi {
   };
 
   readonly memory = {
-    /** An agent's memories: the manager's (agent manager) are the lines of its MEMORY.md, with the file and how many of the newest
+    /** An agent's memories: the assistant's (agent assistant) are the lines of its MEMORY.md, with the file and how many of the newest
      * its prompt carries; every other agent's are rows. */
     list: (a: { agent: string }): Promise<T.MemoryList> =>
       this.call("GET", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, undefined) as Promise<T.MemoryList>,
-    /** What the agent would be reminded of on its next start; the manager is not reminded, it carries its whole file. */
+    /** What the agent would be reminded of on its next start; the assistant is not reminded, it carries its whole file. */
     recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> =>
       this.call(
         "GET",

@@ -12,7 +12,7 @@ flowchart LR
 
   subgraph Server[apps/server · Effect · 127.0.0.1:8787]
     API[handlers<br/>VibeValleyApi、三条 SSE]
-    SITE[Core<br/>核心状态 CoreState]
+    SITE[Core<br/>核心状态 WorkspaceState]
     FM[管家<br/>vibevalley 自己的 agent + 派活工具]
     CHAT[田头<br/>群聊 · PGlite]
     MCP[农场的工具<br/>/mcp]
@@ -61,15 +61,15 @@ flowchart LR
 
 仓库的目录见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **形状和规则**：`packages/protocol` 是唯一的来源。形状写在 `src/shapes.ts`，`src/schema.ts` 给每个形状一个由它定类型的 Effect Schema（读写 JSON 时解码），接口写在 `src/api.ts`（路径、参数、请求体、答复、谁能调）；规则是 `src/rules` 里的纯函数，服务端和页面都 import（[理由](docs/subsystems/foundation.md)）。
-- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数，从下往上是 `base`（地基）、`core`（核心状态）、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game`。每个模块导出一个 Effect 服务（`Context.Service`）和它的 `layer`；`services.ts` 按这个次序把 layer 叠起来，一个模块只用排在它前面的，反方向的消息走它们给的流（`Stream`）；开机后才做的（第一次看 GitHub、把帮工请回来、定时开始走、数 commit）是叠在最后的 `start`、`ready` layer（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
+- **契约**：`packages/protocol` 是服务端和页面之间唯一的契约。形状写在 `src/shapes.ts`，`src/schema.ts` 给每个形状一个由它定类型的 Effect Schema（读写 JSON 时解码），接口写在 `src/api.ts`（路径、参数、请求体、答复、谁能调）；`src/rules` 只放两边都跑的纯函数（帮工在干什么的话、一行的标题、站位的名字、Inbox 里哪些是刚来的、文档的顺序键）。只有服务端跑的规则在它的模块里（`apps/server/src/<模块>`），结论写进帧（[理由](docs/subsystems/foundation.md)）。
+- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十个模块，从下往上是 Platform（`base`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`、`ai`）、Source Control（`project`）、Collaboration（`channel`、`doc`）、Agent Sessions（`session`）、Issues（`issue`、`task`、`recurrence`）、Notifications（`notice`）、Assistant（`assistant`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、整理被打断的种植计划、定时开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
 - **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
 - **存盘**：PGlite（进程里的 Postgres），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 effect-sqlc 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
 - **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
 
 ## 核心状态
 
-农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `CoreState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`packages/protocol/src/rules/core.ts`）折进去。不改变状态的事实不发。
+农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `WorkspaceState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
 
 每个帮工（`Session`）的阶段 `phase` 是它生命周期的唯一状态：
 
@@ -83,7 +83,7 @@ flowchart LR
 
 在做什么、要你做什么、能不能收都由阶段推出来（protocol 的纯函数）。`play` 是地里那一层（在哪块地、最近的步骤、碰过的文件），`conflict` 是最近一次 git 检查的结果，不属于阶段。帮工离开就从状态里删掉。
 
-工单（`Issue`）里开着的和最近关的 50 张（`keepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `issueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`graphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](docs/subsystems/schedule.md)、[游戏](docs/subsystems/game.md)）。
+工单（`Issue`）里开着的和最近关的 50 张（`keepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `issueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`graphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](docs/subsystems/recurrence.md)、[游戏](docs/subsystems/game.md)）。
 
 给页面的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `frameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`reduce` 和 `state.json` 里没有。页面的 `src/rules` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在页面。
 
@@ -106,14 +106,13 @@ flowchart LR
 | 文件 | 内容 |
 |---|---|
 | `.vibevalley.lock` | 家目录的租约：里面是在用它的服务端的 pid；同一目录只允许一个服务端，那个进程没了就接过来 |
-| `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`packages/protocol/src/rules/seeds.json`） |
+| `config.json` | 帮工档案、技能书、每台农机的设置。第一次启动时用 protocol 的种子（`apps/server/src/agent/seeds.json`） |
 | `settings.json` | 「设置」里存的钥匙、语音设置和记性的来源（Nowledge Mem、EverOS 的地址和 key）；只有你能读 |
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `db/` | PGlite 的库：田头、工单和它们的帮工、文档、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、「连接到本机」的设备；新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `apps/server/db/migrations/0001_schema.up.sql`，一个基线，改表直接改它，旧库删掉重建）。查询都在 `db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
-| `sessions.json` | 只有服务端需要的：每个帮工的项目目录或 worktree、农机自己的会话 id、最后一轮的完整原话 |
-| `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `manager.json` |
+| `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `assistant.json` |
 | `spend.json` | 今天每台农机花了多少 |
-| `manager/` | 管家（VibeValley 自己的 agent）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
+| `assistant/` | 管家（VibeValley 自己的 agent）：对话 `assistant.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | 每个帮工会话的原始记录 |
 | `vibevalley.yaml` | 可选：配置（见下）；放钥匙时不进仓库 |
 
@@ -144,7 +143,7 @@ flowchart LR
 | `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
 | `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
 | `patrol.heartbeat_minutes` | 巡查的间隔，0 是关掉 | 10 |
-| `schedule.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
+| `recurrence.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |

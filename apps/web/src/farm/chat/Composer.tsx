@@ -1,5 +1,5 @@
-// The farm chat window's input row: the manager's face that opens and folds the window, who the next job goes to, the
-// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the manager thinks. A failed
+// The farm chat window's input row: the assistant's face that opens and folds the window, who the next job goes to, the
+// box (Enter sends, Shift+Enter starts a line, @ names someone), and the stop button while the assistant thinks. A failed
 // send keeps the draft and its key, so a retry is the same message, not a second one.
 
 import { createMemo, createSignal, For, Show } from "solid-js";
@@ -12,7 +12,7 @@ import { insertName, type Nameable, nameables, offeredFor, threadOwnerOf, typedN
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
 import { ready, useAgents } from "../../data/query";
-import { AgentFace, ManagerFace } from "../../ui/Face";
+import { AgentFace, AssistantFace } from "../../ui/Face";
 import { CallButton } from "../../voice/CallButton";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
@@ -65,7 +65,7 @@ export function FarmComposer(props: {
   onProblem: (p: string | undefined) => void;
 }) {
   const core = useCore();
-  const look = useFarm((s) => s.managerLook);
+  const look = useFarm((s) => s.assistantLook);
   const pick = useFarm((s) => s.pick);
   let input: HTMLTextAreaElement | undefined;
   const [text, setText] = createSignal("");
@@ -79,7 +79,7 @@ export function FarmComposer(props: {
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
   });
-  const stoppable = () => core()?.manager === "thinking" || core()?.manager === "speaking";
+  const stoppable = () => core()?.assistant === "thinking" || core()?.assistant === "speaking";
   const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
   const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");
 
@@ -179,7 +179,7 @@ export function FarmComposer(props: {
         class="relative shrink-0 cursor-pointer p-0.5 shadow-[inset_0_0_0_2px_#2f1f1340]"
         style={{ background: ring[props.phase] }}
       >
-        <ManagerFace size={40} look={look()} />
+        <AssistantFace size={40} look={look()} />
         <Show when={props.unread}>
           <span class="absolute -top-0.5 -right-0.5 h-3 w-3 bg-berry shadow-[inset_0_0_0_2px_#2f1f1340]" />
         </Show>
@@ -205,7 +205,7 @@ export function FarmComposer(props: {
             type="button"
             aria-label="叫管家停下"
             title="叫管家停下这一轮，派出去的帮工照常干活"
-            onClick={() => void api.manager.stop().catch(() => {})}
+            onClick={() => void api.assistant.stop().catch(() => {})}
             class="cursor-pointer p-1"
           >
             <SpriteIcon name="button-stop" size={24} />

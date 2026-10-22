@@ -17,3 +17,15 @@ select * from session where ended_at is not null and (sqlc.arg(agent)::text = ''
 
 -- name: SessionsEndedBefore :many
 select id from session where ended_at < sqlc.arg(before);
+
+-- name: KeepHand :exec
+-- What a session on the farm needs to be taken up again after a restart: where it works (JSON), its oar session, its
+-- last words, the memories it was reminded of (JSON).
+update session set place = sqlc.narg(place), oar_session = sqlc.narg(oar_session), last_text = sqlc.narg(last_text), recalled = sqlc.narg(recalled)
+where id = sqlc.arg(id);
+
+-- name: Hands :many
+select id, place, oar_session, last_text, recalled from session where ended_at is null and place is not null;
+
+-- name: SessionIDs :many
+select id from session;

@@ -1,5 +1,5 @@
 // The state changes in one place only: apply folds a fact in with reduce, then sends it.
-// state.json keeps the state but the chat, progress, schedules and issues, whose home is the database. Each fact is sent
+// state.json keeps the state but the chat, progress, recurrences and issues, whose home is the database. Each fact is sent
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
@@ -8,11 +8,11 @@ import { join } from "node:path";
 import type {
   CallState,
   CommitCount,
-  CoreState,
+  WorkspaceState,
   Fact,
   GameEffect,
   LiveEvent,
-  ManagerState,
+  AssistantState,
   NoticeLevel,
   RuntimeInfo,
   Session,
@@ -20,10 +20,24 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { effectsOf, emptyCoreState, frameOf, reduce, sessionOf, withStations } from "@vibevalley/protocol/rules";
 import { Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+
+export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", assistant: "idle", sessions: [] });
+
+/** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
+ * reads none of the modules above it. */
+export interface ProjectionShape {
+  readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
+  /** What a fact sets off on the farm, from the state before it. */
+  readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
+  readonly frame: (state: WorkspaceState, effects?: GameEffect[]) => StateFrame;
+  /** The state read back from state.json, made whole (the sessions' places on the farm). */
+  readonly restore: (kept: WorkspaceState) => WorkspaceState;
+}
+
+export class Projection extends Context.Service<Projection, ProjectionShape>()("vibevalley/Projection") {}
 
 /** A burst of facts is one write, and one frame. */
 const saveAfterMs = 500;
@@ -34,21 +48,21 @@ export type FactIn = Fact extends infer F ? (F extends Fact ? Omit<F, "at"> : ne
 
 /** A fact with exactly the state it changed, even when it is read late. */
 export interface Transition {
-  readonly before: CoreState;
+  readonly before: WorkspaceState;
   readonly fact: Fact;
-  readonly after: CoreState;
+  readonly after: WorkspaceState;
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
 export type OwnerDid = { readonly kind: "reviewed"; readonly session: string } | { readonly kind: "talked" };
 
 export interface CoreShape {
-  readonly state: () => CoreState;
+  readonly state: () => WorkspaceState;
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
   readonly setCall: (state: CallState, reason?: string) => Effect.Effect<void>;
-  readonly setManager: (state: ManagerState) => Effect.Effect<void>;
+  readonly setAssistant: (state: AssistantState) => Effect.Effect<void>;
   readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
   /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
   readonly open: () => Effect.Effect<void>;
@@ -57,7 +71,7 @@ export interface CoreShape {
   readonly runtime: (info: RuntimeInfo) => Effect.Effect<void>;
   readonly did: (d: OwnerDid) => Effect.Effect<void>;
   /** The state now, then the transitions from here on. */
-  readonly transitions: Effect.Effect<readonly [CoreState, Stream.Stream<Transition>], never, Scope.Scope>;
+  readonly transitions: Effect.Effect<readonly [WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
   /** A snapshot of the state, then every side event. */
   readonly events: Stream.Stream<SideEvent>;
   /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
@@ -72,11 +86,11 @@ export interface CoreShape {
 
 export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") {}
 
-/** What state.json keeps: the chat, progress, schedules and issues are the database's. */
-const toKeep = ({ chat: _chat, progress: _progress, schedules: _schedules, issues: _issues, ...kept }: CoreState): CoreState => kept;
+/** What state.json keeps: the chat, progress, recurrences and issues are the database's. */
+const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: WorkspaceState): WorkspaceState => kept;
 
-/** Started again, nobody is on the call and the manager is not mid-sentence. */
-const restored = (kept: CoreState): CoreState => withStations({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });
+/** Started again, nobody is on the call and the assistant is not mid-sentence. */
+const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, assistant: "idle" });
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -95,16 +109,17 @@ const isFact = (e: SideEvent): e is Fact => e.type !== "snapshot" && e.type !== 
 
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
+  const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
-  let kept = emptyCoreState();
+  let kept = emptyWorkspaceState();
   if (existsSync(file)) {
     try {
-      kept = { ...emptyCoreState(), ...(JSON.parse(readFileSync(file, "utf8")) as CoreState) };
+      kept = { ...emptyWorkspaceState(), ...(JSON.parse(readFileSync(file, "utf8")) as WorkspaceState) };
     } catch (e) {
       yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
     }
   }
-  let state = restored(kept);
+  let state = restore(restarted(kept));
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));
   let pending: ReturnType<typeof setTimeout> | undefined;
@@ -183,10 +198,10 @@ export const make = Effect.gen(function* () {
 
   const shape: CoreShape = {
     state: () => state,
-    session: (id) => sessionOf(state, id),
+    session: (id) => state.sessions.find((h) => h.id === id),
     apply,
     setCall: (call, reason) => apply(reason ? { type: "call", state: call, reason } : { type: "call", state: call }),
-    setManager: (manager) => apply({ type: "manager", state: manager }),
+    setAssistant: (assistant) => apply({ type: "assistant", state: assistant }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" })),
     sessionEvent: (id, activity) => side({ type: "event", at: Date.now(), id, activity }),

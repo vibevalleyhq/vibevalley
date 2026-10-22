@@ -1,21 +1,21 @@
 // Issues: what the owner wants done, each worked by sessions one after another. An issue closes
 // when its last session leaves, as the fact that the session left says how, and opens again with another session; a
-// task's issues open and close as the task says. An issue may be drafted first: a session reads the code and writes it in
-// the issue's format, then leaves, the issue still unsent. One for the manager is handed to the manager, not to a session,
-// and waits on the owner once the manager's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
+// task's issues open and close as the task says. An issue may be refined first: a session reads the code and writes it in
+// the issue's format, then leaves, the issue still unsent. One for the assistant is handed to the assistant, not to a session,
+// and waits on the owner once the assistant's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
 // with its branch and worktree, and the state says which files.
 
 import {
   type Agent,
-  type Ask,
+  type Question,
   type Changes,
   type CriterionCheck,
-  type Conflict,
   type Dispatched,
   type Finding,
   type HandedBack,
   type Issue,
-  type IssueAcceptRequest,
+  type IssueReviewRequest,
+  type IssueActRequest,
   type IssueClose,
   type IssueGraph,
   type IssueHistory,
@@ -25,37 +25,41 @@ import {
   type IssueTask,
   type IssueTimeline,
   type IssueUpdate,
-  managerAgent,
+  assistantAgent,
   maxRunning,
   type Priority,
   type ProjectTemplates,
   type PullRequest,
-  type PullRequestState,
   type RunTrigger,
-  type Schedule,
+  type Recurrence,
   type Session,
-  type SideEvent,
   type TaskGraph,
 } from "@vibevalley/protocol";
+import { actLabel, isBusy, attentionLabel } from "@vibevalley/protocol/rules";
+import { isForAssistant, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
+import { cut } from "../base/text.ts";
+import { templateCatalog } from "../agent/seed.ts";
+import { attentionIn } from "./attention.ts";
+import { statusMove, statusMoves } from "./moves.ts";
+import { graphIssues } from "../task/rules.ts";
+import { dueText } from "../recurrence/rules.ts";
 import {
   conflictBrief,
-  cut,
-  dueText,
-  graphIssues,
-  isBusy,
-  isForManager,
-  issueDraftingOf,
-  issueOrder,
-  issueStatusOf,
-  keepClosedIssues,
-  standingIn,
-  templateCatalog,
-} from "@vibevalley/protocol/rules";
+  cureWords,
+  filledKinds,
+  findingsOf,
+  isClosed,
+  issueJob,
+  kept,
+  milestonesOf,
+  nextTaskId,
+  openQuestions,
+  resumeWords,
+  sentTitles,
+  splitJob,
+} from "./rules.ts";
 import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/issue.sql.ts";
-import * as qq from "../../db/generated/issue_queue.sql.ts";
-import * as qs from "../../db/generated/issue_session.sql.ts";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { causeMessage } from "../base/db.ts";
@@ -63,44 +67,36 @@ import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
-import { issueBranch, MergeFailure, Projects, type Workplace } from "../project/project.ts";
-import { Runtimes, usable } from "../runtime/runtime.ts";
+import { issueBranch, Projects } from "../project/project.ts";
+import { Runtimes } from "../runtime/runtime.ts";
+import { harvesting } from "./harvest.ts";
+import { refinement } from "./refinement.ts";
+import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
-import { chooseAgent } from "../session/rules.ts";
-import { type Hired, type HireOptions, Sessions } from "../session/session.ts";
-import { type Due, Schedules } from "../schedule/schedule.ts";
-import {
-  draftBrief,
-  draftDescription,
-  filledKinds,
-  isClosed,
-  issueJob,
-  type IssueDraft,
-  kept,
-  milestonesOf,
-  openAsks,
-  nextTaskId,
-  parseDraft,
-  sentTitles,
-  splitJob,
-  statusMove,
-  statusMoves,
-} from "./rules.ts";
+import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
+import { type Due, Recurrences } from "../recurrence/recurrence.ts";
+import * as q from "../../db/generated/issue.sql.ts";
+import * as qq from "../../db/generated/issue_queue.sql.ts";
+import * as qs from "../../db/generated/issue_session.sql.ts";
 
-/** An issue for the manager, handed to it. */
-export interface ManagerWork {
+/** An issue for the assistant, handed to it. */
+export interface AssistantWork {
   readonly issue: Issue;
   readonly channel: string;
   readonly by: RunTrigger;
-  /** The schedule that came due, when one did. */
-  readonly schedule?: Schedule;
+  /** The recurrence that came due, when one did. */
+  readonly recurrence?: Recurrence;
 }
 
-/** Who looked at changes: the owner's look counts for the game, the manager's does not. */
-export type Caller = "owner" | "manager";
+/** Who looked at changes: the owner's look counts for the game, the assistant's does not. */
+export type Caller = "owner" | "assistant";
 
 export interface IssueShape {
   readonly list: () => Effect.Effect<Issue[]>;
+  /** Who the farm sends for a task: the profile named (or the owner's pick) if it can work, else the best that can. */
+  readonly pickAgent: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
+  /** The issues the board holds now (open, and the latest closed). */
+  readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
   readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
   readonly edit: (id: string, upd: IssueUpdate) => Effect.Effect<Issue, ApiError>;
@@ -111,26 +107,31 @@ export interface IssueShape {
   readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
   readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
+   * page, the command line and the assistant's tools all go by it. Any act the attention does not offer is refused. */
+  readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** An issue's id from what the owner and the assistant call it: #41 or 41, its id, or the id of a session that worked it. */
+  readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
   readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
   readonly changes: (id: string, by: Caller) => Effect.Effect<Changes, ApiError>;
   readonly merge: (id: string) => Effect.Effect<string, ApiError>;
   readonly resolve: (id: string) => Effect.Effect<void, ApiError>;
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
-  readonly accept: (id: string, req: IssueAcceptRequest) => Effect.Effect<Issue, ApiError>;
-  readonly draft: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
+  readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
-  /** Sends a session for a job that is not written down first (the manager sending someone at once, a task's step): its issue is made from the job. */
+  /** Sends a session for a job that is not written down first (the assistant sending someone at once, a task's step): its issue is made from the job. */
   readonly hire: (agent: Agent, task: string, project: string, opt?: HireOptions) => Effect.Effect<Hired>;
   /** A session started on an issue not written down first: the issue is made from its job, in one write with the session. */
   readonly ran: (id: string, session: Session) => Effect.Effect<void, Error>;
   /** The issues of a task graph as the graph has them now, published as one commit once written. */
   readonly putTask: (graph: TaskGraph) => Effect.Effect<void>;
   readonly nextTaskId: () => Effect.Effect<string>;
-  /** Issues for the manager, subscribed before it returns. */
-  readonly forManager: Effect.Effect<Stream.Stream<ManagerWork>, never, Scope.Scope>;
-  readonly ofSchedule: (id: string) => Effect.Effect<Issue | undefined>;
+  /** Issues for the assistant, subscribed before it returns. */
+  readonly forAssistant: Effect.Effect<Stream.Stream<AssistantWork>, never, Scope.Scope>;
+  readonly ofRecurrence: (id: string) => Effect.Effect<Issue | undefined>;
   readonly refreshPullRequests: Effect.Effect<void>;
   readonly tryQueued: Effect.Effect<void>;
 }
@@ -149,12 +150,6 @@ const json = <T>(text: string | null): T | undefined => {
 };
 
 /** Empty is none. */
-const nullText = (s: string | undefined) => {
-  const t = (s ?? "").trim();
-  return t === "" ? null : t;
-};
-
-const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);
 
 const closedText: Readonly<Partial<Record<IssueClose, string>>> = {
   merged: "收获了，改动已经合进项目的主分支",
@@ -176,7 +171,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   return out + "\n先看看项目现在的样子，再接着做。";
 }
 
-/** The findings still standing, numbered, then the owner's own words. */
+/** The findings still attention, numbered, then the owner's own words. */
 function failedText(findings: readonly Finding[], text: string): string {
   let out = "验收没过，这几处要修：";
   let n = 0;
@@ -200,19 +195,15 @@ export const make = (options: IssueOptions = {}) =>
     const runtimes = yield* Runtimes;
     const sessions = yield* Sessions;
     const chat = yield* Channels;
-    const schedules = yield* Schedules;
+    const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
     const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
     const inTx = <A, E>(e: Effect.Effect<A, E>) =>
       sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-    const managerHub = yield* PubSub.unbounded<ManagerWork>();
+    const assistantHub = yield* PubSub.unbounded<AssistantWork>();
     /** One round of the queue at a time. */
     const trying = Semaphore.makeUnsafe(1);
-    /** One draft starts at a time: two clicks do not send two sessions. */
-    const drafting = Semaphore.makeUnsafe(1);
-    /** Harvests by pull request and the poll of their states, one at a time. */
-    const prLock = Semaphore.makeUnsafe(1);
 
     // ── reading ──
 
@@ -242,25 +233,25 @@ export const make = (options: IssueOptions = {}) =>
         ...(blockedBy ? { blockedBy } : {}),
         ...(graph ? { graph } : {}),
         ...(task ? { task } : {}),
-        ...(row.schedule !== null ? { schedule: row.schedule } : {}),
+        ...(row.recurrence !== null ? { recurrence: row.recurrence } : {}),
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
-        acceptance: row.acceptance as Issue["acceptance"],
-        ...(row.accepted_at !== null ? { acceptedAt: row.accepted_at } : {}),
+        review: row.review as Issue["review"],
+        ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: json<Finding[]>(row.findings) ?? [],
-        asks: json<Ask[]>(row.asks) ?? [],
+        questions: json<Question[]>(row.questions) ?? [],
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
         ...(handedBack ? { handedBack } : {}),
-        standing: { state: "draft", acts: [] },
+        attention: { state: "draft", acts: [] },
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
       out.status = issueStatusOf(out, state);
-      const drafter = issueDraftingOf(out, state);
-      if (drafter) out.drafting = drafter;
-      // The moves read the standing: a round that failed is not harvested.
-      out.standing = standingIn(out, state);
+      const refiner = issueRefiningOf(out, state);
+      if (refiner) out.refining = refiner;
+      // The moves read the attention: a round that failed is not harvested.
+      out.attention = attentionIn(out, state);
       out.moves = statusMoves(out);
       return out;
     }
@@ -277,12 +268,24 @@ export const make = (options: IssueOptions = {}) =>
       return rows.map((r) => issueOf(r, runs.get(r.id))).sort(issueOrder);
     });
 
-    /** By its id, or by the id of a session that worked it. */
-    const get = (id: string): Effect.Effect<Issue, ApiError> =>
+    const idOf = (ref: string): Effect.Effect<string, ApiError> =>
       Effect.gen(function* () {
-        const issue = (yield* one(qs.issueOfSession({ session: id })))?.issue ?? id;
+        const r = ref.trim();
+        const number = /^#?(\d+)$/.exec(r)?.[1];
+        if (number !== undefined) {
+          const row = yield* one(q.issueByNumber({ number: Number(number) }));
+          if (!row) return yield* Effect.fail(missing("工单 #" + number));
+          return row.id;
+        }
+        return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
+      });
+
+    /** By any of what idOf reads. */
+    const get = (ref: string): Effect.Effect<Issue, ApiError> =>
+      Effect.gen(function* () {
+        const issue = yield* idOf(ref);
         const row = yield* one(q.getIssue({ id: issue }));
-        if (!row) return yield* Effect.fail(missing("工单 " + id));
+        if (!row) return yield* Effect.fail(missing("工单 " + ref));
         return issueOf(
           row,
           (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
@@ -321,7 +324,7 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = (req: IssueRequest, schedule?: string) =>
+    const add = (req: IssueRequest, recurrence?: string) =>
       Effect.gen(function* () {
         const [title, description] = yield* issueWords(req);
         const id = newId();
@@ -334,8 +337,8 @@ export const make = (options: IssueOptions = {}) =>
             assignee: nullText(req.assignee),
             priority: req.priority ?? "medium",
             created_at: Date.now(),
-            schedule: schedule ?? null,
-            acceptance: req.acceptance || "glance",
+            recurrence: recurrence ?? null,
+            review: req.review || "glance",
           }),
         );
         yield* publish(id);
@@ -344,11 +347,11 @@ export const make = (options: IssueOptions = {}) =>
 
     const closeAs = (id: string, how: IssueClose) => Effect.andThen(db(q.closeIssue({ closed_at: Date.now(), closed: how, id })), publish(id));
 
-    /** The manager's turn on its issue ended; a session's run on one is not this. */
+    /** The assistant's turn on its issue ended; a session's run on one is not this. */
     const handBack = (id: string, h: HandedBack) =>
       Effect.gen(function* () {
         const t = yield* get(id);
-        if (!isForManager(t)) return;
+        if (!isForAssistant(t)) return;
         // A turn cut off by a restart closed its issue as lost; the turn it goes on in hands back all the same.
         if (isClosed(t.status)) {
           if (t.closed !== "lost") return;
@@ -361,22 +364,22 @@ export const make = (options: IssueOptions = {}) =>
     const reopenRow = (id: string) => Effect.andThen(db(q.reopenIssue({ id })), publish(id));
 
     /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
-    const asked = (id: string, asks: readonly Ask[] | undefined) =>
-      Effect.andThen(db(q.setIssueAsks({ id, asks: jsonOrNull(openAsks(asks), openAsks(asks).length > 0) })), publish(id));
+    const asked = (id: string, questions: readonly Question[] | undefined) =>
+      Effect.andThen(db(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
 
     /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
     const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
     const judged = (id: string, at: number, findings: readonly Finding[]) =>
-      Effect.andThen(db(q.acceptIssue({ id, accepted_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
+      Effect.andThen(db(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
     /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
     const ownerSaid = (id: string) =>
       Effect.gen(function* () {
         yield* asked(id, []);
         const t = yield* get(id);
-        if (t.acceptedAt !== undefined) yield* judged(id, 0, t.findings);
+        if (t.reviewedAt !== undefined) yield* judged(id, 0, t.findings);
       });
 
     /** An issue not written down first is made from the session's job, in one write with its first session; a write that fails says what the database said. */
@@ -442,7 +445,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const hire = (agent: Agent, task: string, project: string, opt: HireOptions = {}) =>
       Effect.gen(function* () {
-        if (agent.id === managerAgent) return { refused: "管家不下地：派给一个帮工档案" } as Hired;
+        if (agent.id === assistantAgent) return { refused: "管家不下地：派给一个帮工档案" } as Hired;
         if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
         for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
         const where = project.trim() || (agent.workdir ?? "").trim();
@@ -451,7 +454,7 @@ export const make = (options: IssueOptions = {}) =>
         if (full) return { refused: full } as Hired;
         // A full farm sends home whoever has been idle longest.
         let evicted = "";
-        const all = core.state().sessions;
+        const all = sessions.presentSessions();
         if (all.length >= maxRunning) {
           const oldest = all.filter((s) => !isBusy(s)).sort((a, b) => a.hiredAt - b.hiredAt)[0];
           if (oldest) {
@@ -466,7 +469,7 @@ export const make = (options: IssueOptions = {}) =>
           if (Option.isSome(known)) options = { ...options, issueNumber: known.value.number };
         }
         // A draft's session is not one of the issue's sessions: the issue stays unsent.
-        if (!options.draft) options = { ...options, hiring: (w) => ran(options.issue!, w) };
+        if (!options.refining) options = { ...options, hiring: (w) => ran(options.issue!, w) };
         const hired = yield* sessions.send(agent, task, where, options);
         return hired.session && evicted ? { ...hired, evicted } : hired;
       });
@@ -474,7 +477,7 @@ export const make = (options: IssueOptions = {}) =>
     const ready = (id: string) =>
       Effect.gen(function* () {
         const issue = yield* unsent(id);
-        if (issue.drafting) return yield* Effect.fail(refused(issue.drafting.name + " 正在起草：等它交回来再开工"));
+        if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
         if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案"));
         const agent = store.agent(issue.assignee);
         if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了"));
@@ -486,19 +489,19 @@ export const make = (options: IssueOptions = {}) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去")),
       );
 
-    const toManager = (issue: Issue, channel: string, by: RunTrigger, due?: Schedule) =>
+    const toAssistant = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence) =>
       Effect.gen(function* () {
         if (isClosed(issue.status)) yield* reopenRow(issue.id);
         else if (issue.handedBack) yield* Effect.andThen(db(q.setHandedBack({ id: issue.id, handed_back: null })), publish(issue.id));
-        PubSub.publishUnsafe(managerHub, { issue, channel, by, ...(due ? { schedule: due } : {}) });
+        PubSub.publishUnsafe(assistantHub, { issue, channel, by, ...(due ? { recurrence: due } : {}) });
       });
 
     /** by undefined: the issue sent out. */
     const start = (id: string, channel: string, by?: RunTrigger): Effect.Effect<Dispatched, ApiError> =>
       Effect.gen(function* () {
         const mine = yield* Effect.option(get(id));
-        if (Option.isSome(mine) && isForManager(mine.value)) {
-          yield* toManager(mine.value, channel, by ?? { kind: "issue" });
+        if (Option.isSome(mine) && isForAssistant(mine.value)) {
+          yield* toAssistant(mine.value, channel, by ?? { kind: "issue" });
           return {};
         }
         const [issue, agent, project] = yield* ready(id);
@@ -561,105 +564,59 @@ export const make = (options: IssueOptions = {}) =>
         return hired.session.id;
       });
 
-    /** A schedule has one issue, for the session it names or for the manager; each time it comes due is a run of that issue. */
+    /** A recurrence has one issue, for the session it names or for the assistant; each time it comes due is a run of that issue. */
     const scheduled = (due: Due) =>
       Effect.gen(function* () {
-        const s = due.schedule;
+        const s = due.recurrence;
         const channel = yield* chat.channelOf(s.channel);
-        const by: RunTrigger = { kind: "schedule", schedule: s.id, ...(due.missed ? { missed: true } : {}) };
-        const found = yield* ofSchedule(s.id);
+        const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
+        const found = yield* ofRecurrence(s.id);
         let issue = found;
         if (!issue) {
           const project = s.project ?? (channel.project || undefined);
           const made = yield* Effect.result(
-            add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? managerAgent }, s.id),
+            add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? assistantAgent }, s.id),
           );
-          if (made._tag === "Failure") return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "schedule_refused");
+          if (made._tag === "Failure")
+            return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
           issue = made.success;
         }
         const text = dueText(s, due.missed);
         const t = issue;
         const result = yield* Effect.result(
           Effect.gen(function* () {
-            if (isForManager(t)) return yield* toManager(t, channel.id, by, s);
+            if (isForAssistant(t)) return yield* toAssistant(t, channel.id, by, s);
             if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
             if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
             const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
             if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
           }),
         );
-        if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "schedule_refused");
+        if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "recurrence_refused");
       });
 
-    const ofSchedule = (id: string) =>
+    const ofRecurrence = (id: string) =>
       Effect.gen(function* () {
-        const row = yield* one(q.latestOfSchedule({ schedule: id }));
+        const row = yield* one(q.latestOfRecurrence({ recurrence: id }));
         if (!row) return undefined;
         return Option.getOrUndefined(yield* Effect.option(get(row.id)));
       });
 
-    // ── merging ──
+    // ── harvesting ──
 
-    const conflictOf = (changes: Changes): Conflict | undefined =>
-      changes.conflicts && changes.conflicts.length > 0 ? { base: changes.base, files: changes.conflicts } : undefined;
-    const sameConflict = (a: Conflict | undefined, b: Conflict | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-
-    /** What the session's branch would bring; the preview is the freshest word on conflicts, and the state follows it. */
-    const sessionChanges = (id: string) =>
-      Effect.gen(function* () {
-        const place = sessions.place(id);
-        if (!place) return undefined;
-        const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
-        const conflict = conflictOf(changes);
-        const session = core.session(id);
-        if (session && !sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
-        return changes;
-      });
-
-    const recheck = (id: string) =>
-      Effect.gen(function* () {
-        const place = sessions.place(id);
-        const session = core.session(id);
-        if (!place || !session) return;
-        const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
-        if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
-      });
-
-    const mergeError = (id: string, err: unknown) =>
-      Effect.gen(function* () {
-        const session = core.session(id);
-        const failure =
-          err instanceof MergeFailure
-            ? err
-            : new MergeFailure("error", typeof err === "object" && err !== null && "_tag" in err ? reasonOf(err as ApiError) : String(err));
-        if (!session) return refused(failure.reasonText || failure.message);
-        if (failure.kind === "conflict") {
-          const files = failure.files.join("、");
-          yield* core.notice("warn", `${session.name} 的分支合进 ${failure.base} 会冲突（${files}），先没收。可以让它自己把冲突解决掉`);
-          return refused(
-            `没收：合进 ${failure.base} 会冲突（${files}）。${session.name} 还在地里，分支和 worktree 都在。要它解决就用 tell 告诉它：${conflictBrief(failure.base, failure.files)}`,
-          );
-        }
-        let why = failure.reasonText;
-        if (failure.kind === "check") {
-          const told = yield* Effect.result(chat.tellSession("user", id, failure.reasonText + "\n请修好检查，再交回来。", ""));
-          if (told._tag === "Failure") why += "\n给帮工带话失败：" + reasonOf(told.failure);
-        }
-        yield* core.notice("warn", `${session.name} 的活没收进去：${why}`);
-        return refused(`没收进去：${why}。${session.name} 还在地里`);
-      });
-
-    const mergeSession = (id: string) =>
-      Effect.gen(function* () {
-        const session = core.session(id);
-        if (!session) return yield* Effect.fail(missing("帮工 " + id));
-        const merged = yield* Effect.result(sessions.merge(id));
-        if (merged._tag === "Failure") return yield* Effect.fail(yield* mergeError(id, merged.failure));
-        yield* core.notice("info", `收了 ${session.name} 的活：${merged.success.text}`);
-        return merged.success.text;
-      });
-
-    const savePullRequest = (id: string, pr: PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
+    const { merge, sessionChanges, recheck, conflictOf, refreshPullRequests } = harvesting({
+      core,
+      sessions,
+      projects,
+      chat,
+      db,
+      inTx,
+      get,
+      list,
+      latest,
+      liveSession,
+      publish,
+    });
 
     const comment = (id: string, text: string, sendKey = "") =>
       Effect.gen(function* () {
@@ -671,26 +628,6 @@ export const make = (options: IssueOptions = {}) =>
         if (!said) yield* ownerSaid(id);
       });
 
-    const merge = (id: string) =>
-      prLock.withPermits(1)(
-        Effect.gen(function* () {
-          const issue = yield* get(id);
-          // Whoever asks (the board, the command line, the manager's tool) is held to the same table: a round that
-          // failed, or a required acceptance not passed, is not harvested.
-          if (!issue.graph && !issue.task) {
-            const [m, why] = statusMove(issue, "done");
-            if (m === "none") return yield* Effect.fail(refused(why));
-          }
-          const session = yield* liveSession(id);
-          if (issue.project && !issue.graph && !issue.task && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {
-            const merged = yield* Effect.result(sessions.submitPullRequest(session, issue, (pr) => savePullRequest(issue.id, pr)));
-            if (merged._tag === "Failure") return yield* Effect.fail(yield* mergeError(session, merged.failure));
-            return merged.success.text;
-          }
-          return yield* mergeSession(session);
-        }),
-      );
-
     const cancel = (id: string) =>
       Effect.gen(function* () {
         const session = yield* liveSession(id);
@@ -699,165 +636,29 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── drafts ──
 
-    /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
-    const drafter = (t: Issue) =>
-      Effect.gen(function* () {
-        const candidates = yield* Effect.forEach(store.agents(), (agent) => Effect.map(runtimes.assess(agent), (a) => ({ agent, usable: usable(a) })));
-        let named = "";
-        if (t.assignee) {
-          if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
-          named = t.assignee;
-        } else if (t.project) {
-          const last = (yield* one(qs.lastAssigneeIn({ project: t.project })))?.assignee;
-          if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
-        }
-        const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
-        if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草"));
-        return chosen;
-      });
-
-    /** Before its session is sent: the owner's first word is its title, the drafter and the project are its own unless it names them, and an answer clears what it asked. */
-    const beforeDraft = (t: Issue, word: string, agent: string, where: string) =>
-      Effect.gen(function* () {
-        let [title, description] = [t.title, t.description ?? ""];
-        if (word && t.asks.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
-        yield* inTx(
-          Effect.gen(function* () {
-            yield* db(
-              q.editIssue({
-                title,
-                description,
-                project: nullText(t.project ?? where),
-                assignee: nullText(t.assignee ?? agent),
-                priority: t.priority,
-                acceptance: t.acceptance,
-                criteria: jsonOrNull(t.criteria, (t.criteria ?? []).length > 0),
-                id: t.id,
-              }),
-            );
-            if (word && t.asks.length > 0) yield* db(q.setIssueAsks({ id: t.id, asks: null }));
-          }),
-        );
-        yield* publish(t.id);
-      });
-
-    const drafted = (id: string, d: IssueDraft, asks: readonly Ask[] | undefined) =>
-      Effect.gen(function* () {
-        const criteria = kept(d.criteria);
-        const open = openAsks(asks);
-        yield* db(
-          q.draftIssue({
-            id,
-            title: d.title,
-            description: draftDescription(d),
-            criteria: jsonOrNull(criteria, criteria.length > 0),
-            asks: jsonOrNull(open, open.length > 0),
-          }),
-        );
-        yield* publish(id);
-      });
-
-    const draft = (id: string, word: string, channel: string) =>
-      drafting.withPermits(1)(
-        Effect.gen(function* () {
-          const t = yield* unsent(id);
-          if (isForManager(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
-          if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
-          if (t.drafting) return yield* Effect.fail(refused(t.drafting.name + " 正在起草：等它交回来"));
-          const chosen = yield* drafter(t);
-          const where = t.project ?? (chosen.workdir ?? "").trim();
-          if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：先选一个项目"));
-          const said = word.trim();
-          const brief = draftBrief(t, said, where);
-          yield* beforeDraft(t, said, chosen.id, where);
-          // A draft cut short (a restart) may have left the worktree as its drafter had it: each draft starts from main.
-          const kept = yield* projects.clear(where, t.number);
-          if (kept) yield* Effect.logInfo(`vibevalley: issue ${t.id}: before its draft: ${kept}`);
-          // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
-          const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "draft" }, draft: true });
-          if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
-          // Its moves no longer hold todo while it drafts.
-          yield* publish(id);
-          return yield* get(id);
-        }),
-      );
-
-    /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
-    const handedBack = (f: { id: string; outcome: string; summary: string; asks?: readonly Ask[] }) =>
-      Effect.gen(function* () {
-        const h = core.session(f.id);
-        if (!h?.draft || !h.issue) return;
-        const id = h.issue;
-        const r = sessions.find(f.id);
-        const said = r?.lastText ?? "";
-        const place: Workplace | undefined = r?.place;
-        const thread = yield* chat.jobThread(f.id);
-        const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_draft") : core.notice("warn", text));
-        if (f.outcome === "completed") {
-          const { draft: d, problem } = parseDraft(said);
-          if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
-          else yield* drafted(id, d, f.asks);
-        } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
-        if (place?.branch) {
-          const reset = yield* Effect.result(projects.reset(place));
-          if (reset._tag === "Failure") yield* core.notice("warn", `起草的 worktree 没能重置：${reset.failure.message}`);
-        }
-        yield* sessions.dismiss(f.id);
-        yield* publish(id);
-      });
-
-    /** An unsent issue going away takes its draft with it: whoever drafts it goes home, and what drafts left is removed. */
-    const clearDraft = (t: Issue) =>
-      Effect.gen(function* () {
-        if (t.drafting) {
-          const r = sessions.find(t.drafting.session);
-          if (r?.place.branch) yield* Effect.ignore(projects.reset(r.place));
-          yield* sessions.dismiss(t.drafting.session);
-        }
-        if (t.project) {
-          const kept = yield* projects.clear(t.project, t.number);
-          if (kept) yield* core.notice("warn", `「${cut(t.title, 40)}」取消了：${kept}`);
-        }
-      });
-
-    // ── pull requests ──
-
-    const finishPullRequest = (issue: Issue, state: PullRequestState) =>
-      Effect.gen(function* () {
-        const closed: IssueClose = state === "closed" ? "dismissed" : "merged";
-        const id = yield* latest(issue.id);
-        if (sessions.find(id))
-          yield* sessions.finishPullRequest(id, issue.number, closed).pipe(Effect.mapError((e) => (e instanceof MergeFailure ? refused(e.reasonText) : e)));
-        else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
-        yield* inTx(
-          Effect.andThen(
-            db(q.closeIssue({ id: issue.id, closed, closed_at: Date.now() })),
-            db(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
-          ),
-        );
-        yield* publish(issue.id);
-      });
-
-    const refreshPullRequests = prLock.withPermits(1)(
-      Effect.gen(function* () {
-        for (const issue of yield* list) {
-          if (issue.pullRequest?.state !== "open" || !issue.project) continue;
-          const state = yield* Effect.result(projects.pullRequestState(issue.project, issue.pullRequest.number));
-          const done = state._tag === "Failure" ? state : state.success === "open" ? undefined : yield* Effect.result(finishPullRequest(issue, state.success));
-          if (done?._tag === "Failure")
-            yield* Effect.logWarning(
-              `vibevalley: refresh pull requests: 工单 #${issue.number}: ${done.failure instanceof Error ? done.failure.message : reasonOf(done.failure)}`,
-            );
-        }
-      }),
-    );
+    const { pickAgent, draft, handedBack, clearRefinement } = refinement({
+      core,
+      store,
+      runtimes,
+      projects,
+      sessions,
+      chat,
+      db,
+      one,
+      inTx,
+      get,
+      unsent,
+      hire,
+      publish,
+    });
 
     // ── what happens to its sessions ──
 
-    const onFact = (e: SideEvent) =>
+    const onSessionNews = (n: SessionNews) =>
       Effect.gen(function* () {
-        switch (e.type) {
+        switch (n._tag) {
           case "left": {
+            const e = n.left;
             const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
             if (!issue) return;
             const row = yield* one(q.getIssue({ id: issue }));
@@ -868,29 +669,28 @@ export const make = (options: IssueOptions = {}) =>
             yield* publish(issue);
             return;
           }
-          case "report": {
+          case "reported": {
+            const e = n.report;
             const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
             // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
             const checks = e.checks ?? [];
             if (issue && checks.length > 0) yield* checked(issue, checks);
-            if (issue) yield* asked(issue, e.asks);
+            if (issue) yield* asked(issue, e.questions);
             yield* handedBack(e);
-            if (core.session(e.id)?.conflict) yield* recheck(e.id);
+            if (n.session?.conflict) yield* recheck(e.id);
             return;
           }
-          case "message": {
-            // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
-            const m = e.message;
-            if (!e.thread || m.fromKind !== "user" || m.kind !== "chat" || !m.final) return;
-            const issue = yield* Effect.option(get(e.thread));
-            if (Option.isNone(issue) || isClosed(issue.value.status)) return;
-            yield* ownerSaid(issue.value.id);
-            return;
-          }
-          default:
-            // The issues hear only these three.
+          case "hired":
             return;
         }
+      });
+
+    // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
+    const onOwnerInThread = (thread: string) =>
+      Effect.gen(function* () {
+        const issue = yield* Effect.option(get(thread));
+        if (Option.isNone(issue) || isClosed(issue.value.status)) return;
+        yield* ownerSaid(issue.value.id);
       });
 
     // ── coming back ──
@@ -898,26 +698,39 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
-    // The manager's turn on its issues stopped with the server; one it had answered still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: managerAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
+    // The assistant's turn on its issues stopped with the server; one it had answered still waits on the owner.
+    for (const r of yield* db(q.openOf({ assignee: assistantAgent }))) if (r.handed_back === null) yield* closeAs(r.id, "lost");
 
-    const facts = yield* core.subscribe;
+    const news = yield* sessions.news;
+    const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
-    const due = yield* schedules.due;
+    const due = yield* recurrences.due;
     const logged =
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
         Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
-    yield* Effect.forkScoped(Stream.runForEach(facts, (e) => onFact(e).pipe(logged(`issues after a ${e.type}`))));
+    // One at a time, as when they were one stream of facts: a report and the owner's word on it do not cross.
     yield* Effect.forkScoped(
-      // However the manager's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
+      Stream.runForEach(
+        Stream.merge(
+          news,
+          Stream.map(ownerWords, (w) => ({ _tag: "owner" as const, thread: w.thread })),
+        ),
+        (n) =>
+          n._tag === "owner"
+            ? onOwnerInThread(n.thread).pipe(logged(`issues after the owner's words in ${n.thread}`))
+            : onSessionNews(n).pipe(logged(`issues after ${n._tag}`)),
+      ),
+    );
+    yield* Effect.forkScoped(
+      // However the assistant's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
         Effect.forEach(run.issues, (id) => handBack(id, { at: Date.now(), outcome: run.outcome }).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
           discard: true,
         }),
       ),
     );
-    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`schedule ${d.schedule.id}`))));
+    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`recurrence ${d.recurrence.id}`))));
     if (options.background ?? true) {
       yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.sleep(options.tryEveryMs ?? 5000), tryQueued.pipe(logged("the queue")))));
       yield* Effect.forkScoped(
@@ -943,6 +756,8 @@ export const make = (options: IssueOptions = {}) =>
       });
 
     const shape: IssueShape = {
+      onBoard: () => core.state().issues ?? [],
+      pickAgent,
       list: () => list,
       get,
       timeline,
@@ -971,7 +786,7 @@ export const make = (options: IssueOptions = {}) =>
               project: nullText(upd.project ?? was.project),
               assignee: nullText(upd.assignee ?? was.assignee),
               priority: upd.priority ?? was.priority,
-              acceptance: upd.acceptance || was.acceptance || "glance",
+              review: upd.review || was.review || "glance",
               criteria: jsonOrNull(criteria, criteria.length > 0),
               id,
             }),
@@ -982,7 +797,7 @@ export const make = (options: IssueOptions = {}) =>
       remove: (id) =>
         Effect.gen(function* () {
           const t = yield* unsent(id);
-          yield* clearDraft(t);
+          yield* clearRefinement(t);
           yield* db(q.removeIssue({ id }));
           yield* core.apply({ type: "issueGone", id } as never);
         }),
@@ -1003,7 +818,7 @@ export const make = (options: IssueOptions = {}) =>
         trying.withPermits(1)(
           Effect.gen(function* () {
             const issue = yield* get(id);
-            if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForManager(issue))
+            if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForAssistant(issue))
               return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
             const [, agent, project] = yield* ready(id);
             const full = sessions.noRoom(agent.runtime, project);
@@ -1012,6 +827,61 @@ export const make = (options: IssueOptions = {}) =>
           }),
         ),
       reopen: (id, text, channel) => reopen(id, text, channel),
+      idOf,
+      act: (ref, req, channel) =>
+        Effect.gen(function* () {
+          const t = yield* get(ref);
+          const id = t.id;
+          const name = actLabel[req.act];
+          if (!t.attention.acts.includes(req.act))
+            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`));
+          const said = (req.text ?? "").trim();
+          const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+          switch (req.act) {
+            case "start":
+              yield* shape.setStatus(id, "todo", said, channel);
+              break;
+            case "answer":
+            case "tell":
+              yield* comment(id, yield* words, req.sendKey ?? "");
+              break;
+            case "accept":
+              yield* shape.review(id, { pass: true });
+              break;
+            case "reject": {
+              const findings = req.findings ?? findingsOf(said);
+              if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
+              yield* shape.review(id, { pass: false, findings });
+              break;
+            }
+            case "harvest":
+            case "acknowledge":
+              yield* shape.setStatus(id, "done", said, channel);
+              break;
+            case "close":
+              yield* shape.setStatus(id, "canceled", said, channel);
+              break;
+            // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
+            case "reopen":
+              yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel) : shape.setStatus(id, "backlog", "", channel);
+              break;
+            case "resolve":
+              yield* shape.resolve(id);
+              break;
+            case "resume":
+              yield* comment(id, resumeWords);
+              break;
+            case "cure": {
+              const last = t.sessions.at(-1);
+              yield* comment(id, cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title));
+              break;
+            }
+            case "stop":
+              yield* sessions.stop(yield* liveSession(id));
+              break;
+          }
+          return yield* get(id);
+        }),
       setStatus: (id, to, text, channel) =>
         Effect.gen(function* () {
           if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
@@ -1049,7 +919,7 @@ export const make = (options: IssueOptions = {}) =>
               yield* closeAs(id, "dismissed");
               break;
             case "drop":
-              yield* clearDraft(t);
+              yield* clearRefinement(t);
               yield* drop(id);
               break;
             case "answered":
@@ -1075,7 +945,7 @@ export const make = (options: IssueOptions = {}) =>
       resolve: (id) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
-          const h = core.session(session);
+          const h = sessions.sessionOf(session);
           if (!h) return yield* Effect.fail(missing("帮工 " + session));
           // A preview that fails (git broken) is said as it is, not taken for no conflict.
           const changes = h.conflict ? undefined : yield* sessionChanges(session);
@@ -1085,10 +955,10 @@ export const make = (options: IssueOptions = {}) =>
         }),
       cancel,
       /** Only an issue in review has something to judge. */
-      accept: (id, req) =>
+      review: (id, req) =>
         Effect.gen(function* () {
           const t = yield* get(id);
-          const why = isForManager(t)
+          const why = isForAssistant(t)
             ? "这是派给管家的工单：管家答完就关"
             : t.graph || t.task
               ? "这是种植计划的工单，跟着计划走：在计划里验收"
@@ -1114,7 +984,7 @@ export const make = (options: IssueOptions = {}) =>
           yield* comment(id, failedText(findings, text));
           return yield* get(id);
         }),
-      draft,
+      refine: draft,
       /** Every issue with its sessions, live and ended, once; a session with no record is named as missing, not given a phase. */
       history: () =>
         Effect.gen(function* () {
@@ -1179,8 +1049,8 @@ export const make = (options: IssueOptions = {}) =>
           yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
         }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
-      forManager: Effect.map(PubSub.subscribe(managerHub), Stream.fromSubscription),
-      ofSchedule,
+      forAssistant: Effect.map(PubSub.subscribe(assistantHub), Stream.fromSubscription),
+      ofRecurrence,
       refreshPullRequests,
       tryQueued,
     };

@@ -7,13 +7,13 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[architecture.md](docs/architecture.md)「配置」） |
-| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/manager.md)；档案的默认项目在帮工档案上） |
+| 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/assistant.md)；档案的默认项目在帮工档案上） |
 | 一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
 | 收成清单：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 收获的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 种植计划的分支和每一件的检查什么时候跑（[种植计划](docs/subsystems/task.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
 | 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](docs/reference/farm-ui.md) 界面 12、19） |
-| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`packages/protocol` 的 `xpToNext`、`levelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
+| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`game/view.ts` 的 `xpToNext`、`levelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
 
 ## 在哪
 
@@ -84,11 +84,11 @@
 
 ## 和谁打交道
 
-- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；收获经 `session` 的 `harvest`（先让帮工歇下，再调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
+- **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；收获经 `session` 的 `handOver`（先让帮工歇下，再由工单、种植计划给的收法调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
 - **工单（`issue`）**：决定什么时候收获、走本地合还是 PR（`usesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **种植计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的收成清单。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。
-- **管家（`manager`、`tool`）**：农场现状和 `look` 工具列出 `list` 和 `root`。
+- **管家（`assistant`、`tool`）**：农场现状和 `look` 工具列出 `list` 和 `root`。
 - **HTTP（`handler`）**：只转发；`github.refresh` 先刷新检测，再调工单的 `refreshPullRequests`。
 
 ## 为什么这样

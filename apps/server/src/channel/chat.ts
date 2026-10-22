@@ -5,12 +5,15 @@
 // than lost. Everything that changes the chat runs one at a time.
 
 import {
+  type Chat,
   type ChatMessage,
   type Conversation,
   type ConversationKind,
   everyone,
+  type FactLeft,
+  type FactReport,
   generalName,
-  managerAgent,
+  assistantAgent,
   type MessageKind,
   type Outcome,
   type RunTrigger,
@@ -19,23 +22,34 @@ import {
   type Spent,
   type SubjectKind,
 } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { keepConversations, keepMessages, targetOf } from "./state.ts";
+import { head } from "../base/text.ts";
 import {
   agentWakeCooldownMs,
-  head,
+  busyNotice,
+  channelNameProblem,
+  chatAudience,
+  type Delivery,
   heldShown,
   hopLimit,
+  hopLimitText,
   type InboxMessage,
-  isBusy,
-  keepConversations,
-  keepMessages,
+  mentionOf,
+  mentionsIn,
+  parseChatTarget,
   retryWindowMs,
-  sessionOnIssue,
   summaryConversations,
-  targetOf,
+  type UnreadRow,
   wakeBreaker,
-} from "@vibevalley/protocol/rules";
+  wakeInput,
+} from "./rules.ts";
 import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+import { Settings } from "../base/config.ts";
+import { newId } from "../base/ids.ts";
+import { Core } from "../core/core.ts";
+import { type ApiError, refused } from "../errors.ts";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
 import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
@@ -44,24 +58,6 @@ import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
-import { Settings } from "../base/config.ts";
-import { newId } from "../base/ids.ts";
-import { Core } from "../core/core.ts";
-import { type ApiError, refused } from "../errors.ts";
-import { summaryOf } from "../session/rules.ts";
-import { type InputConsumed, type LaunchActivity, Sessions } from "../session/session.ts";
-import {
-  busyNotice,
-  channelNameProblem,
-  chatAudience,
-  type Delivery,
-  hopLimitText,
-  mentionOf,
-  mentionsIn,
-  parseChatTarget,
-  type UnreadRow,
-  wakeInput,
-} from "./rules.ts";
 
 const reportMax = 1500;
 const readLimit = 30;
@@ -106,8 +102,8 @@ export interface ReadResult {
   readonly older: boolean;
 }
 
-/** What came to the manager in one conversation, to wake it with. */
-export interface ManagerNews {
+/** What came to the assistant in one conversation, to wake it with. */
+export interface AssistantNews {
   readonly conversation: string;
   readonly target: string;
   readonly messages: InboxMessage[];
@@ -121,7 +117,7 @@ interface Meta {
   spent?: Spent;
   forTask?: boolean;
   code?: string;
-  /** Said on a call: the manager heard it there, so it wakes no one here. */
+  /** Said on a call: the assistant heard it there, so it wakes no one here. */
   spoken?: boolean;
 }
 
@@ -149,7 +145,7 @@ type MsgRow = qm.MessageByIDResult;
 type ConvRow = qc.ConversationByIDResult;
 type DeliveryRow = qd.OpenDeliveriesResult;
 
-const senderKind = (kind: string): SenderKind => (kind === "user" || kind === "manager" || kind === "agent" ? kind : "system");
+const senderKind = (kind: string): SenderKind => (kind === "user" || kind === "assistant" || kind === "agent" ? kind : "system");
 const messageKind = (kind: string): MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
 const conversationKind = (kind: string): ConversationKind => (kind === "thread" || kind === "channel" ? kind : "general");
 const subjectKind = (kind: string | null): SubjectKind | undefined => (kind === "issue" || kind === "graph" || kind === "talk" ? kind : undefined);
@@ -242,12 +238,12 @@ export interface ChannelShape {
   readonly say: (text: string, conversation: string | undefined, sendKey: string) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
   /** Words to a session in its thread; with no thread the session hears them straight. */
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
-  /** A session's or the manager's words, through channel_say. */
+  /** A session's or the assistant's words, through channel_say. */
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
   /** Words said on a call, kept in 田头 as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** The manager's words as they stream: the same key again replaces them until final; delivered once final. */
-  readonly managerSays: (conversation: string, key: string, text: string, final: boolean, run: string) => Effect.Effect<void>;
+  /** The assistant's words as they stream: the same key again replaces them until final; delivered once final. */
+  readonly assistantSays: (conversation: string, key: string, text: string, final: boolean, run: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (conversation: string, text: string, code: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
@@ -256,24 +252,86 @@ export interface ChannelShape {
   readonly markRead: (conversation: string, seq: number) => Effect.Effect<void, ApiError>;
   /** The thread of the issue the session works (a talk thread of its own when it works none). */
   readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
+  /** The conversations and messages the core state holds now. */
+  readonly now: () => Chat | undefined;
   /** Subscribed before it returns. */
-  readonly forManager: Effect.Effect<Stream.Stream<ManagerNews>, never, Scope.Scope>;
-  /** What came to the manager and does not wake it. */
-  readonly managerDigest: () => Effect.Effect<InboxMessage[]>;
+  readonly forAssistant: Effect.Effect<Stream.Stream<AssistantNews>, never, Scope.Scope>;
+  /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
+   * Subscribed before it returns. */
+  readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
+  /** What came to the assistant and does not wake it. */
+  readonly assistantDigest: () => Effect.Effect<InboxMessage[]>;
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
   readonly updateChannel: (id: string, description: string | undefined, project: string | undefined) => Effect.Effect<void, ApiError>;
   readonly channelOf: (conversation: string) => Effect.Effect<Info>;
   readonly channelByName: (name: string) => Effect.Effect<Info | undefined>;
+  /** Agent Sessions registers the helpers; until then a message for one waits. */
+  readonly useHelpers: (helpers: Helpers) => void;
+  /** Once the helpers on the farm are back: what waited for each goes to it now. */
+  readonly helpersBack: Effect.Effect<void>;
+  /** What a helper's launch did. */
+  readonly activity: (a: LaunchActivity) => Effect.Effect<void>;
+  /** Messages a helper took as input. */
+  readonly consumed: (c: InputConsumed) => Effect.Effect<void>;
+  /** A helper hired, reported or gone: a job opens, the report is posted in its thread, a job closes. */
+  readonly sessionNews: (n: SessionNews) => Effect.Effect<void>;
 }
 
 export class Channels extends Context.Service<Channels, ChannelShape>()("vibevalley/Channel") {}
 
+// ── the helpers: the participants that work (Agent Sessions registers them) ──
+
+/** What came of handing a helper a message. */
+export interface Delivered {
+  readonly kind: "run" | "steered" | "queued" | "refused";
+  readonly launch?: string;
+  readonly woke?: boolean;
+  readonly reason?: string;
+}
+
+/** What a helper's launch did, as the channels hear it: it spoke, its turn ended or closed, it compacts. */
+export type LaunchActivity =
+  | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
+  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: Outcome; readonly spoke: boolean }
+  | { readonly kind: "closed"; readonly id: string; readonly launch: string }
+  | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
+
+/** The messages a helper took as input: they are seen. */
+/** What happened to a helper, as the sessions tell it: the fact, and the session as it stood after it (none once it
+ * left). */
+export type SessionNews =
+  | { readonly _tag: "hired"; readonly session: Session }
+  | { readonly _tag: "reported"; readonly report: FactReport; readonly session: Session | undefined }
+  | { readonly _tag: "left"; readonly left: FactLeft };
+
+export interface InputConsumed {
+  readonly session: string;
+  readonly messages: string[];
+}
+
+/** The participants that work: the channels hand them what is said to them and hear what they did. The channels know a
+ * helper by its id and nothing of how it works. */
+export interface Helpers {
+  /** On the farm now: it can be handed a message. */
+  readonly present: (id: string) => boolean;
+  readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
+  /** The run a participant is in now (a helper's, the assistant's), for what it says; undefined between runs. */
+  readonly currentRun: (id: string) => string | undefined;
+  /** A helper's report, from what it last said in full. */
+  readonly report: (id: string) => string;
+  /** The helper working the issue now, if one is. */
+  readonly onIssue: (issue: string) => string | undefined;
+  /** A helper on the farm now, and all of them. */
+  readonly sessionOf: (id: string) => Session | undefined;
+  readonly presentSessions: () => readonly Session[];
+}
+
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
-  const sessions = yield* Sessions;
+  let helpers: Helpers | undefined;
   const sql = yield* SqlClient.SqlClient;
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
   const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
@@ -282,7 +340,7 @@ export const make = Effect.gen(function* () {
   const apply = (...facts: Parameters<typeof core.apply>) => Effect.runSync(core.apply(...facts));
   const lock = Semaphore.makeUnsafe(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
-  const managerHub = yield* PubSub.unbounded<ManagerNews>();
+  const assistantHub = yield* PubSub.unbounded<AssistantNews>();
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();
@@ -312,7 +370,7 @@ export const make = Effect.gen(function* () {
 
   for (const [id, kind, name] of [
     ["user", "user", "主人"],
-    [managerAgent, "manager", "管家"],
+    [assistantAgent, "assistant", "管家"],
     ["system", "system", "农场"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: Date.now() }));
@@ -332,8 +390,9 @@ export const make = Effect.gen(function* () {
   const channelTags = () => [...names.keys()].sort().map((id) => "#" + names.get(id));
   const channelOfSession = (h: Session) => (h.channel && names.has(h.channel) ? h.channel : general);
   const channelIdOf = (row: ConvRow) => (row.kind === "thread" ? (row.channel_id ?? general) : row.id);
-  const sessionOf = (id: string) => core.session(id);
-  const presentSessions = () => core.state().sessions;
+  // Before the helpers are back there are none: a job opens for each once they are.
+  const sessionOf = (id: string) => helpers?.sessionOf(id);
+  const presentSessions = () => helpers?.presentSessions() ?? [];
 
   const targetOfRow = (kind: string, parentNumber: number | null, name: string | null, channelId: string | null, channelName: string | null) => {
     const conv = {
@@ -396,7 +455,7 @@ export const make = Effect.gen(function* () {
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
   const ownerOf = (conv: ConvRow): string => {
     if (conv.kind !== "thread" || !conv.subject_id) return "";
-    if (conv.subject_kind === "issue") return sessionOnIssue(core.state(), conv.subject_id)?.id ?? "";
+    if (conv.subject_kind === "issue") return helpers?.onIssue(conv.subject_id) ?? "";
     if (conv.subject_kind === "talk") return sessionOf(conv.subject_id) ? conv.subject_id : "";
     return "";
   };
@@ -457,18 +516,18 @@ export const make = Effect.gen(function* () {
       const known = new Set((yield* db(qp.participants())).map((p) => p.id));
       const named: { id: string; how: "delivered" | "not_on_farm" | "unknown" }[] = [];
       for (const m of mentions) {
-        const how = m === managerAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "not_on_farm" : "unknown";
+        const how = m === assistantAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "not_on_farm" : "unknown";
         named.push({ id: m, how });
         yield* db(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
       }
       if (mentions.length > 0) yield* db(qm.updateMessageMeta({ meta: metaText({ ...meta, mentions }), id: row.id }));
       let followers: string[] = [];
       if (conv.kind === "thread") {
-        // A dispatch handing the issue to its next session makes no one a follower: the manager would be woken by every word in it.
+        // A dispatch handing the issue to its next session makes no one a follower: the assistant would be woken by every word in it.
         if (row.sender_id !== "system" && row.kind !== "dispatch")
           yield* db(qf.follow({ conversation_id: conv.id, participant_id: row.sender_id, reason: "replied", from_number: row.number }));
         for (const m of named)
-          if (m.how === "delivered" && (m.id === managerAgent || present.includes(m.id)))
+          if (m.how === "delivered" && (m.id === assistantAgent || present.includes(m.id)))
             yield* db(qf.follow({ conversation_id: conv.id, participant_id: m.id, reason: "mentioned", from_number: row.number - 1 }));
         followers = (yield* db(qf.followers({ conversation_id: conv.id }))).map((f) => f.participant_id);
       }
@@ -614,19 +673,20 @@ export const make = Effect.gen(function* () {
       return out;
     });
 
-  const deliver = (recipient: string, text: string, message: string) => sessions.deliver(recipient, text, { kind: "comment", message } as RunTrigger);
+  const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
+    helpers ? helpers.deliver(recipient, text, { kind: "comment", message } as RunTrigger) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
   const kick = (recipient: string): Effect.Effect<void> =>
     Effect.gen(function* () {
       const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
       const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
-      if (recipient === managerAgent) {
+      if (recipient === assistantAgent) {
         const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
         const now = Date.now();
         for (const [conversation, rs] of byConversation) {
           const messages = rs.map(asInbox);
-          PubSub.publishUnsafe(managerHub, { conversation, target: messages[0]!.target, messages });
-          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: managerAgent, message_id: r.message_id }));
+          PubSub.publishUnsafe(assistantHub, { conversation, target: messages[0]!.target, messages });
+          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: assistantAgent, message_id: r.message_id }));
         }
         return;
       }
@@ -734,12 +794,12 @@ export const make = Effect.gen(function* () {
         ? `做种植计划 ${h.graph.id} 的「${h.graph.task}」`
         : h.graph
           ? "拆种植计划 " + h.graph.id
-          : h.draft
+          : h.refining
             ? "看代码，起草这张工单"
             : head(h.brief.replace(/\s+/g, " "), 80);
       yield* write({
         conversation: channel,
-        from: managerAgent,
+        from: assistantAgent,
         kind: "dispatch",
         text: `派 @${h.id}（${h.name}）去 ${h.project ?? "项目"}：${what}`,
         final: true,
@@ -759,15 +819,10 @@ export const make = Effect.gen(function* () {
       const channel = channelOfSession(h);
       const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
       yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
-      let nth = 1;
-      const issue = (core.state().issues ?? []).find((t) => t.id === h.issue);
-      if (issue) {
-        // Linked to the issue or not yet, it is the one after those before it.
-        const at = (issue.sessions ?? []).indexOf(h.id);
-        nth = at >= 0 ? at + 1 : (issue.sessions ?? []).length + 1;
-      }
-      const text = h.draft ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
-      yield* write({ conversation: thread, from: managerAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
+      // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
+      const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
+      const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
+      yield* write({ conversation: thread, from: assistantAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
     });
 
   const sessionsLeft = Effect.gen(function* () {
@@ -790,7 +845,7 @@ export const make = Effect.gen(function* () {
       if (!w || outcome === "interrupted") return;
       const thread = yield* threadOfSession(id);
       if (!thread) return;
-      const said = outcome === "completed" ? summaryOf(sessions.find(id)?.lastText ?? "") : "";
+      const said = outcome === "completed" ? (helpers?.report(id) ?? "") : "";
       const meta: Meta = { outcome, ...(spent ? { spent } : {}), forTask: !!w.graph, ...(run ? { run } : {}) };
       yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), final: true, meta });
     });
@@ -802,7 +857,6 @@ export const make = Effect.gen(function* () {
       // A word half said when the server stopped is as said as it got; whatever was handed and not seen goes back.
       yield* db(qm.finalizeAll({ updated_at: Date.now() }));
       yield* db(qd.rollbackAll());
-      for (const h of presentSessions()) yield* openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`)));
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
       for (const c of [...convs].reverse()) apply({ type: "conversation", conversation: yield* toConversation(c) });
       const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
@@ -810,31 +864,28 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  // Facts: hired and left open and close jobs, a report is posted in the thread. One at a time, before the next.
-  const facts = yield* core.subscribe;
-  const launches = yield* sessions.launches;
-  const inputs = yield* sessions.inputsConsumed;
-  yield* Effect.forkScoped(
-    Stream.runForEach(facts, (e) =>
-      locked(
-        Effect.suspend(() => {
-          if (closed) return Effect.void;
-          if (e.type === "hired")
+  // The sessions' news: hired and left open and close jobs, a report is posted in the thread. One at a time, before the
+  // next.
+  const onSessionNews = (n: SessionNews) =>
+    locked(
+      Effect.suspend(() => {
+        if (closed) return Effect.void;
+        switch (n._tag) {
+          case "hired":
             return Effect.forEach(presentSessions(), (h) => openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`))), {
               discard: true,
             });
-          if (e.type === "left") return sessionsLeft;
-          if (e.type === "report") return postReport(e.id, e.outcome, e.summary, e.spent, e.run);
-          return Effect.void;
-        }),
-      ).pipe(logged(`after a ${e.type}`)),
-    ),
-  );
-  yield* Effect.forkScoped(Stream.runForEach(launches, (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`))));
-  yield* Effect.forkScoped(Stream.runForEach(inputs, (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`))));
-  // Whatever was waiting for a session still on the farm goes to it now.
-  yield* locked(
+          case "left":
+            return sessionsLeft;
+          case "reported":
+            return postReport(n.report.id, n.report.outcome, n.report.summary, n.report.spent, n.report.run);
+        }
+      }),
+    ).pipe(logged(`after ${n._tag}`));
+  // Once the helpers are back: each on the farm has its job, and whatever was waiting for one goes to it.
+  const helpersBack = locked(
     Effect.gen(function* () {
+      for (const h of presentSessions()) yield* openJob(h).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${h.id}'s job: ${String(c)}`)));
       for (const p of yield* db(qp.participants())) if (p.kind === "agent" && p.left_at === null) yield* kick(p.id);
     }),
   );
@@ -850,7 +901,7 @@ export const make = Effect.gen(function* () {
   const resolveTarget = (who: string, target: string): Effect.Effect<string, ApiError> =>
     Effect.gen(function* () {
       if (!target.trim()) {
-        if (who !== managerAgent && who !== "user") {
+        if (who !== assistantAgent && who !== "user") {
           const own = yield* threadOfSession(who);
           if (own) return own;
         }
@@ -879,6 +930,7 @@ export const make = Effect.gen(function* () {
     Effect.flatMap(one(qm.messageByID({ id })), (row) => (row ? Effect.succeed(row) : Effect.fail(refused("写进去了，但读不回来"))));
 
   const shape: ChannelShape = {
+    now: () => core.state().chat,
     general: () => general,
     say: (text, conversation, sendKey) =>
       locked(
@@ -901,11 +953,11 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!sessions.find(session)) return yield* Effect.fail(refused(`没有 ${session} 这个帮工`));
-            yield* sessions.deliver(session, text.trim(), { kind: "comment" });
+            if (!helpers?.present(session)) return yield* Effect.fail(refused(`没有 ${session} 这个帮工`));
+            yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
-          const run = sessions.currentRun(from);
+          const run = helpers?.currentRun(from);
           const written = yield* write({ conversation: thread, from, kind: "chat", text: text.trim(), final: true, meta: run ? { run } : {}, sendKey });
           if (from === "user") yield* readThrough("user", thread, written.number);
           return toMessage(yield* messageOrFail(written.id));
@@ -945,8 +997,8 @@ export const make = Effect.gen(function* () {
               yield* db(qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: shown.at(-1)!.number, updated_at: now }));
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length } as Spoken;
           }
-          const answers = from !== managerAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
-          const run = sessions.currentRun(from);
+          const answers = from !== assistantAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
+          const run = helpers?.currentRun(from);
           const written = yield* write({
             conversation,
             from,
@@ -972,16 +1024,16 @@ export const make = Effect.gen(function* () {
           return false;
         }).pipe(Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false))),
       ),
-    managerSays: (conversation, key, text, final, run) =>
+    assistantSays: (conversation, key, text, final, run) =>
       locked(
         Effect.gen(function* () {
           const id = streaming.get(key);
           if (!id && !text.trim() && !final) return;
-          const written = yield* write({ ...(id ? { id } : {}), conversation, from: managerAgent, kind: "chat", text, final, meta: run ? { run } : {} });
+          const written = yield* write({ ...(id ? { id } : {}), conversation, from: assistantAgent, kind: "chat", text, final, meta: run ? { run } : {} });
           if (final) streaming.delete(key);
           else streaming.set(key, written.id);
         }),
-      ).pipe(logged("the manager's words")),
+      ).pipe(logged("the assistant's words")),
     notice: (conversation, text, code) =>
       locked(write({ conversation, from: "system", kind: "notice", text, final: true, meta: { code } })).pipe(logged("notice")),
     read: (who, opt = {}) =>
@@ -1017,9 +1069,17 @@ export const make = Effect.gen(function* () {
         }),
       ),
     jobThread: threadOfSession,
-    forManager: Effect.map(PubSub.subscribe(managerHub), Stream.fromSubscription),
-    managerDigest: () =>
-      locked(Effect.map(db(qd.openDeliveries({ recipient_id: managerAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox))),
+    forAssistant: Effect.map(PubSub.subscribe(assistantHub), Stream.fromSubscription),
+    ownerInThread: Effect.map(
+      core.subscribe,
+      Stream.flatMap((e) =>
+        e.type === "message" && e.thread && e.message.fromKind === "user" && e.message.kind === "chat" && e.message.final
+          ? Stream.make({ thread: e.thread, message: e.message })
+          : Stream.empty,
+      ),
+    ),
+    assistantDigest: () =>
+      locked(Effect.map(db(qd.openDeliveries({ recipient_id: assistantAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox))),
     channels: () => Effect.map(loadChannels, (rows) => rows.map(infoOf)),
     openChannel: (name, description, project) =>
       locked(
@@ -1064,6 +1124,11 @@ export const make = Effect.gen(function* () {
         const row = yield* one(qc.conversationByID({ id: found.id }));
         return row ? infoOf(row) : undefined;
       }),
+    useHelpers: (h) => void (helpers = h),
+    helpersBack,
+    activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
+    consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
+    sessionNews: onSessionNews,
   };
   return shape;
 });

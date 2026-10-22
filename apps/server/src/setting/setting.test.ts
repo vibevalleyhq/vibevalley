@@ -1,11 +1,10 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { Config } from "../base/config.ts";
+import { type Config, Settings } from "../base/config.ts";
 import { Effect, Layer } from "effect";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import { defaultVoice } from "./rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Settings } from "../base/config.ts";
 import { layer, Setting } from "./setting.ts";
 
 const appId = "11111111111111111111111111111111";
@@ -66,7 +65,7 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         const before = s.status();
-        expect(before.voiceDefaults.answer).toEqual({ vendor: "manager" });
+        expect(before.voiceDefaults.answer).toEqual({ vendor: "assistant" });
         expect(before.voiceDefaults.tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "English_captivating_female1" });
         expect(before.voiceDefaults.greeting).toBe(defaultVoice().greeting);
         expect(before.voice).toEqual(before.voiceDefaults);

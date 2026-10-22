@@ -30,7 +30,7 @@ const issue = (id: string) =>
     sql`insert into issue (id, number, title, description, created_at) values (${id}, ${Number(id.slice(1))}, ${id}, '', 0)`.pipe(Effect.orDie),
   );
 
-describe("the manager's runs", () => {
+describe("the assistant's runs", () => {
   it.live("one loop is one run; its inputs' issues are all linked; failures and stops are said", () =>
     Effect.gen(function* () {
       const sessions = yield* Sessions;
@@ -39,17 +39,17 @@ describe("the manager's runs", () => {
       const finished: RunFinished[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (r) => Effect.sync(() => finished.push(r))));
       yield* Effect.sleep(5);
-      const journal = sessions.trajectories.openLog("manager");
-      const x = new AgentExecution("manager", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
+      const journal = sessions.trajectories.openLog("assistant");
+      const x = new AgentExecution("assistant", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
       yield* x.observe(user("看看工单"), { issue: "i1", by: { kind: "issue" }, heard: ["m1"] });
-      expect(sessions.currentRun("manager")).not.toBe("");
+      expect(sessions.currentRun("assistant")).not.toBe("");
       yield* x.observe(tool("c1"));
       yield* x.observe(toolEnd("c1"));
       yield* x.observe(user("再看一张"), { issue: "i2", by: { kind: "comment" } });
       yield* x.observe(said("看完了"));
       yield* x.observe(end());
-      expect(sessions.currentRun("manager")).toBe("");
+      expect(sessions.currentRun("assistant")).toBe("");
       expect(finished).toEqual([{ id: expect.any(String), issues: ["i1", "i2"], outcome: "completed" }]);
       const runs = yield* sessions.runs("i2");
       expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
@@ -84,14 +84,14 @@ describe("the manager's runs", () => {
       const sessions = yield* Sessions;
       let broken = true;
       const store: RunStore = { ...sessions.runStore, finish: (...a) => (broken ? Effect.fail(new Error("disk full")) : sessions.runStore.finish(...a)) };
-      const x = new AgentExecution("manager", sessions.trajectories.openLog("manager"), (tool) => ({ text: tool, action: "other", tool }), store);
+      const x = new AgentExecution("assistant", sessions.trajectories.openLog("assistant"), (tool) => ({ text: tool, action: "other", tool }), store);
       yield* x.observe(user("一"), { by: { kind: "comment" } });
-      const first = sessions.currentRun("manager");
+      const first = sessions.currentRun("assistant");
       expect(yield* Effect.flip(x.observe(end()))).toBeInstanceOf(Error);
-      expect(sessions.currentRun("manager")).toBe("");
+      expect(sessions.currentRun("assistant")).toBe("");
       broken = false;
       yield* x.observe(user("二"), { by: { kind: "comment" } });
-      const second = sessions.currentRun("manager");
+      const second = sessions.currentRun("assistant");
       expect(second).not.toBe(first);
       yield* x.observe(end());
       const sql = yield* SqlClient.SqlClient;

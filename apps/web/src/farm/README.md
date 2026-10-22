@@ -93,7 +93,7 @@ the top and bottom, bars filled with the dimmed map.
 - `kit/`: the pixel components for the DOM over the canvas, from `kit/index.ts`.
 - `sound.ts`: `playSound(name)`, `isMuted`/`setMuted`, `farmCues`, the sounds' recipes; `muted()` and `farmSounds(...)`
   (FarmPage runs it) in `support.ts`.
-- `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `bugText`, `managerSprite`.
+- `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `managerSprite`.
 - `@vibevalley/engine`: `/pixi` (`pixelStage` with `frame`, `Walker`, `frameAt`, particles, critters, light, sky),
   `/nav`, `/audio`, `/clock`.
 

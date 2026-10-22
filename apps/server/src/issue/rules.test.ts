@@ -1,23 +1,23 @@
-import { type Issue, type IssueStatus, managerAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
-import { graphsOf, templateCatalog } from "@vibevalley/protocol/rules";
+import { type Issue, assistantAgent, type ProjectStack, type Run } from "@vibevalley/protocol";
+import { templateCatalog } from "../agent/seed.ts";
+import { graphsOf } from "../task/issues.ts";
 import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import {
+  pullRequestConclusion,
   criteriaHead,
-  draftBrief,
-  draftDescription,
-  draftOpening,
+  refinementBrief,
+  refinementDescription,
+  refinementOpening,
   filledKinds,
   filledTemplate,
   issueJob,
   kept,
   nextTaskId,
-  parseDraft,
+  parseRefinement,
   sentTitles,
   milestonesOf,
   splitJob,
-  statusMove,
-  statusMoves,
 } from "./rules.ts";
 
 test("the recorded cases", () => {
@@ -49,10 +49,10 @@ describe("an issue as a job", () => {
       sessions: ["w1"],
       status: "in_review",
       moves: [],
-      acceptance: "glance",
+      review: "glance",
       findings: [{ id: "f1", text: "少了测试", at: 400 }],
-      asks: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
-      standing: { state: "asking", acts: [] },
+      questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
+      attention: { state: "asking", acts: [] },
     } as Issue;
     const runs: Run[] = [
       {
@@ -103,34 +103,48 @@ describe("an issue as a job", () => {
   });
 });
 
+describe("a pull request", () => {
+  it("a pull request's conclusion", () => {
+    expect(pullRequestConclusion("开场白\n\n**结论：** 已完成 abc123\n第二行\n\n补充说明")).toBe("已完成 abc123\n第二行");
+    const text = "完整的最后一轮回复。".repeat(20) + "\n\n最后一段";
+    expect(pullRequestConclusion(text)).toBe(text);
+  });
+});
+
 describe("drafts", () => {
   it("are read from the last block", () => {
     const said =
       '看过了。\n\n```json\n{"title": "旧的"}\n```\n\n要问主人：端口用哪个？\n\n```json\n' +
       `{"title": " 看板拖卡改用 issue.status ", "why": "旧接口收不了", "todo": ["改 board.dart", " "], "criteria": "拖到待办就开工", "notDoing": [], "files": ["app/lib/workbench/issues/board.dart"]}` +
       "\n```\n\n结论：写好了";
-    const { draft, problem } = parseDraft(said);
+    const { draft, problem } = parseRefinement(said);
     expect(problem).toBe("");
     expect(draft!.title).toBe("看板拖卡改用 issue.status");
     expect(kept(draft!.criteria)).toEqual(["拖到待办就开工"]);
-    expect(draftDescription(draft!)).toBe("为什么：\n旧接口收不了\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- app/lib/workbench/issues/board.dart");
+    expect(refinementDescription(draft!)).toBe("为什么：\n旧接口收不了\n\n要做的：\n- 改 board.dart\n\n可能涉及：\n- app/lib/workbench/issues/board.dart");
     for (const [said, problem] of [
       ["草稿写好了", "没找到草稿"],
       ["```json\n{title: 1}\n```", "json 读不了"],
       ['```json\n{"why": "x"}\n```', "草稿没有标题"],
       ['```json\n{"title": "x", "todo": [1]}\n```', "json 读不了"],
     ])
-      expect(parseDraft(said!).problem.startsWith(problem!)).toBe(true);
-    const later = parseDraft('```json\n{"title": "x"}\n```\n```\n不是 json\n```');
+      expect(parseRefinement(said!).problem.startsWith(problem!)).toBe(true);
+    const later = parseRefinement('```json\n{"title": "x"}\n```\n```\n不是 json\n```');
     expect([later.draft?.title, later.problem]).toEqual(["x", ""]);
   });
 
   it("briefs", () => {
-    const first = draftBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
-    for (const want of [draftOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："]) expect(first).toContain(want);
+    const first = refinementBrief({ title: "新工单" }, "看板拖卡还在调旧接口", "board");
+    for (const want of [refinementOpening, "项目：board", "主人想做的：看板拖卡还在调旧接口", "```json", '"criteria"', "要问主人："])
+      expect(first).toContain(want);
     expect(first).not.toContain("上一版草稿");
-    const drafted = { title: "看板拖卡改用 issue.status", description: "为什么：\n旧接口", criteria: ["拖到待办就开工"], asks: [{ question: "端口用哪个？" }] };
-    const answer = draftBrief(drafted, "用 8797", "board");
+    const refined = {
+      title: "看板拖卡改用 issue.status",
+      description: "为什么：\n旧接口",
+      criteria: ["拖到待办就开工"],
+      questions: [{ question: "端口用哪个？" }],
+    };
+    const answer = refinementBrief(refined, "用 8797", "board");
     for (const want of [
       "上一版草稿",
       "标题：看板拖卡改用 issue.status",
@@ -140,55 +154,9 @@ describe("drafts", () => {
       "主人的回答：用 8797",
     ])
       expect(answer).toContain(want);
-    const again = draftBrief({ ...drafted, asks: [] }, "也改测试", "board");
+    const again = refinementBrief({ ...refined, questions: [] }, "也改测试", "board");
     expect(again).toContain("主人这次说：也改测试");
     expect(again).not.toContain("主人的回答");
-  });
-});
-
-describe("status moves", () => {
-  const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
-    ({ status, sessions: sent ? ["w1"] : [], standing: { state: "reviewing", acts: [] }, ...more }) as Issue;
-  it("where each status may go", () => {
-    for (const [from, sent, to] of [
-      ["backlog", false, ["todo", "canceled"]],
-      ["todo", false, ["backlog", "canceled"]],
-      ["in_progress", true, ["canceled"]],
-      ["in_review", true, ["todo", "done", "canceled"]],
-      ["done", true, ["todo"]],
-      ["canceled", true, ["todo"]],
-      ["canceled", false, ["backlog"]],
-    ] as const) {
-      const t = issue(from, sent);
-      expect(statusMoves(t), from).toEqual(to);
-      for (const s of ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const) {
-        const [m, why] = statusMove(t, s);
-        expect(m !== "none" || why !== "").toBe(true);
-      }
-    }
-    const required = issue("in_review", true, { acceptance: "required" });
-    expect(statusMoves(required)).toEqual(["todo", "canceled"]);
-    expect(statusMoves({ ...required, acceptedAt: 1 })).toEqual(["todo", "done", "canceled"]);
-    expect(statusMoves(issue("backlog", false, { drafting: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("in_progress", false, { assignee: managerAgent }))).toEqual([]);
-    expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
-  });
-
-  it("a round that failed is not harvested, from the board, the command line or the manager alike", () => {
-    const failed = issue("in_review", true, { standing: { state: "stuck", stuck: "failed", acts: [] } });
-    expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
-    expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
-    // Stopped halfway is not failed: what is there may still be harvested.
-    expect(statusMoves(issue("in_review", true, { standing: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
-  });
-
-  it("the manager's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
-    const manager = (more: Partial<Issue>) => issue("in_review", false, { assignee: managerAgent, ...more });
-    expect(statusMoves(manager({ handedBack: { at: 1, outcome: "completed" } }))).toEqual(["done", "canceled"]);
-    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "done")).toEqual(["answered", ""]);
-    expect(statusMove(manager({ handedBack: { at: 1, outcome: "completed" } }), "canceled")).toEqual(["putAway", ""]);
-    for (const outcome of ["failed", "interrupted"] as const) expect(statusMoves(manager({ handedBack: { at: 1, outcome } }))).toEqual(["canceled"]);
-    expect(statusMoves(issue("done", false, { assignee: managerAgent, closed: "answered" }))).toEqual([]);
   });
 });
 
@@ -244,8 +212,8 @@ describe("templates", () => {
       issue("别的项目", "web", 9),
       issue("没派过", "app", 8, { sessions: [] }),
       issue("计划里的一步", "app", 8, { parent: "g" }),
-      issue("定时", "app", 8, { schedule: "s1" }),
-      issue("给管家", "app", 8, { assignee: managerAgent }),
+      issue("定时", "app", 8, { recurrence: "s1" }),
+      issue("给管家", "app", 8, { assignee: assistantAgent }),
       issue("长".repeat(61), "app", 8),
       issue("三", "app", 3),
       issue("二", "app", 2),

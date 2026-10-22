@@ -1,18 +1,19 @@
-// A plot's issue, opened by clicking the plot or its helper: the helper standing on its crop at the side; then, as the
+// A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.standing, worded by src/rules/issueState.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
 
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import type { Acceptance, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
+import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
 import { castPrefix } from "../../rules/cast";
 import { issueThreadOf } from "../../rules/chat";
-import { actLabel, changesLine, type CriterionRow, findingsOf, issueState, nothingChanged, noStepsText, resumeWords } from "../../rules/issueState";
+import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../rules/issueState";
+import { actLabel } from "@vibevalley/protocol/rules";
 import { runText } from "../../rules/issues";
 import { tookText, wallClockText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
@@ -124,7 +125,7 @@ function IssueBody(props: {
   }));
   const changed = () => ready(changes, undefined);
   const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.standing.state, s().head.runs, props.issue.findings.length],
+    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, s().head.runs, props.issue.findings.length],
     queryFn: () => api.issue.timeline({ id: props.issue.id }),
     placeholderData: <T,>(prev: T) => prev,
   }));
@@ -134,7 +135,7 @@ function IssueBody(props: {
     () => true,
   );
   const agent = () => ready(agentsQuery, []).find((a) => a.id === s().head.agent);
-  const state = () => s().standing.state;
+  const state = () => s().attention.state;
 
   const act = async (run: () => Promise<unknown>) => {
     setBusy(true);
@@ -156,11 +157,16 @@ function IssueBody(props: {
       setBox(undefined);
     }
   };
+  /** An act is the server's (issue.act); the farm adds its effects (commands) and gathers the words some take. */
+  const doAct = (a: IssueAct, words = "") => {
+    const id = props.issue.id;
+    return act(() => api.issue.act({ id, body: { act: a, ...(words ? { text: words } : {}) } }));
+  };
   const reopen = () => {
     const id = props.issue.id;
-    const said = text().trim() || undefined;
+    const said = text().trim();
     return act(async () => {
-      const got = await api.issue.status({ id, body: { status: "todo", text: said } });
+      const got = await api.issue.act({ id, body: { act: "reopen", ...(said ? { text: said } : {}) } });
       const helper = got.sessions.at(-1);
       if (helper) {
         setText("");
@@ -169,38 +175,33 @@ function IssueBody(props: {
     });
   };
   const reject = async () => {
-    const lines = findingsOf(text());
-    if (lines.length === 0) return;
-    const id = props.issue.id;
-    if (await act(() => api.issue.accept({ id, body: { pass: false, findings: lines } }))) {
+    const said = text().trim();
+    if (!said) return;
+    if (await doAct("reject", said)) {
       setText("");
       setBox(undefined);
     }
   };
-  const setAcceptance = (a: Acceptance) => {
+  const setReview = (a: Review) => {
     const id = props.issue.id;
-    return act(() => api.issue.update({ id, body: { acceptance: a } }));
+    return act(() => api.issue.update({ id, body: { review: a } }));
   };
   const go = (a: IssueAct) => {
     const h = props.session;
-    const id = props.issue.id;
     switch (a) {
-      case "start":
-        return void act(() => api.issue.status({ id, body: { status: "todo" } }));
       case "answer":
         return void say(text());
+      case "start":
       case "accept":
-        return void act(() => api.issue.accept({ id, body: { pass: true } }));
+      case "acknowledge":
+      case "resume":
+        return void doAct(a);
       case "reject":
         return box() === "reject" ? void reject() : void setBox("reject");
       case "harvest":
         return props.onHarvest(h);
-      case "acknowledge":
-        return void act(() => api.issue.status({ id, body: { status: "done" } }));
       case "resolve":
         return void act(() => commands.resolve(h));
-      case "resume":
-        return void act(() => commands.water(h, resumeWords));
       case "cure":
         return void act(() => commands.cure(h));
       case "tell":
@@ -227,7 +228,7 @@ function IssueBody(props: {
   );
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
-  const rowActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
+  const rowActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
   const boxShown = () => state() === "asking" || state() === "closed" || box() !== undefined;
 
   return (
@@ -243,7 +244,7 @@ function IssueBody(props: {
             <span class={xs}>{s().project}</span>
           </Show>
         </div>
-        <p class="mt-1 text-[13px]" style={{ color: s().standing.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
+        <p class="mt-1 text-[13px]" style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
 
@@ -255,7 +256,7 @@ function IssueBody(props: {
                 <p class={["mt-1 line-clamp-4 whitespace-pre-wrap", body]}>{ask().line}</p>
               </Show>
               <Show when={state() === "asking"}>
-                <For each={props.issue.asks}>
+                <For each={props.issue.questions}>
                   {(q) => (
                     <div class="mt-2">
                       <p class={body}>{q.question}</p>
@@ -318,7 +319,7 @@ function IssueBody(props: {
             <p class={xs}>{s().taskText}</p>
           </Show>
           <Show when={s().criteria.length > 0} fallback={<p class={xs}>这张工单没写做完的标准：交回来时看改动判断。</p>}>
-            <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.acceptedAt === undefined} />
+            <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().weeds.length > 0}>
             <div class="mt-1.5">
@@ -411,16 +412,16 @@ function IssueBody(props: {
                       {([a, label]) => (
                         <PxButton
                           size="sm"
-                          tone={props.issue.acceptance === a ? "primary" : "plain"}
-                          disabled={busy() || props.issue.acceptance === a || !s().open}
-                          onClick={() => void setAcceptance(a)}
+                          tone={props.issue.review === a ? "primary" : "plain"}
+                          disabled={busy() || props.issue.review === a || !s().open}
+                          onClick={() => void setReview(a)}
                         >
                           {label}
                         </PxButton>
                       )}
                     </For>
-                    <Show when={props.issue.acceptedAt !== undefined}>
-                      <span class="text-[12px] text-leaf-700">已验收 {wallClockText(props.issue.acceptedAt!)}</span>
+                    <Show when={props.issue.reviewedAt !== undefined}>
+                      <span class="text-[12px] text-leaf-700">已验收 {wallClockText(props.issue.reviewedAt!)}</span>
                     </Show>
                   </div>
                 </Row>
@@ -594,9 +595,13 @@ function Fold(props: { label: string; children: JSX.Element }) {
         <SpriteIcon name="button-next" size={12} class={open() ? "rotate-90" : ""} />
         <span class="text-[13px] text-bark-800 group-hover:text-bark-900">{props.label}</span>
       </button>
-      <Show when={open()}>
-        <div class="pb-3">{props.children}</div>
-      </Show>
+      {/* Mounted with the dialog and only hidden while folded: content first mounted by the click reads queries in
+          flight, and Solid holds that click's whole update until they land, so the fold would not open. */}
+      <div class="pb-3" hidden={!open()}>
+        <Errored fallback={<p class="text-[12px] text-bark-500">读不到。</p>}>
+          <Loading fallback={<p class="text-[12px] text-bark-500">在读……</p>}>{props.children}</Loading>
+        </Errored>
+      </div>
     </div>
   );
 }

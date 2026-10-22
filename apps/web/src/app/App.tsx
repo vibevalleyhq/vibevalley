@@ -9,7 +9,7 @@ import { AgentsRoute } from "../pages/agents/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../pages/docs/DocsPage";
 import { IssuesPage } from "../pages/issues/IssuesPage";
-import { ManagerPage } from "../pages/manager/ManagerPage";
+import { AssistantPage } from "../pages/assistant/AssistantPage";
 import { PairPage } from "../pages/pair/PairPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { RuntimesPage } from "../pages/runtimes/RuntimesPage";
@@ -24,6 +24,7 @@ import { sortProjects } from "../rules/projects";
 import { farmState } from "../farm/store";
 import { useRouter } from "./router";
 import { Shell } from "./Shell";
+import { WindowStrip } from "./TitleBar";
 
 type Rest = () => string;
 
@@ -35,7 +36,7 @@ const places: Record<string, (rest: Rest) => JSX.Element> = {
     </div>
   ),
   settings: (rest) => <SettingsPage rest={rest()} />,
-  manager: (rest) => <ManagerPage rest={rest()} />,
+  assistant: (rest) => <AssistantPage rest={rest()} />,
   agents: (rest) => <AgentsRoute rest={rest()} />,
   runtimes: (rest) => <RuntimesPage rest={rest()} />,
   projects: (rest) => <ProjectsPage rest={rest()} />,
@@ -96,6 +97,7 @@ function Routes() {
 export function App() {
   return (
     <Root>
+      <WindowStrip />
       <Follow />
       <Routes />
       <ToastHost />

@@ -1,4 +1,4 @@
-// The farm's HUD over the village: the manager's face and the farm's level, coins and clock at the top left; the
+// The farm's HUD over the village: the assistant's face and the farm's level, coins and clock at the top left; the
 // channels, the quota and the menu at the top right; the phone and the helpers at the bottom left; the tools along the
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
@@ -24,6 +24,7 @@ import { FxLayer } from "./FxLayer";
 import { Overlay } from "./Overlay";
 import { ProjectSign } from "./ProjectSign";
 import { QuotaPill } from "./QuotaPill";
+import { titleBar } from "../../app/TitleBar";
 
 const edge = 8;
 const gap = 4;
@@ -92,20 +93,20 @@ function TopLeft() {
   const frames = useFrames();
   const core = useCore();
   const tod = timeOfDay();
-  const look = useFarm((s) => s.managerLook);
+  const look = useFarm((s) => s.assistantLook);
   const lv = () => frames.frame?.view.level ?? { level: 1, xp: 0, need: 10 };
   const level = () => Math.round(lv().level);
   const need = () => Math.round(lv().need);
   const next = () => nextClearing(level());
   const coins = () => Math.round(core()?.progress?.coins ?? 0);
   const face = () => (look() !== "farmer" ? `manager-${look()}-face` : "manager-face");
-  const open = (panel: "manager" | "graphs") => {
+  const open = (panel: "assistant" | "graphs") => {
     playSound("open");
     farm.panel(panel);
   };
   return (
-    <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
-      <HudTap label="换管家的样子" onClick={() => open("manager")}>
+    <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
+      <HudTap label="换管家的样子" onClick={() => open("assistant")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span
             class="box-border flex items-center justify-center border-2 shadow-[2px_2px_0_0_#3a2a1899]"

@@ -8,12 +8,16 @@ import {
   type IssueTimeline,
   type Priority,
   PriorityValues,
-  type Schedule,
+  type Recurrence,
   type Spent,
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { head, nextText, phaseText, runtimeLabel, shortTitle, standingLabel, standingWantsOwner, whenText, yuan } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { runtimeLabel } from "../agent/seed.ts";
+import { nextText, whenText } from "../recurrence/when.ts";
+import { head } from "../base/text.ts";
+import { yuan } from "../runtime/money.ts";
 import type { Roster } from "../session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
@@ -54,7 +58,7 @@ export function changesText(c: Changes): string {
   return lines.join("\n");
 }
 
-/** How a session reads to the manager, in its situation as in roster; number is its issue's. */
+/** How a session reads to the assistant, in its situation as in roster; number is its issue's. */
 export function sessionLine(w: Roster, now = Date.now(), number?: number): string {
   const h = w.session;
   let last = "";
@@ -69,9 +73,9 @@ export function sessionLine(w: Roster, now = Date.now(), number?: number): strin
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-// ── issues, as the manager reads them ──
+// ── issues, as the assistant reads them ──
 
-/** The words the owner and the manager use for a status, and its own name. */
+/** The words the owner and the assistant use for a status, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
   备选: "backlog",
   草稿: "backlog",
@@ -110,15 +114,15 @@ export function spanWords(ms: number): string {
   return `${Math.floor(m / 60 / 24)} 天`;
 }
 
-/** One line: its number and short title first, so the manager names it by them; who is the one doing it, when any. */
+/** One line: its number and short title first, so the assistant names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
-  const st = t.standing;
+  const st = t.attention;
   const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
-  const parts = [`#${t.number}「${shortTitle(t.title)}」${standingLabel[st.state]}${stuck}`];
+  const parts = [`#${t.number}「${shortTitle(t.title)}」${attentionLabel[st.state]}${stuck}`];
   if (t.project) parts.push(t.project);
   if (who) parts.push(who);
   if (t.priority !== "medium") parts.push(priorityWords[t.priority] + "优先级");
-  if (standingWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
+  if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
 
@@ -135,7 +139,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
       lines.push(`  ${i + 1}. ${c}（${mark}）`);
     });
   }
-  if (t.asks.length > 0) lines.push("在等主人回答：" + t.asks.map((a) => a.question).join("；"));
+  if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
   const weeds = t.findings.filter((f) => !f.pulled);
   if (weeds.length > 0) lines.push("验收没过要修的：" + weeds.map((f) => f.text).join("；"));
   if (t.handedBack) lines.push("管家这一轮" + (t.handedBack.outcome === "completed" ? "答完了" : "没答成") + "，在等主人点头");
@@ -144,7 +148,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
   return lines.join("\n");
 }
 
-export function scheduleLine(s: Schedule, channel: string): string {
+export function recurrenceLine(s: Recurrence, channel: string): string {
   const direct = s.agent ? "，直接派给 " + s.agent + (s.project ? " 去 " + s.project : "") : "";
   const next = s.enabled ? "下次 " + nextText(s) : nextText(s);
   return `- ${s.id} 号「${s.name}」#${channel} ${whenText(s.when, s.tz)}${direct}；${next}\n  ${s.text}`;
@@ -162,7 +166,7 @@ export function parseTime(s: string): number | undefined {
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** Changing an issue or moving it is the owner's call: the manager asks for what it saw itself, as with a merge. */
+/** Changing an issue or moving it is the owner's call: the assistant asks for what it saw itself, as with a merge. */
 export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */

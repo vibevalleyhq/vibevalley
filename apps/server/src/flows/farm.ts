@@ -1,4 +1,4 @@
-// A whole farm for the flow tests, which go through several services at once (an issue drafted, sent, harvested; a
+// A whole farm for the flow tests, which go through several services at once (an issue refined, sent, harvested; a
 // memory kept by one session and recalled by the next). No binary, login or model: the helpers are oar's scripted
 // runtime over real git repositories in temporary folders, doing what the words of their job say (testing/helper.ts).
 
@@ -6,12 +6,12 @@ import { execFileSync } from "node:child_process";
 import { type Runtime } from "@botiverse/oar";
 import type { ScriptedTurn } from "@botiverse/oar/testing";
 import type { Agent, Fact, FactReport, Session } from "@vibevalley/protocol";
-import { seedAgents } from "@vibevalley/protocol/rules";
-import { Effect, Layer, Stream } from "effect";
+import { seedAgents } from "../agent/seed.ts";
+import { Effect, Stream } from "effect";
 import type { Config } from "../base/config.ts";
 import { Core } from "../core/core.ts";
-import { layer as game } from "../game/game.ts";
-import { type Hired, ready as sessionsReady } from "../session/session.ts";
+import { type Hired } from "../session/session.ts";
+import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart } from "../services.ts";
 import { helper } from "../testing/helper.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world, type WorldOptions } from "../testing/world.ts";
@@ -19,7 +19,7 @@ import { world, type WorldOptions } from "../testing/world.ts";
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
-const farmLayer = (options: WorldOptions) => sessionsReady.pipe(Layer.provideMerge(game.pipe(Layer.provideMerge(world(options)))));
+const farmLayer = (options: WorldOptions) => world(options).pipe(gamification, agentSessionsStart, taskGraphsStart, notificationsStart);
 
 export interface Farm {
   readonly config: Config;
@@ -28,7 +28,7 @@ export interface Farm {
 }
 
 /** The farm with its one runtime, pi: testing/helper.ts's unless the test gives its own. As the server starts it, sessions
- * left on the farm by the last run come back (sessionsReady), and the game keeps its ledger. */
+ * left on the farm by the last run come back (Agent Sessions' startup), and the game keeps its ledger. */
 export { helper };
 
 export function farm(options: Omit<WorldOptions, "runtimes"> & { readonly change?: (c: Config) => Config; readonly runtime?: Runtime } = {}): Farm {

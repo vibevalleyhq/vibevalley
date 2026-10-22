@@ -1,10 +1,10 @@
 // The words over the village, at screen pixels so they stay sharp: each plot's card (what a click would do while
 // pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
-// head, the manager's last words, and the yard's signs, names and counts. Words let clicks through to the village.
+// head, the assistant's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { Session } from "@vibevalley/protocol";
-import { doingOf, harvestedOf, lastManagerSaid, plotTitle } from "./rules";
+import { doingOf, harvestedOf, lastAssistantSaid, plotTitle } from "./rules";
 import { farmState } from "../store";
 import { aimTool } from "../tools";
 import { yardPlaces } from "../world/places";
@@ -22,7 +22,7 @@ const rail = 5;
 const signGap = 3;
 const topEdge = 20;
 const signInside = 30;
-/** The manager's words stay this long after he finished saying them. */
+/** The assistant's words stay this long after he finished saying them. */
 const speechMs = 9000;
 
 const sign: Record<string, string> = {
@@ -191,8 +191,8 @@ export function Overlay() {
         });
     });
 
-    const mgr = world.manager;
-    return { back, front, tips, manager: { x: at(mgr.x, 0).x, y: at(0, mgr.y - 34).y - 4 }, village };
+    const mgr = world.assistant;
+    return { back, front, tips, assistant: { x: at(mgr.x, 0).x, y: at(0, mgr.y - 34).y - 4 }, village };
   });
 
   return (
@@ -202,12 +202,12 @@ export function Overlay() {
           <For each={p().back} keyed={(pin) => pin.key}>
             {(pin) => <PinView pin={pin()} />}
           </For>
-          <ManagerWords
-            x={p().manager.x}
-            y={p().manager.y}
+          <AssistantWords
+            x={p().assistant.x}
+            y={p().assistant.y}
             hidden={chatOpen() || reveal()}
             sessions={frames.frame?.state.sessions.length ?? 0}
-            said={lastManagerSaid(frames.frame?.state.chat)}
+            said={lastAssistantSaid(frames.frame?.state.chat)}
           />
           <Heads sessions={frames.frame?.state.sessions ?? []} village={p().village} />
           <For each={p().front} keyed={(pin) => pin.key}>
@@ -275,8 +275,8 @@ function Head(props: { session: Session; village: Village; placed: Map<string, H
   );
 }
 
-/** The manager's last line, for a while after he said it; on an empty farm, his question. */
-function ManagerWords(props: { x: number; y: number; hidden: boolean; sessions: number; said: ReturnType<typeof lastManagerSaid> }) {
+/** The assistant's last line, for a while after he said it; on an empty farm, his question. */
+function AssistantWords(props: { x: number; y: number; hidden: boolean; sessions: number; said: ReturnType<typeof lastAssistantSaid> }) {
   const [now, setNow] = createSignal(Date.now());
   // When the line being shown was finished; a new line starts over.
   let finished: { key: string; at?: number } = { key: "" };
@@ -302,7 +302,7 @@ function ManagerWords(props: { x: number; y: number; hidden: boolean; sessions: 
   };
   return (
     <Show when={text()}>
-      {(t) => <PinView pin={{ key: "manager", x: props.x, y: props.y, ay: 1, card: { maxWidth: 220, maxLines: 3, rows: [[words(t())]] } }} />}
+      {(t) => <PinView pin={{ key: "assistant", x: props.x, y: props.y, ay: 1, card: { maxWidth: 220, maxLines: 3, rows: [[words(t())]] } }} />}
     </Show>
   );
 }

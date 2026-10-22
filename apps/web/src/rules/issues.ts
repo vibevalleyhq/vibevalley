@@ -1,10 +1,10 @@
 // An issue's lane, title and status and priority words.
 
 import {
-  type CoreState,
+  type WorkspaceState,
   type Issue,
   type IssueStatus,
-  managerAgent,
+  assistantAgent,
   type Priority,
   type Run,
   type RunTrigger,
@@ -57,7 +57,7 @@ export const statusLabel: Record<IssueStatus, string> = {
 
 export const priorityLabel: Record<Priority, string> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
-export const isForManager = (issue: Issue) => issue.assignee === managerAgent;
+export const isForAssistant = (issue: Issue) => issue.assignee === assistantAgent;
 
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   const job = issue.title.trim();
@@ -92,7 +92,7 @@ export function taskLine(g: TaskGraph) {
 export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at : undefined);
 
 /** The session on the farm now for an open issue. */
-export function issueSession(core: CoreState | undefined, issue: Issue): Session | undefined {
+export function issueSession(core: WorkspaceState | undefined, issue: Issue): Session | undefined {
   if (!core || issue.sessions.length === 0 || issue.closed !== undefined) return undefined;
   const last = issue.sessions[issue.sessions.length - 1];
   return core.sessions.find((s) => s.id === last);
@@ -120,7 +120,7 @@ export function stageOf(s: IssueStatus): Stage {
 export const newIssueTitle = "新工单";
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
-export const isDrafted = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
+export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
 
 export function laneOf(s: IssueStatus): Lane {
   if (s === "backlog" || s === "todo") return "todo";
@@ -163,9 +163,9 @@ export function runTriggerText(t: RunTrigger) {
       return t.message ? `带话（#${t.message.slice(0, 8)}）` : "带话";
     case "task":
       return "种植计划";
-    case "schedule":
+    case "recurrence":
       return t.missed ? "定时（补跑）" : "定时";
-    case "draft":
+    case "refine":
       return "起草";
     case "runtime":
       return "农机自己";

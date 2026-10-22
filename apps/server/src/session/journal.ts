@@ -6,7 +6,8 @@
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
-import { actionText, cut } from "@vibevalley/protocol/rules";
+import { actionText } from "@vibevalley/protocol/rules";
+import { cut } from "../base/text.ts";
 import { FileWriter } from "../base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
 

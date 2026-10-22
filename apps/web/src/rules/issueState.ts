@@ -1,30 +1,14 @@
 // What an issue's page says, top to bottom, for the owner: what it is, where it stands, what is asked of the owner, how far
 // it is against its criteria; and what a bug on its plot is, and the harvest's checklist. Where it stands (and what the
-// owner may do) is the server's Issue.standing; this only words it.
+// owner may do) is the server's Issue.attention; this only words it.
 
-import type { Changes, Doing, Issue, IssueAct, IssueStanding, Session, SessionEvent, Standing, TaskGraph } from "@vibevalley/protocol";
-import { shortTitle, standingLabel } from "@vibevalley/protocol/rules";
+import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
+import { shortTitle, attentionLabel } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./issues";
 import { tookText } from "./time";
 import type { Tone } from "./cards";
 
-export const actLabel: Record<IssueAct, string> = {
-  start: "开工",
-  answer: "回答",
-  accept: "验收通过",
-  reject: "打回",
-  harvest: "收获",
-  acknowledge: "知道了",
-  resolve: "让它解决冲突",
-  resume: "接着做",
-  cure: "接着修",
-  tell: "带话",
-  stop: "叫停这一轮",
-  close: "关上",
-  reopen: "重开",
-};
-
-export const standingTone: Record<Standing, Tone> = {
+export const attentionTone: Record<Attention, Tone> = {
   draft: "faint",
   queued: "faint",
   working: "water",
@@ -35,16 +19,7 @@ export const standingTone: Record<Standing, Tone> = {
   closed: "faint",
 };
 
-export { standingLabel };
-
-/** The message 接着做 sends to a round that stopped halfway. */
-export const resumeWords = "上一轮停在了半路，接着把它做完。";
-
-/** 接着修: the session's brief, once, with what to do about the failure. */
-export function bugText(task: string) {
-  const original = task.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
-  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
-}
+export { attentionLabel };
 
 /** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
 export function spanText(ms: number) {
@@ -56,7 +31,7 @@ export function spanText(ms: number) {
 }
 
 /** The block that asks the owner for the one thing: its head and what it says under it. */
-export interface OwnerAsk {
+export interface OwnerQuestion {
   head: string;
   line?: string;
   tone: Tone;
@@ -80,18 +55,18 @@ export function criteriaRows(issue: Issue): CriterionRow[] {
 }
 
 /** The one thing the owner is asked for, worded; undefined when nothing is asked of the owner. */
-function ownerAsk(standing: IssueStanding, issue: Issue, head: Session): OwnerAsk | undefined {
+function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): OwnerQuestion | undefined {
   const who = head.name;
   const said = head.lastRun?.summary;
-  switch (standing.state) {
+  switch (attention.state) {
     case "asking":
-      return { head: `${who}有 ${issue.asks.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
+      return { head: `${who}有 ${issue.questions.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
     case "reviewing":
-      return issue.acceptedAt !== undefined
+      return issue.reviewedAt !== undefined
         ? { head: "验收过了，可以收获", ...(said ? { line: said } : {}), tone: "leaf" }
         : { head: `${who}交回来了，等你验收`, ...(said ? { line: said } : {}), tone: "wheat" };
     case "stuck":
-      switch (standing.stuck) {
+      switch (attention.stuck) {
         case "conflict":
           return { head: `合进 ${head.conflict?.base ?? "主分支"} 会冲突`, line: head.conflict?.files.join("、"), tone: "berry" };
         case "failed":
@@ -105,7 +80,7 @@ function ownerAsk(standing: IssueStanding, issue: Issue, head: Session): OwnerAs
       }
       break;
     case "closed":
-      return standing.lead === "reopen" ? { head: "关上了", line: "要它接着做就重开：写一句这次要做什么。", tone: "faint" } : undefined;
+      return attention.lead === "reopen" ? { head: "关上了", line: "要它接着做就重开：写一句这次要做什么。", tone: "faint" } : undefined;
     case "draft":
     case "queued":
     case "working":
@@ -120,7 +95,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
   const graphId = head.graph?.id ?? issue.parent ?? (issue.graph ? issue.id : undefined);
   const graph = graphId === undefined ? undefined : graphs.find((g) => g.id === graphId);
   const node = head.graph?.task === undefined || !graph ? undefined : graph.tasks.find((t) => t.id === head.graph!.task);
-  const standing = issue.standing;
+  const attention = issue.attention;
   const current = doingOf(head);
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
@@ -133,9 +108,9 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     issue,
     head,
     session,
-    standing,
+    attention,
     inTask: issueInTask(issue, session),
-    open: standing.state !== "harvested" && standing.state !== "closed",
+    open: attention.state !== "harvested" && attention.state !== "closed",
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
@@ -145,14 +120,14 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       : !node
         ? `在拆种植计划「${graph.title}」：只读代码，不改文件。`
         : `种植计划「${graph.title}」的一步：${node.title}。做完自动合进计划分支，收获整个计划时才进主分支。`,
-    ask: ownerAsk(standing, issue, head),
+    ask: ownerQuestion(attention, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
-    lead: standing.lead,
-    others: standing.acts.filter((a) => a !== standing.lead),
+    lead: attention.lead,
+    others: attention.acts.filter((a) => a !== attention.lead),
     criteria: rows,
     met: rows.filter((r) => r.result === "met").length,
     doing:
-      standing.state === "working" && current.action !== "none" ? `正在${current.actionText ?? ""}${current.label ? "：" + current.label : ""}` : undefined,
+      attention.state === "working" && current.action !== "none" ? `正在${current.actionText ?? ""}${current.label ? "：" + current.label : ""}` : undefined,
     weeds: issue.findings.filter((f) => !f.pulled),
     pulled: issue.findings.filter((f) => f.pulled),
     crewLine:
@@ -167,8 +142,8 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       const s = session ?? head;
       const turns = Math.round(s.runs);
       return [
-        standingLabel[standing.state],
-        ...(standing.since !== undefined ? [`已经 ${spanText(now - standing.since)}`] : []),
+        attentionLabel[attention.state],
+        ...(attention.since !== undefined ? [`已经 ${spanText(now - attention.since)}`] : []),
         head.name,
         ...(turns > 0 ? [`跑了 ${turns} 轮`] : []),
         `用了 ${spanText((endedAt(head) ?? now) - sessions[0]!.hiredAt)}`,
@@ -186,18 +161,11 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       ].join(" · ");
     },
     /** What it made, while there is a worktree to read it from. */
-    showsChanges: session !== undefined && standing.state !== "harvested" && standing.state !== "closed",
+    showsChanges: session !== undefined && attention.state !== "harvested" && attention.state !== "closed",
   };
 }
 
 export type IssueState = ReturnType<typeof issueState>;
-
-/** 没过: what the box says, one finding a line, blank lines dropped. */
-export const findingsOf = (text: string) =>
-  text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
 
 /** A binary file counts -1: not counted. */
 export const lineCounts = (c: Changes): [number, number] => [

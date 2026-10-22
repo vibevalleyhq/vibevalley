@@ -3,13 +3,13 @@ import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { memoryStore } from "../../task/store.ts";
+import { memoryStore } from "./taskStore.ts";
 import { Brain } from "./agent.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { readMcpConfig } from "./config.ts";
 import { connectAll, mcpContentText, mcpToolName } from "./mcp.ts";
 import { archive, forgetLine, readMemory } from "./memory.ts";
-import { describeJob, dueJobs, type Job, nextRun, parseCron, Schedules } from "./schedules.ts";
+import { describeJob, dueJobs, type Job, nextRun, parseCron, Recurrences } from "./recurrences.ts";
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./tasks.ts";
@@ -130,7 +130,7 @@ describe("skills and memory", () => {
   });
 });
 
-describe("schedules", () => {
+describe("recurrences", () => {
   it("are due by their kind", () => {
     const created = "2026-10-12T00:00:00.000Z";
     const at: Job = { id: "a", name: "a", message: "", at: "2026-10-12T01:00:00.000Z", created };
@@ -148,42 +148,42 @@ describe("schedules", () => {
   it("run a missed job once", async () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Schedules(dir, (text) => woke.push(text));
-    expect(await fails(call(s.tools, "schedule", { name: "x", message: "m" }))).toMatch(/正好给一个/);
-    expect(await fails(call(s.tools, "schedule", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
-    await call(s.tools, "schedule", { name: "巡检", message: "看看测试", every_minutes: 10 });
+    const s = new Recurrences(dir, (text) => woke.push(text));
+    expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m" }))).toMatch(/正好给一个/);
+    expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
+    await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
     await new Promise((r) => setTimeout(r, 2));
-    await call(s.tools, "schedule", { name: "提醒", message: "开会", at: new Date(Date.now() + 60_000).toISOString() });
-    expect(await call(s.tools, "list_schedules", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
+    await call(s.tools, "recurrence", { name: "提醒", message: "开会", at: new Date(Date.now() + 60_000).toISOString() });
+    expect(await call(s.tools, "list_recurrences", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
     const later = new Date(Date.now() + 3_600_000);
     s.tick(later);
     expect(woke.length).toBe(2);
     expect(woke[0]).toMatch(/^【定时任务「巡检」到点了/);
     s.tick(later);
     expect(woke.length).toBe(2);
-    const left = JSON.parse(readFileSync(join(dir, "schedules.json"), "utf8")) as Job[];
+    const left = JSON.parse(readFileSync(join(dir, "recurrences.json"), "utf8")) as Job[];
     expect(left.map((j) => j.name)).toEqual(["巡检"]);
-    await call(s.tools, "cancel_schedule", { id: left[0]!.id });
-    expect(await call(s.tools, "list_schedules", {})).toBe("没有定好的事。");
+    await call(s.tools, "cancel_recurrence", { id: left[0]!.id });
+    expect(await call(s.tools, "list_recurrences", {})).toBe("没有定好的事。");
   });
 
   it("wake only once the claim is stored", () => {
     const dir = home();
     let wakes = 0;
-    const s = new Schedules(dir, () => wakes++);
+    const s = new Recurrences(dir, () => wakes++);
     const now = new Date();
     writeFileSync(
-      join(dir, "schedules.json"),
+      join(dir, "recurrences.json"),
       JSON.stringify([
         { id: "once", name: "", message: "", at: new Date(now.getTime() - 60_000).toISOString(), created: new Date(now.getTime() - 3_600_000).toISOString() },
       ]),
     );
     // A directory at the temporary file's path makes the atomic write fail.
-    mkdirSync(join(dir, "schedules.json.tmp"));
+    mkdirSync(join(dir, "recurrences.json.tmp"));
     s.tick(now);
     s.tick(now);
     expect(wakes).toBe(0);
-    rmdirSync(join(dir, "schedules.json.tmp"));
+    rmdirSync(join(dir, "recurrences.json.tmp"));
     s.tick(now);
     s.tick(now);
     expect(wakes).toBe(1);
@@ -191,15 +191,15 @@ describe("schedules", () => {
 
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
-    const s = new Schedules(dir, () => {
+    const s = new Recurrences(dir, () => {
       throw new Error("unexpected wake");
     });
     const damaged = `[{"id":"important"`;
-    writeFileSync(join(dir, "schedules.json"), damaged);
-    await fails(call(s.tools, "schedule", { name: "new", message: "work", every_minutes: 5 }));
-    await fails(call(s.tools, "list_schedules", {}));
+    writeFileSync(join(dir, "recurrences.json"), damaged);
+    await fails(call(s.tools, "recurrence", { name: "new", message: "work", every_minutes: 5 }));
+    await fails(call(s.tools, "list_recurrences", {}));
     s.tick();
-    expect(readFileSync(join(dir, "schedules.json"), "utf8")).toBe(damaged);
+    expect(readFileSync(join(dir, "recurrences.json"), "utf8")).toBe(damaged);
   });
 });
 

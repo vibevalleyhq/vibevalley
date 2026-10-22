@@ -1,14 +1,16 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
+import { defaultVoice } from "../setting/rules.ts";
 import { Effect, Layer } from "effect";
-import { layer as manager } from "../manager/manager.ts";
+import { layer as assistant } from "../assistant/assistant.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { agentFor, type CallLine, clientOf, layer, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import { notificationsStart } from "../services.ts";
+import { Core } from "../core/core.ts";
+import { agentFor, type CallLine, clientOf, layer, onCallLine, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
 
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
@@ -41,7 +43,7 @@ const cases = JSON.parse(readFileSync(resolve(import.meta.dirname, "testdata/voi
 
 describe("a call's agent", () => {
   for (const c of cases)
-    it(`asks Agora as recorded: ${c.name}`, async () => {
+    it(`questions Agora as recorded: ${c.name}`, async () => {
       const vendors = vendorsFor(
         c.voice,
         { asrKey: c.keys.asrKey ?? "", llmKey: c.keys.llmKey ?? "", ttsKey: c.keys.ttsKey ?? "" },
@@ -71,7 +73,7 @@ describe("a call's agent", () => {
     });
 
   it("says which key is missing", () => {
-    // The quick model, so the rest needs no line; the default (the manager) needs the line and nothing else.
+    // The quick model, so the rest needs no line; the default (the assistant) needs the line and nothing else.
     expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({ reason: "管家的语音线路没接通" });
     const d: VoiceSettings = { ...defaultVoice(), answer: { vendor: "agora", model: "gpt-4.1-mini" } };
     const none = { asrKey: "", llmKey: "", ttsKey: "" };
@@ -92,19 +94,51 @@ describe("a call's agent", () => {
     expect(problem({ ...d, answer: { vendor: "openai", url: "https://x/v1/chat/completions", model: "m" } })).toContain("大模型");
     expect(problem({ ...d, tts: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } })).toContain("合成");
     expect(problem({ ...d, asr: { vendor: "deepgram", model: "nova-3" }, tts: { vendor: "openai", voice: "nova" } })).toBe("");
-    expect(problem({ ...d, answer: { vendor: "manager" } })).toContain("语音线路");
+    expect(problem({ ...d, answer: { vendor: "assistant" } })).toContain("语音线路");
     expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown);
     expect(fixedIn(deepseek)).toBe("deepseek");
     expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("voice");
-    expect(fixedIn({ ...d, answer: { vendor: "manager" } })).toBeUndefined();
+    expect(fixedIn({ ...d, answer: { vendor: "assistant" } })).toBeUndefined();
   });
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
 const farm = (capture: Capture) => {
   const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
-  return layer({ fetch: capture.fetch }).pipe(Layer.provideMerge(manager({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
+  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
+    Layer.provideMerge(assistant({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
+  );
 };
+
+/** A helper at work on an issue, and the issue, as the core has them. */
+const helperOn = (id: string, issue: string) =>
+  ({
+    id,
+    name: "阿狐" + id,
+    agent: "lab",
+    runtime: "pi",
+    brief: "写打卡",
+    hiredAt: Date.now(),
+    runs: 1,
+    issue,
+    phase: { _tag: "working", since: Date.now(), doing: { action: "none", label: "" } },
+    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
+  }) as unknown as Session;
+const issueOf = (id: string, number: number, session: string) =>
+  ({
+    id,
+    number,
+    title: "写打卡",
+    priority: "medium",
+    createdAt: Date.now(),
+    sessions: [session],
+    status: "in_progress",
+    moves: [],
+    review: "glance",
+    findings: [],
+    questions: [],
+    attention: { state: "working", acts: [] },
+  }) as Issue;
 
 const credentials = (voice?: Partial<VoiceSettings>) =>
   Effect.gen(function* () {
@@ -128,17 +162,18 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
 
-  it.live("starts and stops the manager on his line", () => {
+  it.live("starts and stops the assistant on his line", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
-      yield* credentials({ answer: { vendor: "manager" } });
+      yield* credentials({ answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
       expect(agent.agentId).toBe("parity-agent");
       const props = capture.requests[0]!.properties as Record<string, Record<string, unknown>>;
       expect(String(props.llm!.url).startsWith("https://line.example.com/llm/")).toBe(true);
       expect(props.llm!.api_key).not.toBe("");
+      expect(props.llm!.greeting_message).toBeTruthy();
       expect([props.parameters!.data_channel, props.advanced_features!.enable_rtm]).toEqual(["datastream", false]);
       // Only the page's user is listened to.
       expect(props.remote_rtc_uids).toEqual([grant.uid]);
@@ -158,7 +193,7 @@ describe("voice", () => {
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const setting = yield* Setting;
-      yield* credentials({ area: "EU", answer: { vendor: "manager" } });
+      yield* credentials({ area: "EU", answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
       const started = capture.urls[0]!;
@@ -177,6 +212,99 @@ describe("voice", () => {
         if (started.includes("api-eu")) expect(url).toContain("api-eu");
       }
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  // An issue handed back while the owner is on the call: the assistant's words about it are read out on the call, queued
+  // after what is being said; with no call on, nothing is read.
+  it.live("tells the owner on the call when an issue comes to want the owner", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const core = yield* Core;
+      yield* credentials({ answer: { vendor: "assistant" } });
+      expect(yield* voice.speak("没人在听")).toBe(false);
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid);
+      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      const spoken = yield* Effect.promise(async () => {
+        for (let i = 0; i < 300; i++) {
+          const at = capture.urls.findIndex((u) => u.endsWith(`/agents/${call.agentId}/speak`));
+          if (at >= 0) return capture.requests[at]!;
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        throw new Error("never spoken");
+      });
+      expect(spoken).toMatchObject({ priority: "APPEND", interruptable: true });
+      expect(String(spoken.text)).not.toBe("");
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  // Answering a ring: no greeting, the assistant's first words are what rang.
+  it.live("opens a call that answers a ring with what rang", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      yield* credentials({ answer: { vendor: "assistant" } });
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid, "#41「写打卡」交回来了，等你验收");
+      const llm = (capture.requests[0]!.properties as Record<string, Record<string, unknown>>).llm!;
+      expect(llm.greeting_message ?? "").toBe("");
+      yield* Effect.promise(async () => {
+        for (let i = 0; i < 300; i++) {
+          if (capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`))) return;
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        throw new Error("never spoken");
+      });
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  // Two issues handed back one after the other: one ask of the assistant, one answer read out, not two crowding.
+  it.live("tells what comes together once, in one answer", () => {
+    const capture = new Capture();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const core = yield* Core;
+      yield* credentials({ answer: { vendor: "assistant" } });
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid);
+      for (const [w, t, n] of [
+        ["w1", "t1", 41],
+        ["w2", "t2", 42],
+      ] as const) {
+        yield* core.apply({ type: "hired", session: helperOn(w, t) });
+        yield* core.apply({ type: "issue", issue: issueOf(t, n, w) });
+      }
+      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      yield* core.apply({ type: "report", id: "w2", outcome: "failed", summary: "没做成", runs: 1 });
+      const speaks = () => capture.urls.filter((u) => u.endsWith(`/agents/${call.agentId}/speak`)).length;
+      yield* Effect.promise(async () => {
+        for (let i = 0; i < 300 && speaks() === 0; i++) await new Promise((r) => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 300));
+      });
+      expect(speaks()).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  it("asks the assistant for one answer of everything that waited", () => {
+    expect(onCallLine(["#41「写打卡」交回来了，等你验收", "#42「修登录」这一轮没做成"])).toBe(
+      "【要告诉主人】\n- #41「写打卡」交回来了，等你验收\n- #42「修登录」这一轮没做成\n\n主人正在和你通电话，你的回答会念给主人听：这 2 件合成一段说，一件一句，口语，先说结论；不念代码、路径、命令和长列表。",
+    );
+    expect(onCallLine([], "阿狐：活熟了。做完了")).toBe(
+      "主人接起了你打的电话。你打电话是为了这件事：阿狐：活熟了。做完了\n先开口说这些：一两句，口语，先说结论；不念代码、路径、命令和长列表。",
+    );
+  });
+
+  it("cuts what is read out under Agora's 512 bytes, at a sentence's end", () => {
+    expect(speakPieces("短的一句。")).toEqual(["短的一句。"]);
+    const long = "第一句说的是工单交回来了。".repeat(20);
+    const pieces = speakPieces(long);
+    expect(pieces.length).toBeGreaterThan(1);
+    for (const p of pieces) expect(Buffer.byteLength(p, "utf8")).toBeLessThanOrEqual(480);
+    expect(pieces.every((p) => p.endsWith("。"))).toBe(true);
+    expect(pieces.join("")).toBe(long);
   });
 
   it.live("takes no transcripts from a call that is hanging up", () => {

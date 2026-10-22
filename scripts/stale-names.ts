@@ -113,6 +113,47 @@ const RULES: readonly Rule[] = [
     says: "RemoteServer, ServerChoice, ServerConnection, serverConnection, the vibevalley.server key, data/server_choice.dart",
   },
   {
+    name: "an issue's recurrence under the schedule name",
+    pattern:
+      /\b(Schedules|ScheduleShape|ScheduleRequest|ScheduleWhen\w*|ScheduleBy|scheduleProblem|listSchedules|FactSchedule|FactUnschedule)\b|\bschedules?\.\w|"(un)?schedule"/,
+    says: "Recurrence, Recurrences, RecurrenceRequest, RecurrenceWhen, recurrence.*; Effect's Schedule is another thing",
+  },
+  {
+    name: "a helper's question under the ask name",
+    pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/,
+    says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
+  },
+  {
+    name: "the read model under the core name",
+    pattern: /\b(CoreState|emptyCoreState)\b/,
+    says: "WorkspaceState, emptyWorkspaceState; Core is the service that holds it",
+  },
+  {
+    name: "an issue's attention under the standing name",
+    pattern: /\b(Standing|StandingValues|IssueStanding|standingLabel|standingOf|standingIn|standingTone|standingWantsOwner)\b|\.standing\b/,
+    says: "Attention, IssueAttention, attentionLabel, attentionOf, attentionIn; an achievement's standing (AchievementStanding) stays",
+    // The achievements panel's standings are an achievement's tier.
+    except: /^apps\/web\/src\/farm\/panels\/Achievements\.tsx$/,
+  },
+  {
+    name: "an issue's refinement under the draft name",
+    pattern:
+      /\b(IssueDraft|IssueDraftRequest|IssueDrafting|issueDraftingOf|draftBrief|parseDraft|draftDescription|clearDraft|beforeDraft|isDrafted|canDraft)\b|issue\.draft\b|"\/api\/v1\/issues\/\{id\}\/draft"/,
+    says: "IssueRefinement, IssueRefineRequest, IssueRefining, refinementBrief, parseRefinement, issue.refine; a plan's draft and a form's draft stay",
+  },
+  {
+    name: "an issue's review under the acceptance name",
+    pattern: /\b(Acceptance|AcceptanceValues|IssueAcceptRequest|acceptedAt|setAcceptance)\b|issue\.accept\b/,
+    says: "Review, ReviewValues, IssueReviewRequest, reviewedAt, issue.review; a plan step's acceptance (an acceptance test) stays",
+  },
+  {
+    name: "the assistant under the manager name",
+    pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/,
+    says: "Assistant, assistantAgent, AssistantShape, forAssistant; the farm's art and map keep their manager names (manager-face, Manager)",
+    // The village map's entity is Manager (public/village.ldtk).
+    except: /^apps\/web\/src\/farm\/world\/(level|world)\.ts$/,
+  },
+  {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",

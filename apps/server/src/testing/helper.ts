@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { factsOf, presetOf } from "@vibevalley/protocol/rules";
+import { factsOf, presetOf } from "../agent/seed.ts";
 import { criteriaHead } from "../issue/rules.ts";
 import { jobBreak } from "../session/rules.ts";
 
@@ -42,11 +42,11 @@ async function draft(turn: ScriptedTurn, input: string) {
       return "";
     });
   }
-  let [title, criteria, asks] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"];
-  if (input.includes("主人的回答：用 8797")) [title, criteria, asks] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
+  let [title, criteria, questions] = ["看板拖卡改用 issue.status", `["拖到待办就开工"]`, "要问主人：用 8787 还是 8797？\n\n"];
+  if (input.includes("主人的回答：用 8797")) [title, criteria, questions] = ["看板拖卡改用 8797 端口", `["拖到待办就开工", "端口是 8797"]`, ""];
   turn.say(
     "看过代码了。\n\n" +
-      asks +
+      questions +
       "```json\n" +
       `{"title": "${title}", "why": "看板还在调旧接口", "todo": ["改 board.dart"], "criteria": ${criteria}, "notDoing": [], "files": ["board.dart"]}` +
       "\n```\n\n结论：草稿写好了",

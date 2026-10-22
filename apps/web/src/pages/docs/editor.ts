@@ -113,7 +113,7 @@ export class DocEditor {
   private max?: ReturnType<typeof setTimeout>;
   private poll?: ReturnType<typeof setTimeout>;
   private disposed = false;
-  // Asks made for what others wrote, and the one that last brought another writer's change.
+  // Questions made for what others wrote, and the one that last brought another writer's change.
   private polls = 0;
   private heardAt?: number;
   // Blocks another writer changed while the owner was in them: not replaced, asked for again once the owner has left.
@@ -147,7 +147,7 @@ export class DocEditor {
     return this.heardAt !== undefined && this.polls - this.heardAt < busyPolls;
   }
 
-  /** A helper is writing it now: its change came in one of the last writingPolls asks. */
+  /** A helper is writing it now: its change came in one of the last writingPolls questions. */
   writing(b: EditBlock) {
     return b.updatedBy !== docOwner && b.heardAt !== undefined && this.polls - b.heardAt < writingPolls;
   }
@@ -160,16 +160,16 @@ export class DocEditor {
       this.error = reasonOf(e);
     }
     this.changed();
-    this.schedule();
+    this.recurrence();
   }
 
-  private schedule() {
+  private recurrence() {
     clearTimeout(this.poll);
     if (this.disposed) return;
     this.poll = setTimeout(
       async () => {
         await this.refresh();
-        this.schedule();
+        this.recurrence();
       },
       this.othersWriting ? pollFast : pollEvery,
     );
@@ -198,7 +198,7 @@ export class DocEditor {
       await this.api.doc.demo({ id: this.docId });
       this.error = undefined;
       this.heardAt = this.polls;
-      this.schedule();
+      this.recurrence();
     } catch (e) {
       this.error = reasonOf(e);
     }

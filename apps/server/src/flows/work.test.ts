@@ -112,6 +112,28 @@ describe("a session's work", () => {
     });
   });
 
+  // What brings a session back is kept with its row: a database made again (a new schema) brings back no session, so no
+  // plot is left on an issue that is gone.
+  it.live("comes back only with the database it was kept in", () => {
+    const base = testConfig();
+    const before = farm({ config: { ...base, db: join(base.home, "db") } });
+    let session: Session | undefined;
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        const w = yield* watch;
+        session = mustHire(yield* (yield* Issues).hire(lab(), "先写一点并提交", "survivor"));
+        yield* w.nextReport;
+      }).pipe(Effect.scoped, Effect.provide(before.layer));
+      const after = farm({ config: { ...base, db: join(base.home, "db-again") } });
+      yield* Effect.gen(function* () {
+        const sessions = yield* Sessions;
+        const core = yield* Core;
+        expect(sessions.find(session!.id)).toBeUndefined();
+        expect(core.state().sessions.some((s) => s.id === session!.id)).toBe(false);
+      }).pipe(Effect.scoped, Effect.provide(after.layer));
+    });
+  });
+
   it.live("keeps every step in its trajectory", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -164,7 +186,7 @@ describe("a session's work", () => {
       yield* until(() => {
         const need = needOf(sessions.find(session.id)!.session);
         return need?.kind === "quiet" && Date.now() - need.since >= 500;
-      }, "the manager sees it has been quiet half a second");
+      }, "the assistant sees it has been quiet half a second");
       yield* w.nextReport;
       const steps = sessions.events(session.id)!;
       yield* sessions.dismiss(session.id);
@@ -181,7 +203,7 @@ describe("a session's work", () => {
       const sessions = yield* Sessions;
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "preview"));
       yield* w.nextReport;
-      const changes = yield* issues.changes(session.issue!, "manager");
+      const changes = yield* issues.changes(session.issue!, "assistant");
       yield* sessions.dismiss(session.id);
       expect(changes.base).toBe("main");
       expect(changes.commits.map((c) => c.subject)).toEqual(["加上打卡"]);
@@ -203,7 +225,7 @@ describe("a session's work", () => {
       yield* w.nextReport;
       yield* w.nextReport;
       expect(yield* issues.merge(a.issue!)).toMatch(/个提交合进了 clash 的 main/);
-      expect((yield* issues.changes(b.issue!, "manager")).conflicts).toEqual(["same.ts"]);
+      expect((yield* issues.changes(b.issue!, "assistant")).conflicts).toEqual(["same.ts"]);
       const failed = yield* Effect.flip(issues.merge(b.issue!));
       expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
       const stayed = sessions.find(b.id)!;

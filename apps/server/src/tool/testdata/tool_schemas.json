@@ -27,7 +27,7 @@
     ],
     "type": "object"
   },
-  "cancel_schedule": {
+  "cancel_recurrence": {
     "additionalProperties": true,
     "properties": {
       "id": {
@@ -125,7 +125,7 @@
     ],
     "type": "object"
   },
-  "list_schedules": {
+  "list_recurrences": {
     "properties": {},
     "type": "object"
   },
@@ -330,7 +330,7 @@
     "properties": {},
     "type": "object"
   },
-  "schedule": {
+  "recurrence": {
     "additionalProperties": true,
     "properties": {
       "agent": {

@@ -1,5 +1,5 @@
 // Tools to read and change a work directory and run commands in it. No sandbox: a host gives these only to agents that
-// are meant to change things (not the manager).
+// are meant to change things (not the assistant).
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { spawn } from "node:child_process";

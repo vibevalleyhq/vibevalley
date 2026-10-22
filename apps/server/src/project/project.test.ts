@@ -437,7 +437,7 @@ describe("projects", () => {
         const path = join(root, "demo");
         const place = yield* p.workplace("demo", "w1", true, "", 7);
         const main = gitSync(path, "rev-parse", "main");
-        writeFileSync(join(place.cwd, "drafted.txt"), "x");
+        writeFileSync(join(place.cwd, "refined.txt"), "x");
         gitSync(place.cwd, "add", ".");
         gitSync(place.cwd, "commit", "-qm", "not the draft's to keep");
         writeFileSync(join(place.cwd, "scratch.txt"), "y");

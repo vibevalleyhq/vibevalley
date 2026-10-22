@@ -215,7 +215,7 @@ export class Sources {
     return [...this.all];
   }
 
-  /** Asks every source at once; the local one is waited for, any other only up to the timeout. */
+  /** Questions every source at once; the local one is waited for, any other only up to the timeout. */
   async askAll<T>(what: string, ask: (one: Source, signal: AbortSignal) => Promise<T[]>, sources = this.current()): Promise<T[][]> {
     return Promise.all(
       sources.map(async (one) => {

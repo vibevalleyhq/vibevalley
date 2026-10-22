@@ -1,14 +1,14 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import type { CoreState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./board";
 import {
   endedAt,
   issueSession,
   issueTag,
   type IssueTag,
-  isForManager,
+  isForAssistant,
   issueTitle,
   type Lane,
   laneOf,
@@ -21,8 +21,8 @@ import {
   taskLine,
 } from "./issues";
 import { ago, tookText } from "./time";
-import { shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
-import { standingTone } from "./issueState";
+import { shortTitle, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { attentionTone } from "./issueState";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
@@ -32,8 +32,8 @@ export type BoardCard =
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
   | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: Session }
   | { kind: "missing"; id: string; lane: Lane; issue: Issue; missing: string[] }
-  /** An issue for the manager: open while the manager works on it, closed once it has answered; never dragged. */
-  | { kind: "manager"; id: string; lane: Lane; issue: Issue }
+  /** An issue for the assistant: open while the assistant works on it, closed once it has answered; never dragged. */
+  | { kind: "assistant"; id: string; lane: Lane; issue: Issue }
   /** `issue` is the task's own issue: its number, when it was made and last moved. */
   | { kind: "task"; id: string; lane: Lane; graph: TaskGraph; issue?: Issue };
 
@@ -41,12 +41,12 @@ export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.projec
 export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
 
 /** A task is its own card; a step of one is on the board once a helper has worked it. */
-export function buildCards(rows: IssueHistory[], core: CoreState | undefined, graphs: TaskGraph[]): BoardCard[] {
+export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefined, graphs: TaskGraph[]): BoardCard[] {
   const cards: BoardCard[] = [];
   for (const row of rows) {
     const issue = row.issue;
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
-    if (isForManager(issue)) cards.push({ kind: "manager", ...base });
+    if (isForAssistant(issue)) cards.push({ kind: "assistant", ...base });
     else if (issue.graph === undefined && (issue.parent === undefined || issue.sessions.length > 0)) {
       if (issue.sessions.length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
@@ -71,7 +71,7 @@ function cardWords(c: BoardCard): (string | undefined)[] {
       const head = c.sessions[c.sessions.length - 1]!;
       return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
     }
-    case "manager":
+    case "assistant":
       return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, "管家"];
     case "task":
       return [c.graph.title, c.graph.goal, c.graph.project, c.graph.id];
@@ -89,12 +89,12 @@ export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.project 
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
   (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matchesQuery(f.query, cardWords(c));
 
-const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.acceptedAt ?? 0);
+const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.reviewedAt ?? 0);
 
 export function rowFacts(c: BoardCard): RowFacts {
   switch (c.kind) {
     case "todo":
-    case "manager":
+    case "assistant":
     case "missing":
       return {
         lane: c.lane,
@@ -144,10 +144,10 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
   switch (c.kind) {
     case "todo": {
       const item = c.issue;
-      if (item.drafting) flags.push({ text: `${item.drafting.name}在起草`, tone: "water" });
+      if (item.refining) flags.push({ text: `${item.refining.name}在起草`, tone: "water" });
       else if (item.status === "backlog") flags.push({ text: "草稿", tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: "排队中", tone: "water" });
-      if (item.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (item.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(item.assignee === undefined ? "还没选帮工" : nameOf(item.assignee));
       if (item.assignee === undefined || item.project === undefined) lines.push("没选帮工或项目，开工前要选好");
       lines.push(item.queuedAt !== undefined ? `等空地，${ago(item.queuedAt, now)}排上的` : `写于 ${ago(item.createdAt, now)}`);
@@ -158,10 +158,10 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const head = sessions[sessions.length - 1]!;
       const phase = session?.phase;
       const now0 = session ?? head;
-      // The board says what the page says: the standing, when it waits on the owner.
-      if (standingWantsOwner(issue.standing.state)) flags.push({ text: standingLabel[issue.standing.state], tone: standingTone[issue.standing.state] });
+      // The board says what the page says: the attention, when it waits on the owner.
+      if (attentionWantsOwner(issue.attention.state)) flags.push({ text: attentionLabel[issue.attention.state], tone: attentionTone[issue.attention.state] });
       if (tag === "lost") flags.push({ text: "丢了", tone: "berry" });
-      if (issue.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);
       if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(`${tookText(now - phase.quietSince)}没动静`);
       if (sessions.length > 1) lines.push(`第 ${sessions.length} 次`);
@@ -182,9 +182,9 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
         detail: lines.join("\n"),
       };
     }
-    case "manager": {
+    case "assistant": {
       const { issue } = c;
-      if (issue.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       const tag = issueTag(issue);
       lines.push(tagOpen(tag) ? "管家在做" : `${tagLabel[tag]} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };

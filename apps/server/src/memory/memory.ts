@@ -1,9 +1,9 @@
 // What the agents remember: every agent's rows and the outside sources (sources.ts), and the
-// manager's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
-// writes for the manager starts with 「主人交代：」, so the manager reading it knows whose it is.
+// assistant's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
+// writes for the assistant starts with 「主人交代：」, so the assistant reading it knows whose it is.
 
 import { join } from "node:path";
-import { type ArchiveListing, managerAgent, type Memory, type MemoryList, type MemorySourceInfo, type RecallPreview } from "@vibevalley/protocol";
+import { type ArchiveListing, assistantAgent, type Memory, type MemoryList, type MemorySourceInfo, type RecallPreview } from "@vibevalley/protocol";
 import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
@@ -25,10 +25,10 @@ export interface Recalled {
   readonly lines: string[];
 }
 
-export const managerHome = (home: string) => join(home, "manager");
+export const assistantHome = (home: string) => join(home, "assistant");
 
 export interface MemoryShape {
-  /** An agent's memories: the manager's are MEMORY.md's lines; every other agent's are rows and its sources'. */
+  /** An agent's memories: the assistant's are MEMORY.md's lines; every other agent's are rows and its sources'. */
   readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
   readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly forgetOf: (agent: string, id: string) => Effect.Effect<void, ApiError>;
@@ -43,7 +43,7 @@ export interface MemoryShape {
   readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly list: (agent: string) => Effect.Effect<Memory[]>;
   readonly sources: () => MemorySourceInfo[];
-  readonly writeManager: (text: string) => Effect.Effect<Memory, ApiError>;
+  readonly writeAssistant: (text: string) => Effect.Effect<Memory, ApiError>;
   readonly archive: (query: string) => ArchiveListing;
   readonly archiveFile: (name: string) => string | undefined;
 }
@@ -59,12 +59,12 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
   }
   return {
     id: line.id,
-    agent: managerAgent,
+    agent: assistantAgent,
     kind: "note",
     text: person ? line.text.slice(fromOwner.length).trim() : line.text,
     at,
     recalled: 0,
-    ...(person ? {} : { session: managerAgent }),
+    ...(person ? {} : { session: assistantAgent }),
   } as Memory;
 };
 
@@ -93,7 +93,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     yield* Effect.addFinalizer(() => Effect.promise(() => sources.stop()));
     // What an older cut left is cut again in the background.
     yield* Effect.forkScoped(local.recutTerms);
-    const home = managerHome(config.home);
+    const home = assistantHome(config.home);
 
     const prefetchAll = (cue: RecallCue) =>
       sources.askAll(cue.agent, async (one, signal) =>
@@ -128,7 +128,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         yield* Effect.promise(() => one.forget(agent, own));
       });
 
-    const writeManager = (text: string) =>
+    const writeAssistant = (text: string) =>
       Effect.gen(function* () {
         const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
         if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
@@ -136,7 +136,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         return lineMemory(written, Date.now());
       });
 
-    const manager = (): MemoryList => {
+    const assistant = (): MemoryList => {
       const snapshot = readMemory(home);
       return { file: snapshot.file, memories: snapshot.lines.map((l) => lineMemory(l, snapshot.updatedAt)).reverse(), carried: snapshot.carried, sources: [] };
     };
@@ -148,10 +148,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     const shape: MemoryShape = {
-      memoriesOf: (agent) => (agent === managerAgent ? Effect.sync(manager) : Effect.map(list(agent), (memories) => ({ memories, sources: sources.info() }))),
-      remember: (n) => (n.agent === managerAgent ? writeManager(n.text) : write(n)),
-      forgetOf: (agent, id) => (agent === managerAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
-      recallOf: (agent, project, text) => (agent === managerAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text)),
+      memoriesOf: (agent) =>
+        agent === assistantAgent ? Effect.sync(assistant) : Effect.map(list(agent), (memories) => ({ memories, sources: sources.info() })),
+      remember: (n) => (n.agent === assistantAgent ? writeAssistant(n.text) : write(n)),
+      forgetOf: (agent, id) => (agent === assistantAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
+      recallOf: (agent, project, text) => (agent === assistantAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text)),
       recall: (cue) =>
         Effect.gen(function* () {
           const told = mergeRecalled(yield* Effect.promise(() => prefetchAll(cue)));
@@ -185,7 +186,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       write,
       list,
       sources: () => sources.info(),
-      writeManager,
+      writeAssistant,
       archive: (query) => ({
         files: archiveFiles(home),
         hits: query.trim() ? searchArchive(home, query) : [],

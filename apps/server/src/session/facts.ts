@@ -5,10 +5,11 @@ import { relative } from "node:path";
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
 import type { FactIn } from "../core/core.ts";
-import type { SessionAction, Session, SessionEventType, Spent, ToolAction } from "@vibevalley/protocol";
-import { clip, doingOf, isBusy } from "@vibevalley/protocol/rules";
+import type { Session, SessionAction, SessionEventType, Spent, ToolAction } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { doingOf, failureText, jobBreak, recalledIn } from "./rules.ts";
+import { clip } from "../base/text.ts";
 import type { Rate } from "../runtime/price.ts";
-import { failureText, jobBreak, recalledIn } from "./rules.ts";
 import { shellCommand } from "./shell.ts";
 
 /** The bubble over a session's head holds about this much. */

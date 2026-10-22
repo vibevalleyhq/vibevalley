@@ -2,7 +2,7 @@
 // device asks, the owner nods, and from then on the device's browser is let in by the cookie it keeps.
 import { expect, test } from "./fixtures";
 
-test("a device names itself, asks, and is told why not", async ({ page }) => {
+test("a device names itself, questions, and is told why not", async ({ page }) => {
   await page.goto("/pair?c=ABCDE12345");
   await expect(page.getByRole("heading", { name: "连进农场" })).toBeVisible();
   await expect(page.getByLabel("配对码")).toHaveCount(0);

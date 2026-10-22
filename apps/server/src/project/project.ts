@@ -31,7 +31,7 @@ import {
   type Repo,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { slice } from "@vibevalley/protocol/rules";
+import { slice } from "../base/text.ts";
 import { Context, Effect, Layer, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";

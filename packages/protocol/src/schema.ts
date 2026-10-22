@@ -168,7 +168,7 @@ export const RuntimeFacts: Schema.Codec<T.RuntimeFacts> = Schema.Struct({
 
 export const CallState: Schema.Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
-export const ManagerState: Schema.Codec<T.ManagerState> = Schema.Literals(T.ManagerStateValues);
+export const AssistantState: Schema.Codec<T.AssistantState> = Schema.Literals(T.AssistantStateValues);
 
 export const SenderKind: Schema.Codec<T.SenderKind> = Schema.Literals(T.SenderKindValues);
 
@@ -423,55 +423,55 @@ export const ProgressNews: Schema.Codec<T.ProgressNews> = Schema.Struct({
   unlocked: Schema.optionalKey(Schema.mutable(Schema.Array(Unlock))),
 });
 
-export const ScheduleWhenOnce: Schema.Codec<T.ScheduleWhenOnce> = Schema.Struct({
+export const RecurrenceWhenOnce: Schema.Codec<T.RecurrenceWhenOnce> = Schema.Struct({
   kind: Schema.Literal("once"),
   at: Schema.Number,
 });
 
-export const ScheduleWhenEvery: Schema.Codec<T.ScheduleWhenEvery> = Schema.Struct({
+export const RecurrenceWhenEvery: Schema.Codec<T.RecurrenceWhenEvery> = Schema.Struct({
   kind: Schema.Literal("every"),
   minutes: Schema.Number,
 });
 
-export const ScheduleWhenDaily: Schema.Codec<T.ScheduleWhenDaily> = Schema.Struct({
+export const RecurrenceWhenDaily: Schema.Codec<T.RecurrenceWhenDaily> = Schema.Struct({
   kind: Schema.Literal("daily"),
   time: Schema.String,
 });
 
-export const ScheduleWhenWeekly: Schema.Codec<T.ScheduleWhenWeekly> = Schema.Struct({
+export const RecurrenceWhenWeekly: Schema.Codec<T.RecurrenceWhenWeekly> = Schema.Struct({
   kind: Schema.Literal("weekly"),
   days: Schema.mutable(Schema.Array(Schema.Number)),
   time: Schema.String,
 });
 
-export const ScheduleWhenCron: Schema.Codec<T.ScheduleWhenCron> = Schema.Struct({
+export const RecurrenceWhenCron: Schema.Codec<T.RecurrenceWhenCron> = Schema.Struct({
   kind: Schema.Literal("cron"),
   expr: Schema.String,
 });
 
-export const ScheduleWhen: Schema.Codec<T.ScheduleWhen> = Schema.Union([
-  ScheduleWhenOnce,
-  ScheduleWhenEvery,
-  ScheduleWhenDaily,
-  ScheduleWhenWeekly,
-  ScheduleWhenCron,
+export const RecurrenceWhen: Schema.Codec<T.RecurrenceWhen> = Schema.Union([
+  RecurrenceWhenOnce,
+  RecurrenceWhenEvery,
+  RecurrenceWhenDaily,
+  RecurrenceWhenWeekly,
+  RecurrenceWhenCron,
 ]);
 
-export const ScheduleBy: Schema.Codec<T.ScheduleBy> = Schema.Literals(T.ScheduleByValues);
+export const RecurrenceBy: Schema.Codec<T.RecurrenceBy> = Schema.Literals(T.RecurrenceByValues);
 
-export const Schedule: Schema.Codec<T.Schedule> = Schema.Struct({
+export const Recurrence: Schema.Codec<T.Recurrence> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   text: Schema.String,
   channel: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  when: ScheduleWhen,
+  when: RecurrenceWhen,
   tz: Schema.String,
   enabled: Schema.Boolean,
   created: Schema.Number,
   lastRun: Schema.optionalKey(Schema.Number),
-  by: ScheduleBy,
+  by: RecurrenceBy,
   pending: Schema.optionalKey(Schema.Boolean),
   whenText: Schema.optionalKey(Schema.String),
   nextText: Schema.optionalKey(Schema.String),
@@ -516,7 +516,7 @@ export const PullRequest: Schema.Codec<T.PullRequest> = Schema.Struct({
   state: PullRequestState,
 });
 
-export const Acceptance: Schema.Codec<T.Acceptance> = Schema.Literals(T.AcceptanceValues);
+export const Review: Schema.Codec<T.Review> = Schema.Literals(T.ReviewValues);
 
 export const Finding: Schema.Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
@@ -525,12 +525,12 @@ export const Finding: Schema.Codec<T.Finding> = Schema.Struct({
   pulled: Schema.optionalKey(Schema.Boolean),
 });
 
-export const IssueDrafting: Schema.Codec<T.IssueDrafting> = Schema.Struct({
+export const IssueRefining: Schema.Codec<T.IssueRefining> = Schema.Struct({
   session: Schema.String,
   name: Schema.String,
 });
 
-export const Ask: Schema.Codec<T.Ask> = Schema.Struct({
+export const Question: Schema.Codec<T.Question> = Schema.Struct({
   question: Schema.String,
   options: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
@@ -543,12 +543,12 @@ export const CriterionCheck: Schema.Codec<T.CriterionCheck> = Schema.Struct({
   proof: Schema.optionalKey(Schema.String),
 });
 
-export const Standing: Schema.Codec<T.Standing> = Schema.Literals(T.StandingValues);
+export const Attention: Schema.Codec<T.Attention> = Schema.Literals(T.AttentionValues);
 export const StuckReason: Schema.Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
 export const IssueAct: Schema.Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
-export const IssueStanding: Schema.Codec<T.IssueStanding> = Schema.Struct({
-  state: Standing,
+export const IssueAttention: Schema.Codec<T.IssueAttention> = Schema.Struct({
+  state: Attention,
   since: Schema.optionalKey(Schema.Number),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
@@ -592,30 +592,30 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   blockedBy: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   graph: Schema.optionalKey(IssueGraph),
   task: Schema.optionalKey(IssueTask),
-  schedule: Schema.optionalKey(Schema.String),
+  recurrence: Schema.optionalKey(Schema.String),
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
-  acceptance: Acceptance,
-  acceptedAt: Schema.optionalKey(Schema.Number),
+  review: Review,
+  reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
-  asks: Schema.mutable(Schema.Array(Ask)),
+  questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
-  drafting: Schema.optionalKey(IssueDrafting),
+  drafting: Schema.optionalKey(IssueRefining),
   handedBack: Schema.optionalKey(HandedBack),
-  standing: IssueStanding,
+  attention: IssueAttention,
 });
 
-export const CoreState: Schema.Codec<T.CoreState> = Schema.Struct({
+export const WorkspaceState: Schema.Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  manager: ManagerState,
+  assistant: AssistantState,
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
   progress: Schema.optionalKey(Progress),
-  schedules: Schema.optionalKey(Schema.mutable(Schema.Array(Schedule))),
+  recurrences: Schema.optionalKey(Schema.mutable(Schema.Array(Recurrence))),
   issues: Schema.optionalKey(Schema.mutable(Schema.Array(Issue))),
 });
 
@@ -773,11 +773,11 @@ export const InboxFromSession: Schema.Codec<T.InboxFromSession> = Schema.Struct(
   agent: Schema.String,
 });
 
-export const InboxFromManager: Schema.Codec<T.InboxFromManager> = Schema.Struct({
-  kind: Schema.Literal("manager"),
+export const InboxFromAssistant: Schema.Codec<T.InboxFromAssistant> = Schema.Struct({
+  kind: Schema.Literal("assistant"),
 });
 
-export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromManager]);
+export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromAssistant]);
 
 export const InboxTargetSession: Schema.Codec<T.InboxTargetSession> = Schema.Struct({
   kind: Schema.Literal("session"),
@@ -796,13 +796,22 @@ export const InboxTargetChat: Schema.Codec<T.InboxTargetChat> = Schema.Struct({
 
 export const InboxTarget: Schema.Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetGraph, InboxTargetChat]);
 
+export const InboxWords: Schema.Codec<T.InboxWords> = Schema.Struct({
+  label: Schema.String,
+  title: Schema.String,
+  body: Schema.String,
+  tray: Schema.optionalKey(Schema.String),
+});
+
 export const InboxItem: Schema.Codec<T.InboxItem> = Schema.Struct({
   id: Schema.String,
   kind: InboxKind,
   from: InboxFrom,
+  who: Schema.String,
   text: Schema.String,
   at: Schema.Number,
   target: InboxTarget,
+  words: InboxWords,
 });
 
 export const Crop: Schema.Codec<T.Crop> = Schema.Literals(T.CropValues);
@@ -856,7 +865,7 @@ export const GameEffectAchievement: Schema.Codec<T.GameEffectAchievement> = Sche
 export const GameEffect: Schema.Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
 export const StateFrame: Schema.Codec<T.StateFrame> = Schema.Struct({
-  state: CoreState,
+  state: WorkspaceState,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   graphs: Schema.mutable(Schema.Array(TaskGraph)),
   view: FarmView,
@@ -1156,12 +1165,12 @@ export const Skill: Schema.Codec<T.Skill> = Schema.Struct({
   body: Schema.String,
 });
 
-export const ManagerEvalRequest: Schema.Codec<T.ManagerEvalRequest> = Schema.Struct({
+export const AssistantEvalRequest: Schema.Codec<T.AssistantEvalRequest> = Schema.Struct({
   on: Schema.Number,
   want: Schema.String,
 });
 
-export const ManagerEval: Schema.Codec<T.ManagerEval> = Schema.Struct({
+export const AssistantEval: Schema.Codec<T.AssistantEval> = Schema.Struct({
   id: Schema.String,
   file: Schema.String,
 });
@@ -1280,7 +1289,7 @@ export const IssueHistory: Schema.Codec<T.IssueHistory> = Schema.Struct({
   missingSessions: Schema.mutable(Schema.Array(Schema.String)),
 });
 
-export const IssueDraftRequest: Schema.Codec<T.IssueDraftRequest> = Schema.Struct({
+export const IssueRefineRequest: Schema.Codec<T.IssueRefineRequest> = Schema.Struct({
   text: Schema.optionalKey(Schema.String),
 });
 
@@ -1290,11 +1299,18 @@ export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  acceptance: Schema.optionalKey(Acceptance),
+  review: Schema.optionalKey(Review),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
-export const IssueAcceptRequest: Schema.Codec<T.IssueAcceptRequest> = Schema.Struct({
+export const IssueActRequest: Schema.Codec<T.IssueActRequest> = Schema.Struct({
+  act: IssueAct,
+  text: Schema.optionalKey(Schema.String),
+  findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  sendKey: Schema.optionalKey(Schema.String),
+});
+
+export const IssueReviewRequest: Schema.Codec<T.IssueReviewRequest> = Schema.Struct({
   pass: Schema.Boolean,
   findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   text: Schema.optionalKey(Schema.String),
@@ -1306,7 +1322,7 @@ export const IssueRequest: Schema.Codec<T.IssueRequest> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  acceptance: Schema.optionalKey(Acceptance),
+  review: Schema.optionalKey(Review),
 });
 
 export const RunTriggerKind: Schema.Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);
@@ -1314,7 +1330,7 @@ export const RunTriggerKind: Schema.Codec<T.RunTriggerKind> = Schema.Literals(T.
 export const RunTrigger: Schema.Codec<T.RunTrigger> = Schema.Struct({
   kind: RunTriggerKind,
   message: Schema.optionalKey(Schema.String),
-  schedule: Schema.optionalKey(Schema.String),
+  recurrence: Schema.optionalKey(Schema.String),
   missed: Schema.optionalKey(Schema.Boolean),
 });
 
@@ -1350,13 +1366,13 @@ export const ChannelUpdate: Schema.Codec<T.ChannelUpdate> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
 });
 
-export const ScheduleRequest: Schema.Codec<T.ScheduleRequest> = Schema.Struct({
+export const RecurrenceRequest: Schema.Codec<T.RecurrenceRequest> = Schema.Struct({
   name: Schema.String,
   text: Schema.String,
   channel: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  when: ScheduleWhen,
+  when: RecurrenceWhen,
   tz: Schema.optionalKey(Schema.String),
 });
 
@@ -1400,8 +1416,8 @@ export const VoiceASRMicrosoft: Schema.Codec<T.VoiceASRMicrosoft> = Schema.Struc
 
 export const VoiceASR: Schema.Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
 
-export const VoiceAnswerManager: Schema.Codec<T.VoiceAnswerManager> = Schema.Struct({
-  vendor: Schema.Literal("manager"),
+export const VoiceAnswerAssistant: Schema.Codec<T.VoiceAnswerAssistant> = Schema.Struct({
+  vendor: Schema.Literal("assistant"),
 });
 
 export const VoiceAnswerAgoraModel: Schema.Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
@@ -1422,7 +1438,7 @@ export const VoiceAnswerOpenai: Schema.Codec<T.VoiceAnswerOpenai> = Schema.Struc
   model: Schema.String,
 });
 
-export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerManager, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerAssistant, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
 
 export const VoiceTTSMinimaxModel: Schema.Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 
@@ -1544,10 +1560,10 @@ export const FactCall: Schema.Codec<T.FactCall> = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
-export const FactManager: Schema.Codec<T.FactManager> = Schema.Struct({
-  type: Schema.Literal("manager"),
+export const FactAssistant: Schema.Codec<T.FactAssistant> = Schema.Struct({
+  type: Schema.Literal("assistant"),
   at: Schema.Number,
-  state: ManagerState,
+  state: AssistantState,
 });
 
 export const FactMessage: Schema.Codec<T.FactMessage> = Schema.Struct({
@@ -1623,7 +1639,7 @@ export const FactReport: Schema.Codec<T.FactReport> = Schema.Struct({
   summary: Schema.String,
   runs: Schema.Number,
   spent: Schema.optionalKey(Spent),
-  asks: Schema.optionalKey(Schema.mutable(Schema.Array(Ask))),
+  questions: Schema.optionalKey(Schema.mutable(Schema.Array(Question))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
 });
 
@@ -1667,21 +1683,21 @@ export const FactProgress: Schema.Codec<T.FactProgress> = Schema.Struct({
   news: Schema.optionalKey(ProgressNews),
 });
 
-export const FactSchedule: Schema.Codec<T.FactSchedule> = Schema.Struct({
-  type: Schema.Literal("schedule"),
+export const FactRecurrence: Schema.Codec<T.FactRecurrence> = Schema.Struct({
+  type: Schema.Literal("recurrence"),
   at: Schema.Number,
-  schedule: Schedule,
+  recurrence: Recurrence,
 });
 
-export const FactUnschedule: Schema.Codec<T.FactUnschedule> = Schema.Struct({
-  type: Schema.Literal("unschedule"),
+export const FactRecurrenceGone: Schema.Codec<T.FactRecurrenceGone> = Schema.Struct({
+  type: Schema.Literal("recurrenceGone"),
   at: Schema.Number,
   id: Schema.String,
 });
 
 export const Fact: Schema.Codec<T.Fact> = Schema.Union([
   FactCall,
-  FactManager,
+  FactAssistant,
   FactMessage,
   FactConversation,
   FactHired,
@@ -1698,14 +1714,14 @@ export const Fact: Schema.Codec<T.Fact> = Schema.Union([
   FactIssue,
   FactIssueGone,
   FactProgress,
-  FactSchedule,
-  FactUnschedule,
+  FactRecurrence,
+  FactRecurrenceGone,
 ]);
 
 export const SideEventSnapshot: Schema.Codec<T.SideEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
   at: Schema.Number,
-  state: CoreState,
+  state: WorkspaceState,
 });
 
 export const SideEventSessionEvent: Schema.Codec<T.SideEventSessionEvent> = Schema.Struct({
@@ -1730,7 +1746,7 @@ export const SideEventRuntime: Schema.Codec<T.SideEventRuntime> = Schema.Struct(
 
 export const SideEvent: Schema.Codec<T.SideEvent> = Schema.Union([
   FactCall,
-  FactManager,
+  FactAssistant,
   FactMessage,
   FactConversation,
   FactHired,
@@ -1747,8 +1763,8 @@ export const SideEvent: Schema.Codec<T.SideEvent> = Schema.Union([
   FactIssue,
   FactIssueGone,
   FactProgress,
-  FactSchedule,
-  FactUnschedule,
+  FactRecurrence,
+  FactRecurrenceGone,
   SideEventSnapshot,
   SideEventSessionEvent,
   SideEventNotice,
@@ -1763,7 +1779,7 @@ export const Roots: Schema.Codec<T.Roots> = Schema.Struct({
   taskEvent: GraphEvent,
 });
 
-export const ScheduleUpdate: Schema.Codec<T.ScheduleUpdate> = Schema.Struct({
+export const RecurrenceUpdate: Schema.Codec<T.RecurrenceUpdate> = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
 });
 
@@ -1822,6 +1838,7 @@ export const VoiceHeard: Schema.Codec<T.VoiceHeard> = Schema.Struct({
 export const StartRequest: Schema.Codec<T.StartRequest> = Schema.Struct({
   channel: Schema.String,
   uid: Schema.String,
+  about: Schema.optionalKey(Schema.String),
 });
 
 export const VerifyRequest: Schema.Codec<T.VerifyRequest> = Schema.Struct({

@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 仓库和目录：`apps/`、`packages/`、`apps/server/db`、`scripts/` | 每个包对外的约定（各包的 README） |
-| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/manager.md)、[定时](docs/subsystems/schedule.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
+| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/assistant.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
 | 形状、Schema 和接口表放在哪 | 核心状态折什么、帧里有什么（[architecture.md](docs/architecture.md)「核心状态」） |
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
 | 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件和配置键（[architecture.md](docs/architecture.md)「存了什么」「配置」） |
@@ -19,7 +19,7 @@
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
 - **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
-- **规则和黄金数据**：几处都用的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有一个主人的在那个模块里（`issue/rules.ts`、`channel/rules.ts`……）；黄金数据是 `packages/protocol/testdata/*.jsonl.gz` 和 `apps/server/src/<模块>/testdata/*.jsonl.gz`，读写工具 `src/testing/golden.ts` 和 `packages/protocol/src/rules/golden.test.ts`。
+- **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`bun run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
@@ -34,11 +34,12 @@
 
 **模块和服务**
 
-- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `agent/brain`（VibeValley 自己的 agent）。
+- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`assistant`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `agent/brain`（VibeValley 自己的 agent）。
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
-- **模块有先后**：`services.ts` 按 `core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`schedule`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game` 一层叠一层（`on(layer)` 是 `Layer.provideMerge`）。一个服务只拿得到排在它前面的；要用排在后面的，Effect 的类型报缺了谁。反方向的消息走 `Stream`（`Core` 的事实、事件、帧，`Sessions` 的动静），订阅的人自己读，发布的人不等。`game` 只听别的服务的事实，业务的服务不调它。
-- **开机的活叠在最后**：`project` 的 `start`、`session` 的 `ready`（接着上回没完的执行）、`schedule` 的 `start`、`game` 的 `start` 是 `Layer.effectDiscard`，在全部服务都建好以后按这个次序跑。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
+- **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Notifications、Assistant、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Sessions.sessionOf`、`Issues.onBoard`、`Tasks.graphs`、`Channels.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Sessions.news`、`Channels.ownerInThread`、`Notices.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（田头的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
+- **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的种植计划、定时开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
+- **折法和拼帧在组装那一层**：`projection/` 的 `reduce`、`frameOf` 读每个模块的规则，组装时以 `Projection` 交给 Platform 里的 `core`，`core` 不 import 上面的模块。
 - **一个家目录一个服务端**：`base/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
 
 **形状和规则**
@@ -46,9 +47,9 @@
 - **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Schema.Codec<T.X>`，两边对不上就编不过；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
 - **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`bun run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
-- **规则在它的主人那里**：核心状态的折法（`reduce`、`frameOf`）和几处都用的规则在 `packages/protocol/src/rules`；只有一个模块用的在那个模块的 `rules.ts` 一类文件里（`connector/text.ts`、`setting/rules.ts`、`memory/recall.ts`、`runtime/rules.ts`、`manager/rules.ts`、`channel/rules.ts`、`game/progress.ts`、`task/rules.ts`、`issue/rules.ts`、`schedule/rules.ts`）。别的模块要用一条单一主人的规则，问它的服务，或者挪进 `packages/protocol`。页面要用的服务端规则也挪进 `packages/protocol`，不在页面里重写。
+- **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/state.ts`、`issue/state.ts`、`task/graph.ts`、`game/view.ts`、`notice/inbox.ts`、`setting/rules.ts`、`runtime/rules.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
 - **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`bun run golden:update`，`-- <模块>` 或 `-- protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
-- **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`packages/protocol/src/rules/text.ts`）。没有另一份。
+- **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`apps/server/src/base/text.ts`）。没有另一份。
 
 **存盘**
 
@@ -100,6 +101,9 @@
 
 ## 为什么这样
 
+- **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调执行、合并写在执行里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（执行同时被工单、田头、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
+- **端口只在有两个适配器、或方向必须倒过来时才立。** 田头的 `Helpers` 是因为田头在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和收获）；执行和田头的几块共用同一份状态，拆开只是把状态传来传去。
+- **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Assistant；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
 - **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
@@ -112,7 +116,7 @@
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
 - **一份表结构，不留兼容，不搬数据。** 每次改名都多一段搬旧数据的代码，都在每次启动的路上；项目还没有外部用户，搬数据的代码只让架构成形期的每一步更慢。放弃了「改表写迁移」和「开机看到旧文件顺手导入」。以后有了用户，改存盘要重新写迁移：在 `0001_schema.up.sql` 后面加文件，并改这一条。
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
-- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-manager-evals](.agents/skills/verify-manager-evals/SKILL.md)、`verify-server`）。
+- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-assistant-evals](.agents/skills/verify-assistant-evals/SKILL.md)、`verify-server`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 
@@ -123,7 +127,7 @@
 ## 怎么验证
 
 - `src/base/schema.test.ts`：一份基线，表名、索引名，每个查询文件只写它自己的表。
-- `packages/protocol/src/rules/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
+- `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
 - `bun run check`：`vp check`，格式、lint 和类型。
 - `bun run server:check`：protocol 的测试、服务端的类型、`db:check`、vitest。
 - `bun run web:check`、`cd apps/web && bun run test`、`bun run desktop:test`：各包的类型、页面能构建，Playwright 对着真的服务端和整个应用。

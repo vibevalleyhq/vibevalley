@@ -2,7 +2,7 @@ import { For, Match, Switch } from "solid-js";
 import { CardColors, type Piece } from "./card";
 import type { SpriteAtlas } from "../world/sprites";
 
-/** A helper's head, cut from its standing drawing (`<look>-down`, else the bear farmer's), on a leaf green ground. */
+/** A helper's head, cut from its attention drawing (`<look>-down`, else the bear farmer's), on a leaf green ground. */
 export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: number }) {
   const cut = () => {
     const sp = props.atlas.has(`${props.look}-down`) ? props.atlas.get(`${props.look}-down`) : props.atlas.get("bear-farmer-down");

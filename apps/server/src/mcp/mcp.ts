@@ -10,7 +10,6 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
-import { Core } from "../core/core.ts";
 import { Sessions } from "../session/session.ts";
 import { type Caller, Tools } from "../tool/tool.ts";
 
@@ -32,14 +31,13 @@ export interface McpOptions {
 export const make = (options: McpOptions = {}) =>
   Effect.gen(function* () {
     const config = yield* Settings;
-    const core = yield* Core;
     const sessions = yield* Sessions;
     const tools = yield* Tools;
     const who = options.who ?? sessions.who;
 
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {
-      const h = core.state().sessions.find((s) => s.id === id);
+      const h = sessions.sessionOf(id);
       return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", owner: false };
     };
 

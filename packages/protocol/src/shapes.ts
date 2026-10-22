@@ -1,8 +1,8 @@
 // The shapes the server and the page share: every type on the wire and on disk, and the closed sets' members. schema.ts
 // holds a Schema for each, typed by it (Schema.Codec<T.X>), so the two cannot drift apart; api.ts the endpoints.
 
-/** The manager's participant id, and the agent of an issue for it. No agent profile has this id. */
-export const managerAgent = "manager";
+/** The assistant's participant id, and the agent of an issue for it. No agent profile has this id. */
+export const assistantAgent = "assistant";
 
 /** Who @所有人 is. */
 export const everyone = "everyone";
@@ -190,10 +190,10 @@ export type RuntimeCapability = (typeof RuntimeCapabilityValues)[number];
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
 
-export const ManagerStateValues = ["idle", "listening", "thinking", "speaking"] as const;
-export type ManagerState = (typeof ManagerStateValues)[number];
+export const AssistantStateValues = ["idle", "listening", "thinking", "speaking"] as const;
+export type AssistantState = (typeof AssistantStateValues)[number];
 
-export const SenderKindValues = ["user", "manager", "agent", "system"] as const;
+export const SenderKindValues = ["user", "assistant", "agent", "system"] as const;
 export type SenderKind = (typeof SenderKindValues)[number];
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -327,7 +327,7 @@ export interface Session {
   channel?: string;
   play?: SessionPlay;
   issue?: string;
-  draft?: boolean;
+  refining?: boolean;
   phaseText?: string;
 }
 
@@ -417,43 +417,43 @@ export interface ProgressNews {
 }
 
 /** Told apart by `kind`. */
-export type ScheduleWhen = ScheduleWhenOnce | ScheduleWhenEvery | ScheduleWhenDaily | ScheduleWhenWeekly | ScheduleWhenCron;
+export type RecurrenceWhen = RecurrenceWhenOnce | RecurrenceWhenEvery | RecurrenceWhenDaily | RecurrenceWhenWeekly | RecurrenceWhenCron;
 
-export interface Schedule {
+export interface Recurrence {
   id: string;
   name: string;
   text: string;
   channel: string;
   agent?: string;
   project?: string;
-  when: ScheduleWhen;
+  when: RecurrenceWhen;
   tz: string;
   enabled: boolean;
   created: number;
   lastRun?: number;
-  by: ScheduleBy;
+  by: RecurrenceBy;
   pending?: boolean;
   whenText?: string;
   nextText?: string;
 }
 
-export const ScheduleByValues = ["owner", "manager"] as const;
-export type ScheduleBy = (typeof ScheduleByValues)[number];
+export const RecurrenceByValues = ["owner", "assistant"] as const;
+export type RecurrenceBy = (typeof RecurrenceByValues)[number];
 
 export interface Chat {
   conversations: Conversation[];
   messages: ChatMessage[];
 }
 
-export interface CoreState {
+export interface WorkspaceState {
   call: CallState;
   callReason?: string;
-  manager: ManagerState;
+  assistant: AssistantState;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
-  schedules?: Schedule[];
+  recurrences?: Recurrence[];
   issues?: Issue[];
 }
 
@@ -565,22 +565,46 @@ export interface FarmLevel {
   need: number;
 }
 
-export const InboxKindValues = ["merge", "fix", "conflict", "quiet", "graph-draft", "graph-ripe", "task-failed", "mention", "schedule-ask"] as const;
+export const InboxKindValues = [
+  "merge",
+  "ask",
+  "fix",
+  "interrupted",
+  "conflict",
+  "quiet",
+  "graph-draft",
+  "graph-ripe",
+  "task-failed",
+  "mention",
+  "recurrence-ask",
+] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
 /** Told apart by `kind`. */
-export type InboxFrom = InboxFromSession | InboxFromManager;
+export type InboxFrom = InboxFromSession | InboxFromAssistant;
 
 /** Told apart by `kind`. */
 export type InboxTarget = InboxTargetSession | InboxTargetGraph | InboxTargetChat;
+
+/** What an item says on each route the owner hears it on: the phone's label after who, the system notice, the tray's
+ * line (none for a mention: it is counted with the unread). */
+export interface InboxWords {
+  label: string;
+  title: string;
+  body: string;
+  tray?: string;
+}
 
 export interface InboxItem {
   id: string;
   kind: InboxKind;
   from: InboxFrom;
+  /** Who it is from, as the routes say it: the helper's name, or 管家. */
+  who: string;
   text: string;
   at: number;
   target: InboxTarget;
+  words: InboxWords;
 }
 
 export const CropValues = ["empty", "seeded", "sprout", "leafy", "flowering", "wheat", "carrot", "withered", "weeds", "dry", "harvested", "locked"] as const;
@@ -604,7 +628,7 @@ export interface FarmView {
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
 export interface StateFrame {
-  state: CoreState;
+  state: WorkspaceState;
   inbox: InboxItem[];
   graphs: TaskGraph[];
   view: FarmView;
@@ -649,7 +673,7 @@ export const GraphEventKindValues = [
 ] as const;
 export type GraphEventKind = (typeof GraphEventKindValues)[number];
 
-export const GraphActorValues = ["user", "manager", "system", "session"] as const;
+export const GraphActorValues = ["user", "assistant", "system", "session"] as const;
 export type GraphActor = (typeof GraphActorValues)[number];
 
 export interface TaskFieldChange {
@@ -844,12 +868,12 @@ export interface Skill {
   body: string;
 }
 
-export interface ManagerEvalRequest {
+export interface AssistantEvalRequest {
   on: number;
   want: string;
 }
 
-export interface ManagerEval {
+export interface AssistantEval {
   id: string;
   file: string;
 }
@@ -886,7 +910,7 @@ export interface Memory {
   source?: string;
 }
 
-export const MemoryAuthorValues = ["owner", "agent", "manager", "system"] as const;
+export const MemoryAuthorValues = ["owner", "agent", "assistant", "system"] as const;
 export type MemoryAuthor = (typeof MemoryAuthorValues)[number];
 
 export const MemoryKindValues = ["note", "issue"] as const;
@@ -1038,20 +1062,20 @@ export interface Issue {
   blockedBy?: string[];
   graph?: IssueGraph;
   task?: IssueTask;
-  schedule?: string;
+  recurrence?: string;
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
-  acceptance: Acceptance;
-  acceptedAt?: number;
+  review: Review;
+  reviewedAt?: number;
   findings: Finding[];
-  asks: Ask[];
+  questions: Question[];
   criteria?: string[];
   checks?: CriterionCheck[];
-  drafting?: IssueDrafting;
-  /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
+  refining?: IssueRefining;
+  /** An issue for the assistant: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
   handedBack?: HandedBack;
-  standing: IssueStanding;
+  attention: IssueAttention;
 }
 
 export interface HandedBack {
@@ -1060,7 +1084,7 @@ export interface HandedBack {
 }
 
 /** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
-export interface Ask {
+export interface Question {
   question: string;
   options?: string[];
 }
@@ -1076,14 +1100,14 @@ export interface CriterionCheck {
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
-export const StandingValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
-export type Standing = (typeof StandingValues)[number];
+export const AttentionValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
+export type Attention = (typeof AttentionValues)[number];
 
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
 
 /** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
- * reject sends it back with findings; acknowledge takes what the manager answered as done. */
+ * reject sends it back with findings; acknowledge takes what the assistant answered as done. */
 export const IssueActValues = [
   "start",
   "answer",
@@ -1103,8 +1127,8 @@ export type IssueAct = (typeof IssueActValues)[number];
 
 /** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
  * it can do, lead first. */
-export interface IssueStanding {
-  state: Standing;
+export interface IssueAttention {
+  state: Attention;
   since?: number;
   stuck?: StuckReason;
   lead?: IssueAct;
@@ -1113,7 +1137,7 @@ export interface IssueStanding {
 
 export const MilestoneKindValues = [
   "opened",
-  "drafted",
+  "refined",
   "started",
   "reported",
   "asked",
@@ -1140,12 +1164,12 @@ export interface IssueTimeline {
   spent?: Spent;
 }
 
-export interface IssueDrafting {
+export interface IssueRefining {
   session: string;
   name: string;
 }
 
-export interface IssueDraftRequest {
+export interface IssueRefineRequest {
   text?: string;
 }
 
@@ -1183,12 +1207,12 @@ export interface IssueUpdate {
   project?: string;
   assignee?: string;
   priority?: Priority;
-  acceptance?: Acceptance;
+  review?: Review;
   criteria?: string[];
 }
 
-export const AcceptanceValues = ["glance", "required"] as const;
-export type Acceptance = (typeof AcceptanceValues)[number];
+export const ReviewValues = ["glance", "required"] as const;
+export type Review = (typeof ReviewValues)[number];
 
 export interface Finding {
   id: string;
@@ -1197,7 +1221,16 @@ export interface Finding {
   pulled?: boolean;
 }
 
-export interface IssueAcceptRequest {
+/** One of what the owner may do (Issue.attention.acts). text: what answer, tell and reopen say, and reject's findings
+ * one a line unless findings is given; sendKey: answer and tell said again with the same key are said once. */
+export interface IssueActRequest {
+  act: IssueAct;
+  text?: string;
+  findings?: string[];
+  sendKey?: string;
+}
+
+export interface IssueReviewRequest {
   pass: boolean;
   findings?: string[];
   text?: string;
@@ -1209,19 +1242,19 @@ export interface IssueRequest {
   project?: string;
   assignee?: string;
   priority?: Priority;
-  acceptance?: Acceptance;
+  review?: Review;
 }
 
 export const IssueCloseValues = ["merged", "merged_into_graph", "dismissed", "lost", "answered"] as const;
 export type IssueClose = (typeof IssueCloseValues)[number];
 
-export const RunTriggerKindValues = ["issue", "comment", "task", "schedule", "draft", "runtime"] as const;
+export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
 export interface RunTrigger {
   kind: RunTriggerKind;
   message?: string;
-  schedule?: string;
+  recurrence?: string;
   missed?: boolean;
 }
 
@@ -1257,13 +1290,13 @@ export interface ChannelUpdate {
   project?: string;
 }
 
-export interface ScheduleRequest {
+export interface RecurrenceRequest {
   name: string;
   text: string;
   channel?: string;
   agent?: string;
   project?: string;
-  when: ScheduleWhen;
+  when: RecurrenceWhen;
   tz?: string;
 }
 
@@ -1403,28 +1436,28 @@ export interface ProgressTitle {
   tier: number;
 }
 
-export interface ScheduleWhenOnce {
+export interface RecurrenceWhenOnce {
   kind: "once";
   at: number;
 }
 
-export interface ScheduleWhenEvery {
+export interface RecurrenceWhenEvery {
   kind: "every";
   minutes: number;
 }
 
-export interface ScheduleWhenDaily {
+export interface RecurrenceWhenDaily {
   kind: "daily";
   time: string;
 }
 
-export interface ScheduleWhenWeekly {
+export interface RecurrenceWhenWeekly {
   kind: "weekly";
   days: number[];
   time: string;
 }
 
-export interface ScheduleWhenCron {
+export interface RecurrenceWhenCron {
   kind: "cron";
   expr: string;
 }
@@ -1481,8 +1514,8 @@ export interface InboxFromSession {
   agent: string;
 }
 
-export interface InboxFromManager {
-  kind: "manager";
+export interface InboxFromAssistant {
+  kind: "assistant";
 }
 
 export interface InboxTargetSession {
@@ -1688,10 +1721,10 @@ export interface VoiceASRMicrosoft {
 }
 
 /** Told apart by `vendor`. */
-export type VoiceAnswer = VoiceAnswerManager | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
+export type VoiceAnswer = VoiceAnswerAssistant | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
 
-export interface VoiceAnswerManager {
-  vendor: "manager";
+export interface VoiceAnswerAssistant {
+  vendor: "assistant";
 }
 
 export const VoiceAnswerAgoraModelValues = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-5-mini"] as const;
@@ -1764,7 +1797,7 @@ export interface Roots {
 /** Told apart by `type`. */
 export type Fact =
   | FactCall
-  | FactManager
+  | FactAssistant
   | FactMessage
   | FactConversation
   | FactHired
@@ -1781,8 +1814,8 @@ export type Fact =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactSchedule
-  | FactUnschedule;
+  | FactRecurrence
+  | FactRecurrenceGone;
 
 export interface FactCall {
   type: "call";
@@ -1791,10 +1824,10 @@ export interface FactCall {
   reason?: string;
 }
 
-export interface FactManager {
-  type: "manager";
+export interface FactAssistant {
+  type: "assistant";
   at: number;
-  state: ManagerState;
+  state: AssistantState;
 }
 
 export interface FactMessage {
@@ -1870,7 +1903,7 @@ export interface FactReport {
   summary: string;
   runs: number;
   spent?: Spent;
-  asks?: Ask[];
+  questions?: Question[];
   checks?: CriterionCheck[];
 }
 
@@ -1914,14 +1947,14 @@ export interface FactProgress {
   news?: ProgressNews;
 }
 
-export interface FactSchedule {
-  type: "schedule";
+export interface FactRecurrence {
+  type: "recurrence";
   at: number;
-  schedule: Schedule;
+  recurrence: Recurrence;
 }
 
-export interface FactUnschedule {
-  type: "unschedule";
+export interface FactRecurrenceGone {
+  type: "recurrenceGone";
   at: number;
   id: string;
 }
@@ -1929,7 +1962,7 @@ export interface FactUnschedule {
 /** Told apart by `type`. */
 export type SideEvent =
   | FactCall
-  | FactManager
+  | FactAssistant
   | FactMessage
   | FactConversation
   | FactHired
@@ -1946,8 +1979,8 @@ export type SideEvent =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactSchedule
-  | FactUnschedule
+  | FactRecurrence
+  | FactRecurrenceGone
   | SideEventSnapshot
   | SideEventSessionEvent
   | SideEventNotice
@@ -1956,7 +1989,7 @@ export type SideEvent =
 export interface SideEventSnapshot {
   type: "snapshot";
   at: number;
-  state: CoreState;
+  state: WorkspaceState;
 }
 
 export interface SideEventSessionEvent {
@@ -1979,7 +2012,7 @@ export interface SideEventRuntime {
   info: RuntimeInfo;
 }
 
-export interface ScheduleUpdate {
+export interface RecurrenceUpdate {
   enabled?: boolean;
 }
 
@@ -2038,6 +2071,8 @@ export interface VoiceHeard {
 export interface StartRequest {
   channel: string;
   uid: string;
+  /** The call answers a ring: what rang, which the assistant says first instead of the greeting. */
+  about?: string;
 }
 
 export interface VerifyRequest {

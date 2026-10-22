@@ -67,7 +67,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 - **`apps/web/public`**：`title/` 的场景贴图和 `title/sprites.json`（`scene.ts` 读尺寸）、`pixel/` 的背景、图标、帮工的帧、地块和 `pixel/sprites.json`（`assets.ts` 读尺寸和站点）、`fonts/` 的像素字。改了文件名，官网构建报错（`no picture`、`no sprite`）。
 - **游戏的首页**（`apps/web/src/farm/title/`）：官网的 `scene.ts` 和 `global.css` 的动法是同一套摆放的另一份；改了一边，另一边跟着改。
 - **`docs/images`**：截图，README 和官网共用，界面变了照 `verify-app` 重拍。
-- **游戏代码里的数**：`facts.ts` 抄 `packages/protocol/src/shapes.ts`（样子、连接器、`maxRunning`）、`packages/protocol/src/rules/seeds.json` 的成就、`apps/web/src/farm/phone/screens.tsx`（小游戏）、[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)（农机）；那边变了要手改这里。
+- **游戏代码里的数**：`facts.ts` 抄 `packages/protocol/src/shapes.ts`（样子、连接器、`maxRunning`）、`apps/server/src/agent/seeds.json` 的成就、`apps/web/src/farm/phone/screens.tsx`（小游戏）、[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)（农机）；那边变了要手改这里。
 - **Cloudflare**：DNS 和 Worker；没有按分支的预览地址。
 - **GitHub**：`links.ts` 的仓库地址，仓库公开以前打不开。
 

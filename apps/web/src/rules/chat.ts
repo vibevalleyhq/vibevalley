@@ -8,7 +8,7 @@ import {
   everyone,
   generalName,
   type Issue,
-  managerAgent,
+  assistantAgent,
   type Phase,
   type Session,
   type Spent,
@@ -182,9 +182,9 @@ export function feedOf(chat: Chat | undefined, conversation: string, more?: Load
   });
 }
 
-/** The manager's dots: it thinks, in a channel, and has not answered the last word yet. */
-export const waitingForManager = (manager: string | undefined, conversation: Conversation | undefined, messages: ChatMessage[]) =>
-  manager === "thinking" && conversation?.kind !== "thread" && messages.length > 0 && messages[messages.length - 1]!.from !== managerAgent;
+/** The assistant's dots: it thinks, in a channel, and has not answered the last word yet. */
+export const waitingForAssistant = (assistant: string | undefined, conversation: Conversation | undefined, messages: ChatMessage[]) =>
+  assistant === "thinking" && conversation?.kind !== "thread" && messages.length > 0 && messages[messages.length - 1]!.from !== assistantAgent;
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
@@ -261,7 +261,7 @@ export function roleShort(role: string) {
   return first.length > 18 ? first.slice(0, 18) : first;
 }
 
-export const mentionOf: Record<string, string> = { [managerAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Record<string, string> = { [assistantAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
 
 export interface Nameable {
   token: string;
@@ -275,7 +275,7 @@ export const menuMax = 6;
 /** Everyone only when there is more than one helper. */
 export const nameables = (sessions: Session[], now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[managerAgent]!, name: "管家", note: "派活、拆计划、问进度" },
+  { token: mentionOf[assistantAgent]!, name: "管家", note: "派活、拆计划、问进度" },
   ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: "所有人", note: "叫醒地里每个帮工" }] : []),
 ];
 

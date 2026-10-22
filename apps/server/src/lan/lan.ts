@@ -11,16 +11,15 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
-import type { LanDevice, LanPaired, LanStatus } from "@vibevalley/protocol";
-import { eventsPath, lanKeyCookie, livePath, statePath } from "@vibevalley/protocol";
+import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
-import * as lanQ from "../../db/generated/lan.sql.ts";
-import * as q from "../../db/generated/lan_device.sql.ts";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
 import { callbackLog } from "../base/log.ts";
+import * as lanQ from "../../db/generated/lan.sql.ts";
+import * as q from "../../db/generated/lan_device.sql.ts";
 
 /** A device's asking gets as long again for the owner to answer. */
 const pairingForMs = 2 * 60_000;
@@ -338,7 +337,7 @@ export const make = (options: LanOptions = {}) =>
           if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
           p.asking = name;
           p.expires = now() + pairingForMs;
-          logs.info(`vibevalley: lan access: "${name}" asks to pair`);
+          logs.info(`vibevalley: lan access: "${name}" questions to pair`);
           const allow = yield* Effect.callback<boolean | "late">((resume) => {
             p.answer = (a) => resume(Effect.succeed(a));
             const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);

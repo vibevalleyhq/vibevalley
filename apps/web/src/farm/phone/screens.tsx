@@ -1,23 +1,24 @@
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
-// the manager's line. The web has no voice yet, so calling the manager says so and points to 田头 instead of dialing.
+// the assistant's line. The web has no voice yet, so calling the assistant says so and points to 田头 instead of dialing.
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
 import type { GlyphCell } from "../kit/card";
-import { inboxKindLabel, missedOf } from "./calls";
+import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
-import { callerName } from "../../rules/notice";
 import { aria } from "../../app/util";
 import { ready, useAgents } from "../../data/query";
-import { AgentFace, ManagerFace } from "../../ui/Face";
+import { AgentFace, AssistantFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
+import { createCall } from "../../voice/CallButton";
+import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 
-export type PhoneApp = "home" | "missed" | "log" | "manager" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
+export type PhoneApp = "home" | "missed" | "log" | "assistant" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
 const cream = "#f7e8c4";
 const bark = "#2f1f13";
@@ -48,7 +49,7 @@ export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
 function CallerFace(props: { call: InboxItem; size: number }) {
   const agents = useAgents();
   return (
-    <Show when={props.call.from.kind !== "manager" ? props.call.from : undefined} fallback={<ManagerFace size={props.size} />}>
+    <Show when={props.call.from.kind !== "assistant" ? props.call.from : undefined} fallback={<AssistantFace size={props.size} />}>
       {(from) => <AgentFace agentId={from().agent || from().id} look={ready(agents, []).find((a) => a.id === from().agent)?.look} size={props.size} />}
     </Show>
   );
@@ -78,9 +79,9 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
           <CallerFace call={props.call} size={60} />
         </BigFace>
       </span>
-      <p class="mt-3 text-[24px] leading-none">{callerName(props.call)}</p>
+      <p class="mt-3 text-[24px] leading-none">{props.call.who}</p>
       <p class="mt-2 px-2" style={{ background: lcd.dark, color: lcd.pale }}>
-        {inboxKindLabel[props.call.kind]}
+        {props.call.words.label}
       </p>
       <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
       <div class="mt-auto mb-5 flex gap-8">
@@ -115,7 +116,7 @@ function RoundKey(props: { answer: boolean; label: string; onClick: () => void }
   );
 }
 
-function CallManager(props: { onCall: () => void }) {
+function CallAssistant(props: { onCall: () => void }) {
   return (
     <button
       type="button"
@@ -168,7 +169,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                       <CallerFace call={e().call} size={28} />
                     </SmallFace>
                     <span class="min-w-0 flex-1 truncate">
-                      {callerName(e().call)} · {inboxKindLabel[e().call.kind]}
+                      {e().call.who} · {e().call.words.label}
                     </span>
                     <span style={{ color: e().answered ? lcd.dark : declineRed }}>{e().answered ? "接了" : "挂了"}</span>
                   </li>
@@ -184,7 +185,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                   <button
                     type="button"
                     onClick={() => props.onAnswer(c())}
-                    aria-label={`${callerName(c())}：${inboxKindLabel[c().kind]}`}
+                    aria-label={`${c().who}：${c().words.label}`}
                     class={[row, "cursor-pointer hover:bg-[#b9cf8c]"]}
                   >
                     <SmallFace>
@@ -192,9 +193,9 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     </SmallFace>
                     <span class="min-w-0 flex-1">
                       <span class="flex">
-                        {callerName(c())}
+                        {c().who}
                         <span class="ml-auto" style={{ color: declineRed }}>
-                          {inboxKindLabel[c().kind]}
+                          {c().words.label}
                         </span>
                       </span>
                       <span class="block truncate" style={{ color: lcd.dark }}>
@@ -208,31 +209,41 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           </Show>
         </Show>
       </ul>
-      <CallManager onCall={() => props.onCall()} />
+      <CallAssistant onCall={() => props.onCall()} />
     </>
   );
 }
 
-/** The manager's line: on the web it cannot be dialed yet, so it sends you to 田头. */
-export function ManagerScreen(props: { onChat: () => void }) {
+/** The assistant's line: on the web it cannot be dialed yet, so it sends you to 田头. */
+/** The farm's one call, the chat's call button's too: calling, on it, or why it did not get through. */
+export function AssistantScreen() {
+  const call = createCall();
+  const phase = () => call().phase;
+  const line = () => {
+    switch (phase()) {
+      case "connecting":
+        return "正在接通……";
+      case "live":
+        return call().agentHere ? "通话中：说吧，管家在听" : "通话中：管家在路上";
+      case "ending":
+        return "挂断中……";
+      case "idle":
+        return call().problem ? "没接通：" + call().problem : "有事直接说，工单交回来、卡住了，管家也会打过来。";
+    }
+  };
+  const on = () => phase() === "live" || phase() === "connecting";
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
-      <BigFace>
-        <ManagerFace size={60} />
+      <BigFace shake={phase() === "connecting"}>
+        <AssistantFace size={60} />
       </BigFace>
       <p class="mt-2 text-[24px] leading-none">管家</p>
-      <p class="mt-3 leading-[1.625]">网页上还打不了电话。</p>
-      <p class="leading-[1.625]" style={{ color: lcd.dark }}>
-        有事去田头跟他说，他一样听得到。
+      <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
+        {line()}
       </p>
-      <button
-        type="button"
-        onClick={() => props.onChat()}
-        class="mt-auto mb-5 cursor-pointer px-3 py-1.5 hover:brightness-110"
-        style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
-      >
-        去田头说
-      </button>
+      <div class="mt-auto mb-5">
+        <RoundKey answer={!on()} label={on() ? "挂断" : "打给管家"} onClick={() => void (on() ? voiceCall.end() : voiceCall.start())} />
+      </div>
     </div>
   );
 }
@@ -241,7 +252,7 @@ export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => v
   const apps: { label: string; icon: () => JSX.Element; badge?: () => number; go: () => void }[] = [
     { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
     { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: "管家", icon: () => <ManagerFace size={28} />, go: () => props.onOpen("manager") },
+    { label: "管家", icon: () => <AssistantFace size={28} />, go: () => props.onOpen("assistant") },
     { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
     { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
     { label: "方块", icon: () => <BlocksIcon />, go: () => props.onOpen("blocks") },

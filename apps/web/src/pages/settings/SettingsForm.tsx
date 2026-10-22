@@ -319,7 +319,7 @@ function KeyField(props: { label: string; help: JSX.Element; line: string; onCle
   );
 }
 
-/** What the server found of gh (github.status); a refresh asks it to look again. */
+/** What the server found of gh (github.status); a refresh questions it to look again. */
 export function GitHub() {
   const [refreshed, setRefreshed] = createSignal<GitHubStatus>();
   const [busy, setBusy] = createSignal(false);

@@ -2,24 +2,26 @@
 // id, its draft (what the drafting session is told and how what it hands back is read), where its status may move, and
 // the sowing form's templates filled for a project.
 
-import {
-  type Ask,
-  type Issue,
-  type IssueClose,
-  type IssueTimeline,
-  type Milestone,
-  type MilestoneKind,
-  type Run,
-  type RunTrigger,
-  type Spent,
-  type IssueStatus,
-  IssueStatusValues,
-  type IssueTemplate,
-  type ProjectStack,
-  type TemplateBlank,
-  type TemplateKind,
+import { reportVerdict } from "../session/rules.ts";
+import type {
+  Question,
+  Issue,
+  IssueClose,
+  IssueStatus,
+  IssueTemplate,
+  IssueTimeline,
+  Milestone,
+  MilestoneKind,
+  ProjectStack,
+  Run,
+  RunTrigger,
+  Spent,
+  TemplateBlank,
+  TemplateKind,
 } from "@vibevalley/protocol";
-import { clip, isForManager, shortTitle } from "@vibevalley/protocol/rules";
+import { shortTitle } from "@vibevalley/protocol/rules";
+import { isForAssistant } from "./state.ts";
+import { clip } from "../base/text.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 
@@ -68,7 +70,7 @@ export function nextTaskId(ids: readonly string[]): string {
 }
 
 /** A draft as its session hands it back, in the json block its brief asks for. A list may come as one string. */
-export interface IssueDraft {
+export interface IssueRefinement {
   readonly title: string;
   readonly why: string;
   readonly todo: string[];
@@ -81,7 +83,7 @@ export interface IssueDraft {
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
 
 /** The questions with words in them. */
-export const openAsks = (asks: readonly Ask[] | undefined): Ask[] => (asks ?? []).filter((a) => a.question.trim() !== "");
+export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
 function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
@@ -96,15 +98,15 @@ function textOf(v: unknown, field: string): string {
   throw new Error(`${field}：要是字符串`);
 }
 
-const draftBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
+const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
 /** The last block that reads as a draft with a title; problem says why none did. */
-export function parseDraft(text: string): { draft?: IssueDraft; problem: string } {
-  const blocks = [...text.matchAll(draftBlock)].map((m) => m[1]!);
+export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
+  const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
   if (blocks.length === 0) return { problem: "没找到草稿：要用一个 json 代码块给出" };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
-    let d: IssueDraft;
+    let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
       if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
@@ -131,7 +133,7 @@ export function parseDraft(text: string): { draft?: IssueDraft; problem: string 
 }
 
 /** The issue's description from a draft, under the same headings every time; a heading with nothing under it is left out. */
-export function draftDescription(d: IssueDraft): string {
+export function refinementDescription(d: IssueRefinement): string {
   const parts: string[] = [];
   const why = d.why.trim();
   if (why) parts.push("为什么：\n" + why);
@@ -144,15 +146,19 @@ export function draftDescription(d: IssueDraft): string {
   return parts.join("\n\n");
 }
 
-export const draftOpening =
+export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
-export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly asks?: readonly Ask[] }, word: string, project: string): string {
+export function refinementBrief(
+  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
+  word: string,
+  project: string,
+): string {
   word = word.trim();
-  const asks = t.asks ?? [];
+  const questions = t.questions ?? [];
   const criteria = t.criteria ?? [];
-  const answering = word !== "" && asks.length > 0;
+  const answering = word !== "" && questions.length > 0;
   const redraft = !!t.description || criteria.length > 0;
   const example = {
     title: "看板拖卡改用 issue.status",
@@ -162,14 +168,14 @@ export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> 
     notDoing: ["不改看板的样子"],
     files: ["app/lib/workbench/issues/board.dart"],
   };
-  const lines = [draftOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
+  const lines = [refinementOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
   if (redraft) {
     lines.push("", "上一版草稿（主人可能改过，以这一版为准）：", "标题：" + t.title);
     if (t.description) lines.push(t.description);
     if (criteria.length > 0) lines.push("验收标准：", "- " + criteria.join("\n- "));
   }
   if (answering)
-    lines.push("", "你上一版问主人的：", "- " + asks.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
+    lines.push("", "你上一版问主人的：", "- " + questions.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
   else if (redraft && word) lines.push("", "主人这次说：" + word, "", "照主人说的再起草一版，整张重写。");
   else if (redraft) lines.push("", "再起草一版，整张重写。");
   lines.push(
@@ -192,91 +198,6 @@ export function draftBrief(t: Pick<Issue, "title" | "description" | "criteria"> 
   return lines.join("\n");
 }
 
-// ── where a status may go ──
-
-/** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
-export type Move =
-  | "none"
-  /** backlog → todo: sent out now, or waits in todo for room */
-  | "start"
-  /** todo → backlog */
-  | "unqueue"
-  /** in_review → todo: another round, with the owner's words */
-  | "round"
-  /** done, canceled → todo: a new session picks it up, with the owner's words */
-  | "reopen"
-  /** canceled before it was ever sent → backlog */
-  | "revive"
-  /** in_review → done */
-  | "merge"
-  /** in_progress, in_review → canceled: its session goes home */
-  | "cancel"
-  /** backlog, todo → canceled: never sent */
-  | "drop"
-  /** the manager's issue, in_review → done: the owner takes its answer */
-  | "answered"
-  /** the manager's issue, in_review → canceled */
-  | "putAway";
-
-export const statusWords: Readonly<Record<IssueStatus, string>> = {
-  backlog: "备选",
-  todo: "待办",
-  in_progress: "处理中",
-  in_review: "等你看",
-  done: "已完成",
-  canceled: "已取消",
-};
-
-/** The whole table; the reason says why when there is no move. */
-export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
-  const from = t.status;
-  if (isForManager(t)) return managerMove(t, to);
-  if (t.graph || t.task || t.closed === "merged_into_graph") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
-  if (from === to) return ["none", "它已经是这个状态了"];
-  if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
-  const sent = t.sessions.length > 0;
-  switch (from) {
-    case "backlog":
-      if (to === "todo") return t.drafting ? ["none", t.drafting.name + " 正在起草：等它交回来再开工"] : ["start", ""];
-      if (to === "canceled") return ["drop", ""];
-      break;
-    case "todo":
-      if (to === "backlog") return ["unqueue", ""];
-      if (to === "canceled") return ["drop", ""];
-      break;
-    case "in_progress":
-      return to === "canceled" ? ["cancel", ""] : ["none", "帮工还在干：等它交回来，或者挪到已取消让它回家"];
-    case "in_review":
-      if (to === "todo") return ["round", ""];
-      // Every issue has an acceptance; a glance one is passed by this harvest itself, so a round that failed is never
-      // harvested: done is what was asked for, not how the round ended.
-      if (to === "done") {
-        if (t.standing.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
-        return t.acceptance === "required" && t.acceptedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
-      }
-      if (to === "canceled") return ["cancel", ""];
-      break;
-    case "done":
-    case "canceled":
-      if (to === "todo" && sent) return ["reopen", ""];
-      if (to === "backlog" && !sent) return ["revive", ""];
-      return sent ? ["none", "关上的工单挪回待办，就是带一句话重开"] : ["none", "没开过工就取消的工单，挪回备选再说"];
-  }
-  return ["none", "不能从" + statusWords[from] + "挪到" + statusWords[to]];
-}
-
-/** The manager closes nothing: it answers, and the owner takes the answer as done or puts it away. */
-function managerMove(t: Issue, to: IssueStatus): [Move, string] {
-  if (t.status === "in_progress") return ["none", "管家还在答：等它答完"];
-  if (t.status !== "in_review") return ["none", "这是派给管家的工单：再问管家一次就开了"];
-  if (to === "canceled") return ["putAway", ""];
-  if (to !== "done") return ["none", "管家答完的工单只能挪到已完成或已取消；要它接着做，在串里跟管家说"];
-  if (t.handedBack && t.handedBack.outcome !== "completed") return ["none", "管家这一轮没答成：再问它一次，或者挪到已取消"];
-  return ["answered", ""];
-}
-
-export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
-
 // ── the sowing form's templates ──
 
 const recentTitles = 5;
@@ -287,7 +208,8 @@ const recentTitleLength = 60;
 export function sentTitles(all: readonly Issue[], project: string): string[] {
   const mine = all
     .filter(
-      (i) => i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.schedule === undefined && !isForManager(i),
+      (i) =>
+        i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.recurrence === undefined && !isForAssistant(i),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
@@ -335,7 +257,7 @@ const closedWords: Record<IssueClose, string> = {
 
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (t.kind) {
-    case "draft":
+    case "refine":
       return ["started", "开始起草"];
     case "comment":
       return ["told", "你带了话，接着做一轮"];
@@ -343,7 +265,7 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
       return ["started", first ? "开工" : "重开，接着做"];
     case "task":
       return ["started", "照种植计划开工"];
-    case "schedule":
+    case "recurrence":
       return ["started", t.missed ? "定时开工（补跑）" : "定时开工"];
     case "runtime":
       return ["started", "农机自己接着做"];
@@ -358,15 +280,16 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   runs.forEach((r, i) => {
     const who = names.get(r.session);
     const by = who !== undefined ? { who } : {};
-    const draft = r.triggeredBy.kind === "draft";
-    const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "draft"));
+    const draft = r.triggeredBy.kind === "refine";
+    const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
     const said = r.summary ? `：${r.summary}` : "";
     switch (r.outcome) {
       case "completed":
-        if (i === lastDone && t.asks.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.asks.map((a) => a.question).join(" / ") });
-        else out.push({ at: r.endedAt, kind: draft ? "drafted" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
+        if (i === lastDone && t.questions.length > 0)
+          out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.questions.map((a) => a.question).join(" / ") });
+        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
         break;
       case "failed":
         out.push({ at: r.endedAt, kind: "failed", ...by, text: "没做成" + said });
@@ -379,7 +302,7 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   const sentBack = new Map<number, string[]>();
   for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
   for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: "打回：" + lines.join("；") });
-  if (t.acceptedAt !== undefined) out.push({ at: t.acceptedAt, kind: "accepted", text: "验收通过" });
+  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: "验收通过" });
   if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: t.closed ? closedWords[t.closed] : "关了" });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
@@ -393,3 +316,37 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   }, undefined);
   return { milestones, ...(spent ? { spent } : {}) };
 }
+
+// ── what an act says to the helper ──
+
+/** 接着做: a round that stopped halfway goes on. */
+export const resumeWords = "上一轮停在了半路，接着把它做完。";
+
+/** 接着修: the job once, with what to do about the failure; a job that was told this before is not told it twice. */
+export function cureWords(job: string): string {
+  const original = job.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
+  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
+}
+
+/** 打回: one finding a line. */
+export const findingsOf = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+/** A pull request's description: the session's conclusion (its 结论： part), else all it last said. */
+export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
+
+/** What a session is told when merging its base in would conflict. */
+export const conflictBrief = (base: string, files: readonly string[]) =>
+  `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;
+
+/** A text column: blank is null. */
+export const nullText = (s: string | undefined) => {
+  const t = (s ?? "").trim();
+  return t === "" ? null : t;
+};
+
+/** A JSON column: null when there is nothing to keep. */
+export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);

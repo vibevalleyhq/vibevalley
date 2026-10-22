@@ -55,12 +55,12 @@ export type Pose = "idle" | "walk" | "think" | "work" | "cheer" | "worry";
 
 const pixelPose: Record<Pose, string> = { idle: "down", think: "side", walk: "down-1", work: "work", cheer: "cheer", worry: "worry" };
 
-/** Its outfit's, else the farmer's, else the farmer standing. */
+/** Its outfit's, else the farmer's, else the farmer attention. */
 export const castSprite = (cast: Cast, pose: Pose, has: (name: string) => boolean) =>
   [`${cast.species}-${cast.outfit}-${pixelPose[pose]}`, `${cast.species}-farmer-${pixelPose[pose]}`, `${cast.species}-farmer-down`].find(has) ??
   `${cast.species}-farmer-down`;
 
-/** Without a cycle for this outfit, the stepping pose and the standing pose take turns. */
+/** Without a cycle for this outfit, the stepping pose and the attention pose take turns. */
 export function walkFrames(cast: Cast, has: (name: string) => boolean): string[] {
   const base = `${cast.species}-${cast.outfit}-down`;
   if (has(`${base}-1`)) return [`${base}-1`, base, has(`${base}-2`) ? `${base}-2` : base, base];

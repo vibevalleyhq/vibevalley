@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ChatMessage, type Conversation, managerAgent, type Outcome } from "@vibevalley/protocol";
+import { type ChatMessage, type Conversation, assistantAgent, type Outcome } from "@vibevalley/protocol";
 import {
   chatPath,
   feedOf,
@@ -14,14 +14,14 @@ import {
   spentText,
   threadOwnerOf,
   unreadIn,
-  waitingForManager,
+  waitingForAssistant,
   workbenchClock,
 } from "../../rules/chat";
 import { aria, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
 import { ready, useAgents } from "../../data/query";
-import { ManagerFace } from "../../ui/Face";
+import { AssistantFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, StreamingCaret, Tag, ThinkingDots } from "./bits";
@@ -61,7 +61,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
   const parent = () => (props.conversation?.kind === "thread" ? parentOf(core()?.chat, props.conversation, more()) : undefined);
   const searching = () => (props.filter ?? "").trim() !== "";
   const hasOlder = () => !!id() && all().length > 0 && !(more()?.complete ?? false);
-  const waiting = () => waitingForManager(core()?.manager, props.conversation, all());
+  const waiting = () => waitingForAssistant(core()?.assistant, props.conversation, all());
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
@@ -101,7 +101,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
           )}
         </For>
         <Show when={waiting()}>
-          <Frame face={<ManagerFace size={36} />} name="管家" meta="在想…">
+          <Frame face={<AssistantFace size={36} />} name="管家" meta="在想…">
             <div class="flex h-5 items-center">
               <ThinkingDots />
             </div>
@@ -221,8 +221,8 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
           </div>
         )}
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "manager" && props.m.kind !== "dispatch"}>
-        <TurnSteps session={managerAgent} run={props.m.run} manager />
+      <Show when={props.m.final && props.m.fromKind === "assistant" && props.m.kind !== "dispatch"}>
+        <TurnSteps session={assistantAgent} run={props.m.run} assistant />
       </Show>
       <Show when={props.m.final && props.m.fromKind === "agent" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />

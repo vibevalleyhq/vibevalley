@@ -6,11 +6,12 @@ import { join } from "node:path";
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { Agent, LiveEvent, RuntimeInfo } from "@vibevalley/protocol";
-import { factsOf, presetOf, runtimeIds } from "@vibevalley/protocol/rules";
+import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { Effect, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
 import { type Config, Settings } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
+import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
@@ -33,7 +34,8 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
   checkedAt: Date.now(),
 });
 
-const world = (config: Config = testConfig()) => Layer.mergeAll(coreLayer, agentLayer).pipe(Layer.provideMerge(Layer.succeed(Settings, config)));
+const world = (config: Config = testConfig()) =>
+  Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(Layer.provideMerge(Layer.succeed(Settings, config)));
 
 /** A runtime service over the given runtimes, never asking this machine's. */
 const runtimes = (options: RuntimeOptions = {}) => make({ background: false, probe: notFound, usageOf: async () => null, ...options });

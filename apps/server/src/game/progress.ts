@@ -2,9 +2,24 @@
 // Outcomes earn, not effort: what counts is work that went into the main branch, never commands run or tokens spent
 // (docs/subsystems/game.md). Nothing here changes what it is given.
 
-import type { AchievementDef, CoreState, Fact, LedgerEntry, Progress, ProgressNews, TaskGraph, Unlock } from "@vibevalley/protocol";
-import { everyone, managerAgent } from "@vibevalley/protocol";
-import { achievements, emptyProgress, graphOf, layersOf, levelForCommits, sessionOf, sessionOnIssue } from "@vibevalley/protocol/rules";
+import {
+  type Achievement,
+  type AchievementDef,
+  type WorkspaceState,
+  everyone,
+  type Fact,
+  type LedgerEntry,
+  assistantAgent,
+  type Progress,
+  type ProgressNews,
+  type TaskGraph,
+  type Unlock,
+} from "@vibevalley/protocol";
+import { sessionOf, sessionOnIssue } from "../session/state.ts";
+import { achievements } from "../agent/seed.ts";
+import { layersOf } from "../task/graph.ts";
+import { achievementInWords, levelForCommits } from "./view.ts";
+import { graphOf } from "../task/rules.ts";
 
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
@@ -39,6 +54,8 @@ export interface Folded {
   readonly progress: Progress;
   readonly seen: Seen;
 }
+
+export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
 
 export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
 
@@ -160,7 +177,7 @@ export const progressFold = (entries: readonly LedgerEntry[], from: Folded = emp
 
 const fullHouse = 6;
 
-const working = (state: CoreState) => state.sessions.filter((h) => h.phase._tag === "working").length;
+const working = (state: WorkspaceState) => state.sessions.filter((h) => h.phase._tag === "working").length;
 
 function graphEntry(graph: TaskGraph): Entry {
   const merged = new Set((graph.tasks ?? []).filter((n) => n.state === "merged").map((n) => n.id));
@@ -168,12 +185,12 @@ function graphEntry(graph: TaskGraph): Entry {
   return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
 }
 
-/** Whether a message is new to the state: the manager's words change as they stream in, and count once. */
-const isNew = (state: CoreState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
+/** Whether a message is new to the state: the assistant's words change as they stream in, and count once. */
+const isNew = (state: WorkspaceState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
-export function entriesFor(before: CoreState, fact: Fact, after: CoreState): Entry[] {
+export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
     case "report": {
@@ -225,7 +242,7 @@ export function entriesFor(before: CoreState, fact: Fact, after: CoreState): Ent
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions ?? [])
-          if (named !== managerAgent && named !== "user" && named !== everyone && sessionOf(before, named)) out.push({ kind: "called", session: named });
+          if (named !== assistantAgent && named !== "user" && named !== everyone && sessionOf(before, named)) out.push({ kind: "called", session: named });
       } else if (fact.message.fromKind === "agent" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
@@ -242,8 +259,11 @@ export function entriesFor(before: CoreState, fact: Fact, after: CoreState): Ent
 }
 
 /** A farm level the ledger has not told yet, from commits counted before it. */
-export function catchUp(state: CoreState): Entry[] {
+export function catchUp(state: WorkspaceState): Entry[] {
   const [level] = levelForCommits(state.commits?.total ?? 0);
   const known = state.progress?.counts.farm_level ?? 1;
   return level > known ? [{ kind: "level", level }] : [];
 }
+
+/** Every achievement, in the page's order. */
+export const achievementsInWords = (): Achievement[] => achievements.map(achievementInWords);

@@ -7,7 +7,7 @@ pairing and keys: [连接到本机](docs/subsystems/lan.md).
 
 ```
 App.tsx              paired: the farm; not yet (or the farm forgot this phone): pairing. A vibevalley://pair link pairs again
-src/PairScreen.tsx   the camera reads the QR code, or the link is pasted or arrives; it asks, the owner nods on the computer
+src/PairScreen.tsx   the camera reads the QR code, or the link is pasted or arrives; it questions, the owner nods on the computer
 src/FarmScreen.tsx   the WebView: the key as the page's cookie, the bridge's calls answered, the call's events sent back
 src/farm.ts          the paired farm in the keychain (expo-secure-store), and lan.pair
 src/rtc.ts           the call on Agora's native SDK: it goes on with the screen locked (the audio background mode)

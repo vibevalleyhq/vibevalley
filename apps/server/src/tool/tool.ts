@@ -1,23 +1,28 @@
-// The tools agents call, defined once: the manager gets them in process, a session over /mcp. A
+// The tools agents call, defined once: the assistant gets them in process, a session over /mcp. A
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
-  type Acceptance,
+  type Review,
   type Agent,
   type Block,
   type BlockAttrs,
-  type GraphAction,
   generalName,
+  type GraphAction,
   type Issue,
-  managerAgent,
+  assistantAgent,
   type Memory,
-  type ScheduleWhen,
+  type RecurrenceWhen,
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { graphsOf, graphText, head, inboxLines, isOpen, maxTasks, openFindings, phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { openFindings } from "../issue/state.ts";
+import { isOpen, maxTasks } from "../task/graph.ts";
+import { head } from "../base/text.ts";
+import { graphText } from "../task/rules.ts";
+import { inboxLines } from "../channel/rules.ts";
 import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";
@@ -28,10 +33,8 @@ import { type ApiError, reasonOf } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
-import { Runtimes } from "../runtime/runtime.ts";
-import { Schedules } from "../schedule/schedule.ts";
+import { Recurrences } from "../recurrence/recurrence.ts";
 import type { ToolStart } from "../session/facts.ts";
-import { chooseAgent } from "../session/rules.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
 import {
@@ -42,7 +45,7 @@ import {
   mergeNotAsked,
   parseTime,
   priorityOf,
-  scheduleLine,
+  recurrenceLine,
   sessionLine,
   startNotAsked,
   statusOf,
@@ -52,12 +55,12 @@ import { schemas, sessionSchemas } from "./schemas.ts";
 
 /** Who is calling, at the moment of the call. */
 export interface Caller {
-  /** The profile: managerAgent for the manager. */
+  /** The profile: assistantAgent for the assistant. */
   readonly agent: string;
-  /** The session working as agent, and the project it works in; both empty for the manager. */
+  /** The session working as agent, and the project it works in; both empty for the assistant. */
   readonly session: string;
   readonly project: string;
-  /** The conversation the manager is answering. A session's default is its own issue thread, which the channel service knows. */
+  /** The conversation the assistant is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
@@ -69,11 +72,11 @@ export interface Caller {
 export type Who = () => Caller | Promise<Caller>;
 
 export interface ToolShape {
-  /** The manager's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly manager: (who: Who) => AgentTool[];
+  /** The assistant's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+  readonly assistant: (who: Who) => AgentTool[];
   /** A session's tools, served on /mcp. */
   readonly session: (who: Who) => AgentTool[];
-  /** How a tool call reads in the manager's trajectory: its label and the first naming argument. */
+  /** How a tool call reads in the assistant's trajectory: its label and the first naming argument. */
   readonly start: (name: string, args: unknown) => ToolStart;
   readonly sessionLine: (w: Roster) => string;
 }
@@ -86,9 +89,9 @@ export const labels: Record<string, string> = {
   channels: "频道",
   open_channel: "开频道",
   channel_settings: "改频道",
-  schedule: "定时",
-  list_schedules: "看定时",
-  cancel_schedule: "取消定时",
+  recurrence: "定时",
+  list_recurrences: "看定时",
+  cancel_recurrence: "取消定时",
   merge: "收获",
   accept: "验收",
   changes: "看改动",
@@ -152,10 +155,9 @@ export const make = Effect.gen(function* () {
   const projects = yield* Projects;
   const memory = yield* Memories;
   const docs = yield* Docs;
-  const runtimes = yield* Runtimes;
   const run = yield* Sessions;
   const chat = yield* Channels;
-  const schedule = yield* Schedules;
+  const recurrence = yield* Recurrences;
   const issue = yield* Issues;
   const tasks = yield* Tasks;
 
@@ -170,13 +172,13 @@ export const make = Effect.gen(function* () {
   const sessionSchemaTool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
     textTool<P>({ name, label: labels[name] ?? name, description, parameters: sessionSchemas[name]!, run: (p) => runIt(p) });
 
-  // The manager may name a session by its id, its name, or words that contain its name.
+  // The assistant may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
     const all = run.roster();
     return all.find((w) => w.session.id === key) ?? all.find((w) => w.session.name === key) ?? all.find((w) => key.includes(w.session.name));
   };
 
-  // The manager names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
+  // The assistant names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
   const findIssue = async (key: string): Promise<Issue | string> => {
     const k = key.trim().replace(/^#/, "");
     const all = await go(issue.list());
@@ -199,27 +201,20 @@ export const make = Effect.gen(function* () {
     return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
   };
   const whoOf = (t: Issue) =>
-    workerOf(t)?.session.name ?? (t.assignee === managerAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
+    workerOf(t)?.session.name ?? (t.assignee === assistantAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
   const nobodyOn = (t: Issue) => `#${t.number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status 挪到待办`;
-  const numberOf = (w: Roster) => (w.session.issue ? core.state().issues?.find((t) => t.id === w.session.issue)?.number : undefined);
+  const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((t) => t.id === w.session.issue)?.number : undefined);
 
-  // Who reads and speaks in a channel: a session as itself, the manager as the manager.
+  // Who reads and speaks in a channel: a session as itself, the assistant as the assistant.
   const participant = (c: Caller) => c.session || c.agent;
 
   // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
-  const choose = async (task: string, name: string, picked: string): Promise<Agent | undefined> => {
-    const candidates = [];
-    for (const a of agents.agents()) {
-      const assessed = await go(runtimes.assess(a));
-      candidates.push({ agent: assessed.agent, usable: assessed.agent.enabled && assessed.blocking.length === 0 });
-    }
-    return chooseAgent(candidates, task, name, picked);
-  };
+  const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(issue.pickAgent(task, name, picked));
 
-  // The manager may say a profile's name or id.
+  // The assistant may say a profile's name or id.
   const profile = (key: string): string => {
     const k = key.trim();
-    if (k === managerAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
+    if (k === assistantAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
     const a = agents.agents().find((x) => x.id === k || x.name === k);
     if (!a) throw new Error("没有叫 " + k + " 的帮工档案");
     return a.id;
@@ -263,7 +258,7 @@ export const make = Effect.gen(function* () {
     "看收获一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
     async (t) => {
       try {
-        return changesText(await go(issue.changes(t.id, "manager")));
+        return changesText(await go(issue.changes(t.id, "assistant")));
       } catch (e) {
         return "看不了改动：" + toError(e).message;
       }
@@ -273,7 +268,7 @@ export const make = Effect.gen(function* () {
   const sessionList = sessionSchemaTool<object>("session_list", "地里现在有谁：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
     // Listed without @: an @ wakes someone, and models copy what they read.
     const lines = ["地里有主人、管家，和这些帮工："];
-    for (const h of core.state().sessions)
+    for (const h of run.presentSessions())
       lines.push(`- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, Date.now())}）工单：${head(h.brief.replace(spaces, " "), 60)}`);
     lines.push("要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。");
     return lines.join("\n");
@@ -395,7 +390,8 @@ export const make = Effect.gen(function* () {
         return withIssue(p.issue, async (t) => {
           if (!c.owner) return mergeNotAsked;
           try {
-            return await go(issue.merge(t.id));
+            const done = await go(issue.act(t.id, { act: "harvest" }, c.here));
+            return done.pullRequest?.state === "open" ? `#${done.number} 的 PR 开着：${done.pullRequest.url}` : `#${done.number} 收获了`;
           } catch (e) {
             return toError(e).message;
           }
@@ -403,7 +399,7 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  // Acceptance is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
+  // Review is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
   // the owner's (merge).
   const accept = tool<{ issue: string; pass: boolean; findings?: string[]; text?: string }>(
     "accept",
@@ -411,7 +407,7 @@ export const make = Effect.gen(function* () {
     (p) =>
       withIssue(p.issue, async (t) => {
         try {
-          const done = await go(issue.accept(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
+          const done = await go(issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
           return p.pass ? `#${done.number} 验收过了，等主人收获` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
         } catch (e) {
           return toError(e).message;
@@ -439,9 +435,12 @@ export const make = Effect.gen(function* () {
     );
 
   const stop = issueTool("stop", "叫停在做一张工单的帮工正在做的这一轮。", async (t) => {
-    const w = workerOf(t);
-    if (!w) return nobodyOn(t);
-    return (await go(run.stop(w.session.id))) ? `${w.session.name} 停下了（#${t.number}）` : `${w.session.name} 现在没在干活`;
+    try {
+      await go(issue.act(t.id, { act: "stop" }, ""));
+      return `#${t.number} 这一轮叫停了`;
+    } catch (e) {
+      return toError(e).message;
+    }
   });
   const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开农场，不收它的改动（分支留着）。", async (t) => {
     const w = workerOf(t);
@@ -462,11 +461,11 @@ export const make = Effect.gen(function* () {
       let found = (await go(issue.list())).filter(
         (t) =>
           (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
-          (!p.wants_owner || standingWantsOwner(t.standing.state)) &&
+          (!p.wants_owner || attentionWantsOwner(t.attention.state)) &&
           (!p.project || t.project === p.project.trim()) &&
           words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
       );
-      if (p.wants_owner) found = found.sort((a, b) => (a.standing.since ?? now) - (b.standing.since ?? now));
+      if (p.wants_owner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
       if (found.length === 0) return p.wants_owner ? "没有在等主人的工单。" : "没有这样的工单。";
       const limit = p.limit && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? `\n（还有 ${found.length - limit} 张没列）` : "";
@@ -506,11 +505,11 @@ export const make = Effect.gen(function* () {
             }),
           );
           if (!p.draft) return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里`;
-          const drafted = await go(issue.draft(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
+          const refined = await go(issue.refine(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
             () => "，帮工在起草",
             (e: unknown) => "；起草没开始：" + toError(e).message,
           );
-          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${drafted}`;
+          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${refined}`;
         } catch (e) {
           return "没记下：" + toError(e).message;
         }
@@ -551,7 +550,7 @@ export const make = Effect.gen(function* () {
                 ...(p.project !== undefined ? { project: p.project } : {}),
                 ...(assignee ? { assignee } : {}),
                 ...(priority ? { priority } : {}),
-                ...(p.acceptance ? { acceptance: p.acceptance as Acceptance } : {}),
+                ...(p.acceptance ? { review: p.acceptance as Review } : {}),
                 ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
               }),
             );
@@ -589,7 +588,7 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  const scheduleTool = (who: Who) =>
+  const recurrenceTool = (who: Who) =>
     tool<{
       name: string;
       text: string;
@@ -604,7 +603,7 @@ export const make = Effect.gen(function* () {
       project?: string;
       tz?: string;
     }>(
-      "schedule",
+      "recurrence",
       "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
       async (p) => {
         const c = await who();
@@ -615,7 +614,7 @@ export const make = Effect.gen(function* () {
             if (!byName) throw new Error("没有 " + p.channel + " 这个频道：先用 channels 看看");
             channel = byName;
           }
-          let when: ScheduleWhen;
+          let when: RecurrenceWhen;
           switch (p.kind) {
             case "once": {
               const at = parseTime(p.at ?? "");
@@ -636,7 +635,7 @@ export const make = Effect.gen(function* () {
               when = { kind: "weekly", days: (p.days ?? []).map((d) => Math.trunc(d)), time: p.time ?? "" };
           }
           const made = await go(
-            schedule.add(
+            recurrence.add(
               {
                 name: p.name,
                 text: p.text,
@@ -646,32 +645,32 @@ export const make = Effect.gen(function* () {
                 ...(p.project ? { project: p.project } : {}),
                 ...(p.tz ? { tz: p.tz } : {}),
               },
-              "manager",
+              "assistant",
               c.owner,
             ),
           );
           if (made.pending)
             return (
               "定好了，等主人同意才生效：\n" +
-              scheduleLine(made, channel.name) +
+              recurrenceLine(made, channel.name) +
               "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时列表里点「同意」才开始。跟主人说一声它是做什么的。"
             );
-          return "定好了：\n" + scheduleLine(made, channel.name);
+          return "定好了：\n" + recurrenceLine(made, channel.name);
         } catch (e) {
           return "没成：" + toError(e).message;
         }
       },
     );
 
-  const listSchedules = tool<object>("list_schedules", "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。", async () => {
-    const all = schedule.list();
+  const listRecurrences = tool<object>("list_recurrences", "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。", async () => {
+    const all = recurrence.list();
     if (all.length === 0) return "没有定时。";
     const names = new Map((await go(chat.channels())).map((c) => [c.id, c.name]));
-    return all.map((s) => scheduleLine(s, names.get(s.channel) ?? "?")).join("\n");
+    return all.map((s) => recurrenceLine(s, names.get(s.channel) ?? "?")).join("\n");
   });
 
-  const cancelSchedule = tool<{ id: string }>("cancel_schedule", "删掉一个定时（编号从 list_schedules 看）。", (p) =>
-    answered(Effect.map(schedule.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
+  const cancelRecurrence = tool<{ id: string }>("cancel_recurrence", "删掉一个定时（编号从 list_recurrences 看）。", (p) =>
+    answered(Effect.map(recurrence.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
   );
 
   const openChannel = tool<{ name: string; description?: string; project?: string }>(
@@ -697,11 +696,12 @@ export const make = Effect.gen(function* () {
   const graphSplit = tool<{ goal: string; project: string; agent?: string }>(
     "graph_split",
     "起一个种植计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "manager")),
+    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "assistant")),
   );
 
   const graphsTool = tool<{ id?: string }>("graphs", "列出种植计划：每件的状态、谁在做、结论。", (p) => {
-    const texts = graphsOf(core.state())
+    const texts = tasks
+      .graphs()
       .filter((g) => (p.id ? g.id === p.id : isOpen(g)))
       .map(graphText);
     if (texts.length > 0) return texts.join("\n\n");
@@ -712,7 +712,7 @@ export const make = Effect.gen(function* () {
     "task_edit",
     "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
     (p) => {
-      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "manager"));
+      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "assistant"));
       const edit: TaskEdit = {
         ...(p.title !== undefined ? { title: p.title } : {}),
         ...(p.brief !== undefined ? { brief: p.brief } : {}),
@@ -720,7 +720,7 @@ export const make = Effect.gen(function* () {
         ...(p.agent !== undefined ? { agent: p.agent } : {}),
         ...(p.check !== undefined ? { check: p.check } : {}),
       };
-      return answered(tasks.editTask(p.graph, p.task, edit, "manager"));
+      return answered(tasks.editTask(p.graph, p.task, edit, "assistant"));
     },
   );
 
@@ -732,14 +732,14 @@ export const make = Effect.gen(function* () {
         const c = await who();
         if (p.action === "merge" && !c.owner) return mergeNotAsked;
         if (p.action === "start" && !c.owner) return startNotAsked;
-        return answered(tasks.act(p.graph, p.action, "manager"));
+        return answered(tasks.act(p.graph, p.action, "assistant"));
       },
     );
 
   const taskAction = tool<{ graph: string; task: string; action: TaskAction }>(
     "task_action",
     "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
-    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "manager")),
+    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "assistant")),
   );
 
   const issueSplit = (who: Who) =>
@@ -765,8 +765,8 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  const memorySearch = (who: Who, forManager: boolean) =>
-    forManager
+  const memorySearch = (who: Who, forAssistant: boolean) =>
+    forAssistant
       ? tool<{ query?: string; agent?: string; project?: string }>(
           "memory_search",
           "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
@@ -790,15 +790,15 @@ export const make = Effect.gen(function* () {
           },
         );
 
-  const memoryAdd = (who: Who, forManager: boolean) =>
-    forManager
+  const memoryAdd = (who: Who, forAssistant: boolean) =>
+    forAssistant
       ? tool<{ agent: string; text: string; project?: string }>(
           "memory_add",
           "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
           async (p) => {
             try {
               const id = profile(p.agent);
-              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "manager" }));
+              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "assistant" }));
               return "替 " + id + " 记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
             } catch (e) {
               return "没成：" + toError(e).message;
@@ -866,13 +866,13 @@ export const make = Effect.gen(function* () {
     );
 
   return Tools.of({
-    manager: (who) => [
+    assistant: (who) => [
       dispatch(who),
       projectsTool,
       channelsTool,
-      scheduleTool(who),
-      listSchedules,
-      cancelSchedule,
+      recurrenceTool(who),
+      listRecurrences,
+      cancelRecurrence,
       openChannel,
       channelSettings,
       merge(who),

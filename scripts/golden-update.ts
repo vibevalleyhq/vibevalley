@@ -1,6 +1,6 @@
 // pnpm run golden:update [-- <where>…]: rewrites the golden data with what the rules answer now, then look at the diff.
-// With no <where>, every golden file; with some, only theirs: `protocol` is packages/protocol's (reduce, rules, play),
-// a module name (setting, issue, tool…) the tests in apps/server/src/<module>.
+// With no <where>, every golden file; with some, only theirs: a module name (core for the core state's reduce, rules
+// and play; setting, issue, tool…) the tests in apps/server/src/<module>.
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -16,13 +16,9 @@ function run(cwd: string, cmd: string[]) {
 }
 
 const wanted = process.argv.slice(2);
-const unknown = wanted.filter((w) => w !== "protocol" && !existsSync(join(root, "apps/server/src", w)));
+const unknown = wanted.filter((w) => !existsSync(join(root, "apps/server/src", w)));
 if (unknown.length > 0) {
-  console.error(`golden:update: no such place: ${unknown.join(", ")} (protocol, or a folder of apps/server/src)`);
+  console.error(`golden:update: no such place: ${unknown.join(", ")} (a folder of apps/server/src)`);
   process.exit(2);
 }
-const modules = wanted.filter((w) => w !== "protocol");
-if (wanted.length === 0 || wanted.includes("protocol"))
-  run("packages/protocol", ["pnpm", "run", "test", ...(wanted.length === 0 ? [] : ["src/rules/golden.test.ts"])]);
-if (wanted.length === 0) run("apps/server", ["pnpm", "run", "test"]);
-else if (modules.length > 0) run("apps/server", ["pnpm", "run", "test", ...modules.map((m) => `src/${m}/`)]);
+run("apps/server", ["pnpm", "run", "test", ...wanted.map((m) => `src/${m}/`)]);

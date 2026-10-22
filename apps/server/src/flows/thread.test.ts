@@ -1,7 +1,7 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { ChatMessage, Conversation } from "@vibevalley/protocol";
-import { conversationOf, messagesIn } from "@vibevalley/protocol/rules";
+import { conversationOf, messagesIn } from "../channel/state.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -15,7 +15,7 @@ describe("an issue's thread", () => {
   // One issue, one thread: sent out, cancelled and reopened, both sessions' dispatch, reports and the person's words are
   // in the same thread; the person's words wake the session working the issue now, and only keep when none is.
   it.live("is one across its sessions", () => {
-    // Says only that it is done: echoing its input would @ the manager, who would then follow the thread.
+    // Says only that it is done: echoing its input would @ the assistant, who would then follow the thread.
     const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }) });
     return Effect.gen(function* () {
       const issues = yield* Issues;
@@ -74,7 +74,7 @@ describe("an issue's thread", () => {
       const channels = yield* Channels;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const issue = yield* issues.add({ title: "先问清楚，再写打卡", project: "clock", assignee: "lab", acceptance: "required" });
+      const issue = yield* issues.add({ title: "先问清楚，再写打卡", project: "clock", assignee: "lab", review: "required" });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(
         () => channels.jobThread(sent.session!),
@@ -82,15 +82,15 @@ describe("an issue's thread", () => {
         "the issue's thread",
       ))!;
       const get = () => issues.get(issue.id);
-      yield* await_(get, (i) => (i.asks ?? []).length === 1, "its question");
+      yield* await_(get, (i) => (i.questions ?? []).length === 1, "its question");
 
       yield* channels.say("用 8797", thread, "");
-      yield* await_(get, (i) => (i.asks ?? []).length === 0, "answered in the thread");
+      yield* await_(get, (i) => (i.questions ?? []).length === 0, "answered in the thread");
       yield* await_(get, (i) => i.status === "in_review", "handed back");
-      yield* issues.accept(issue.id, { pass: true });
-      expect((yield* get()).acceptedAt).toBeDefined();
+      yield* issues.review(issue.id, { pass: true });
+      expect((yield* get()).reviewedAt).toBeDefined();
       yield* channels.say("标题再短一点", thread, "");
-      yield* await_(get, (i) => i.acceptedAt === undefined, "another round voids the pass");
+      yield* await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
       const said = () => messagesIn(core.state().chat, thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
       for (let i = 0; i < 2; i++) yield* issues.comment(issue.id, "顺手把注释删掉", "k1");

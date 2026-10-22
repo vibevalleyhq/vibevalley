@@ -53,7 +53,7 @@
 - **根目录 `AGENTS.md`**：「怎么让 agent 做对」一节是四层手段的常驻版本，理由链到这里；规矩列表里每条链到它的家。
 - **各子系统**：沉淀的去处；`docs:verify` 查它们的链接和路径。
 - **地基、客户端**：它们的检查（黄金数据、`schema.test.ts`、`db:check`、各包的类型）是第 2 层的另一半，跟着各自的代码住。
-- **验证 skill**：`verify-server`、`verify-app` 用 `scripts/verify-server.ts` 起隔离的服务端；`verify-manager-evals` 归[管家](docs/subsystems/manager.md)。
+- **验证 skill**：`verify-server`、`verify-app` 用 `scripts/verify-server.ts` 起隔离的服务端；`verify-assistant-evals` 归[管家](docs/subsystems/assistant.md)。
 - **农场的皮**：读 `process.py` 写出的 `apps/web/public/pixel/` 和 `sprites.json`；界面按钮图标只用这条流水线的贴图（[AGENTS.md](AGENTS.md#规矩)「图标是像素素材」）。
 
 ## 为什么这样

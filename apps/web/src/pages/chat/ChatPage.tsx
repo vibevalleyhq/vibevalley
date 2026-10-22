@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Conversation, generalName, type ManagerState, type Session } from "@vibevalley/protocol";
+import { type Conversation, generalName, type AssistantState, type Session } from "@vibevalley/protocol";
 import {
   channelName,
   channelOf,
@@ -18,14 +18,14 @@ import {
 import { aria, autofocus, Keyed, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
-import { ManagerFace } from "../../ui/Face";
+import { AssistantFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer } from "./Composer";
 import { createHistory, HistoryContext } from "./data";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
-import { Jobs, Schedules } from "./Tabs";
+import { Jobs, Recurrences } from "./Tabs";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
@@ -85,12 +85,12 @@ function Chat() {
   );
 }
 
-type Tab = "chat" | "jobs" | "schedules";
+type Tab = "chat" | "jobs" | "recurrences";
 
 const tabs: { tab: Tab; icon: string; label: string }[] = [
   { tab: "chat", icon: "icon-board", label: "聊天" },
   { tab: "jobs", icon: "icon-tasks", label: "任务" },
-  { tab: "schedules", icon: "icon-clock", label: "定时" },
+  { tab: "recurrences", icon: "icon-clock", label: "定时" },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -179,8 +179,8 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
             <Show when={tab() === "jobs"}>
               <Jobs channel={c()} />
             </Show>
-            <Show when={tab() === "schedules"}>
-              <Schedules channel={c()} />
+            <Show when={tab() === "recurrences"}>
+              <Recurrences channel={c()} />
             </Show>
             <ChannelSettingsDialog channel={c()} open={settings()} onClose={() => setSettings(false)} />
           </>
@@ -228,7 +228,7 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
       </div>
-      <ManagerLine mood={core()?.manager ?? "idle"} />
+      <AssistantLine mood={core()?.assistant ?? "idle"} />
     </aside>
   );
 }
@@ -305,12 +305,12 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversati
   );
 }
 
-const mood: Record<ManagerState, string> = { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" };
+const mood: Record<AssistantState, string> = { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" };
 
-function ManagerLine(props: { mood: ManagerState }) {
+function AssistantLine(props: { mood: AssistantState }) {
   return (
     <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label="管家">
-      <ManagerFace size={32} />
+      <AssistantFace size={32} />
       管家
       <Dot tone={props.mood === "idle" ? "idle" : props.mood === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[props.mood]}</span>

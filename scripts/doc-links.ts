@@ -14,7 +14,7 @@ const root = resolve(import.meta.dirname, "..");
 
 const LINK = /\]\(([^)\s]+)\)/g;
 
-/** A path with a folder and a source file's extension; files in the owner's home (`manager/manager.jsonl`) have none of these. */
+/** A path with a folder and a source file's extension; files in the owner's home (`assistant/assistant.jsonl`) have none of these. */
 const CODE_PATH = /`((?:\.\.?\/)*[\w-][\w.-]*\/[\w./-]+\.(?:go|dart|ts|tsx|astro|sql|json|yaml|sh|py|gz))`/g;
 
 /** Tracked and new files: a path may be written from the repository root or from inside a package (`internal/core/core.go`). */

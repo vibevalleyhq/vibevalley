@@ -50,9 +50,11 @@ export function Fold(props: { label: string; summary?: string; open?: boolean; l
           <span class="min-w-0 truncate text-xs text-muted">{props.summary}</span>
         </Show>
       </button>
-      <Show when={open()}>
-        <div class="pb-3 pl-5">{props.children}</div>
-      </Show>
+      {/* Mounted with the page and only hidden while folded: content first mounted by the click reads queries in flight,
+          and Solid holds that click's whole update until they land, so the fold would not open. */}
+      <div class="pb-3 pl-5" hidden={!open()}>
+        {props.children}
+      </div>
     </div>
   );
 }

@@ -36,7 +36,7 @@ export async function writeIssue(text: string, agent: string, project: string): 
   const made = await api.issue.create({ body: { title: words || newIssueTitle, project: where || undefined, assignee: who || undefined } });
   if (!words) return { issue: made, refused: "" };
   try {
-    return { issue: await api.issue.draft({ id: made.id, body: { text: words } }), refused: "" };
+    return { issue: await api.issue.refine({ id: made.id, body: { text: words } }), refused: "" };
   } catch (e) {
     if (e instanceof VibeValleyApiError) return { issue: made, refused: e.reason };
     throw e;

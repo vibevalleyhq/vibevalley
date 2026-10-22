@@ -3,68 +3,43 @@
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
-import type {
-  Agent,
-  Changes,
-  GraphAction,
-  GraphActor,
-  GraphEvent,
-  GraphEventKind,
-  Session,
-  SessionGraph,
-  Task,
-  TaskAction,
-  TaskEdit,
-  TaskGraph,
+import {
+  type Agent,
+  type Changes,
+  type GraphAction,
+  type GraphActor,
+  GraphActorValues,
+  type GraphEvent,
+  type GraphEventKind,
+  GraphEventKindValues,
+  type Session,
+  type SessionGraph,
+  type Task,
+  type TaskAction,
+  type TaskEdit,
+  type TaskGraph,
 } from "@vibevalley/protocol";
-import { GraphActorValues, GraphEventKindValues } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { sessionOf } from "../session/state.ts";
+import { graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskOf } from "./graph.ts";
+import { graphsOf } from "./issues.ts";
+import { clip } from "../base/text.ts";
 import {
   acceptanceChecks,
-  acceptancesOf,
-  actorText,
-  clip,
-  autoRetries,
-  conflictBrief,
-  defaultParallel,
-  graphActionText,
-  graphChanges,
-  graphEventText,
-  graphOf,
-  graphProblems,
-  graphsOf,
-  graphStateText,
-  graphText,
-  isAcceptance,
-  isBusy,
-  isOpen,
-  sessionOf,
-  taskIssueID,
-  taskOf,
-  withTask,
-} from "@vibevalley/protocol/rules";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
-import * as q from "../../db/generated/task_event.sql.ts";
-import { Agents } from "../agent/agent.ts";
-import { causeMessage } from "../base/db.ts";
-import { newId } from "../base/ids.ts";
-import { Core, type Transition } from "../core/core.ts";
-import { type ApiError, reasonOf, refused } from "../errors.ts";
-import { Issues } from "../issue/issue.ts";
-import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
-import { Runtimes, usable } from "../runtime/runtime.ts";
-import { chooseAgent, splitBrief } from "../session/rules.ts";
-import { type Hired, type HireOptions, type Roster, Sessions } from "../session/session.ts";
-import {
   acceptancePassedText,
+  acceptancesOf,
   allSettled,
+  autoRetries,
   changeOf,
   checkFailedText,
-  editTask,
+  defaultParallel,
   type EditResult,
+  editTask,
   freshTask,
   frozenTouched,
   frozenTouchedText,
+  graphOf,
+  graphText,
   issueSplitRefusal,
   parseSplit,
   removeTask,
@@ -72,7 +47,25 @@ import {
   startable,
   type StepDraft,
   taskBrief,
+  taskIssueID,
+  withTask,
 } from "./rules.ts";
+import { conflictBrief } from "../issue/rules.ts";
+import { actorText, graphChanges, graphEventText } from "./changes.ts";
+import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { SqlClient } from "effect/sql";
+import { Agents } from "../agent/agent.ts";
+import { causeMessage } from "../base/db.ts";
+import { newId } from "../base/ids.ts";
+import { Core } from "../core/core.ts";
+import { type ApiError, reasonOf, refused } from "../errors.ts";
+import { Issues } from "../issue/issue.ts";
+import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
+import { Runtimes, usable } from "../runtime/runtime.ts";
+import { chooseAgent } from "../session/rules.ts";
+import { splitBrief } from "./rules.ts";
+import { type Hired, type HireOptions, type Roster, type SessionNews, Sessions } from "../session/session.ts";
+import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
 
@@ -85,9 +78,14 @@ export interface TaskShape {
   readonly editTask: (id: string, task: string, edit: TaskEdit, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly removeTask: (id: string, task: string, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
+  /** The task graphs now, as the board has them. */
+  readonly graphs: () => TaskGraph[];
   readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
-  /** What the manager is told about graphs, subscribed before it returns. */
+  /** What the assistant is told about graphs, subscribed before it returns. */
   readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
+  /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
+   * steps at work pauses, and a running one goes on. */
+  readonly comeBack: Effect.Effect<void>;
 }
 
 export class Tasks extends Context.Service<Tasks, TaskShape>()("vibevalley/Task") {}
@@ -134,12 +132,17 @@ export const make = (options: TaskOptions = {}) =>
     const store = yield* Agents;
     const runtimes = yield* Runtimes;
     const live = yield* Sessions;
+    const scm = yield* Projects;
     const work: TaskWork = options.work ?? {
       hire: issues.hire,
       tell: (id, text) => live.tell(id, text, { kind: "task" }),
       dismiss: live.dismiss,
       find: live.find,
-      mergeInto: live.mergeInto,
+      mergeInto: (id, target) =>
+        Effect.map(
+          live.handOver(id, "merged_into_graph", (place) => scm.mergeInto(place, target)),
+          (m) => m.hashes ?? [],
+        ),
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
     const sql = yield* SqlClient.SqlClient;
@@ -153,7 +156,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellManager = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
+    const tellAssistant = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
 
     const candidates = Effect.forEach(store.agents(), (agent) =>
       options.usable ? Effect.succeed({ agent, usable: options.usable(agent) }) : Effect.map(runtimes.assess(agent), (a) => ({ agent, usable: usable(a) })),
@@ -210,7 +213,7 @@ export const make = (options: TaskOptions = {}) =>
         splitters.delete(graph.id);
         if (splitter) yield* dismiss(splitter);
         yield* notice("warn", "计划「" + graph.title + "」没拆成：" + why);
-        yield* tellManager(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
+        yield* tellAssistant(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
       });
 
     const split = (graph: TaskGraph, session: Session, outcome: string, summary: string) =>
@@ -237,10 +240,10 @@ export const make = (options: TaskOptions = {}) =>
         splitterTries.delete(graph.id);
         yield* dismiss(session.id);
         yield* notice("info", `计划「${draft.title}」拆好了，${draft.tasks.length} 步：在「计划」里看过再开工`);
-        yield* tellManager(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
+        yield* tellAssistant(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
       });
 
-    const schedule = (id: string): Effect.Effect<void, ApiError> =>
+    const recurrence = (id: string): Effect.Effect<void, ApiError> =>
       Effect.gen(function* () {
         let graph = get(id);
         if (!graph || graph.state !== "running") return;
@@ -280,7 +283,7 @@ export const make = (options: TaskOptions = {}) =>
       Effect.gen(function* () {
         yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
         yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
-        yield* tellManager(
+        yield* tellAssistant(
           graph.id +
             " 的「" +
             task.title +
@@ -306,7 +309,7 @@ export const make = (options: TaskOptions = {}) =>
     /** Judged by the farm, not by the step's session. Not verified: it is sent back, and the answer is false. */
     const verified = (graph: TaskGraph, task: Task, sessionId: string) =>
       Effect.gen(function* () {
-        const session = core.session(sessionId);
+        const session = live.sessionOf(sessionId);
         if (!session?.worktree) return { ok: true, frozen: [] as string[] };
         const cwd = session.worktree;
         let changed: string[] = [];
@@ -342,7 +345,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const taskDone = (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) =>
       Effect.gen(function* () {
-        const session = core.session(sessionId);
+        const session = live.sessionOf(sessionId);
         const { ok, frozen } = yield* verified(graph, task, sessionId);
         if (!ok) return;
         if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
@@ -368,7 +371,9 @@ export const make = (options: TaskOptions = {}) =>
         yield* putSystem(next).pipe(Effect.mapError((e) => refused(`步骤「${task.title}」已合进计划分支，但完成状态没能保存：${reasonOf(e)}`)));
         if (next.state === "ripe") {
           yield* notice("info", "计划「" + next.title + "」都做完了：在「计划」里看看改动，收获进主分支");
-          yield* tellManager(next.id + "「" + next.title + "」都做完了，等主人收获（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next));
+          yield* tellAssistant(
+            next.id + "「" + next.title + "」都做完了，等主人收获（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next),
+          );
         }
       });
 
@@ -380,12 +385,12 @@ export const make = (options: TaskOptions = {}) =>
         yield* putSystem(withNote({ ...graph, state: "paused" }, "「" + task.title + "」被叫停了，计划先暂停；点继续接着做"));
       });
 
-    const follow = (t: Transition) =>
+    const follow = (n: SessionNews) =>
       lock.withPermits(1)(
         Effect.gen(function* () {
-          const f = t.fact;
-          if (f.type === "report") {
-            const session = sessionOf(t.after, f.id);
+          if (n._tag === "reported") {
+            const f = n.report;
+            const session = n.session;
             if (session && !session.graph && session.issue) {
               // The helper that split its issue: the steps do the work now.
               const graph = get(session.issue);
@@ -400,7 +405,8 @@ export const make = (options: TaskOptions = {}) =>
                 }
               }
             }
-          } else if (f.type === "left") {
+          } else if (n._tag === "left") {
+            const f = n.left;
             // Sent home from outside the graph (a full farm, the person): its step did not get done.
             for (const graph of graphsOf(core.state())) {
               if (!isOpen(graph)) continue;
@@ -409,7 +415,7 @@ export const make = (options: TaskOptions = {}) =>
               if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, "帮工被请走了，这一步没做完");
             }
           } else return;
-          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* schedule(graph.id);
+          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
@@ -419,7 +425,7 @@ export const make = (options: TaskOptions = {}) =>
           if (task.state !== "working") continue;
           const graph = get(id);
           if (!graph) return;
-          const session = task.session ? core.session(task.session) : undefined;
+          const session = task.session ? live.sessionOf(task.session) : undefined;
           if (!session) {
             yield* putSystem(withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting" })));
             continue;
@@ -447,25 +453,26 @@ export const make = (options: TaskOptions = {}) =>
         }),
       );
 
-    // ── coming back: the sessions, built before, have already marked the runs that stopped with the server ──
+    // ── coming back: run by the startup, after the sessions came back and marked the runs that stopped with the server ──
 
-    yield* lock.withPermits(1)(
+    const comeBack = lock.withPermits(1)(
       Effect.gen(function* () {
         for (const graph of graphsOf(core.state())) {
           if (graph.state === "splitting") {
             yield* putSystem(withNote({ ...graph, state: "abandoned" }, "VibeValley 重启了，规划停在了半路：再说一遍要做什么"));
-            for (const h of core.state().sessions) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
+            for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
           } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
             yield* putSystem(withNote({ ...graph, state: "paused" }, "VibeValley 重启过，计划先暂停了；点继续接着做"));
           }
         }
-        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* schedule(graph.id);
+        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
-    const [, transitions] = yield* core.transitions;
-    yield* Effect.forkScoped(Stream.runForEach(transitions, (t) => (t.fact.type === "report" || t.fact.type === "left" ? follow(t) : Effect.void)));
+    yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
     const shape: TaskShape = {
+      graphs: () => graphsOf(core.state()),
+      comeBack,
       split: (goal, project, agent, by) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
@@ -532,9 +539,9 @@ export const make = (options: TaskOptions = {}) =>
             yield* put(graph, "session", session!.name + " 拆的").pipe(
               Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但拆好的工单没能保存：${reasonOf(e)}`)),
             );
-            yield* schedule(graph.id);
+            yield* recurrence(graph.id);
             yield* notice("info", `${session!.name} 把工单「${graph.title}」拆成了 ${tasks.length} 张子工单，开工了`);
-            yield* tellManager(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
+            yield* tellAssistant(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
             return `拆好了：工单「${graph.title}」下面 ${tasks.length} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`;
           }),
         ),
@@ -552,7 +559,7 @@ export const make = (options: TaskOptions = {}) =>
                 yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
                   Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但开工状态没能保存：${reasonOf(e)}`)),
                 );
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "计划「" + graph.title + "」开工了，分支 " + branch;
               }
               case "pause":
@@ -563,7 +570,7 @@ export const make = (options: TaskOptions = {}) =>
                 if (graph.state !== "paused") return yield* not();
                 yield* put(withNote({ ...graph, state: "running" }, ""), by);
                 yield* resumeWorking(graph.id);
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "计划「" + graph.title + "」接着做了";
               case "abandon": {
                 if (!isOpen(graph)) return yield* not();
@@ -610,7 +617,7 @@ export const make = (options: TaskOptions = {}) =>
             switch (action) {
               case "retry": {
                 if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试"));
-                const session = task.session ? core.session(task.session) : undefined;
+                const session = task.session ? live.sessionOf(task.session) : undefined;
                 if (session && !isBusy(session)) {
                   // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
                   yield* put(
@@ -624,7 +631,7 @@ export const make = (options: TaskOptions = {}) =>
                   withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting", tries: 0 })),
                   by,
                 );
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "「" + task.title + "」重新排上了";
               }
               case "skip": {
@@ -634,7 +641,7 @@ export const make = (options: TaskOptions = {}) =>
                 if (allSettled(next)) next = withNote({ ...next, state: "ripe" }, "");
                 yield* put(next, by);
                 if (task.session) yield* dismiss(task.session);
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "跳过了「" + task.title + "」，后面的步骤照常开工";
               }
             }
@@ -684,3 +691,6 @@ export const make = (options: TaskOptions = {}) =>
   });
 
 export const layer = (options?: TaskOptions) => Layer.effect(Tasks, make(options));
+
+/** Issues' startup: the task graphs come back. */
+export const start = Layer.effectDiscard(Effect.flatMap(Tasks, (t) => t.comeBack));

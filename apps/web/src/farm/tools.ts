@@ -66,13 +66,8 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   }
 }
 
-export function bugText(task: string): string {
-  const original = task.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
-  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
-}
-
 /** The young farmer stands in for a look not painted. */
-export const managerSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
+export const assistantSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
   has(`manager-${look}${suffix}`) ? `manager-${look}${suffix}` : `manager${suffix}`;
 
 export const lookReady = (look: string, has: (name: string) => boolean) => look === "farmer" || has(`manager-${look}`);
@@ -103,8 +98,8 @@ export function farmKey(
   return tool ? { kind: "pick", tool } : undefined;
 }
 
-/** The manager's looks: sprite manager-<id>, the plain one is farmer. */
-export const managerLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
+/** The assistant's looks: sprite assistant-<id>, the plain one is farmer. */
+export const assistantLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
   { id: "farmer", name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
   { id: "foreman", name: "包工头", blurb: "安全帽、反光背心，对讲机不离身，一喊就到。" },
   { id: "auntie", name: "农场大婶", blurb: "头巾围裙，小本子上记着每块地的活。" },

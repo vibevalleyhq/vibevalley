@@ -37,7 +37,7 @@ Workspace（工作目录，一张大地图）
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
 | Workspace | `Config.workRoot`、`Config.home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
-| 管家 | `Manager` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
+| 管家 | `Assistant` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
@@ -50,7 +50,7 @@ Workspace（工作目录，一张大地图）
 | 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 |
 | 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
 | 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |
-| 定时 | `Schedule` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run |
+| 定时 | `Recurrence` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run |
 | Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |
 | 记忆 | `Memory` | 一个档案记得的事 |
 | 技能 | `Skill` | 档案能带的技能 |

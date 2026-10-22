@@ -1,5 +1,5 @@
 // The farm's chat window and a plot's issue (src/farm/chat, src/farm/issue). The chat runs against the real server (it
-// has no model key: the manager answers that it has none); the plot needs a helper on it, which tests cannot start, so
+// has no model key: the assistant answers that it has none); the plot needs a helper on it, which tests cannot start, so
 // that test serves a frame with one in place of the state stream.
 
 import type { Page } from "@playwright/test";
@@ -16,7 +16,7 @@ async function openFarm(page: Page) {
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
 }
 
-test("a sentence said in 田头 shows in the window, and the manager answers it", async ({ page }) => {
+test("a sentence said in 田头 shows in the window, and the assistant answers it", async ({ page }) => {
   await openFarm(page);
   const chat = page.getByRole("region", { name: "田头" });
   await expect(chat.getByText("这里是田头")).toBeVisible();
@@ -73,8 +73,8 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     status: "in_review",
     moves: ["done", "canceled"],
     criteria: ["勾上后重开浏览器还登着"],
-    acceptance: "required",
-    standing: { state: "reviewing", since: Date.now() - 60_000, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
+    review: "required",
+    attention: { state: "reviewing", since: Date.now() - 60_000, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
   };
   const fixture: StateFrame = {
     ...frame,
@@ -94,6 +94,13 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   await expect(view.getByRole("button", { name: "验收通过" })).toBeVisible();
   await expect(view.getByRole("button", { name: "打回" })).toBeVisible();
   await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
+  // Each fold opens whatever was opened before it: content first mounted by a click once held the whole update while
+  // its queries were in flight, and the fold stayed shut.
+  for (const name of ["详情", "每次干活", "帮工的每一步", "怎么走到这一步"]) {
+    const fold = view.getByRole("button", { name: new RegExp("^" + name) });
+    await fold.click();
+    await expect(fold).toHaveAttribute("aria-expanded", "true");
+  }
   await view.getByRole("button", { name: "勾上后重开浏览器还登着" }).click();
   await expect(view.getByRole("button", { name: "勾上后重开浏览器还登着" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: test.info().outputPath("plot.png") });

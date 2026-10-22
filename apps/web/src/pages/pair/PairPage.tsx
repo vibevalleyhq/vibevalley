@@ -1,5 +1,5 @@
 // /pair: another device joins the farm (连接到本机). The owner's QR code opens it with the code; the device names itself
-// and asks, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
+// and questions, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
 
 import { createSignal, Show } from "solid-js";
 import { api, reasonOf } from "../../data/api";

@@ -3,8 +3,10 @@
 
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
-import type { Agent, Ask, CheckResult, CriterionCheck, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
-import { clip, isBusy, maxTasks, runtimeLabel, slice } from "@vibevalley/protocol/rules";
+import type { Agent, Question, CheckResult, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { clip, slice } from "../base/text.ts";
+import { runtimeLabel } from "../agent/seed.ts";
 import type { Workplace } from "../project/project.ts";
 
 const summaryMax = 160;
@@ -44,7 +46,8 @@ function conclusion(text: string, min: number): string {
   return tail;
 }
 
-function reportVerdict(text: string): string {
+/** A report's verdict: the paragraph after its last 结论：, else empty. */
+export function reportVerdict(text: string): string {
   const all = [...text.matchAll(verdict)];
   const last = all.at(-1);
   if (!last) return "";
@@ -60,7 +63,6 @@ function reportVerdict(text: string): string {
 export const summaryOf = (text: string) => reportVerdict(text) || conclusion(text, 80);
 
 /** A pull request's description: the verdict, else the whole reply. */
-export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
 
 /** Said out loud on the farm, not only in the report. */
 const needsYou = new Set<FailureClass>(["auth", "billing", "quota", "model_unavailable"]);
@@ -74,24 +76,24 @@ export interface SessionRead {
   readonly failure: string;
   readonly needsYou: boolean;
   /** The 要问主人： lines: what it cannot go on without. */
-  readonly asks: Ask[];
+  readonly questions: Question[];
   /** The 标准 N： lines: its word on each of the issue's criteria. */
   readonly checks: CriterionCheck[];
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
-const askLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
+const questionLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
 
 /** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
 const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/;
 
-export function asksOf(said: string): Ask[] {
+export function questionsOf(said: string): Question[] {
   return said
     .split("\n")
-    .map((line) => askLine.exec(line)?.[1])
+    .map((line) => questionLine.exec(line)?.[1])
     .filter((q): q is string => q !== undefined)
     .map((q) => q.trim().replace(/\*\*$/, "").trim())
-    .flatMap((q): Ask[] => {
+    .flatMap((q): Question[] => {
       const tail = optionsTail.exec(q);
       const question = tail ? q.slice(0, tail.index).trim() : q;
       const options = (tail?.[1] ?? "")
@@ -134,7 +136,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
     summary: clip(summary, summaryMax),
     failure: failed,
     needsYou: outcome.kind === "failed" && needsYou.has(outcome.failure),
-    asks: out === "completed" ? asksOf(text) : [],
+    questions: out === "completed" ? questionsOf(text) : [],
     checks: out === "completed" ? checksOf(text) : [],
   };
 }
@@ -239,52 +241,6 @@ export function workplaceRules(place: Workplace, house: string, id: string): str
   return lines.join("\n");
 }
 
-/** What a splitter is told: split goal into a task graph, as JSON, for the profiles there are. */
-export function splitBrief(goal: string, project: string, agents: readonly Agent[]): string {
-  const agent = agents[0]?.id ?? "lab";
-  const example = {
-    title: "按月查询打卡记录",
-    tasks: [
-      { id: "accept", title: "验收", brief: "……", needs: [], scope: ["test/month.test.ts"], check: "pnpm test test/month.test.ts", acceptance: true },
-      { id: "schema", title: "数据层", brief: "……", needs: ["accept"], scope: ["src/db"], check: "pnpm test" },
-      { id: "api", title: "查询接口", brief: "……", needs: ["schema"], agent, scope: ["src/api"], check: "pnpm test" },
-    ],
-  };
-  const lines = [
-    "这一轮你是规划师：把下面这件事拆成一张种植计划，交给几个帮工分头去做。你自己不写代码、不改文件、不提交。",
-    "",
-    "要做的事：" + goal.trim(),
-    `项目：${project}（你现在就在它的目录里）`,
-    "",
-    "先读代码，弄清现状，再拆。拆的规矩：",
-    `- 最多 ${maxTasks} 步，一般三到六步。一步是一个帮工在自己的分支上能做完、提交、单独验证的一件事，不要拆得太碎。`,
-    "- brief 是这一步的工单，写清：目标、要改哪里、做到什么程度算完、要留下什么给后面的步骤（接口签名、文件位置、数据格式）。帮工只看得到它自己这一步的工单和前面步骤的结论。",
-    "- needs 写这一步要等哪些步骤做完。不互相依赖的步骤会同时做：尽量让它们改不同的文件，写在 scope 里。",
-    "- 别拆成一条串行的长链（每一步都等上一步，就只能一个一个做）。有先后的按阶段分组，同一阶段里的步骤互不依赖。",
-    "- 项目里有测试或构建命令的，写进 check（比如 pnpm test），这一步做完会在它的分支上跑，过了才合。",
-    "- 修 bug，或要做的事能用测试说清楚的：第一步写验收（acceptance: true）。它只写现在会失败的测试（复现 bug，或说明做成什么样），不修、不实现；check 写只跑这些测试的命令，要因为问题本身失败，不能因为写错、编译不过失败。别的步骤都等它。它合进去以后就冻结了，后面的步骤不能改它，最后一步要让它通过。",
-    "- 最后放一步整体验证：跑全部测试、修小问题、补文档，写一段总结。",
-    "- id 用简短的英文小写单词，比如 schema、api、ui。",
-  ];
-  if (agents.length > 0) {
-    lines.push("- 能派的帮工（agent 填 id；不填就按「适合的活」挑）：");
-    for (const a of agents) {
-      // 职责 is the profile's role; 适合的活 its tags, which chooseAgent matches.
-      const about = [...(a.role ? ["职责：" + a.role] : []), ...((a.tags ?? []).length > 0 ? ["适合的活：" + a.tags!.join("、")] : [])];
-      lines.push(`  - ${a.id}：${a.name}，${about.join("；")}`);
-    }
-  }
-  lines.push(
-    "",
-    "汇报的最后，用一个 json 代码块给出整张计划，格式照这个：",
-    "```json",
-    JSON.stringify(example, null, 2),
-    "```",
-    "代码块之后写一句结论：拆成了几步、为什么这样拆。",
-  );
-  return lines.join("\n");
-}
-
 /** recalledIn finds the block by these words. */
 export const recallHead = "【你记得的】";
 
@@ -306,3 +262,5 @@ export function recalledIn(input: string): string {
   const block = parts[parts.length - 2]!;
   return block.startsWith(recallHead) ? block.split("\n").slice(1).join("\n") : "";
 }
+
+export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

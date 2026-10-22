@@ -57,7 +57,7 @@ describe("GitHub", () => {
       expect(githubOrigin(s)).toBe("");
   });
 
-  it.effect("permissions are found on a refresh and kept: a summary asks gh nothing", () => {
+  it.effect("permissions are found on a refresh and kept: a summary questions gh nothing", () => {
     let permission = "WRITE";
     let calls = 0;
     const counted: GitHubRun = (...args) => Effect.tap(loggedIn(() => permission)(...args), () => Effect.sync(() => calls++));

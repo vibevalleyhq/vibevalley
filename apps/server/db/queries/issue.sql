@@ -10,25 +10,25 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule, acceptance)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(schedule), sqlc.arg(acceptance));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(review));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
-  priority = sqlc.arg(priority), acceptance = sqlc.arg(acceptance), criteria = sqlc.narg(criteria) where id = sqlc.arg(id);
+  priority = sqlc.arg(priority), review = sqlc.arg(review), criteria = sqlc.narg(criteria) where id = sqlc.arg(id);
 
--- name: DraftIssue :exec
+-- name: RefineIssue :exec
 -- A draft handed back: its words, its criteria and what it asks, in one write.
-update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), asks = sqlc.narg(asks)
+update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), questions = sqlc.narg(questions)
 where id = sqlc.arg(id);
 
--- name: AcceptIssue :exec
--- A verdict on what was handed back: passed (accepted_at set) or not (cleared), with the weeds as they stand now.
-update issue set accepted_at = sqlc.narg(accepted_at), findings = sqlc.narg(findings) where id = sqlc.arg(id);
+-- name: ReviewIssue :exec
+-- A verdict on what was handed back: passed (reviewed_at set) or not (cleared), with the weeds as they stand now.
+update issue set reviewed_at = sqlc.narg(reviewed_at), findings = sqlc.narg(findings) where id = sqlc.arg(id);
 
--- name: SetIssueAsks :exec
-update issue set asks = sqlc.narg(asks) where id = sqlc.arg(id);
+-- name: SetIssueQuestions :exec
+update issue set questions = sqlc.narg(questions) where id = sqlc.arg(id);
 
 -- name: SetIssueChecks :exec
 update issue set checks = sqlc.narg(checks) where id = sqlc.arg(id);
@@ -79,9 +79,9 @@ on conflict (id) do update set
 -- name: GraphIDs :many
 select id from issue where graph is not null;
 
--- name: LatestOfSchedule :one
--- A schedule's issue: the one it made last.
-select * from issue where schedule = sqlc.arg(schedule) order by created_at desc, id desc limit 1;
+-- name: LatestOfRecurrence :one
+-- A recurrence's issue: the one it made last.
+select * from issue where recurrence = sqlc.arg(recurrence) order by created_at desc, id desc limit 1;
 
 -- name: ReopenIssue :exec
 update issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
@@ -90,7 +90,7 @@ update issue set closed_at = null, closed = null, queued_at = null, checks = nul
 select id, handed_back from issue where assignee = sqlc.arg(assignee) and closed_at is null;
 
 -- name: SetHandedBack :exec
--- How the manager's last turn on its issue ended (JSON); null while it is on it.
+-- How the assistant's last turn on its issue ended (JSON); null while it is on it.
 update issue set handed_back = sqlc.narg(handed_back) where id = sqlc.arg(id);
 
 -- name: SetIssuePullRequest :exec

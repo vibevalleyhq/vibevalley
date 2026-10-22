@@ -5,7 +5,7 @@ import { ready, useSprites } from "../data/query";
 
 const walkFps = 7;
 
-/** A helper standing, walking, working…, `height` px tall, moving as the farm moves it. */
+/** A helper attention, walking, working…, `height` px tall, moving as the farm moves it. */
 export function PoseSprite(props: { cast: Cast; pose: Pose; height: number }) {
   const sprites = useSprites();
   const [frame, setFrame] = createSignal(0);

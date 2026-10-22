@@ -6,20 +6,20 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 档案、技能库、农机设置的存取：`config.json`、事务、种子、内置的管家档案、新建时的 id | 管家怎么用它的档案（模型、只接 DeepSeek，[管家](docs/subsystems/manager.md)） |
+| 档案、技能库、农机设置的存取：`config.json`、事务、种子、内置的管家档案、新建时的 id | 管家怎么用它的档案（模型、只接 DeepSeek，[管家](docs/subsystems/assistant.md)） |
 | 档案没填的外观补齐（`withCast`），和页面的 `castOf` 挑同一只动物 | 长相怎么画、动物和衣服的贴图（[农场的皮](docs/subsystems/farm.md)） |
 | 农机的注册表（`registry`）、探测、模型列表、清单（技能、MCP、工具）、缓存和推给页面 | 额度怎么读成字、钱的那条「派不出去」、价目和今天的花费（[帮工](docs/subsystems/session.md)「额度、花费和上限」） |
 | 农机接受哪些开会话的选项（`runtimeFacts` 和适配器的 `refusedSessionOptions`） | 选项怎么交给 oar、人设和技能怎么拼进会话、安装身份怎么用（[帮工](docs/subsystems/session.md)） |
-| 档案照现在的农机派不派得出去（`agentIssues`，`agent.check`、`assess`）；派活时用哪个模型、思考强度、环境变量、安装（`resolve`） | 挑哪个档案（`session.ChooseAgent`，[管家](docs/subsystems/manager.md)「挑档案」）；派活的其余关口（[工单](docs/subsystems/issue.md)） |
+| 档案照现在的农机派不派得出去（`agentIssues`，`agent.check`、`assess`）；派活时用哪个模型、思考强度、环境变量、安装（`resolve`） | 挑哪个档案（`session.ChooseAgent`，[管家](docs/subsystems/assistant.md)「挑档案」）；派活的其余关口（[工单](docs/subsystems/issue.md)） |
 | 技能库的存取；这台机器上装的技能从农机清单里来 | 档案的记性（[记性](docs/subsystems/memory.md)） |
 | | 捏帮工、农具、技能书、管家页的界面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）；种子档案的名单（[farm-ui.md](docs/reference/farm-ui.md)「角色」） |
-| | VibeValley 自己的 agent 怎么跑（`agent/brain`，[管家](docs/subsystems/manager.md)） |
+| | VibeValley 自己的 agent 怎么跑（`agent/brain`，[管家](docs/subsystems/assistant.md)） |
 
 ## 在哪
 
-- **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、内置的管家档案（`managerProfile`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`agent/brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/manager.md)。
+- **`apps/server/src/agent/agent.ts`**（`Agents`）：读写 `config.json`、事务 `change`、内置的管家档案（`assistantProfile`）、新建档案和技能时分配 id、补外观（`withCast`、`castHash`）。`agent/brain` 是 VibeValley 自己的 agent，归[管家](docs/subsystems/assistant.md)。
 - **`apps/server/src/runtime`**（`Runtimes`）：`runtime.ts` 注册表（`registryOf`）、探测、缓存、合并农机拒绝的选项、额度的定时读取、今天的花费、`assess`、`resolve`、`check`；`rules.ts` 的 `agentIssues`、`moneyStop`、额度的字（纯函数，黄金数据 `testdata/rules.jsonl.gz`）；`price.ts` 价目；`dsh.ts` DeepSeek Harness；`pi.ts` 读 pi 自己的设置。
-- **种子**：`packages/protocol/src/rules/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seeds.ts` 读它（`seedAgents`、`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
+- **种子**：`apps/server/src/agent/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`seedAgents`、`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
 - **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.save`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
 - **页面**：`apps/web/src/pages/agents/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`pages/runtimes/RuntimesPage.tsx`（农具）、`pages/settings/SkillsPage.tsx`；数据在 `data/query.ts`（`useAgents`、`useRuntimes`）、`data/agents.ts`（`useWorkAgents`、`useAgentIssues` 问 `agent.check`）；`rules/skills.ts`（`installedSkills`、`runtimeName`）、`rules/cast.ts`（`castOf`）。
@@ -27,12 +27,12 @@
 ## 模型和不变量
 
 - **职责（`role`）和适合的活（`tags`）是两个字段，用法不同。**
-  - `role` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、田头里帮工名字旁边显示它；管家的农场现状里每个能派的档案写成「- 名字（id …，农机）职责：<Role>；适合的活：<Tags>」（`manager/manager.ts`），规划师的提示写成「- id：名字，职责：<Role>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
+  - `role` 是一句话的「职责」（捏帮工「身份」页的栏名），给人和模型读：帮工栏、帮工列表、田头里帮工名字旁边显示它；管家的农场现状里每个能派的档案写成「- 名字（id …，农机）职责：<Role>；适合的活：<Tags>」（`assistant/assistant.ts`），规划师的提示写成「- id：名字，职责：<Role>；适合的活：<Tags>」（`session/rules.ts`），没填的那半不写；管家的提示让它按「适合的活」挑，和 `chooseAgent` 是同一个字段。挑档案不读它。
   - `tags` 是「适合的活」，一组关键词：`dispatch` 没点名、主人也没选定时，`chooseAgent` 把工单的字转小写，数每个能派的档案有几个关键词（转小写）出现在里面，取最多的，一样多取靠前的，都是 0 也取第一个能派的。
 - **档案、技能库、农机设置存在一个文件 `config.json`**，整份读进内存，`base.FileWriter` 写（先写临时文件再改名，同一个文件的写一个接一个）。每次改走 `change`：回调拿到一份完整独立的副本（嵌套的切片、字典、MCP 的参数和头、预算和上限的指针都复制），写盘成功后才换成当前版本；写盘失败当前版本不变。读出去的（`all`、`Agent`、`Settings`）也是副本，拿着它改不动服务端那份。
 - **读不了的 `config.json` 不覆盖**：改名成 `config.json.unreadable-<毫秒>` 留着，从种子起；改不了名就不开机。文件不在才从种子起。
 - **种子只用一次**：没有 `config.json` 时用 `seeds.json` 的 `agents`，技能库空、农机设置空；之后删掉的种子档案不再补回。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。
-- **管家档案每个农场都有**：开机时没有 `manager`（`managerAgent`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`）；删它回「管家是每个农场都有的，删不了」；保存时把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。页面也把 `agent.list` 里的管家分开放。
+- **管家档案每个农场都有**：开机时没有 `assistant`（`assistantAgent`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`）；删它回「管家是每个农场都有的，删不了」；保存时把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。页面也把 `agent.list` 里的管家分开放。
 - **新建由服务端分 id**：`agent.create`、`skill.create` 的 `id` 要留空（填了回「新档案的 id 要留空；指定 id 请用保存」）。档案取下一个没占用的 `agent-N`；技能取名字转小写、非 `a-z0-9` 换成 `-` 的 slug，空了用 `skill`，重名加 `-2`、`-3`。分配在 `change` 的锁里，两台设备同时建不会撞。编辑和导入指定 id 走 `agent.save`、`skill.save`，路径里的 id 和请求里的不一样就拒绝。
 - **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `rules/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`runtime.list` 照这个顺序给，农具页和捏帮工的农机列表也照它列。每台都有一份 `runtimePresets`，顺序一样。注册表（`registryOf`）是 oar 的内置农机（`defaultRuntimes`）加 VibeValley 自己的 agent（`agent/brain/runtime.ts`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.update` 回 404。
@@ -84,12 +84,21 @@
 
 - **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`Settings`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
-- **管家（`manager`）、工具（`tool`）、种植计划（`task`）**：`Agents` 列能派的档案，`assess` 给每个能不能派和农机的样子，再交给 `session/rules.ts` 的 `chooseAgent`；管家把它们写进农场现状。
-- **记性（`memory`）**、**定时（`schedule`）**：`Agents` 列档案（不填档案的检索、定时派给谁）。
+- **管家（`assistant`）、工具（`tool`）、种植计划（`task`）**：`Agents` 列能派的档案，`assess` 给每个能不能派和农机的样子，再交给 `session/rules.ts` 的 `chooseAgent`；管家把它们写进农场现状。
+- **记性（`memory`）**、**定时（`recurrence`）**：`Agents` 列档案（不填档案的检索、定时派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
-- **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `CoreState`。
+- **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。
 - **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.check` 逐个调 `Runtimes.check`。
+
+## 自己的任务图
+
+`agent/brain/taskGraph.ts` 是 VibeValley 自己的 agent（`agent/brain`）在会话里给自己记的图：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `helper`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。
+
+- 一张图最多 30 件（`maxTasks`）；`add` 整批收或整批不收，回给模型的问题说清是哪一条；改只让没开始和没做成的改正文和先后。交给帮手的件失败后重来 1 次（`retries`）；叫回或进程没了，在做的退回等着。
+- 存储（`agent/brain/taskStore.ts`）是一个主人没做完的那张图：库里的存在表 `agent_task`，按会话 id 分开，做完的盖上 `finished_at` 留着；内存里的给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个库里的存储。
+- 它不进工单、不进核心状态、没有分支和检查，和种植计划不相通。
+- 测试在 `agent/brain/taskGraph.test.ts`：加进来的件等着、第一件能开工；一批里有问题就整批不收；做完或跳过让下一件开工；一件能变成什么；给模型看的图；交给帮手的件出去再回来；存储留着图、把做完的收起来；一个主人的图不是另一个的。
 
 ## 为什么这样
 
@@ -111,7 +120,7 @@
 ## 还没做的
 
 - opencode、grok、kimi、antigravity、cursor 逐个跑通，种子里各给一个档案：[pi 打磨好之后接回其他 runtime](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 档案加能力字段 `can`，管家和帮工用同一张工具表、按档案放行，`agent` 包定默认能力和谁能改：[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)。
+- 档案加能力字段 `can`，管家和帮工用同一张工具表、按档案放行，`agent` 包定默认能力和谁能改：[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-assistant-is-an-agent.md)。
 
 ## 怎么验证
 

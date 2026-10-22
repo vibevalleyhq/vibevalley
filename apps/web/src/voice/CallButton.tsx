@@ -1,4 +1,4 @@
-// The call to the manager: on, off, and how loud you are while it is on.
+// The call to the assistant: on, off, and how loud you are while it is on.
 
 import { Show } from "solid-js";
 import { voiceCall } from "./call";

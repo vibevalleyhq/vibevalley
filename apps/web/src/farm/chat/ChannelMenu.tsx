@@ -1,5 +1,5 @@
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, a
-// new channel, the current one's settings, and the way to its full page (its schedules are there).
+// new channel, the current one's settings, and the way to its full page (its recurrences are there).
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";

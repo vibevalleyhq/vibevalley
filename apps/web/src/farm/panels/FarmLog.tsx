@@ -1,11 +1,11 @@
-// The farm's log: what you and the manager said in the general channel and every helper's turn report, newest first.
+// The farm's log: what you and the assistant said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
 import { For, Show } from "solid-js";
-import type { ChatMessage, CoreState, Issue, Outcome } from "@vibevalley/protocol";
+import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { generalOf, messagesIn, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
-import { AgentFace, ManagerFace } from "../../ui/Face";
+import { AgentFace, AssistantFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../kit";
 import { useFarm } from "../state";
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
@@ -17,21 +17,21 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
 };
 
 /** The turn reports, newest first. */
-const turnReportsOf = (s: CoreState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
+const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
 
-const issueOfSession = (s: CoreState | undefined, session: string): Issue | undefined => (s?.issues ?? []).find((i) => i.sessions.includes(session));
+const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined => (s?.issues ?? []).find((i) => i.sessions.includes(session));
 
 type Row = { kind: "said" | "report"; message: ChatMessage };
 
 export function FarmLog() {
   const core = useCore();
-  const look = useFarm((st) => st.managerLook);
+  const look = useFarm((st) => st.assistantLook);
   const rows = (): Row[] => {
     const s = core();
     const chat = s?.chat;
     return [
       ...messagesIn(chat, generalOf(chat)?.id ?? "")
-        .filter((m) => m.kind === "chat" && (m.fromKind === "user" || m.fromKind === "manager"))
+        .filter((m) => m.kind === "chat" && (m.fromKind === "user" || m.fromKind === "assistant"))
         .map((message) => ({ kind: "said" as const, message })),
       ...turnReportsOf(s).map((message) => ({ kind: "report" as const, message })),
     ].sort((a, b) => b.message.at - a.message.at);
@@ -66,7 +66,7 @@ function Said(props: { m: ChatMessage; look: string }) {
   const you = () => props.m.fromKind === "user";
   return (
     <>
-      <Show when={you()} fallback={<ManagerFace size={32} look={props.look} />}>
+      <Show when={you()} fallback={<AssistantFace size={32} look={props.look} />}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">你</span>
       </Show>
       <div class="min-w-0 flex-1">

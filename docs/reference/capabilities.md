@@ -18,16 +18,16 @@
 |---|---|---|---|---|
 | `server.health` | `GET /api/v1/health` | ✓ | ✓ |   |
 
-## manager
+## assistant
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `manager.open` | `POST /api/v1/manager/open` | ✓ | ✓ |   |
-| `manager.stop` | `POST /api/v1/manager/stop` | ✓ | ✓ |   |
-| `manager.hear` | `POST /api/v1/manager/hear` | ✓ | ✓ |   |
-| `manager.listArchive` | `GET /api/v1/manager/archive` | ✓ | ✓ | ✓ |
-| `manager.getArchive` | `GET /api/v1/manager/archive/{name}` | ✓ | ✓ |   |
-| `manager.markWrong` | `POST /api/v1/manager/evals` | ✓ | ✓ |   |
+| `assistant.open` | `POST /api/v1/assistant/open` | ✓ | ✓ |   |
+| `assistant.stop` | `POST /api/v1/assistant/stop` | ✓ | ✓ |   |
+| `assistant.hear` | `POST /api/v1/assistant/hear` | ✓ | ✓ |   |
+| `assistant.listArchive` | `GET /api/v1/assistant/archive` | ✓ | ✓ | ✓ |
+| `assistant.getArchive` | `GET /api/v1/assistant/archive/{name}` | ✓ | ✓ |   |
+| `assistant.markWrong` | `POST /api/v1/assistant/evals` | ✓ | ✓ |   |
 
 ## setting
 
@@ -47,14 +47,14 @@
 | `channel.history` | `GET /api/v1/channels/{id}/messages` | ✓ | ✓ | ✓ |
 | `channel.markRead` | `POST /api/v1/channels/{id}/read` | ✓ | ✓ |   |
 
-## schedule
+## recurrence
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `schedule.create` | `POST /api/v1/schedules` | ✓ | ✓ | ✓ |
-| `schedule.list` | `GET /api/v1/schedules` | ✓ | ✓ | ✓ |
-| `schedule.update` | `PUT /api/v1/schedules/{id}` | ✓ | ✓ |   |
-| `schedule.delete` | `DELETE /api/v1/schedules/{id}` | ✓ | ✓ | ✓ |
+| `recurrence.create` | `POST /api/v1/recurrences` | ✓ | ✓ | ✓ |
+| `recurrence.list` | `GET /api/v1/recurrences` | ✓ | ✓ | ✓ |
+| `recurrence.update` | `PUT /api/v1/recurrences/{id}` | ✓ | ✓ |   |
+| `recurrence.delete` | `DELETE /api/v1/recurrences/{id}` | ✓ | ✓ | ✓ |
 
 ## issue
 
@@ -73,9 +73,10 @@
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |   |
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
-| `issue.draft` | `POST /api/v1/issues/{id}/draft` | ✓ | ✓ |   |
+| `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
-| `issue.accept` | `POST /api/v1/issues/{id}/accept` | ✓ | ✓ | ✓ |
+| `issue.review` | `POST /api/v1/issues/{id}/review` | ✓ | ✓ | ✓ |
+| `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
 
 ## session
 

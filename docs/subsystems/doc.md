@@ -31,7 +31,7 @@
 - **rev**：每个改到这一块的 op 让它加 1；新块从 1 开始。每一版的字存进 `doc_block_revision`。
 - **seq**：文档每收下一批加 1；同一批重发（同一个 `batchId`）不加，回答第一次的结果。
 - **墓碑**：删除只置 `deleted`，子块一起；`doc.get` 不返回墓碑。
-- **偏移按 Unicode 码点数**，不按 UTF-16。仓库里给人看的字数（`packages/protocol/src/rules/text.ts`）按 UTF-16 码元，两套单位只在这里分开：`split_block` 的 `offset` 是码点，页面把光标的 UTF-16 位置换成码点再发（`codePointOffset`）。
+- **偏移按 Unicode 码点数**，不按 UTF-16。仓库里给人看的字数（`apps/server/src/base/text.ts`）按 UTF-16 码元，两套单位只在这里分开：`split_block` 的 `offset` 是码点，页面把光标的 UTF-16 位置换成码点再发（`codePointOffset`）。
 
 ## 怎么走
 

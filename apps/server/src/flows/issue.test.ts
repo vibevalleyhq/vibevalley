@@ -1,15 +1,19 @@
-import { mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
-import { isBusy, openFindings, viewOf } from "@vibevalley/protocol/rules";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { openFindings } from "../issue/state.ts";
+import { messagesIn } from "../channel/state.ts";
+import { viewOf } from "../game/view.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
+import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { Schedules } from "../schedule/schedule.ts";
+import { Recurrences } from "../recurrence/recurrence.ts";
 import { Sessions } from "../session/session.ts";
 import { write } from "../testing/git.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
@@ -159,42 +163,42 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("of a schedule is one, told again and reopened", () => {
+  it.live("of a recurrence is one, told again and reopened", () => {
     let now = Date.now();
     const f = farm({ now: () => now });
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      const schedules = yield* Schedules;
+      const recurrences = yield* Recurrences;
       yield* (yield* Agents).saveAgent({ ...lab(), enabled: true });
-      const made = yield* schedules.add({ name: "巡检", text: "看一眼", agent: "lab", project: "every", when: { kind: "every", minutes: 5 } }, "owner", true);
+      const made = yield* recurrences.add({ name: "巡检", text: "看一眼", agent: "lab", project: "every", when: { kind: "every", minutes: 5 } }, "owner", true);
       const due = () => {
         now += 5 * 60_000 + 1;
-        return schedules.tick;
+        return recurrences.tick;
       };
-      const ofSchedule = () => Effect.map(issues.ofSchedule(made.id), (i) => i!);
-      const runs = () => Effect.flatMap(ofSchedule(), (i) => sessions.runs(i.id));
+      const ofRecurrence = () => Effect.map(issues.ofRecurrence(made.id), (i) => i!);
+      const runs = () => Effect.flatMap(ofRecurrence(), (i) => sessions.runs(i.id));
       yield* due();
       yield* w.nextReport;
-      const first = yield* ofSchedule();
+      const first = yield* ofRecurrence();
       expect(first.sessions).toHaveLength(1);
 
       yield* due();
       yield* w.nextReport;
-      expect((yield* ofSchedule()).id).toBe(first.id);
-      expect((yield* ofSchedule()).sessions).toHaveLength(1);
+      expect((yield* ofRecurrence()).id).toBe(first.id);
+      expect((yield* ofRecurrence()).sessions).toHaveLength(1);
       const two = yield* await_(runs, (r) => r.length === 2 && r[1]!.endedAt !== undefined, "a second run");
-      expect(two[1]!.triggeredBy.kind).toBe("schedule");
+      expect(two[1]!.triggeredBy.kind).toBe("recurrence");
 
       yield* issues.merge(first.id);
-      yield* await_(ofSchedule, (i) => i.status === "done", "merged");
+      yield* await_(ofRecurrence, (i) => i.status === "done", "merged");
       yield* due();
       yield* w.nextReport;
-      expect((yield* ofSchedule()).id).toBe(first.id);
-      expect((yield* ofSchedule()).sessions).toHaveLength(2);
+      expect((yield* ofRecurrence()).id).toBe(first.id);
+      expect((yield* ofRecurrence()).sessions).toHaveLength(2);
       const three = yield* await_(runs, (r) => r.length === 3, "a third run");
-      expect(three[2]!.triggeredBy.kind).toBe("schedule");
+      expect(three[2]!.triggeredBy.kind).toBe("recurrence");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -305,6 +309,41 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  // An act is the server's: only what the attention offers, with the words the server puts to the helper, by number too.
+  it.live("does an act as the issue's page does it", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      const core = yield* Core;
+      const chat = yield* Channels;
+      yield* (yield* Agents).saveAgent(lab());
+      const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
+      refusedWith(yield* Effect.flip(issues.act(drop.id, { act: "cure" }, "")), "现在不能「接着修」");
+      const dropped = yield* issues.act(drop.id, { act: "close" }, "");
+      expect(dropped.status).toBe("canceled");
+      // Never sent: a reopen is back to the backlog, with nothing to tell.
+      expect((yield* issues.act("#" + drop.number, { act: "reopen" }, "")).status).toBe("backlog");
+
+      const issue = yield* issues.add({ title: "这一单必败", project: "acts", assignee: "lab" });
+      yield* issues.act(String(issue.number), { act: "start" }, "");
+      yield* w.nextReport;
+      yield* await_(
+        () => issues.get(issue.id),
+        (i) => i.attention.stuck === "failed",
+        "stuck: failed",
+      );
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "harvest" }, "")), "现在不能「收获」");
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "")), "「带话」要说一句");
+      yield* issues.act("#" + issue.number, { act: "cure" }, "");
+      const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
+      yield* until(
+        () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
+        "the cure said once, by the server",
+      );
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever asks.
   it.live("does not harvest a round that failed", () => {
     const f = farm();
@@ -317,7 +356,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       const failed = yield* await_(
         () => issues.get(issue.id),
-        (i) => i.standing.stuck === "failed",
+        (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
       expect(failed.status).toBe("in_review");
@@ -337,23 +376,23 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      let issue = yield* issues.add({ title: "先问清楚，再写打卡并提交", project: "clock", assignee: "lab", acceptance: "required" });
-      expect(issue.acceptance).toBe("required");
+      let issue = yield* issues.add({ title: "先问清楚，再写打卡并提交", project: "clock", assignee: "lab", review: "required" });
+      expect(issue.review).toBe("required");
       yield* issues.setStatus(issue.id, "todo", "", "");
       yield* w.nextReport;
       issue = yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.asks ?? []).length === 1,
+        (i) => (i.questions ?? []).length === 1,
         "its question kept",
       );
-      expect(issue.asks).toEqual([{ question: "用 8787 还是 8797？" }]);
+      expect(issue.questions).toEqual([{ question: "用 8787 还是 8797？" }]);
       const crop = () => viewOf(core.state()).plots[issue.id]?.crop;
       yield* until(() => crop() === "dry", "缺肥");
 
       yield* issues.comment(issue.id, "用 8797");
       yield* await_(
         () => issues.get(issue.id),
-        (i) => (i.asks ?? []).length === 0,
+        (i) => (i.questions ?? []).length === 0,
         "answered",
       );
       yield* w.nextReport;
@@ -365,7 +404,7 @@ describe("an issue", () => {
       yield* until(() => crop() === "flowering", "抽穗：等验收");
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")));
 
-      yield* issues.accept(issue.id, { pass: false, findings: ["再写版本B"] });
+      yield* issues.review(issue.id, { pass: false, findings: ["再写版本B"] });
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
       yield* w.nextReport;
       yield* await_(
@@ -375,8 +414,8 @@ describe("an issue", () => {
       );
       yield* until(() => crop() === "weeds", "the weed stands until a pass");
 
-      issue = yield* issues.accept(issue.id, { pass: true });
-      expect([issue.acceptedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
+      issue = yield* issues.review(issue.id, { pass: true });
+      expect([issue.reviewedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
       issue = yield* issues.setStatus(issue.id, "done", "", "");
       expect(issue.status).toBe("done");
       expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);

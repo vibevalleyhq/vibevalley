@@ -1,16 +1,19 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
-import { blockedBy, clip, graphOf, inbox, isAcceptance, taskIssueID, taskOf } from "@vibevalley/protocol/rules";
+import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
+import { inbox } from "../notice/inbox.ts";
+import { clip } from "../base/text.ts";
+import { graphOf, parseSplit, taskBrief, taskIssueID } from "./rules.ts";
 import { Effect, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { chooseAgent, splitBrief } from "../session/rules.ts";
+import { chooseAgent } from "../session/rules.ts";
+import { splitBrief } from "./rules.ts";
 import type { Hired, HireOptions, Roster } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
-import { parseSplit, taskBrief } from "./rules.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
 
 const step = (id: string, ...needs: string[]) => ({
@@ -192,6 +195,8 @@ const farm = Effect.gen(function* () {
     ),
   );
   const tasks = yield* make({ usable: () => true, work, git });
+  // As the farm's startup does once the sessions came back.
+  yield* tasks.comeBack;
   const news: string[] = [];
   yield* Effect.forkScoped(Stream.runForEach(yield* tasks.news, (n) => Effect.sync(() => news.push(n))));
   const until = (id: string, ready: (g: TaskGraph) => boolean) =>
@@ -227,7 +232,7 @@ describe("task graphs", () => {
           ["d", "b,c"],
         ]);
         expect(f.news[0]).toMatch(new RegExp("^【种植计划】" + id + " 拆好了"));
-        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "manager");
+        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "assistant");
         expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
         const ripe = yield* f.until(id, (g) => g.state === "ripe");
         const mine = f.states.filter((g) => g.id === id);
@@ -246,7 +251,7 @@ describe("task graphs", () => {
             .join(" "),
         ).toBe("splitting/user drafted/system started/user ripe/system merged/user");
         const edit = history.find((e) => e.kind === "task_edited")!;
-        expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "manager", "管家", 1, "检查"]);
+        expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "assistant", "管家", 1, "检查"]);
         expect(edit.text).toMatch(/^改了「.+」的检查$/);
         for (const s of ["a", "b", "c", "d"])
           expect(

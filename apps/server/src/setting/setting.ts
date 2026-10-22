@@ -4,21 +4,11 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  type Dictation,
-  type KeySource,
-  type KeyStatus,
-  type SettingsCheck,
-  type SettingsStatus,
-  type SettingsUpdate,
-  type SettingsUpdateVoice,
-  type VoiceSettings,
-} from "@vibevalley/protocol";
-import { defaultVoice } from "@vibevalley/protocol/rules";
+import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
+import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
-import { keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 
 /** settings.json, in the order the file has it. */
 interface Stored {

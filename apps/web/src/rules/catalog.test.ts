@@ -15,7 +15,7 @@ test("the manifest in art pixels, with heads and sheets", () => {
 
 test("shelves", () => {
   expect(shelfOf("bear-farmer-down")).toBe("helpers");
-  expect(shelfOf("manager-face")).toBe("manager");
+  expect(shelfOf("manager-face")).toBe("assistant");
   expect(shelfOf("map")).toBe("yard");
   expect(shelfOf("lang-go")).toBe("langs");
   expect(shelfOf("day-0")).toBe("ui");

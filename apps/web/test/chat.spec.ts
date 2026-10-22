@@ -15,7 +15,7 @@ async function newChannel(api: VibeValleyApi, name: string, description?: string
   return api.channel.create({ body: { name, description } });
 }
 
-test("the general shows with its empty words, the manager resting", async ({ page }) => {
+test("the general shows with its empty words, the assistant resting", async ({ page }) => {
   await page.goto("/chat");
   await expect(page.getByRole("heading", { name: generalName })).toBeVisible();
   const side = page.getByRole("complementary", { name: "频道和帮工" });
@@ -37,12 +37,12 @@ test("a sentence said shows in the list through the state stream", async ({ page
   await expect(log.getByText("把测试跑一遍")).toBeVisible();
   await expect(log.getByText("主人", { exact: true })).toBeVisible();
   await expect(box).toHaveValue("");
-  // Without a model key the manager answers that it has none; the page takes that as any answer.
+  // Without a model key the assistant answers that it has none; the page takes that as any answer.
   await expect(log.getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "说话" })).toBeVisible();
 });
 
-test("Shift+Enter starts a line and @ offers the manager", async ({ page, api }) => {
+test("Shift+Enter starts a line and @ offers the assistant", async ({ page, api }) => {
   const id = await newChannel(api, "叫人");
   await page.goto(`/chat/${id}`);
   const box = page.getByRole("textbox", { name: "发送消息至 #叫人" });
@@ -115,9 +115,9 @@ test("search keeps the messages that contain it", async ({ page, api }) => {
   await expect(log.getByText("香蕉该收了")).toBeVisible();
 });
 
-test("the schedules tab turns a schedule off and deletes it on the second press", async ({ page, api }) => {
+test("the recurrences tab turns a recurrence off and deletes it on the second press", async ({ page, api }) => {
   const id = await newChannel(api, "定时");
-  await api.schedule.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
+  await api.recurrence.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
   await page.goto(`/chat/${id}`);
   await page.getByRole("tab", { name: "任务" }).click();
   await expect(page.getByText("这个频道里还没有活")).toBeVisible();
@@ -137,7 +137,7 @@ test("the chat page as it looks", async ({ page, api }) => {
   await api.channel.say({ body: { text: "帮我看看 @管家 打卡页为什么**白屏**", conversation: id } });
   await page.goto(`/chat/${id}`);
   await expect(page.getByRole("log", { name: "消息" }).getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
-  // Shown, the manager's answer is read: no count on the channel.
+  // Shown, the assistant's answer is read: no count on the channel.
   await expect(page.getByRole("complementary").getByRole("button", { name: "clock", exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("chat.png") });
   await page.setViewportSize({ width: 600, height: 800 });

@@ -1,10 +1,10 @@
 // The tools' parameters as the model is given them, written out as they were first made from the tools' argument types.
-// The manager's are its prompt's prefix: change one only on purpose, with the manager's evals replayed. Unknown fields
+// The assistant's are its prompt's prefix: change one only on purpose, with the assistant's evals replayed. Unknown fields
 // are let through.
 
 import type { Schema } from "../agent/brain/tool.ts";
 
-/** The manager's, by name; read_chat is a session's too. */
+/** The assistant's, by name; read_chat is a session's too. */
 export const schemas: Record<string, Schema> = {
   accept: {
     additionalProperties: true,
@@ -32,7 +32,7 @@ export const schemas: Record<string, Schema> = {
     required: ["issue", "pass"],
     type: "object",
   },
-  cancel_schedule: {
+  cancel_recurrence: {
     additionalProperties: true,
     properties: {
       id: {
@@ -289,7 +289,7 @@ export const schemas: Record<string, Schema> = {
     },
     type: "object",
   },
-  list_schedules: {
+  list_recurrences: {
     additionalProperties: true,
     properties: {},
     type: "object",
@@ -387,7 +387,7 @@ export const schemas: Record<string, Schema> = {
     properties: {},
     type: "object",
   },
-  schedule: {
+  recurrence: {
     additionalProperties: true,
     properties: {
       agent: {
@@ -529,7 +529,7 @@ export const schemas: Record<string, Schema> = {
   },
 };
 
-/** A session's own, where it differs from the manager's of the same name. */
+/** A session's own, where it differs from the assistant's of the same name. */
 export const sessionSchemas: Record<string, Schema> = {
   ...schemas,
   ...{

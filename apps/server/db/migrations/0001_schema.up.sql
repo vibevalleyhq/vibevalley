@@ -5,7 +5,7 @@
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  kind       text not null check (kind in ('user', 'manager', 'agent', 'system')),
+  kind       text not null check (kind in ('user', 'assistant', 'agent', 'system')),
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -102,16 +102,16 @@ CREATE TABLE issue (
   blocked_by  text,
   graph       text,
   task        text,
-  schedule    text,
+  recurrence    text,
   created_at  double precision not null,
   queued_at   double precision,
   closed_at   double precision,
   closed      text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
   pull_request text,
-  acceptance  text not null default 'glance' check (acceptance in ('glance', 'required')),
-  accepted_at double precision,
+  review  text not null default 'glance' check (review in ('glance', 'required')),
+  reviewed_at double precision,
   findings    text,
-  asks        text,
+  questions        text,
   criteria    text,
   checks      text,
   handed_back text
@@ -139,12 +139,12 @@ CREATE TABLE task_event (
   graph_id    text not null,
   task_id     text,
   kind        text not null,
-  actor       text not null check (actor in ('user', 'manager', 'system', 'session')),
+  actor       text not null check (actor in ('user', 'assistant', 'system', 'session')),
   payload     text not null default '{}',
   created_at  double precision not null
 );
 CREATE INDEX task_event_by_graph on task_event (graph_id, id);
-CREATE TABLE schedule (
+CREATE TABLE recurrence (
   id          text primary key,
   name        text not null,
   body        text not null,
@@ -156,9 +156,9 @@ CREATE TABLE schedule (
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the owner to say yes (schedule/rules.go's needsOK): a waiting one stays off
+  -- Who set it, and whether it waits for the owner to say yes (recurrence/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'manager')),
+  set_by      text not null default 'owner' check (set_by in ('owner', 'assistant')),
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -180,7 +180,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   project      text,                -- null: every project
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'agent', 'manager', 'system')),
+  author       text not null check (author in ('owner', 'agent', 'assistant', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   double precision not null,
   updated_at   double precision not null,
@@ -266,7 +266,11 @@ CREATE TABLE session (
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,
-  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered'))
+  closed    text check (closed in ('merged', 'merged_into_graph', 'dismissed', 'lost', 'answered')),
+  place       text,
+  oar_session text,
+  last_text   text,
+  recalled    text
 );
 CREATE INDEX session_by_agent on session (agent, hired_at);
 CREATE TABLE session_run_issue (
@@ -280,7 +284,7 @@ CREATE TABLE issue_queue (
   channel text not null,
   triggered_by text not null
 );
-CREATE TABLE task_graph (
+CREATE TABLE agent_task (
   graph text not null,
   owner text not null,
   id text not null,
@@ -296,7 +300,7 @@ CREATE TABLE task_graph (
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX task_graph_by_owner on task_graph (owner, finished_at);
+CREATE INDEX agent_task_by_owner on agent_task (owner, finished_at);
 -- Documents (doc/doc.go): blocks in a flat list, nested by parent_id and ordered by (order_key, id); every change is an op,
 -- and a batch of ops is one doc_change with the doc's next seq.
 CREATE TABLE doc (
