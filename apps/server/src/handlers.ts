@@ -80,10 +80,7 @@ export const handlers = Effect.gen(function* () {
     "orchestrator.markWrong": ({ body }) => orchestrator.markWrong(body.on, body.want),
     "channel.say": ({ body }) =>
       Effect.andThen(
-        Effect.andThen(
-          Effect.sync(() => body.station !== undefined && game.want(body.station)),
-          core.open(),
-        ),
+        Effect.sync(() => body.station !== undefined && game.want(body.station)),
         orchestrator.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },

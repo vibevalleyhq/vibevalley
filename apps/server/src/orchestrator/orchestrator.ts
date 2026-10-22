@@ -113,7 +113,8 @@ interface Intake {
 }
 
 export interface OrchestratorShape {
-  /** The owner's words in a conversation; sendKey: the client's key for this send, a retry with the same key is the message already said. */
+  /** The owner's words in a conversation, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
+   * the client's key for this send, a retry with the same key is the message already said. */
   readonly say: (text: string, pick: Pick, conversation: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
@@ -407,11 +408,13 @@ export const make = (options: OrchestratorOptions = {}) =>
         Effect.gen(function* () {
           const a = pick.agent ? store.agent(pick.agent) : undefined;
           const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+          yield* core.open();
           const { message, again } = yield* chat.say(text, conversation, sendKey);
           if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
         }),
       heard: (text, agent, sendKey) =>
         Effect.gen(function* () {
+          yield* core.open();
           if (yield* chat.spoken("user", text, sendKey)) return;
           const picked = agent ? store.agent(agent)?.id : undefined;
           void take({

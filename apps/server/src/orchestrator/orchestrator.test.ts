@@ -160,7 +160,10 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
+      expect((yield* Core).state().call).not.toBe("live");
       yield* orchestrator.say("地里怎么样", {}, undefined, "");
+      // The owner speaking, from any door, opens the farm.
+      expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
       const kept = readFileSync(join(config.home, "orchestrator", "orchestrator.jsonl"), "utf8");
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【农场现状】/);

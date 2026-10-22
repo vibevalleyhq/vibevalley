@@ -20,7 +20,6 @@ import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
 import { newId } from "../base/ids.ts";
 import { causeMessage } from "../base/db.ts";
 import { Channels } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
@@ -248,7 +247,6 @@ export const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     const sql = yield* SqlClient.SqlClient;
-    const core = yield* Core;
     const chat = yield* Channels;
     const notices = yield* Notices;
     const orchestrator = yield* Orchestrator;
@@ -457,7 +455,6 @@ export const make = (options: ConnectorOptions = {}) =>
         await drain(signal, true);
         if (!m.text) return;
         const conversation = (await quotedConversation(m.quoted)) ?? now()?.channel;
-        if (core.state().call !== "live") await runHere(core.setCall("live"));
         await runHere(Effect.mapError(say(m.text, conversation), (e) => new Error("reason" in e ? String(e.reason) : e._tag)));
       };
 

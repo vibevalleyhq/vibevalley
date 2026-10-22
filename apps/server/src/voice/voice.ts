@@ -549,7 +549,6 @@ export const make = (options: VoiceOptions = {}) =>
         const call = yield* callOf(agentId);
         // Both transcript directions use the answer mode captured by this call, never the current settings.
         if (!call.quick) return;
-        yield* core.open();
         yield* orchestrator.heard(text, picked, sendKey);
       });
 

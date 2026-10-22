@@ -107,7 +107,7 @@
 
 ## 和谁打交道
 
-- **施加事实的**：工单、帮工、田头、定时、管家（`setOrchestrator`）；`orchestrator.open`、主人说话、语音和连接器经 `open`、`setCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
+- **施加事实的**：工单、帮工、田头、定时、管家（`setOrchestrator`）；`orchestrator.open` 和主人说话经 `open` 让通话在线（主人从哪里说话都走 `Orchestrator.say`、`heard`，由它们开），语音经 `setCall` 报通话的起落；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
 - **订阅的**：游戏的账本和种植计划读 `transitions`；别的读 `facts`、`events`；账本另读 `owner`。
 - **读的**：任何服务用 `state()`、`session(id)` 读当前值；`http/streams.ts` 把三条流交给页面。
 - **外面**：页面读帧和窄流、调 `VibeValleyApi`；命令行按 `endpoints` 发 HTTP；「连接到本机」后的设备经同一套接口，由 `lan` 按 `can` 放行。
