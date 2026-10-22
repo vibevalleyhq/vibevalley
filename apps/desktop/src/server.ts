@@ -44,7 +44,7 @@ export interface RunningServer {
   stop(): Promise<void>;
 }
 
-/** port 0 picks a free one; a restart in development (dev.ts) questions for the one it had, so the page keeps its origin and
+/** port 0 picks a free one; a restart in development (dev.ts) asks for the one it had, so the page keeps its origin and
  * what it stored there. */
 export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0): Promise<RunningServer> {
   mkdirSync(dirname(files.log), { recursive: true });

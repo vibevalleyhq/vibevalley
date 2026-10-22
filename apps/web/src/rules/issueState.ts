@@ -30,7 +30,7 @@ export function spanText(ms: number) {
   return `${Math.floor(m / 60 / 24)} 天`;
 }
 
-/** The block that questions the owner for the one thing: its head and what it says under it. */
+/** The block that asks the owner for the one thing: its head and what it says under it. */
 export interface OwnerQuestion {
   head: string;
   line?: string;

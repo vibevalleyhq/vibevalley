@@ -1,5 +1,5 @@
 // /pair, where another device joins the farm (连接到本机): the owner's link opens it through the lan listener, the
-// device questions, the owner nods, and from then on the device's browser is let in by the cookie it keeps.
+// device asks, the owner nods, and from then on the device's browser is let in by the cookie it keeps.
 import { expect, test } from "./fixtures";
 
 test("a device names itself, questions, and is told why not", async ({ page }) => {
@@ -12,7 +12,7 @@ test("a device names itself, questions, and is told why not", async ({ page }) =
   await expect(page).toHaveURL(/\/pair/);
 });
 
-test("without a code it questions for one", async ({ page }) => {
+test("without a code it asks for one", async ({ page }) => {
   await page.goto("/pair");
   await expect(page.getByRole("button", { name: "请主人放行" })).toBeDisabled();
   await page.getByLabel("配对码").fill("abcde12345");

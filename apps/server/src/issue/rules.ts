@@ -69,7 +69,7 @@ export function nextTaskId(ids: readonly string[]): string {
   return "p" + (top + 1n).toString();
 }
 
-/** A draft as its session hands it back, in the json block its brief questions for. A list may come as one string. */
+/** A draft as its session hands it back, in the json block its brief asks for. A list may come as one string. */
 export interface IssueRefinement {
   readonly title: string;
   readonly why: string;

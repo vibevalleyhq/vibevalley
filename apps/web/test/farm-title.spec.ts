@@ -6,7 +6,7 @@ import { expect, test } from "./fixtures";
 // A new farm: no other file's lines on its server.
 test.use({ farm: "title" });
 
-test("a new farm: 继续游戏 is off, 开始游戏 questions for the key first, 设置 leaves, and the title does not come back", async ({ page }) => {
+test("a new farm: 继续游戏 is off, 开始游戏 asks for the key first, 设置 leaves, and the title does not come back", async ({ page }) => {
   await page.goto("/?tod=0.9");
   const title = page.getByRole("dialog", { name: "码农场物语 首页" });
   await expect(title.getByRole("heading", { name: "码农场物语" })).toBeVisible();

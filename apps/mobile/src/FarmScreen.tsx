@@ -1,5 +1,5 @@
 // The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/host's mobile
-// bridge): the page posts what it questions, the shell answers by id and sends the call's events back.
+// bridge): the page posts what it asks, the shell answers by id and sends the call's events back.
 
 import { type ComponentType, type Ref, useRef } from "react";
 import { StyleSheet } from "react-native";

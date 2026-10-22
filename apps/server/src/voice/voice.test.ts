@@ -288,7 +288,7 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  it("questions the assistant for one answer of everything that waited", () => {
+  it("asks the assistant for one answer of everything that waited", () => {
     expect(onCallLine(["#41「写打卡」交回来了，等你验收", "#42「修登录」这一轮没做成"])).toBe(
       "【要告诉主人】\n- #41「写打卡」交回来了，等你验收\n- #42「修登录」这一轮没做成\n\n主人正在和你通电话，你的回答会念给主人听：这 2 件合成一段说，一件一句，口语，先说结论；不念代码、路径、命令和长列表。",
     );

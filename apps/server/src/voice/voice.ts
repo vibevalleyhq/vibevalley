@@ -148,7 +148,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
     } as never,
-    // RTM carries transcripts and the agent's state; a client without RTM questions for the RTC data stream, which carries
+    // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
     // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
     advancedFeatures: { enable_rtm: false, enable_tools: true },
     parameters: { audio_scenario: "chorus", data_channel: "datastream", enable_error_message: true, enable_metrics: true } as never,

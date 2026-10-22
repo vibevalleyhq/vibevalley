@@ -6,7 +6,7 @@ import { freshOf } from "@vibevalley/protocol/rules";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { inbox } from "./inbox.ts";
 
-test("a helper handed back with questions questions the owner to answer, not to harvest", () => {
+test("a helper handed back with questions asks the owner to answer, not to harvest", () => {
   const session = {
     id: "w1",
     name: "阿狐",
@@ -52,7 +52,7 @@ test("the inbox says what the issue's attention says: a round stopped halfway wa
     attention: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
   } as unknown as Issue;
   expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
-  // Closed by the owner, the helper still on the farm questions nothing.
+  // Closed by the owner, the helper still on the farm asks nothing.
   expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [{ ...issue, attention: { state: "closed", acts: [] } }] })).toEqual([]);
 });
 

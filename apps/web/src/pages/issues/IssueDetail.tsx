@@ -39,7 +39,7 @@ export function IssueDetail(props: {
   const head = () => s().head;
   const [busy, setBusy] = createSignal(false);
   const [text, setText] = createSignal("");
-  /** The box under the block: an answer, the findings of 打回, a word to the helper, or what a reopen questions for. */
+  /** The box under the block: an answer, the findings of 打回, a word to the helper, or what a reopen asks for. */
   const [box, setBox] = createSignal<"reject" | "tell" | undefined>();
   const agents = useAgents();
   const agent = () => ready(agents, []).find((a) => a.id === head().agent);

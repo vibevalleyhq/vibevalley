@@ -31,7 +31,7 @@ const refinementLeftNothing = (work: string, issue: Issue) => {
 
 describe("a refined issue", () => {
   // The plus makes an unsent issue; a session drafts it to the issue's format and leaves, the issue still in the
-  // backlog. It questions; the owner's answer makes a second draft over the first; sent out, its session is told the criteria.
+  // backlog. It asks; the owner's answer makes a second draft over the first; sent out, its session is told the criteria.
   it.live("is refined before it is sent", () => {
     const f = farm();
     return Effect.gen(function* () {

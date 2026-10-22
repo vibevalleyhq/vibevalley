@@ -130,7 +130,7 @@ export const make = (options: DocOptions = {}) =>
             if (Option.isSome(seen)) return yield* again(id, seen.value);
             const now = Date.now();
             const p = new Page(id, actor, now, yield* blocksOf(id));
-            // The page questions synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
+            // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
             const revisions = new Map<string, DocSpan[]>();
             for (const op of body.ops ?? []) {
               if (op.op !== "update_text" && op.op !== "split_block") continue;

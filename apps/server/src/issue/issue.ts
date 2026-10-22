@@ -941,7 +941,7 @@ export const make = (options: IssueOptions = {}) =>
           return changes;
         }),
       merge,
-      /** The owner questions the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
+      /** The owner asks the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
       resolve: (id) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);

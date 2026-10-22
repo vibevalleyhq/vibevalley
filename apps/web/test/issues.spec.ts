@@ -80,7 +80,7 @@ test("an issue opens at its own address and its edits are saved", async ({ page,
   await expect(page.getByRole("dialog", { name: "工单" }).getByRole("textbox", { name: "标题" })).toHaveValue("改标题之后");
 });
 
-test("starting an issue with no helper questions for one", async ({ page, api }) => {
+test("starting an issue with no helper asks for one", async ({ page, api }) => {
   const made = await issue(api, "还没有帮工的活");
   await page.goto("/issues");
   await lane(page, "待办").getByRole("button", { name: "还没有帮工的活" }).dragTo(lane(page, "处理中"));

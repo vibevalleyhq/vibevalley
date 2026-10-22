@@ -297,7 +297,7 @@ describe("the assistant", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("merges only when the owner questions", () => {
+  it.live("merges only when the owner asks", () => {
     let helper = "";
     let number = 0;
     const f = farm((c) => {

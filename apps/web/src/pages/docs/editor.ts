@@ -35,13 +35,13 @@ import {
 export const idleWait = 500;
 export const maxWait = 2000;
 
-/** How often an open document questions for what others (helpers) wrote while nothing of the owner's waits: every pollFast
- * while another writer was heard in the last busyPolls questions (or the demo was just started), else pollEvery. */
+/** How often an open document asks for what others (helpers) wrote while nothing of the owner's waits: every pollFast
+ * while another writer was heard in the last busyPolls asks (or the demo was just started), else pollEvery. */
 export const pollEvery = 4000;
 export const pollFast = 1000;
 const busyPolls = 4;
 
-/** A block another writer changed shows as being written for this many questions after the change was heard. */
+/** A block another writer changed shows as being written for this many asks after the change was heard. */
 const writingPolls = 3;
 
 /** A uuid (v4) for a block this client inserts: block ids are the inserter's to make. */
@@ -187,12 +187,12 @@ export class DocEditor {
         redraw = true;
       }
     } catch {
-      // The next tick questions again.
+      // The next tick asks again.
     }
     if (redraw) this.changed();
   }
 
-  /** Starts the scripted demo: helpers write their sections at once; questions come every pollFast from now. */
+  /** Starts the scripted demo: helpers write their sections at once; asks come every pollFast from now. */
   async demo() {
     try {
       await this.api.doc.demo({ id: this.docId });

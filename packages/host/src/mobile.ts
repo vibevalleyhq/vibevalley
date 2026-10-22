@@ -3,7 +3,7 @@
 
 import type { Host, Notice, RtcEvents, RtcGrant, RtcLine } from "./index";
 
-/** What the page questions of the shell; each is answered once by its id. */
+/** What the page asks of the shell; each is answered once by its id. */
 export type ToNative =
   | { readonly id: number; readonly call: "notify"; readonly notice: Notice }
   | { readonly id: number; readonly call: "rtc.join"; readonly grant: RtcGrant }

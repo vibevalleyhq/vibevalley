@@ -1,4 +1,4 @@
-// The system prompt lists only names and when-to-use; the body is read when the model questions for it (load_skill), so a
+// The system prompt lists only names and when-to-use; the body is read when the model asks for it (load_skill), so a
 // hundred skills cost a hundred lines, not a hundred files.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

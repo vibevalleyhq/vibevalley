@@ -22,7 +22,7 @@ export const defaultGreeting = "来啦！今天想种点什么？";
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;
 
-/** The three long-lived streams; the client questions for them by path. */
+/** The three long-lived streams; the client asks for them by path. */
 export const statePath = "/api/v1/state";
 
 export const eventsPath = "/api/v1/events";

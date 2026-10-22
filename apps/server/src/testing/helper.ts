@@ -27,7 +27,7 @@ const idle = (turn: ScriptedTurn, ms: number) =>
   });
 
 /** A drafting session: 慢慢 takes its time, 顺手提交 changes and commits what it should not, 乱写 hands back no block; the
- * answer 用 8797 makes the second version, which questions nothing. */
+ * answer 用 8797 makes the second version, which asks nothing. */
 async function draft(turn: ScriptedTurn, input: string) {
   if (input.includes("慢慢") && (await idle(turn, 1500))) return;
   if (input.includes("乱写")) return turn.say("看了一圈，不知道写什么。\n\n结论：没写出来");
@@ -55,7 +55,7 @@ async function draft(turn: ScriptedTurn, input: string) {
 
 /** The helper every flow hires: what it does is in the words of its job (the part after the reminders). 只起草工单 drafts;
  * 必败 fails; 发呆 idles a while; 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
- * clock.ts; 先问清楚 questions the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
+ * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
  * memories. It answers with its job and persona, and says of each numbered criterion that it was met. */
 export const helper = (turns: ScriptedTurn[] = []): Runtime =>
   scriptedRuntime({

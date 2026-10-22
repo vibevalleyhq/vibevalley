@@ -105,7 +105,7 @@ export function questionsOf(said: string): Question[] {
     });
 }
 
-/** A line on one criterion (the issue's brief questions for them): 「标准 2：做到了 —— bun test 通过」. */
+/** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
 const checkLine = /^[\s>*#_-]*(?:\*\*)?标准\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定)(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/;
 const checkWords: Record<string, CheckResult> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
 

@@ -344,7 +344,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever questions.
+  // Done is what was asked for, not how a round ended: a round that failed is not harvested, whoever asks.
   it.live("does not harvest a round that failed", () => {
     const f = farm();
     return Effect.gen(function* () {

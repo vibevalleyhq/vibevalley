@@ -28,7 +28,7 @@ export function PairScreen({ given, paired }: { given?: PairLink; paired: (farm:
     }
   };
 
-  // A link opened for the app (vibevalley://pair) is already the owner's choice: it questions at once.
+  // A link opened for the app (vibevalley://pair) is already the owner's choice: it asks at once.
   useEffect(() => {
     if (given) void ask(given);
   }, []);

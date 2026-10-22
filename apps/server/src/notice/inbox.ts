@@ -122,7 +122,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       case "paused":
         for (const task of graph.tasks) {
           if (task.state !== "failed") continue;
-          // A step retried and failed again questions again: from its second failure the id counts them.
+          // A step retried and failed again asks again: from its second failure the id counts them.
           const failures = task.failures ?? 0;
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
           const why = task.conclusion ? "：" + slice(task.conclusion, 0, 80) : "";

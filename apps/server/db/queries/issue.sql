@@ -19,7 +19,7 @@ update issue set title = sqlc.arg(title), description = sqlc.arg(description), p
   priority = sqlc.arg(priority), review = sqlc.arg(review), criteria = sqlc.narg(criteria) where id = sqlc.arg(id);
 
 -- name: RefineIssue :exec
--- A draft handed back: its words, its criteria and what it questions, in one write.
+-- A draft handed back: its words, its criteria and what it asks, in one write.
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), criteria = sqlc.narg(criteria), questions = sqlc.narg(questions)
 where id = sqlc.arg(id);
 

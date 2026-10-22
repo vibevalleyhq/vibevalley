@@ -384,7 +384,7 @@ describe("the agent", () => {
       );
     });
 
-    it("questions again on its own when a tool is called instead of a summary", async () => {
+    it("asks again on its own when a tool is called instead of a summary", async () => {
       await idleRig(
         undefined,
         () => fauxAssistantMessage([fauxToolCall("list_dir", {})]),

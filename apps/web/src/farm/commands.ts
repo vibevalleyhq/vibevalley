@@ -40,7 +40,7 @@ export interface FarmCommands {
   resolve(s: Session): Promise<void>;
   cure(s: Session): Promise<void>;
   harvest(s: Session): Promise<void>;
-  /** Stops one at work; questions one not at work to leave. */
+  /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(sessionId: string): Promise<void>;
   stopAssistant(): Promise<void>;
@@ -146,7 +146,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
 }
 
 /**
- * A click on a bed, as the farm page does it: decide once, then open what the result questions for. Returns the decision so
+ * A click on a bed, as the farm page does it: decide once, then open what the result asks for. Returns the decision so
  * the caller can play its sound (a tap when it applies).
  */
 export async function clickBed(commands: FarmCommands, bed: Bed): Promise<PlotAim> {

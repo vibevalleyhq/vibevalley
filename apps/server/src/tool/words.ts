@@ -126,7 +126,7 @@ export function issueLine(t: Issue, who: string, now: number): string {
   return "- " + parts.join(" · ");
 }
 
-/** One issue in full: what it questions, its criteria as far as they got, what it waits on, and its story, newest first. */
+/** One issue in full: what it asks, its criteria as far as they got, what it waits on, and its story, newest first. */
 export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | undefined, now: number): string {
   const lines = [issueLine(t, who, now).slice(2)];
   if (t.title !== shortTitle(t.title) || t.description) lines.push("要做的：" + head([t.title, t.description ?? ""].join("\n").trim(), 600));
@@ -166,7 +166,7 @@ export function parseTime(s: string): number | undefined {
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** Changing an issue or moving it is the owner's call: the assistant questions for what it saw itself, as with a merge. */
+/** Changing an issue or moving it is the owner's call: the assistant asks for what it saw itself, as with a merge. */
 export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */
