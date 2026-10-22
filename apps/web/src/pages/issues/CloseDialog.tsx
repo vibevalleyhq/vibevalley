@@ -59,7 +59,7 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
   };
   const resolve = () => {
     const id = props.issue;
-    void run(() => api.issue.resolve({ id }));
+    void run(() => api.issue.act({ id, body: { act: "resolve" } }));
     props.onDone();
   };
   return (

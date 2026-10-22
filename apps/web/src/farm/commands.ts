@@ -49,7 +49,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "water");
     },
     async resolve(s) {
-      await api.issue.resolve({ id: issueOf(s) });
+      await api.issue.act({ id: issueOf(s), body: { act: "resolve" } });
       fx(s, "water");
     },
     async cure(s) {

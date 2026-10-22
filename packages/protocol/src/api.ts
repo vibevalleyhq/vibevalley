@@ -77,8 +77,6 @@ export interface Handlers<R = never> {
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment": (a: { readonly id: string; readonly body: T.CommentRequest }) => Effect.Effect<void, ApiError, R>;
   readonly "issue.changes": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
-  /** Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask). */
-  readonly "issue.resolve": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** Stops a session's turn; it stays, and a comment starts the next. */
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "session.list": (a: { readonly agent?: string }) => Effect.Effect<T.Session[], ApiError, R>;
@@ -341,16 +339,6 @@ export const endpoints: readonly Endpoint[] = [
     body: undefined,
     result: S.Changes,
     can: ["owner", "remote", "orchestrator"],
-  },
-  {
-    op: "issue.resolve",
-    method: "POST",
-    path: "/api/v1/issues/{id}/resolve",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
-    result: undefined,
-    can: ["owner", "remote"],
   },
   {
     op: "session.stop",

@@ -80,9 +80,6 @@ export class VibeValleyApi {
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/comment", undefined, a.body) as Promise<void>,
     changes: (a: { id: string }): Promise<T.Changes> =>
       this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<T.Changes>,
-    /** Tells the newest session to merge its base in and settle the conflicts, in the owner's words (ConflictTask). */
-    resolve: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/resolve", undefined, undefined) as Promise<void>,
     /** One joined read of issues and their real sessions, including explicit missing records. */
     history: (): Promise<T.IssueHistory[]> => this.call("GET", "/api/v1/issues/history", undefined, undefined) as Promise<T.IssueHistory[]>,
     list: (): Promise<T.Issue[]> => this.call("GET", "/api/v1/issues", undefined, undefined) as Promise<T.Issue[]>,

@@ -62,7 +62,6 @@
 |---|---|---|---|---|
 | `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |
 | `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |
-| `issue.resolve` | `POST /api/v1/issues/{id}/resolve` | ✓ | ✓ |   |
 | `issue.history` | `GET /api/v1/issues/history` | ✓ | ✓ | ✓ |
 | `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |   |
 | `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |   |
