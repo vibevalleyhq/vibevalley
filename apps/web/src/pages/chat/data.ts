@@ -1,13 +1,10 @@
 // The chat page's reads beyond the state.
 
-import { type Accessor, createContext, createEffect, createMemo, createSignal, createStore, onSettled, snapshot, useContext } from "solid-js";
+import { type Accessor, createContext, createEffect, createStore, snapshot, useContext } from "solid-js";
 
-import type { Conversation, WorkspaceState, SessionEvent } from "@vibevalley/protocol";
+import type { Conversation, WorkspaceState } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { subscribeLive } from "../../data/live";
 import { chatPage, type Loaded, mergeLoaded, messagesOf, newestUnread } from "../../rules/chat";
-import { mergeSteps } from "../../rules/rounds";
-import { ready, useQuery } from "../../data/query";
 
 export interface History {
   /** The pages of messages read beyond what the state holds, by conversation. */
@@ -69,16 +66,4 @@ export function useMarkRead(core: Accessor<WorkspaceState | undefined>, conversa
       api.channel.markRead({ id, body: { number } }).catch(() => {});
     },
   );
-}
-
-/** A session's log (the orchestrator's is "orchestrator"): the read one, with what the live stream brought since merged in by seq. */
-export function createSessionEvents(id: Accessor<string>, enabled: Accessor<boolean>): Accessor<SessionEvent[]> {
-  const read = useQuery(() => ({ queryKey: ["session-events", id()], queryFn: () => api.session.events({ id: id() }), enabled: enabled() }));
-  const [arrived, setArrived] = createSignal<SessionEvent[]>([]);
-  onSettled(() =>
-    subscribeLive((e) => {
-      if (enabled() && e.type === "event" && e.id === id()) setArrived((a) => mergeSteps(a, [e.activity]));
-    }),
-  );
-  return createMemo(() => mergeSteps(ready(read, []), arrived()));
 }

@@ -21,7 +21,7 @@ import { ago, tookText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { createSessionEvents } from "./data";
+import { createSessionEvents } from "../../data/sessions";
 
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
 export function TurnSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {

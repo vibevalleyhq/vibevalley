@@ -18,7 +18,7 @@ import { runText } from "../../rules/issues";
 import { tookText, wallClockText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
-import { createSessionEvents } from "../../pages/chat/data";
+import { createSessionEvents } from "../../data/sessions";
 import { WorkLog } from "../../pages/chat/WorkLog";
 import { useCore, useFrames } from "../../data/frame";
 import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";

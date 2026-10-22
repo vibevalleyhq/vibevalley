@@ -27,7 +27,7 @@ import {
 import { ago } from "../rules/time";
 import { toast } from "../ui/toasts";
 import { aria, autofocus, Keyed, useNow } from "../app/util";
-import { createSessionEvents } from "./chat/data";
+import { createSessionEvents } from "../data/sessions";
 import { ready, useQuery } from "../data/query";
 import { TextInput } from "../ui/Field";
 import { Icon } from "../ui/Icon";
