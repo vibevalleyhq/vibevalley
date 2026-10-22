@@ -4,7 +4,7 @@
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
-  type Acceptance,
+  type Review,
   type Agent,
   type Block,
   type BlockAttrs,
@@ -399,7 +399,7 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  // Acceptance is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
+  // Review is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
   // the owner's (merge).
   const accept = tool<{ issue: string; pass: boolean; findings?: string[]; text?: string }>(
     "accept",
@@ -407,7 +407,7 @@ export const make = Effect.gen(function* () {
     (p) =>
       withIssue(p.issue, async (t) => {
         try {
-          const done = await go(issue.accept(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
+          const done = await go(issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
           return p.pass ? `#${done.number} 验收过了，等主人收获` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
         } catch (e) {
           return toError(e).message;
@@ -550,7 +550,7 @@ export const make = Effect.gen(function* () {
                 ...(p.project !== undefined ? { project: p.project } : {}),
                 ...(assignee ? { assignee } : {}),
                 ...(priority ? { priority } : {}),
-                ...(p.acceptance ? { acceptance: p.acceptance as Acceptance } : {}),
+                ...(p.acceptance ? { review: p.acceptance as Review } : {}),
                 ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
               }),
             );

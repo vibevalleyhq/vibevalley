@@ -73,7 +73,7 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     status: "in_review",
     moves: ["done", "canceled"],
     criteria: ["勾上后重开浏览器还登着"],
-    acceptance: "required",
+    review: "required",
     attention: { state: "reviewing", since: Date.now() - 60_000, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
   };
   const fixture: StateFrame = {

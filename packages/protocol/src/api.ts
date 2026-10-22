@@ -106,7 +106,7 @@ export interface Handlers<R = never> {
   readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;
   /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
    * another round. */
-  readonly "issue.accept": (a: { readonly id: string; readonly body: T.IssueAcceptRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.review": (a: { readonly id: string; readonly body: T.IssueReviewRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
   readonly "issue.act": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
@@ -486,12 +486,12 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "issue.accept",
+    op: "issue.review",
     method: "POST",
-    path: "/api/v1/issues/{id}/accept",
+    path: "/api/v1/issues/{id}/review",
     pathParams: [{ name: "id", number: false }],
     query: [],
-    body: S.IssueAcceptRequest,
+    body: S.IssueReviewRequest,
     result: S.Issue,
     can: ["owner", "remote", "manager"],
   },

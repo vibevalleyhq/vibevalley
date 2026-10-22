@@ -53,9 +53,9 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       if (last?.outcome === "interrupted")
         return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: ["resume", "harvest", "tell", "close"] };
       // A required acceptance passes before the harvest (the server's statusMove); a glance one is passed by the harvest.
-      const lead: IssueAct = t.acceptance === "required" && t.acceptedAt === undefined ? "accept" : "harvest";
+      const lead: IssueAct = t.review === "required" && t.reviewedAt === undefined ? "accept" : "harvest";
       const acts: IssueAct[] =
-        lead === "harvest" ? ["harvest", ...(t.acceptedAt === undefined ? (["reject"] as const) : []), "tell", "close"] : ["accept", "reject", "tell", "close"];
+        lead === "harvest" ? ["harvest", ...(t.reviewedAt === undefined ? (["reject"] as const) : []), "tell", "close"] : ["accept", "reject", "tell", "close"];
       return { state: "reviewing", ...at(since), lead, acts };
     }
   }

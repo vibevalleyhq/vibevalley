@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
-import { type Acceptance, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import { type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { rememberPick } from "./write";
 import { isRefined, newIssueTitle, priorityLabel } from "../../rules/issues";
@@ -21,7 +21,7 @@ interface Draft {
   project: string;
   agent: string;
   priority: Priority;
-  acceptance: Acceptance;
+  acceptance: Review;
 }
 
 const draftOf = (i: Issue): Draft => ({
@@ -31,7 +31,7 @@ const draftOf = (i: Issue): Draft => ({
   project: i.project ?? "",
   agent: i.assignee ?? "",
   priority: i.priority,
-  acceptance: i.acceptance,
+  acceptance: i.review,
 });
 
 const criteriaList = (text: string) =>
@@ -81,7 +81,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       project: x.project,
       assignee: x.agent,
       priority: x.priority,
-      acceptance: x.acceptance,
+      review: x.acceptance,
       criteria: criteriaList(x.criteria),
     };
   };
@@ -291,7 +291,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           <Pick
             label="验收"
             value={d().acceptance}
-            onChange={(v) => edit({ acceptance: v as Acceptance })}
+            onChange={(v) => edit({ acceptance: v as Review })}
             options={[
               { value: "glance", label: "看一眼就收" },
               { value: "required", label: "必须过验收" },

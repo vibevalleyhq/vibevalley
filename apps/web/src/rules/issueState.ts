@@ -62,7 +62,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
     case "asking":
       return { head: `${who}有 ${issue.questions.length} 个问题要问你`, line: "点一个选项就是回答，也可以自己说。", tone: "wheat" };
     case "reviewing":
-      return issue.acceptedAt !== undefined
+      return issue.reviewedAt !== undefined
         ? { head: "验收过了，可以收获", ...(said ? { line: said } : {}), tone: "leaf" }
         : { head: `${who}交回来了，等你验收`, ...(said ? { line: said } : {}), tone: "wheat" };
     case "stuck":

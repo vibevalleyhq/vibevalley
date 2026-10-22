@@ -63,7 +63,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       // harvested: done is what was asked for, not how the round ended.
       if (to === "done") {
         if (t.attention.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
-        return t.acceptance === "required" && t.acceptedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
+        return t.review === "required" && t.reviewedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
       }
       if (to === "canceled") return ["cancel", ""];
       break;

@@ -49,7 +49,7 @@ describe("an issue as a job", () => {
       sessions: ["w1"],
       status: "in_review",
       moves: [],
-      acceptance: "glance",
+      review: "glance",
       findings: [{ id: "f1", text: "少了测试", at: 400 }],
       questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
       attention: { state: "asking", acts: [] },

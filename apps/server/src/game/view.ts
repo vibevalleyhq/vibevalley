@@ -89,7 +89,7 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
     case "ripe":
     case "resting":
       if ((issue.questions ?? []).length > 0) return { crop: "dry", badge: badgeQuestions };
-      if (issue.acceptedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
+      if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
       if (weeds > 0) return { crop: "weeds", badge: { text: `${weeds} 棵草`, tone: "bug" } };
       if (h.phase._tag === "ripe") return { crop: "flowering", badge: badgeReview };
       break;

@@ -74,7 +74,7 @@ describe("an issue's thread", () => {
       const channels = yield* Channels;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const issue = yield* issues.add({ title: "先问清楚，再写打卡", project: "clock", assignee: "lab", acceptance: "required" });
+      const issue = yield* issues.add({ title: "先问清楚，再写打卡", project: "clock", assignee: "lab", review: "required" });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(
         () => channels.jobThread(sent.session!),
@@ -87,10 +87,10 @@ describe("an issue's thread", () => {
       yield* channels.say("用 8797", thread, "");
       yield* await_(get, (i) => (i.questions ?? []).length === 0, "answered in the thread");
       yield* await_(get, (i) => i.status === "in_review", "handed back");
-      yield* issues.accept(issue.id, { pass: true });
-      expect((yield* get()).acceptedAt).toBeDefined();
+      yield* issues.review(issue.id, { pass: true });
+      expect((yield* get()).reviewedAt).toBeDefined();
       yield* channels.say("标题再短一点", thread, "");
-      yield* await_(get, (i) => i.acceptedAt === undefined, "another round voids the pass");
+      yield* await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
       const said = () => messagesIn(core.state().chat, thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
       for (let i = 0; i < 2; i++) yield* issues.comment(issue.id, "顺手把注释删掉", "k1");

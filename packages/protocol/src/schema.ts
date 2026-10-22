@@ -516,7 +516,7 @@ export const PullRequest: Schema.Codec<T.PullRequest> = Schema.Struct({
   state: PullRequestState,
 });
 
-export const Acceptance: Schema.Codec<T.Acceptance> = Schema.Literals(T.AcceptanceValues);
+export const Review: Schema.Codec<T.Review> = Schema.Literals(T.ReviewValues);
 
 export const Finding: Schema.Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
@@ -596,8 +596,8 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
-  acceptance: Acceptance,
-  acceptedAt: Schema.optionalKey(Schema.Number),
+  review: Review,
+  reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
@@ -1299,7 +1299,7 @@ export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  acceptance: Schema.optionalKey(Acceptance),
+  review: Schema.optionalKey(Review),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
 });
 
@@ -1310,7 +1310,7 @@ export const IssueActRequest: Schema.Codec<T.IssueActRequest> = Schema.Struct({
   sendKey: Schema.optionalKey(Schema.String),
 });
 
-export const IssueAcceptRequest: Schema.Codec<T.IssueAcceptRequest> = Schema.Struct({
+export const IssueReviewRequest: Schema.Codec<T.IssueReviewRequest> = Schema.Struct({
   pass: Schema.Boolean,
   findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   text: Schema.optionalKey(Schema.String),
@@ -1322,7 +1322,7 @@ export const IssueRequest: Schema.Codec<T.IssueRequest> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  acceptance: Schema.optionalKey(Acceptance),
+  review: Schema.optionalKey(Review),
 });
 
 export const RunTriggerKind: Schema.Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);

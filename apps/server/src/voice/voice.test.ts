@@ -134,7 +134,7 @@ const issueOf = (id: string, number: number, session: string) =>
     sessions: [session],
     status: "in_progress",
     moves: [],
-    acceptance: "glance",
+    review: "glance",
     findings: [],
     questions: [],
     attention: { state: "working", acts: [] },

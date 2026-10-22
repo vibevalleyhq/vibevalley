@@ -301,7 +301,7 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   const sentBack = new Map<number, string[]>();
   for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
   for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: "打回：" + lines.join("；") });
-  if (t.acceptedAt !== undefined) out.push({ at: t.acceptedAt, kind: "accepted", text: "验收通过" });
+  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: "验收通过" });
   if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: t.closed ? closedWords[t.closed] : "关了" });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out

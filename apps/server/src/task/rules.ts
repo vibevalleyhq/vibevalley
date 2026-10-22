@@ -352,7 +352,7 @@ function taskClosed(graph: GraphState, n: Task): IssueClose | undefined {
   return undefined;
 }
 
-type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "acceptance" | "findings" | "questions" | "attention">;
+type Draft = Omit<Issue, "number" | "priority" | "createdAt" | "sessions" | "status" | "moves" | "review" | "findings" | "questions" | "attention">;
 
 export const defaultParallel = 3;
 

@@ -79,7 +79,7 @@ export function refinement(d: RefinementDeps) {
               project: nullText(t.project ?? where),
               assignee: nullText(t.assignee ?? agent),
               priority: t.priority,
-              acceptance: t.acceptance,
+              review: t.review,
               criteria: jsonOrNull(t.criteria, (t.criteria ?? []).length > 0),
               id: t.id,
             }),

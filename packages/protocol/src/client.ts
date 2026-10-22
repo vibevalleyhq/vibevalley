@@ -113,8 +113,8 @@ export class VibeValleyApi {
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,
     /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
      * another round. */
-    accept: (a: { id: string; body: T.IssueAcceptRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/accept", undefined, a.body) as Promise<T.Issue>,
+    review: (a: { id: string; body: T.IssueReviewRequest }): Promise<T.Issue> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/review", undefined, a.body) as Promise<T.Issue>,
     /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
     act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,

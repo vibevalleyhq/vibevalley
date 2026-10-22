@@ -14,7 +14,7 @@ import {
   type Finding,
   type HandedBack,
   type Issue,
-  type IssueAcceptRequest,
+  type IssueReviewRequest,
   type IssueActRequest,
   type IssueClose,
   type IssueGraph,
@@ -117,7 +117,7 @@ export interface IssueShape {
   readonly merge: (id: string) => Effect.Effect<string, ApiError>;
   readonly resolve: (id: string) => Effect.Effect<void, ApiError>;
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
-  readonly accept: (id: string, req: IssueAcceptRequest) => Effect.Effect<Issue, ApiError>;
+  readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
   readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
@@ -237,8 +237,8 @@ export const make = (options: IssueOptions = {}) =>
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
-        acceptance: row.acceptance as Issue["acceptance"],
-        ...(row.accepted_at !== null ? { acceptedAt: row.accepted_at } : {}),
+        review: row.review as Issue["review"],
+        ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: json<Finding[]>(row.findings) ?? [],
         questions: json<Question[]>(row.questions) ?? [],
         ...(criteria ? { criteria } : {}),
@@ -338,7 +338,7 @@ export const make = (options: IssueOptions = {}) =>
             priority: req.priority ?? "medium",
             created_at: Date.now(),
             recurrence: recurrence ?? null,
-            acceptance: req.acceptance || "glance",
+            review: req.review || "glance",
           }),
         );
         yield* publish(id);
@@ -372,14 +372,14 @@ export const make = (options: IssueOptions = {}) =>
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
     const judged = (id: string, at: number, findings: readonly Finding[]) =>
-      Effect.andThen(db(q.acceptIssue({ id, accepted_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
+      Effect.andThen(db(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
     /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
     const ownerSaid = (id: string) =>
       Effect.gen(function* () {
         yield* asked(id, []);
         const t = yield* get(id);
-        if (t.acceptedAt !== undefined) yield* judged(id, 0, t.findings);
+        if (t.reviewedAt !== undefined) yield* judged(id, 0, t.findings);
       });
 
     /** An issue not written down first is made from the session's job, in one write with its first session; a write that fails says what the database said. */
@@ -786,7 +786,7 @@ export const make = (options: IssueOptions = {}) =>
               project: nullText(upd.project ?? was.project),
               assignee: nullText(upd.assignee ?? was.assignee),
               priority: upd.priority ?? was.priority,
-              acceptance: upd.acceptance || was.acceptance || "glance",
+              review: upd.review || was.review || "glance",
               criteria: jsonOrNull(criteria, criteria.length > 0),
               id,
             }),
@@ -846,12 +846,12 @@ export const make = (options: IssueOptions = {}) =>
               yield* comment(id, yield* words, req.sendKey ?? "");
               break;
             case "accept":
-              yield* shape.accept(id, { pass: true });
+              yield* shape.review(id, { pass: true });
               break;
             case "reject": {
               const findings = req.findings ?? findingsOf(said);
               if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
-              yield* shape.accept(id, { pass: false, findings });
+              yield* shape.review(id, { pass: false, findings });
               break;
             }
             case "harvest":
@@ -955,7 +955,7 @@ export const make = (options: IssueOptions = {}) =>
         }),
       cancel,
       /** Only an issue in review has something to judge. */
-      accept: (id, req) =>
+      review: (id, req) =>
         Effect.gen(function* () {
           const t = yield* get(id);
           const why = isForManager(t)

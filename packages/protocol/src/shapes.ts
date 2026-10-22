@@ -1066,8 +1066,8 @@ export interface Issue {
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
-  acceptance: Acceptance;
-  acceptedAt?: number;
+  review: Review;
+  reviewedAt?: number;
   findings: Finding[];
   questions: Question[];
   criteria?: string[];
@@ -1207,12 +1207,12 @@ export interface IssueUpdate {
   project?: string;
   assignee?: string;
   priority?: Priority;
-  acceptance?: Acceptance;
+  review?: Review;
   criteria?: string[];
 }
 
-export const AcceptanceValues = ["glance", "required"] as const;
-export type Acceptance = (typeof AcceptanceValues)[number];
+export const ReviewValues = ["glance", "required"] as const;
+export type Review = (typeof ReviewValues)[number];
 
 export interface Finding {
   id: string;
@@ -1230,7 +1230,7 @@ export interface IssueActRequest {
   sendKey?: string;
 }
 
-export interface IssueAcceptRequest {
+export interface IssueReviewRequest {
   pass: boolean;
   findings?: string[];
   text?: string;
@@ -1242,7 +1242,7 @@ export interface IssueRequest {
   project?: string;
   assignee?: string;
   priority?: Priority;
-  acceptance?: Acceptance;
+  review?: Review;
 }
 
 export const IssueCloseValues = ["merged", "merged_into_graph", "dismissed", "lost", "answered"] as const;

@@ -74,12 +74,12 @@ Status: <状态>
 
 ## Alternatives considered
 
-## Acceptance criteria
+## Review criteria
 
 ## Risks
 ```
 
-`## Proposal` 是打算做的改动，可以用将来时，计划、迁移步骤、待定问题都放这里。`## Acceptance criteria` 写做到什么可观察的状态算完。`## Risks` 写可能出什么问题，以及有意放弃了什么。
+`## Proposal` 是打算做的改动，可以用将来时，计划、迁移步骤、待定问题都放这里。`## Review criteria` 写做到什么可观察的状态算完。`## Risks` 写可能出什么问题，以及有意放弃了什么。
 
 `implemented/`：
 
@@ -95,7 +95,7 @@ Status: <状态>
 ## Consequences
 ```
 
-`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Plan`、`## Migration plan`、`## Acceptance criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
+`## Decision` 用现在时描述上线的样子，整篇跟着它保持最新。`## Consequences` 写这个取舍付出了什么、换来了什么。提案时期的章节在这里不允许出现，校验会拒绝：`## Proposal`、`## Plan`、`## Migration plan`、`## Review criteria`。写现状的 `## Verification`、`## Deferred`、`## Related` 可以有。
 
 `rejected/`：就是冻结的提案，保留提案时的章节，结论写在 `Status:` 行。只要求开头、`## Problem`、`## Proposal` 和下面的「Alternatives considered」。
 
@@ -105,4 +105,4 @@ Status: <状态>
 
 ### 在生命周期之间挪
 
-挪目录要同时改 `Status:` 行，并满足新目录的章节要求，否则校验不过。`proposed/` → `implemented/`：把 `## Proposal` 改写成现在时的 `## Decision`，把 `## Acceptance criteria` 和 `## Risks` 并进 `## Consequences`（或写成现在时的 `## Verification`），删掉计划，换成上线的样子。`proposed/` → `rejected/`：只在 `Status:` 行加理由，然后冻结。
+挪目录要同时改 `Status:` 行，并满足新目录的章节要求，否则校验不过。`proposed/` → `implemented/`：把 `## Proposal` 改写成现在时的 `## Decision`，把 `## Review criteria` 和 `## Risks` 并进 `## Consequences`（或写成现在时的 `## Verification`），删掉计划，换成上线的样子。`proposed/` → `rejected/`：只在 `Status:` 行加理由，然后冻结。

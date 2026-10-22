@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
-import type { Acceptance, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
+import type { Review, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { newSendKey } from "./write";
 import type { Tone } from "../../rules/cards";
@@ -267,7 +267,7 @@ export function IssueDetail(props: {
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
         <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看改动判断。</p>}>
-          <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.acceptedAt === undefined} />
+          <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().weeds.length > 0}>
           <div class="mt-2">
@@ -351,7 +351,7 @@ export function IssueDetail(props: {
       <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>
       <Property label="开工">{wallClockText(props.sessions[0]!.hiredAt)}</Property>
       <Show when={s().ask && s().attention.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
-      <Show when={props.issue.acceptedAt}>
+      <Show when={props.issue.reviewedAt}>
         {(at) => (
           <Property label="验收过">
             <span class="text-accent">{wallClockText(at())}</span>
@@ -368,11 +368,11 @@ export function IssueDetail(props: {
         <Property label="验收">
           <Pick
             label="验收"
-            value={props.issue.acceptance}
+            value={props.issue.review}
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, body: { acceptance: v as Acceptance } }));
+              void act(() => api.issue.update({ id, body: { review: v as Review } }));
             }}
             options={[
               { value: "glance", label: "看一眼就收" },

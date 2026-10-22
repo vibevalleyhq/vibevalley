@@ -376,8 +376,8 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      let issue = yield* issues.add({ title: "先问清楚，再写打卡并提交", project: "clock", assignee: "lab", acceptance: "required" });
-      expect(issue.acceptance).toBe("required");
+      let issue = yield* issues.add({ title: "先问清楚，再写打卡并提交", project: "clock", assignee: "lab", review: "required" });
+      expect(issue.review).toBe("required");
       yield* issues.setStatus(issue.id, "todo", "", "");
       yield* w.nextReport;
       issue = yield* await_(
@@ -404,7 +404,7 @@ describe("an issue", () => {
       yield* until(() => crop() === "flowering", "抽穗：等验收");
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")));
 
-      yield* issues.accept(issue.id, { pass: false, findings: ["再写版本B"] });
+      yield* issues.review(issue.id, { pass: false, findings: ["再写版本B"] });
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
       yield* w.nextReport;
       yield* await_(
@@ -414,8 +414,8 @@ describe("an issue", () => {
       );
       yield* until(() => crop() === "weeds", "the weed stands until a pass");
 
-      issue = yield* issues.accept(issue.id, { pass: true });
-      expect([issue.acceptedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
+      issue = yield* issues.review(issue.id, { pass: true });
+      expect([issue.reviewedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
       issue = yield* issues.setStatus(issue.id, "done", "", "");
       expect(issue.status).toBe("done");
       expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);

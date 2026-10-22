@@ -173,7 +173,7 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
     { state: "reviewing", since: now - minute, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
     {
       status: "in_review",
-      acceptance: "required",
+      review: "required",
       criteria: ["勾上后重开浏览器还登着", "不勾时关掉浏览器就登出"],
       checks: [
         { criterion: 0, result: "met", proof: "bun test auth 通过" },

@@ -89,7 +89,7 @@ export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.project 
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
   (f.project === "" || cardProject(c) === f.project) && (f.agent === "" || cardAgent(c) === f.agent) && matchesQuery(f.query, cardWords(c));
 
-const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.acceptedAt ?? 0);
+const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.closedAt ?? 0, i.reviewedAt ?? 0);
 
 export function rowFacts(c: BoardCard): RowFacts {
   switch (c.kind) {

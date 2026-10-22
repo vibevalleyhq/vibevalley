@@ -27,9 +27,9 @@ describe("status moves", () => {
         expect(m !== "none" || why !== "").toBe(true);
       }
     }
-    const required = issue("in_review", true, { acceptance: "required" });
+    const required = issue("in_review", true, { review: "required" });
     expect(statusMoves(required)).toEqual(["todo", "canceled"]);
-    expect(statusMoves({ ...required, acceptedAt: 1 })).toEqual(["todo", "done", "canceled"]);
+    expect(statusMoves({ ...required, reviewedAt: 1 })).toEqual(["todo", "done", "canceled"]);
     expect(statusMoves(issue("backlog", false, { refining: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { assignee: managerAgent }))).toEqual([]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
@@ -56,15 +56,15 @@ describe("status moves", () => {
 describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "ripe" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
-  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], acceptance: "glance", createdAt: 0 } as unknown as Issue;
+  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], review: "glance", createdAt: 0 } as unknown as Issue;
   // One table: an act that takes the issue to done is offered exactly when the move is.
   it("agree on done, whatever the round came to", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [
       [{}, session("completed")],
       [{}, session("failed")],
       [{}, session("interrupted")],
-      [{ acceptance: "required" }, session("completed")],
-      [{ acceptance: "required", acceptedAt: 5 }, session("completed")],
+      [{ review: "required" }, session("completed")],
+      [{ review: "required", reviewedAt: 5 }, session("completed")],
       [{ assignee: managerAgent, sessions: [], handedBack: { at: 1, outcome: "completed" } }, undefined],
       [{ assignee: managerAgent, sessions: [], handedBack: { at: 1, outcome: "failed" } }, undefined],
     ];

@@ -6,7 +6,7 @@
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import type { Acceptance, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
+import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
@@ -182,9 +182,9 @@ function IssueBody(props: {
       setBox(undefined);
     }
   };
-  const setAcceptance = (a: Acceptance) => {
+  const setReview = (a: Review) => {
     const id = props.issue.id;
-    return act(() => api.issue.update({ id, body: { acceptance: a } }));
+    return act(() => api.issue.update({ id, body: { review: a } }));
   };
   const go = (a: IssueAct) => {
     const h = props.session;
@@ -319,7 +319,7 @@ function IssueBody(props: {
             <p class={xs}>{s().taskText}</p>
           </Show>
           <Show when={s().criteria.length > 0} fallback={<p class={xs}>这张工单没写做完的标准：交回来时看改动判断。</p>}>
-            <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.acceptedAt === undefined} />
+            <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().weeds.length > 0}>
             <div class="mt-1.5">
@@ -412,16 +412,16 @@ function IssueBody(props: {
                       {([a, label]) => (
                         <PxButton
                           size="sm"
-                          tone={props.issue.acceptance === a ? "primary" : "plain"}
-                          disabled={busy() || props.issue.acceptance === a || !s().open}
-                          onClick={() => void setAcceptance(a)}
+                          tone={props.issue.review === a ? "primary" : "plain"}
+                          disabled={busy() || props.issue.review === a || !s().open}
+                          onClick={() => void setReview(a)}
                         >
                           {label}
                         </PxButton>
                       )}
                     </For>
-                    <Show when={props.issue.acceptedAt !== undefined}>
-                      <span class="text-[12px] text-leaf-700">已验收 {wallClockText(props.issue.acceptedAt!)}</span>
+                    <Show when={props.issue.reviewedAt !== undefined}>
+                      <span class="text-[12px] text-leaf-700">已验收 {wallClockText(props.issue.reviewedAt!)}</span>
                     </Show>
                   </div>
                 </Row>
