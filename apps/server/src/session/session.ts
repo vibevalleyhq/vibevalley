@@ -148,7 +148,6 @@ export interface SessionShape {
   readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
   readonly stop: (id: string) => Effect.Effect<boolean>;
   readonly dismiss: (id: string) => Effect.Effect<boolean>;
-  readonly place: (id: string) => Workplace | undefined;
   readonly roster: () => Roster[];
   readonly find: (id: string) => Roster | undefined;
   /** A session on the farm now, as the core state has it: what another module reads a session by. */
@@ -172,7 +171,6 @@ export interface SessionShape {
   /** A session on the farm, or one that has ended. */
   readonly get: (id: string) => Effect.Effect<Session | undefined>;
   readonly runs: (issue: string) => Effect.Effect<Run[]>;
-  readonly currentRun: (id: string) => string;
   /** A session's log, oldest first; a run's only when run is given. */
   readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
   /** These four are subscribed before they return: nothing published after is missed. */
@@ -181,14 +179,10 @@ export interface SessionShape {
   readonly news: Effect.Effect<Stream.Stream<SessionNews>, never, Scope.Scope>;
   readonly finishedRuns: Effect.Effect<Stream.Stream<RunFinished>, never, Scope.Scope>;
   readonly inputsConsumed: Effect.Effect<Stream.Stream<InputConsumed>, never, Scope.Scope>;
-  /** A session's token for the farm's MCP server; a new one stops the old working. */
-  readonly issueToken: (session: string) => string;
-  readonly revokeToken: (session: string) => void;
   /** Whose token it is; "" when nobody's. */
   readonly who: (token: string) => string;
   /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
   readonly setAddress: (address: string) => void;
-  readonly mcpUrl: () => string;
   /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
   readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
   /** Brings back the sessions the farm had when it stopped, once every service is ready. */
@@ -937,6 +931,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       return session ? { session, place: h.place, lastText: h.lastText } : undefined;
     };
 
+    const currentRun = (id: string) => hands.get(id)?.run ?? executions.get(id)?.() ?? "";
     const runStore: RunStore = {
       ...runs,
       finished: (r) => PubSub.publishUnsafe(finishedHub, r),
@@ -1058,7 +1053,6 @@ export const make = (options: SessionOptionsIn = {}) =>
             return true;
           }),
         ),
-      place: (id) => hands.get(id)?.place,
       roster: () =>
         [...hands.values()]
           .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -1090,7 +1084,6 @@ export const make = (options: SessionOptionsIn = {}) =>
           return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
         }),
       runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
-      currentRun: (id) => hands.get(id)?.run ?? executions.get(id)?.() ?? "",
       events: (id, r) => trajectories.events(id, r),
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
@@ -1098,11 +1091,8 @@ export const make = (options: SessionOptionsIn = {}) =>
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       finishedRuns: Effect.map(PubSub.subscribe(finishedHub), Stream.fromSubscription),
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
-      issueToken,
-      revokeToken,
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      mcpUrl: () => mcpUrl,
       host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
       restore,
     };
@@ -1110,7 +1100,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     chat.useHelpers({
       present: (id) => hands.has(id),
       deliver,
-      currentRun: shape.currentRun,
+      currentRun,
       report: (id) => summaryOf(hands.get(id)?.lastText ?? ""),
       onIssue: (issue) => sessionOnIssue(core.state(), issue)?.id,
       sessionOf: shape.sessionOf,
@@ -1122,10 +1112,25 @@ export const make = (options: SessionOptionsIn = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
-    return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run, trajectories, runStore });
+    return Object.assign(shape, {
+      hands,
+      expect,
+      unexpect,
+      hired: () => hired,
+      run,
+      trajectories,
+      runStore,
+      currentRun,
+      issueToken,
+      place: (id: string) => hands.get(id)?.place,
+      mcpUrl: () => mcpUrl,
+    });
   });
 
 export const layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));
+
+/** The sessions as a test sees them: the shape, and what is inside it. */
+export type SessionsInside = Effect.Success<ReturnType<typeof make>>;
 
 /** Brings the sessions back once every service is built. */
 export const ready = Layer.effectDiscard(Effect.flatMap(Sessions, (s) => s.restore));

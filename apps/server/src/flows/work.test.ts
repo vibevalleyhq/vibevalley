@@ -8,7 +8,7 @@ import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { Sessions } from "../session/session.ts";
+import { Sessions, type SessionsInside } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
@@ -294,7 +294,7 @@ describe("a session's work", () => {
       id = session.id;
       yield* until(() => kinds.includes("ended"), "the turn ended");
       expect(kinds.filter((k) => k === "spoke" || k === "ended")).toEqual(["spoke", "ended"]);
-      const token = sessions.issueToken(session.id);
+      const token = (sessions as SessionsInside).issueToken(session.id);
       expect(sessions.who(token)).toBe(session.id);
       expect((yield* sessions.deliver(session.id, "再看看", { kind: "comment" })).kind).toBe("run");
       yield* w.nextReport;

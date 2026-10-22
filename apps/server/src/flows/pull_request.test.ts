@@ -7,7 +7,7 @@ import { Effect } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { Issues } from "../issue/issue.ts";
 import { Projects } from "../project/project.ts";
-import { Sessions } from "../session/session.ts";
+import { Sessions, type SessionsInside } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { farm, git, lab, watch } from "./farm.ts";
 
@@ -73,7 +73,7 @@ describe("a pull request", () => {
           yield* w.nextReport;
           issue = yield* issues.get(issue.id);
           id = issue.sessions!.at(-1)!;
-          const place = sessions.place(id)!;
+          const place = (sessions as SessionsInside).place(id)!;
           [branch, cwd] = [place.branch!, place.cwd];
           git(work, "init", "--bare", bare);
           git(path, "remote", "add", "origin", "https://github.com/test/clock.git");

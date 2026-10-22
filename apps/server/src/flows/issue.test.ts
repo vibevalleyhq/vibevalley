@@ -14,7 +14,7 @@ import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
-import { Sessions } from "../session/session.ts";
+import { Sessions, type SessionsInside } from "../session/session.ts";
 import { write } from "../testing/git.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
 
@@ -254,7 +254,7 @@ describe("an issue", () => {
       yield* (yield* Agents).saveAgent(lab());
       const helper = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
-      const place = sessions.place(helper.id)!;
+      const place = (sessions as SessionsInside).place(helper.id)!;
       mkdirSync(join(place.cwd, ".vibevalley"), { recursive: true });
       write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\necho harvest-check-failed\nexit 1\n", 0o755);
       const project = join(f.config.workRoot, "projects", "clock");
