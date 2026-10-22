@@ -29,11 +29,11 @@ describe("the tools", () => {
   });
 
   it("read in the trajectory by label and what they name", () => {
-    expect(toolStart("dispatch", { brief: "加个 README", project: "demo" })).toEqual({
-      text: "派活：demo",
+    expect(toolStart("issue_create", { title: "加个 README", project: "demo", start: true })).toEqual({
+      text: "记一张工单：demo",
       action: "other",
-      tool: "dispatch",
-      input: `{"brief":"加个 README","project":"demo"}`,
+      tool: "issue_create",
+      input: `{"title":"加个 README","project":"demo","start":true}`,
     });
     expect(toolStart("graph_split", { goal: "长".repeat(50) }).text).toBe("拆计划：" + "长".repeat(40) + "…");
     expect(toolStart("unknown", undefined).text).toBe("unknown");

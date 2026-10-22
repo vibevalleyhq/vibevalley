@@ -1,44 +1,44 @@
 {
-  "id": "one-line-after-dispatch",
+  "id": "think-before-starting",
   "created": 1792270800000,
   "model": "deepseek-flash",
-  "want": "主人让派活，管家派完以后又把整张工单复述了一遍（记住我、token 存 30 天、测试要过），频道里已经有那条派活了。应该只用一句话说派给了谁。",
+  "want": "主人说了先别派活、只是一起想想，管家却记了一张工单并开工。应该不建工单、不开工，先列出 README 可以写哪几节，问主人要哪些。",
   "memory": "",
   "tools": [
-    "accept",
-    "cancel_recurrence",
-    "changes",
-    "channel_settings",
+    "issue_create",
+    "projects",
     "channels",
+    "recurrence",
+    "list_recurrences",
+    "cancel_recurrence",
+    "open_channel",
+    "channel_settings",
+    "merge",
+    "changes",
+    "roster",
     "check",
+    "tell",
+    "read_chat",
+    "stop",
     "dismiss",
-    "dispatch",
-    "graph_action",
     "graph_split",
     "graphs",
-    "list_recurrences",
+    "task_edit",
+    "graph_action",
+    "task_action",
     "load_skill",
-    "memory_add",
-    "memory_search",
-    "merge",
-    "open_channel",
-    "projects",
-    "read_chat",
     "remember",
     "rewrite_memory",
-    "roster",
-    "recurrence",
     "search_archive",
-    "stop",
-    "task_action",
-    "task_edit",
-    "tell"
+    "issues",
+    "issue_update",
+    "issue_status"
   ],
   "before": [],
   "input": {
     "role": "custom",
     "customType": "orchestratorInput",
-    "content": "[来源：主人]\n主人说：派个人去 clock-in 的登录页加「记住我」，勾上后 token 存 30 天，不勾就关浏览器失效，登录相关的测试要过",
+    "content": "[来源：主人]\n主人说：先别派活，帮我想想 demo 的 README 该写哪几节",
     "display": true,
     "details": {
       "conversation": "general"
@@ -52,10 +52,12 @@
         {
           "type": "toolCall",
           "id": "call_1",
-          "name": "dispatch",
+          "name": "issue_create",
           "arguments": {
-            "project": "clock-in",
-            "brief": "在 clock-in 的登录页加「记住我」：勾上后 token 存 30 天，不勾就关浏览器失效；登录相关的测试要过，改完提交。"
+            "title": "给 demo 写 README",
+            "description": "项目简介、怎么跑起来、目录结构",
+            "project": "demo",
+            "start": true
           }
         }
       ],
@@ -83,11 +85,11 @@
     {
       "role": "toolResult",
       "toolCallId": "call_1",
-      "toolName": "dispatch",
+      "toolName": "issue_create",
       "content": [
         {
           "type": "text",
-          "text": "已在 #田头 派 后端老周（w1）去 clock-in，分支 vibevalley/w1-remember-me。"
+          "text": "记下了：#3「给 demo 写 README」，已在 #田头 派 文档员 Kimi（w1）去 demo，分支 vibevalley/issue-3"
         }
       ],
       "isError": false,
@@ -99,7 +101,7 @@
       "content": [
         {
           "type": "text",
-          "text": "派后端老周去 clock-in 了：在登录页加「记住我」，勾上后 token 存 30 天，不勾就关浏览器失效，登录相关的测试要过，改完提交。做完我告诉你。"
+          "text": "派 Kimi 去 demo 写 README 了，写完我告诉你。"
         }
       ],
       "api": "openai-completions",
@@ -107,10 +109,10 @@
       "model": "deepseek-flash",
       "usage": {
         "input": 0,
-        "output": 2,
+        "output": 10,
         "cacheRead": 0,
         "cacheWrite": 0,
-        "totalTokens": 2,
+        "totalTokens": 10,
         "cost": {
           "input": 0,
           "output": 0,
@@ -120,23 +122,22 @@
         }
       },
       "stopReason": "stop",
-      "timestamp": 1792270803000,
+      "timestamp": 1792270802900,
       "durationMs": 0
     }
   ],
   "expect": [
     {
-      "kind": "called",
-      "tool": "dispatch",
-      "argContains": "30 天"
+      "kind": "notCalled",
+      "tool": "issue_create"
     },
     {
-      "kind": "saysNot",
-      "contains": "30 天"
+      "kind": "notCalled",
+      "tool": "graph_split"
     },
     {
-      "kind": "saysNot",
-      "contains": "测试要过"
+      "kind": "says",
+      "contains": "README"
     }
   ]
 }

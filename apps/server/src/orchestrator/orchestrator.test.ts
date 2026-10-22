@@ -60,7 +60,10 @@ const respond = (c: Request): AssistantMessage => {
   const want = asked.exec(sinceAnswer(c))?.[0];
   if (want)
     return fauxAssistantMessage(
-      fauxToolCall("dispatch", want.includes("CHANGELOG") ? { brief: want, project: "notes", agent: "lab" } : { brief: want, project: "demo" }),
+      fauxToolCall(
+        "issue_create",
+        want.includes("CHANGELOG") ? { title: want, project: "notes", agent: "lab", start: true } : { title: want, project: "demo", start: true },
+      ),
     );
   if (lastLine(c).includes("定时任务")) return fauxAssistantMessage("到点了，看了一眼");
   return fauxAssistantMessage("收到");
@@ -117,7 +120,7 @@ describe("the orchestrator", () => {
     expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/);
   });
 
-  it.live("dispatches, and hears the owner's voice in 田头", () => {
+  it.live("writes an issue down and starts it, and hears the owner's voice in 田头", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
@@ -127,7 +130,7 @@ describe("the orchestrator", () => {
       yield* enableLab;
       const words = yield* said;
       yield* orchestrator.say("帮我在 demo 里加个 README", {}, undefined, "");
-      expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，已在了"]);
+      expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，记下了"]);
       const first = f.requests[0]!;
       expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【农场现状】[\s\S]*可以派的帮工：\n- /);
       expect(first.messages[0]!.role === "system" && messageText(first.messages[0]!)).not.toContain("【农场现状】");
@@ -140,9 +143,9 @@ describe("the orchestrator", () => {
       expect(result).toMatchObject({ type: "tool/result", call: tool!.seq, ok: true });
       expect(ask!.type).toBe("user/message");
       expect(ask!.text).toMatch(/^\[来源：主人\][\s\S]*加个 README/);
-      expect(tool).toMatchObject({ tool: "dispatch", text: "派活：demo" });
+      expect(tool).toMatchObject({ tool: "issue_create", text: "记一张工单：demo" });
       expect(tool!.input).toContain(`"project":"demo"`);
-      expect(answer!.text).toBe("好，已在了");
+      expect(answer!.text).toBe("好，记下了");
       expect(sessions.roster().map((w) => w.place.project)).toEqual(["demo"]);
       yield* until(() => sessions.roster()[0]?.session.lastRun, "its report");
 
@@ -369,7 +372,7 @@ describe("the orchestrator", () => {
       const noted = yield* until(() => words().find((w) => w.startsWith("工单：记下了")), "noted");
       const issue = (yield* issues.list()).find((t) => t.title === "首页偶尔白屏")!;
       number = issue.number;
-      expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里`);
+      expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里，没开工`);
       expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
       yield* orchestrator.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
@@ -476,7 +479,7 @@ describe("the orchestrator", () => {
       expect(saved.want).toBe("应该先看一眼地里");
       expect(saved.input.customType).toBe("orchestratorInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");
-      expect(saved.tools).toContain("dispatch");
+      expect(saved.tools).toContain("issue_create");
       expect(saved.tools).toContain("remember");
       expect(yield* Effect.flip(orchestrator.markWrong(9_999, "x"))).toMatchObject({ _tag: "Missing" });
     }).pipe(Effect.scoped, Effect.provide(f.layer));

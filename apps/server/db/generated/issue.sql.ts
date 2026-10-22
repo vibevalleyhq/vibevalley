@@ -541,6 +541,23 @@ export const latestOfRecurrence = Effect.fn("LatestOfRecurrence")(function* (par
   })(params)
 })
 
+export const AssignIssueParams = Schema.Struct({
+  ["assignee"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type AssignIssueParams = typeof AssignIssueParams.Type
+
+
+export const AssignIssueSql = "-- name: AssignIssue :exec\n-- Who does it is the profile its latest session works as: another one when it was handed over.\nupdate issue set assignee = $1 where id = $2;"
+
+export const assignIssue = Effect.fn("AssignIssue")(function* (params: AssignIssueParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: AssignIssueParams,
+    execute: (p) => sql.unsafe(AssignIssueSql, [p["assignee"], p["id"]]),
+  })(params)
+})
+
 export const ReopenIssueParams = Schema.Struct({
   ["id"]: Schema.String,
 })

@@ -2,13 +2,14 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `pnpm run notes:catalog`，过期了 `pnpm run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（21 篇）
+## proposed（23 篇）
 
 ### feature
 
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [电话就是管家的嘴：默认由管家自己接电话，验证这条线真的接上了](.agents/notes/proposed/feature/2026-10-21-voice-is-the-orchestrators-mouth.md)
-- 2026-10-21 [管家以工单为单位干活：像 Linear 的老用户一样记、找、改、问、报](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)
+- 2026-10-21 [管家以工单为单位，照主人的意图记下、指派、开工、叫停和换人](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)
+- 2026-10-21 [管家给主人报告：早报、项目健康度、工单之间的关系和分拣建议](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)
 - 2026-10-20 [几个帮工同时写一篇文章：在屏幕上看起来怎样](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)
 - 2026-10-20 [块编辑器协同：按块存，按 op 改，服务端是唯一权威](.agents/notes/proposed/feature/2026-10-20-block-editor-collab.md)
 - 2026-10-13 [帮工各自的音色](.agents/notes/proposed/feature/2026-10-13-helper-voices.md)
@@ -21,6 +22,7 @@
 
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)
+- 2026-10-22 [工单为本：完成是主人对工单的结论，合并只是交付的一种](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
 - 2026-10-18 [记忆都存在农场的库里：主人画像、管家的记性和干活的经过都进 memory 表](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)

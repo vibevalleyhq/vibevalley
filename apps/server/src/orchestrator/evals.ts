@@ -10,12 +10,14 @@ import { messageText } from "../agent/brain/messages.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { schemas } from "../tool/schemas.ts";
 
-/** One check on a turn, a closed set by kind: called (tool, and argContains in its arguments' JSON when given), notCalled
- * (tool), silent (no words said), says (contains in the words), saysNot (contains not in them). */
+/** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
+ * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in
+ * them). */
 export interface Expect {
   readonly kind: string;
   readonly tool?: string;
   readonly argContains?: string;
+  readonly argLacks?: string;
   readonly contains?: string;
 }
 
@@ -70,7 +72,11 @@ const wordsOf = (turn: readonly AgentMessage[]) =>
 export function check(expect: readonly Expect[], turn: readonly AgentMessage[]): string[] {
   const calls = callsOf(turn);
   const words = wordsOf(turn);
-  const called = (tool: string, args = "") => calls.some((c) => c.name === tool && JSON.stringify(c.arguments ?? {}).includes(args));
+  const called = (tool: string, args = "", lacks?: string) =>
+    calls.some((c) => {
+      const json = JSON.stringify(c.arguments ?? {});
+      return c.name === tool && json.includes(args) && (lacks === undefined || !json.includes(lacks));
+    });
   const missed: string[] = [];
   for (const e of expect) {
     const problem = problemOf(e);
@@ -80,7 +86,7 @@ export function check(expect: readonly Expect[], turn: readonly AgentMessage[]):
     }
     const ok =
       e.kind === "called"
-        ? called(e.tool!, e.argContains)
+        ? called(e.tool!, e.argContains, e.argLacks)
         : e.kind === "notCalled"
           ? !called(e.tool!)
           : e.kind === "silent"

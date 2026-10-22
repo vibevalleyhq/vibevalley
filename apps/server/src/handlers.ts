@@ -153,7 +153,7 @@ export const handlers = Effect.gen(function* () {
     "issue.refine": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.general())),
     "issue.dispatch": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.dispatchQueued(id)),
     "issue.status": ({ id: ref, body }) =>
-      Effect.flatMap(edited(ref, body.edit), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general())),
+      Effect.flatMap(edited(ref, body.edit), (id) => issues.setStatus(id, body.status, body.text ?? "", channels.general(), body.agent)),
     "issue.comment": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
     "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, "owner")),
     "project.templates": ({ id }) => issues.templates(id),

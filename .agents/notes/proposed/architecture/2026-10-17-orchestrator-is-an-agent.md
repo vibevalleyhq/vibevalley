@@ -102,7 +102,7 @@ type Caller struct {
 
 工具表（第 2 节的目录）2026-10-18 做了：`apps/server/src/tool` 排在 `task` 之后、`orchestrator` 之前，按事情分文件（`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`、`tool/tool.ts`），管家的 23 个工具和帮工的 6 个都搬了进去；`tool/tool.ts`、`tool/schemas.ts` 删了，管家经 `tool.Service.Orchestrator` 拿工具，调用者从它正在回答的输入取；`apps/server/src/mcp` 只剩认证和把 `tool.Service.Session` 的工具注册到 `/mcp`。读频道合成一个 `read_chat`（帮工原来叫 `channel_read`，管家的多了 `unread`、`before`、`limit`）；记性的两个工具各一个函数，按调用者选写法。哪些工具给谁现在还是两张写死的表（`Orchestrator`、`Session`），没有 `Can`。
 
-还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `orchestrator` 和 `session`（第 3 节）、`hire`（第 5 节）、管家页上改模型；从[先有能力，再有入口](docs/subsystems/core.md)并过来的：管家的 `dispatch` 现在直接 `Issue.Hire`、满了就拒绝，要改成先写工单再挪到待办（`issue.status`），和主人派的一条规则、满了排队。
+还没做：`Capability` 和 `Agent.Can`（第 1 节）、`agent.Service` 的「是不是常驻」（第 4 节）、按 `Can` 过滤和放行、能力表去掉 `orchestrator` 和 `session`（第 3 节）、`hire`（第 5 节）、管家页上改模型。从[先有能力，再有入口](docs/subsystems/core.md)并过来的「管家先写工单再开工、满了排队」已经做了：管家的工具里没有 `dispatch` 了，建单和开工是 `issue_create`（`start`），开工走 `Issues.start`；本文里的 `dispatch` 只指那项能力。
 
 ## Alternatives considered
 

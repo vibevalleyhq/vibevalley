@@ -96,29 +96,6 @@ export const schemas: Record<string, Schema> = {
     required: ["issue"],
     type: "object",
   },
-  dispatch: {
-    additionalProperties: true,
-    properties: {
-      agent: {
-        description: "帮工名字、id 或 runtime",
-        type: "string",
-      },
-      brief: {
-        description: "工单",
-        type: "string",
-      },
-      channel: {
-        description: "派在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
-        type: "string",
-      },
-      project: {
-        description: "项目文件夹名，比如 clock-in",
-        type: "string",
-      },
-    },
-    required: ["brief"],
-    type: "object",
-  },
   graph_action: {
     additionalProperties: true,
     properties: {
@@ -167,11 +144,15 @@ export const schemas: Record<string, Schema> = {
     additionalProperties: true,
     properties: {
       agent: {
-        description: "以后谁来做：帮工的名字或 id；不填，开工时按农场的规则挑",
+        description: "谁来做：帮工的名字、id 或 runtime；不填，开工时按农场的规则挑",
+        type: "string",
+      },
+      channel: {
+        description: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
         type: "string",
       },
       description: {
-        description: "说明：主人说的原话和你补的背景",
+        description: "说明：主人说的原话和你补的背景；主人没说的写成建议或待定，不写成要求",
         type: "string",
       },
       draft: {
@@ -183,8 +164,12 @@ export const schemas: Record<string, Schema> = {
         type: "string",
       },
       project: {
-        description: "项目文件夹名；频道有默认项目时可以不填",
+        description: "项目文件夹名；频道有默认项目时可以不填；新项目起一个简短的英文名，开工时会新建",
         type: "string",
+      },
+      start: {
+        description: "记下就开工（没空地就排队）：只在主人要马上做时填 true；记一下、先别开始、只是指派都不填",
+        type: "boolean",
       },
       title: {
         description: "一句话的标题",
@@ -197,12 +182,16 @@ export const schemas: Record<string, Schema> = {
   issue_status: {
     additionalProperties: true,
     properties: {
+      agent: {
+        description: "挪到待办时谁来做：填另一个帮工的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
+        type: "string",
+      },
       issue: {
         description: "工单编号（#41 或 41）",
         type: "string",
       },
       text: {
-        description: "带给帮工的一句话：从等你看挪回待办（再干一轮）、重开时必填",
+        description: "带给帮工的一句话：从等你看挪回待办（再干一轮）、重开时必填；换人时写接手的接着做什么",
         type: "string",
       },
       to: {
