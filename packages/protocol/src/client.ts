@@ -108,10 +108,6 @@ export class VibeValleyApi {
     /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
     dispatch: (a: { id: string; body: T.IssueDispatchRequest }): Promise<T.Dispatched> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,
-    /** The acceptance of what was handed back (in review): a pass makes it ready to harvest, a fail adds weeds and sends
-     * another round. */
-    review: (a: { id: string; body: T.IssueReviewRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/review", undefined, a.body) as Promise<T.Issue>,
     /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
     act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,

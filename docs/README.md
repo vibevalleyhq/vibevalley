@@ -76,7 +76,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 收成清单 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情 |
 | 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |
 | 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
-| 验收 | review（`Issue.review`、`issue.review`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核 |
+| 验收 | review（`Issue.review`；动作 `accept`、`reject`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核 |
 | 草 | finding（`Issue.Findings`） | 没过验收的一条意见；下次验收通过才拔 | |
 | 缺肥 | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；施肥是回答它 | |
 | 仓库 | warehouse | 收获了的工单 | |

@@ -74,7 +74,6 @@
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
 | `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
-| `issue.review` | `POST /api/v1/issues/{id}/review` | ✓ | ✓ | ✓ |
 | `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
 
 ## session
