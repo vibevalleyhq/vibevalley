@@ -85,7 +85,8 @@ export function ChatRow(props: { mine: boolean; first: boolean; face?: JSX.Eleme
         <div
           title={props.title}
           class={[
-            "px-3 py-2 text-[12px] leading-[1.625]",
+            // Capped by its column: a one-line dispatch note is as wide as its whole line until it truncates.
+            "max-w-full px-3 py-2 text-[12px] leading-[1.625]",
             props.mine
               ? "bg-leaf-500 text-cream-50 shadow-[0_2px_0_0_#3f6427]"
               : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_#7a5f4029]",

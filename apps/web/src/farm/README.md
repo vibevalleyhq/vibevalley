@@ -8,9 +8,9 @@ the pad).
 
 ## Its parts
 
-`FarmPage.tsx` mounts each part's one entry without props (`VillageCanvas`, `Hud`, `Panels`, `ChatWindow`, `IssueView`,
-`Phone`, `TitleScreen`, `DebugPanel`): what they need comes from the store, the frame and the commands, so keep them
-prop-less.
+`FarmPage.tsx` mounts each part's one entry without props (`VillageCanvas`, `Hud`, `Panels`, `IssueView`,
+`TitleScreen`, `DebugPanel`): what they need comes from the store, the frame and the commands, so keep them
+prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving it the room it may take.
 
 | Part | Folder | Draws |
 |---|---|---|
@@ -29,7 +29,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 |---|---|
 | `inspect` (a plot's issue) | `IssueView` |
 | `review` (harvest), `sow`, `water`, `panel`, `menu` | `Panels` |
-| the chat window (`chatOpen`, `chatLarge`, `chatShown`) | `ChatWindow` (FarmPage puts it at the bottom right) |
+| the chat (`chatOpen` is the phone unfolded, `chatLarge`, `chatShown`) | `ChatWindow`, the unfolded phone's right screen (`Phone`) |
 | `phoneOpen` | `Phone` (its button sits in the HUD, which calls `farm.phoneOpen(true)`) |
 | `titleOpen` | `TitleScreen` (FarmPage mounts it only while open) |
 | `bedFx`, `rewards`, hover, names | the canvas draws bed FX over the plots and sets hover; the HUD's FX layer shows rewards |
@@ -50,7 +50,7 @@ outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 | `hold(tool)` | the tool in hand (`tools.ts`: hand, water, bug, weed, harvest, shovel; keys 1–6) |
 | `hover(bed \| null, spot \| null)` | set by the canvas: the bed and the yard place under the pointer |
 | `revealNames(on)` | Alt held: every name tag shows |
-| `chatOpen(open)`, `chatLarge(large)`, `showChat(conversation \| null)` | the chat window; null is the general channel |
+| `chatOpen(open)`, `chatLarge(large)`, `showChat(conversation \| null)` | the chat: unfolding takes the phone out, putting the phone away folds it; null is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
 | `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (`localStorage` `vibevalley.title.seen`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |
