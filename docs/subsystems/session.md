@@ -118,7 +118,7 @@
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。
 - **核心状态（`core`）**：`apply` 施加 `hired`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`；日志的事件推给页面；提醒经核心状态的 side event 发。
-- **管家（`orchestrator`）**：建一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；run 和日志由宿主经 `execution.ts` 记（`session.events orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
+- **管家（`orchestrator`）**：向 `Sessions.host` 要一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；日志和记 run 的地方由 `Sessions` 配上，管家碰不到：run 和日志经 `execution.ts` 记，和帮工的放在一起（`session.events orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
 - **`/mcp`（`mcp`）**：凭 `Sessions.who` 认出调工具的是哪个 Session。
 
 ## 为什么这样

@@ -18,7 +18,7 @@
 
 ## 在哪
 
-- **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；农场现状、频道的汇报、听巡查和计划的消息；把一个 `AgentHost` 配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、农场现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
+- **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；农场现状、频道的汇报、听巡查和计划的消息；向 `Sessions.host` 要一个 `AgentHost`，配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、农场现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 28 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
 - **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。

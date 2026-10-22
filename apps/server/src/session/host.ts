@@ -94,9 +94,9 @@ export interface HostOptions<R> {
   readonly fresh: () => void;
   /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
   readonly restored: (route: R) => RunInput;
-  readonly journal: Journal;
+  /** How many events its log keeps; 0 keeps them all. */
+  readonly keepEvents?: number;
   readonly toolStart: (tool: string, args: unknown) => ToolStart;
-  readonly runStore: RunStore;
   readonly notice: (level: "info" | "warn" | "error", text: string) => void;
   readonly log: (level: "info" | "error", text: string) => void;
   readonly go: <A, E>(e: Effect.Effect<A, E>) => Promise<A>;
@@ -123,8 +123,16 @@ export class AgentHost<R> {
   /** Held from building an input to handing it over, so that each input's text follows the one before. */
   private inputs = Promise.resolve();
 
-  constructor(private readonly o: HostOptions<R>) {
-    this.execution = new AgentExecution(o.name, o.journal, o.toolStart, o.runStore);
+  private readonly journal: Journal;
+
+  /** Made by Sessions.host: its log and its runs are kept with the sessions'. */
+  constructor(
+    private readonly o: HostOptions<R>,
+    journal: Journal,
+    runs: RunStore,
+  ) {
+    this.journal = journal;
+    this.execution = new AgentExecution(o.name, journal, o.toolStart, runs);
     this.transcript = join(o.home, o.name + ".jsonl");
     this.input = { route: o.first, run: { by: { kind: "" } } };
   }
@@ -191,7 +199,7 @@ export class AgentHost<R> {
     this.execution.resume(this.o.restored(at.route));
     if (b.resume(maxAgeMs)) return;
     this.execution.resume(undefined);
-    if (!b.busy()) this.o.journal.note("run/error", "上一轮停在了半路，太久了，没有接着做");
+    if (!b.busy()) this.journal.note("run/error", "上一轮停在了半路，太久了，没有接着做");
   }
 
   /** The inputs waiting are dropped with the run. */
@@ -212,7 +220,7 @@ export class AgentHost<R> {
     return Effect.suspend(() => {
       const w = want.trim();
       if (!w) return Effect.fail(refused("写一句它应该怎样"));
-      const asked = this.o.journal.events().find((e) => e.seq === on);
+      const asked = this.journal.events().find((e) => e.seq === on);
       if (!asked) return Effect.fail(missing(`${this.o.label}轨迹里没有第 ${on} 步`));
       if (asked.type !== "user/message") return Effect.fail(refused(`第 ${on} 步不是${this.o.label}收到的话`));
       const lines = readLines(this.transcript);
@@ -319,7 +327,7 @@ export class AgentHost<R> {
 
   // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
   private async settled(aborted: boolean) {
-    if (aborted && !this.closing) this.o.journal.note("run/error", "主人叫停了");
+    if (aborted && !this.closing) this.journal.note("run/error", "主人叫停了");
     this.input.caller?.end();
     this.input = { route: this.input.route, run: this.input.run };
     this.open = false;
@@ -332,7 +340,7 @@ export class AgentHost<R> {
     const changed = this.prefixChanged;
     this.prefixChanged = [];
     const tokens = tokensOf(u);
-    this.o.journal.usage(tokens, usageText(tokens, changed));
+    this.journal.usage(tokens, usageText(tokens, changed));
   }
 
   // The agent's events, handled one at a time in order.
@@ -377,7 +385,7 @@ export class AgentHost<R> {
       case "compaction_end":
         if (e.usage) {
           const tokens = tokensOf(e.usage);
-          this.o.journal.usage(tokens, "整理对话，" + usageText(tokens));
+          this.journal.usage(tokens, "整理对话，" + usageText(tokens));
         }
         if (e.compaction) this.o.fresh();
         return;

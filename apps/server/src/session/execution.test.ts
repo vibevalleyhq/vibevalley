@@ -4,6 +4,7 @@ import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
+import type { Trajectories } from "./journal.ts";
 import { type RunFinished, type RunStore, Sessions } from "./session.ts";
 
 const user = (text: string) => ({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } }) as AgentEvent;
@@ -30,10 +31,13 @@ const issue = (id: string) =>
     sql`insert into issue (id, number, title, description, created_at) values (${id}, ${Number(id.slice(1))}, ${id}, '', 0)`.pipe(Effect.orDie),
   );
 
+/** What Sessions.host hands an in-process agent, from the sessions' handle for tests. */
+type Kept = Sessions["Service"] & { trajectories: Trajectories; runStore: RunStore };
+
 describe("the orchestrator's runs", () => {
   it.live("one loop is one run; its inputs' issues are all linked; failures and stops are said", () =>
     Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = (yield* Sessions) as Kept;
       yield* issue("i1");
       yield* issue("i2");
       const finished: RunFinished[] = [];
@@ -81,7 +85,7 @@ describe("the orchestrator's runs", () => {
 
   it.live("a run whose end could not be written ends before the next starts", () =>
     Effect.gen(function* () {
-      const sessions = yield* Sessions;
+      const sessions = (yield* Sessions) as Kept;
       let broken = true;
       const store: RunStore = { ...sessions.runStore, finish: (...a) => (broken ? Effect.fail(new Error("disk full")) : sessions.runStore.finish(...a)) };
       const x = new AgentExecution("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);

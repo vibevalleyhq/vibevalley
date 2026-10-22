@@ -47,6 +47,7 @@ import { type Merged, MergeFailure, Projects, type Workplace } from "../project/
 import { probeInstallation, Runtimes } from "../runtime/runtime.ts";
 import { eventFacts, type From, type Op, since, type Tracking } from "./facts.ts";
 import { type Journal, Trajectories } from "./journal.ts";
+import { AgentHost, type HostOptions } from "./host.ts";
 import {
   conflictOf,
   instructions,
@@ -176,7 +177,6 @@ export interface SessionShape {
   readonly currentRun: (id: string) => string;
   /** A session's log, oldest first; a run's only when run is given. */
   readonly events: (id: string, run?: string) => SessionEvent[] | undefined;
-  readonly trajectories: Trajectories;
   /** These four are subscribed before they return: nothing published after is missed. */
   readonly launches: Effect.Effect<Stream.Stream<LaunchActivity>, never, Scope.Scope>;
   /** A session hired, reported or gone, with the session as it stood after: what the issues and task graphs follow. */
@@ -191,8 +191,8 @@ export interface SessionShape {
   /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
   readonly setAddress: (address: string) => void;
   readonly mcpUrl: () => string;
-  /** Records a run of an in-process agent (the orchestrator's) as its own; execution.ts. */
-  readonly runStore: RunStore;
+  /** An agent run in this process (the orchestrator): its log and its runs are kept as a session's are. */
+  readonly host: <R>(options: HostOptions<R>) => AgentHost<R>;
   /** Brings back the sessions the farm had when it stopped, once every service is ready. */
   readonly restore: Effect.Effect<void>;
 }
@@ -939,6 +939,12 @@ export const make = (options: SessionOptionsIn = {}) =>
       return session ? { session, place: h.place, lastText: h.lastText } : undefined;
     };
 
+    const runStore: RunStore = {
+      ...runs,
+      finished: (r) => PubSub.publishUnsafe(finishedHub, r),
+      consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
+      register: (session, current) => void executions.set(session, current),
+    };
     const shape: SessionShape = {
       noRoom: roomFor,
       makeRoom: (runtime, project) =>
@@ -1089,7 +1095,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
       currentRun: (id) => hands.get(id)?.run ?? executions.get(id)?.() ?? "",
       events: (id, r) => trajectories.events(id, r),
-      trajectories,
       sessionOf: (id) => core.session(id),
       presentSessions: () => core.state().sessions,
       launches: Effect.map(PubSub.subscribe(launchesHub), Stream.fromSubscription),
@@ -1101,12 +1106,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
       mcpUrl: () => mcpUrl,
-      runStore: {
-        ...runs,
-        finished: (r) => PubSub.publishUnsafe(finishedHub, r),
-        consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
-        register: (session, current) => void executions.set(session, current),
-      },
+      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
@@ -1123,7 +1123,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.inputsConsumed, chat.consumed));
     yield* Effect.forkScoped(Stream.runForEach(yield* shape.news, chat.sessionNews));
     // A handle for tests: what the shape does not say.
-    return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run });
+    return Object.assign(shape, { hands, expect, unexpect, hired: () => hired, run, trajectories, runStore });
   });
 
 export const layer = (options?: SessionOptionsIn) => Layer.effect(Sessions, make(options));

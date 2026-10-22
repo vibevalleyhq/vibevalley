@@ -11,6 +11,7 @@ import { Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
+import type { Trajectories } from "./journal.ts";
 import { Sessions } from "./session.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
@@ -102,6 +103,7 @@ describe("sessions", () => {
         expect: (h: unknown, by: unknown) => void;
         unexpect: (h: unknown) => void;
         hired: () => number;
+        trajectories: Trajectories;
       };
       yield* core.apply({
         type: "hired",
@@ -110,7 +112,7 @@ describe("sessions", () => {
       const h = {
         id: "w1",
         place: { project: "demo", cwd: "/nowhere" },
-        journal: sessions.trajectories.openLog("w1"),
+        journal: s.trajectories.openLog("w1"),
         oarSessionId: "",
         lastText: "",
         tracking: {},

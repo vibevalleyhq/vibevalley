@@ -26,7 +26,7 @@ import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
-import { AgentHost, Caller } from "../session/host.ts";
+import { Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
 import { Tasks } from "../task/task.ts";
@@ -191,7 +191,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       });
     };
 
-    const host = new AgentHost<Route>({
+    const host = run.host<Route>({
       name: orchestratorAgent,
       label: "管家",
       inputType: "orchestratorInput",
@@ -209,9 +209,8 @@ export const make = (options: OrchestratorOptions = {}) =>
         shown = "";
       },
       restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
-      journal: run.trajectories.openLog(orchestratorAgent, keepEvents),
+      keepEvents,
       toolStart: tool.start,
-      runStore: run.runStore,
       notice,
       log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
       go,
