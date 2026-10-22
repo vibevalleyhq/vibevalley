@@ -19,8 +19,8 @@ export const places: readonly Place[] = [
   { id: "settings", label: "设置", hint: "钥匙、记性、连接器、技能、声音、连接到本机", icon: "icon-wrench", path: "/settings" },
 ];
 
-/** The place a path is in (/manager is the agents' too); undefined for the farm. */
+/** The place a path is in (/assistant is the agents' too); undefined for the farm. */
 export function placeOf(path: string): Place | undefined {
-  if (path.startsWith("/manager")) return places.find((p) => p.id === "agents");
+  if (path.startsWith("/assistant")) return places.find((p) => p.id === "agents");
   return places.find((p) => path === p.path || path.startsWith(`${p.path}/`));
 }

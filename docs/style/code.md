@@ -37,7 +37,7 @@
 | 不写什么 | 例子 |
 |---|---|
 | 照着名字或代码再说一遍 | `// tell gives a session words.`<br>`/** The tool in hand. */` |
-| 文件开头的功能概述 | `// The group chat (田头): the person, the manager and the helpers in one square …` |
+| 文件开头的功能概述 | `// The group chat (田头): the person, the assistant and the helpers in one square …` |
 | 给一段代码起标题、画分隔线 | `// ── Plots ──`<br>`// Everyone walks in from the gate.` |
 | 测试里一步步讲在测什么 | `// No room yet: it waits.` |
 | 历史和出处 | `// ported from the Go server's session.go`<br>`// as on the web page` |

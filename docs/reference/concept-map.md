@@ -23,8 +23,8 @@
 | 帮工档案 | 一种小动物 | `/agents`（`pages/agents`） | `Agent` | `/api/v1/agents` |
 | 农机 | 农具 | `/runtimes`（`pages/runtimes`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtimes` |
 | 技能书 | 技能书 | `/settings/skills`（`pages/settings/SkillsPage.tsx`） | `Skill` | `/api/v1/skills` |
-| 记性 | 记性 | 档案页和管家页（`pages/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `manager`） |
-| 管家 | 管家 | `/manager`（`pages/manager`） | `WorkspaceState.manager`（管家的状态） | `/api/v1/say`、`/api/v1/manager/...` |
+| 记性 | 记性 | 档案页和管家页（`pages/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `assistant`） |
+| 管家 | 管家 | `/assistant`（`pages/assistant`） | `WorkspaceState.assistant`（管家的状态） | `/api/v1/say`、`/api/v1/assistant/...` |
 | 工单 | 看板上的卡片 | `/issues`（`pages/issues`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issues` |
 | 种植计划 | 图纸桌、计划板 | `farm/panels/TaskBoard.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graphs` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`WorkspaceState.sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
@@ -52,9 +52,9 @@
 | 项目 | `Projects`（`project/project.ts`、`git.ts`、`stack.ts`） | 工作目录下的 git 仓库 | 会话的 `cwd` |
 | 帮工档案、技能书 | `Agents` | `config.json` | |
 | 农机 | `Runtimes` | `config.json` 里每台农机的设置、`spend.json` | `Runtime`、`RuntimeRegistry` |
-| 记性 | `Memories` | `memory` 表；管家的在 `manager/MEMORY.md` | |
-| 管家 | `Manager` | `manager/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
-| 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `manager/manager.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
+| 记性 | `Memories` | `memory` 表；管家的在 `assistant/MEMORY.md` | |
+| 管家 | `Assistant` | `assistant/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
+| 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `assistant/assistant.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
 | 种植计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
 | 帮工 | `Sessions`（`session/session.ts`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
 | 一次干活（run） | `Sessions`（`session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
@@ -62,7 +62,7 @@
 | 收成清单、收获 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 工单的分支和 worktree | |
 | 田头、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Recurrences` | `recurrence` 表 | |
-| 巡查 | `Manager`（规则在 `manager/rules.ts`） | 不存：每轮从核心状态算 | |
+| 巡查 | `Assistant`（规则在 `assistant/rules.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | 不存：`inbox` 从核心状态算 | | |
 | 连接器 | `Connectors`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
 | 「连接到本机」 | `Lan` | `lan`、`lan_device` 表 | |

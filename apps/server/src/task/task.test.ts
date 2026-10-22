@@ -232,7 +232,7 @@ describe("task graphs", () => {
           ["d", "b,c"],
         ]);
         expect(f.news[0]).toMatch(new RegExp("^【种植计划】" + id + " 拆好了"));
-        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "manager");
+        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "assistant");
         expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
         const ripe = yield* f.until(id, (g) => g.state === "ripe");
         const mine = f.states.filter((g) => g.id === id);
@@ -251,7 +251,7 @@ describe("task graphs", () => {
             .join(" "),
         ).toBe("splitting/user drafted/system started/user ripe/system merged/user");
         const edit = history.find((e) => e.kind === "task_edited")!;
-        expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "manager", "管家", 1, "检查"]);
+        expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "assistant", "管家", 1, "检查"]);
         expect(edit.text).toMatch(/^改了「.+」的检查$/);
         for (const s of ["a", "b", "c", "d"])
           expect(

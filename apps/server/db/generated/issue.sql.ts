@@ -609,7 +609,7 @@ export const SetHandedBackParams = Schema.Struct({
 export type SetHandedBackParams = typeof SetHandedBackParams.Type
 
 
-export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the manager's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
+export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the assistant's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
 
 export const setHandedBack = Effect.fn("SetHandedBack")(function* (params: SetHandedBackParams) {
   const sql = yield* SqlClient.SqlClient

@@ -58,7 +58,7 @@ export function changesText(c: Changes): string {
   return lines.join("\n");
 }
 
-/** How a session reads to the manager, in its situation as in roster; number is its issue's. */
+/** How a session reads to the assistant, in its situation as in roster; number is its issue's. */
 export function sessionLine(w: Roster, now = Date.now(), number?: number): string {
   const h = w.session;
   let last = "";
@@ -73,9 +73,9 @@ export function sessionLine(w: Roster, now = Date.now(), number?: number): strin
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-// ── issues, as the manager reads them ──
+// ── issues, as the assistant reads them ──
 
-/** The words the owner and the manager use for a status, and its own name. */
+/** The words the owner and the assistant use for a status, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
   备选: "backlog",
   草稿: "backlog",
@@ -114,7 +114,7 @@ export function spanWords(ms: number): string {
   return `${Math.floor(m / 60 / 24)} 天`;
 }
 
-/** One line: its number and short title first, so the manager names it by them; who is the one doing it, when any. */
+/** One line: its number and short title first, so the assistant names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
   const st = t.attention;
   const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
@@ -166,7 +166,7 @@ export function parseTime(s: string): number | undefined {
  * list, so that the prompt's prefix does not change from round to round. */
 export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** Changing an issue or moving it is the owner's call: the manager questions for what it saw itself, as with a merge. */
+/** Changing an issue or moving it is the owner's call: the assistant questions for what it saw itself, as with a merge. */
 export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 /** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */

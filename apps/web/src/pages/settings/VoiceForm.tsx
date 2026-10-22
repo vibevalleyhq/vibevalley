@@ -1,5 +1,5 @@
-// 声音: the call's line on /settings/voice (credentials, how it listens, who answers, dictation) and the manager's voice
-// on /manager/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
+// 声音: the call's line on /settings/voice (credentials, how it listens, who answers, dictation) and the assistant's voice
+// on /assistant/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
 import { createSignal, For, Match, onSettled, Show, snapshot, Switch, untrack } from "solid-js";
@@ -205,7 +205,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
   const answer = () => draft().answer;
   const credentialsReady = () => base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
   const answerHint = () =>
-    answer().vendor === "manager"
+    answer().vendor === "assistant"
       ? "田头上那个管家本人接电话：看得到地里，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。"
       : answer().vendor === "agora"
         ? "声网托管的模型，不用别的 key。"
@@ -226,7 +226,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
               <p class="text-sm text-muted">
                 管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的
                 key），也可以换成自己的服务。管家的人设、开场白和音色在
-                <A class="underline" href="/manager/voice">
+                <A class="underline" href="/assistant/voice">
                   管家页
                 </A>
                 。
@@ -424,9 +424,9 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
           页。
         </p>
         <Card title="开口" action={<span class="text-sm text-muted">人设 · 开场白</span>}>
-          {/* The persona is the quick model's only: the manager answering is itself, with its own prompt. */}
+          {/* The persona is the quick model's only: the assistant answering is itself, with its own prompt. */}
           <Show
-            when={answer().vendor !== "manager"}
+            when={answer().vendor !== "assistant"}
             fallback={<p class="text-sm text-muted">电话由农场的管家自己接：它就是田头里那个管家，用它自己的提示词，不另设人设。</p>}
           >
             <Labeled label="人设" hint="电话里先答话的模型是谁、怎么说话。它看不到地里，派活由本机的管家做；写明别编进度。">

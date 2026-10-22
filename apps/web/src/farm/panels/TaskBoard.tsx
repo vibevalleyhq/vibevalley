@@ -5,7 +5,7 @@
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
-import { type GraphAction, type GraphEvent, type GraphState, managerAgent, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
+import { type GraphAction, type GraphEvent, type GraphState, assistantAgent, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { doingOf } from "../hud/rules";
 import { farm } from "../store";
@@ -97,7 +97,7 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   const frames = useFrames();
   const projectsQuery = useProjects();
   const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== managerAgent && a.enabled);
+  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== assistantAgent && a.enabled);
   const [goal, setGoal] = createSignal("");
   const [project, setProject] = createSignal<string>();
   const [splitter, setSplitter] = createSignal("auto");
@@ -498,7 +498,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
 
 function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer) => void }) {
   const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== managerAgent && a.enabled);
+  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== assistantAgent && a.enabled);
   // The editor starts from the step as it is when opened, and edits its own copy.
   const start = untrack(() => props.node);
   const [id, setId] = createSignal(start?.id ?? "");
@@ -565,7 +565,7 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
 
 const actorTone: Record<GraphEvent["actor"], [fill: string, ink: string]> = {
   user: ["#74a046", "#f7e8c4"],
-  manager: ["#efd08f", "#2f1f13"],
+  assistant: ["#efd08f", "#2f1f13"],
   session: ["#bfd7ea", "#2f1f13"],
   system: ["#e2c995", "#2f1f13"],
 };

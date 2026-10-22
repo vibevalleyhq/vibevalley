@@ -1,5 +1,5 @@
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
-// the manager's line. The web has no voice yet, so calling the manager says so and points to 田头 instead of dialing.
+// the assistant's line. The web has no voice yet, so calling the assistant says so and points to 田头 instead of dialing.
 
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -10,7 +10,7 @@ import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
 import { aria } from "../../app/util";
 import { ready, useAgents } from "../../data/query";
-import { AgentFace, ManagerFace } from "../../ui/Face";
+import { AgentFace, AssistantFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
 import { createCall } from "../../voice/CallButton";
@@ -18,7 +18,7 @@ import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 
-export type PhoneApp = "home" | "missed" | "log" | "manager" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
+export type PhoneApp = "home" | "missed" | "log" | "assistant" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
 const cream = "#f7e8c4";
 const bark = "#2f1f13";
@@ -49,7 +49,7 @@ export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
 function CallerFace(props: { call: InboxItem; size: number }) {
   const agents = useAgents();
   return (
-    <Show when={props.call.from.kind !== "manager" ? props.call.from : undefined} fallback={<ManagerFace size={props.size} />}>
+    <Show when={props.call.from.kind !== "assistant" ? props.call.from : undefined} fallback={<AssistantFace size={props.size} />}>
       {(from) => <AgentFace agentId={from().agent || from().id} look={ready(agents, []).find((a) => a.id === from().agent)?.look} size={props.size} />}
     </Show>
   );
@@ -116,7 +116,7 @@ function RoundKey(props: { answer: boolean; label: string; onClick: () => void }
   );
 }
 
-function CallManager(props: { onCall: () => void }) {
+function CallAssistant(props: { onCall: () => void }) {
   return (
     <button
       type="button"
@@ -209,14 +209,14 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
           </Show>
         </Show>
       </ul>
-      <CallManager onCall={() => props.onCall()} />
+      <CallAssistant onCall={() => props.onCall()} />
     </>
   );
 }
 
-/** The manager's line: on the web it cannot be dialed yet, so it sends you to 田头. */
+/** The assistant's line: on the web it cannot be dialed yet, so it sends you to 田头. */
 /** The farm's one call, the chat's call button's too: calling, on it, or why it did not get through. */
-export function ManagerScreen() {
+export function AssistantScreen() {
   const call = createCall();
   const phase = () => call().phase;
   const line = () => {
@@ -235,7 +235,7 @@ export function ManagerScreen() {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
       <BigFace shake={phase() === "connecting"}>
-        <ManagerFace size={60} />
+        <AssistantFace size={60} />
       </BigFace>
       <p class="mt-2 text-[24px] leading-none">管家</p>
       <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
@@ -252,7 +252,7 @@ export function HomeScreen(props: { missed: number; onOpen: (app: PhoneApp) => v
   const apps: { label: string; icon: () => JSX.Element; badge?: () => number; go: () => void }[] = [
     { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
     { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: "管家", icon: () => <ManagerFace size={28} />, go: () => props.onOpen("manager") },
+    { label: "管家", icon: () => <AssistantFace size={28} />, go: () => props.onOpen("assistant") },
     { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
     { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
     { label: "方块", icon: () => <BlocksIcon />, go: () => props.onOpen("blocks") },

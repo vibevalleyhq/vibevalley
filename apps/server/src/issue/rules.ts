@@ -20,7 +20,7 @@ import type {
   TemplateKind,
 } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
-import { isForManager } from "./state.ts";
+import { isForAssistant } from "./state.ts";
 import { clip } from "../base/text.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
@@ -208,7 +208,8 @@ const recentTitleLength = 60;
 export function sentTitles(all: readonly Issue[], project: string): string[] {
   const mine = all
     .filter(
-      (i) => i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.recurrence === undefined && !isForManager(i),
+      (i) =>
+        i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.recurrence === undefined && !isForAssistant(i),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];

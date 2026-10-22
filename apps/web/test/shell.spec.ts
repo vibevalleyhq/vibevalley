@@ -9,7 +9,7 @@ test("the rail lists every place, the farm at the top, and marks where you are",
     await expect(nav.getByRole("link", { name: new RegExp(`^${label} · `) })).toBeVisible();
   await expect(nav.getByRole("link", { name: /^工单 · / })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "工单" })).toBeVisible();
-  // The server is the worker's: an earlier test may have left the manager at work.
+  // The server is the worker's: an earlier test may have left the assistant at work.
   await expect(page.getByRole("link", { name: /^(没开工|开工中 · \d+ 个在干活)$/ })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("rail.png") });
 });

@@ -8,7 +8,7 @@
 |---|---|
 | Inbox：从核心状态现算要主人处理的事，每件带好各条路上说的话 | 一件事本身的状态：工单的站位（[工单](docs/subsystems/issue.md)）、帮工的阶段（[帮工](docs/subsystems/session.md)） |
 | 哪些是刚来的：开机时已经在的不算，同一个 id 只算一次 | 电话本身：线路、Agora、念出来（[语音](docs/subsystems/voice.md)） |
-| 巡查：放过了宽限期的，按频道交给管家 | 管家要不要提醒、怎么说（[管家](docs/subsystems/manager.md)） |
+| 巡查：放过了宽限期的，按频道交给管家 | 管家要不要提醒、怎么说（[管家](docs/subsystems/assistant.md)） |
 | | 手机的响铃、未接和通话记录（[农场的皮](docs/subsystems/farm.md)）；连接器转到微信、飞书、QQ 的话（[田头](docs/subsystems/channel.md)） |
 
 ## 在哪
@@ -50,7 +50,7 @@
 
 - **核心状态（`core`）**：订阅事实、读状态；`frameOf` 把 Inbox 放进帧。
 - **田头（`channel`）**：巡查的发现没有频道时归田头（`general()`）；@主人 的话从频道的消息里算。
-- **管家（`manager`）**：订阅 `overdue`，巡查的话由它写（`patrolText`）。它在本模块之上，所以是它来订阅，通知不调管家。
+- **管家（`assistant`）**：订阅 `overdue`，巡查的话由它写（`patrolText`）。它在本模块之上，所以是它来订阅，通知不调管家。
 - **语音（`voice`）**：订阅 `news`，通话里说。
 - **页面**：只读帧里的 `inbox`，不自己配话、不自己判断哪些要主人。
 
@@ -69,6 +69,6 @@
 
 - `apps/server/src/core/golden.test.ts`（每种什么时候算、id、截字、先后，和工单站位一致）；`inbox.test.ts`（交回来带着问题、停在半路、每件的话、刚来的）。
 - `apps/server/src/notice/rules.test.ts`：巡查照黄金数据。
-- `apps/server/src/manager/manager.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
+- `apps/server/src/assistant/assistant.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。
 - 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/rules/notice.test.ts`（菜单栏）。

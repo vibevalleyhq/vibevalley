@@ -32,7 +32,7 @@ export interface RtcGrant {
   readonly token: string;
 }
 
-/** What a call hears: the manager's arrival and leaving, its captions, both sides' levels (0..100), a trouble, and
+/** What a call hears: the assistant's arrival and leaving, its captions, both sides' levels (0..100), a trouble, and
  * that the token is about to run out. */
 export interface RtcEvents {
   readonly joined: () => void;
@@ -60,7 +60,7 @@ export interface Host {
   readonly notify: ((notice: Notice) => Promise<void>) | null;
   /** The tray's title and lines; null where there is no tray. */
   readonly tray: ((summary: TraySummary) => Promise<void>) | null;
-  /** The key that starts and ends a call to the manager from anywhere; null where there is none. */
+  /** The key that starts and ends a call to the assistant from anywhere; null where there is none. */
   readonly voiceShortcut: Shortcut | null;
   /** A call the host carries itself (the phone's, which goes on with the screen locked); null: the page joins with
    * Agora's web SDK. */

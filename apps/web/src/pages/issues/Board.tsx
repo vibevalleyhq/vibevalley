@@ -248,7 +248,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         aria-label={look().title}
         aria-current={props.selected ? "true" : undefined}
         title={look().detail}
-        draggable={props.card.kind !== "task" && props.card.kind !== "manager" && props.card.kind !== "missing" ? "true" : "false"}
+        draggable={props.card.kind !== "task" && props.card.kind !== "assistant" && props.card.kind !== "missing" ? "true" : "false"}
         onDragStart={(e) => {
           e.dataTransfer!.effectAllowed = "move";
           e.dataTransfer!.setData("text/plain", props.card.id);

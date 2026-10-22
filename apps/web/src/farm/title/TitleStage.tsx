@@ -9,8 +9,8 @@ import {
   chimney,
   clouds,
   light,
-  manager,
-  managerPose,
+  assistant,
+  assistantPose,
   type PetFrame,
   petRound,
   petScale,
@@ -145,10 +145,13 @@ export function TitleStage(props: { scene: TitleScene }) {
 }
 
 function Farmer(props: { scene: TitleScene; sizes: TitleSprites }) {
-  const s = () => spriteOf(props.sizes, managerPose[props.scene], manager.scale);
+  const s = () => spriteOf(props.sizes, assistantPose[props.scene], assistant.scale);
   const ground = () => light[props.scene].ground;
   return (
-    <div class="title-breathe absolute" style={{ left: pct(manager.x - s().w / 2), top: pct(manager.bottom - s().h), width: pct(s().w), height: pct(s().h) }}>
+    <div
+      class="title-breathe absolute"
+      style={{ left: pct(assistant.x - s().w / 2), top: pct(assistant.bottom - s().h), width: pct(s().w), height: pct(s().h) }}
+    >
       <img
         src={s().src}
         alt=""

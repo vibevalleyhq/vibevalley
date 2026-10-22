@@ -175,7 +175,7 @@ export interface SessionShape {
   /** For a farm listening on a free port: sessions opened from now on reach /mcp there. */
   readonly setAddress: (address: string) => void;
   readonly mcpUrl: () => string;
-  /** Records a run of an in-process agent (the manager's) as its own; execution.ts. */
+  /** Records a run of an in-process agent (the assistant's) as its own; execution.ts. */
   readonly runStore: RunStore;
   /** Brings back the sessions the farm had when it stopped, once every service is ready. */
   readonly restore: Effect.Effect<void>;

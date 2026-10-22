@@ -1,16 +1,16 @@
-// 管家: who the manager is, and its 记性, 轨迹 (every round, a round markable as wrong),
-// 旧账 (the conversation it folded away) and 声音 (what it says on a call); /manager/<tab>.
+// 管家: who the assistant is, and its 记性, 轨迹 (every round, a round markable as wrong),
+// 旧账 (the conversation it folded away) and 声音 (what it says on a call); /assistant/<tab>.
 
 import { For, Match, Switch } from "solid-js";
-import { managerAgent } from "@vibevalley/protocol";
+import { assistantAgent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { managerLooks } from "../../farm/tools";
+import { assistantLooks } from "../../farm/tools";
 import { A } from "../../app/A";
 import { useRouter } from "../../app/router";
 import { aria } from "../../app/util";
 import { useFarm } from "../../farm/state";
-import { ManagerFace } from "../../ui/Face";
-import { ArchivePanel, ManagerMemoryPanel } from "../Memory";
+import { AssistantFace } from "../../ui/Face";
+import { ArchivePanel, AssistantMemoryPanel } from "../Memory";
 import { VoiceForm } from "../settings/VoiceForm";
 import { TrajectoryLog } from "../Trajectory";
 
@@ -21,16 +21,16 @@ const tabs = [
   { id: "voice", label: "声音" },
 ] as const;
 
-/** `rest` is the path after /manager/. */
-export function ManagerPage(props: { rest: string }) {
+/** `rest` is the path after /assistant/. */
+export function AssistantPage(props: { rest: string }) {
   const at = () => tabs.find((t) => t.id === props.rest)?.id ?? "memory";
   const router = useRouter();
-  const chosen = useFarm((s) => s.managerLook);
-  const look = () => managerLooks.find((l) => l.id === chosen());
+  const chosen = useFarm((s) => s.assistantLook);
+  const look = () => assistantLooks.find((l) => l.id === chosen());
   const head = () => (
     <div class="flex items-center gap-4 pt-4">
       <span class="flex size-18 shrink-0 items-center justify-center rounded-lg bg-hover">
-        <ManagerFace size={64} look={chosen()} />
+        <AssistantFace size={64} look={chosen()} />
       </span>
       <div class="flex min-w-0 flex-col gap-0.5">
         <A href="/agents" class="text-xs text-muted hover:underline">
@@ -51,7 +51,7 @@ export function ManagerPage(props: { rest: string }) {
             type="button"
             role="tab"
             aria-selected={aria(t.id === at())}
-            onClick={() => router.navigate(`/manager/${t.id}`)}
+            onClick={() => router.navigate(`/assistant/${t.id}`)}
             class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}
           >
             {t.label}
@@ -69,12 +69,12 @@ export function ManagerPage(props: { rest: string }) {
           {bar()}
           <div class="min-h-0 flex-1">
             <TrajectoryLog
-              id={managerAgent}
+              id={assistantAgent}
               asked="收到"
               empty="管家还没开过口。"
               title="管家每一轮的经过"
               about="它收到的话、调的每个工具（点一行看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。"
-              onMarkWrong={(on, want) => api.manager.markWrong({ body: { on, want } })}
+              onMarkWrong={(on, want) => api.assistant.markWrong({ body: { on, want } })}
             />
           </div>
         </div>
@@ -86,7 +86,7 @@ export function ManagerPage(props: { rest: string }) {
             {bar()}
             <Switch>
               <Match when={at() === "memory"}>
-                <ManagerMemoryPanel />
+                <AssistantMemoryPanel />
               </Match>
               <Match when={at() === "archive"}>
                 <ArchivePanel />

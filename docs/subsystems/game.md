@@ -8,7 +8,7 @@
 |---|---|
 | 账本：哪些事实记一笔、一笔怎么折成金币、连胜、成就、称号、战绩 | 工单的状态、验收、收获本身（[工单](docs/subsystems/issue.md)）；计划怎么推进（[种植计划](docs/subsystems/task.md)） |
 | 等级：commit 数怎么换成等级、什么时候放升级横幅 | 怎么数 commit（`project.Contributions`，[项目](docs/subsystems/project.md)「数 commit」） |
-| 主人点的空地：下一个帮工挪过去 | 雇谁、派给谁（[管家](docs/subsystems/manager.md)、[帮工](docs/subsystems/session.md)） |
+| 主人点的空地：下一个帮工挪过去 | 雇谁、派给谁（[管家](docs/subsystems/assistant.md)、[帮工](docs/subsystems/session.md)） |
 | 特效：金币、升级、成就、没做成的惩罚 | 特效、庄稼、奖章怎么画，横幅和提示怎么放（[farm-ui.md](docs/reference/farm-ui.md)、[pixel-village.md](docs/reference/pixel-village.md)） |
 | 地块的样子（`FarmView`）和帮工在哪块地、做过什么（`SessionPlay`）的规则 | 地里长什么对应工单的哪一段（[工单](docs/subsystems/issue.md)「三段和状态」） |
 | | 精力瓶：农机的额度（[帮工](docs/subsystems/session.md)，`quotaLow`）；手机里的小游戏（`apps/web/src/farm/phone`，[farm-ui.md](docs/reference/farm-ui.md)「农场手机」） |

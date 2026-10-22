@@ -168,7 +168,7 @@ export const RuntimeFacts: Schema.Codec<T.RuntimeFacts> = Schema.Struct({
 
 export const CallState: Schema.Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
-export const ManagerState: Schema.Codec<T.ManagerState> = Schema.Literals(T.ManagerStateValues);
+export const AssistantState: Schema.Codec<T.AssistantState> = Schema.Literals(T.AssistantStateValues);
 
 export const SenderKind: Schema.Codec<T.SenderKind> = Schema.Literals(T.SenderKindValues);
 
@@ -610,7 +610,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
 export const WorkspaceState: Schema.Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
-  manager: ManagerState,
+  assistant: AssistantState,
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -773,11 +773,11 @@ export const InboxFromSession: Schema.Codec<T.InboxFromSession> = Schema.Struct(
   agent: Schema.String,
 });
 
-export const InboxFromManager: Schema.Codec<T.InboxFromManager> = Schema.Struct({
-  kind: Schema.Literal("manager"),
+export const InboxFromAssistant: Schema.Codec<T.InboxFromAssistant> = Schema.Struct({
+  kind: Schema.Literal("assistant"),
 });
 
-export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromManager]);
+export const InboxFrom: Schema.Codec<T.InboxFrom> = Schema.Union([InboxFromSession, InboxFromAssistant]);
 
 export const InboxTargetSession: Schema.Codec<T.InboxTargetSession> = Schema.Struct({
   kind: Schema.Literal("session"),
@@ -1165,12 +1165,12 @@ export const Skill: Schema.Codec<T.Skill> = Schema.Struct({
   body: Schema.String,
 });
 
-export const ManagerEvalRequest: Schema.Codec<T.ManagerEvalRequest> = Schema.Struct({
+export const AssistantEvalRequest: Schema.Codec<T.AssistantEvalRequest> = Schema.Struct({
   on: Schema.Number,
   want: Schema.String,
 });
 
-export const ManagerEval: Schema.Codec<T.ManagerEval> = Schema.Struct({
+export const AssistantEval: Schema.Codec<T.AssistantEval> = Schema.Struct({
   id: Schema.String,
   file: Schema.String,
 });
@@ -1416,8 +1416,8 @@ export const VoiceASRMicrosoft: Schema.Codec<T.VoiceASRMicrosoft> = Schema.Struc
 
 export const VoiceASR: Schema.Codec<T.VoiceASR> = Schema.Union([VoiceASRAres, VoiceASRDeepgram, VoiceASRMicrosoft]);
 
-export const VoiceAnswerManager: Schema.Codec<T.VoiceAnswerManager> = Schema.Struct({
-  vendor: Schema.Literal("manager"),
+export const VoiceAnswerAssistant: Schema.Codec<T.VoiceAnswerAssistant> = Schema.Struct({
+  vendor: Schema.Literal("assistant"),
 });
 
 export const VoiceAnswerAgoraModel: Schema.Codec<T.VoiceAnswerAgoraModel> = Schema.Literals(T.VoiceAnswerAgoraModelValues);
@@ -1438,7 +1438,7 @@ export const VoiceAnswerOpenai: Schema.Codec<T.VoiceAnswerOpenai> = Schema.Struc
   model: Schema.String,
 });
 
-export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerManager, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
+export const VoiceAnswer: Schema.Codec<T.VoiceAnswer> = Schema.Union([VoiceAnswerAssistant, VoiceAnswerAgora, VoiceAnswerDeepseek, VoiceAnswerOpenai]);
 
 export const VoiceTTSMinimaxModel: Schema.Codec<T.VoiceTTSMinimaxModel> = Schema.Literals(T.VoiceTTSMinimaxModelValues);
 
@@ -1560,10 +1560,10 @@ export const FactCall: Schema.Codec<T.FactCall> = Schema.Struct({
   reason: Schema.optionalKey(Schema.String),
 });
 
-export const FactManager: Schema.Codec<T.FactManager> = Schema.Struct({
-  type: Schema.Literal("manager"),
+export const FactAssistant: Schema.Codec<T.FactAssistant> = Schema.Struct({
+  type: Schema.Literal("assistant"),
   at: Schema.Number,
-  state: ManagerState,
+  state: AssistantState,
 });
 
 export const FactMessage: Schema.Codec<T.FactMessage> = Schema.Struct({
@@ -1697,7 +1697,7 @@ export const FactRecurrenceGone: Schema.Codec<T.FactRecurrenceGone> = Schema.Str
 
 export const Fact: Schema.Codec<T.Fact> = Schema.Union([
   FactCall,
-  FactManager,
+  FactAssistant,
   FactMessage,
   FactConversation,
   FactHired,
@@ -1746,7 +1746,7 @@ export const SideEventRuntime: Schema.Codec<T.SideEventRuntime> = Schema.Struct(
 
 export const SideEvent: Schema.Codec<T.SideEvent> = Schema.Union([
   FactCall,
-  FactManager,
+  FactAssistant,
   FactMessage,
   FactConversation,
   FactHired,

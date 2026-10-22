@@ -1,5 +1,5 @@
 // The farm's chat window and a plot's issue (src/farm/chat, src/farm/issue). The chat runs against the real server (it
-// has no model key: the manager answers that it has none); the plot needs a helper on it, which tests cannot start, so
+// has no model key: the assistant answers that it has none); the plot needs a helper on it, which tests cannot start, so
 // that test serves a frame with one in place of the state stream.
 
 import type { Page } from "@playwright/test";
@@ -16,7 +16,7 @@ async function openFarm(page: Page) {
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
 }
 
-test("a sentence said in 田头 shows in the window, and the manager answers it", async ({ page }) => {
+test("a sentence said in 田头 shows in the window, and the assistant answers it", async ({ page }) => {
   await openFarm(page);
   const chat = page.getByRole("region", { name: "田头" });
   await expect(chat.getByText("这里是田头")).toBeVisible();

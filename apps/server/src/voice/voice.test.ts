@@ -4,7 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
 import { Effect, Layer } from "effect";
-import { layer as manager } from "../manager/manager.ts";
+import { layer as assistant } from "../assistant/assistant.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
@@ -73,7 +73,7 @@ describe("a call's agent", () => {
     });
 
   it("says which key is missing", () => {
-    // The quick model, so the rest needs no line; the default (the manager) needs the line and nothing else.
+    // The quick model, so the rest needs no line; the default (the assistant) needs the line and nothing else.
     expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({ reason: "管家的语音线路没接通" });
     const d: VoiceSettings = { ...defaultVoice(), answer: { vendor: "agora", model: "gpt-4.1-mini" } };
     const none = { asrKey: "", llmKey: "", ttsKey: "" };
@@ -94,11 +94,11 @@ describe("a call's agent", () => {
     expect(problem({ ...d, answer: { vendor: "openai", url: "https://x/v1/chat/completions", model: "m" } })).toContain("大模型");
     expect(problem({ ...d, tts: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } })).toContain("合成");
     expect(problem({ ...d, asr: { vendor: "deepgram", model: "nova-3" }, tts: { vendor: "openai", voice: "nova" } })).toBe("");
-    expect(problem({ ...d, answer: { vendor: "manager" } })).toContain("语音线路");
+    expect(problem({ ...d, answer: { vendor: "assistant" } })).toContain("语音线路");
     expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown);
     expect(fixedIn(deepseek)).toBe("deepseek");
     expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("voice");
-    expect(fixedIn({ ...d, answer: { vendor: "manager" } })).toBeUndefined();
+    expect(fixedIn({ ...d, answer: { vendor: "assistant" } })).toBeUndefined();
   });
 });
 
@@ -106,7 +106,7 @@ describe("a call's agent", () => {
 const farm = (capture: Capture) => {
   const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
   return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
-    Layer.provideMerge(manager({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
+    Layer.provideMerge(assistant({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
   );
 };
 
@@ -162,11 +162,11 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
 
-  it.live("starts and stops the manager on his line", () => {
+  it.live("starts and stops the assistant on his line", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
-      yield* credentials({ answer: { vendor: "manager" } });
+      yield* credentials({ answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
       expect(agent.agentId).toBe("parity-agent");
@@ -193,7 +193,7 @@ describe("voice", () => {
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const setting = yield* Setting;
-      yield* credentials({ area: "EU", answer: { vendor: "manager" } });
+      yield* credentials({ area: "EU", answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
       const started = capture.urls[0]!;
@@ -214,14 +214,14 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // An issue handed back while the owner is on the call: the manager's words about it are read out on the call, queued
+  // An issue handed back while the owner is on the call: the assistant's words about it are read out on the call, queued
   // after what is being said; with no call on, nothing is read.
   it.live("tells the owner on the call when an issue comes to want the owner", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const core = yield* Core;
-      yield* credentials({ answer: { vendor: "manager" } });
+      yield* credentials({ answer: { vendor: "assistant" } });
       expect(yield* voice.speak("没人在听")).toBe(false);
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
@@ -241,12 +241,12 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // Answering a ring: no greeting, the manager's first words are what rang.
+  // Answering a ring: no greeting, the assistant's first words are what rang.
   it.live("opens a call that answers a ring with what rang", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
-      yield* credentials({ answer: { vendor: "manager" } });
+      yield* credentials({ answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid, "#41「写打卡」交回来了，等你验收");
       const llm = (capture.requests[0]!.properties as Record<string, Record<string, unknown>>).llm!;
@@ -261,13 +261,13 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  // Two issues handed back one after the other: one ask of the manager, one answer read out, not two crowding.
+  // Two issues handed back one after the other: one ask of the assistant, one answer read out, not two crowding.
   it.live("tells what comes together once, in one answer", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
       const voice = yield* Voice;
       const core = yield* Core;
-      yield* credentials({ answer: { vendor: "manager" } });
+      yield* credentials({ answer: { vendor: "assistant" } });
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
       for (const [w, t, n] of [
@@ -288,7 +288,7 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
-  it("questions the manager for one answer of everything that waited", () => {
+  it("questions the assistant for one answer of everything that waited", () => {
     expect(onCallLine(["#41「写打卡」交回来了，等你验收", "#42「修登录」这一轮没做成"])).toBe(
       "【要告诉主人】\n- #41「写打卡」交回来了，等你验收\n- #42「修登录」这一轮没做成\n\n主人正在和你通电话，你的回答会念给主人听：这 2 件合成一段说，一件一句，口语，先说结论；不念代码、路径、命令和长列表。",
     );

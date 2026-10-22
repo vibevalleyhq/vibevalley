@@ -1,8 +1,8 @@
 // The shapes the server and the page share: every type on the wire and on disk, and the closed sets' members. schema.ts
 // holds a Schema for each, typed by it (Schema.Codec<T.X>), so the two cannot drift apart; api.ts the endpoints.
 
-/** The manager's participant id, and the agent of an issue for it. No agent profile has this id. */
-export const managerAgent = "manager";
+/** The assistant's participant id, and the agent of an issue for it. No agent profile has this id. */
+export const assistantAgent = "assistant";
 
 /** Who @所有人 is. */
 export const everyone = "everyone";
@@ -190,10 +190,10 @@ export type RuntimeCapability = (typeof RuntimeCapabilityValues)[number];
 export const CallStateValues = ["idle", "connecting", "live", "ending", "error"] as const;
 export type CallState = (typeof CallStateValues)[number];
 
-export const ManagerStateValues = ["idle", "listening", "thinking", "speaking"] as const;
-export type ManagerState = (typeof ManagerStateValues)[number];
+export const AssistantStateValues = ["idle", "listening", "thinking", "speaking"] as const;
+export type AssistantState = (typeof AssistantStateValues)[number];
 
-export const SenderKindValues = ["user", "manager", "agent", "system"] as const;
+export const SenderKindValues = ["user", "assistant", "agent", "system"] as const;
 export type SenderKind = (typeof SenderKindValues)[number];
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -437,7 +437,7 @@ export interface Recurrence {
   nextText?: string;
 }
 
-export const RecurrenceByValues = ["owner", "manager"] as const;
+export const RecurrenceByValues = ["owner", "assistant"] as const;
 export type RecurrenceBy = (typeof RecurrenceByValues)[number];
 
 export interface Chat {
@@ -448,7 +448,7 @@ export interface Chat {
 export interface WorkspaceState {
   call: CallState;
   callReason?: string;
-  manager: ManagerState;
+  assistant: AssistantState;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -581,7 +581,7 @@ export const InboxKindValues = [
 export type InboxKind = (typeof InboxKindValues)[number];
 
 /** Told apart by `kind`. */
-export type InboxFrom = InboxFromSession | InboxFromManager;
+export type InboxFrom = InboxFromSession | InboxFromAssistant;
 
 /** Told apart by `kind`. */
 export type InboxTarget = InboxTargetSession | InboxTargetGraph | InboxTargetChat;
@@ -673,7 +673,7 @@ export const GraphEventKindValues = [
 ] as const;
 export type GraphEventKind = (typeof GraphEventKindValues)[number];
 
-export const GraphActorValues = ["user", "manager", "system", "session"] as const;
+export const GraphActorValues = ["user", "assistant", "system", "session"] as const;
 export type GraphActor = (typeof GraphActorValues)[number];
 
 export interface TaskFieldChange {
@@ -868,12 +868,12 @@ export interface Skill {
   body: string;
 }
 
-export interface ManagerEvalRequest {
+export interface AssistantEvalRequest {
   on: number;
   want: string;
 }
 
-export interface ManagerEval {
+export interface AssistantEval {
   id: string;
   file: string;
 }
@@ -910,7 +910,7 @@ export interface Memory {
   source?: string;
 }
 
-export const MemoryAuthorValues = ["owner", "agent", "manager", "system"] as const;
+export const MemoryAuthorValues = ["owner", "agent", "assistant", "system"] as const;
 export type MemoryAuthor = (typeof MemoryAuthorValues)[number];
 
 export const MemoryKindValues = ["note", "issue"] as const;
@@ -1073,7 +1073,7 @@ export interface Issue {
   criteria?: string[];
   checks?: CriterionCheck[];
   refining?: IssueRefining;
-  /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
+  /** An issue for the assistant: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
   handedBack?: HandedBack;
   attention: IssueAttention;
 }
@@ -1107,7 +1107,7 @@ export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] 
 export type StuckReason = (typeof StuckReasonValues)[number];
 
 /** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
- * reject sends it back with findings; acknowledge takes what the manager answered as done. */
+ * reject sends it back with findings; acknowledge takes what the assistant answered as done. */
 export const IssueActValues = [
   "start",
   "answer",
@@ -1514,8 +1514,8 @@ export interface InboxFromSession {
   agent: string;
 }
 
-export interface InboxFromManager {
-  kind: "manager";
+export interface InboxFromAssistant {
+  kind: "assistant";
 }
 
 export interface InboxTargetSession {
@@ -1721,10 +1721,10 @@ export interface VoiceASRMicrosoft {
 }
 
 /** Told apart by `vendor`. */
-export type VoiceAnswer = VoiceAnswerManager | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
+export type VoiceAnswer = VoiceAnswerAssistant | VoiceAnswerAgora | VoiceAnswerDeepseek | VoiceAnswerOpenai;
 
-export interface VoiceAnswerManager {
-  vendor: "manager";
+export interface VoiceAnswerAssistant {
+  vendor: "assistant";
 }
 
 export const VoiceAnswerAgoraModelValues = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-5-nano", "gpt-5-mini"] as const;
@@ -1797,7 +1797,7 @@ export interface Roots {
 /** Told apart by `type`. */
 export type Fact =
   | FactCall
-  | FactManager
+  | FactAssistant
   | FactMessage
   | FactConversation
   | FactHired
@@ -1824,10 +1824,10 @@ export interface FactCall {
   reason?: string;
 }
 
-export interface FactManager {
-  type: "manager";
+export interface FactAssistant {
+  type: "assistant";
   at: number;
-  state: ManagerState;
+  state: AssistantState;
 }
 
 export interface FactMessage {
@@ -1962,7 +1962,7 @@ export interface FactRecurrenceGone {
 /** Told apart by `type`. */
 export type SideEvent =
   | FactCall
-  | FactManager
+  | FactAssistant
   | FactMessage
   | FactConversation
   | FactHired
@@ -2071,7 +2071,7 @@ export interface VoiceHeard {
 export interface StartRequest {
   channel: string;
   uid: string;
-  /** The call answers a ring: what rang, which the manager says first instead of the greeting. */
+  /** The call answers a ring: what rang, which the assistant says first instead of the greeting. */
   about?: string;
 }
 

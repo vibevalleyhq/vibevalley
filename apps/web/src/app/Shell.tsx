@@ -1,4 +1,4 @@
-// The workbench's frame: a dark rail of places on the left (the manager's face
+// The workbench's frame: a dark rail of places on the left (the assistant's face
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
 
@@ -7,7 +7,7 @@ import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../data/frame";
 import { useFarm } from "../farm/state";
-import { AgentFace, ManagerFace } from "../ui/Face";
+import { AgentFace, AssistantFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
 import { A } from "./A";
 import { useRouter } from "./router";
@@ -44,7 +44,7 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
 
 function Rail(props: { here?: Place }) {
   const frames = useFrames();
-  const look = useFarm((s) => s.managerLook);
+  const look = useFarm((s) => s.assistantLook);
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav aria-label="工作台" class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
@@ -52,7 +52,7 @@ function Rail(props: { here?: Place }) {
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
         <Slot to="/" label="回农场" current fill="#e5a93c">
-          <ManagerFace size={38} look={look()} />
+          <AssistantFace size={38} look={look()} />
         </Slot>
       </div>
       <div class="flex flex-col gap-2">

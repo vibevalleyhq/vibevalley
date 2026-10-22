@@ -13,7 +13,7 @@ import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
 
-/** The person plants on an empty plot and then says what to do; the manager hires a session for it some seconds later. */
+/** The person plants on an empty plot and then says what to do; the assistant hires a session for it some seconds later. */
 const wantStationForMs = 10_000;
 const countEveryMs = 2 * 60_000;
 const countAfterRunMs = 15_000;

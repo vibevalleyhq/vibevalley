@@ -1,6 +1,6 @@
-// Recurrences: the owner's and the manager's, kept in the recurrence table and in the core state.
+// Recurrences: the owner's and the assistant's, kept in the recurrence table and in the core state.
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
-// is published for the manager, who does it.
+// is published for the assistant, who does it.
 
 import type { Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
@@ -21,7 +21,7 @@ export interface Due {
 
 export interface RecurrenceShape {
   readonly list: () => Recurrence[];
-  /** by is who questions; ownerInRun, for the manager, whether the owner's words are in the run it questions from (needsOK). */
+  /** by is who questions; ownerInRun, for the assistant, whether the owner's words are in the run it questions from (needsOK). */
   readonly add: (req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean) => Effect.Effect<Recurrence, ApiError>;
   /** Turned on is the owner's yes. */
   readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Recurrence, ApiError>;
@@ -203,7 +203,7 @@ export const make = (options: RecurrenceOptions = {}) =>
 
 export const layer = (options?: RecurrenceOptions) => Layer.effect(Recurrences, make(options));
 
-/** Ticks once every service is built, so what the first tick finds due reaches the manager (once ready). */
+/** Ticks once every service is built, so what the first tick finds due reaches the assistant (once ready). */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* Settings;

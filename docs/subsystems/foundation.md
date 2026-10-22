@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 仓库和目录：`apps/`、`packages/`、`apps/server/db`、`scripts/` | 每个包对外的约定（各包的 README） |
-| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/manager.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
+| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/assistant.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
 | 形状、Schema 和接口表放在哪 | 核心状态折什么、帧里有什么（[architecture.md](docs/architecture.md)「核心状态」） |
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
 | 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件和配置键（[architecture.md](docs/architecture.md)「存了什么」「配置」） |
@@ -34,10 +34,10 @@
 
 **模块和服务**
 
-- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `agent/brain`（VibeValley 自己的 agent）。
+- **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`assistant`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `agent/brain`（VibeValley 自己的 agent）。
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
-- **模块有先后**：`services.ts` 按 `core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`manager`、`lan`、`voice`、`connector`、`game` 一层叠一层（`on(layer)` 是 `Layer.provideMerge`）。一个服务只拿得到排在它前面的；要用排在后面的，Effect 的类型报缺了谁。反方向的消息走 `Stream`（`Core` 的事实、事件、帧，`Sessions` 的动静），订阅的人自己读，发布的人不等。`game` 只听别的服务的事实，业务的服务不调它。
+- **模块有先后**：`services.ts` 按 `core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`assistant`、`lan`、`voice`、`connector`、`game` 一层叠一层（`on(layer)` 是 `Layer.provideMerge`）。一个服务只拿得到排在它前面的；要用排在后面的，Effect 的类型报缺了谁。反方向的消息走 `Stream`（`Core` 的事实、事件、帧，`Sessions` 的动静），订阅的人自己读，发布的人不等。`game` 只听别的服务的事实，业务的服务不调它。
 - **开机的活叠在最后**：`project` 的 `start`、`session` 的 `ready`（接着上回没完的执行）、`recurrence` 的 `start`、`game` 的 `start` 是 `Layer.effectDiscard`，在全部服务都建好以后按这个次序跑。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
 - **一个家目录一个服务端**：`base/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
 
@@ -112,7 +112,7 @@
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
 - **一份表结构，不留兼容，不搬数据。** 每次改名都多一段搬旧数据的代码，都在每次启动的路上；项目还没有外部用户，搬数据的代码只让架构成形期的每一步更慢。放弃了「改表写迁移」和「开机看到旧文件顺手导入」。以后有了用户，改存盘要重新写迁移：在 `0001_schema.up.sql` 后面加文件，并改这一条。
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
-- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-manager-evals](.agents/skills/verify-manager-evals/SKILL.md)、`verify-server`）。
+- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-assistant-evals](.agents/skills/verify-assistant-evals/SKILL.md)、`verify-server`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 

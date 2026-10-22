@@ -1,4 +1,4 @@
--- Who is in the chat: the owner, the manager, the sessions, the farm (channel/store.ts).
+-- Who is in the chat: the owner, the assistant, the sessions, the farm (channel/store.ts).
 
 -- name: UpsertParticipant :exec
 insert into channel_participant (id, kind, name, agent_id, runtime, joined_at)

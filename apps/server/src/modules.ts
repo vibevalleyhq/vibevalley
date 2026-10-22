@@ -16,7 +16,7 @@ export const modules: readonly Module[] = [
   { name: "Agent Sessions", parts: ["session"] },
   { name: "Issues", parts: ["issue", "task", "recurrence"] },
   { name: "Notifications", parts: ["notice"] },
-  { name: "Assistant", parts: ["manager", "tool"] },
+  { name: "Assistant", parts: ["assistant", "tool"] },
   { name: "Gamification", parts: ["game"] },
   { name: "Gateway", parts: ["http", "mcp", "lan", "connector", "voice", "handlers.ts", "cli.ts", "main.ts", "services.ts", "modules.ts", "projection"] },
 ];

@@ -1,4 +1,4 @@
-// Talking to the manager: the server hands out the call (appId, channel, uid, one token) and starts Agora's
+// Talking to the assistant: the server hands out the call (appId, channel, uid, one token) and starts Agora's
 // conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (agora.ts). The
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
@@ -24,9 +24,9 @@ export class VoiceCall {
   problem?: string;
   /** The 设置 section the problem is fixed in, when the server says a setting does. */
   problemAt?: VoiceFix;
-  /** 0..100: the microphone's level and the manager's. */
+  /** 0..100: the microphone's level and the assistant's. */
   micLevel = 0;
-  managerLevel = 0;
+  assistantLevel = 0;
   readonly captions = new LiveCaptions();
   version = 0;
 
@@ -38,7 +38,7 @@ export class VoiceCall {
   private readonly pending: { text: string; owner: boolean; picked?: string; key?: string }[] = [];
   private readonly listeners = new Set<() => void>();
 
-  /** The helper the owner picked to send work to, or undefined for the manager's choice. */
+  /** The helper the owner picked to send work to, or undefined for the assistant's choice. */
   constructor(private readonly agentPick: () => string | undefined = () => undefined) {
     this.captions.onHeard = (text) => this.caption(text, true);
     this.captions.onAnswered = (text) => this.caption(text, false);
@@ -89,7 +89,7 @@ export class VoiceCall {
     sent.catch(() => undefined);
   }
 
-  /** about: what rang, when the call answers the phone: the manager says it first. */
+  /** about: what rang, when the call answers the phone: the assistant says it first. */
   start(about?: string) {
     if (this.phase !== "idle") return Promise.resolve();
     this.starting ??= this.run(about).finally(() => (this.starting = undefined));
@@ -111,10 +111,10 @@ export class VoiceCall {
           joined: () => mine() && ((this.agentHere = true), this.changed()),
           left: () => mine() && ((this.agentHere = false), this.changed()),
           stream: (text) => mine() && this.captions.feed(text) && this.changed(),
-          levels: (mic, manager) => {
+          levels: (mic, assistant) => {
             if (!mine()) return;
             this.micLevel = mic;
-            this.managerLevel = manager;
+            this.assistantLevel = assistant;
             this.changed();
           },
           problem: (text) => mine() && ((this.problem = text), this.changed()),
@@ -201,7 +201,7 @@ export class VoiceCall {
     this.muted = false;
     this.agentHere = false;
     this.micLevel = 0;
-    this.managerLevel = 0;
+    this.assistantLevel = 0;
     this.captions.clear();
     await line?.leave().catch(() => undefined);
   }

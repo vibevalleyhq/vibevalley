@@ -189,10 +189,10 @@ export function roundLabel(r: Round, firstAsked: number | undefined, asked?: str
 /** Folded to `lines` when longer. */
 export const isLongText = (text: string, lines: number) => text.length > lines * 60 || text.split("\n").length > lines;
 
-/** The line under a message for the run behind it, or undefined with none to show: a manager's run only when it used tools. */
-export function turnLabel(steps: SessionEvent[], manager: boolean) {
+/** The line under a message for the run behind it, or undefined with none to show: a assistant's run only when it used tools. */
+export function turnLabel(steps: SessionEvent[], assistant: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
-  if (steps.length === 0 || (manager && tools === 0)) return undefined;
+  if (steps.length === 0 || (assistant && tools === 0)) return undefined;
   return tools > 0 ? `用了 ${tools} 个工具` : "这一轮的干活过程";
 }
 

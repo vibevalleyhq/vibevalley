@@ -2,13 +2,13 @@
 // conflict and the acceptance, with the one thing the owner is asked to do. The board, the farm and the page all say it.
 
 import type { WorkspaceState, Issue, IssueAct, IssueAttention, Session } from "@vibevalley/protocol";
-import { isForManager } from "./state.ts";
+import { isForAssistant } from "./state.ts";
 import { sessionOf } from "../session/state.ts";
 
-/** session is the issue's newest one, when it is on the farm. A task graph's issues and one for the manager go with the
- * graph or the manager: they stand, but the owner acts on them elsewhere. */
+/** session is the issue's newest one, when it is on the farm. A task graph's issues and one for the assistant go with the
+ * graph or the assistant: they stand, but the owner acts on them elsewhere. */
 export function attentionOf(t: Issue, session: Session | undefined): IssueAttention {
-  const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined || isForManager(t);
+  const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined || isForAssistant(t);
   const own = (s: IssueAttention): IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
   switch (t.status) {
@@ -30,9 +30,9 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       return own({ state: "working", ...at(phase?._tag === "working" ? phase.since : undefined), acts: ["tell", "stop", "close"] });
     }
     case "in_review": {
-      // The manager's turn ended: what it said is the owner's to take (acknowledge) or put away; one that did not end well
+      // The assistant's turn ended: what it said is the owner's to take (acknowledge) or put away; one that did not end well
       // cannot be taken as done.
-      if (isForManager(t)) {
+      if (isForAssistant(t)) {
         const ended = t.handedBack?.outcome ?? "completed";
         const since = at(t.handedBack?.at);
         return ended === "completed"

@@ -10,17 +10,17 @@
 | 一条消息给谁、叫不叫醒，三道刹车，送达的状态 | 一轮怎么跑、能不能插话（帮工经 `Helpers.deliver` 交给 oar，[帮工](docs/subsystems/session.md)） |
 | 帮工的汇报贴进工单串；带话、验收意见、冲突经工单串交给帮工 | 汇报怎么读出结论（`session/rules.ts` 的 `summaryOf`） |
 | 帮工在 `/mcp` 上的说话工具（`channel_say`、`read_chat`、`channel_inbox`）背后的规则 | 工具的定义和认人（`apps/server/src/tool`、`mcp`、`Sessions.who`） |
-| 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`manager`）；连接器把话交给 `manager.Say`，管家照田头的规则被叫醒 |
+| 连接器：扫码登录、只认主人、收件和发件、转成纯文本 | 管家怎么回答（`assistant`）；连接器把话交给 `assistant.Say`，管家照田头的规则被叫醒 |
 | | Inbox 和巡查（[通知](docs/subsystems/notice.md)）；定时到点在频道里说的那句（[定时](docs/subsystems/recurrence.md)） |
 | | 田头和串在界面上的样子（[farm-ui.md](docs/reference/farm-ui.md)、`apps/web/src/farm/chat`、`apps/web/src/pages/chat`） |
 
 ## 在哪
 
-- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`managerSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`。
+- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`assistantSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`。
 - **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留哪些（`keepMessages` 300 条、`keepConversations` 100 个）。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的规则（`forOwner`、`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
-- **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`manager.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
+- **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`assistant.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
 - **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`）；整页的聊天页 `/chat`（`apps/web/src/pages/chat`）；连接器页 `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`）。
 
@@ -47,7 +47,7 @@
 
 - **三道刹车**只管 agent 叫醒 agent，主人的话不受限：一个对话里从主人上次说话算起最多叫醒 4 次（`hopLimit`），到了 @ 照记、照显示，不叫醒，对话里贴一句提示（每次主人说话后只贴一次）；同一个帮工被 agent 叫醒至少隔 60 秒（`agentWakeCooldownMs`）；连着 3 次叫醒都在开口前失败（`wakeBreaker`）就不再自动叫它，工单串里贴一句，主人的下一句叫醒它的话解除。被拦下的投递照样记着（`held_by` 是 `hop_limit`、`cooldown`、`wake_breaker`）。来回次数和冷却从 `channel_delivery` 现算；熔断的计数在内存里，重启清零。
 - **送达**：每条给帮工的投递走 `pending` → `announced`（插过不带正文的提示）→ `handed`（放进了一轮的输入）→ `seen`；离开的是 `dropped`。这一轮真的开口才算 `seen`；没开口就结束、会话关掉、服务端重启都退回 `pending`，过一会儿再叫。宁可重复给，不会丢。给管家的投递交出去当即算看到。
-- **主人的话重发不成两条**：`channel.say`、`issue.comment`、`manager.hear`、`voice.heard` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。页面为一份草稿生成一个键，发成功才换；发送失败时草稿留在输入框里，重发用同一个键。帮工的 `channel_say` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
+- **主人的话重发不成两条**：`channel.say`、`issue.comment`、`assistant.hear`、`voice.heard` 带页面为这一次发送生成的 `sendKey`（至多 64 个字，长了拒绝）。同一个人带同一个键再发就是已经说过的那一条：不另写、不再送，管家也不再听一遍（唯一索引 `channel_message_send_key` 在发送者和键上）。页面为一份草稿生成一个键，发成功才换；发送失败时草稿留在输入框里，重发用同一个键。帮工的 `channel_say` 不带键：60 秒内（`retryWindowMs`）同一个帮工在同一处说一模一样的话，返回原来那条。连接器按外部消息 id 去重。
 - **消息带着产生它的那次干活**（`meta.run`）：过程面板按这个号取事件；没有号的消息不按时间推测归属。创建频道的接口返回实际的频道号，页面用它跳转，不从名字猜号、不等状态流确认。
 - **连接器只认主人**：微信扫码的人就是主人；飞书返回扫码者的 OpenID 时直接绑定，没返回时和 QQ 一样，由第一个私聊机器人发 6 位配对码（前面可以带「配对」和空格）的人成为主人。别人的话丢掉，群里的不收。账号和密钥在 `connector_account`，不进日志、不发给页面；断开就删掉这一行。
 - **连接器只往外连**：微信长轮询，飞书、QQ 长连接，都是服务端连出去，不收 webhook。
@@ -55,7 +55,7 @@
 
 ## 怎么走
 
-**主人说一句**（`channel.say` → `manager.Say` → `channel.Say`）：写库、算投递、推进主人的已读，提交后施加事实；被叫醒的是管家就经 `forManager` 交给它，它在哪个对话被叫就回在哪个对话。管家的回答是逐字长出来的同一条消息（`managerSays`，同一个键替换正文，`final` 时才算投递）；服务端停下时说到一半的，开机时就当说完了。
+**主人说一句**（`channel.say` → `assistant.Say` → `channel.Say`）：写库、算投递、推进主人的已读，提交后施加事实；被叫醒的是管家就经 `forAssistant` 交给它，它在哪个对话被叫就回在哪个对话。管家的回答是逐字长出来的同一条消息（`assistantSays`，同一个键替换正文，`final` 时才算投递）；服务端停下时说到一半的，开机时就当说完了。
 
 **派活开工单串**：执行模块告诉田头雇了一个帮工（`sessionNews` 的 `hired`），田头为新的 Session 建参与者，把它在频道里的已读位置放到最新，按它的工单找串：
 
@@ -89,7 +89,7 @@
 **外面进来的话**（连接器）：
 
 1. 适配器把平台的消息翻成「谁、说了什么、回复凭据、引用了哪条」：微信每页消息和下一页游标交给 `voiceInbox.accept`，同一个事务写进 `connector_inbound` 和 `connector_account.cursor`，失败就整页回滚、游标不动；飞书和 QQ 的回调等这一行落库后才返回给 SDK。同一个平台消息 id 只收一次（`on conflict do nothing`）。
-2. 收件工人（`voiceInbox.run`，有新收件或每秒）按顺序交付：还没配对的，对上配对码就绑定主人、回一句「配对好了」；不是主人的丢掉；主人的先记下回复凭据、补发发件表，再把话交给管家（`manager.Say`）。被引用的是农场发出去的某条消息时，话说在那条所在的对话里（比如它的工单串），否则说在连接器接的频道（默认田头）。
+2. 收件工人（`voiceInbox.run`，有新收件或每秒）按顺序交付：还没配对的，对上配对码就绑定主人、回一句「配对好了」；不是主人的丢掉；主人的先记下回复凭据、补发发件表，再把话交给管家（`assistant.Say`）。被引用的是农场发出去的某条消息时，话说在那条所在的对话里（比如它的工单串），否则说在连接器接的频道（默认田头）。
 3. 交付成功，标成已交付、清空正文，只留去重记录。没交付完的，重启后接着交。
 
 **送出去的话**：核心状态的每条 `message` 事实交给每个连接器的协调器，`forOwner` 挑出主人要看的：说完了的，不是主人自己的；汇报和派活，管家的话，@主人 或 @所有人 的话；提示不送。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上「【谁 · 做完了 / 没做成 / 派活 / 在工单串里】」，Markdown 转成纯文本，按 UTF-16 长度切开（微信 1800、飞书 4000、QQ 2000，尽量在空行或换行处切），写进 `connector_outbox`；网络发送不阻塞读核心事件。
@@ -105,13 +105,13 @@
 
 - **帮工（`session`）**：田头不 import 执行模块，也不读核心状态里的帮工。它定义帮工这类参与者的端口 `Helpers`（在不在地里、地里的帮工、交一句话、现在是哪一轮、汇报的摘要、一张工单现在谁在做），执行模块建的时候用 `useHelpers` 登记，并把每一轮的开口、结束、关掉、压缩上下文交给 `activity`，一轮实际读进去的消息交给 `consumed`，雇了、交回、走了交给 `sessionNews`（`SessionNews`，带着那一刻的 Session），田头据此开串、贴汇报、推进送达。帮工接回以后执行模块调 `helpersBack`：这时才给地里的每个帮工开好工单串、送出等着的话；接回以前田头看不到帮工。
 - **核心状态（`core`）**：田头施加 `message`、`conversation` 事实；读 `WorkspaceState.Sessions` 知道谁在地里、谁在忙。
-- **管家（`manager`）**：订阅 `forManager`（叫醒它的话，按对话分批）和 `managerDigest`（只让它知道的汇报）；用 `managerSays` 说话、`spoken` 记下通话里的话。主人的话经 `manager.Say` 进田头，管家照田头的规则被叫醒。
+- **管家（`assistant`）**：订阅 `forAssistant`（叫醒它的话，按对话分批）和 `assistantDigest`（只让它知道的汇报）；用 `assistantSays` 说话、`spoken` 记下通话里的话。主人的话经 `assistant.Say` 进田头，管家照田头的规则被叫醒。
 - **主人在串里的话**：`ownerInThread` 把主人在任何一个串里说完的话（不管经哪条路进来）告诉订阅的人；工单靠它知道主人在工单串里说了话。
 - **工单（`issue`）**：带话、验收意见、冲突和检查失败经 `tellSession`；首次派活时记下频道（`channelOf`）。
 - **定时（`recurrence`）、种植计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `speak`、`read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `spoken` 留在田头，不叫醒谁，管家在电话里已经听过。
-- **连接器 → 管家、田头**：收进来的话交给 `manager.Say`；送出去的读核心事件里的 `message`，只读不改田头。主人在外面说话也让农场开门（通话状态成 `live`）。
+- **连接器 → 管家、田头**：收进来的话交给 `assistant.Say`；送出去的读核心事件里的 `message`，只读不改田头。主人在外面说话也让农场开门（通话状态成 `live`）。
 - **通知（`notice`）**：@主人 的话进 Inbox；巡查的发现没有频道时归田头（[通知](docs/subsystems/notice.md)）。
 
 ## 为什么这样
@@ -137,7 +137,7 @@
 
 - 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
 - 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
-- 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[管家也是一个 agent](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md)。
+- 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[管家也是一个 agent](.agents/notes/proposed/architecture/2026-10-17-assistant-is-an-agent.md)。
 - 种植计划自己的串、串的静音和退出跟帖、Telegram 等别的渠道：还没有提案。
 
 ## 怎么验证

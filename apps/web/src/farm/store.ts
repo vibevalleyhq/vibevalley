@@ -75,10 +75,10 @@ export interface FarmUi {
   /** Rewards shown in the FX layer for a few seconds each. */
   readonly rewards: readonly GameEffectReward[];
   readonly screen: VillageScreen | null;
-  /** The manager's look (tools.ts managerLooks ids; "farmer" is the plain one) and the pet by his door: this machine's. */
-  readonly managerLook: string;
+  /** The assistant's look (tools.ts assistantLooks ids; "farmer" is the plain one) and the pet by his door: this machine's. */
+  readonly assistantLook: string;
   readonly pet: string;
-  /** Who the next job goes to: a profile's id, or "auto" for the manager to choose; this machine's. */
+  /** Who the next job goes to: a profile's id, or "auto" for the assistant to choose; this machine's. */
   readonly pick: string;
   /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
   readonly project: string | null;
@@ -88,17 +88,17 @@ const titleSeenKey = "vibevalley.title.seen";
 
 const looksKey = "vibevalley.farm.looks";
 
-/** The manager's look and the pet, kept per machine. */
-const savedLooks = (): { managerLook: string; pet: string } => {
+/** The assistant's look and the pet, kept per machine. */
+const savedLooks = (): { assistantLook: string; pet: string } => {
   try {
-    const raw = JSON.parse(localStorage.getItem(looksKey) ?? "{}") as { managerLook?: unknown; pet?: unknown };
-    return { managerLook: typeof raw.managerLook === "string" ? raw.managerLook : "farmer", pet: typeof raw.pet === "string" ? raw.pet : "dog" };
+    const raw = JSON.parse(localStorage.getItem(looksKey) ?? "{}") as { assistantLook?: unknown; pet?: unknown };
+    return { assistantLook: typeof raw.assistantLook === "string" ? raw.assistantLook : "farmer", pet: typeof raw.pet === "string" ? raw.pet : "dog" };
   } catch {
-    return { managerLook: "farmer", pet: "dog" };
+    return { assistantLook: "farmer", pet: "dog" };
   }
 };
 
-const saveLooks = (looks: { managerLook: string; pet: string }) => {
+const saveLooks = (looks: { assistantLook: string; pet: string }) => {
   try {
     localStorage.setItem(looksKey, JSON.stringify(looks));
   } catch {
@@ -235,9 +235,9 @@ export const farm = {
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
   setScreen: (screen: VillageScreen | null) => set({ screen }),
-  setManagerLook: (managerLook: string) => {
-    set({ managerLook });
-    saveLooks({ managerLook, pet: state.pet });
+  setAssistantLook: (assistantLook: string) => {
+    set({ assistantLook });
+    saveLooks({ assistantLook, pet: state.pet });
   },
   setProject: (project: string) => {
     set({ project });
@@ -257,7 +257,7 @@ export const farm = {
   },
   setPet: (pet: string) => {
     set({ pet });
-    saveLooks({ managerLook: state.managerLook, pet });
+    saveLooks({ assistantLook: state.assistantLook, pet });
   },
 };
 

@@ -1,6 +1,6 @@
 // Notifications: what in the inbox is news to the owner, and the patrol (what has waited past its kind's grace). The
-// routes listen and say it their own way: on a call the manager says the news (voice), the patrol's findings wake the
-// manager, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
+// routes listen and say it their own way: on a call the assistant says the news (voice), the patrol's findings wake the
+// assistant, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
 import type { InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";

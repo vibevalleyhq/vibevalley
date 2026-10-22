@@ -19,7 +19,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
 | [channel.md](docs/subsystems/channel.md) | 田头：频道、谁听见、工单串、连接器、Inbox |
-| [manager.md](docs/subsystems/manager.md) | 管家：自己的 agent、提示和工具、来源、巡查、评测 |
+| [assistant.md](docs/subsystems/assistant.md) | 管家：自己的 agent、提示和工具、来源、巡查、评测 |
 | [schedule.md](docs/subsystems/recurrence.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [task.md](docs/subsystems/task.md) | 种植计划：带子工单的父工单、按图推进；agent 自己的任务图 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
@@ -59,7 +59,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 叫法 | 代码里 | 意思 | 不用 |
 |---|---|---|---|
-| 管家 | manager | 你直接说话的 agent，替你派活 | 工头、主 agent |
+| 管家 | assistant | 你直接说话的 agent，替你派活 | 工头、主 agent |
 | 帮工 | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 在一块地上干活的：一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，地不换 | 工人、子 agent、worker |
 | 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己；农场里是一季庄稼 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |

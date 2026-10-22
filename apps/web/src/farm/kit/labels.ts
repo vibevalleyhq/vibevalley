@@ -1,4 +1,4 @@
-import type { IssueClose, ManagerState, Outcome, Phase } from "@vibevalley/protocol";
+import type { IssueClose, AssistantState, Outcome, Phase } from "@vibevalley/protocol";
 
 export { ago, numberText } from "../../rules/time";
 
@@ -27,7 +27,7 @@ export function phaseLabel(phase: Phase): string {
   }
 }
 
-export const managerLabel: Record<ManagerState, string> = { idle: "没开工", listening: "在听", thinking: "在想", speaking: "在说" };
+export const assistantLabel: Record<AssistantState, string> = { idle: "没开工", listening: "在听", thinking: "在想", speaking: "在说" };
 
 export const outcomeLabel: Record<Outcome, string> = { completed: "完成", failed: "失败", interrupted: "叫停" };
 

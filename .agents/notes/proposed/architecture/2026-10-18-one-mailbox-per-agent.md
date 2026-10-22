@@ -6,9 +6,9 @@ Status: proposed
 
 给 agent 的话（频道里的消息、交给管家的工单、到点的定时、巡查的发现、计划的进展、外面聊天软件和电话里的话、帮工的汇报）什么时候、以什么方式交到 agent 手里，现在没有一个地方说了算。2026-10-18 数下来：
 
-- **入口至少 7 条，各走各的**：频道投递（`channel/chat.ts` 的 `kicked`）、工单交给管家（`manager/manager.ts` 的 `forManager`）、定时（`issue/issue.ts` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`manager/manager.ts`）、计划（`tool/tool.ts` 的 `tellManager`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`manager.Call`，直接插进管家，频道里只留记录）。
-- **「插话还是排到这一轮之后」写了三遍，判断依据各不相同**：频道给帮工的（`session.Deliver` → oar 的 `steerOrQueue`，看农机能不能插话）、频道给管家的（`heardInChat`：只有主人的话插话）、管家的脑子（`manager.sendInput` 在 `brain.Send` 和 `brain.Later` 里二选一）。
-- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`manager/manager.ts`）、定时每 20 秒看一次（`recurrence`）、排队的工单每 5 秒找一次空地（`issue/issue.ts`）、管家把这期间的汇报和农场现状拼进一条输入（`manager.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
+- **入口至少 7 条，各走各的**：频道投递（`channel/chat.ts` 的 `kicked`）、工单交给管家（`assistant/assistant.ts` 的 `forAssistant`）、定时（`issue/issue.ts` 的 `scheduled`，忙着的帮工直接 `session.Deliver`，绕开频道）、巡查（`assistant/assistant.ts`）、计划（`tool/tool.ts` 的 `tellAssistant`）、连接器（落库后重新走 `channel.Say`）、电话和听写（`assistant.Call`，直接插进管家，频道里只留记录）。
+- **「插话还是排到这一轮之后」写了三遍，判断依据各不相同**：频道给帮工的（`session.Deliver` → oar 的 `steerOrQueue`，看农机能不能插话）、频道给管家的（`heardInChat`：只有主人的话插话）、管家的脑子（`assistant.sendInput` 在 `brain.Send` 和 `brain.Later` 里二选一）。
+- **节奏散在七个包里，互相不知道**：忙时攒 3 秒合成一条提醒（`channel` 的 `NoticeBatchMs`）、同一个人 60 秒内不再叫（`AgentWakeCooldownMs`）、帮工互相 @ 超过 4 跳挂起（`HopLimit`）、叫三次都没起来就不叫了（`WakeBreaker`）、巡查每 10 分钟扫一遍（`assistant/assistant.ts`）、定时每 20 秒看一次（`recurrence`）、排队的工单每 5 秒找一次空地（`issue/issue.ts`）、管家把这期间的汇报和农场现状拼进一条输入（`assistant.news`、`situationNow`）。同一个「攒一批再给」的想法写了四遍，单位和条件都不一样。
 - **管家和帮工收话是两套**：帮工经频道投递（`channel_delivery` 表记着谁该收、收没收到），管家经五个 `base.Hub` 订阅，什么也不存，重启前没处理的就没了（巡查过后会再报，计划和工单的消息不会）。
 
 结果：想改一条节奏规则（比如「主人的话总是插话」「帮工忙时别一条一条打断它」），要先找到它在哪几处各写了一份；加一个新入口（比如再接一家聊天软件，或者让领班收到它派出去的工单的进展），又要再写一遍「叫不叫、什么时候叫、怎么叫」。
@@ -35,7 +35,7 @@ Status: proposed
 |---|---|---|
 | `chat`：频道里给它的话 | `channel` 写 `channel_delivery`，`kicked` 叫醒 | `channel` 算出收件人后投一封；`channel_delivery` 只记「谁该收到」，叫醒的部分归信箱 |
 | `owner`：主人对它说的话（频道里、聊天软件、电话） | 各自判断插话 | 投一封，急 |
-| `issue`：交给它的工单、到点的定时 | 管家经 `forManager`；帮工经 `session.Deliver` | 投一封 |
+| `issue`：交给它的工单、到点的定时 | 管家经 `forAssistant`；帮工经 `session.Deliver` | 投一封 |
 | `report`：帮工的汇报 | 写进工单串，没做成的叫醒管家 | 投给管家一封，做完的不急 |
 | `patrol`：巡查的发现 | `PatrolNews` Hub | 投一封，不急 |
 | `task`：种植计划的进展 | `task.news` Hub | 投一封，不急 |
@@ -79,7 +79,7 @@ Status: proposed
 交给谁由收件人定，信箱不知道 agent 怎么跑：
 
 - **Session**：开一轮、插话、排到这一轮之后，都经 `session.Service`（现在的 `Deliver` 拆成这三个动作）；能不能开（同时干活的上限）仍由 Session 定，开不了的信留在信箱里，有空地了再交。
-- **管家**：常驻（[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-manager-is-an-agent.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `manager` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`manager.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
+- **管家**：常驻（[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-assistant-is-an-agent.md) 第 4 节的「常驻」），管家包在开机时把自己的三个动作交给编排层（`mailbox` 排在 `assistant` 前面，往上走 `base.Hub` 或注册一个收件的接口）。`assistant.ask`、`send`、`heardInChat`、`onWork` 和那五个 Hub 订阅都不要了。
 
 ### 5. 节流和熔断都搬进编排层
 
@@ -118,7 +118,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- `channel`、`manager`、`issue`、`recurrence`、`task`、`connector`、`voice` 里没有直接叫醒 agent 的代码：都投信；`session.Deliver` 和管家的 `ask`、`send` 只被 `mailbox` 调。
+- `channel`、`assistant`、`issue`、`recurrence`、`task`、`connector`、`voice` 里没有直接叫醒 agent 的代码：都投信；`session.Deliver` 和管家的 `ask`、`send` 只被 `mailbox` 调。
 - 「插话、排队、攒一批、打断」只在 `mailbox` 的一个纯函数里决定，有表驱动的测试覆盖默认表的每一格；加一个 `Source` 不处理时测试失败（照「封闭的联合穷尽处理」）。
 - 冷却、跳数、熔断、攒一批的参数在一处，对管家和帮工都生效，有测试。
 - 管家有正在跑的子活时，`interrupt` 变成 `queue`，有测试。
@@ -128,6 +128,6 @@ Status: proposed
 ## Risks
 
 - 这是投递的主干，改坏了话就丢了或叫重了。第一步只搬不改：先让现有测试原样通过，再一格一格改默认表。
-- 管家的提示开头要保持不变（[提示开头不变](docs/subsystems/manager.md)）：信合成输入的格式变了，开头不能跟着变；改完跑 `verify-manager-evals`（要花钱，先问主人）。
+- 管家的提示开头要保持不变（[提示开头不变](docs/subsystems/assistant.md)）：信合成输入的格式变了，开头不能跟着变；改完跑 `verify-assistant-evals`（要花钱，先问主人）。
 - 插话的落点在「一批工具调用之后」，比现在的「马上」慢；对正在跑长命令的帮工，主人的话可能要等这条命令跑完才被看到。真不能等的用 `interrupt`。
 - 信箱在内存里的第一步，重启会丢掉非频道来源的信，和今天一样；落库前不要指望它可靠。

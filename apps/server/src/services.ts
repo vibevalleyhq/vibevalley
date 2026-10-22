@@ -24,7 +24,7 @@ import { layer as setting } from "./setting/setting.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
 import { layer as mcp, type McpOptions } from "./mcp/mcp.ts";
-import { layer as manager, type ManagerOptions } from "./manager/manager.ts";
+import { layer as assistantAgent, type AssistantOptions } from "./assistant/assistant.ts";
 import { layer as game, start as gameStart } from "./game/game.ts";
 import { layer as lan, type LanOptions } from "./lan/lan.ts";
 import { layer as voice, type VoiceOptions } from "./voice/voice.ts";
@@ -46,7 +46,7 @@ export interface ServiceOptions {
   readonly issue?: IssueOptions;
   readonly task?: TaskOptions;
   readonly notice?: NoticeOptions;
-  readonly manager?: ManagerOptions;
+  readonly assistant?: AssistantOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
   readonly voice?: VoiceOptions;
@@ -103,7 +103,7 @@ export const notifications =
 export const assistant =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(tool), on(manager(o.manager)));
+    below.pipe(on(tool), on(assistantAgent(o.assistant)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(game));

@@ -2,12 +2,12 @@
 // stream (the server starts it with data_channel 'datastream'). A message comes in chunks, `id|part|parts|base64`,
 // 1-based; put together and decoded, it is JSON with an `object`:
 //   user.transcription       what you said so far in a turn; `final` when the turn is over
-//   assistant.transcription  what the manager has said so far; `turn_status` 0 while it is still talking
-//   message.interrupt        you talked over the manager: its turn `turn_id` stops there
+//   assistant.transcription  what the assistant has said so far; `turn_status` 0 while it is still talking
+//   message.interrupt        you talked over the assistant: its turn `turn_id` stops there
 //   message.state            the agent's state: idle, listening, thinking, speaking, silent
 // Every message of a turn carries the whole text so far, so a turn's caption is replaced, never appended to.
 
-export type Speaker = "you" | "manager";
+export type Speaker = "you" | "assistant";
 
 export interface Caption {
   readonly speaker: Speaker;
@@ -25,7 +25,7 @@ export class LiveCaptions {
   agentState?: string;
   /** Said once per turn. */
   onHeard?: (text: string) => void;
-  /** The manager's words of a turn, once the turn is over or talked over: what it got to say. */
+  /** The assistant's words of a turn, once the turn is over or talked over: what it got to say. */
   onAnswered?: (text: string) => void;
   private readonly chunks = new Map<string, Map<number, string>>();
   private readonly heard = new Set<number>();
@@ -45,13 +45,13 @@ export class LiveCaptions {
         this.put("you", turn, typeof m.text === "string" ? m.text : "", m.final === true || status !== 0);
         return true;
       case "assistant.transcription":
-        this.put("manager", turn, typeof m.text === "string" ? m.text : "", status !== 0);
+        this.put("assistant", turn, typeof m.text === "string" ? m.text : "", status !== 0);
         return true;
       case "message.state":
         this.agentState = typeof m.state === "string" ? m.state : undefined;
         return true;
       case "message.interrupt": {
-        const c = this.find("manager", turn);
+        const c = this.find("assistant", turn);
         if (!c) return false;
         c.done = true;
         c.interrupted = true;
@@ -84,7 +84,7 @@ export class LiveCaptions {
       this.heard.add(turn);
       this.onHeard?.(text);
     }
-    if (speaker === "manager" && done) this.answer(this.find(speaker, turn)!);
+    if (speaker === "assistant" && done) this.answer(this.find(speaker, turn)!);
   }
 
   private answer(c: Caption) {

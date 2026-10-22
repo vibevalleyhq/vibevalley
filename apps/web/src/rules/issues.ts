@@ -4,7 +4,7 @@ import {
   type WorkspaceState,
   type Issue,
   type IssueStatus,
-  managerAgent,
+  assistantAgent,
   type Priority,
   type Run,
   type RunTrigger,
@@ -57,7 +57,7 @@ export const statusLabel: Record<IssueStatus, string> = {
 
 export const priorityLabel: Record<Priority, string> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
-export const isForManager = (issue: Issue) => issue.assignee === managerAgent;
+export const isForAssistant = (issue: Issue) => issue.assignee === assistantAgent;
 
 export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   const job = issue.title.trim();

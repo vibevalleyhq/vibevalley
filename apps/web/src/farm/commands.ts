@@ -43,9 +43,9 @@ export interface FarmCommands {
   /** Stops one at work; questions one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(sessionId: string): Promise<void>;
-  stopManager(): Promise<void>;
+  stopAssistant(): Promise<void>;
   dismiss(sessionId: string): Promise<void>;
-  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The manager is told to sow it. */
+  /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The assistant is told to sow it. */
   plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
   /** The click's decision, read from one frame, so the page's sound and the command agree. */
   aim(bed: Bed): PlotAim;
@@ -58,7 +58,7 @@ export interface FarmCommands {
   actOnTask(graph: string, task: string, action: TaskActRequest["action"]): Promise<Answer>;
   chooseTitle(achievement?: string, tier?: number): Promise<void>;
   refreshRuntime(id: string): Promise<void>;
-  /** Leaves the title screen; `start` opens the manager's day too. */
+  /** Leaves the title screen; `start` opens the assistant's day too. */
   enterFarm(start: boolean): void;
 }
 
@@ -88,7 +88,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "shovel");
     },
     stop: (id) => api.session.stop({ id }),
-    stopManager: () => api.manager.stop(),
+    stopAssistant: () => api.assistant.stop(),
     async dismiss(id) {
       const s = sessions().find((x) => x.id === id);
       if (!s) throw new Error(`no session ${id}`);
@@ -139,7 +139,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     refreshRuntime: async (id) => void (await api.runtime.refresh({ id })),
     enterFarm(start) {
       farm.closeTitle();
-      if (start) fire(api.manager.open());
+      if (start) fire(api.assistant.open());
     },
   };
   return commands;

@@ -65,7 +65,7 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         const before = s.status();
-        expect(before.voiceDefaults.answer).toEqual({ vendor: "manager" });
+        expect(before.voiceDefaults.answer).toEqual({ vendor: "assistant" });
         expect(before.voiceDefaults.tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "English_captivating_female1" });
         expect(before.voiceDefaults.greeting).toBe(defaultVoice().greeting);
         expect(before.voice).toEqual(before.voiceDefaults);

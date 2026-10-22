@@ -1,17 +1,17 @@
-// The manager (管家): it takes the channels', issues', patrol's and task graphs' lines and the owner's
+// The assistant (管家): it takes the channels', issues', patrol's and task graphs' lines and the owner's
 // voice, hands them to VibeValley's own agent (agent/brain) with tool's tools, and sends the answers back where each came
 // from.
 //
 // Every input carries where it came from (its channel, the profile the owner picked, whether it is quiet, the voice stream
 // that waits for it) into the agent's steering or follow-up queue; the time, the farm (whole, or the lines that changed),
 // what memory gained, the news and the line itself go in as one input, read by the first request. An input given while the
-// manager is busy may be taken after one given later, so it carries the whole farm, and the one after it does too. Queuing
+// assistant is busy may be taken after one given later, so it carries the whole farm, and the one after it does too. Queuing
 // does not change the channel being answered: output follows the agent's events, and tools read the input consumed last.
 // Runs and their logs are session's (execution.ts); only an input that is consumed starts or joins one.
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
-import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
+import { type AssistantEval, assistantAgent, type RunTrigger } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
@@ -29,11 +29,11 @@ import { selfTools } from "../agent/brain/self.ts";
 import { readLines, replay } from "../agent/brain/session.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
-import { Channels, type ManagerNews } from "../channel/chat.ts";
+import { Channels, type AssistantNews } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, missing, refused } from "../errors.ts";
-import { Issues, type ManagerWork } from "../issue/issue.ts";
-import { managerHome } from "../memory/memory.ts";
+import { Issues, type AssistantWork } from "../issue/issue.ts";
+import { assistantHome } from "../memory/memory.ts";
 import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
@@ -46,8 +46,8 @@ import { Tasks } from "../task/task.ts";
 import { Tools } from "../tool/tool.ts";
 import {
   deepseekModel,
-  managerInboxLines,
-  managerModel,
+  assistantInboxLines,
+  assistantModel,
   patrolText,
   quotaText,
   situationDelta,
@@ -117,9 +117,9 @@ interface Routing {
   readonly agent?: string;
   readonly quiet?: boolean;
   readonly source: Source;
-  /** The issue handed to the manager that this input is; its run ends when the manager's settles. */
+  /** The issue handed to the assistant that this input is; its run ends when the assistant's settles. */
   readonly issue?: string;
-  /** The owner's own words are in this input: only then may the manager merge into a main branch. */
+  /** The owner's own words are in this input: only then may the assistant merge into a main branch. */
   readonly owner?: boolean;
 }
 
@@ -162,35 +162,35 @@ interface Local {
   readonly run: RunInput;
 }
 
-const isInput = (m: AgentMessage): m is CustomMessage & { details: Routing } => m.role === "custom" && (m as CustomMessage).customType === "managerInput";
+const isInput = (m: AgentMessage): m is CustomMessage & { details: Routing } => m.role === "custom" && (m as CustomMessage).customType === "assistantInput";
 
-export interface ManagerShape {
+export interface AssistantShape {
   /** The owner's words in a conversation; sendKey: the client's key for this send, a retry with the same key is the message already said. */
   readonly say: (text: string, pick: Pick, conversation: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
-  /** A voice transcript the owner chose for the manager to overhear. */
+  /** A voice transcript the owner chose for the assistant to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** The words said on the phone; the answer is read out, and both stay in 田头. */
   readonly call: (text: string, signal?: AbortSignal) => AsyncIterable<string>;
-  /** Something to tell the owner on the phone: given as from an issue, after what the manager is on, it answers in 田头
+  /** Something to tell the owner on the phone: given as from an issue, after what the assistant is on, it answers in 田头
    * as always; the whole answer comes back to be read out. It does not end the call's own answer. */
   readonly brief: (line: string) => Promise<string>;
-  /** The manager as managerModel on the farm's own chat/completions: what is asked there is the owner's, as in 田头. */
+  /** The assistant as assistantModel on the farm's own chat/completions: what is asked there is the owner's, as in 田头. */
   readonly answerer: (model: string) => ((text: string, signal?: AbortSignal) => AsyncIterable<string>) | undefined;
-  /** The lines waiting for the manager are dropped with the run; the sessions it sent keep working. */
+  /** The lines waiting for the assistant are dropped with the run; the sessions it sent keep working. */
   readonly stop: () => Effect.Effect<void>;
-  readonly markWrong: (on: number, want: string) => Effect.Effect<ManagerEval, ApiError>;
+  readonly markWrong: (on: number, want: string) => Effect.Effect<AssistantEval, ApiError>;
 }
 
-export class Manager extends Context.Service<Manager, ManagerShape>()("vibevalley/Manager") {}
+export class Assistant extends Context.Service<Assistant, AssistantShape>()("vibevalley/Assistant") {}
 
-export interface ManagerOptions {
+export interface AssistantOptions {
   /** The model; absent, DeepSeek with the key in settings. */
   readonly llm?: () => LLM;
   /** Whether it hears the farm; a test without a model does not, so nothing reaches a model. */
   readonly listen?: boolean;
 }
 
-export const make = (options: ManagerOptions = {}) =>
+export const make = (options: AssistantOptions = {}) =>
   Effect.gen(function* () {
     const logs = yield* callbackLog;
     const config = yield* Settings;
@@ -212,17 +212,17 @@ export const make = (options: ManagerOptions = {}) =>
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
     const notices = yield* Notices;
-    const home = managerHome(config.home);
-    const sessionFile = join(home, managerAgent + ".jsonl");
+    const home = assistantHome(config.home);
+    const sessionFile = join(home, assistantAgent + ".jsonl");
 
-    const trace: Journal = run.trajectories.openLog(managerAgent, keepEvents);
-    const execution = new AgentExecution(managerAgent, trace, tool.start, run.runStore);
+    const trace: Journal = run.trajectories.openLog(assistantAgent, keepEvents);
+    const execution = new AgentExecution(assistantAgent, trace, tool.start, run.runStore);
 
     const local = new WeakMap<AgentMessage, Local>();
     let input: Routing & Local = { conversation: general, source: "owner", run: { by: { kind: "" } } };
     const selected = new Map<string, Pick>();
     let latestCall: Caller | undefined;
-    /** What the manager last said it cannot start for, per conversation: said once, not to every line, until it starts. */
+    /** What the assistant last said it cannot start for, per conversation: said once, not to every line, until it starts. */
     const cannot = new Map<string, string>();
     let toCaller = 0;
     let said = 0;
@@ -237,8 +237,8 @@ export const make = (options: ManagerOptions = {}) =>
 
     const llmOf = (): LLM => {
       if (options.llm) return options.llm();
-      // The key saved in settings, asked before each request: one saved while the manager runs is used at once.
-      return deepseek(deepseekModel(store.agent(managerAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
+      // The key saved in settings, asked before each request: one saved while the assistant runs is used at once.
+      return deepseek(deepseekModel(store.agent(assistantAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
     };
 
     // Tools run within the request; each reads who is calling from the input consumed last.
@@ -250,10 +250,10 @@ export const make = (options: ManagerOptions = {}) =>
       }
       return input;
     };
-    const managerTools = () =>
-      tool.manager(() => {
+    const assistantTools = () =>
+      tool.assistant(() => {
         const at = requestInput();
-        return { agent: managerAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
+        return { agent: assistantAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
       });
 
     // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
@@ -261,7 +261,7 @@ export const make = (options: ManagerOptions = {}) =>
       const by = Date.now() + withinMs;
       return recurrence.list().some((s) => {
         const next = nextRun(s);
-        return next !== undefined && (!s.agent || s.agent === managerAgent) && next <= by;
+        return next !== undefined && (!s.agent || s.agent === assistantAgent) && next <= by;
       });
     };
 
@@ -281,8 +281,8 @@ export const make = (options: ManagerOptions = {}) =>
       const key = keyNow();
       if (input.quiet || Date.now() - lastPush < streamEveryMs) return;
       lastPush = Date.now();
-      await go(core.setManager("speaking"));
-      await go(chat.managerSays(input.conversation, key, text, false, execution.currentRun()));
+      await go(core.setAssistant("speaking"));
+      await go(chat.assistantSays(input.conversation, key, text, false, execution.currentRun()));
     };
 
     const done = async (text: string) => {
@@ -291,7 +291,7 @@ export const make = (options: ManagerOptions = {}) =>
       toCaller = 0;
       const key = keyNow();
       open = false;
-      if (text && !input.quiet) await go(chat.managerSays(input.conversation, key, text, true, execution.currentRun()));
+      if (text && !input.quiet) await go(chat.assistantSays(input.conversation, key, text, true, execution.currentRun()));
     };
 
     // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
@@ -300,7 +300,7 @@ export const make = (options: ManagerOptions = {}) =>
       input.caller?.end();
       input = { conversation: input.conversation, source: input.source, run: input.run };
       open = false;
-      await go(core.setManager("listening"));
+      await go(core.setAssistant("listening"));
     };
 
     // An answer that failed before any token came has none to tell.
@@ -335,7 +335,7 @@ export const make = (options: ManagerOptions = {}) =>
           }
           return;
         case "agent_start":
-          return go(core.setManager("thinking"));
+          return go(core.setAssistant("thinking"));
         case "message_update": {
           if (e.message.role !== "assistant") return;
           const text = messageText(e.message);
@@ -358,7 +358,7 @@ export const make = (options: ManagerOptions = {}) =>
           if (e.compaction) shown = "";
           return;
         case "prefix_changed":
-          logs.info(`vibevalley: the manager's prompt start changed between compactions: ${e.parts.join(",")}`);
+          logs.info(`vibevalley: the assistant's prompt start changed between compactions: ${e.parts.join(",")}`);
           prefixChanged = e.parts;
           return;
         case "agent_settled":
@@ -369,7 +369,7 @@ export const make = (options: ManagerOptions = {}) =>
     // The agent's events, handled one at a time in order.
     let events = Promise.resolve();
     const follow = (e: BrainEvent) => {
-      events = events.then(() => event(e)).catch((err) => logs.error("vibevalley: the manager could not follow its agent:", err));
+      events = events.then(() => event(e)).catch((err) => logs.error("vibevalley: the assistant could not follow its agent:", err));
     };
 
     // Started on first use: loading it is not free, and a farm without a model works otherwise.
@@ -378,12 +378,12 @@ export const make = (options: ManagerOptions = {}) =>
       starting ??= (async () => {
         const llm = llmOf();
         const b = await Brain.start({
-          name: managerAgent,
+          name: assistantAgent,
           instructions: systemPrompt + agentPrompt,
           llm,
           home,
           cwd: projectsDir(config),
-          tools: managerTools(),
+          tools: assistantTools(),
           noSkills: true,
           noSubagents: true,
           recurrences: false,
@@ -392,7 +392,7 @@ export const make = (options: ManagerOptions = {}) =>
         shown = "";
         // Listening before the first line is sent.
         b.subscribe(follow);
-        logs.info(`vibevalley: the manager is on vibevalley's own agent, model ${llm.model.id}`);
+        logs.info(`vibevalley: the assistant is on vibevalley's own agent, model ${llm.model.id}`);
         brain = b;
         return b;
       })().finally(() => {
@@ -459,9 +459,9 @@ export const make = (options: ManagerOptions = {}) =>
     };
 
     const news = async (): Promise<[string, string[]]> => {
-      const digest = await go(chat.managerDigest());
+      const digest = await go(chat.assistantDigest());
       if (digest.length === 0) return ["", []];
-      return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + managerInboxLines(digest), digest.map((m) => m.id)];
+      return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + assistantInboxLines(digest), digest.map((m) => m.id)];
     };
 
     // Held from reading the situation to handing the input over, so that each input's changes follow the one before.
@@ -494,7 +494,7 @@ export const make = (options: ManagerOptions = {}) =>
             : "我这边起不来：" + why;
         const again = cannot.get(conversation) === words;
         cannot.set(conversation, words);
-        if (!again) await go(chat.managerSays(conversation, `failed${Date.now()}`, words, true, id));
+        if (!again) await go(chat.assistantSays(conversation, `failed${Date.now()}`, words, true, id));
         extra.caller?.push("我这边起不来：" + why);
         extra.caller?.end();
         return false;
@@ -507,7 +507,7 @@ export const make = (options: ManagerOptions = {}) =>
         const text = ["【现在】" + localeMinute(new Date()), await situationNow(b, conversation), b.memoryNews(), heard, line]
           .filter((p) => p !== "")
           .join("\n\n");
-        const message = customMessage("managerInput", text, { details: routing });
+        const message = customMessage("assistantInput", text, { details: routing });
         local.set(message, { ...(extra.caller ? { caller: extra.caller } : {}), run: asked });
         if (now) b.send(message);
         else b.later(message);
@@ -515,7 +515,7 @@ export const make = (options: ManagerOptions = {}) =>
       return true;
     };
 
-    /** now joins the run under way; otherwise the line waits until the run would stop. false: the manager could not start. */
+    /** now joins the run under way; otherwise the line waits until the run would stop. false: the assistant could not start. */
     const ask = (line: string, routing: Routing, extra: Partial<Local>, now: boolean) =>
       sendInput(sourceHead(routing.source) + line, routing, { ...extra, run: extra.run ?? { by: { kind: "" } } }, now);
 
@@ -530,7 +530,7 @@ export const make = (options: ManagerOptions = {}) =>
       return note;
     };
 
-    const heardInChat = async (n: ManagerNews) => {
+    const heardInChat = async (n: AssistantNews) => {
       const fromPerson = n.messages.every((m) => m.from === "user");
       const owner = n.messages.some((m) => m.from === "user");
       const source: Source = fromPerson ? "owner" : "chat";
@@ -548,15 +548,15 @@ export const make = (options: ManagerOptions = {}) =>
         return;
       }
       await ask(
-        pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + managerInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。",
+        pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + assistantInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。",
         routing,
         {},
         fromPerson,
       );
     };
 
-    // A run of an issue for the manager lasts until the manager's run that takes the line settles.
-    const onWork = async (w: ManagerWork) => {
+    // A run of an issue for the assistant lasts until the assistant's run that takes the line settles.
+    const onWork = async (w: AssistantWork) => {
       const channel = await go(chat.channelOf(w.channel));
       let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
       const s = w.recurrence;
@@ -575,7 +575,7 @@ export const make = (options: ManagerOptions = {}) =>
       try {
         b = await brainOf();
       } catch (err) {
-        logs.error("vibevalley: the manager could not go on with its last run:", err);
+        logs.error("vibevalley: the assistant could not go on with its last run:", err);
         return;
       }
       const at = requestInput();
@@ -607,12 +607,12 @@ export const make = (options: ManagerOptions = {}) =>
     const handled =
       <A>(what: string, f: (a: A) => Promise<unknown>) =>
       (a: A) =>
-        Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the manager could not take ${what}:`, err)));
+        Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the assistant could not take ${what}:`, err)));
 
-    // A test that gave the manager no model hears nothing: the other services run as without it, and nothing reaches a model.
+    // A test that gave the assistant no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
-      yield* Effect.forkScoped(Stream.runForEach(yield* chat.forManager, handled("a line", heardInChat)));
-      yield* Effect.forkScoped(Stream.runForEach(yield* issue.forManager, handled("an issue", onWork)));
+      yield* Effect.forkScoped(Stream.runForEach(yield* chat.forAssistant, handled("a line", heardInChat)));
+      yield* Effect.forkScoped(Stream.runForEach(yield* issue.forAssistant, handled("an issue", onWork)));
       yield* Effect.forkScoped(
         Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
           Effect.flatMap(chat.channelOf(o.channel), (c) =>
@@ -635,7 +635,7 @@ export const make = (options: ManagerOptions = {}) =>
         const b = brain ?? (await starting?.catch(() => undefined));
         await b?.close();
         await events;
-        await go(execution.close()).catch((err: Error) => logs.error("manager execution:", err.message));
+        await go(execution.close()).catch((err: Error) => logs.error("assistant execution:", err.message));
       }),
     );
 
@@ -643,11 +643,11 @@ export const make = (options: ManagerOptions = {}) =>
       try {
         return llmOf().model.id;
       } catch {
-        return store.agent(managerAgent)?.model ?? "";
+        return store.agent(assistantAgent)?.model ?? "";
       }
     };
 
-    const markWrong = (on: number, want: string): Effect.Effect<ManagerEval, ApiError> =>
+    const markWrong = (on: number, want: string): Effect.Effect<AssistantEval, ApiError> =>
       Effect.suspend(() => {
         const w = want.trim();
         if (!w) return Effect.fail(refused("写一句它应该怎样"));
@@ -663,7 +663,7 @@ export const make = (options: ManagerOptions = {}) =>
         } catch {
           memoryText = "";
         }
-        const tools = [...managerTools(), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name);
+        const tools = [...assistantTools(), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name);
         const id = newId();
         const evalCase = {
           id,
@@ -687,7 +687,7 @@ export const make = (options: ManagerOptions = {}) =>
         return Effect.succeed({ id, file });
       });
 
-    return Manager.of({
+    return Assistant.of({
       say: (text, pick, conversation, sendKey) =>
         Effect.gen(function* () {
           const a = pick.agent ? store.agent(pick.agent) : undefined;
@@ -719,7 +719,7 @@ export const make = (options: ManagerOptions = {}) =>
         for await (const w of me.words()) said += w;
         return said.trim();
       },
-      answerer: (model) => (model === managerModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),
+      answerer: (model) => (model === assistantModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),
       stop: () =>
         Effect.promise(async () => {
           await brain?.stop();
@@ -728,9 +728,9 @@ export const make = (options: ManagerOptions = {}) =>
     });
   });
 
-export const layer = (options?: ManagerOptions) => Layer.effect(Manager, make(options));
+export const layer = (options?: AssistantOptions) => Layer.effect(Assistant, make(options));
 
-const isInputLine = (m: AgentMessage) => m.role === "custom" && (m as CustomMessage).customType === "managerInput";
+const isInputLine = (m: AgentMessage) => m.role === "custom" && (m as CustomMessage).customType === "assistantInput";
 
 /** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
  * than the step, and it holds the step's words (trimmed and maybe cut; the message puts the time, the farm and the news

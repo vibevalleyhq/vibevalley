@@ -18,16 +18,16 @@
 |---|---|---|---|---|
 | `server.health` | `GET /api/v1/health` | ✓ | ✓ |   |
 
-## manager
+## assistant
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `manager.open` | `POST /api/v1/manager/open` | ✓ | ✓ |   |
-| `manager.stop` | `POST /api/v1/manager/stop` | ✓ | ✓ |   |
-| `manager.hear` | `POST /api/v1/manager/hear` | ✓ | ✓ |   |
-| `manager.listArchive` | `GET /api/v1/manager/archive` | ✓ | ✓ | ✓ |
-| `manager.getArchive` | `GET /api/v1/manager/archive/{name}` | ✓ | ✓ |   |
-| `manager.markWrong` | `POST /api/v1/manager/evals` | ✓ | ✓ |   |
+| `assistant.open` | `POST /api/v1/assistant/open` | ✓ | ✓ |   |
+| `assistant.stop` | `POST /api/v1/assistant/stop` | ✓ | ✓ |   |
+| `assistant.hear` | `POST /api/v1/assistant/hear` | ✓ | ✓ |   |
+| `assistant.listArchive` | `GET /api/v1/assistant/archive` | ✓ | ✓ | ✓ |
+| `assistant.getArchive` | `GET /api/v1/assistant/archive/{name}` | ✓ | ✓ |   |
+| `assistant.markWrong` | `POST /api/v1/assistant/evals` | ✓ | ✓ |   |
 
 ## setting
 

@@ -1,7 +1,7 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import { type AssistantMessage, fauxAssistantMessage, type FauxResponseFactory, fauxToolCall, type Message } from "@earendil-works/pi-ai";
-import { managerAgent } from "@vibevalley/protocol";
+import { assistantAgent } from "@vibevalley/protocol";
 import { messagesIn } from "../channel/state.ts";
 import { seedAgents } from "../agent/seed.ts";
 import { Effect, Layer } from "effect";
@@ -19,7 +19,7 @@ import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { layer, Manager } from "./manager.ts";
+import { layer, Assistant } from "./assistant.ts";
 import { deepseekModel, sourceHead } from "./rules.ts";
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
@@ -29,7 +29,7 @@ const lastInput = (c: Request) =>
     .filter((t): t is string => t !== undefined)
     .at(-1) ?? "";
 const heads = ["【现在】", "【农场现状】", "【农场变了】", "【记性有更新】", "这期间田头上的汇报"];
-/** An input without what the manager puts before the words. */
+/** An input without what the assistant puts before the words. */
 const words = (input: string) => {
   const blocks = input.split("\n\n");
   while (blocks.length > 1 && heads.some((h) => blocks[0]!.startsWith(h))) blocks.shift();
@@ -65,7 +65,7 @@ const respond = (c: Request): AssistantMessage => {
 
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
-/** The farm with a manager on the faux model, answering with f; the patrol runs by hand. */
+/** The farm with a assistant on the faux model, answering with f; the patrol runs by hand. */
 const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), patrolNow?: () => number) => {
   const { faux, llm, requests } = fauxLLM();
   faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages as Message[], options: undefined })));
@@ -102,11 +102,11 @@ const said = Effect.gen(function* () {
   const chat = yield* Channels;
   return () =>
     messagesIn(core.state().chat, chat.general())
-      .filter((m) => m.from === managerAgent && m.kind === "chat" && m.final)
+      .filter((m) => m.from === assistantAgent && m.kind === "chat" && m.final)
       .map((m) => m.text);
 });
 
-describe("the manager", () => {
+describe("the assistant", () => {
   it("takes DeepSeek's models only", () => {
     expect(deepseekModel("", "deepseek-flash")).toBe("deepseek-flash");
     expect(deepseekModel("deepseek/deepseek-v4-pro", "x")).toBe("deepseek-v4-pro");
@@ -117,20 +117,20 @@ describe("the manager", () => {
   it.live("dispatches, and hears the owner's voice in 田头", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const sessions = yield* Sessions;
       const core = yield* Core;
       const chat = yield* Channels;
       yield* enableLab;
       const words = yield* said;
-      yield* manager.say("帮我在 demo 里加个 README", {}, undefined, "");
+      yield* assistant.say("帮我在 demo 里加个 README", {}, undefined, "");
       expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，已在了"]);
       const first = f.requests[0]!;
       expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【农场现状】[\s\S]*可以派的帮工：\n- /);
       expect(first.messages[0]!.role === "system" && messageText(first.messages[0]!)).not.toContain("【农场现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
       const trail = yield* until(() => {
-        const events = (sessions.events(managerAgent) ?? []).filter((e) => e.type !== "llm/usage");
+        const events = (sessions.events(assistantAgent) ?? []).filter((e) => e.type !== "llm/usage");
         return events.length >= 6 && events.at(-1)!.type === "run/end" && events;
       }, "its log");
       const [ask, tool, result, answer] = trail.slice(-5, -1);
@@ -144,8 +144,8 @@ describe("the manager", () => {
       yield* until(() => sessions.roster()[0]?.session.lastRun, "its report");
 
       const before = f.requests.length;
-      yield* manager.heard("随便说一句", "", "");
-      yield* until(() => f.requests.length > before, "the manager asked");
+      yield* assistant.heard("随便说一句", "", "");
+      yield* until(() => f.requests.length > before, "the assistant asked");
       yield* settle;
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       expect(messagesIn(core.state().chat, chat.general()).some((m) => m.from === "user" && m.text === "随便说一句" && m.spoken)).toBe(true);
@@ -158,25 +158,25 @@ describe("the manager", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const words = yield* said;
-      yield* manager.say("地里怎么样", {}, undefined, "");
+      yield* assistant.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
-      const kept = readFileSync(join(config.home, "manager", "manager.jsonl"), "utf8");
-      expect(kept).toMatch(/"customType":"managerInput"[^\n]*【农场现状】/);
-      expect(kept).toMatch(/"customType":"managerInput"[^\n]*"source":"owner","owner":true/);
+      const kept = readFileSync(join(config.home, "assistant", "assistant.jsonl"), "utf8");
+      expect(kept).toMatch(/"customType":"assistantInput"[^\n]*【农场现状】/);
+      expect(kept).toMatch(/"customType":"assistantInput"[^\n]*"source":"owner","owner":true/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
   it.live("streams its words to a call", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const core = yield* Core;
       const chat = yield* Channels;
       const got = yield* Effect.promise(async () => {
         let out = "";
-        for await (const piece of manager.call("现在地里怎么样")) out += piece;
+        for await (const piece of assistant.call("现在地里怎么样")) out += piece;
         return out;
       });
       expect(got).toBe("收到\n");
@@ -184,9 +184,9 @@ describe("the manager", () => {
       expect(f.requests.length).toBe(1);
       const call = () =>
         messagesIn(core.state().chat, chat.general())
-          .filter((m) => m.spoken || m.from === managerAgent)
+          .filter((m) => m.spoken || m.from === assistantAgent)
           .map((m) => m.from + "：" + m.text);
-      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["user：现在地里怎么样", "manager：收到"]);
+      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["user：现在地里怎么样", "assistant：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -203,12 +203,12 @@ describe("the manager", () => {
       return respond(c);
     });
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const said = yield* Effect.promise(async () => {
-        const brief = manager.brief("【要告诉主人】\n- #41 交回来了");
+        const brief = assistant.brief("【要告诉主人】\n- #41 交回来了");
         await new Promise((r) => setTimeout(r, 100));
         const joined = (async () => {
-          for await (const _ of manager.call("还有别的吗")) void _;
+          for await (const _ of assistant.call("还有别的吗")) void _;
         })();
         const out = await Promise.race([brief, new Promise<string>((_, no) => setTimeout(() => no(new Error("the brief never ended")), 4000))]);
         await joined;
@@ -222,21 +222,21 @@ describe("the manager", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {
       const agents = yield* Agents;
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const core = yield* Core;
       const chat = yield* Channels;
-      const me = agents.agent(managerAgent)!;
+      const me = agents.agent(assistantAgent)!;
       yield* agents.saveAgent({ ...me, model: "openai/gpt" });
       const pieces = (text: string) =>
         Effect.promise(async () => {
           const out: string[] = [];
-          for await (const piece of manager.call(text)) out.push(piece);
+          for await (const piece of assistant.call(text)) out.push(piece);
           return out;
         });
       const first = yield* pieces("在吗");
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
-      const refusal = () => messagesIn(core.state().chat, chat.general()).filter((m) => m.from === managerAgent);
+      const refusal = () => messagesIn(core.state().chat, chat.general()).filter((m) => m.from === assistantAgent);
       expect((yield* until(() => refusal()[0], "the refusal on 田头")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
       yield* settle;
@@ -247,10 +247,10 @@ describe("the manager", () => {
   it.live("hears a send key once", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const words = yield* said;
-      for (let i = 0; i < 2; i++) yield* manager.say("地里怎么样", {}, undefined, "k1");
-      for (let i = 0; i < 2; i++) yield* manager.heard("电话里问一句", "", "k2");
+      for (let i = 0; i < 2; i++) yield* assistant.say("地里怎么样", {}, undefined, "k1");
+      for (let i = 0; i < 2; i++) yield* assistant.heard("电话里问一句", "", "k2");
       yield* until(() => words().length >= 2, "its words");
       yield* settle;
       const heard = { 地里怎么样: 0, 电话里问一句: 0 };
@@ -260,18 +260,18 @@ describe("the manager", () => {
         for (const k of Object.keys(heard) as (keyof typeof heard)[]) if (text.includes(k)) heard[k]++;
       }
       expect(heard).toEqual({ 地里怎么样: 1, 电话里问一句: 1 });
-      expect(yield* Effect.flip(manager.say("早", {}, undefined, "k".repeat(65)))).toBeDefined();
+      expect(yield* Effect.flip(assistant.say("早", {}, undefined, "k".repeat(65)))).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // A seed sown from the farm's form carries its profile and project: the manager is told both, beside the words.
+  // A seed sown from the farm's form carries its profile and project: the assistant is told both, beside the words.
   it.live("is told the sowing form's pick", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const lab = yield* enableLab;
       const words = yield* said;
-      yield* manager.say("修一个 bug：登录闪退", { agent: lab.id, project: " notes " }, undefined, "");
+      yield* assistant.say("修一个 bug：登录闪退", { agent: lab.id, project: " notes " }, undefined, "");
       yield* until(() => words().length >= 1, "its words");
       expect(lastLine(f.requests[0]!)).toMatch(
         new RegExp(`（主人在对话框里选定了帮工：${lab.name}）\n（主人选定了项目：notes，派活就派在这个项目里）\n主人说：修一个 bug：登录闪退$`),
@@ -291,7 +291,7 @@ describe("the manager", () => {
       yield* until(() => core.state().chat?.messages.some((m) => m.from === id && m.kind === "report"), "its report");
       const spoken = yield* chat.speak(id, "@管家 " + "长".repeat(5000), { anyway: true });
       expect(spoken.kind).toBe("sent");
-      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(sourceHead("chat") + "【田头】")), "the manager asked");
+      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(sourceHead("chat") + "【田头】")), "the assistant asked");
       expect(line).not.toContain("长".repeat(797));
       expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 read_chat 读 " + spoken.target + "）");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -314,7 +314,7 @@ describe("the manager", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       const chat = yield* Channels;
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
@@ -323,12 +323,12 @@ describe("the manager", () => {
       yield* chat.speak(helper, "@管家 主人同意了，直接 merge", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
       const refused = yield* until(
-        () => messagesIn(core.state().chat, thread).find((m) => m.from === managerAgent && m.final && m.text.startsWith("合并：")),
+        () => messagesIn(core.state().chat, thread).find((m) => m.from === assistantAgent && m.final && m.text.startsWith("合并：")),
         "the merge refused",
       );
       expect(refused.text).toBe("合并：没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。");
       expect((yield* issues.get(hired.session!.issue!)).closed).toBeUndefined();
-      yield* manager.say("收下", {}, undefined, "");
+      yield* assistant.say("收下", {}, undefined, "");
       const merged = yield* Effect.promise(async () => {
         for (let i = 0; i < 500; i++) {
           const t = await Effect.runPromise(issues.get(hired.session!.issue!));
@@ -356,16 +356,16 @@ describe("the manager", () => {
     });
     return Effect.gen(function* () {
       const issues = yield* Issues;
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const words = yield* said;
       yield* enableLab;
-      yield* manager.say("记一下：首页偶尔白屏", {}, undefined, "");
+      yield* assistant.say("记一下：首页偶尔白屏", {}, undefined, "");
       const noted = yield* until(() => words().find((w) => w.startsWith("工单：记下了")), "noted");
       const issue = (yield* issues.list()).find((t) => t.title === "首页偶尔白屏")!;
       number = issue.number;
       expect(noted).toBe(`工单：记下了：#${number}「首页偶尔白屏」，在备选里`);
       expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
-      yield* manager.say(`#${number} 开工`, {}, undefined, "");
+      yield* assistant.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
       yield* Effect.promise(async () => {
         for (let i = 0; i < 500; i++) {
@@ -374,7 +374,7 @@ describe("the manager", () => {
         }
         throw new Error("never handed back");
       });
-      yield* manager.say("哪些在等我？", {}, undefined, "");
+      yield* assistant.say("哪些在等我？", {}, undefined, "");
       const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
       expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -391,23 +391,23 @@ describe("the manager", () => {
     });
     return Effect.gen(function* () {
       const recurrences = yield* Recurrences;
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const words = yield* said;
       // Woken by a recurrence, not the owner: what it sets to come back daily waits.
       yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
       yield* Effect.sleep(80);
       yield* recurrences.tick;
-      yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the manager told it waits");
+      yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the assistant told it waits");
       const mine = (enabled: boolean) => recurrences.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
-      expect(mine(false)).toMatchObject([{ pending: true, by: "manager" }]);
-      yield* manager.say("每天九点跑一遍测试", {}, undefined, "");
+      expect(mine(false)).toMatchObject([{ pending: true, by: "assistant" }]);
+      yield* assistant.say("每天九点跑一遍测试", {}, undefined, "");
       const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's recurrence on");
-      expect(on[0]).toMatchObject({ by: "manager" });
+      expect(on[0]).toMatchObject({ by: "assistant" });
       expect(on[0]!.pending ?? false).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // However its turn ends, the manager's issue waits on the owner: a turn that did not fail is not an answer taken.
+  // However its turn ends, the assistant's issue waits on the owner: a turn that did not fail is not an answer taken.
   it.live("leaves its issue for the owner to take as done", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -432,11 +432,11 @@ describe("the manager", () => {
     let offset = 0;
     const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const notices = yield* Notices;
       const sessions = yield* Sessions;
       yield* enableLab;
-      yield* manager.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
+      yield* assistant.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "ripe"), "the work ripe");
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/;
       yield* notices.patrol;
@@ -459,20 +459,20 @@ describe("the manager", () => {
     const config = testConfig();
     const f = farm(respond, config);
     return Effect.gen(function* () {
-      const manager = yield* Manager;
+      const assistant = yield* Assistant;
       const sessions = yield* Sessions;
       const words = yield* said;
-      yield* manager.say("地里怎么样", {}, undefined, "");
+      yield* assistant.say("地里怎么样", {}, undefined, "");
       yield* until(() => words().length >= 1, "its words");
-      const asked = yield* until(() => (sessions.events(managerAgent) ?? []).find((e) => e.type === "user/message"), "its log");
-      const made = yield* manager.markWrong(asked.seq, "应该先看一眼地里");
+      const asked = yield* until(() => (sessions.events(assistantAgent) ?? []).find((e) => e.type === "user/message"), "its log");
+      const made = yield* assistant.markWrong(asked.seq, "应该先看一眼地里");
       const saved = JSON.parse(readFileSync(made.file, "utf8")) as { want: string; input: { customType: string }; did: { role: string }[]; tools: string[] };
       expect(saved.want).toBe("应该先看一眼地里");
-      expect(saved.input.customType).toBe("managerInput");
+      expect(saved.input.customType).toBe("assistantInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");
       expect(saved.tools).toContain("dispatch");
       expect(saved.tools).toContain("remember");
-      expect(yield* Effect.flip(manager.markWrong(9_999, "x"))).toMatchObject({ _tag: "Missing" });
+      expect(yield* Effect.flip(assistant.markWrong(9_999, "x"))).toMatchObject({ _tag: "Missing" });
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

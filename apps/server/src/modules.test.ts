@@ -23,7 +23,7 @@ function files(dir: string): string[] {
 const rel = (p: string) => relative(src, p).split("\\").join("/");
 const rank = (path: string) => modules.findIndex((m) => m === moduleOf(path));
 
-/** Whose part of the core state each field is; the call and the manager's state are the core's own. */
+/** Whose part of the core state each field is; the call and the assistant's state are the core's own. */
 const owners: Readonly<Record<string, string>> = {
   sessions: "Agent Sessions",
   chat: "Collaboration",

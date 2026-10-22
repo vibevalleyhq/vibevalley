@@ -59,7 +59,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
 - 优先级的 `normal` 改叫 `medium`；
 - `Issue.agent` 改叫 `assignee`；
 - `AgentProfile` 改叫 `Agent`，`Helper` 改叫 `Run`，`WorkStep` 改叫 `Activity`（`asked` → `prompt`、`said` → `response`、`tool` → `action`、`problem` → `error`）；
-- `IncomingCall` 改叫 `InboxItem`（已经改了，见第 5 步），`Merges.Harvest` 改叫 `Merge`（已经改了，现在是 `Issue.Merge`），`Foreman` 改叫 `Manager`。
+- `IncomingCall` 改叫 `InboxItem`（已经改了，见第 5 步），`Merges.Harvest` 改叫 `Merge`（已经改了，现在是 `Issue.Merge`），`Foreman` 改叫 `Assistant`。
 
 ### 接下来的步骤
 
@@ -74,7 +74,7 @@ VibeValley 是 AI 版的 Linear，穿农场的皮。概念收成下面几样，�
    - 金币、成就、等级、地块位置挪进农场的画面，和现在的 `FarmView` 一样，从状态和账本算出来；
    - 页面的工作台读核心状态，像素村读画面。
 9. **改名，拆包**：
-   - 照上面的名字改类型、字段和服务，生成的类型跟着改（改了 `IncomingCall` 那一组，见第 5 步；`Helper`、`Foreman` 改成了 `Worker`、`Manager`，`Worker` 后来改叫 `Session`，见 [Run 是一次干活，Session 跨好几次 run](docs/subsystems/session.md)；`AgentProfile`、`WorkStep`、`Merges.Harvest`、工单状态和优先级的值也都改完了，见 [改完旧名字](docs/subsystems/foundation.md)）；
+   - 照上面的名字改类型、字段和服务，生成的类型跟着改（改了 `IncomingCall` 那一组，见第 5 步；`Helper`、`Foreman` 改成了 `Worker`、`Assistant`，`Worker` 后来改叫 `Session`，见 [Run 是一次干活，Session 跨好几次 run](docs/subsystems/session.md)；`AgentProfile`、`WorkStep`、`Merges.Harvest`、工单状态和优先级的值也都改完了，见 [改完旧名字](docs/subsystems/foundation.md)）；
    - 存盘的字段和表名一起改，改表结构；复数表名改成单数，查询搬进 effect-sqlc（这一项已经做了）；
    - 按模块拆成服务，模块之间的依赖方向由 layer 的次序和类型检查（这一项已经做了，[一个概念一个包](docs/subsystems/foundation.md)）。
 

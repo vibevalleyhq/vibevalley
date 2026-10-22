@@ -1,6 +1,6 @@
 // One profile, made or edited: its
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
-// manager from sending it, the server's answer (agent.check), under them.
+// assistant from sending it, the server's answer (agent.check), under them.
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";

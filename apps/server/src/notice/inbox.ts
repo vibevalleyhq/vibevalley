@@ -1,5 +1,5 @@
 // What is waiting on the owner: the inbox the phone rings with, and what the
-// manager's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
+// assistant's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // questions in their place; a quiet one still questions.
 
@@ -9,7 +9,7 @@ import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
 
-/** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the manager, {ago} filled with how long it has waited. */
+/** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the assistant, {ago} filled with how long it has waited. */
 export interface InboxEntry {
   readonly item: InboxItem;
   readonly channel?: string;
@@ -100,20 +100,20 @@ function gathered(state: WorkspaceState): Unworded[] {
     }
   }
 
-  const manager: InboxFrom = { kind: "manager" };
+  const assistant: InboxFrom = { kind: "assistant" };
   for (const graph of graphsOf(state)) {
     const target = { kind: "graph", graph: graph.id } as const;
     switch (graph.state) {
       case "draft":
         out.push({
-          item: { id: graph.id + ":draft", kind: "graph-draft", from: manager, text: cut(graph.title, 40), at: graph.createdAt, target },
+          item: { id: graph.id + ":draft", kind: "graph-draft", from: assistant, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
           brief: "种植计划「" + graph.title + "」（" + graph.id + "）拆好了，{ago}还没人看",
         });
         break;
       case "ripe":
         out.push({
-          item: { id: graph.id + ":ripe", kind: "graph-ripe", from: manager, text: cut(graph.title, 40), at: graph.createdAt, target },
+          item: { id: graph.id + ":ripe", kind: "graph-ripe", from: assistant, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
           brief: "种植计划「" + graph.title + "」（" + graph.id + "）都做完了，{ago}还没收",
         });
@@ -127,7 +127,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
           const why = task.conclusion ? "：" + slice(task.conclusion, 0, 80) : "";
           out.push({
-            item: { id, kind: "task-failed", from: manager, text: cut(graph.title + "：" + task.title, 40), at: graph.createdAt, target },
+            item: { id, kind: "task-failed", from: assistant, text: cut(graph.title + "：" + task.title, 40), at: graph.createdAt, target },
             channel: general,
             brief: "种植计划「" + graph.title + "」（" + graph.id + "）的步骤 " + task.id + "「" + task.title + "」没做成，{ago}没人管了" + why,
           });
@@ -142,7 +142,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       item: {
         id: sc.id + ":ask",
         kind: "recurrence-ask",
-        from: manager,
+        from: assistant,
         text: cut(sc.name, 40),
         at: sc.created,
         target: { kind: "chat", conversation: sc.channel },
@@ -161,7 +161,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       const read = c.read ?? 0;
       for (const m of messagesIn(chat, c.id)) {
         if (!m.final || m.from === "user" || m.number <= read || (lastFromUser.get(c.id) ?? 0) > m.number || !(m.mentions ?? []).includes("user")) continue;
-        const from: InboxFrom = m.fromKind === "agent" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : manager;
+        const from: InboxFrom = m.fromKind === "agent" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : assistant;
         out.push({
           item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: c.id } },
           channel: channelOf(chat, c)?.id,

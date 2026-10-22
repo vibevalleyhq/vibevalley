@@ -1,11 +1,11 @@
 import { chmodSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, managerAgent } from "@vibevalley/protocol";
+import { type Agent, assistantAgent } from "@vibevalley/protocol";
 import { Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Agents, layer, managerRuntime, withCast } from "./agent.ts";
+import { Agents, layer, assistantRuntime, withCast } from "./agent.ts";
 
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
@@ -52,25 +52,25 @@ describe("profiles", () => {
     expect([kept.look.species, kept.look.outfit]).toEqual(["owl", "rain"]);
   });
 
-  it.effect("the manager is built in: not sent work, never deleted, only on VibeValley's own agent", () => {
+  it.effect("the assistant is built in: not sent work, never deleted, only on VibeValley's own agent", () => {
     const config = testConfig();
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        const manager = s.agent(managerAgent)!;
-        expect([manager.runtime, manager.enabled]).toEqual([managerRuntime, true]);
-        expect(s.agents().some((a) => a.id === managerAgent)).toBe(false);
-        expect(s.all().some((a) => a.id === managerAgent)).toBe(true);
-        expect((yield* Effect.flip(s.deleteAgent(managerAgent)))._tag).toBe("Refused");
-        expect(Exit.isFailure(yield* Effect.exit(s.saveAgent({ ...manager, runtime: "claude" })))).toBe(true);
-        yield* s.saveAgent({ ...manager, model: "deepseek-pro" });
+        const assistant = s.agent(assistantAgent)!;
+        expect([assistant.runtime, assistant.enabled]).toEqual([assistantRuntime, true]);
+        expect(s.agents().some((a) => a.id === assistantAgent)).toBe(false);
+        expect(s.all().some((a) => a.id === assistantAgent)).toBe(true);
+        expect((yield* Effect.flip(s.deleteAgent(assistantAgent)))._tag).toBe("Refused");
+        expect(Exit.isFailure(yield* Effect.exit(s.saveAgent({ ...assistant, runtime: "claude" })))).toBe(true);
+        yield* s.saveAgent({ ...assistant, model: "deepseek-pro" });
       }),
     ).pipe(
       Effect.andThen(
         run(
           config,
-          Effect.map(Agents, (again) => expect(again.agent(managerAgent)?.model).toBe("deepseek-pro")),
+          Effect.map(Agents, (again) => expect(again.agent(assistantAgent)?.model).toBe("deepseek-pro")),
         ),
       ),
     );

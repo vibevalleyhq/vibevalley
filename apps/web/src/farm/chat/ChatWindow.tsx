@@ -1,5 +1,5 @@
-// The farm's chat window, 田头: folded, the manager's face and the input row; open, a window of a fixed size drawn up
-// over the picture from that row, so the farm never rescales: a head (the channel menu and what the manager is doing,
+// The farm's chat window, 田头: folded, the assistant's face and the input row; open, a window of a fixed size drawn up
+// over the picture from that row, so the farm never rescales: a head (the channel menu and what the assistant is doing,
 // or a thread's title and its helper), the messages newest at the bottom, a few lines to say, and the row.
 // Double-clicking the head makes it large.
 
@@ -16,7 +16,7 @@ import { createHistory, HistoryContext, useHistory, useMarkRead } from "../../pa
 import { TurnSteps } from "../../pages/chat/WorkLog";
 import { useCore } from "../../data/frame";
 import { ready, useAgents } from "../../data/query";
-import { ManagerFace } from "../../ui/Face";
+import { AssistantFace } from "../../ui/Face";
 import { createCall } from "../../voice/CallButton";
 import { PxButton, PxWindow, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
@@ -40,7 +40,7 @@ const phaseWords: Record<ChatPhase, string> = {
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
-/** What the manager is doing: on a call, what the call says; else from the farm's state. */
+/** What the assistant is doing: on a call, what the call says; else from the farm's state. */
 const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
   if (v.phase === "connecting" || v.phase === "ending") return "connecting";
   if (v.phase === "live")
@@ -49,7 +49,7 @@ const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
   if (s.call === "connecting") return "connecting";
   if (s.call === "error" || v.problem !== undefined) return "error";
   if (s.call !== "live") return "off";
-  return s.manager === "speaking" ? "speaking" : s.manager === "thinking" ? "thinking" : "listening";
+  return s.assistant === "speaking" ? "speaking" : s.assistant === "thinking" ? "thinking" : "listening";
 };
 
 function Dots() {
@@ -118,7 +118,7 @@ function Window() {
   const open = useFarm((s) => s.chatOpen);
   const large = useFarm((s) => s.chatLarge);
   const shownId = useFarm((s) => s.chatShown);
-  const look = useFarm((s) => s.managerLook);
+  const look = useFarm((s) => s.assistantLook);
   const history = useHistory();
   const [problem, setProblem] = createSignal<string>();
   const shown = createMemo(() => (shownId() ? conversationOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));
@@ -179,7 +179,7 @@ function Window() {
     return t ? parentOf(chat(), t, more()) : undefined;
   };
   const hasOlder = () => more() !== undefined && !more()!.complete;
-  const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "manager";
+  const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "assistant";
   const showSuggestions = () => !thread() && (core()?.call === "live" || (chat()?.messages ?? []).length === 0);
 
   return (
@@ -230,7 +230,7 @@ function Window() {
               </Show>
               <Show when={parent()}>{(m) => <ParentMessage m={m()} face={<FaceOf m={m()} agents={agents()} />} />}</Show>
               <Show when={items().length === 0 && !thread()}>
-                <ChatRow mine={false} first face={<ManagerFace size={30} look={look()} />} name="管家">
+                <ChatRow mine={false} first face={<AssistantFace size={30} look={look()} />} name="管家">
                   <span class="whitespace-pre-line">{greeting}</span>
                 </ChatRow>
               </Show>
@@ -249,7 +249,7 @@ function Window() {
                 )}
               </For>
               <Show when={thinking()}>
-                <ChatRow mine={false} first face={<ManagerFace size={30} look={look()} />}>
+                <ChatRow mine={false} first face={<AssistantFace size={30} look={look()} />}>
                   <span class="flex h-5 items-center px-1">
                     <Dots />
                   </span>
@@ -363,9 +363,11 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
     const t = props.thread;
     return t ? <ThreadChip thread={t} unread={props.chatUnread(t)} onOpen={() => farm.showChat(t.id)} /> : undefined;
   };
-  // The dispatch note is the farm's, under the manager's name: its words say the same turn.
+  // The dispatch note is the farm's, under the assistant's name: its words say the same turn.
   const turn = () =>
-    props.m.final && props.m.fromKind === "manager" && props.m.kind !== "dispatch" ? <TurnSteps session="manager" run={props.m.run} manager /> : undefined;
+    props.m.final && props.m.fromKind === "assistant" && props.m.kind !== "dispatch" ? (
+      <TurnSteps session="assistant" run={props.m.run} assistant />
+    ) : undefined;
   return (
     <Switch
       fallback={

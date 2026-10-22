@@ -15,7 +15,7 @@ export const UpsertParticipantParams = Schema.Struct({
 export type UpsertParticipantParams = typeof UpsertParticipantParams.Type
 
 
-export const UpsertParticipantSql = "-- Who is in the chat: the owner, the manager, the sessions, the farm (channel/store.ts).\n\n-- name: UpsertParticipant :exec\ninsert into channel_participant (id, kind, name, agent_id, runtime, joined_at)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;"
+export const UpsertParticipantSql = "-- Who is in the chat: the owner, the assistant, the sessions, the farm (channel/store.ts).\n\n-- name: UpsertParticipant :exec\ninsert into channel_participant (id, kind, name, agent_id, runtime, joined_at)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id, runtime = excluded.runtime, left_at = null;"
 
 export const upsertParticipant = Effect.fn("UpsertParticipant")(function* (params: UpsertParticipantParams) {
   const sql = yield* SqlClient.SqlClient

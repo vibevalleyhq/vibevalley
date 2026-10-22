@@ -1,7 +1,7 @@
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "vite-plus/test";
-import { check, committed, type Expect, casesIn, isInput, kinds, managerToolNames, problemOf } from "./evals.ts";
+import { check, committed, type Expect, casesIn, isInput, kinds, assistantToolNames, problemOf } from "./evals.ts";
 
 const call = fauxAssistantMessage(fauxToolCall("dispatch", { project: "demo", brief: "加个 README" }, { id: "c1" }));
 const turn: AgentMessage[] = [
@@ -11,7 +11,7 @@ const turn: AgentMessage[] = [
 ];
 const quiet = turn.slice(0, 2);
 
-describe("the manager's evals", () => {
+describe("the assistant's evals", () => {
   it("judge every kind", () => {
     const passed = new Set<string>();
     const cases: [Expect, AgentMessage[], boolean][] = [
@@ -42,7 +42,7 @@ describe("the manager's evals", () => {
   it("hold cases that catch their error", () => {
     const cases = casesIn(committed);
     expect(cases.length).toBeGreaterThan(0);
-    const tools = managerToolNames();
+    const tools = assistantToolNames();
     for (const { file, case: c } of cases) {
       expect({ file, id: !!c.id, want: !!c.want, model: !!c.model, input: isInput(c.input), expect: c.expect.length > 0 }).toEqual({
         file,

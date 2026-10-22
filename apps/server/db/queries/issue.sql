@@ -90,7 +90,7 @@ update issue set closed_at = null, closed = null, queued_at = null, checks = nul
 select id, handed_back from issue where assignee = sqlc.arg(assignee) and closed_at is null;
 
 -- name: SetHandedBack :exec
--- How the manager's last turn on its issue ended (JSON); null while it is on it.
+-- How the assistant's last turn on its issue ended (JSON); null while it is on it.
 update issue set handed_back = sqlc.narg(handed_back) where id = sqlc.arg(id);
 
 -- name: SetIssuePullRequest :exec

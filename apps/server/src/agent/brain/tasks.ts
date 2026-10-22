@@ -110,7 +110,7 @@ export class TaskRunner {
 
   constructor(
     private readonly store: TaskStore,
-    /** Undefined: this agent cannot send helpers (a helper itself, or the manager). */
+    /** Undefined: this agent cannot send helpers (a helper itself, or the assistant). */
     private readonly helper: Helper | undefined,
     private readonly life: AbortSignal,
     private readonly tell: (text: string) => void,
