@@ -9,7 +9,7 @@ import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone 
 import { actLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
-import { ready } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { useNow } from "../../app/util";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
@@ -20,7 +20,6 @@ import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "../../data/issues";
 import { useAgent } from "../../data/agents";
-import { createSessionEvents } from "../../data/sessions";
 
 function Dot(props: { tone: Tone }) {
   return <span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${props.tone})` }} />;
@@ -51,10 +50,12 @@ export function IssueDetail(props: {
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => head().agent);
-  const steps = createSessionEvents(
-    () => head().id,
-    () => true,
-  );
+  const stepsQuery = useQuery(() => ({
+    queryKey: ["issues", "events", head().id, head().runs, head().phase._tag],
+    queryFn: () => api.session.events({ id: head().id }),
+    placeholderData: (prev: SessionEvent[] | undefined) => prev,
+  }));
+  const steps = () => ready(stepsQuery, undefined);
   const changesQuery = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -259,8 +260,8 @@ export function IssueDetail(props: {
               <Markdown class="text-sm text-ink/90" text={s().description} />
             </Fold>
           </Show>
-          <Fold label="帮工的每一步" summary={steps().length ? stepsLine(steps()) : undefined}>
-            <Show when={steps().length ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
+          <Fold label="帮工的每一步" summary={steps()?.length ? stepsLine(steps()!) : undefined}>
+            <Show when={steps()?.length ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
               {(st) => <WorkLog steps={st()} />}
             </Show>
           </Fold>
@@ -343,7 +344,7 @@ export function IssueDetail(props: {
             </Property>
           )}
         </Show>
-        <Property label="用时">{s().usedLine(steps(), now())}</Property>
+        <Property label="用时">{s().usedLine(steps() ?? [], now())}</Property>
         <Show when={s().pulled.length > 0}>
           <Property label="拔了的草">
             <For each={s().pulled}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
