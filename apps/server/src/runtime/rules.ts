@@ -98,3 +98,32 @@ export function agentIssues(agent: Agent, runtime: RuntimeInfo | null | undefine
   }
   return issues;
 }
+
+export interface Candidate {
+  readonly agent: Agent;
+  readonly usable: boolean;
+}
+
+/** The profile named (by id or name, else a usable one on the runtime named), else the one picked, else the usable one whose tags the job names most. */
+export function chooseAgent(candidates: readonly Candidate[], task: string, named: string, picked: string): Agent | undefined {
+  if (named) {
+    const byName = candidates.find((c) => c.agent.id === named || c.agent.name === named) ?? candidates.find((c) => c.agent.runtime === named && c.usable);
+    if (byName) return byName.agent;
+  }
+  if (picked) {
+    const chosen = candidates.find((c) => c.agent.id === picked);
+    if (chosen) return chosen.agent;
+  }
+  const text = task.toLowerCase();
+  let best: Agent | undefined;
+  let bestScore = -1;
+  for (const c of candidates) {
+    if (!c.usable) continue;
+    const score = (c.agent.tags ?? []).filter((t) => text.includes(t.toLowerCase())).length;
+    if (score > bestScore) {
+      best = c.agent;
+      bestScore = score;
+    }
+  }
+  return best;
+}

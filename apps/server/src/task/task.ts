@@ -60,8 +60,8 @@ import { Core } from "../core/core.ts";
 import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { MergeFailure, ProjectError, Projects } from "../project/project.ts";
-import { Runtimes, usable } from "../runtime/runtime.ts";
-import { chooseAgent } from "../session/rules.ts";
+import { chooseAgent } from "../runtime/rules.ts";
+import { Runtimes } from "../runtime/runtime.ts";
 import { splitBrief } from "./rules.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
@@ -158,9 +158,8 @@ export const make = (options: TaskOptions = {}) =>
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
     const tellOrchestrator = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
 
-    const candidates = Effect.forEach(store.agents(), (agent) =>
-      options.usable ? Effect.succeed({ agent, usable: options.usable(agent) }) : Effect.map(runtimes.assess(agent), (a) => ({ agent, usable: usable(a) })),
-    );
+    const usableAs = options.usable;
+    const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;
 
     const get = (id: string) => graphOf(core.state(), id);
     const need = (id: string) => {

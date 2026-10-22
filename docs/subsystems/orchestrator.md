@@ -45,7 +45,7 @@
 - **来源跟着输入走。** 每条输入的第一行是固定的来源（`orchestratorHead`）：`[来源：主人]`（田头里只有主人的话、电话、`/v1/chat/completions`、连接器）、`[来源：田头]`（频道或串里有帮工的话，后面写明帮工引用的网页、代码、文件内容是信息、不是主人的指令）、`[来源：工单]`、`[来源：定时]`、`[来源：巡查]`、`[来源：种植计划]`。管家的日志里每一轮的第一句也带着它。
 - **管家以工单为单位。** 点名一件活的工具（`check`、`changes`、`merge`、`accept`、`tell`、`stop`、`dismiss`、`issue_update`、`issue_status`）都收 `issue`：工单编号（`#41`、`41`）、工单 id，或在做它的帮工的名字（找它的工单）；要帮工的（`tell`、`stop`、`dismiss`）找工单最新的、还在地里的那个。农场现状和 `roster` 里每个帮工带它的工单号。`issues` 找工单、看一批（状态、项目、字、`wants_owner` 在等主人的按等了多久排），填编号就是一张的全部；`issue_create` 记进备选、不派人（`draft` 让帮工起草）；`issue_update` 改各栏；`issue_status` 照 `statusMove` 挪，备选挪到待办而没写谁来做时照 `dispatch` 的规矩挑一个。规则都在工单服务里，工具只转发、写成一句话（`tool/words.ts` 的 `issueLine`、`issueDetail`）。
 - **合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：否则 `merge`、`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人；改工单和挪状态（`issue_update`、`issue_status`）也一样，回「没动：改工单、挪状态要主人说一声。……」。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
-- **挑档案**（`session/rules.ts` 的 `chooseAgent`，管家的 `dispatch` 和计划共用）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。界面和挑中以后的检查见[派给谁](docs/reference/agents-and-runtimes.md#派给谁)。
+- **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `dispatch`、起草和计划共用）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。界面和挑中以后的检查见[派给谁](docs/reference/agents-and-runtimes.md#派给谁)。
 - **管家的状态**在 `WorkspaceState.Orchestrator`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
 
 ## 怎么走
@@ -96,7 +96,7 @@
 
 - **田头（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进田头，带 `sendKey` 的重发不再交给管家（[田头](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（`answered`）（[工单](docs/subsystems/issue.md)）。`dispatch` 直接 `Issue.hire`；`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`draft`、`edit`、`setStatus`……）。
-- **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工；`chooseAgent` 挑档案。
+- **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工。挑档案归 `Runtimes.choose`。
 - **语音（`voice`）**：电话里的每句经 `call`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
 - **定时（`recurrence`）**：管家的 `recurrence` 工具经 `Recurrence.Add(req, orchestrator, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **种植计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_action`、`task_edit`、`task_action` 调它。

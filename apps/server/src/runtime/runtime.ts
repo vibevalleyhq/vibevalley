@@ -23,7 +23,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, type Price, price, type Rate } from "./price.ts";
-import { agentIssues, moneyStop, quotaOf } from "./rules.ts";
+import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
 /** Past this a probe counts as unknown. */
@@ -64,6 +64,10 @@ export interface RuntimeShape {
   /** The profile's issues as it would be dispatched now. */
   readonly check: (agent: Agent) => Effect.Effect<AgentIssue[]>;
   readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
+  /** Every profile, and whether it can be sent now. */
+  readonly candidates: Effect.Effect<Candidate[]>;
+  /** Who the farm sends for a task now: chooseAgent over the candidates. */
+  readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
   readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
   readonly runtime: (id: string) => Runtime | undefined;
   readonly price: (id: string, model: string) => Price | undefined;
@@ -371,6 +375,8 @@ export const make = (options: RuntimeOptions = {}) =>
         return { agent, info: i, issues, blocking: issues.filter((x) => x.level === "error") };
       });
 
+    const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
+
     const shape: RuntimeShape = {
       list: () =>
         runtimeIds().map((id) => {
@@ -402,6 +408,8 @@ export const make = (options: RuntimeOptions = {}) =>
           : Effect.succeed(undefined),
       check: (agent) => Effect.promise(async () => agentIssues(agent, await info(agent.runtime))),
       assess,
+      candidates,
+      choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
       resolve: (agent) =>
         Effect.gen(function* () {
           const runtime = registry.get(agent.runtime);

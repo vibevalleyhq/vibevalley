@@ -92,8 +92,6 @@ export type Caller = "owner" | "orchestrator";
 
 export interface IssueShape {
   readonly list: () => Effect.Effect<Issue[]>;
-  /** Who the farm sends for a task: the profile named (or the owner's pick) if it can work, else the best that can. */
-  readonly pickAgent: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
   /** The issues the board holds now (open, and the latest closed). */
   readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
@@ -626,7 +624,7 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── drafts ──
 
-    const { pickAgent, draft, handedBack, clearRefinement } = refinement({
+    const { draft, handedBack, clearRefinement } = refinement({
       core,
       store,
       runtimes,
@@ -746,7 +744,6 @@ export const make = (options: IssueOptions = {}) =>
 
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
-      pickAgent,
       list: () => list,
       get,
       timeline,

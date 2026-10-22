@@ -9,7 +9,7 @@ import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { chooseAgent } from "../session/rules.ts";
+import { chooseAgent } from "../runtime/rules.ts";
 import { splitBrief } from "./rules.ts";
 import type { Hired, HireOptions, Roster } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";

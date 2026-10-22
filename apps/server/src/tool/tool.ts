@@ -36,6 +36,7 @@ import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
 import type { ToolStart } from "../session/facts.ts";
+import { Runtimes } from "../runtime/runtime.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
 import {
@@ -160,6 +161,7 @@ export const make = Effect.gen(function* () {
   const memory = yield* Memories;
   const docs = yield* Docs;
   const run = yield* Sessions;
+  const runtimes = yield* Runtimes;
   const chat = yield* Channels;
   const recurrence = yield* Recurrences;
   const issue = yield* Issues;
@@ -213,7 +215,7 @@ export const make = Effect.gen(function* () {
   const participant = (c: Caller) => c.session || c.agent;
 
   // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
-  const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(issue.pickAgent(task, name, picked));
+  const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(runtimes.choose(task, name, picked));
 
   // The orchestrator may say a profile's name or id.
   const profile = (key: string): string => {

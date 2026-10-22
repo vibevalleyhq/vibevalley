@@ -1,5 +1,5 @@
 import type { Event } from "@botiverse/oar";
-import type { Agent, Doing, Session } from "@vibevalley/protocol";
+import type { Doing, Session } from "@vibevalley/protocol";
 import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
@@ -7,7 +7,6 @@ import { eventFacts, type FactContext, near, since, type Tracking } from "./fact
 import { MergeFailure } from "../project/project.ts";
 import {
   checksOf,
-  chooseAgent,
   conflictBrief,
   conflictOf,
   jobBreak,
@@ -258,20 +257,6 @@ describe("room and names", () => {
     expect(sessionName([], "zhou", "老周")).toBe("老周");
     expect(sessionName([h("w1", "pi", "a", true)], "zhou", "老周")).toBe("老周 2");
     expect(sessionName([h("w1", "pi", "a", true), h("w2", "pi", "a", true)], "zhou", "老周")).toBe("老周 3");
-  });
-
-  it("choose a profile", () => {
-    const a = { id: "a", name: "甲", runtime: "pi", tags: ["前端"] } as Agent;
-    const b = { id: "b", name: "乙", runtime: "claude", tags: ["测试", "后端"] } as Agent;
-    const candidates = [
-      { agent: a, usable: true },
-      { agent: b, usable: true },
-    ];
-    expect(chooseAgent(candidates, "随便", "乙", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "claude", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "", "b")?.id).toBe("b");
-    expect(chooseAgent(candidates, "补后端测试", "", "")?.id).toBe("b");
-    expect(chooseAgent(candidates, "随便", "", "")?.id).toBe("a");
   });
 });
 

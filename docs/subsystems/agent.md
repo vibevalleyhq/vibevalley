@@ -84,7 +84,7 @@
 
 - **帮工（`session`）**：开会话前 `resolve`；拼说明时读 `Skills()`、档案（`Agent`）；同时干活的上限读农机设置的 `maxWorking`（`Settings`）；记花费 `quote`、`spend`，一轮结束 `usageSoon`。
 - **工单（`issue`）**：`hire` 读档案、跑 `check`，有 `error` 就回「<档案> 派不出去：<原因>」；档案停用另回「<档案> 被停用了」。
-- **管家（`orchestrator`）、工具（`tool`）、种植计划（`task`）**：`Agents` 列能派的档案，`assess` 给每个能不能派和农机的样子，再交给 `session/rules.ts` 的 `chooseAgent`；管家把它们写进农场现状。
+- **管家（`orchestrator`）、工具（`tool`）、种植计划（`task`）**：`Runtimes.candidates` 是每个档案和它现在能不能派（`assess`），`Runtimes.choose` 在其中按 `runtime/rules.ts` 的 `chooseAgent` 挑一个；管家、起草和计划都问它，不各自拼候选；管家把它们写进农场现状。
 - **记性（`memory`）**、**定时（`recurrence`）**：`Agents` 列档案（不填档案的检索、定时派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
 - **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。

@@ -14,8 +14,6 @@ export interface Answer {
   readonly text: string;
 }
 
-/** 16 random bytes in hex: one per draft, so sending it again after a failure is not said twice. */
-
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});
 
