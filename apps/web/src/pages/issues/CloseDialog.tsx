@@ -6,12 +6,13 @@ import { issueTitle } from "../../rules/issues";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../../rules/issueState";
 import { ago } from "../../rules/time";
 import { aria, autofocus } from "../../app/util";
-import { ready, useQuery } from "../../data/query";
+import { ready } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { TextArea } from "../../ui/Field";
 import { run } from "./hooks";
 import { Note } from "./Sheet";
+import { useIssueChanges } from "../../data/issues";
 
 /** Closing an issue: harvest it (its checklist first) or let the helper go. `review` opens straight on the checklist. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
@@ -50,7 +51,7 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
 
 /** What the branch brings before it is merged. */
 export function HarvestReview(props: { issue: string; onDone: () => void }) {
-  const changes = useQuery(() => ({ queryKey: ["issues", "changes", props.issue], queryFn: () => api.issue.changes({ id: props.issue }) }));
+  const changes = useIssueChanges(() => props.issue);
   const take = () => {
     const id = props.issue;
     void run(() => api.issue.status({ id, body: { status: "done" } }));

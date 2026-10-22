@@ -18,6 +18,7 @@ import { Markdown } from "../../ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
+import { useIssueChanges, useIssueRuns, useIssueTimeline } from "../../data/issues";
 
 function Dot(props: { tone: Tone }) {
   return <span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${props.tone})` }} />;
@@ -55,17 +56,15 @@ export function IssueDetail(props: {
     placeholderData: (prev: SessionEvent[] | undefined) => prev,
   }));
   const steps = () => ready(stepsQuery, undefined);
-  const changesQuery = useQuery(() => ({
-    queryKey: ["issues", "changes", props.issue.id],
-    queryFn: () => api.issue.changes({ id: props.issue.id }),
-    enabled: s().showsChanges,
-  }));
+  const changesQuery = useIssueChanges(
+    () => props.issue.id,
+    () => s().showsChanges,
+  );
   const changes = () => ready(changesQuery, undefined);
-  const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, head().runs, props.issue.findings.length],
-    queryFn: () => api.issue.timeline({ id: props.issue.id }),
-    placeholderData: <T,>(prev: T) => prev,
-  }));
+  const timelineQuery = useIssueTimeline(
+    () => props.issue,
+    () => head().runs,
+  );
   const timeline = () => ready(timelineQuery, undefined);
 
   /** lead is read as it renders: the lead changes as the issue moves on. */
@@ -450,11 +449,10 @@ function Story(props: { milestones: Milestone[] }) {
 
 /** The runs of an issue, read again whenever `version` changes. */
 function Runs(props: { issue: string; version: string }) {
-  const query = useQuery(() => ({
-    queryKey: ["issues", "runs", props.issue, props.version],
-    queryFn: () => api.issue.runs({ id: props.issue }),
-    placeholderData: <T,>(prev: T) => prev,
-  }));
+  const query = useIssueRuns(
+    () => props.issue,
+    () => props.version,
+  );
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (

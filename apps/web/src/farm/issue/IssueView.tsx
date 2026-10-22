@@ -21,8 +21,8 @@ import { useRouter } from "../../app/router";
 import { createSessionEvents } from "../../pages/chat/data";
 import { WorkLog } from "../../pages/chat/WorkLog";
 import { useCore, useFrames } from "../../data/frame";
-import { useIssueHistory } from "../../data/issues";
-import { ready, useAgents, useQuery } from "../../data/query";
+import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";
+import { ready, useAgents } from "../../data/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
@@ -139,17 +139,15 @@ function IssueBody(props: {
   });
   const { busy, text, setText, box, go } = acts;
   const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.graphs ?? []));
-  const changes = useQuery(() => ({
-    queryKey: ["issues", "changes", props.issue.id],
-    queryFn: () => api.issue.changes({ id: props.issue.id }),
-    enabled: s().showsChanges,
-  }));
+  const changes = useIssueChanges(
+    () => props.issue.id,
+    () => s().showsChanges,
+  );
   const changed = () => ready(changes, undefined);
-  const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, s().head.runs, props.issue.findings.length],
-    queryFn: () => api.issue.timeline({ id: props.issue.id }),
-    placeholderData: <T,>(prev: T) => prev,
-  }));
+  const timelineQuery = useIssueTimeline(
+    () => props.issue,
+    () => s().head.runs,
+  );
   const timeline = () => ready(timelineQuery, undefined);
   const steps = createSessionEvents(
     () => s().head.id,
@@ -558,7 +556,10 @@ function Row(props: { label: string; children: JSX.Element }) {
 
 /** The issue's runs, read again whenever `version` changes. */
 function Runs(props: { issue: string; version: string }) {
-  const runsQuery = useQuery(() => ({ queryKey: ["issue-runs", props.issue, props.version], queryFn: () => api.issue.runs({ id: props.issue }) }));
+  const runsQuery = useIssueRuns(
+    () => props.issue,
+    () => props.version,
+  );
   const runs = () => ready(runsQuery, []);
   const now = useNow();
   return (

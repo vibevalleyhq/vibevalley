@@ -3,7 +3,7 @@
 import { For, Match, Show, Switch } from "solid-js";
 
 import type { Changes, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { reasonOf } from "../../data/api";
 import { fire } from "../commands";
 import { harvestedOf } from "../hud/rules";
 import { farm } from "../store";
@@ -14,18 +14,16 @@ import { ago } from "../../rules/time";
 import { useRouter } from "../../app/router";
 import { useNow } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents, useQuery } from "../../data/query";
+import { ready, useAgents } from "../../data/query";
 import { FarmSection, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
+import { useIssueChanges } from "../../data/issues";
 
 const xs = "text-[12px] text-bark-600";
 
 export function HarvestReview(props: { session: Session; onDone: () => void }) {
-  const changes = useQuery(() => ({
-    queryKey: ["issues", "changes", issueOf(props.session)],
-    queryFn: () => api.issue.changes({ id: issueOf(props.session) }),
-  }));
+  const changes = useIssueChanges(() => issueOf(props.session));
   return (
     <Switch>
       <Match when={changes.isSuccess}>
