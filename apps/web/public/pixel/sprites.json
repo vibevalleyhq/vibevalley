@@ -1864,19 +1864,19 @@
   "sheet": "design/pixel/raw/ui-starter.png",
   "w": 49
  },
- "emblem-s_split": {
-  "ax": 25,
-  "ay": 47,
-  "h": 48,
-  "sheet": "design/pixel/raw/ui-starter.png",
-  "w": 50
- },
  "emblem-s_review": {
   "ax": 24,
   "ay": 46,
   "h": 47,
   "sheet": "design/pixel/raw/ui-starter.png",
   "w": 48
+ },
+ "emblem-s_split": {
+  "ax": 25,
+  "ay": 47,
+  "h": 48,
+  "sheet": "design/pixel/raw/ui-starter.png",
+  "w": 50
  },
  "emblem-s_tell": {
   "ax": 23,
@@ -3309,6 +3309,13 @@
   "sheet": "design/pixel/raw/ui-icons-more.png",
   "w": 53
  },
+ "icon-fruit": {
+  "w": 43,
+  "h": 47,
+  "ax": 21,
+  "ay": 46,
+  "sheet": "design/pixel/raw/memory.png"
+ },
  "icon-hand": {
   "ax": 19,
   "ay": 43,
@@ -3322,6 +3329,20 @@
   "h": 53,
   "sheet": "design/pixel/raw/ui-icons.png",
   "w": 45
+ },
+ "icon-leaf": {
+  "w": 38,
+  "h": 49,
+  "ax": 19,
+  "ay": 48,
+  "sheet": "design/pixel/raw/memory.png"
+ },
+ "icon-leaf-fall": {
+  "w": 38,
+  "h": 49,
+  "ax": 19,
+  "ay": 48,
+  "sheet": "design/pixel/raw/memory.png"
  },
  "icon-log": {
   "ax": 24,
@@ -3344,12 +3365,12 @@
   "sheet": "design/pixel/raw/ui-icons-extra.png",
   "w": 50
  },
- "icon-task-board": {
-  "ax": 29,
-  "ay": 44,
-  "h": 45,
-  "sheet": "design/pixel/raw/ui-icons-more.png",
-  "w": 58
+ "icon-rings": {
+  "w": 45,
+  "h": 48,
+  "ax": 22,
+  "ay": 47,
+  "sheet": "design/pixel/raw/memory.png"
  },
  "icon-scarecrow": {
   "ax": 26,
@@ -3357,6 +3378,20 @@
   "h": 54,
   "sheet": "design/pixel/raw/ui-icons-more.png",
   "w": 53
+ },
+ "icon-seed": {
+  "w": 45,
+  "h": 48,
+  "ax": 22,
+  "ay": 47,
+  "sheet": "design/pixel/raw/memory.png"
+ },
+ "icon-seed-gold": {
+  "w": 43,
+  "h": 48,
+  "ax": 21,
+  "ay": 47,
+  "sheet": "design/pixel/raw/memory.png"
  },
  "icon-seeds": {
   "ax": 22,
@@ -3400,12 +3435,33 @@
   "sheet": "design/pixel/raw/ui-icons-more.png",
   "w": 47
  },
+ "icon-stars": {
+  "w": 46,
+  "h": 45,
+  "ax": 23,
+  "ay": 44,
+  "sheet": "design/pixel/raw/memory.png"
+ },
+ "icon-task-board": {
+  "ax": 29,
+  "ay": 44,
+  "h": 45,
+  "sheet": "design/pixel/raw/ui-icons-more.png",
+  "w": 58
+ },
  "icon-tasks": {
   "ax": 21,
   "ay": 48,
   "h": 49,
   "sheet": "design/pixel/raw/ui-icons.png",
   "w": 42
+ },
+ "icon-tree": {
+  "w": 46,
+  "h": 59,
+  "ax": 23,
+  "ay": 58,
+  "sheet": "design/pixel/raw/memory.png"
  },
  "icon-trophy": {
   "ax": 24,
@@ -6179,5 +6235,26 @@
   "h": 70,
   "sheet": "design/pixel/raw/ui-medals.png",
   "w": 68
+ },
+ "tree-hill": {
+  "w": 384,
+  "h": 256,
+  "ax": 0,
+  "ay": 0,
+  "sheet": "design/pixel/raw/tree-hill.png"
+ },
+ "tree-hill-night": {
+  "w": 384,
+  "h": 256,
+  "ax": 0,
+  "ay": 0,
+  "sheet": "design/pixel/raw/tree-hill-night.png"
+ },
+ "tree-sky": {
+  "w": 384,
+  "h": 256,
+  "ax": 0,
+  "ay": 0,
+  "sheet": "design/pixel/raw/tree-sky.png"
  }
 }

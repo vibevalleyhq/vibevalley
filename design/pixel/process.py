@@ -180,6 +180,11 @@ SHEETS: dict[str, Sheet] = {
     # DeepSeek Harness came after the eight above (gen.sh dsh): its machine at their scale, its logo beside the logos.
     "dsh": Sheet(2, 1, ["machine-dsh", "logo-dsh"], height=30, reference=[0]),
     "ui-machines": Sheet(4, 2, ["machine-tractor", "machine-watercart", "machine-wheelbarrow", "machine-pump", "machine-seeder", "machine-windmill", "machine-beehive", "machine-lantern"], height=30, reference=list(range(8))),
+    # The memory tree page (apps/web/src/tree): the HUD's button and the panel's icons; the tree itself is drawn in code.
+    "memory": Sheet(4, 2, [
+        "icon-tree", "icon-leaf", "icon-fruit", "icon-seed",
+        "icon-leaf-fall", "icon-stars", "icon-rings", "icon-seed-gold",
+    ], height=24, reference=list(range(8))),
     # The map page (lib/desk/map/): its icon, the compass in its corner, a queued job's sack and a free spot's stake on an
     # island, a cloud drifting over, and a worktree's branch.
     "mapbits": Sheet(3, 2, ["icon-map", "map-compass", "map-sack", "map-stake", "map-cloud", "icon-branch"], height=24, reference=[0],
@@ -487,15 +492,32 @@ def backdrop(manifest: dict) -> None:
     print("map: done")
 
 
+# Whole pictures at the village's own size (384 x 256 art pixels) whatever the density: the memory tree's hill by day
+# and by night and the sky looking up from it, under a tree drawn in code on the same pixel grid (apps/web/src/tree/Scene.tsx).
+SCENES = ("tree-hill", "tree-hill-night", "tree-sky")
+
+
+def scene(name: str, manifest: dict) -> None:
+    img = Image.open(RAW / f"{name}.png").convert("RGBA")
+    small = shrink(np.asarray(img), (384, 256))
+    small[..., 3] = 255
+    Image.fromarray(quantize(small, MAP_COLOURS), "RGBA").convert("RGB").save(OUT / f"{name}.png")
+    manifest[name] = {"w": 384, "h": 256, "ax": 0, "ay": 0, "sheet": sheet_path(name)}
+    print(f"{name}: done")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     wanted = sys.argv[1:] or [p.stem for p in sorted(RAW.glob("*.png"))]
     for name in wanted:
-        if not (RAW / f"{RAW_PREFIX if name != 'ui-cursors' else ''}{name}.png").exists():
+        plain = name == "ui-cursors" or name in SCENES
+        if not (RAW / f"{'' if plain else RAW_PREFIX}{name}.png").exists():
             print(f"{name}: not generated yet")
         elif name == "map":
             backdrop(manifest)
+        elif name in SCENES:
+            scene(name, manifest)
         elif name == "ui-cursors":
             make_cursors()
         elif name.startswith("island-"):

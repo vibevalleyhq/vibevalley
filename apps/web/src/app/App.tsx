@@ -5,6 +5,7 @@ import { Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { ChatPage } from "../pages/chat/ChatPage";
 import { FarmPage } from "../farm/FarmPage";
+import { TreePage } from "../tree/TreePage";
 import { AgentsRoute } from "../pages/agents/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../pages/docs/DocsPage";
@@ -78,6 +79,9 @@ function Routes() {
       <Match when={place() === "farm"}>
         {/* One farm per project: entering another builds its farm anew. */}
         <Keyed key={decodeURIComponent(rest())}>{() => <FarmPage project={untrack(() => decodeURIComponent(rest()))} />}</Keyed>
+      </Match>
+      <Match when={pathname() === "/tree"}>
+        <TreePage />
       </Match>
       <Match when={pathname() === "/pair"}>
         <PairPage />

@@ -15,6 +15,9 @@ src/rules/        pure functions the pages share (what a lane holds, how a feed 
 src/pages/<place>/  one folder per place: issues, chat, docs, settings, orchestrator, agents, runtimes, projects, catalog; kit.tsx is their layout
 src/voice/        the call to the orchestrator (Agora), its captions, and dictation
 src/farm/         the pixel farm at /, outside the shell (its README: who owns which folder, the store, the canvas's screen)
+src/tree/         the memory tree at /tree, outside the shell like the farm: the tree grown from the memories, its panel and the
+                  memory sky, on one canvas; made-up
+                  memories (mock.ts) until the server sums them up (.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 test/             Playwright against a real server per worker (fixtures.ts)
 ```
 

@@ -33,6 +33,11 @@
 #   look-<look>                 a manager look (farmer, foreman, auntie, grandpa, gardener, robot), from its painted sheet
 #   island-<rim>                a project's small map on the map page: an island with an empty yard for its worktrees'
 #                               plots (meadow, orchard, pond, pines, windmill, lavender); then hd-island-<rim>
+#   memory                      the memory tree page's icons (the HUD's button, leaf, fruit, seed, falling leaf, stars,
+#                               rings, gold seed); then hd-memory. The tree itself is drawn in code (apps/web/src/tree)
+#   tree-hill tree-hill-night   the hilltop above the valley the memory tree grows on, by day (from the title screen and
+#                               the farm) and the same scene at night (from tree-hill); the knoll is left empty
+#   tree-sky                    the night sky seen looking up from that hill, its middle left empty for the memory sky
 #   mapbits                     the map page's icon and bits (compass, a queued job's sack, a free spot's stake, a cloud,
 #                               a branch); then hd-mapbits
 cd "$(dirname "$0")"
@@ -112,6 +117,20 @@ $(cat prompts/_sheet.txt)" -i raw/map.png ;;
 $(cat prompts/_hd.txt)
 
 $(cat prompts/_sheet.txt)" -i "raw/${name#hd-}.png" ;;
+    memory) draw memory "$(style 8)
+
+$(cat prompts/memory.txt)
+
+$(cat prompts/_sheet.txt)" -i raw/ui-icons.png ;;
+    tree-hill) draw tree-hill "$(style 4)
+
+$(cat prompts/tree-hill.txt)" -i raw/title.png -i raw/hd-map.png ;;
+    tree-hill-night) draw tree-hill-night "$(style 4)
+
+$(cat prompts/tree-hill-night.txt)" -i raw/tree-hill.png ;;
+    tree-sky) draw tree-sky "$(style 4)
+
+$(cat prompts/tree-sky.txt)" -i raw/tree-hill-night.png ;;
     mapbits) draw mapbits "$(style 8)
 
 $(cat prompts/mapbits.txt)
