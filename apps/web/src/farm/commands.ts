@@ -2,7 +2,7 @@
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
 import type { GraphActRequest, GraphSplitRequest, Session, StateFrame, TaskActRequest, TaskEdit } from "@vibevalley/protocol";
-import { api, reasonOf } from "../data/api";
+import { api, newSendKey, reasonOf } from "../data/api";
 import { farm, farmState } from "./store";
 import { aimTool, type BedFxKind, type PlotAim, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
@@ -15,7 +15,6 @@ export interface Answer {
 }
 
 /** 16 random bytes in hex: one per draft, so sending it again after a failure is not said twice. */
-export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 /** A refusal is the server's to tell (a notice). */
 export const fire = (command: Promise<unknown>) => void command.catch(() => {});

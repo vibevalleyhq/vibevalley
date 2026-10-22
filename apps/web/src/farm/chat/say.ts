@@ -1,8 +1,6 @@
 import type { Conversation } from "@vibevalley/protocol";
+export { newSendKey } from "../../data/api";
 import { api } from "../../data/api";
-
-/** 16 random bytes in hex: names one send. */
-export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 /** Says a line in a conversation (the general one when it is undefined), with the picked helper; the orchestrator is woken first. */
 export async function say(text: string, conversation: Conversation | undefined, sendKey: string, agent: string | undefined) {

@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import type { Review, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { newSendKey } from "./write";
+import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
 import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
@@ -37,10 +37,16 @@ export function IssueDetail(props: {
   const now = useNow();
   const s = createMemo(() => issueState(props.issue, props.sessions, props.session, graphs()));
   const head = () => s().head;
-  const [busy, setBusy] = createSignal(false);
-  const [text, setText] = createSignal("");
-  /** The box under the block: an answer, the findings of 打回, a word to the helper, or what a reopen asks for. */
-  const [box, setBox] = createSignal<"reject" | "tell" | undefined>();
+  // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
+  const acts = createIssueActs(() => props.issue, {
+    run: async (f) => (await run(async () => (await f(), true))) === true,
+    harvest: () => props.onClose(props.session ?? head(), true),
+    close: () => props.onClose(props.session ?? head(), false),
+    told: (title, description) => toast(`${title}：${description}`),
+  });
+  const { busy, text, setText, box, setBox, go, act } = acts;
+  const doAct = acts.send;
+  const sayAct = acts.say;
   const agents = useAgents();
   const agent = () => ready(agents, []).find((a) => a.id === head().agent);
   const stepsQuery = useQuery(() => ({
@@ -62,80 +68,10 @@ export function IssueDetail(props: {
   }));
   const timeline = () => ready(timelineQuery, undefined);
 
-  async function act(f: () => Promise<unknown>) {
-    setBusy(true);
-    const done = await run(async () => {
-      await f();
-      return true;
-    });
-    setBusy(false);
-    return done;
-  }
-
-  /** An act is the server's (issue.act); the page gathers the words some take and shows the harvest's checklist and the
-   * close dialog first. */
-  const doAct = (a: IssueAct, words = "") => {
-    const id = props.issue.id;
-    return act(() => api.issue.act({ id, body: { act: a, ...(words ? { text: words, sendKey: newSendKey() } : {}) } }));
-  };
-
-  /** answer, tell, reject: what the box says (reject: one weed a line); nothing said, nothing sent. */
-  const sayAct = (a: IssueAct) => {
-    const words = text().trim();
-    if (!words) return;
-    void doAct(a, words).then((ok) => {
-      if (!ok) return;
-      setText("");
-      setBox(undefined);
-    });
-  };
-
-  const reopen = async () => {
-    const id = props.issue.id;
-    const words = text().trim();
-    setBusy(true);
-    const got = await run(() => api.issue.act({ id, body: { act: "reopen", ...(words ? { text: words } : {}) } }));
-    setBusy(false);
-    const last = got?.sessions[got.sessions.length - 1];
-    if (last) {
-      setText("");
-      toast(`工单重开了：${last} 接着做。`);
-    }
-  };
-
-  const go = (a: IssueAct) => {
-    const h = props.session ?? head();
-    switch (a) {
-      case "harvest":
-        return props.onClose(h, true);
-      case "close":
-        return props.onClose(h, false);
-      case "answer":
-        return sayAct(a);
-      case "reject":
-      case "tell":
-        return box() === a ? sayAct(a) : void setBox(a);
-      case "reopen":
-        return void reopen();
-      case "start":
-      case "accept":
-      case "acknowledge":
-      case "resolve":
-      case "resume":
-      case "cure":
-      case "stop":
-        return void doAct(a);
-    }
-  };
-
   /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
-    <Button
-      tone={lead() ? "primary" : a === "reject" && box() === "reject" ? "danger" : "plain"}
-      disabled={busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim())}
-      onClick={() => go(a)}
-    >
-      {a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : actLabel[a]}
+    <Button tone={lead() ? "primary" : acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
+      {acts.label(a)}
     </Button>
   );
 

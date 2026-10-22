@@ -1,4 +1,5 @@
 // Writing an issue from a sentence and remembering the last pick: framework-free, for the board and the farm.
+export { newSendKey } from "../../data/api";
 
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { api } from "../../data/api";
@@ -44,4 +45,3 @@ export async function writeIssue(text: string, agent: string, project: string): 
 }
 
 /** A key for one sent word, so a retry is not said twice. */
-export const newSendKey = () => `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

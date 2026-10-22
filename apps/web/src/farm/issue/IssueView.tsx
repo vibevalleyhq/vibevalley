@@ -8,12 +8,12 @@ import type { JSX } from "@solidjs/web";
 
 import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
+import { createIssueActs } from "../../data/issueActs";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
 import { castPrefix } from "../../rules/cast";
 import { issueThreadOf } from "../../rules/chat";
 import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../rules/issueState";
-import { actLabel } from "@vibevalley/protocol/rules";
 import { runText } from "../../rules/issues";
 import { tookText, wallClockText } from "../../rules/time";
 import { aria, useNow } from "../../app/util";
@@ -114,9 +114,30 @@ function IssueBody(props: {
   const frames = useFrames();
   const agentsQuery = useAgents();
   const now = useNow();
-  const [text, setText] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
-  const [box, setBox] = createSignal<"reject" | "tell" | undefined>();
+  // The farm carries out an answer, a word to the helper and the fixes with its own commands (and their effects).
+  const water = (words: string) => commands.water(props.session, words);
+  const acts = createIssueActs(() => props.issue, {
+    run: async (f) => {
+      try {
+        await f();
+        return true;
+      } catch (e) {
+        toasts.add({ type: ToastType.warn, title: "没办成", description: reasonOf(e) });
+        return false;
+      }
+    },
+    own: {
+      answer: water,
+      tell: water,
+      resolve: () => commands.resolve(props.session),
+      cure: () => commands.cure(props.session),
+      stop: () => commands.stop(props.session.id),
+    },
+    harvest: () => props.onHarvest(props.session),
+    close: () => props.onClose(props.session),
+    told: (title, description) => toasts.add({ type: ToastType.info, title, description }),
+  });
+  const { busy, text, setText, box, go } = acts;
   const s = createMemo(() => issueState(props.issue, props.sessions, props.session, frames.frame?.graphs ?? []));
   const changes = useQuery(() => ({
     queryKey: ["issues", "changes", props.issue.id],
@@ -137,93 +158,13 @@ function IssueBody(props: {
   const agent = () => ready(agentsQuery, []).find((a) => a.id === s().head.agent);
   const state = () => s().attention.state;
 
-  const act = async (run: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await run();
-      return true;
-    } catch (e) {
-      toasts.add({ type: ToastType.warn, title: "没办成", description: reasonOf(e) });
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  };
-  const say = async (words: string) => {
-    const who = props.session;
-    if (!words.trim()) return;
-    if (await act(() => commands.water(who, words.trim()))) {
-      setText("");
-      setBox(undefined);
-    }
-  };
-  /** An act is the server's (issue.act); the farm adds its effects (commands) and gathers the words some take. */
-  const doAct = (a: IssueAct, words = "") => {
-    const id = props.issue.id;
-    return act(() => api.issue.act({ id, body: { act: a, ...(words ? { text: words } : {}) } }));
-  };
-  const reopen = () => {
-    const id = props.issue.id;
-    const said = text().trim();
-    return act(async () => {
-      const got = await api.issue.act({ id, body: { act: "reopen", ...(said ? { text: said } : {}) } });
-      const helper = got.sessions.at(-1);
-      if (helper) {
-        setText("");
-        toasts.add({ type: ToastType.info, title: "工单重开了", description: `${helper} 接着做。` });
-      }
-    });
-  };
-  const reject = async () => {
-    const said = text().trim();
-    if (!said) return;
-    if (await doAct("reject", said)) {
-      setText("");
-      setBox(undefined);
-    }
-  };
   const setReview = (a: Review) => {
     const id = props.issue.id;
-    return act(() => api.issue.update({ id, body: { review: a } }));
-  };
-  const go = (a: IssueAct) => {
-    const h = props.session;
-    switch (a) {
-      case "answer":
-        return void say(text());
-      case "start":
-      case "accept":
-      case "acknowledge":
-      case "resume":
-        return void doAct(a);
-      case "reject":
-        return box() === "reject" ? void reject() : void setBox("reject");
-      case "harvest":
-        return props.onHarvest(h);
-      case "resolve":
-        return void act(() => commands.resolve(h));
-      case "cure":
-        return void act(() => commands.cure(h));
-      case "tell":
-        return box() === "tell" ? void say(text()) : void setBox("tell");
-      case "stop":
-        return void act(() => commands.stop(h.id));
-      case "close": {
-        const close = props.onClose;
-        return void act(() => close(h));
-      }
-      case "reopen":
-        return void reopen();
-    }
-  };
-  /** lead is read as it renders: the lead changes as the issue moves on. */
+    return acts.act(() => api.issue.update({ id, body: { review: a } }));
+  }; /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
-    <PxButton
-      tone={lead() ? "primary" : a === "close" || (a === "reject" && box() === "reject") ? "danger" : "plain"}
-      disabled={busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim())}
-      onClick={() => go(a)}
-    >
-      {a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : actLabel[a]}
+    <PxButton tone={lead() ? "primary" : a === "close" || acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
+      {acts.label(a)}
     </PxButton>
   );
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
@@ -264,7 +205,7 @@ function IssueBody(props: {
                         <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={`回答：${q.question}`}>
                           <For each={q.options}>
                             {(o) => (
-                              <PxButton size="sm" disabled={busy()} onClick={() => void say(o)}>
+                              <PxButton size="sm" disabled={busy()} onClick={() => void acts.send("answer", o).then((ok) => ok && acts.setText(""))}>
                                 {o}
                               </PxButton>
                             )}

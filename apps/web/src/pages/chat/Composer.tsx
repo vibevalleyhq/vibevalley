@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, newSendKey, reasonOf } from "../../data/api";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "../../rules/chat";
 import { toast } from "../../ui/toasts";
 import { aria } from "../../app/util";
@@ -11,7 +11,6 @@ import { DictationButton } from "../../voice/DictationButton";
 import { HelperFace } from "./bits";
 
 /** 16 random bytes in hex: names one send, so a retry is the message already said, not a second one. */
-const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 /** The box for saying a sentence in a conversation: Enter sends, Shift+Enter starts a line, @ names someone. */
 export function Composer(props: { conversation: Conversation | undefined; placeholder: string }) {
