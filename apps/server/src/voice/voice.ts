@@ -183,16 +183,18 @@ interface Grant {
   agent: string;
 }
 
+/** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
+type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
+
 interface Call {
   readonly grant: string;
   readonly client: AgoraClient;
+  readonly session: CallSession;
   readonly release: () => void;
   /** Agora's model answers, so its words reach 田头 only through said; the orchestrator's own reach it as it says them. */
   readonly quick: boolean;
   /** Said at every pickup; not worth keeping in 田头. */
   readonly greeting: string;
-  /** The app the call's agent is in: speak names it. */
-  readonly appId: string;
   ending: boolean;
 }
 
@@ -485,8 +487,8 @@ export const make = (options: VoiceOptions = {}) =>
       const call = calls.get(agentId);
       if (!call || call.ending) return false;
       try {
-        for (const piece of speakPieces(text))
-          await call.client.agents.speak({ appid: call.appId, agentId, text: piece, priority: "APPEND", interruptable: true });
+        // Through the session: a bare agents.speak carries no token, and Agora answers 401.
+        for (const piece of speakPieces(text)) await call.session.say(piece, { priority: "APPEND", interruptable: true });
         return true;
       } catch (e) {
         logs.warn("vibevalley: voice: the orchestrator's words were not read out: " + message(e));
@@ -617,10 +619,10 @@ export const make = (options: VoiceOptions = {}) =>
             calls.set(id, {
               grant: key,
               client,
+              session,
               release,
               quick: callLine === undefined,
               greeting: forCall.greeting.trim(),
-              appId: g.credentials.appId,
               ending: false,
             });
             if (about) tell([], about);
