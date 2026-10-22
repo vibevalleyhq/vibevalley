@@ -2,14 +2,14 @@
 // routes listen and say it their own way: on a call the orchestrator says the news (voice), the patrol's findings wake the
 // orchestrator, and the page rings, notifies and fills the tray from the same inbox in the frame, each item worded there.
 
-import type { InboxItem } from "@vibevalley/protocol";
+import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { emptyPatrol, type PatrolMemory, type PatrolNote, patrolStep } from "./rules.ts";
+import { emptyPatrol, forOwner, type PatrolMemory, type PatrolNote, patrolStep } from "./rules.ts";
 
 /** What has waited too long in one channel. */
 export interface Overdue {
@@ -22,6 +22,8 @@ export interface NoticeShape {
   readonly news: Effect.Effect<Stream.Stream<readonly InboxItem[]>, never, Scope.Scope>;
   /** The patrol's findings, one per channel. */
   readonly overdue: Effect.Effect<Stream.Stream<Overdue>, never, Scope.Scope>;
+  /** The farm's talk the owner hears off the farm, as it is said (forOwner); the chat apps carry it. */
+  readonly toOwner: Effect.Effect<Stream.Stream<ChatMessage>, never, Scope.Scope>;
   /** One round of the patrol, now. */
   readonly patrol: Effect.Effect<void>;
   /** From here what the inbox holds is known: the startup's, after the sessions and issues came back. */
@@ -72,6 +74,10 @@ export const make = (options: NoticeOptions = {}) =>
     const shape: NoticeShape = {
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
+      toOwner: Effect.map(
+        core.subscribe,
+        Stream.flatMap((e) => (e.type === "message" && forOwner(e.message) ? Stream.make(e.message) : Stream.empty)),
+      ),
       patrol,
       prime: Effect.sync(() => {
         known = freshOf(undefined, inbox(core.state())).known;

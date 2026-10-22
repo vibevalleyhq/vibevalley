@@ -19,7 +19,7 @@
 - **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`。
 - **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留哪些（`keepMessages` 300 条、`keepConversations` 100 个）。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
-- **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的规则（`forOwner`、`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
+- **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
 - **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`orchestrator.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
 - **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`）；整页的聊天页 `/chat`（`apps/web/src/pages/chat`）；连接器页 `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`）。
@@ -92,7 +92,7 @@
 2. 收件工人（`voiceInbox.run`，有新收件或每秒）按顺序交付：还没配对的，对上配对码就绑定主人、回一句「配对好了」；不是主人的丢掉；主人的先记下回复凭据、补发发件表，再把话交给管家（`orchestrator.Say`）。被引用的是农场发出去的某条消息时，话说在那条所在的对话里（比如它的工单串），否则说在连接器接的频道（默认田头）。
 3. 交付成功，标成已交付、清空正文，只留去重记录。没交付完的，重启后接着交。
 
-**送出去的话**：核心状态的每条 `message` 事实交给每个连接器的协调器，`forOwner` 挑出主人要看的：说完了的，不是主人自己的；汇报和派活，管家的话，@主人 或 @所有人 的话；提示不送。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上「【谁 · 做完了 / 没做成 / 派活 / 在工单串里】」，Markdown 转成纯文本，按 UTF-16 长度切开（微信 1800、飞书 4000、QQ 2000，尽量在空行或换行处切），写进 `connector_outbox`；网络发送不阻塞读核心事件。
+**送出去的话**：哪些话出农场归[通知](docs/subsystems/notice.md)（`notice/rules.ts` 的 `forOwner`，经 `Notices.toOwner` 交给每个连接器的协调器），挑出主人要看的：说完了的，不是主人自己的；汇报和派活，管家的话，@主人 或 @所有人 的话；提示不送。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上「【谁 · 做完了 / 没做成 / 派活 / 在工单串里】」，Markdown 转成纯文本，按 UTF-16 长度切开（微信 1800、飞书 4000、QQ 2000，尽量在空行或换行处切），写进 `connector_outbox`；网络发送不阻塞读核心事件。
 
 **发件表**（`voiceOutbox`）：每条马上发，按顺序，遇到发不出去的就停下。拒收的（微信、QQ 的回复窗口，`restricted`）留着，30 秒后重试，每失败一次等待翻倍，最多半小时；发出去一条就从 30 秒重来。主人下次说话时先补发，积了 3 条以上就合成一条摘要（「你不在的时候有 N 条消息」，每条留头 60 个字），整批一起确认。飞书、QQ 拿到平台的消息 id 才算发成功。登录过期（`stale`）就暂停这个账号一小时，页面说明可以断开重连。收消息断了先等 2 秒重连，连着断 3 次等 30 秒。
 

@@ -1,7 +1,8 @@
 import type { ChatMessage, Conversation } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { flushText, forOwner, isPairing, ownerLine, plainText, shortId, splitText } from "./text.ts";
+import { forOwner } from "../notice/rules.ts";
+import { flushText, isPairing, ownerLine, plainText, shortId, splitText } from "./text.ts";
 
 describe("the connector's words", () => {
   it("are as recorded", () => {

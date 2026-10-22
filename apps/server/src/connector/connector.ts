@@ -24,9 +24,10 @@ import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
-import { digestOver, flushText, forOwner, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
+import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
 import { baseUrl, failed as weixinFailed, quoted, restricted, staleToken, text as weixinText, type WeixinApi, WeixinClient, WeixinError } from "./weixin.ts";
 import { callbackLog } from "../base/log.ts";
+import { Notices } from "../notice/notice.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -249,6 +250,7 @@ export const make = (options: ConnectorOptions = {}) =>
     const sql = yield* SqlClient.SqlClient;
     const core = yield* Core;
     const chat = yield* Channels;
+    const notices = yield* Notices;
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
@@ -390,7 +392,7 @@ export const make = (options: ConnectorOptions = {}) =>
 
       const offer = async (m: ChatMessage) => {
         const a = now();
-        if (!a || !a.owner || !forOwner(m)) return;
+        if (!a || !a.owner) return;
         const state = chat.now();
         const where = conversationOf(state, m.conversation);
         const mine = a.channel ?? generalOf(state)?.id;
@@ -720,12 +722,9 @@ export const make = (options: ConnectorOptions = {}) =>
     for (const b of bridges) yield* Effect.promise(b.load);
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
-    // A farm message for the owner goes out on every app, each deciding if it is for it.
-    yield* Effect.forkScoped(
-      Stream.runForEach(yield* core.subscribe, (e) =>
-        e.type === "message" ? Effect.promise(() => Promise.all(bridges.map((b) => b.offer(e.message)))) : Effect.void,
-      ),
-    );
+    // What the owner hears off the farm (Notifications says what) goes out on every app the owner has, each checking it is
+    // its owner's channel.
+    yield* Effect.forkScoped(Stream.runForEach(yield* notices.toOwner, (m) => Effect.promise(() => Promise.all(bridges.map((b) => b.offer(m))))));
     for (const b of bridges) if (b.hasAccount()) void b.resume();
     yield* Effect.addFinalizer(() =>
       Effect.promise(async () => {
