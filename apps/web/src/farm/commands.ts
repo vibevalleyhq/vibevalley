@@ -26,8 +26,6 @@ export interface FarmCommands {
   /** Stops one at work; asks one not at work to leave. */
   shovel(s: Session): Promise<void>;
   stop(sessionId: string): Promise<void>;
-  stopOrchestrator(): Promise<void>;
-  dismiss(sessionId: string): Promise<void>;
   /** `station`: the plot it was sown on; `project`: the one chosen on the sowing form. The orchestrator is told to sow it. */
   plant(text: string, o?: { station?: number; agent?: string; project?: string; sendKey?: string }): Promise<void>;
   /** The click's decision, read from one frame, so the page's sound and the command agree. */
@@ -36,13 +34,10 @@ export interface FarmCommands {
   act(plot: PlotAim): Promise<ToolResult>;
   chooseTitle(achievement?: string, tier?: number): Promise<void>;
   refreshRuntime(id: string): Promise<void>;
-  /** Leaves the title screen; `start` opens the orchestrator's day too. */
-  enterFarm(start: boolean): void;
 }
 
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
-  const sessions = () => frame()?.state.sessions ?? [];
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
       await api.issue.comment({ id: issueOf(s), body: { text, sendKey } });
@@ -66,12 +61,6 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "shovel");
     },
     stop: (id) => api.session.stop({ id }),
-    stopOrchestrator: () => api.orchestrator.stop(),
-    async dismiss(id) {
-      const s = sessions().find((x) => x.id === id);
-      if (!s) throw new Error(`no session ${id}`);
-      await api.issue.status({ id: issueOf(s), body: { status: "canceled" } });
-    },
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;
@@ -110,10 +99,6 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     },
     chooseTitle: (achievement, tier) => api.game.chooseTitle({ body: { achievement, tier } }),
     refreshRuntime: async (id) => void (await api.runtime.refresh({ id })),
-    enterFarm(start) {
-      farm.closeTitle();
-      if (start) fire(api.orchestrator.open());
-    },
   };
   return commands;
 }
