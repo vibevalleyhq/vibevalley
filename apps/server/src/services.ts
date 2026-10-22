@@ -1,8 +1,8 @@
 // The farm's services, module by module (modules.ts): each module assembles its own services on the modules below it, and
 // what goes the other way is news on a stream. Two phases: every module is built first, subscribing to what it follows;
 // then each module's startup runs, in module order, so whatever a startup says reaches every module already listening.
-// Some modules still do startup work while they are built (putting their state back into the core); it moves into their
-// startup (.agents/notes/proposed/architecture/2026-10-22-ten-modules.md). The tests assemble the same modules
+// Some modules still do startup work while they are built (putting their state back into the core); ordering by data
+// instead is .agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md. The tests assemble the same modules
 // (testing/world.ts).
 
 import { Layer } from "effect";

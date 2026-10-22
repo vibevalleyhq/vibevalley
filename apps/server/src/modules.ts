@@ -1,5 +1,5 @@
 // The server's ten modules, lowest first: a module uses the ones before it and never one after
-// (.agents/notes/proposed/architecture/2026-10-22-ten-modules.md). Each entry is the folders and root files under src/ it
+// (docs/subsystems/foundation.md). Each entry is the folders and root files under src/ it
 // is made of; modules.test.ts reads every import against this table, and services.ts assembles the modules in this order.
 
 export interface Module {

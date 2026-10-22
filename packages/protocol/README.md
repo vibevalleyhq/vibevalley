@@ -1,9 +1,8 @@
 # @vibevalley/protocol
 
 The contract between the server and the page: the shapes on the wire, their Schemas, the endpoints, and the few pure
-rules both sides run. A rule only the server runs belongs to its module in `apps/server/src`; the ones still here for
-the core state's fold and the frame move out by the
-[proposal](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md). No files, no network.
+rules both sides run. A rule only the server runs belongs to its module in `apps/server/src`, and so do the core
+state's fold and the frame (`apps/server/src/projection`). No files, no network.
 
 | Entry | What |
 |---|---|

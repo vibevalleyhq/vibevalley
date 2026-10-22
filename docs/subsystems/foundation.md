@@ -37,8 +37,9 @@
 - **一块业务一个文件夹**，都在 `apps/server/src/` 下，名字单数，用[用语表](docs/README.md#用语)和[概念](docs/concepts.md)里的词：`core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`assistant`、`lan`、`voice`、`connector`、`game`。子文件夹只有 `agent/brain`（VibeValley 自己的 agent）。
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
-- **模块有先后**：`services.ts` 按 `core`、`setting`、`agent`、`project`、`memory`、`doc`、`runtime`、`session`、`channel`、`recurrence`、`issue`、`task`、`tool`、`mcp`、`assistant`、`lan`、`voice`、`connector`、`game` 一层叠一层（`on(layer)` 是 `Layer.provideMerge`）。一个服务只拿得到排在它前面的；要用排在后面的，Effect 的类型报缺了谁。反方向的消息走 `Stream`（`Core` 的事实、事件、帧，`Sessions` 的动静），订阅的人自己读，发布的人不等。`game` 只听别的服务的事实，业务的服务不调它。
-- **开机的活叠在最后**：`project` 的 `start`、`session` 的 `ready`（接着上回没完的执行）、`recurrence` 的 `start`、`game` 的 `start` 是 `Layer.effectDiscard`，在全部服务都建好以后按这个次序跑。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
+- **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Notifications、Assistant、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Sessions.sessionOf`、`Issues.onBoard`、`Tasks.graphs`、`Channels.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Sessions.news`、`Channels.ownerInThread`、`Notices.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（田头的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
+- **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的种植计划、定时开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
+- **折法和拼帧在组装那一层**：`projection/` 的 `reduce`、`frameOf` 读每个模块的规则，组装时以 `Projection` 交给 Platform 里的 `core`，`core` 不 import 上面的模块。
 - **一个家目录一个服务端**：`base/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
 
 **形状和规则**
@@ -100,6 +101,9 @@
 
 ## 为什么这样
 
+- **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调执行、合并写在执行里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（执行同时被工单、田头、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
+- **端口只在有两个适配器、或方向必须倒过来时才立。** 田头的 `Helpers` 是因为田头在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和收获）；执行和田头的几块共用同一份状态，拆开只是把状态传来传去。
+- **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Assistant；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
 - **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。

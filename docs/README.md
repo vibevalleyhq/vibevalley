@@ -76,9 +76,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 收成清单 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情 |
 | 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |
 | 聊清楚、安排活、完成 | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一块地的三段 | |
-| 验收 | acceptance（`Issue.Review`、`issue.accept`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核、review |
+| 验收 | review（`Issue.review`、`issue.review`） | 每张工单都有：判交回来的活过没过；`glance` 是收获就算，`required` 是先过验收才能收获 | 审核 |
 | 草 | finding（`Issue.Findings`） | 没过验收的一条意见；下次验收通过才拔 | |
-| 缺肥 | asks（`Issue.Questions`） | 帮工问了主人、还没回答的；施肥是回答它 | |
+| 缺肥 | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；施肥是回答它 | |
 | 仓库 | warehouse | 收获了的工单 | |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |
 | 轨迹 | trajectory | 一个 agent 干活的每一步 | 日志、trace |
@@ -91,7 +91,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 田头 | general | 默认的频道：你、管家和帮工都在 | 群 |
 | 频道 | channel | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群 |
 | 串 | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |
-| 定时 | schedule | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | cron |
+| 定时 | recurrence（`Recurrence`） | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | cron |
 | 来电 | inbox | 要你处理的事 | 通知 |
 | 巡查 | patrol | 定时看 Inbox，放久了叫醒管家 | |
 | 连接到本机 | lan | 让局域网里的设备用这个农场的监听，默认关 | 远程模式 |

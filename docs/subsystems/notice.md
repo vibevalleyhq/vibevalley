@@ -14,7 +14,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/notice`（`Notices`，属于 Notifications 模块）：`notice.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`rules.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），黄金数据在 `testdata/rules.jsonl.gz`。
-- Inbox 本身还在 `apps/server/src/notice/inbox.ts`（`inbox`、`inboxEntries`、`freshOf`），因为拼帧的 `frameOf` 在那里；放在 `StateFrame.inbox`，和 `state`、`view` 并排。它要挪回本模块，见[提案](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)。
+- Inbox 在 `apps/server/src/notice/inbox.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
 - 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/app/Follow.tsx`、`apps/web/src/rules/notice.ts`。
 
 ## 模型和不变量
@@ -60,10 +60,6 @@
 - **通话里说的和手机响的是同一批。** 原来通话里看的是工单站位的变化（另一条规则），手机看的是 Inbox，@主人、计划、定时只响不说。现在两条路都看 Inbox 里刚来的。
 - **话跟着条目走，不在每条路上各配一份。** 原来同一种事的话写在五处（手机的标签、系统通知、菜单栏、通话、巡查），加一种要改五处。放弃了把配话的函数放进 protocol 让页面调：页面只该展示服务端给的结论。
 - **送达的路不立端口。** 通话、手机、系统通知各自订阅、各自说，通知只决定什么、什么时候；为它们立一个「送达」接口，背后的适配器在两个进程里，换不来什么。
-
-## 还没做的
-
-- Inbox 和它的配话从 `packages/protocol` 挪回本模块，帧由各模块拼：[提案](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)。
 
 ## 怎么验证
 

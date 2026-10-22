@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `pnpm run notes:catalog`，过期了 `pnpm run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（20 篇）
+## proposed（19 篇）
 
 ### feature
 
@@ -18,7 +18,6 @@
 
 ### architecture
 
-- 2026-10-22 [服务端按十个领域模块切分，代码统一用行业词汇](.agents/notes/proposed/architecture/2026-10-22-ten-modules.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
 - 2026-10-18 [编排层：每个 agent 一个信箱，什么时候交给它只在一处定](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)
