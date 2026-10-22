@@ -19,8 +19,11 @@ import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { layer, Orchestrator } from "./orchestrator.ts";
-import { deepseekModel, intake } from "./rules.ts";
+import { layer, Orchestrator, type OrchestratorShape } from "./orchestrator.ts";
+import { deepseekModel, intake, orchestratorModel } from "./rules.ts";
+
+/** Words said to the orchestrator on the phone, as the voice line asks them. */
+const onPhone = (o: OrchestratorShape, text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) =>
@@ -179,7 +182,7 @@ describe("the orchestrator", () => {
       const chat = yield* Channels;
       const got = yield* Effect.promise(async () => {
         let out = "";
-        for await (const piece of orchestrator.call("现在地里怎么样")) out += piece;
+        for await (const piece of onPhone(orchestrator, "现在地里怎么样")) out += piece;
         return out;
       });
       expect(got).toBe("收到\n");
@@ -211,7 +214,7 @@ describe("the orchestrator", () => {
         const brief = orchestrator.brief("【要告诉主人】\n- #41 交回来了");
         await new Promise((r) => setTimeout(r, 100));
         const joined = (async () => {
-          for await (const _ of orchestrator.call("还有别的吗")) void _;
+          for await (const _ of onPhone(orchestrator, "还有别的吗")) void _;
         })();
         const out = await Promise.race([brief, new Promise<string>((_, no) => setTimeout(() => no(new Error("the brief never ended")), 4000))]);
         await joined;
@@ -233,7 +236,7 @@ describe("the orchestrator", () => {
       const pieces = (text: string) =>
         Effect.promise(async () => {
           const out: string[] = [];
-          for await (const piece of orchestrator.call(text)) out.push(piece);
+          for await (const piece of onPhone(orchestrator, text)) out.push(piece);
           return out;
         });
       const first = yield* pieces("在吗");

@@ -22,6 +22,6 @@ export const mcpRoute = HttpRouter.use((router) =>
     const mcp = yield* Mcp;
     const orchestrator = yield* Orchestrator;
     yield* router.add("*", "/mcp", web(mcp.handle));
-    yield* router.add("*", chatCompletionsPath, web(chatCompletions({ answerer: orchestrator.answerer, log: (line) => logs.info(line) })));
+    yield* router.add("*", chatCompletionsPath, web(chatCompletions({ answerer: orchestrator.answerer("api"), log: (line) => logs.info(line) })));
   }),
 );

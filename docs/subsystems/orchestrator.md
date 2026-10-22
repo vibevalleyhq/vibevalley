@@ -60,7 +60,7 @@
 | 电话、语音转来的话、`/v1/chat/completions` | 插进 |
 
 - 交给管家的话里，不是主人说的超过 800 字（UTF-16，`orchestratorLineMax`）只给前 800 字，后面写明这条有多少字、用 `read_chat` 读哪里（`#频道` 或 `#频道:消息号`）；主人的话照原样给。`read_chat` 给全文，`check` 给帮工上一轮汇报的结尾 2000 字。
-- 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`call`）带一句口语、一两句、先说结论的提示，回答边长边念。
+- 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`answerer("phone")`）带一句口语、一两句、先说结论的提示，回答边长边念。
 - **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。
 
 **说话**：管家说的字边长边进它回话的那个频道（至多每 120 毫秒推一次），一句说完写成定稿；空的不发。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
@@ -97,13 +97,13 @@
 - **田头（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进田头，带 `sendKey` 的重发不再交给管家（[田头](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（`answered`）（[工单](docs/subsystems/issue.md)）。`dispatch` 直接 `Issue.hire`；`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工。挑档案归 `Runtimes.choose`。
-- **语音（`voice`）**：电话里的每句经 `call`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
+- **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
 - **定时（`recurrence`）**：管家的 `recurrence` 工具经 `Recurrence.Add(req, orchestrator, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **种植计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_action`、`task_edit`、`task_action` 调它。
 - **记性（`memory`）**：`orchestratorHome` 定家目录；管家页的记性和旧账接口读写 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`agent/brain/memory.ts`）。
 - **农机和额度（`runtime`）**：`assess` 给每个档案能不能派、额度和花费，写进农场现状。
 - **设置（`setting`）**：`deepseekAPIKey`。
-- **语音（`voice`）**：电话里的话经 `call`、`answerer`，转来的字幕经 `heard`（[语音](docs/subsystems/voice.md)）。
+- **语音（`voice`）**：电话里的话经 `answerer("phone")`，本机的 `/v1/chat/completions` 经 `answerer("api")`：认不认这个模型名、电话里的话要不要先记进田头，都由管家定；转来的字幕经 `heard`（[语音](docs/subsystems/voice.md)）。
 
 ## 为什么这样
 

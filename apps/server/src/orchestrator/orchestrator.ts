@@ -26,6 +26,7 @@ import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
+import type { Answer } from "../agent/brain/openai.ts";
 import { Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
@@ -118,13 +119,12 @@ export interface OrchestratorShape {
   readonly say: (text: string, pick: Pick, conversation: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
-  /** The words said on the phone; the answer is read out, and both stay in 田头. */
-  readonly call: (text: string, signal?: AbortSignal) => AsyncIterable<string>;
   /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in 田头
    * as always; the whole answer comes back to be read out. It does not end the call's own answer. */
   readonly brief: (line: string) => Promise<string>;
-  /** The orchestrator as orchestratorModel on the farm's own chat/completions: what is asked there is the owner's, as in 田头. */
-  readonly answerer: (model: string) => ((text: string, signal?: AbortSignal) => AsyncIterable<string>) | undefined;
+  /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in 田头.
+   * On the phone (the voice line) the words are said in 田头 too, and the answer is one to be read out. */
+  readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
   /** The lines waiting for the orchestrator are dropped with the run; the sessions it sent keep working. */
   readonly stop: () => Effect.Effect<void>;
   readonly markWrong: (on: number, want: string) => Effect.Effect<OrchestratorEval, ApiError>;
@@ -427,10 +427,6 @@ export const make = (options: OrchestratorOptions = {}) =>
             owner: true,
           });
         }),
-      call: (text, signal) => {
-        void go(Effect.ignore(chat.spoken("user", text, "")));
-        return answer(voiceNote + "\n主人说：" + text, signal);
-      },
       brief: async (line) => {
         const me = new Caller();
         void take({ source: "issue", line, conversation: general, caller: me });
@@ -438,7 +434,14 @@ export const make = (options: OrchestratorOptions = {}) =>
         for await (const w of me.words()) said += w;
         return said.trim();
       },
-      answerer: (model) => (model === orchestratorModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),
+      answerer: (on) => (model) => {
+        if (model !== orchestratorModel) return undefined;
+        if (on === "api") return (text, signal) => answer("主人说：" + text, signal);
+        return (text, signal) => {
+          void go(Effect.ignore(chat.spoken("user", text, "")));
+          return answer(voiceNote + "\n主人说：" + text, signal);
+        };
+      },
       stop: () => Effect.promise(() => host.stop()),
       markWrong: (on, want) =>
         host.markWrong(

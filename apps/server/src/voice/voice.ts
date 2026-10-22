@@ -362,7 +362,7 @@ export const make = (options: VoiceOptions = {}) =>
     let tunnel: { url: string; close: () => void } | undefined;
     let closing: NodeJS.Timeout | undefined;
     const answer = chatCompletions({
-      answerer: (model) => (model === orchestratorModel ? (text, signal) => orchestrator.call(text, signal) : undefined),
+      answerer: orchestrator.answerer("phone"),
       misheard: lineMisheard,
       log: (l) => logs.info(l),
     });

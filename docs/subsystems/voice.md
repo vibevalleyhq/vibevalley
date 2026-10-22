@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 电话：签 RTC 令牌、请语音管家进出频道、续签、挂断 | 管家怎么想、怎么派活，`call`、`heard`、`answerer` 的提示（[管家](docs/subsystems/orchestrator.md)） |
+| 电话：签 RTC 令牌、请语音管家进出频道、续签、挂断 | 管家怎么想、怎么派活，`answerer`、`heard` 的提示（[管家](docs/subsystems/orchestrator.md)） |
 | 语音线路：单独的回环监听、每通电话一把钥匙、隧道 | OpenAI `chat/completions` 的协议本身（`agent/brain/openai.ts`，[管家](docs/subsystems/orchestrator.md)「OpenAI 的协议」） |
 | 两种字幕的接受和分流（按通话建立时的模式） | 字幕怎么留在田头、不叫醒谁（`channel` 的 `spoken`，[田头](docs/subsystems/channel.md)） |
 | 听写：把录音转给主人填的转写地址 | 设置的存取、优先级、钥匙只给提示（`setting`，[设置](docs/subsystems/setting.md)） |
@@ -30,7 +30,7 @@
 - **一份授予只有一个启动者**：启动时认领（`starting`），重复启动回「这通电话已经在接通」；启动失败撤销授予；成功后授予归通话，直到挂断。
 - **一通电话记下建立时的决定**：通话存它用的 Agora client、语音线路的释放函数、是不是快嘴（`quick`）和开场白。之后改「谁接电话」、区域、凭据都不改这通电话：字幕怎么分流、停止请求发到哪个区域都按建立时的。
 - **挂断一开始，字幕资格就终止**：挂断先删授予、把通话标成 `ending`，此后 `heard`、`said` 回 `VoiceAgentFailed`（「这通电话已经挂了」）；声网停止失败时保留原 client 供重试，但不再接字幕。
-- **电话里的每句话由服务端记进田头**，带 `spoken`，不叫醒任何人：主人的话快嘴模式下由 `Orchestrator.heard` 记，管家模式下由 `Orchestrator.call` 记；管家的回答照常进田头；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
+- **电话里的每句话由服务端记进田头**，带 `spoken`，不叫醒任何人：主人的话快嘴模式下由 `Orchestrator.heard` 记，管家模式下由 `Orchestrator.answerer("phone")` 记；管家的回答照常进田头；快嘴的回答由页面交 `/voice/agent/said`，只在快嘴模式、通话没挂时记，开场白不记。
 - **农场只有一通电话**：页面的 `voiceCall`，田头的通话键、手机的「打给管家」和接听来电都开它、挂它；服务端的 `calls` 里没在挂断的那一通就是「正在通话」。
 - **管家能主动在电话里说**（`Voice.speak`）：有一通电话就用建立时的 client 调声网的 `agents.speak`，`priority: APPEND`（排在正在说的这句之后，不打断主人）、`interruptable`（主人能插话）；一次最多 512 字节，长的在句末切成几段（`speakPieces`，每段不超过 480 字节）。没有电话回 false。念不出来只记日志。
 - **一句话只处理一次**：管家模式下 `/agent/heard` 收下但不转给管家（语音线路已经交过）；`heard` 带 `sendKey`，同一个键再交是已经听过的那句。
@@ -64,7 +64,7 @@
 
 1. 监听开在 `voice.line.port`（默认 8788，只听 127.0.0.1）；端口被占时只记日志，农场照常，打给管家的电话回原因。
 2. 隧道：设了 `voice.line.url` 就用它（去掉结尾的 `/`），地址固定、第一通不用等，比如 Tailscale Funnel（`tailscale funnel --bg 8788`，把它给的 `https://<机器>.<tailnet>.ts.net` 设成 `voice.line.url`；只放这条线路的端口，农场的 8787 不放）；没设时第一通电话开 cloudflared 临时隧道（`cloudflared tunnel --url`），30 秒内给不出 `trycloudflare.com` 地址就失败，没装就提示 `brew install cloudflared` 或设 `voice.line.url`；拿到地址后每 2 秒探一次，最多 60 秒，线路回 401 算通了，到时还不通也接着打，只记日志。最后一通挂了 10 分钟后关隧道，其间再打就复用。
-3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `agent/brain/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Orchestrator.call`（先记进田头，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
+3. 每通电话一个随机的通话 id 和钥匙；Agora 每说完一句就来一个请求。协议由 `agent/brain/openai.ts` 处理：只取 `messages` 里最后一条 `user`，交给 `Orchestrator.answerer("phone")`（先记进田头，再带「电话里说的、要口语」的提示问管家），管家的字边长边以 SSE 流回去念。没有主人的话时回一句「嗯？我没听清，你再说一遍？」。
 4. Agora 在主人插话时挂掉请求：请求断了就不再送字；同一通电话的新一句结束上一句的流；管家这一轮照常跑完。
 
 **管家打电话找主人**：
@@ -88,7 +88,7 @@
 
 ## 和谁打交道
 
-- **管家（`orchestrator`）**：快嘴模式的主人字幕经 `heard`；语音线路的每句经 `call`，回一个字的流。`call` 和本机 `/v1/chat/completions` 的 `answerer` 共用一个回答的流，同一时间只流一个。要告诉主人的事经 `brief`：一个自己的回答流，不结束 `call` 的那个，整段回来以后念出来。
+- **管家（`orchestrator`）**：快嘴模式的主人字幕经 `heard`；语音线路的每句经 `answerer("phone")`，回一个字的流；它和本机 `/v1/chat/completions` 的 `answerer("api")` 共用一个回答的流，同一时间只流一个。要告诉主人的事经 `brief`：一个自己的回答流，不结束电话的那个，整段回来以后念出来。
 - **田头（`channel`）**：快嘴的回答经 `spoken` 记成管家的话；主人的话和管家的回答由管家那边记。带 `spoken` 的消息不投给任何人。
 - **设置（`setting`）**：声网的凭据（每次现取，存的凭据不用重启）、语音设置和三段的 key、听写的设置。
 - **核心（`core`）**：`did`（账本的语音时刻）、`open`。
