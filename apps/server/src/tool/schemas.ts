@@ -190,6 +190,10 @@ export const schemas: Record<string, Schema> = {
         description: "工单编号（#41 或 41）",
         type: "string",
       },
+      keep_branch: {
+        description: "挪到已完成时：完成，但分支留着不合（主人说「先别合」「分支留着」时）",
+        type: "boolean",
+      },
       text: {
         description: "带给帮工的一句话：从等你看挪回待办（再干一轮）、重开时必填；换人时写接手的接着做什么",
         type: "string",

@@ -7,7 +7,6 @@ import {
   type GraphEvent,
   type GraphState,
   type Issue,
-  type IssueClose,
   type Session,
   type Task,
   type TaskEdit,
@@ -264,7 +263,7 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
   if (!issue) return "你手上没有工单：只有工单能拆";
   if (session.refining) return "你在起草这张工单，还没开工：把要拆的想法写进草稿";
   if (issue.graph || issue.task) return "这张工单已经是计划了";
-  if (issue.closed !== undefined || issue.closedAt !== undefined) return "这张工单已经关了";
+  if (issue.closedAt !== undefined) return "这张工单已经关了";
   if (isForOrchestrator(issue)) return "这是派给管家的工单";
   if (!issue.project) return "这张工单没有项目，没法开分支";
   if (issue.sessions.length === 0 || issue.sessions.at(-1) !== session.id) return "这张工单现在不归你做";
@@ -277,7 +276,7 @@ export const taskIssueID = (graph: string, key: string) => graph + "." + key;
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
   const was = new Map(before.map((t) => [t.id, t]));
-  const keep = (draft: Draft, closed: IssueClose | undefined): Issue => {
+  const keep = (draft: Draft, closed: Closing | undefined): Issue => {
     const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
     const old = was.get(t.id);
     if (old) {
@@ -285,7 +284,9 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
       if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
     }
     t.sessions ??= [];
-    t.closed = closed;
+    delete t.delivered;
+    delete t.canceled;
+    if (closed) Object.assign(t, closed);
     if (closed !== undefined && t.closedAt === undefined) t.closedAt = now;
     return t;
   };
@@ -345,11 +346,16 @@ export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefine
   return t ? graphFrom(t, issues) : undefined;
 }
 
-const graphClosed = (s: GraphState): IssueClose | undefined => (s === "done" ? "merged" : s === "abandoned" ? "dismissed" : undefined);
+/** How a task graph's issue closes: done with what it delivered, or canceled. */
+type Closing = { readonly delivered: "merged" | "merged_into_parent" } | { readonly canceled: "dismissed" };
 
-function taskClosed(graph: GraphState, n: Task): IssueClose | undefined {
-  if (n.state === "merged") return "merged_into_graph";
-  if (n.state === "skipped" || graph === "done" || graph === "abandoned") return "dismissed";
+const graphClosed = (s: GraphState): Closing | undefined =>
+  s === "done" ? { delivered: "merged" } : s === "abandoned" ? { canceled: "dismissed" } : undefined;
+
+/** A step merged into its graph's branch is done; one skipped, or left when its graph ended, is not. */
+function taskClosed(graph: GraphState, n: Task): Closing | undefined {
+  if (n.state === "merged") return { delivered: "merged_into_parent" };
+  if (n.state === "skipped" || graph === "done" || graph === "abandoned") return { canceled: "dismissed" };
   return undefined;
 }
 

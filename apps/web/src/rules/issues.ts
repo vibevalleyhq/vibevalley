@@ -12,16 +12,17 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 
-export type IssueTag = "working" | "waiting" | "harvested" | "merged" | "dropped" | "lost" | "answered" | "closed";
+export type IssueTag = "working" | "waiting" | "harvested" | "merged" | "kept" | "done" | "dropped" | "lost" | "closed";
 
 export const tagLabel: Record<IssueTag, string> = {
   working: "处理中",
   waiting: "等你看",
   harvested: "已收获",
   merged: "合进了计划",
+  kept: "完成，分支留着",
+  done: "完成了",
   dropped: "没收就收工了",
   lost: "丢了",
-  answered: "管家答完了",
   closed: "已关",
 };
 
@@ -30,19 +31,18 @@ export const tagOpen = (t: IssueTag) => t === "working" || t === "waiting";
 export function issueTag(issue: Issue): IssueTag {
   if (issue.status === "in_progress") return "working";
   if (issue.status === "in_review") return "waiting";
-  switch (issue.closed) {
+  switch (issue.delivered) {
     case "merged":
+    case "pull_request":
       return "harvested";
-    case "merged_into_graph":
+    case "merged_into_parent":
       return "merged";
-    case "dismissed":
-      return "dropped";
-    case "lost":
-      return "lost";
-    case "answered":
-      return "answered";
+    case "kept":
+      return "kept";
+    case "none":
+      return "done";
     case undefined:
-      return "closed";
+      return issue.canceled === "lost" ? "lost" : issue.canceled === "dismissed" ? "dropped" : "closed";
   }
 }
 
@@ -93,7 +93,7 @@ export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at :
 
 /** The session on the farm now for an open issue. */
 export function issueSession(core: WorkspaceState | undefined, issue: Issue): Session | undefined {
-  if (!core || issue.sessions.length === 0 || issue.closed !== undefined) return undefined;
+  if (!core || issue.sessions.length === 0 || issue.closedAt !== undefined) return undefined;
   const last = issue.sessions[issue.sessions.length - 1];
   return core.sessions.find((s) => s.id === last);
 }
@@ -140,7 +140,7 @@ export function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undef
 }
 
 export const issueInTask = (issue: Issue, session: Session | undefined) =>
-  issue.graph !== undefined || issue.parent !== undefined || session?.graph !== undefined || issue.closed === "merged_into_graph";
+  issue.graph !== undefined || issue.parent !== undefined || session?.graph !== undefined || issue.delivered === "merged_into_parent";
 
 /** Every word of the query is somewhere in the fields, ignoring case. */
 export function matchesQuery(query: string, fields: (string | undefined)[]) {

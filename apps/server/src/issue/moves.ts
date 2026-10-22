@@ -18,8 +18,8 @@ export type Move =
   | "reopen"
   /** canceled before it was ever sent → backlog */
   | "revive"
-  /** in_review → done */
-  | "merge"
+  /** in_review → done: what it delivers follows the issue (its branch's commits, the owner's choice to keep it) */
+  | "complete"
   /** in_progress, in_review → canceled: its session goes home */
   | "cancel"
   /** backlog, todo → canceled: never sent */
@@ -42,7 +42,7 @@ export const statusWords: Readonly<Record<IssueStatus, string>> = {
 export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const from = t.status;
   if (isForOrchestrator(t)) return orchestratorMove(t, to);
-  if (t.graph || t.task || t.closed === "merged_into_graph") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
+  if (t.graph || t.task || t.delivered === "merged_into_parent") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
   if (from === to) return ["none", "它已经是这个状态了"];
   if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
   const sent = t.sessions.length > 0;
@@ -63,7 +63,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       // harvested: done is what was asked for, not how the round ended.
       if (to === "done") {
         if (t.attention.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
-        return t.review === "required" && t.reviewedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
+        return t.review === "required" && t.reviewedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["complete", ""];
       }
       if (to === "canceled") return ["cancel", ""];
       break;

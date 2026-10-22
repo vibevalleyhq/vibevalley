@@ -45,8 +45,18 @@ update issue set queued_at = coalesce(queued_at, sqlc.arg(at)) where id = sqlc.a
 -- name: UnqueueIssue :exec
 update issue set queued_at = null where id = sqlc.arg(id);
 
--- name: CloseIssue :exec
-update issue set closed_at = sqlc.arg(closed_at), closed = sqlc.narg(closed) where id = sqlc.arg(id);
+-- name: CompleteIssue :exec
+update issue set closed_at = sqlc.arg(closed_at), delivered = sqlc.arg(delivered), canceled = null where id = sqlc.arg(id);
+
+-- name: CancelIssue :exec
+update issue set closed_at = sqlc.arg(closed_at), canceled = sqlc.arg(canceled), delivered = null where id = sqlc.arg(id);
+
+-- name: CompleteOpenIssue :exec
+-- As a session leaves: only an issue still open, so a verdict written meanwhile (a pull request merged) stands.
+update issue set closed_at = sqlc.arg(closed_at), delivered = sqlc.arg(delivered) where id = sqlc.arg(id) and closed_at is null;
+
+-- name: CancelOpenIssue :exec
+update issue set closed_at = sqlc.arg(closed_at), canceled = sqlc.arg(canceled) where id = sqlc.arg(id) and closed_at is null;
 
 -- name: KeptIssues :many
 -- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.
@@ -61,13 +71,13 @@ select * from issue where id = sqlc.arg(id) or parent = sqlc.arg(id);
 
 -- name: PutIssue :exec
 -- An issue as its task graph has it now; its sessions and its queue are not the graph's.
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, closed, parent, blocked_by, graph, task)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, closed_at, delivered, canceled, parent, blocked_by, graph, task)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), sqlc.arg(rank), sqlc.arg(created_at), sqlc.narg(closed_at), sqlc.narg(closed), sqlc.narg(parent), sqlc.narg(blocked_by),
+        sqlc.arg(priority), sqlc.arg(rank), sqlc.arg(created_at), sqlc.narg(closed_at), sqlc.narg(delivered), sqlc.narg(canceled), sqlc.narg(parent), sqlc.narg(blocked_by),
         sqlc.narg(graph), sqlc.narg(task))
 on conflict (id) do update set
   title = excluded.title, description = excluded.description, project = excluded.project, assignee = excluded.assignee, rank = excluded.rank,
-  closed_at = excluded.closed_at, closed = excluded.closed, parent = excluded.parent, blocked_by = excluded.blocked_by,
+  closed_at = excluded.closed_at, delivered = excluded.delivered, canceled = excluded.canceled, parent = excluded.parent, blocked_by = excluded.blocked_by,
   graph = excluded.graph, task = excluded.task;
 
 -- name: GraphIDs :many
@@ -82,7 +92,7 @@ select * from issue where recurrence = sqlc.arg(recurrence) order by created_at 
 update issue set assignee = sqlc.arg(assignee) where id = sqlc.arg(id);
 
 -- name: ReopenIssue :exec
-update issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
+update issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
 
 -- name: OpenOf :many
 select id, handed_back from issue where assignee = sqlc.arg(assignee) and closed_at is null;

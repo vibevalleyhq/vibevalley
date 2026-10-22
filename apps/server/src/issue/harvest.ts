@@ -2,7 +2,7 @@
 // requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
 // here, for the board, the command line and the orchestrator's tool alike.
 
-import type { Issue, IssueClose, PullRequest, PullRequestState } from "@vibevalley/protocol";
+import type { Issue, PullRequest, PullRequestState } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
@@ -95,7 +95,8 @@ export function harvesting(d: HarvestDeps) {
 
   const finishPullRequest = (issue: Issue, state: PullRequestState) =>
     Effect.gen(function* () {
-      const closed: IssueClose = state === "closed" ? "dismissed" : "merged";
+      // A pull request merged is the issue done, delivered by it; one closed unmerged is the issue not done.
+      const closed = state === "closed" ? "dismissed" : "merged";
       const id = yield* latest(issue.id);
       if (sessions.find(id))
         yield* sessions
@@ -104,7 +105,11 @@ export function harvesting(d: HarvestDeps) {
       else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
       yield* inTx(
         Effect.andThen(
-          db(q.closeIssue({ id: issue.id, closed, closed_at: Date.now() })),
+          db(
+            state === "closed"
+              ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: Date.now() })
+              : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: Date.now() }),
+          ),
           db(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
         ),
       );

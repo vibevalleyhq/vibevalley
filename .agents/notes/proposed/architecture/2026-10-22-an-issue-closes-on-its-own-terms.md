@@ -29,7 +29,7 @@ VibeValley 以工单为单位：工单写明要什么、怎么算完，帮工的
 |---|---|---|
 | 结论：`status` | `done`（完成）、`canceled`（不做了） | 主人 |
 | 不做了的原因：`Issue.canceled` | `dismissed`（主人关的）、`lost`（干活的目录丢了） | 主人或服务端 |
-| 交付：`Issue.delivered` | `merged`（带 `into`：父工单的分支或项目主分支）、`pull_request`、`kept`（分支留着不合）、`none` | 完成时算出默认，主人可改 |
+| 交付：`Issue.delivered` | `merged`（项目主分支）、`merged_into_parent`（父工单的分支）、`pull_request`、`kept`（分支留着不合）、`none` | 完成时算出默认，主人可改 |
 
 `closed` 和 `IssueClose` 删掉。现在的关单方式对过来：`merged` 是完成、合进主分支；`merged_into_graph` 是完成、合进父工单的分支；`answered` 是完成、没有交付；`dismissed`、`lost` 是不做了。不留兼容：表结构直接改，本机的旧库作废。
 
@@ -59,7 +59,7 @@ VibeValley 以工单为单位：工单写明要什么、怎么算完，帮工的
 
 每一步单独能上线：
 
-1. 关单拆成结论和交付；`complete` 一个挪法，没提交时交付 `none`，有提交时能选留着分支；不开空 PR。改 `packages/protocol` 的形状和 `issue` 表，`moves.ts`、`harvest.ts`、`attention.ts`、页面的收获清单和看板。
+1. 关单拆成结论和交付；`complete` 一个挪法，没提交时交付 `none`，有提交时能选留着分支；不开空 PR。改 `packages/protocol` 的形状和 `issue` 表，`moves.ts`、`harvest.ts`、`attention.ts`、页面的收获清单和看板。已经做了，现状在[工单](docs/subsystems/issue.md)「完成和交付」；帮工离开的方式另成 `SessionClose`（多了 `completed`），不再和工单共用一个类型。
 2. 派给管家的工单并进同一套：删 `orchestratorMove` 和 `handedBack`。
 3. `Issue.deliver` 和 `answer` 工单：只读的执行、`Issue.answer`、`parseAnswer`，管家记「查一下」时填它。
 4. 计划的步骤改走 `complete`，交付进父工单的分支。

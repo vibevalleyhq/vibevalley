@@ -20,7 +20,7 @@ import {
   type Changes,
   dayMs,
   type Fact,
-  type IssueClose,
+  type SessionClose,
   type Issue,
   maxRunning,
   type Outcome,
@@ -167,7 +167,8 @@ export interface SessionShape {
   readonly tell: (id: string, text: string, by: RunTrigger) => Effect.Effect<string>;
   readonly stop: (id: string) => Effect.Effect<boolean>;
   /** Discard resets its branch only after the runtime has stopped writing. */
-  readonly dismiss: (id: string, work?: "keep" | "discard") => Effect.Effect<boolean, ApiError>;
+  /** closed: how it leaves, "dismissed" unless its issue was completed without a merge ("completed"). */
+  readonly dismiss: (id: string, work?: "keep" | "discard", closed?: "dismissed" | "completed") => Effect.Effect<boolean, ApiError>;
   /** Removes an issue's unused workplace; an active or unclosed startup still owns it. */
   readonly clearWorkplace: (issue: string, project: string, number: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease, ApiError>;
   readonly roster: () => Roster[];
@@ -182,7 +183,7 @@ export interface SessionShape {
    * open keeps the session too. */
   readonly handOver: (
     id: string,
-    closed: IssueClose,
+    closed: SessionClose,
     use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
     settle?: Settle,
   ) => Effect.Effect<Merged, ApiError | NotTakenIn>;
@@ -297,7 +298,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
     brief: r.brief,
     hiredAt: r.hired_at,
     runs: runs.length,
-    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as IssueClose },
+    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as SessionClose },
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: r.issue } : {}),
   };
@@ -459,7 +460,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       );
 
-    const ended = (id: string, closed: IssueClose) => logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: Date.now(), closed, id }));
+    const ended = (id: string, closed: SessionClose) => logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: Date.now(), closed, id }));
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
@@ -746,7 +747,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         return { session: Object.assign(allocation, { agent: spawned.agent, detached: false }) };
       });
 
-    const leave = (h: Hand, closed: IssueClose, merged: number) =>
+    const leave = (h: Hand, closed: SessionClose, merged: number) =>
       Effect.gen(function* () {
         release(h);
         trajectories.finish(h.id);
@@ -879,7 +880,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       });
 
-    const harvest = (id: string, closed: IssueClose, use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>, settle: Settle = "owner") =>
+    const harvest = (id: string, closed: SessionClose, use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>, settle: Settle = "owner") =>
       Effect.gen(function* () {
         const h = hands.get(id);
         if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
@@ -1131,7 +1132,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           }
           return true;
         }),
-      dismiss: (id, work = "keep") =>
+      dismiss: (id, work = "keep", closed = "dismissed") =>
         Effect.gen(function* () {
           const h = hands.get(id);
           if (!h) return false;
@@ -1144,7 +1145,7 @@ export const make = (options: SessionOptionsIn = {}) =>
                 const reset = yield* Effect.result(projects.reset(h.place));
                 if (reset._tag === "Failure") notice("warn", `${name} 的工作目录没能重置：${reset.failure.message}`);
               }
-              yield* leave(h, "dismissed", 0);
+              yield* leave(h, closed, 0);
               const kept = yield* projects.release(h.place);
               if (kept.kept) notice("info", `${name} 收工了：${kept.reason}`);
               return true;

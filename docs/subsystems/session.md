@@ -33,7 +33,7 @@
 | Run | `Run`、`session_run` | 一次触发到一次汇报，包着一个 oar turn；核心状态里是 `run` 到 `report` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 
-- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session，阶段是 `arriving`、`working`、`ripe`、`failed`、`resting`；`report` 事实按结果折成 `ripe`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么关的：`merged`、`merged_into_graph`、`dismissed`、`lost`、`answered`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
+- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session，阶段是 `arriving`、`working`、`ripe`、`failed`、`resting`；`report` 事实按结果折成 `ripe`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`、`merged_into_graph`、`completed`（它的工单完成了、没合并）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
 - **每个 Session 一个 oar 的 `Subagents`**，深度上限 1：帮工不能经 oar 再派帮工；农机自己派的子 agent（claude 的 Task、codex 的子线程）的事件带 oar 的 agent 路径，记在派它的那次调用下面（`under`），工具调用按「哪个 agent 的、哪一个」认，不按调用编号认。
 - **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下的项目里、自己的 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
 - **档案经 `spawn` 的选项进会话**：人设和技能拼成说明，`append` 放进追加的系统提示，`replace` 替换系统提示，`prompt` 写在交给它的活前面（中间隔 `jobBreak`）；档案的 MCP 服务器、禁用的工具、模型、思考强度、环境变量（农机设置的在前，档案的盖过它）一起交给 oar，不改共享的农机注册表。档案没写模型就用农机设置的默认模型；模型列表里没有的退回农机默认并提醒一次。

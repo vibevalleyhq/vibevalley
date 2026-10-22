@@ -96,7 +96,7 @@
 ## 和谁打交道
 
 - **田头（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进田头，带 `sendKey` 的重发不再交给管家（[田头](docs/subsystems/channel.md)的「重发不成两条」）。
-- **工单（`issue`）**：派给管家的工单和管家的定时经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（`answered`）（[工单](docs/subsystems/issue.md)）。`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
+- **工单（`issue`）**：派给管家的工单和管家的定时经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（完成，交付 `none`）（[工单](docs/subsystems/issue.md)）。`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工。挑档案归 `Runtimes.choose`。
 - **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
 - **定时（`recurrence`）**：管家的 `recurrence` 工具经 `Recurrence.Add(req, orchestrator, owner)`；`wakeSoon` 读定时决定空闲时压不压。

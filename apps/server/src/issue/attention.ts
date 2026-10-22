@@ -13,7 +13,7 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
   const last = session?.lastRun;
   switch (t.status) {
     case "done":
-      return own({ state: "harvested", ...at(t.closedAt), acts: t.closed === "merged_into_graph" ? [] : ["reopen"] });
+      return own({ state: "harvested", ...at(t.closedAt), acts: t.delivered === "merged_into_parent" ? [] : ["reopen"] });
     case "canceled":
       return own({ state: "closed", ...at(t.closedAt), lead: "reopen", acts: ["reopen"] });
     case "backlog":
@@ -51,11 +51,14 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       if (last?.outcome === "failed") return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: ["cure", "tell", "close"] };
       // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be harvested.
       if (last?.outcome === "interrupted")
-        return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: ["resume", "harvest", "tell", "close"] };
+        return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: ["resume", "harvest", "keep", "tell", "close"] };
       // A required acceptance passes before the harvest (the server's statusMove); a glance one is passed by the harvest.
+      // Keep is the same completion with the branch left unmerged.
       const lead: IssueAct = t.review === "required" && t.reviewedAt === undefined ? "accept" : "harvest";
       const acts: IssueAct[] =
-        lead === "harvest" ? ["harvest", ...(t.reviewedAt === undefined ? (["reject"] as const) : []), "tell", "close"] : ["accept", "reject", "tell", "close"];
+        lead === "harvest"
+          ? ["harvest", "keep", ...(t.reviewedAt === undefined ? (["reject"] as const) : []), "tell", "close"]
+          : ["accept", "reject", "tell", "close"];
       return { state: "reviewing", ...at(since), lead, acts };
     }
   }

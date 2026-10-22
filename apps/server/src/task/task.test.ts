@@ -422,13 +422,13 @@ describe("task graphs", () => {
         yield* f.tasks.act(id, "start", "user");
         yield* f.until(id, (g) => g.state === "ripe");
         const a = yield* f.issues.get(taskIssueID(id, "a"));
-        expect([a.sessions.length, a.closed]).toEqual([1, "merged_into_graph"]);
+        expect([a.sessions.length, a.delivered]).toEqual([1, "merged_into_parent"]);
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", "user");
         yield* Effect.promise(async () => {
           for (let i = 0; i < 300; i++) {
-            if ((await Effect.runPromise(f.issues.get(id))).closed === "merged") return;
+            if ((await Effect.runPromise(f.issues.get(id))).delivered === "merged") return;
             await new Promise((r) => setTimeout(r, 10));
           }
           throw new Error("the graph's issue never closed as harvested");
@@ -476,7 +476,7 @@ describe("task graphs", () => {
           for (let i = 0; i < 300 && f.core.session("h1"); i++) await new Promise((r) => setTimeout(r, 10));
         });
         expect(f.core.session("h1")).toBeUndefined();
-        expect((yield* f.issues.get(issue.id)).closed).toBeUndefined();
+        expect((yield* f.issues.get(issue.id)).closedAt).toBeUndefined();
       }),
     ),
   );

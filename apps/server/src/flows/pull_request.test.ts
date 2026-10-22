@@ -102,7 +102,7 @@ describe("a pull request", () => {
           state = ending;
           yield* issues.refreshPullRequests;
           const closed = yield* issues.get(issue!.id);
-          expect(closed.closed).toBe(ending === "MERGED" ? "merged" : "dismissed");
+          expect([closed.delivered, closed.canceled]).toEqual(ending === "MERGED" ? ["pull_request", undefined] : [undefined, "dismissed"]);
           expect(sessions.find(id)).toBeUndefined();
           expect(existsSync(cwd)).toBe(false);
           expect(quiet(path, "show-ref", "--verify", "refs/heads/" + branch)).toBe(false);

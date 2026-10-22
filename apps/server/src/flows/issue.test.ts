@@ -25,6 +25,57 @@ const refusedWith = (e: unknown, words = "") => {
 };
 
 describe("an issue", () => {
+  // Done is the owner's verdict; what it delivers follows the issue: nothing to take in touches no git, a branch can be
+  // kept unmerged, and only commits go into the main branch.
+  it.live("completes by what it delivers: nothing, a kept branch, or a merge", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      yield* (yield* Agents).saveAgent(lab());
+      const project = join(f.config.workRoot, "projects", "clock");
+      const closed = (id: string) =>
+        await_(
+          () => issues.get(id),
+          (i) => i.closedAt !== undefined,
+          "closed",
+        );
+      const left = (id: string) =>
+        await_(
+          () => sessions.get(id),
+          (s) => s?.phase._tag === "closed",
+          "gone home",
+        );
+      const mainLog = () => git(project, "log", "--format=%s", "main");
+
+      const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
+      yield* w.nextReport;
+      const before = mainLog();
+      yield* issues.setStatus(looked.issue!, "done", "", "");
+      const nothing = yield* closed(looked.issue!);
+      expect([nothing.status, nothing.delivered, nothing.canceled]).toEqual(["done", "none", undefined]);
+      const gone = yield* left(looked.id);
+      expect(gone?.phase._tag === "closed" && gone.phase.closed).toBe("completed");
+      expect(mainLog()).toBe(before);
+
+      const kept = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      yield* w.nextReport;
+      const keptIssue = yield* issues.get(kept.issue!);
+      yield* issues.act(kept.issue!, { act: "keep" }, "");
+      expect((yield* closed(kept.issue!)).delivered).toBe("kept");
+      yield* left(kept.id);
+      expect(mainLog()).toBe(before);
+      expect(git(project, "branch", "--list", `vibevalley/issue-${keptIssue.number}`)).not.toBe("");
+
+      const harvested = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      yield* w.nextReport;
+      yield* issues.setStatus(harvested.issue!, "done", "", "");
+      expect((yield* closed(harvested.issue!)).delivered).toBe("merged");
+      expect(mainLog()).not.toBe(before);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("closes and reopens", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -49,7 +100,7 @@ describe("an issue", () => {
       const closedAs = (how: string) =>
         await_(
           () => issues.get(session.issue!),
-          (i) => i.closed === how,
+          (i) => (i.delivered ?? i.canceled) === how,
           `closed as ${how}`,
         );
       yield* closedAs("merged");
@@ -57,7 +108,13 @@ describe("an issue", () => {
       const again = yield* issues.reopen(session.id, "打卡还要记下时区", "");
       yield* w.nextReport;
       const issue = yield* issues.get(again);
-      expect([issue.id, issue.sessions, issue.closed, issue.closedAt]).toEqual([session.issue, [session.id, again], undefined, undefined]);
+      expect([issue.id, issue.sessions, issue.delivered, issue.canceled, issue.closedAt]).toEqual([
+        session.issue,
+        [session.id, again],
+        undefined,
+        undefined,
+        undefined,
+      ]);
       const reopened = (yield* sessions.get(again))!;
       expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`));
       expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：收获了/);
@@ -65,7 +122,7 @@ describe("an issue", () => {
       expect((yield* Effect.flip(issues.reopen("w404", "", "")))._tag).toBe("Missing");
       yield* sessions.dismiss(again);
       yield* closedAs("dismissed");
-      yield* sql`update issue set closed = 'merged_into_graph', closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
+      yield* sql`update issue set delivered = 'merged_into_parent', canceled = null, closed_at = ${Date.now()} where id = ${issue.id}`.pipe(Effect.orDie);
       refusedWith(yield* Effect.flip(issues.reopen(issue.id, "", "")), "种植计划");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -239,7 +296,7 @@ describe("an issue", () => {
 
       let dropped = yield* issues.add({ title: "算了" });
       dropped = yield* move(dropped.id, "canceled");
-      expect([dropped.status, dropped.closed]).toEqual(["canceled", "dismissed"]);
+      expect([dropped.status, dropped.canceled]).toEqual(["canceled", "dismissed"]);
       dropped = yield* move(dropped.id, "backlog");
       expect(dropped.status).toBe("backlog");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -288,7 +345,7 @@ describe("an issue", () => {
       yield* sessions.dismiss(first.id);
       yield* await_(
         () => issues.get(issue.id),
-        (i) => i.closed !== undefined,
+        (i) => i.closedAt !== undefined,
         "cancelled",
       );
       let again = yield* issues.reopen(issue.id, "接着做", "");
@@ -300,7 +357,7 @@ describe("an issue", () => {
       yield* issues.merge(issue.id);
       yield* await_(
         () => issues.get(issue.id),
-        (i) => i.closed === "merged",
+        (i) => i.delivered === "merged",
         "merged",
       );
       again = yield* issues.reopen(issue.id, "再看看", "");
@@ -363,7 +420,7 @@ describe("an issue", () => {
       expect(failed.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")), "这一轮没做成");
       refusedWith(yield* Effect.flip(issues.merge(issue.id)), "这一轮没做成");
-      expect((yield* issues.get(issue.id)).closed).toBeUndefined();
+      expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

@@ -102,6 +102,8 @@ test("a real round: the helper asks with options, one click answers, and it hand
   // Exact: the folded steps hold the helper's whole last message, which says it too.
   await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
   await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "收获" })).toBeVisible();
+  // Done need not be a merge: the branch can be kept.
+  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成，分支留着" })).toBeVisible();
   await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
   await page.screenshot({ path: test.info().outputPath("real-round.png") });
 });
@@ -233,7 +235,7 @@ test("a harvested issue asks nothing: 收获了, and says it went into main", as
     server,
     made,
     { state: "harvested", since: now - 2 * minute, acts: ["reopen"] },
-    { status: "done", closed: "merged", closedAt: now - 2 * minute, criteria: ["模板能选"], checks: [{ criterion: 0, result: "met" }] },
+    { status: "done", delivered: "merged", closedAt: now - 2 * minute, criteria: ["模板能选"], checks: [{ criterion: 0, result: "met" }] },
     {},
     {
       milestones: [
