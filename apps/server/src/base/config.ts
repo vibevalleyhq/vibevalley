@@ -33,7 +33,7 @@ export interface Config {
   /** 0 or less: no patrol. */
   readonly patrol: { readonly heartbeatMinutes: number };
   /** 0 or less: looked at every millisecond. */
-  readonly schedule: { readonly tickMs: number };
+  readonly recurrence: { readonly tickMs: number };
   /** stallSeconds: quiet this long, a session is shown as stuck; trajectoryDays: a gone session's steps are deleted after it (0 or less keeps them). */
   readonly session: { readonly stallSeconds: number; readonly trajectoryDays: number };
   readonly project: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
@@ -60,7 +60,7 @@ export function defaults(home = homedir()): Config {
     tokei: "",
     cnyPerUsd: 7.2,
     patrol: { heartbeatMinutes: 10 },
-    schedule: { tickMs: 20_000 },
+    recurrence: { tickMs: 20_000 },
     session: { stallSeconds: 240, trajectoryDays: 30 },
     project: { maxSessions: 3, checkTimeoutSeconds: 1200 },
     github: { prProjects: [], prPollSeconds: 180 },

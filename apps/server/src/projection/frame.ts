@@ -1,11 +1,11 @@
-// What the client gets. The words for people (a session's phaseText, a schedule's
+// What the client gets. The words for people (a session's phaseText, a recurrence's
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
 import type { CoreState, GameEffect, StateFrame } from "@vibevalley/protocol";
 import { inbox } from "../notice/inbox.ts";
 import { actionText, phaseWords } from "@vibevalley/protocol/rules";
-import { nextText, whenText } from "../schedule/when.ts";
+import { nextText, whenText } from "../recurrence/when.ts";
 import { graphsOf } from "../task/issues.ts";
 import { canEditTask, canRemoveTask, graphActions, graphActionText, graphStateTag, taskActions, taskActionText, taskStateText } from "../task/graph.ts";
 import { viewOf } from "../game/view.ts";
@@ -45,7 +45,7 @@ function withWords(state: CoreState): CoreState {
       }),
     };
   }
-  if ((state.schedules ?? []).length > 0)
-    next = { ...next, schedules: state.schedules!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
+  if ((state.recurrences ?? []).length > 0)
+    next = { ...next, recurrences: state.recurrences!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
   return next;
 }

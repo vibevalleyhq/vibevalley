@@ -243,7 +243,7 @@ export const make = (options: TaskOptions = {}) =>
         yield* tellManager(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
       });
 
-    const schedule = (id: string): Effect.Effect<void, ApiError> =>
+    const recurrence = (id: string): Effect.Effect<void, ApiError> =>
       Effect.gen(function* () {
         let graph = get(id);
         if (!graph || graph.state !== "running") return;
@@ -413,7 +413,7 @@ export const make = (options: TaskOptions = {}) =>
               if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, "帮工被请走了，这一步没做完");
             }
           } else return;
-          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* schedule(graph.id);
+          for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
@@ -463,7 +463,7 @@ export const make = (options: TaskOptions = {}) =>
             yield* putSystem(withNote({ ...graph, state: "paused" }, "VibeValley 重启过，计划先暂停了；点继续接着做"));
           }
         }
-        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* schedule(graph.id);
+        for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
       }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
@@ -537,7 +537,7 @@ export const make = (options: TaskOptions = {}) =>
             yield* put(graph, "session", session!.name + " 拆的").pipe(
               Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但拆好的工单没能保存：${reasonOf(e)}`)),
             );
-            yield* schedule(graph.id);
+            yield* recurrence(graph.id);
             yield* notice("info", `${session!.name} 把工单「${graph.title}」拆成了 ${tasks.length} 张子工单，开工了`);
             yield* tellManager(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
             return `拆好了：工单「${graph.title}」下面 ${tasks.length} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`;
@@ -557,7 +557,7 @@ export const make = (options: TaskOptions = {}) =>
                 yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
                   Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但开工状态没能保存：${reasonOf(e)}`)),
                 );
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "计划「" + graph.title + "」开工了，分支 " + branch;
               }
               case "pause":
@@ -568,7 +568,7 @@ export const make = (options: TaskOptions = {}) =>
                 if (graph.state !== "paused") return yield* not();
                 yield* put(withNote({ ...graph, state: "running" }, ""), by);
                 yield* resumeWorking(graph.id);
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "计划「" + graph.title + "」接着做了";
               case "abandon": {
                 if (!isOpen(graph)) return yield* not();
@@ -629,7 +629,7 @@ export const make = (options: TaskOptions = {}) =>
                   withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting", tries: 0 })),
                   by,
                 );
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "「" + task.title + "」重新排上了";
               }
               case "skip": {
@@ -639,7 +639,7 @@ export const make = (options: TaskOptions = {}) =>
                 if (allSettled(next)) next = withNote({ ...next, state: "ripe" }, "");
                 yield* put(next, by);
                 if (task.session) yield* dismiss(task.session);
-                yield* schedule(graph.id);
+                yield* recurrence(graph.id);
                 return "跳过了「" + task.title + "」，后面的步骤照常开工";
               }
             }

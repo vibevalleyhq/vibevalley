@@ -1,13 +1,13 @@
-// When a schedule runs and how it is said. The next run is
+// When a recurrence runs and how it is said. The next run is
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
 import { Cron, DateTime, Option } from "effect";
-import type { Schedule, ScheduleWhen } from "@vibevalley/protocol";
+import type { Recurrence, RecurrenceWhen } from "@vibevalley/protocol";
 
 export const minEveryMinutes = 1;
 
-export const scheduleTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+export const recurrenceTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 export const weekdays = ["日", "一", "二", "三", "四", "五", "六"] as const;
 
@@ -28,7 +28,7 @@ function runZone(tz: string): DateTime.TimeZone | undefined {
   return named(tz);
 }
 
-/** The zone a schedule may be given and its times are written in: an IANA name or an offset (+08:00, +0800, +08). */
+/** The zone a recurrence may be given and its times are written in: an IANA name or an offset (+08:00, +0800, +08). */
 export function givenZone(tz: string): DateTime.TimeZone | undefined {
   const m = givenOffset.exec(tz);
   if (m) return fixed(m[1]!, m[2]!, m[3]);
@@ -48,7 +48,7 @@ export function nextOf(cron: Cron.Cron, from: number): number | undefined {
   }
 }
 
-export function nextRun(s: Schedule): number | undefined {
+export function nextRun(s: Recurrence): number | undefined {
   if (!s.enabled) return undefined;
   const from = s.lastRun ?? s.created;
   const w = s.when;
@@ -69,7 +69,7 @@ export function nextRun(s: Schedule): number | undefined {
 }
 
 export function daily(from: number, at: string, days: readonly number[], tz: string): number | undefined {
-  const m = scheduleTime.exec(at);
+  const m = recurrenceTime.exec(at);
   const timeZone = runZone(tz);
   if (!m || !timeZone) return undefined;
   // Cron reads only 0 to 7 (7 is Sunday again); anything else is no cron.
@@ -85,7 +85,7 @@ function clock(at: number, tz: string): string {
   return `${w.month}/${w.day} ${two(w.hour)}:${two(w.minute)}`;
 }
 
-export function whenText(when: ScheduleWhen, tz: string): string {
+export function whenText(when: RecurrenceWhen, tz: string): string {
   switch (when.kind) {
     case "once":
       return clock(when.at, tz) + " 一次";
@@ -103,7 +103,7 @@ export function whenText(when: ScheduleWhen, tz: string): string {
   return "";
 }
 
-export function nextText(s: Schedule): string {
+export function nextText(s: Recurrence): string {
   const next = nextRun(s);
   if (next !== undefined) return clock(next, s.tz);
   if (s.enabled) return "不会再到点";

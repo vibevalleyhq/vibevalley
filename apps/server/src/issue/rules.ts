@@ -204,7 +204,7 @@ const recentTitleLength = 60;
 export function sentTitles(all: readonly Issue[], project: string): string[] {
   const mine = all
     .filter(
-      (i) => i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.schedule === undefined && !isForManager(i),
+      (i) => i.project === project && i.sessions.length > 0 && !i.graph && !i.task && i.parent === undefined && i.recurrence === undefined && !isForManager(i),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
   const out: string[] = [];
@@ -260,7 +260,7 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
       return ["started", first ? "开工" : "重开，接着做"];
     case "task":
       return ["started", "照种植计划开工"];
-    case "schedule":
+    case "recurrence":
       return ["started", t.missed ? "定时开工（补跑）" : "定时开工"];
     case "runtime":
       return ["started", "农机自己接着做"];

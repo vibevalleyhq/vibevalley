@@ -82,7 +82,7 @@ async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptio
     noMemory: true,
     noSubagents: true,
     noSession: true,
-    schedules: false,
+    recurrences: false,
     ...extra,
   });
   const receipts: RunResult[] = [];
@@ -183,7 +183,7 @@ describe("a run's receipt", () => {
       noMemory: true,
       noSubagents: true,
       noSession: true,
-      schedules: false,
+      recurrences: false,
     });
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
@@ -265,7 +265,7 @@ describe("the agent's task graph", () => {
         await until(() => sent.length === 3 && told === 3);
         expect(await Effect.runPromise(store.load)).toEqual([]);
       },
-      { tasks: store, schedules: false },
+      { tasks: store, recurrences: false },
     );
   });
 
@@ -300,7 +300,7 @@ describe("the agent's task graph", () => {
         expect(g[0]).toMatchObject({ state: "waiting" });
         expect(g[0]!.tries ?? 0).toBe(0);
       },
-      { tools: [wait], tasks: store, schedules: false },
+      { tools: [wait], tasks: store, recurrences: false },
     );
   });
 
@@ -336,7 +336,7 @@ describe("the agent's task graph", () => {
         expect(nudged).toBe(2);
         events = [...r.events];
       },
-      { tasks: memoryStore(), maxNudges: 2, schedules: false },
+      { tasks: memoryStore(), maxNudges: 2, recurrences: false },
     );
     const changed = events.filter((e) => e.type === "tasks_changed");
     // The task was one change.

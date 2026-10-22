@@ -38,7 +38,7 @@ export interface EvalCase {
 
 export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as const;
 
-/** The manager's tools by name, as its brain has them: the farm's and its own (no skills, subagents or schedules). */
+/** The manager's tools by name, as its brain has them: the farm's and its own (no skills, subagents or recurrences). */
 export const managerToolNames = () => [...Object.keys(schemas), ...selfTools({ home: "", skills: () => [], memory: true }).map((t) => t.name)];
 
 /** "" when it is whole: the fields its kind reads are there. */

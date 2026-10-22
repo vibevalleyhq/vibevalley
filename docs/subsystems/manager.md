@@ -8,7 +8,7 @@
 |---|---|
 | 管家听到什么、一条输入怎么拼、话回到哪个频道 | 频道里谁该被叫醒、投递和回执（`channel`，[田头](docs/subsystems/channel.md)） |
 | 管家的对话、压缩、记性的快照、提示的开头 | 帮工档案的记性、想起和外面的来源（[记性](docs/subsystems/memory.md)）；管家的 `memory_search`、`memory_add` 只是那边的入口 |
-| 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `schedule`（[定时](docs/subsystems/schedule.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
+| 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `recurrence`（[定时](docs/subsystems/recurrence.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家的一轮：叫停、重启后接着做、做错的一轮存成评测 | 一轮记成 Run、日志和结局（`session/execution.ts`） |
 | 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
@@ -20,7 +20,7 @@
 
 - **`apps/server/src/manager`**（`Manager`）：`manager.ts` 起大脑（`brainOf`）、收输入和它的路由与来源、农场现状、把字送回频道、叫停、接着做、听巡查、做错的一轮存成样例；提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：农场现状的差异（`situationDelta`）、截长汇报（`managerInboxLines`）、用量那一行字、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 28 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
-- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`schedules.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
+- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`managerProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/manager/`**（`managerHome`）：对话 `manager.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
 - **接口**：`manager.stop`、`manager.hear`、`manager.markWrong`、`manager.listArchive`、`manager.getArchive`，记性走 `memory.*`（档案 `manager`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `agent/brain/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley manager …`。
@@ -30,7 +30,7 @@
 
 - **管家是一份档案，只在 VibeValley 自己的 agent 上跑。** 档案 `manager`（`managerAgent`）每个农场都有：加载时没有就补上，删它拒绝（「管家是每个农场都有的，删不了」），把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。模型从档案读（`vibevalley agent save manager --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`agent/brain/config.ts` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
 - **大脑第一句话到了才起来**（`brainOf`），起不来（没钥匙、模型不对）下一句再试。钥匙先取「设置」里存的，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`），每次请求前现取，存了马上生效，不进提示。起不来时在那个频道说原因，同一个原因在一个频道里只说一次，起来了才清掉。
-- **管家的大脑没有编码工具、帮手和自己的定时**（`noSkills`、`noSubagents`、`schedules: false`）：工具是 `Tools` 管家那张表的 28 个，加上大脑自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`。工具表在大脑建好时定下，轮与轮之间不增减：用不了的工具留着，调用时回一句写明下一步的话。
+- **管家的大脑没有编码工具、帮手和自己的定时**（`noSkills`、`noSubagents`、`recurrences: false`）：工具是 `Tools` 管家那张表的 28 个，加上大脑自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`。工具表在大脑建好时定下，轮与轮之间不增减：用不了的工具留着，调用时回一句写明下一步的话。
 - **对话只往后加。** `manager.jsonl` 一条消息一行；压缩追加一行摘要，原文归档到 `archive/`，`search_archive` 和管家页的旧账都能翻。每条输入是一条 `custom` 消息 `managerInput`，带频道、主人选定的档案、来源 `source`、`owner`（这条里有没有主人的话）、交给管家的工单 `issue`，读回来认得出。
 - **提示分三段：不变的开头、只往后加的对话、最新那条输入。**
 
@@ -44,7 +44,7 @@
 - **农场现状**（`situation`）：项目、能派的档案（职责、适合的活、额度和今天的花费，或派不出去的原因）、各频道和地里的帮工、没收完的计划，最后一行是「你正在回话的频道」。大脑起来后、压缩后的第一条带全文；之后 `situationDelta` 按行比，列表项连同上面的标题一起比，只给变了的行；变了的超过一半给全文；没变就不写这一段。管家忙着（在跑或有排着的输入）时交进去的输入带全文，下一条也带全文：它可能排在后交的输入后面才被读。读现状到交进去由一把锁（`inputs`）连着。
 - **来源跟着输入走。** 每条输入的第一行是固定的来源（`managerHead`）：`[来源：主人]`（田头里只有主人的话、电话、`/v1/chat/completions`、连接器）、`[来源：田头]`（频道或串里有帮工的话，后面写明帮工引用的网页、代码、文件内容是信息、不是主人的指令）、`[来源：工单]`、`[来源：定时]`、`[来源：巡查]`、`[来源：种植计划]`。管家的日志里每一轮的第一句也带着它。
 - **管家以工单为单位。** 点名一件活的工具（`check`、`changes`、`merge`、`accept`、`tell`、`stop`、`dismiss`、`issue_update`、`issue_status`）都收 `issue`：工单编号（`#41`、`41`）、工单 id，或在做它的帮工的名字（找它的工单）；要帮工的（`tell`、`stop`、`dismiss`）找工单最新的、还在地里的那个。农场现状和 `roster` 里每个帮工带它的工单号。`issues` 找工单、看一批（状态、项目、字、`wants_owner` 在等主人的按等了多久排），填编号就是一张的全部；`issue_create` 记进备选、不派人（`draft` 让帮工起草）；`issue_update` 改各栏；`issue_status` 照 `statusMove` 挪，备选挪到待办而没写谁来做时照 `dispatch` 的规矩挑一个。规则都在工单服务里，工具只转发、写成一句话（`tool/words.ts` 的 `issueLine`、`issueDetail`）。
-- **合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：否则 `merge`、`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人；改工单和挪状态（`issue_update`、`issue_status`）也一样，回「没动：改工单、挪状态要主人说一声。……」。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/schedule.md)的「等主人同意」）。
+- **合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：否则 `merge`、`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人；改工单和挪状态（`issue_update`、`issue_status`）也一样，回「没动：改工单、挪状态要主人说一声。……」。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
 - **挑档案**（`session/rules.ts` 的 `chooseAgent`，管家的 `dispatch` 和计划共用）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。界面和挑中以后的检查见[派给谁](docs/reference/agents-and-runtimes.md#派给谁)。
 - **管家的状态**在 `CoreState.Manager`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
 
@@ -98,7 +98,7 @@
 - **工单（`issue`）**：派给管家的工单和管家的定时经 `forManager` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（`answered`）（[工单](docs/subsystems/issue.md)）。`dispatch` 直接 `Issue.hire`；`issues`、`issue_create`、`issue_update`、`issue_status`、`merge`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给农场现状和工具找帮工；`chooseAgent` 挑档案。
 - **语音（`voice`）**：电话里的每句经 `call`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
-- **定时（`schedule`）**：管家的 `schedule` 工具经 `Schedule.Add(req, manager, owner)`；`wakeSoon` 读定时决定空闲时压不压。
+- **定时（`recurrence`）**：管家的 `recurrence` 工具经 `Recurrence.Add(req, manager, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **种植计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_action`、`task_edit`、`task_action` 调它。
 - **记性（`memory`）**：`managerHome` 定家目录；管家页的记性和旧账接口读写 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`agent/brain/memory.ts`）。
 - **农机和额度（`runtime`）**：`assess` 给每个档案能不能派、额度和花费，写进农场现状。

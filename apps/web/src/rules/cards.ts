@@ -147,7 +147,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       if (item.drafting) flags.push({ text: `${item.drafting.name}在起草`, tone: "water" });
       else if (item.status === "backlog") flags.push({ text: "草稿", tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: "排队中", tone: "water" });
-      if (item.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (item.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(item.assignee === undefined ? "还没选帮工" : nameOf(item.assignee));
       if (item.assignee === undefined || item.project === undefined) lines.push("没选帮工或项目，开工前要选好");
       lines.push(item.queuedAt !== undefined ? `等空地，${ago(item.queuedAt, now)}排上的` : `写于 ${ago(item.createdAt, now)}`);
@@ -161,7 +161,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       // The board says what the page says: the standing, when it waits on the owner.
       if (standingWantsOwner(issue.standing.state)) flags.push({ text: standingLabel[issue.standing.state], tone: standingTone[issue.standing.state] });
       if (tag === "lost") flags.push({ text: "丢了", tone: "berry" });
-      if (issue.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);
       if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(`${tookText(now - phase.quietSince)}没动静`);
       if (sessions.length > 1) lines.push(`第 ${sessions.length} 次`);
@@ -184,7 +184,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     }
     case "manager": {
       const { issue } = c;
-      if (issue.schedule !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       const tag = issueTag(issue);
       lines.push(tagOpen(tag) ? "管家在做" : `${tagLabel[tag]} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };

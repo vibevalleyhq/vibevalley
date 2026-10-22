@@ -47,14 +47,14 @@
 | `channel.history` | `GET /api/v1/channels/{id}/messages` | ✓ | ✓ | ✓ |
 | `channel.markRead` | `POST /api/v1/channels/{id}/read` | ✓ | ✓ |   |
 
-## schedule
+## recurrence
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `schedule.create` | `POST /api/v1/schedules` | ✓ | ✓ | ✓ |
-| `schedule.list` | `GET /api/v1/schedules` | ✓ | ✓ | ✓ |
-| `schedule.update` | `PUT /api/v1/schedules/{id}` | ✓ | ✓ |   |
-| `schedule.delete` | `DELETE /api/v1/schedules/{id}` | ✓ | ✓ | ✓ |
+| `recurrence.create` | `POST /api/v1/recurrences` | ✓ | ✓ | ✓ |
+| `recurrence.list` | `GET /api/v1/recurrences` | ✓ | ✓ | ✓ |
+| `recurrence.update` | `PUT /api/v1/recurrences/{id}` | ✓ | ✓ |   |
+| `recurrence.delete` | `DELETE /api/v1/recurrences/{id}` | ✓ | ✓ | ✓ |
 
 ## issue
 

@@ -10,9 +10,9 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, schedule, acceptance)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, acceptance)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(schedule), sqlc.arg(acceptance));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(acceptance));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
@@ -79,9 +79,9 @@ on conflict (id) do update set
 -- name: GraphIDs :many
 select id from issue where graph is not null;
 
--- name: LatestOfSchedule :one
--- A schedule's issue: the one it made last.
-select * from issue where schedule = sqlc.arg(schedule) order by created_at desc, id desc limit 1;
+-- name: LatestOfRecurrence :one
+-- A recurrence's issue: the one it made last.
+select * from issue where recurrence = sqlc.arg(recurrence) order by created_at desc, id desc limit 1;
 
 -- name: ReopenIssue :exec
 update issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);

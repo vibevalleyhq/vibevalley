@@ -31,7 +31,7 @@ import {
   type ProjectTemplates,
   type PullRequest,
   type RunTrigger,
-  type Schedule,
+  type Recurrence,
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
@@ -42,7 +42,7 @@ import { templateCatalog } from "../agent/seed.ts";
 import { standingIn } from "./standing.ts";
 import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
-import { dueText } from "../schedule/rules.ts";
+import { dueText } from "../recurrence/rules.ts";
 import {
   conflictBrief,
   cureWords,
@@ -74,7 +74,7 @@ import { refinement } from "./draft.ts";
 import { jsonOrNull, nullText } from "./rules.ts";
 import { askedMax } from "../session/journal.ts";
 import { type Hired, type HireOptions, type SessionNews, Sessions } from "../session/session.ts";
-import { type Due, Schedules } from "../schedule/schedule.ts";
+import { type Due, Recurrences } from "../recurrence/recurrence.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
@@ -84,8 +84,8 @@ export interface ManagerWork {
   readonly issue: Issue;
   readonly channel: string;
   readonly by: RunTrigger;
-  /** The schedule that came due, when one did. */
-  readonly schedule?: Schedule;
+  /** The recurrence that came due, when one did. */
+  readonly recurrence?: Recurrence;
 }
 
 /** Who looked at changes: the owner's look counts for the game, the manager's does not. */
@@ -131,7 +131,7 @@ export interface IssueShape {
   readonly nextTaskId: () => Effect.Effect<string>;
   /** Issues for the manager, subscribed before it returns. */
   readonly forManager: Effect.Effect<Stream.Stream<ManagerWork>, never, Scope.Scope>;
-  readonly ofSchedule: (id: string) => Effect.Effect<Issue | undefined>;
+  readonly ofRecurrence: (id: string) => Effect.Effect<Issue | undefined>;
   readonly refreshPullRequests: Effect.Effect<void>;
   readonly tryQueued: Effect.Effect<void>;
 }
@@ -195,7 +195,7 @@ export const make = (options: IssueOptions = {}) =>
     const runtimes = yield* Runtimes;
     const sessions = yield* Sessions;
     const chat = yield* Channels;
-    const schedules = yield* Schedules;
+    const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
     const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
@@ -233,7 +233,7 @@ export const make = (options: IssueOptions = {}) =>
         ...(blockedBy ? { blockedBy } : {}),
         ...(graph ? { graph } : {}),
         ...(task ? { task } : {}),
-        ...(row.schedule !== null ? { schedule: row.schedule } : {}),
+        ...(row.recurrence !== null ? { recurrence: row.recurrence } : {}),
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
@@ -324,7 +324,7 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = (req: IssueRequest, schedule?: string) =>
+    const add = (req: IssueRequest, recurrence?: string) =>
       Effect.gen(function* () {
         const [title, description] = yield* issueWords(req);
         const id = newId();
@@ -337,7 +337,7 @@ export const make = (options: IssueOptions = {}) =>
             assignee: nullText(req.assignee),
             priority: req.priority ?? "medium",
             created_at: Date.now(),
-            schedule: schedule ?? null,
+            recurrence: recurrence ?? null,
             acceptance: req.acceptance || "glance",
           }),
         );
@@ -489,11 +489,11 @@ export const make = (options: IssueOptions = {}) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去")),
       );
 
-    const toManager = (issue: Issue, channel: string, by: RunTrigger, due?: Schedule) =>
+    const toManager = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence) =>
       Effect.gen(function* () {
         if (isClosed(issue.status)) yield* reopenRow(issue.id);
         else if (issue.handedBack) yield* Effect.andThen(db(q.setHandedBack({ id: issue.id, handed_back: null })), publish(issue.id));
-        PubSub.publishUnsafe(managerHub, { issue, channel, by, ...(due ? { schedule: due } : {}) });
+        PubSub.publishUnsafe(managerHub, { issue, channel, by, ...(due ? { recurrence: due } : {}) });
       });
 
     /** by undefined: the issue sent out. */
@@ -564,20 +564,21 @@ export const make = (options: IssueOptions = {}) =>
         return hired.session.id;
       });
 
-    /** A schedule has one issue, for the session it names or for the manager; each time it comes due is a run of that issue. */
+    /** A recurrence has one issue, for the session it names or for the manager; each time it comes due is a run of that issue. */
     const scheduled = (due: Due) =>
       Effect.gen(function* () {
-        const s = due.schedule;
+        const s = due.recurrence;
         const channel = yield* chat.channelOf(s.channel);
-        const by: RunTrigger = { kind: "schedule", schedule: s.id, ...(due.missed ? { missed: true } : {}) };
-        const found = yield* ofSchedule(s.id);
+        const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
+        const found = yield* ofRecurrence(s.id);
         let issue = found;
         if (!issue) {
           const project = s.project ?? (channel.project || undefined);
           const made = yield* Effect.result(
             add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? managerAgent }, s.id),
           );
-          if (made._tag === "Failure") return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "schedule_refused");
+          if (made._tag === "Failure")
+            return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
           issue = made.success;
         }
         const text = dueText(s, due.missed);
@@ -591,12 +592,12 @@ export const make = (options: IssueOptions = {}) =>
             if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
           }),
         );
-        if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "schedule_refused");
+        if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "recurrence_refused");
       });
 
-    const ofSchedule = (id: string) =>
+    const ofRecurrence = (id: string) =>
       Effect.gen(function* () {
-        const row = yield* one(q.latestOfSchedule({ schedule: id }));
+        const row = yield* one(q.latestOfRecurrence({ recurrence: id }));
         if (!row) return undefined;
         return Option.getOrUndefined(yield* Effect.option(get(row.id)));
       });
@@ -703,7 +704,7 @@ export const make = (options: IssueOptions = {}) =>
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
     const finished = yield* sessions.finishedRuns;
-    const due = yield* schedules.due;
+    const due = yield* recurrences.due;
     const logged =
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
@@ -729,7 +730,7 @@ export const make = (options: IssueOptions = {}) =>
         }),
       ),
     );
-    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`schedule ${d.schedule.id}`))));
+    yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`recurrence ${d.recurrence.id}`))));
     if (options.background ?? true) {
       yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.sleep(options.tryEveryMs ?? 5000), tryQueued.pipe(logged("the queue")))));
       yield* Effect.forkScoped(
@@ -1048,7 +1049,7 @@ export const make = (options: IssueOptions = {}) =>
         }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
       forManager: Effect.map(PubSub.subscribe(managerHub), Stream.fromSubscription),
-      ofSchedule,
+      ofRecurrence,
       refreshPullRequests,
       tryQueued,
     };

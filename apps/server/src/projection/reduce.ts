@@ -79,17 +79,17 @@ function fold(state: CoreState, f: Fact): [CoreState, boolean] {
     case "progress":
       if (state.progress && same(state.progress, f.progress)) return [state, false];
       return [{ ...state, progress: f.progress }, true];
-    case "schedule": {
-      const all = [...(state.schedules ?? [])];
-      const i = all.findIndex((x) => x.id === f.schedule.id);
-      if (i >= 0 && same(all[i], f.schedule)) return [state, false];
-      if (i >= 0) all[i] = f.schedule;
-      else all.push(f.schedule);
-      return [{ ...state, schedules: all }, true];
+    case "recurrence": {
+      const all = [...(state.recurrences ?? [])];
+      const i = all.findIndex((x) => x.id === f.recurrence.id);
+      if (i >= 0 && same(all[i], f.recurrence)) return [state, false];
+      if (i >= 0) all[i] = f.recurrence;
+      else all.push(f.recurrence);
+      return [{ ...state, recurrences: all }, true];
     }
-    case "unschedule":
-      if (!(state.schedules ?? []).some((x) => x.id === f.id)) return [state, false];
-      return [{ ...state, schedules: state.schedules!.filter((x) => x.id !== f.id) }, true];
+    case "recurrenceGone":
+      if (!(state.recurrences ?? []).some((x) => x.id === f.id)) return [state, false];
+      return [{ ...state, recurrences: state.recurrences!.filter((x) => x.id !== f.id) }, true];
     case "issue":
       if ((state.issues ?? []).some((t) => t.id === f.issue.id && same(t, f.issue))) return [state, false];
       return [{ ...state, issues: withIssue(state.issues, f.issue) }, true];

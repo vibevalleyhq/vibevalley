@@ -417,28 +417,28 @@ export interface ProgressNews {
 }
 
 /** Told apart by `kind`. */
-export type ScheduleWhen = ScheduleWhenOnce | ScheduleWhenEvery | ScheduleWhenDaily | ScheduleWhenWeekly | ScheduleWhenCron;
+export type RecurrenceWhen = RecurrenceWhenOnce | RecurrenceWhenEvery | RecurrenceWhenDaily | RecurrenceWhenWeekly | RecurrenceWhenCron;
 
-export interface Schedule {
+export interface Recurrence {
   id: string;
   name: string;
   text: string;
   channel: string;
   agent?: string;
   project?: string;
-  when: ScheduleWhen;
+  when: RecurrenceWhen;
   tz: string;
   enabled: boolean;
   created: number;
   lastRun?: number;
-  by: ScheduleBy;
+  by: RecurrenceBy;
   pending?: boolean;
   whenText?: string;
   nextText?: string;
 }
 
-export const ScheduleByValues = ["owner", "manager"] as const;
-export type ScheduleBy = (typeof ScheduleByValues)[number];
+export const RecurrenceByValues = ["owner", "manager"] as const;
+export type RecurrenceBy = (typeof RecurrenceByValues)[number];
 
 export interface Chat {
   conversations: Conversation[];
@@ -453,7 +453,7 @@ export interface CoreState {
   chat?: Chat;
   commits?: CommitCount;
   progress?: Progress;
-  schedules?: Schedule[];
+  recurrences?: Recurrence[];
   issues?: Issue[];
 }
 
@@ -576,7 +576,7 @@ export const InboxKindValues = [
   "graph-ripe",
   "task-failed",
   "mention",
-  "schedule-ask",
+  "recurrence-ask",
 ] as const;
 export type InboxKind = (typeof InboxKindValues)[number];
 
@@ -1062,7 +1062,7 @@ export interface Issue {
   blockedBy?: string[];
   graph?: IssueGraph;
   task?: IssueTask;
-  schedule?: string;
+  recurrence?: string;
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
@@ -1248,13 +1248,13 @@ export interface IssueRequest {
 export const IssueCloseValues = ["merged", "merged_into_graph", "dismissed", "lost", "answered"] as const;
 export type IssueClose = (typeof IssueCloseValues)[number];
 
-export const RunTriggerKindValues = ["issue", "comment", "task", "schedule", "draft", "runtime"] as const;
+export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "draft", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
 export interface RunTrigger {
   kind: RunTriggerKind;
   message?: string;
-  schedule?: string;
+  recurrence?: string;
   missed?: boolean;
 }
 
@@ -1290,13 +1290,13 @@ export interface ChannelUpdate {
   project?: string;
 }
 
-export interface ScheduleRequest {
+export interface RecurrenceRequest {
   name: string;
   text: string;
   channel?: string;
   agent?: string;
   project?: string;
-  when: ScheduleWhen;
+  when: RecurrenceWhen;
   tz?: string;
 }
 
@@ -1436,28 +1436,28 @@ export interface ProgressTitle {
   tier: number;
 }
 
-export interface ScheduleWhenOnce {
+export interface RecurrenceWhenOnce {
   kind: "once";
   at: number;
 }
 
-export interface ScheduleWhenEvery {
+export interface RecurrenceWhenEvery {
   kind: "every";
   minutes: number;
 }
 
-export interface ScheduleWhenDaily {
+export interface RecurrenceWhenDaily {
   kind: "daily";
   time: string;
 }
 
-export interface ScheduleWhenWeekly {
+export interface RecurrenceWhenWeekly {
   kind: "weekly";
   days: number[];
   time: string;
 }
 
-export interface ScheduleWhenCron {
+export interface RecurrenceWhenCron {
   kind: "cron";
   expr: string;
 }
@@ -1814,8 +1814,8 @@ export type Fact =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactSchedule
-  | FactUnschedule;
+  | FactRecurrence
+  | FactRecurrenceGone;
 
 export interface FactCall {
   type: "call";
@@ -1947,14 +1947,14 @@ export interface FactProgress {
   news?: ProgressNews;
 }
 
-export interface FactSchedule {
-  type: "schedule";
+export interface FactRecurrence {
+  type: "recurrence";
   at: number;
-  schedule: Schedule;
+  recurrence: Recurrence;
 }
 
-export interface FactUnschedule {
-  type: "unschedule";
+export interface FactRecurrenceGone {
+  type: "recurrenceGone";
   at: number;
   id: string;
 }
@@ -1979,8 +1979,8 @@ export type SideEvent =
   | FactIssue
   | FactIssueGone
   | FactProgress
-  | FactSchedule
-  | FactUnschedule
+  | FactRecurrence
+  | FactRecurrenceGone
   | SideEventSnapshot
   | SideEventSessionEvent
   | SideEventNotice
@@ -2012,7 +2012,7 @@ export interface SideEventRuntime {
   info: RuntimeInfo;
 }
 
-export interface ScheduleUpdate {
+export interface RecurrenceUpdate {
   enabled?: boolean;
 }
 

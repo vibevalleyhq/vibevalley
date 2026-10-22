@@ -1,5 +1,5 @@
 // The state changes in one place only: apply folds a fact in with reduce, then sends it.
-// state.json keeps the state but the chat, progress, schedules and issues, whose home is the database. Each fact is sent
+// state.json keeps the state but the chat, progress, recurrences and issues, whose home is the database. Each fact is sent
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
@@ -86,8 +86,8 @@ export interface CoreShape {
 
 export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") {}
 
-/** What state.json keeps: the chat, progress, schedules and issues are the database's. */
-const toKeep = ({ chat: _chat, progress: _progress, schedules: _schedules, issues: _issues, ...kept }: CoreState): CoreState => kept;
+/** What state.json keeps: the chat, progress, recurrences and issues are the database's. */
+const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: CoreState): CoreState => kept;
 
 /** Started again, nobody is on the call and the manager is not mid-sentence. */
 const restarted = (kept: CoreState): CoreState => ({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });

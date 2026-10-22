@@ -6,7 +6,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 核心状态怎么变：`apply`、`reduce`，每条事实的前后状态（`Transition`） | 某种事实什么时候施加、业务规则（各拥有者：[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[田头](docs/subsystems/channel.md)、[定时](docs/subsystems/schedule.md)、[种植计划](docs/subsystems/task.md)） |
+| 核心状态怎么变：`apply`、`reduce`，每条事实的前后状态（`Transition`） | 某种事实什么时候施加、业务规则（各拥有者：[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[田头](docs/subsystems/channel.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)） |
 | `state.json`：存什么、什么时候存、开机怎么读回 | 库里的表、各 Session 的日志（[帮工](docs/subsystems/session.md)、[architecture.md](docs/architecture.md)「存了什么」） |
 | 给页面的帧 `StateFrame`（`frameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
 | 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[田头](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
@@ -18,7 +18,7 @@
 
 - `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
 - `packages/protocol`：形状在 `shapes.ts`（`CoreState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
-- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`schedule/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyCoreState` 在 `core.ts`。
+- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`recurrence/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyCoreState` 在 `core.ts`。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers.ts` 实现 `Handlers`。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue run`；`runtime chat` 和自己的 agent 不经服务端。
@@ -41,7 +41,7 @@
 
 **`state.json`**
 
-- **存除了田头、进度、定时、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`schedules`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。只有服务端要的（会话 id、worktree、原话）在 `sessions.json`，干活过程、diff 这类大块的旁路数据不进核心状态。
+- **存除了田头、进度、定时、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`recurrences`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。只有服务端要的（会话 id、worktree、原话）在 `sessions.json`，干活过程、diff 这类大块的旁路数据不进核心状态。
 - **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`base/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
 - **关时写最后一份**：关的时候停掉等着的那次，写最后的状态并封住，已经在路上的定时回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
 - **读回时**：读不了或解析不了就从空的开始并记日志；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
@@ -98,7 +98,7 @@
 
 1. `Core` 建的时候读 `state.json`：帮工、commit 数回来，通话和管家回到 `idle`，地块重排。
 2. 各拥有者在构造时从库里施加事实放回核心状态：工单（开着的和最近关的 50 家）、田头的频道和最近的对话、定时。这时还没有订阅者，这些事实不算进游戏。
-3. 全部服务建好以后，开机的活接手：帮工回到各自的地上歇着，停在半路的那一轮记成 `interrupted`（[帮工](docs/subsystems/session.md)「重启」）；定时补跑错过的（[定时](docs/subsystems/schedule.md)）。
+3. 全部服务建好以后，开机的活接手：帮工回到各自的地上歇着，停在半路的那一轮记成 `interrupted`（[帮工](docs/subsystems/session.md)「重启」）；定时补跑错过的（[定时](docs/subsystems/recurrence.md)）。
 4. 其余各拥有者自己恢复，次序不相干：种植计划跟着工单回来：停在拆的放弃，有件在做的暂停（[种植计划](docs/subsystems/task.md)「重启」）。
 5. 田头里交出去还没看到的消息退回 `pending`，过一会儿再叫（[田头](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/manager.md)「重启后接着做」）。
 6. 账本整本重折出金币、连胜、成就，规则改了重启就按新规则算（[游戏](docs/subsystems/game.md)）。
@@ -134,7 +134,7 @@
 ## 怎么验证
 
 - `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧。
-- `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`schedule/cron.test.ts` 查折法和出帧填的话。
+- `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`recurrence/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、说命令哪里不对。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。
 - 能力表：`bun run docs:verify`（`scripts/capabilities.ts --check`）。

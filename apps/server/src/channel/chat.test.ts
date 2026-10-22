@@ -385,7 +385,7 @@ describe("the chat", () => {
         yield* f.chat.managerSays(general, "k1", "好的，我叫 @w11 去看看", true, "");
         expect(ours().map((m) => [m.final, m.mentions])).toEqual([[true, ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
-        yield* f.chat.notice(general, "定时到了", "schedule");
+        yield* f.chat.notice(general, "定时到了", "recurrence");
         yield* settle;
         const last = f.messagesOf(general).at(-1)!;
         expect([last.kind, last.from]).toEqual(["notice", "system"]);

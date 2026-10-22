@@ -29,7 +29,7 @@ export interface WorldOptions {
   /** Projects made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
   readonly stallMs?: number;
-  /** The schedules' clock. */
+  /** The recurrences' clock. */
   readonly now?: () => number;
   /** What a runtime's account says of its quota or balance; none when absent. */
   readonly usage?: () => AccountUsage | null;
@@ -52,7 +52,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
     project: { gh: noGitHub, ...options.projects },
     ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
-    ...(options.now ? { schedule: { now: options.now } } : {}),
+    ...(options.now ? { recurrence: { now: options.now } } : {}),
     issue: { background: false },
   };
   return platform(config).pipe(agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));

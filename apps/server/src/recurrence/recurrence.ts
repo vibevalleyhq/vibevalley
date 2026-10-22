@@ -1,9 +1,9 @@
-// Schedules: the owner's and the manager's, kept in the schedule table and in the core state.
+// Recurrences: the owner's and the manager's, kept in the recurrence table and in the core state.
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the manager, who does it.
 
-import type { Schedule, ScheduleBy, ScheduleRequest } from "@vibevalley/protocol";
-import { afterRun, dueSchedules, dueText, isMissed, needsOK, scheduleProblem } from "./rules.ts";
+import type { Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
+import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -12,26 +12,26 @@ import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
-import * as q from "../../db/generated/schedule.sql.ts";
+import * as q from "../../db/generated/recurrence.sql.ts";
 
 export interface Due {
-  readonly schedule: Schedule;
+  readonly recurrence: Recurrence;
   readonly missed: boolean;
 }
 
-export interface ScheduleShape {
-  readonly list: () => Schedule[];
+export interface RecurrenceShape {
+  readonly list: () => Recurrence[];
   /** by is who asks; ownerInRun, for the manager, whether the owner's words are in the run it asks from (needsOK). */
-  readonly add: (req: ScheduleRequest, by: ScheduleBy, ownerInRun: boolean) => Effect.Effect<Schedule, ApiError>;
+  readonly add: (req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean) => Effect.Effect<Recurrence, ApiError>;
   /** Turned on is the owner's yes. */
-  readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Schedule, ApiError>;
-  readonly remove: (id: string) => Effect.Effect<Schedule, ApiError>;
+  readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Recurrence, ApiError>;
+  readonly remove: (id: string) => Effect.Effect<Recurrence, ApiError>;
   readonly tick: Effect.Effect<void>;
   /** What comes due from now on, subscribed before it returns. */
   readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
 }
 
-export class Schedules extends Context.Service<Schedules, ScheduleShape>()("vibevalley/Schedule") {}
+export class Recurrences extends Context.Service<Recurrences, RecurrenceShape>()("vibevalley/Recurrence") {}
 
 /** $TZ when it names a zone, else the system's. */
 export function localZone(): string {
@@ -47,12 +47,12 @@ export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export interface ScheduleOptions {
+export interface RecurrenceOptions {
   /** The clock; tests turn it by hand. */
   readonly now?: () => number;
 }
 
-export const make = (options: ScheduleOptions = {}) =>
+export const make = (options: RecurrenceOptions = {}) =>
   Effect.gen(function* () {
     const core = yield* Core;
     const store = yield* Agents;
@@ -64,16 +64,16 @@ export const make = (options: ScheduleOptions = {}) =>
     const lock = Semaphore.makeUnsafe(1);
     const dueHub = yield* PubSub.unbounded<Due>();
 
-    for (const row of yield* db(q.schedules())) {
-      let when: Schedule["when"] | undefined;
+    for (const row of yield* db(q.recurrences())) {
+      let when: Recurrence["when"] | undefined;
       try {
-        when = JSON.parse(row.spec) as Schedule["when"];
+        when = JSON.parse(row.spec) as Recurrence["when"];
       } catch {
         when = undefined;
       }
-      // A schedule whose time this code cannot read any more is left out.
+      // A recurrence whose time this code cannot read any more is left out.
       if (!when?.kind) continue;
-      const s: Schedule = {
+      const s: Recurrence = {
         id: row.id,
         name: row.name,
         text: row.body,
@@ -85,44 +85,44 @@ export const make = (options: ScheduleOptions = {}) =>
         enabled: row.enabled,
         created: row.created_at,
         ...(row.last_run ? { lastRun: row.last_run } : {}),
-        by: row.set_by as ScheduleBy,
+        by: row.set_by as RecurrenceBy,
         ...(row.pending ? { pending: true } : {}),
-      } as Schedule;
-      yield* core.apply({ type: "schedule", schedule: s });
+      } as Recurrence;
+      yield* core.apply({ type: "recurrence", recurrence: s });
     }
 
     const find = (id: string) => {
-      const s = (core.state().schedules ?? []).find((x) => x.id === id);
+      const s = (core.state().recurrences ?? []).find((x) => x.id === id);
       return s ? Effect.succeed(s) : Effect.fail(refused(`没有 ${id} 号定时`));
     };
 
-    const ran = (id: string, at: number, enabled: boolean) => db(q.scheduleRan({ last_run: at, enabled, id }));
+    const ran = (id: string, at: number, enabled: boolean) => db(q.recurrenceRan({ last_run: at, enabled, id }));
 
     const tick = lock.withPermits(1)(
       Effect.gen(function* () {
         const at = now();
-        for (const s of dueSchedules(core.state().schedules ?? [], at)) {
+        for (const s of dueRecurrences(core.state().recurrences ?? [], at)) {
           const missed = isMissed(s, at);
           const after = afterRun(s, at);
           const written = yield* Effect.exit(ran(after.id, at, after.enabled));
           if (written._tag === "Failure") {
-            yield* Effect.logWarning(`vibevalley: schedule ${s.id}'s run was not kept: ${String(written.cause)}`);
+            yield* Effect.logWarning(`vibevalley: recurrence ${s.id}'s run was not kept: ${String(written.cause)}`);
             continue;
           }
-          yield* core.apply({ type: "schedule", schedule: after });
-          yield* chat.notice(s.channel, dueText(s, missed), "schedule");
-          PubSub.publishUnsafe(dueHub, { schedule: after, missed });
+          yield* core.apply({ type: "recurrence", recurrence: after });
+          yield* chat.notice(s.channel, dueText(s, missed), "recurrence");
+          PubSub.publishUnsafe(dueHub, { recurrence: after, missed });
         }
       }),
     );
 
-    const shape: ScheduleShape = {
-      list: () => [...(core.state().schedules ?? [])],
+    const shape: RecurrenceShape = {
+      list: () => [...(core.state().recurrences ?? [])],
       add: (req, by, ownerInRun) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
             const at = now();
-            const problem = scheduleProblem(req, at);
+            const problem = recurrenceProblem(req, at);
             if (problem) return yield* Effect.fail(refused(problem));
             const want = req.channel ?? chat.general();
             const channel = (yield* chat.channels()).find((c) => c.id === want);
@@ -135,7 +135,7 @@ export const make = (options: ScheduleOptions = {}) =>
             if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
             const tz = req.tz ?? localZone();
             const pending = needsOK(req, by, ownerInRun);
-            const s: Schedule = {
+            const s: Recurrence = {
               id: newId(),
               name: req.name.trim(),
               text: req.text.trim(),
@@ -149,9 +149,9 @@ export const make = (options: ScheduleOptions = {}) =>
               created: at,
               by,
               ...(pending ? { pending: true } : {}),
-            } as Schedule;
+            } as Recurrence;
             yield* db(
-              q.addSchedule({
+              q.addRecurrence({
                 id: s.id,
                 name: s.name,
                 body: s.text,
@@ -165,7 +165,7 @@ export const make = (options: ScheduleOptions = {}) =>
                 created_at: at,
               }),
             );
-            yield* core.apply({ type: "schedule", schedule: s });
+            yield* core.apply({ type: "recurrence", recurrence: s });
             return s;
           }),
         ),
@@ -173,16 +173,16 @@ export const make = (options: ScheduleOptions = {}) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
             const was = yield* find(id);
-            // Turned on is the owner's yes (only the owner may: schedule.update); the queries clear pending the same way.
+            // Turned on is the owner's yes (only the owner may: recurrence.update); the queries clear pending the same way.
             const { pending: _, ...rest } = was;
-            let s: Schedule = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
+            let s: Recurrence = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
             // Switched back on: it counts from now, not from runs it skipped while off.
             if (enabled && !was.enabled && was.when.kind !== "once") {
               const at = now();
               s = { ...s, lastRun: at };
               yield* ran(id, at, enabled);
-            } else yield* db(q.enableSchedule({ enabled, id }));
-            yield* core.apply({ type: "schedule", schedule: s });
+            } else yield* db(q.enableRecurrence({ enabled, id }));
+            yield* core.apply({ type: "recurrence", recurrence: s });
             return s;
           }),
         ),
@@ -190,8 +190,8 @@ export const make = (options: ScheduleOptions = {}) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
             const was = yield* find(id);
-            yield* db(q.removeSchedule({ id }));
-            yield* core.apply({ type: "unschedule", id });
+            yield* db(q.removeRecurrence({ id }));
+            yield* core.apply({ type: "recurrenceGone", id });
             return was;
           }),
         ),
@@ -201,14 +201,14 @@ export const make = (options: ScheduleOptions = {}) =>
     return shape;
   });
 
-export const layer = (options?: ScheduleOptions) => Layer.effect(Schedules, make(options));
+export const layer = (options?: RecurrenceOptions) => Layer.effect(Recurrences, make(options));
 
 /** Ticks once every service is built, so what the first tick finds due reaches the manager (once ready). */
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const config = yield* Settings;
-    const schedules = yield* Schedules;
-    const every = Math.max(config.schedule.tickMs, 1);
-    yield* Effect.forkScoped(Effect.forever(Effect.andThen(schedules.tick, Effect.sleep(every))));
+    const recurrences = yield* Recurrences;
+    const every = Math.max(config.recurrence.tickMs, 1);
+    yield* Effect.forkScoped(Effect.forever(Effect.andThen(recurrences.tick, Effect.sleep(every))));
   }),
 );

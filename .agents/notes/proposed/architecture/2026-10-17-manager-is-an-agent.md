@@ -7,7 +7,7 @@ Status: proposed
 管家和档案本质上是一种东西：一个模型、一份人设、一组工具。差别只在两处：管家手里的工具多（派活、带话、合并、计划、定时、开频道），以及它常驻、不绑工单。可是代码里把它们写成了两种东西：
 
 - **档案这半边已经并了**：管家是档案 `manager`（`protocol.ManagerAgent`），模型从档案读，记忆走 `memory.*`（见「做到哪了」）。
-- **工具这半边还是两套**：管家的工具手写在 `apps/server/src/tool/tool.ts`（`dispatch`、`tell`、`changes`、`roster`、`task`、`schedule`、`open_channel`、`memory_search`……），帮工的工具手写在 `apps/server/src/mcp/mcp.ts`（`channel_say`、`channel_read`、`channel_inbox`、`session_list`、`memory_search`、`memory_add`）。记性的两个工具写了两遍；同一件事（读频道）管家叫 `read_chat`，帮工叫 `channel_read`，规则也各写一份。
+- **工具这半边还是两套**：管家的工具手写在 `apps/server/src/tool/tool.ts`（`dispatch`、`tell`、`changes`、`roster`、`task`、`recurrence`、`open_channel`、`memory_search`……），帮工的工具手写在 `apps/server/src/mcp/mcp.ts`（`channel_say`、`channel_read`、`channel_inbox`、`session_list`、`memory_search`、`memory_add`）。记性的两个工具写了两遍；同一件事（读频道）管家叫 `read_chat`，帮工叫 `channel_read`，规则也各写一份。
 - **谁能做什么写在三处**：管家的工具表、MCP 的工具表、能力表的 `can manager`（[先有能力，再有入口](docs/subsystems/core.md)）。想让一个帮工也能拆子工单（一个「领班」），或者让管家能建档案，没有地方改，只能再手接一遍。
 - 「管家」「帮工」作为两种调用者散在 16 个服务端文件里（`ManagerAgent`、`IsForManager` 等的判断）；其中一部分是真的不一样（见下面「不是能力的差别」），一部分只是「它的工具多」。
 
@@ -35,7 +35,7 @@ Status: proposed
 | `look` | 看地里谁在干什么、看改动（`roster`/`session_list`、`check`、`changes`、`projects`、`channels`） | ✓ | ✓（只读） |
 | `dispatch` | 派活、带话、合并、请走、打断（`dispatch`、`tell`、`merge`、`dismiss`、`stop`） | ✓ | |
 | `graph` | 种植计划（`graph_split`、`task_edit`、`graph_action`、`task_action`、`graphs`） | ✓ | |
-| `schedule` | 定时（`schedule`、`list_schedules`、`cancel_schedule`） | ✓ | |
+| `recurrence` | 定时（`recurrence`、`list_recurrences`、`cancel_recurrence`） | ✓ | |
 | `channel` | 开频道、改频道设置（`open_channel`、`channel_settings`） | ✓ | |
 | `hire` | 建档案、改别的档案的人设、模型、技能（新） | ✓ | |
 
@@ -58,7 +58,7 @@ type Caller struct {
 }
 ```
 
-- 表放在一个新包 `apps/server/src/tool`（排在 `task`、`schedule` 之后、`manager` 之前，`tool.Service`）。工具的规则还在拥有它的服务里，`tool` 只做参数、放行和把结果写成给模型看的一句话。
+- 表放在一个新包 `apps/server/src/tool`（排在 `task`、`recurrence` 之后、`manager` 之前，`tool.Service`）。工具的规则还在拥有它的服务里，`tool` 只做参数、放行和把结果写成给模型看的一句话。
 - **管家**在进程里拿这张表：`tool.Service` 按 `Can` 交出 pi-agent-core 的 `AgentTool`，`apps/server/src/manager` 不再手写工具，只留它特有的输入、回复和 Run 的接线。
 - **外部农机上的 Session**（Claude Code、Codex……）经 `/mcp` 拿同一张表：`apps/server/src/mcp` 只做 MCP 的传输和认证（从请求认出 Session，再找到它的档案），工具列表按档案的 `Can` 过滤。
 - 放行在执行时再查一次 `Can`，不只靠列表过滤：档案的 `Can` 在 Session 干活时被主人改小，下一次调用就拒。

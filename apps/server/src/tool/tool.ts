@@ -13,7 +13,7 @@ import {
   type Issue,
   managerAgent,
   type Memory,
-  type ScheduleWhen,
+  type RecurrenceWhen,
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
@@ -33,7 +33,7 @@ import { type ApiError, reasonOf } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
-import { Schedules } from "../schedule/schedule.ts";
+import { Recurrences } from "../recurrence/recurrence.ts";
 import type { ToolStart } from "../session/facts.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
@@ -45,7 +45,7 @@ import {
   mergeNotAsked,
   parseTime,
   priorityOf,
-  scheduleLine,
+  recurrenceLine,
   sessionLine,
   startNotAsked,
   statusOf,
@@ -89,9 +89,9 @@ export const labels: Record<string, string> = {
   channels: "频道",
   open_channel: "开频道",
   channel_settings: "改频道",
-  schedule: "定时",
-  list_schedules: "看定时",
-  cancel_schedule: "取消定时",
+  recurrence: "定时",
+  list_recurrences: "看定时",
+  cancel_recurrence: "取消定时",
   merge: "收获",
   accept: "验收",
   changes: "看改动",
@@ -157,7 +157,7 @@ export const make = Effect.gen(function* () {
   const docs = yield* Docs;
   const run = yield* Sessions;
   const chat = yield* Channels;
-  const schedule = yield* Schedules;
+  const recurrence = yield* Recurrences;
   const issue = yield* Issues;
   const tasks = yield* Tasks;
 
@@ -588,7 +588,7 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  const scheduleTool = (who: Who) =>
+  const recurrenceTool = (who: Who) =>
     tool<{
       name: string;
       text: string;
@@ -603,7 +603,7 @@ export const make = Effect.gen(function* () {
       project?: string;
       tz?: string;
     }>(
-      "schedule",
+      "recurrence",
       "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
       async (p) => {
         const c = await who();
@@ -614,7 +614,7 @@ export const make = Effect.gen(function* () {
             if (!byName) throw new Error("没有 " + p.channel + " 这个频道：先用 channels 看看");
             channel = byName;
           }
-          let when: ScheduleWhen;
+          let when: RecurrenceWhen;
           switch (p.kind) {
             case "once": {
               const at = parseTime(p.at ?? "");
@@ -635,7 +635,7 @@ export const make = Effect.gen(function* () {
               when = { kind: "weekly", days: (p.days ?? []).map((d) => Math.trunc(d)), time: p.time ?? "" };
           }
           const made = await go(
-            schedule.add(
+            recurrence.add(
               {
                 name: p.name,
                 text: p.text,
@@ -652,25 +652,25 @@ export const make = Effect.gen(function* () {
           if (made.pending)
             return (
               "定好了，等主人同意才生效：\n" +
-              scheduleLine(made, channel.name) +
+              recurrenceLine(made, channel.name) +
               "\n这一轮不是主人叫你定的，而它会反复来或直接派帮工：主人在定时列表里点「同意」才开始。跟主人说一声它是做什么的。"
             );
-          return "定好了：\n" + scheduleLine(made, channel.name);
+          return "定好了：\n" + recurrenceLine(made, channel.name);
         } catch (e) {
           return "没成：" + toError(e).message;
         }
       },
     );
 
-  const listSchedules = tool<object>("list_schedules", "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。", async () => {
-    const all = schedule.list();
+  const listRecurrences = tool<object>("list_recurrences", "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。", async () => {
+    const all = recurrence.list();
     if (all.length === 0) return "没有定时。";
     const names = new Map((await go(chat.channels())).map((c) => [c.id, c.name]));
-    return all.map((s) => scheduleLine(s, names.get(s.channel) ?? "?")).join("\n");
+    return all.map((s) => recurrenceLine(s, names.get(s.channel) ?? "?")).join("\n");
   });
 
-  const cancelSchedule = tool<{ id: string }>("cancel_schedule", "删掉一个定时（编号从 list_schedules 看）。", (p) =>
-    answered(Effect.map(schedule.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
+  const cancelRecurrence = tool<{ id: string }>("cancel_recurrence", "删掉一个定时（编号从 list_recurrences 看）。", (p) =>
+    answered(Effect.map(recurrence.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
   );
 
   const openChannel = tool<{ name: string; description?: string; project?: string }>(
@@ -870,9 +870,9 @@ export const make = Effect.gen(function* () {
       dispatch(who),
       projectsTool,
       channelsTool,
-      scheduleTool(who),
-      listSchedules,
-      cancelSchedule,
+      recurrenceTool(who),
+      listRecurrences,
+      cancelRecurrence,
       openChannel,
       channelSettings,
       merge(who),

@@ -211,14 +211,14 @@ describe("the agent", () => {
         expect(await r.ask("同时查 A 和 B")).toBe("查 A 做完了；查 B 做完了");
         expect(most).toBe(2);
       },
-      { tools: [nap], schedules: false },
+      { tools: [nap], recurrences: false },
     );
   });
 
-  it("is woken by a schedule that comes due", async () => {
+  it("is woken by a recurrence that comes due", async () => {
     const dir = home();
     writeFileSync(
-      join(dir, "schedules.json"),
+      join(dir, "recurrences.json"),
       `[{"id":"job-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
     );
     await withAgent(
@@ -230,9 +230,9 @@ describe("the agent", () => {
         expect(history[0]!.role).toBe("custom");
         expect(messageText(history[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
       },
-      { scheduleTickMs: 10 },
+      { recurrenceTickMs: 10 },
     );
-    expect(JSON.parse(readFileSync(join(dir, "schedules.json"), "utf8"))).toEqual([]);
+    expect(JSON.parse(readFileSync(join(dir, "recurrences.json"), "utf8"))).toEqual([]);
   });
 
   it("keeps the same system prompt between folds and tells memory news in the input", async () => {
@@ -479,7 +479,7 @@ describe("the agent", () => {
 
   it("drops the tools it is told not to have only after all are assembled", async () => {
     const dir = home();
-    const blocked = ["custom", "load_skill", "spawn_agent", "schedule", "list_schedules", "cancel_schedule"];
+    const blocked = ["custom", "load_skill", "spawn_agent", "recurrence", "list_recurrences", "cancel_recurrence"];
     await withAgent(
       dir,
       [],
@@ -491,7 +491,7 @@ describe("the agent", () => {
       },
       {
         noSession: true,
-        schedules: true,
+        recurrences: true,
         tools: [textTool({ name: "custom", description: "", parameters: objectSchema(), run: () => "" })],
         disallowedTools: blocked,
       },

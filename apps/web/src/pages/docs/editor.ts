@@ -160,16 +160,16 @@ export class DocEditor {
       this.error = reasonOf(e);
     }
     this.changed();
-    this.schedule();
+    this.recurrence();
   }
 
-  private schedule() {
+  private recurrence() {
     clearTimeout(this.poll);
     if (this.disposed) return;
     this.poll = setTimeout(
       async () => {
         await this.refresh();
-        this.schedule();
+        this.recurrence();
       },
       this.othersWriting ? pollFast : pollEvery,
     );
@@ -198,7 +198,7 @@ export class DocEditor {
       await this.api.doc.demo({ id: this.docId });
       this.error = undefined;
       this.heardAt = this.polls;
-      this.schedule();
+      this.recurrence();
     } catch (e) {
       this.error = reasonOf(e);
     }

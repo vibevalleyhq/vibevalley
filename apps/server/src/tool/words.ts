@@ -8,14 +8,14 @@ import {
   type IssueTimeline,
   type Priority,
   PriorityValues,
-  type Schedule,
+  type Recurrence,
   type Spent,
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { phaseText, shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
-import { nextText, whenText } from "../schedule/when.ts";
+import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
 import { yuan } from "../runtime/money.ts";
 import type { Roster } from "../session/session.ts";
@@ -148,7 +148,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
   return lines.join("\n");
 }
 
-export function scheduleLine(s: Schedule, channel: string): string {
+export function recurrenceLine(s: Recurrence, channel: string): string {
   const direct = s.agent ? "，直接派给 " + s.agent + (s.project ? " 去 " + s.project : "") : "";
   const next = s.enabled ? "下次 " + nextText(s) : nextText(s);
   return `- ${s.id} 号「${s.name}」#${channel} ${whenText(s.when, s.tz)}${direct}；${next}\n  ${s.text}`;

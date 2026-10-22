@@ -32,7 +32,7 @@ export const schemas: Record<string, Schema> = {
     required: ["issue", "pass"],
     type: "object",
   },
-  cancel_schedule: {
+  cancel_recurrence: {
     additionalProperties: true,
     properties: {
       id: {
@@ -289,7 +289,7 @@ export const schemas: Record<string, Schema> = {
     },
     type: "object",
   },
-  list_schedules: {
+  list_recurrences: {
     additionalProperties: true,
     properties: {},
     type: "object",
@@ -387,7 +387,7 @@ export const schemas: Record<string, Schema> = {
     properties: {},
     type: "object",
   },
-  schedule: {
+  recurrence: {
     additionalProperties: true,
     properties: {
       agent: {

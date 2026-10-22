@@ -16,7 +16,7 @@ import { memoryFileLines, readMemory } from "./memory.ts";
 import { type CompactionSummaryMessage, customMessage, kept, messageText, userMessage, withPrefix } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
 import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
-import { Schedules } from "./schedules.ts";
+import { Recurrences } from "./recurrences.ts";
 import { type Helper, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
@@ -77,9 +77,9 @@ export interface BrainOptions {
   /** Times a run that stops with its own tasks ready is reminded of them while the graph stays the same; 3 when absent. */
   readonly maxNudges?: number;
   /** Absent: when it keeps a session. */
-  readonly schedules?: boolean;
+  readonly recurrences?: boolean;
   /** 20 s when absent. */
-  readonly scheduleTickMs?: number;
+  readonly recurrenceTickMs?: number;
   /** Default later. */
   readonly wake?: (text: string) => void;
 }
@@ -195,7 +195,7 @@ export class Brain {
           maxSteps: 30,
           noSession: true,
           noSubagents: true,
-          schedules: false,
+          recurrences: false,
         });
         try {
           const said = await h.ask(userMessage(brief), AbortSignal.any([signal, this.life.signal]));
@@ -217,10 +217,10 @@ export class Brain {
 
     this.refreshPrefix();
     let tools = allowed([...hostTools, ...own], options.disallowedTools);
-    const schedules = options.schedules ?? this.session !== undefined;
-    let jobs: Schedules | undefined;
-    if (schedules) {
-      jobs = new Schedules(options.home, options.wake ?? ((text) => this.later(customMessage("schedule", text))));
+    const recurrences = options.recurrences ?? this.session !== undefined;
+    let jobs: Recurrences | undefined;
+    if (recurrences) {
+      jobs = new Recurrences(options.home, options.wake ?? ((text) => this.later(customMessage("recurrence", text))));
       tools = allowed([...tools, ...jobs.tools], options.disallowedTools);
     }
     this.core = new Agent({
@@ -267,7 +267,7 @@ export class Brain {
       const s = jobs;
       // The first look is at once: what came due while it was away runs now, once.
       s.tick();
-      this.scheduleTimer = setInterval(() => s.tick(), options.scheduleTickMs ?? 20_000);
+      this.scheduleTimer = setInterval(() => s.tick(), options.recurrenceTickMs ?? 20_000);
       this.scheduleTimer.unref();
     }
     // What a process that went left out goes out again, now that the agent can be told.

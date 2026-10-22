@@ -13,7 +13,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { type ManagerEval, managerAgent, type RunTrigger } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
-import { nextRun } from "../schedule/when.ts";
+import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
@@ -24,7 +24,7 @@ import { Brain, type BrainEvent, sessionUnfinished } from "../agent/brain/agent.
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
 import { memoryFile } from "../agent/brain/memory.ts";
 import { type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
-import { localeMinute } from "../agent/brain/schedules.ts";
+import { localeMinute } from "../agent/brain/recurrences.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { readLines, replay } from "../agent/brain/session.ts";
 import { projectsDir, Settings } from "../base/config.ts";
@@ -37,7 +37,7 @@ import { managerHome } from "../memory/memory.ts";
 import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { Schedules } from "../schedule/schedule.ts";
+import { Recurrences } from "../recurrence/recurrence.ts";
 import { AgentExecution, type RunInput } from "../session/execution.ts";
 import type { Journal } from "../session/journal.ts";
 import { Sessions } from "../session/session.ts";
@@ -96,8 +96,8 @@ export const systemPrompt = `你是码农场物语的管家。主人跟你说要
 - 计划都做完了（等收获）：主人说收，就用 graph_action merge 把整个计划合进主分支。
 - 收到「【种植计划】」开头的消息：照里面说的，用一两句话告诉主人。
 - 收到「【巡查】」开头的消息：那是农场自己看出来放着没人管的事。值得提醒就在那个频道里用一两句话提醒主人（问题没人回、活做完了没收、步骤没做成），帮工没动静就看看要不要叫停；不值得就什么也别说。
-- 定时：主人说「每天」「每周几」「到点」「过一会儿」「每隔多久」，用 schedule 定在一个频道里（不填就是你正在回话的频道）。到点时频道里先出现一条「⏰ 定时……」，然后你会收到「【定时任务……】」开头的那句话，照着做（派活、看进度、提醒主人），做完说一两句。写了 agent 的定时到点直接派活，不经过你。看有哪些用 list_schedules，不要了用 cancel_schedule。
-- 回头看：派了活、答应了主人一件事、或在等一个结果时，可以自己用 schedule 定一个一次性的（once）回头看，比如派完活 30 分钟后看看进度。到点时照常看一眼、说一两句：有要主人知道或决定的就说，没有就说一句进展。会反复来的定时（every、daily、weekly、cron）只在主人要的时候定。
+- 定时：主人说「每天」「每周几」「到点」「过一会儿」「每隔多久」，用 recurrence 定在一个频道里（不填就是你正在回话的频道）。到点时频道里先出现一条「⏰ 定时……」，然后你会收到「【定时任务……】」开头的那句话，照着做（派活、看进度、提醒主人），做完说一两句。写了 agent 的定时到点直接派活，不经过你。看有哪些用 list_recurrences，不要了用 cancel_recurrence。
+- 回头看：派了活、答应了主人一件事、或在等一个结果时，可以自己用 recurrence 定一个一次性的（once）回头看，比如派完活 30 分钟后看看进度。到点时照常看一眼、说一两句：有要主人知道或决定的就说，没有就说一句进展。会反复来的定时（every、daily、weekly、cron）只在主人要的时候定。
 
 说话：中文，口语，简短，一般一两句。需要列点时可以用 Markdown，但不要贴大段代码。只说工具结果和汇报里有的东西，不要编造进度、文件名或结果。`;
 
@@ -203,7 +203,7 @@ export const make = (options: ManagerOptions = {}) =>
     const issue = yield* Issues;
     const chat = yield* Channels;
     const tasks = yield* Tasks;
-    const schedule = yield* Schedules;
+    const recurrence = yield* Recurrences;
     const tool = yield* Tools;
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
@@ -256,10 +256,10 @@ export const make = (options: ManagerOptions = {}) =>
         return { agent: managerAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
       });
 
-    // One of its own schedules (not a helper's) comes due within that long: it will be woken then.
+    // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
     const wakeSoon = (withinMs: number) => {
       const by = Date.now() + withinMs;
-      return schedule.list().some((s) => {
+      return recurrence.list().some((s) => {
         const next = nextRun(s);
         return next !== undefined && (!s.agent || s.agent === managerAgent) && next <= by;
       });
@@ -386,7 +386,7 @@ export const make = (options: ManagerOptions = {}) =>
           tools: managerTools(),
           noSkills: true,
           noSubagents: true,
-          schedules: false,
+          recurrences: false,
           wakeSoon,
         });
         shown = "";
@@ -559,12 +559,12 @@ export const make = (options: ManagerOptions = {}) =>
     const onWork = async (w: ManagerWork) => {
       const channel = await go(chat.channelOf(w.channel));
       let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
-      const s = w.schedule;
+      const s = w.recurrence;
       if (s) {
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";
         line = `【定时任务「${s.name}」到点了${missed}】\n${s.text}\n\n这是 #${channel.name} 的定时（${s.id}），你的回答会发在那里；照着做，做完说一两句。`;
       }
-      await ask(line, { conversation: channel.id, source: s ? "schedule" : "issue", issue: w.issue.id }, { run: { issue: w.issue.id, by: w.by } }, false);
+      await ask(line, { conversation: channel.id, source: s ? "recurrence" : "issue", issue: w.issue.id }, { run: { issue: w.issue.id, by: w.by } }, false);
     };
 
     // The run the last start was cut off in goes on, answering where its input came from. Its first message is in the

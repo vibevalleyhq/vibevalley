@@ -64,14 +64,14 @@ export class VibeValleyApi {
       this.call("POST", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/read", undefined, a.body) as Promise<void>,
   };
 
-  readonly schedule = {
-    create: (a: { body: T.ScheduleRequest }): Promise<T.Schedule> => this.call("POST", "/api/v1/schedules", undefined, a.body) as Promise<T.Schedule>,
-    list: (): Promise<T.Schedule[]> => this.call("GET", "/api/v1/schedules", undefined, undefined) as Promise<T.Schedule[]>,
+  readonly recurrence = {
+    create: (a: { body: T.RecurrenceRequest }): Promise<T.Recurrence> => this.call("POST", "/api/v1/recurrences", undefined, a.body) as Promise<T.Recurrence>,
+    list: (): Promise<T.Recurrence[]> => this.call("GET", "/api/v1/recurrences", undefined, undefined) as Promise<T.Recurrence[]>,
     /** Only what the body gives changes. */
-    update: (a: { id: string; body: T.ScheduleUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
+    update: (a: { id: string; body: T.RecurrenceUpdate }): Promise<void> =>
+      this.call("PUT", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
     delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/schedules/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+      this.call("DELETE", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
   };
 
   readonly issue = {

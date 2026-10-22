@@ -19,7 +19,7 @@ import { layer as notice, type NoticeOptions, start as noticeStart } from "./not
 import { layer as project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
 import { layer as session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
-import { layer as schedule, type ScheduleOptions, start as scheduleStart } from "./schedule/schedule.ts";
+import { layer as recurrence, type RecurrenceOptions, start as recurrenceStart } from "./recurrence/recurrence.ts";
 import { layer as setting } from "./setting/setting.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
@@ -42,7 +42,7 @@ export interface ServiceOptions {
   readonly project?: ProjectHooks;
   readonly doc?: DocOptions;
   readonly session?: SessionOptionsIn;
-  readonly schedule?: ScheduleOptions;
+  readonly recurrence?: RecurrenceOptions;
   readonly issue?: IssueOptions;
   readonly task?: TaskOptions;
   readonly notice?: NoticeOptions;
@@ -85,9 +85,9 @@ export const collaboration =
 export const issuesBelowTaskGraphs =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(schedule(o.schedule)), on(issue(o.issue)));
+    below.pipe(on(recurrence(o.recurrence)), on(issue(o.issue)));
 
-/** Issues: the issues, their task graphs and schedules. */
+/** Issues: the issues, their task graphs and recurrences. */
 export const issues =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
@@ -120,7 +120,7 @@ export const sourceControlStart = <B, E, R>(built: Layer.Layer<B, E, R>) => buil
 export const agentSessionsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(sessionReady));
 /** Issues' startup, after the sessions came back: the task graphs cut off by the stop are settled, then the recurrences start
  * coming due. */
-export const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(scheduleStart));
+export const issuesStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart), on(recurrenceStart));
 /** Issues' startup without the recurrences' clock: for a test farm that ticks them by hand. */
 export const taskGraphsStart = <B, E, R>(built: Layer.Layer<B, E, R>) => built.pipe(on(taskGraphStart));
 /** Notifications' startup, after the sessions and issues came back: what stands is known, the patrol starts its rounds. */

@@ -70,7 +70,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
       mcpServers: (o.mcpServers ?? []).map(toMcp),
       noMemory: true,
       session: kernel.sessionId,
-      schedules: false,
+      recurrences: false,
       ...(tasks ? { tasks } : {}),
     });
     const queued: { input: string; inputId?: string }[] = [];

@@ -115,9 +115,9 @@ test("search keeps the messages that contain it", async ({ page, api }) => {
   await expect(log.getByText("香蕉该收了")).toBeVisible();
 });
 
-test("the schedules tab turns a schedule off and deletes it on the second press", async ({ page, api }) => {
+test("the recurrences tab turns a recurrence off and deletes it on the second press", async ({ page, api }) => {
   const id = await newChannel(api, "定时");
-  await api.schedule.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
+  await api.recurrence.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
   await page.goto(`/chat/${id}`);
   await page.getByRole("tab", { name: "任务" }).click();
   await expect(page.getByText("这个频道里还没有活")).toBeVisible();

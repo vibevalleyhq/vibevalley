@@ -10,7 +10,7 @@
 | [田头](docs/subsystems/channel.md) | 频道、谁听见、工单串、连接器 |
 | [通知](docs/subsystems/notice.md) | Inbox、刚来的、巡查，经通话、手机、系统通知送到主人 |
 | [管家](docs/subsystems/manager.md) | 自己的 agent、提示和工具、来源、评测 |
-| [定时](docs/subsystems/schedule.md) | 一张工单的触发：间隔和 cron、补跑、回头看 |
+| [定时](docs/subsystems/recurrence.md) | 一张工单的触发：间隔和 cron、补跑、回头看 |
 | [种植计划](docs/subsystems/task.md) | 带子工单的父工单、按图推进；agent 自己的任务图 |
 | [记性](docs/subsystems/memory.md) | 想起、记下、主动查、外面的来源 |
 | [文档](docs/subsystems/doc.md) | 按块存、按 op 改的文档：块和顺序键、一批一个事务、Markdown |

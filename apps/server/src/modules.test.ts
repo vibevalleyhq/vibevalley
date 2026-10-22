@@ -28,7 +28,7 @@ const owners: Readonly<Record<string, string>> = {
   sessions: "Agent Sessions",
   chat: "Collaboration",
   issues: "Issues",
-  schedules: "Issues",
+  recurrences: "Issues",
   progress: "Gamification",
   commits: "Gamification",
 };

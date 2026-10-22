@@ -102,7 +102,7 @@ CREATE TABLE issue (
   blocked_by  text,
   graph       text,
   task        text,
-  schedule    text,
+  recurrence    text,
   created_at  double precision not null,
   queued_at   double precision,
   closed_at   double precision,
@@ -144,7 +144,7 @@ CREATE TABLE task_event (
   created_at  double precision not null
 );
 CREATE INDEX task_event_by_graph on task_event (graph_id, id);
-CREATE TABLE schedule (
+CREATE TABLE recurrence (
   id          text primary key,
   name        text not null,
   body        text not null,
@@ -156,7 +156,7 @@ CREATE TABLE schedule (
   enabled     boolean not null default true,
   created_at  double precision not null,
   last_run    double precision,
-  -- Who set it, and whether it waits for the owner to say yes (schedule/rules.go's needsOK): a waiting one stays off
+  -- Who set it, and whether it waits for the owner to say yes (recurrence/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
   set_by      text not null default 'owner' check (set_by in ('owner', 'manager')),
   pending     boolean not null default false

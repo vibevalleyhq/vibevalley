@@ -27,7 +27,7 @@ test("the defaults, then the file, then the environment", () => {
   expect(c.deepseek.apiKey).toBe("sk-env");
   expect(c.gitEmails).toEqual(["a@x", "b@x"]);
   expect(dbDir(c)).toBe("memory");
-  expect(c.schedule.tickMs).toBe(20_000);
+  expect(c.recurrence.tickMs).toBe(20_000);
   expect(loadConfig("", { ...env, VIBEVALLEY_GIT_EMAILS: "c@x,d@x,e@x" }).gitEmails).toHaveLength(3);
 });
 

@@ -10,7 +10,7 @@ description: 改了 VibeValley 服务端（apps/server/src/**、apps/server/db�
 ## 什么时候用
 
 - 改了 `apps/server/src/handlers.ts`、`apps/server/src/http`、`packages/protocol/src/api.ts`：新的或改过的接口。
-- 改了某个服务的行为（`issue`、`channel`、`setting`、`schedule`、`task`……），想看它经接口和 `/api/v1/state` 出来的样子。
+- 改了某个服务的行为（`issue`、`channel`、`setting`、`recurrence`、`task`……），想看它经接口和 `/api/v1/state` 出来的样子。
 - 改了 `apps/server/db/migrations` 或 `apps/server/db/queries`：新库能建、能读写。
 - 改了开机的流程（`apps/server/src/main.ts`、`services.ts`、`http/app.ts`）。
 

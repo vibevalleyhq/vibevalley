@@ -70,8 +70,8 @@ test("each item is worded for every route: the phone, the system notice, the tra
     lastRun: { outcome: "completed", summary: "打卡\n  写好了", at: 2 },
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], asks: [], standing: { state: "reviewing", acts: [] } } as unknown as Issue;
-  const schedule = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<CoreState["schedules"]>[number];
-  const [merged, asked] = [...inbox({ ...emptyCoreState(), sessions: [session], issues: [issue], schedules: [schedule] })].sort((a, b) => a.at - b.at);
+  const recurrence = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<CoreState["recurrences"]>[number];
+  const [merged, asked] = [...inbox({ ...emptyCoreState(), sessions: [session], issues: [issue], recurrences: [recurrence] })].sort((a, b) => a.at - b.at);
   expect([merged!.who, merged!.words]).toEqual(["小吴", { label: "活熟了", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，可以收" }]);
   expect([asked!.who, asked!.words]).toEqual([
     "管家",

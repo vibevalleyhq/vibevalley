@@ -620,7 +620,7 @@ export function ManagerIssueDetail(props: { issue: Issue }) {
             <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
-        <Show when={props.issue.schedule}>
+        <Show when={props.issue.recurrence}>
           <Property label="来自">定时：每次到点交给管家，答完等你看</Property>
         </Show>
         <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>

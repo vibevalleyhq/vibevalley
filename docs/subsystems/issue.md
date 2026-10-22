@@ -115,7 +115,7 @@
 - **帮工（`session`）**：派活经 `Sessions.send` 开一个 Session，起草的带 `HireOptions.draft`、不记关联，它的汇报由工单服务读成草稿；帮工离开（`left`）时，离开的是最后一个就关上工单；汇报（`report`）带来缺肥的问题。
 - **项目（`project`）**：worktree、分支、冲突预检（`git merge-tree`，不碰工作区）、检查和合并、推送和 `gh`、起草后的重置（`reset`）和取消时的清理（`clear`）；工单服务只决定什么时候做。
 - **田头（`channel`）**：派活时在频道里开工单串，一张工单一个串，重开、换帮工都在这个串里（[田头](docs/subsystems/channel.md)）；带话和验收没过的意见经它交给帮工。
-- **定时（`schedule`）**：一个定时一张工单，到点是它的一次干活（[定时](docs/subsystems/schedule.md)）。
+- **定时（`recurrence`）**：一个定时一张工单，到点是它的一次干活（[定时](docs/subsystems/recurrence.md)）。
 - **种植计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。
 - **管家（`tool`）**：派活、带话、验收、收获都是同一个服务的方法，收获要主人说一声。
 - **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `project.pullRequest`；收获只读缓存决定走哪条路。

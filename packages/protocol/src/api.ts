@@ -66,11 +66,11 @@ export interface Handlers<R = never> {
   readonly "setting.save": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.SettingsStatus, ApiError, R>;
   readonly "channel.say": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
   readonly "channel.create": (a: { readonly body: T.ChannelRequest }) => Effect.Effect<string, ApiError, R>;
-  readonly "schedule.create": (a: { readonly body: T.ScheduleRequest }) => Effect.Effect<T.Schedule, ApiError, R>;
-  readonly "schedule.list": () => Effect.Effect<T.Schedule[], ApiError, R>;
+  readonly "recurrence.create": (a: { readonly body: T.RecurrenceRequest }) => Effect.Effect<T.Recurrence, ApiError, R>;
+  readonly "recurrence.list": () => Effect.Effect<T.Recurrence[], ApiError, R>;
   /** Only what the body gives changes. */
-  readonly "schedule.update": (a: { readonly id: string; readonly body: T.ScheduleUpdate }) => Effect.Effect<void, ApiError, R>;
-  readonly "schedule.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  readonly "recurrence.update": (a: { readonly id: string; readonly body: T.RecurrenceUpdate }) => Effect.Effect<void, ApiError, R>;
+  readonly "recurrence.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "channel.update": (a: { readonly id: string; readonly body: T.ChannelUpdate }) => Effect.Effect<void, ApiError, R>;
   /** The v1 caption relay without a call id is accepted only with one active call. */
   readonly "manager.hear": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
@@ -245,39 +245,39 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote", "manager"],
   },
   {
-    op: "schedule.create",
+    op: "recurrence.create",
     method: "POST",
-    path: "/api/v1/schedules",
+    path: "/api/v1/recurrences",
     pathParams: [],
     query: [],
-    body: S.ScheduleRequest,
-    result: S.Schedule,
+    body: S.RecurrenceRequest,
+    result: S.Recurrence,
     can: ["owner", "remote", "manager"],
   },
   {
-    op: "schedule.list",
+    op: "recurrence.list",
     method: "GET",
-    path: "/api/v1/schedules",
+    path: "/api/v1/recurrences",
     pathParams: [],
     query: [],
     body: undefined,
-    result: Schema.mutable(Schema.Array(S.Schedule)),
+    result: Schema.mutable(Schema.Array(S.Recurrence)),
     can: ["owner", "remote", "manager"],
   },
   {
-    op: "schedule.update",
+    op: "recurrence.update",
     method: "PUT",
-    path: "/api/v1/schedules/{id}",
+    path: "/api/v1/recurrences/{id}",
     pathParams: [{ name: "id", number: false }],
     query: [],
-    body: S.ScheduleUpdate,
+    body: S.RecurrenceUpdate,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "schedule.delete",
+    op: "recurrence.delete",
     method: "DELETE",
-    path: "/api/v1/schedules/{id}",
+    path: "/api/v1/recurrences/{id}",
     pathParams: [{ name: "id", number: false }],
     query: [],
     body: undefined,

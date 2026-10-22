@@ -11,7 +11,7 @@ src/services.ts    every service in build order, then what runs at start
 src/handlers.ts    each endpoint handed to the service that owns it
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page
 src/base/          configuration, database, ids, the home's lease, files, redaction
-src/<module>/      one service each: core setting agent project memory doc runtime session channel schedule issue task tool mcp manager lan voice connector game
+src/<module>/      one service each: core setting agent project memory doc runtime session channel recurrence issue task tool mcp manager lan voice connector game
 src/flows/         tests that go through several services: a whole farm and a helper that works by the words of its job
 src/testing/       test layers: a temporary home, an in-memory database, a whole farm, git repositories, golden data
 db/                migrations/0001_schema.up.sql (the one schema), queries/<table>.sql, generated/ (effect-sqlc)

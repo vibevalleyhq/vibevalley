@@ -163,7 +163,7 @@ export function runTriggerText(t: RunTrigger) {
       return t.message ? `带话（#${t.message.slice(0, 8)}）` : "带话";
     case "task":
       return "种植计划";
-    case "schedule":
+    case "recurrence":
       return t.missed ? "定时（补跑）" : "定时";
     case "draft":
       return "起草";

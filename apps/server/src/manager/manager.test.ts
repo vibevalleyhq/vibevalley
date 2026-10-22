@@ -14,7 +14,7 @@ import type { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
-import { Schedules } from "../schedule/schedule.ts";
+import { Recurrences } from "../recurrence/recurrence.ts";
 import { Notices } from "../notice/notice.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -380,28 +380,28 @@ describe("the manager", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("lets a schedule it sets unasked wait for the owner", () => {
+  it.live("lets a recurrence it sets unasked wait for the owner", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", kind: "daily", time: "09:00" };
     const f = farm((c) => {
       const result = answeredWith(c);
       if (result !== undefined) return fauxAssistantMessage("定时：" + result);
       const line = lastLine(c);
-      if (line.includes("每天九点") || line.includes("定时任务")) return fauxAssistantMessage(fauxToolCall("schedule", daily));
+      if (line.includes("每天九点") || line.includes("定时任务")) return fauxAssistantMessage(fauxToolCall("recurrence", daily));
       return respond(c);
     });
     return Effect.gen(function* () {
-      const schedules = yield* Schedules;
+      const recurrences = yield* Recurrences;
       const manager = yield* Manager;
       const words = yield* said;
-      // Woken by a schedule, not the owner: what it sets to come back daily waits.
-      yield* schedules.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
+      // Woken by a recurrence, not the owner: what it sets to come back daily waits.
+      yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
       yield* Effect.sleep(80);
-      yield* schedules.tick;
+      yield* recurrences.tick;
       yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the manager told it waits");
-      const mine = (enabled: boolean) => schedules.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
+      const mine = (enabled: boolean) => recurrences.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
       expect(mine(false)).toMatchObject([{ pending: true, by: "manager" }]);
       yield* manager.say("每天九点跑一遍测试", {}, undefined, "");
-      const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's schedule on");
+      const on = yield* until(() => mine(true).length === 1 && mine(true), "the owner's recurrence on");
       expect(on[0]).toMatchObject({ by: "manager" });
       expect(on[0]!.pending ?? false).toBe(false);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -411,13 +411,13 @@ describe("the manager", () => {
   it.live("leaves its issue for the owner to take as done", () => {
     const f = farm();
     return Effect.gen(function* () {
-      const schedules = yield* Schedules;
+      const recurrences = yield* Recurrences;
       const issues = yield* Issues;
-      const s = yield* schedules.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
+      const s = yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
       yield* Effect.sleep(80);
-      yield* schedules.tick;
+      yield* recurrences.tick;
       const core = yield* Core;
-      const handed = yield* until(() => core.state().issues?.find((t) => t.schedule === s.id && t.status === "in_review"), "handed back");
+      const handed = yield* until(() => core.state().issues?.find((t) => t.recurrence === s.id && t.status === "in_review"), "handed back");
       const id = handed.id;
       expect(handed.closed).toBeUndefined();
       expect(handed.handedBack?.outcome).toBe("completed");

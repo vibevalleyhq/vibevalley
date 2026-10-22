@@ -136,12 +136,12 @@ function gathered(state: CoreState): Unworded[] {
     }
   }
 
-  for (const sc of state.schedules ?? []) {
+  for (const sc of state.recurrences ?? []) {
     if (!sc.pending) continue;
     out.push({
       item: {
         id: sc.id + ":ask",
-        kind: "schedule-ask",
+        kind: "recurrence-ask",
         from: manager,
         text: cut(sc.name, 40),
         at: sc.created,
@@ -254,7 +254,7 @@ const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWord
   }),
   "task-failed": (_, text) => ({ label: "计划卡住了", title: `计划卡住了：${text}`, body: "重试、改工单，或者跳过", tray: `计划「${text}」没做成` }),
   mention: (who, text) => ({ label: "找你", title: `${who} 叫你`, body: text }),
-  "schedule-ask": (_, text) => ({
+  "recurrence-ask": (_, text) => ({
     label: "定时等你同意",
     title: "管家想定一个定时",
     body: `「${text}」：同意了才开始`,

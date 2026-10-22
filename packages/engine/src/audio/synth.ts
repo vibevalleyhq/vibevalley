@@ -34,7 +34,7 @@ export interface BellOptions extends Shape {
   partials?: readonly (readonly [number, number])[];
 }
 
-/** What a recipe draws with. Every call schedules relative to the moment the sound was played. */
+/** What a recipe draws with. Every call recurrences relative to the moment the sound was played. */
 export interface Pen {
   tone(options: ToneOptions): void;
   noise(options: NoiseOptions): void;

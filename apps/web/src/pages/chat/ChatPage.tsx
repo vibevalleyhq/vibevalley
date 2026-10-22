@@ -25,7 +25,7 @@ import { Composer } from "./Composer";
 import { createHistory, HistoryContext } from "./data";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
-import { Jobs, Schedules } from "./Tabs";
+import { Jobs, Recurrences } from "./Tabs";
 
 const head = "flex h-[66px] shrink-0 items-center border-b border-line";
 
@@ -85,12 +85,12 @@ function Chat() {
   );
 }
 
-type Tab = "chat" | "jobs" | "schedules";
+type Tab = "chat" | "jobs" | "recurrences";
 
 const tabs: { tab: Tab; icon: string; label: string }[] = [
   { tab: "chat", icon: "icon-board", label: "聊天" },
   { tab: "jobs", icon: "icon-tasks", label: "任务" },
-  { tab: "schedules", icon: "icon-clock", label: "定时" },
+  { tab: "recurrences", icon: "icon-clock", label: "定时" },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -179,8 +179,8 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
             <Show when={tab() === "jobs"}>
               <Jobs channel={c()} />
             </Show>
-            <Show when={tab() === "schedules"}>
-              <Schedules channel={c()} />
+            <Show when={tab() === "recurrences"}>
+              <Recurrences channel={c()} />
             </Show>
             <ChannelSettingsDialog channel={c()} open={settings()} onClose={() => setSettings(false)} />
           </>

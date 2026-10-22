@@ -1,4 +1,4 @@
-// What the agent set itself to do later, in schedules.json in its home. One missed while the agent was away runs once
+// What the agent set itself to do later, in recurrences.json in its home. One missed while the agent was away runs once
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -66,7 +66,7 @@ export function describeJob(j: Job): string {
 
 export const dueMessage = (j: Job) => "【定时任务「" + j.name + "」到点了（" + j.id + "）】\n" + j.message;
 
-export class Schedules {
+export class Recurrences {
   readonly tools: AgentTool[];
   private readonly file: string;
 
@@ -74,7 +74,7 @@ export class Schedules {
     private readonly home: string,
     private readonly wake: (text: string) => void,
   ) {
-    this.file = join(home, "schedules.json");
+    this.file = join(home, "recurrences.json");
     this.tools = this.makeTools();
   }
 
@@ -98,7 +98,7 @@ export class Schedules {
       const isDue = new Set(due.map((j) => j.id));
       this.store(jobs.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
     } catch (e) {
-      console.error("agent: cannot claim due schedules:", e);
+      console.error("agent: cannot claim due recurrences:", e);
       return;
     }
     for (const j of due) this.wake(dueMessage(j));
@@ -106,7 +106,7 @@ export class Schedules {
 
   private makeTools(): AgentTool[] {
     const add = textTool<{ name: string; message: string; at?: string; every_minutes?: number; cron?: string }>({
-      name: "schedule",
+      name: "recurrence",
       description:
         "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
       parameters: objectSchema(
@@ -139,7 +139,7 @@ export class Schedules {
       },
     });
     const list = textTool<object>({
-      name: "list_schedules",
+      name: "list_recurrences",
       description: "列出定好的事。",
       parameters: objectSchema(),
       run: () => {
@@ -148,13 +148,13 @@ export class Schedules {
       },
     });
     const cancel = textTool<{ id: string }>({
-      name: "cancel_schedule",
-      description: "取消一件定好的事（id 从 list_schedules 看）。",
+      name: "cancel_recurrence",
+      description: "取消一件定好的事（id 从 list_recurrences 看）。",
       parameters: objectSchema({ id: stringSchema() }, "id"),
       run: (p) => {
         const jobs = this.load();
         const j = jobs.find((x) => x.id === p.id);
-        if (!j) throw new Error(`没有 ${p.id}：先 list_schedules 看看。`);
+        if (!j) throw new Error(`没有 ${p.id}：先 list_recurrences 看看。`);
         this.store(jobs.filter((x) => x !== j));
         return "取消了「" + j.name + "」。";
       },

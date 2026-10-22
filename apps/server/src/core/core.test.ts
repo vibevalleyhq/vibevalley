@@ -22,14 +22,14 @@ describe("core", () => {
       manager: "speaking",
       sessions: [helper],
       progress: emptyProgress(),
-      schedules: [],
+      recurrences: [],
       issues: [],
     };
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
       expect([s.call, s.callReason, s.manager]).toEqual(["idle", undefined, "idle"]);
-      expect([s.progress, s.schedules, s.issues]).toEqual([undefined, undefined, undefined]);
+      expect([s.progress, s.recurrences, s.issues]).toEqual([undefined, undefined, undefined]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));

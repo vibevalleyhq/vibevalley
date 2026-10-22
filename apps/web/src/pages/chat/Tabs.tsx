@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import type { Conversation, Schedule } from "@vibevalley/protocol";
+import type { Conversation, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { chatPath, jobThreadOf, phaseText } from "../../rules/chat";
 import { toast } from "../../ui/toasts";
@@ -57,26 +57,26 @@ export function Jobs(props: { channel: Conversation }) {
   );
 }
 
-export function Schedules(props: { channel: Conversation }) {
+export function Recurrences(props: { channel: Conversation }) {
   const core = useCore();
-  const schedules = () => (core()?.schedules ?? []).filter((s) => s.channel === props.channel.id);
+  const recurrences = () => (core()?.recurrences ?? []).filter((s) => s.channel === props.channel.id);
   return (
     <Show
-      when={schedules().length > 0}
+      when={recurrences().length > 0}
       fallback={<Empty icon="icon-clock">这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。</Empty>}
     >
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
-        <For each={schedules()}>{(s) => <ScheduleCard s={s} />}</For>
+        <For each={recurrences()}>{(s) => <RecurrenceCard s={s} />}</For>
       </div>
     </Show>
   );
 }
 
-function ScheduleCard(props: { s: Schedule }) {
+function RecurrenceCard(props: { s: Recurrence }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.schedule.update({ id: props.s.id, body: { enabled } }));
-  const remove = () => act(api.schedule.delete({ id: props.s.id }));
+  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, body: { enabled } }));
+  const remove = () => act(api.recurrence.delete({ id: props.s.id }));
   // The second press deletes; a press anywhere else takes the first back.
   createEffect(deleting, (on) => {
     if (!on) return;
