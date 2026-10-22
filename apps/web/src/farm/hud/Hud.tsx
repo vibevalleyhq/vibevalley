@@ -1,5 +1,5 @@
 // The farm's HUD over the village: the orchestrator's face and the farm's level, coins and clock at the top left; the
-// channels, the quota and the menu at the top right; the phone and the helpers at the bottom left; the tools along the
+// memory tree, the map, the channels, the quota and the menu at the top right; the phone and the helpers at the bottom left; the tools along the
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
 
@@ -169,6 +169,12 @@ function TopRight() {
   };
   return (
     <div class="absolute flex items-start" style={{ right: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
+      <HudTap label="记忆树：农场学会了什么" onClick={() => go("/tree")}>
+        <HudCard height={top}>
+          <SpriteIcon name="icon-tree" size={20} />
+          记忆树
+        </HudCard>
+      </HudTap>
       <Show when={webRoutes.includes("/projects")}>
         <HudTap label="地图：每个项目一座岛" onClick={() => go("/projects")}>
           <HudCard height={top}>

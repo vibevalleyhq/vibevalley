@@ -2,10 +2,11 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `pnpm run notes:catalog`，过期了 `pnpm run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（19 篇）
+## proposed（20 篇）
 
 ### feature
 
+- 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [电话就是管家的嘴：默认由管家自己接电话，验证这条线真的接上了](.agents/notes/proposed/feature/2026-10-21-voice-is-the-orchestrators-mouth.md)
 - 2026-10-21 [管家以工单为单位干活：像 Linear 的老用户一样记、找、改、问、报](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)
 - 2026-10-20 [几个帮工同时写一篇文章：在屏幕上看起来怎样](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)

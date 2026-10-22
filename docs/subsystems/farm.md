@@ -23,7 +23,7 @@
 - **像素村** `apps/web/src/farm/canvas/`（PixiJS）：`VillageCanvas.tsx` 挂画布，`scene.ts` 每帧把核心状态画成画面、按脚底的 y 排前后；`dog.ts`、`life.ts`、`fx.ts` 院子的动静和地上的效果。
 - **世界** `apps/web/src/farm/world/`：`world.ts` 给位置起名、算帮工去哪（`Whereabouts`、`spotsFor`、`poseOf`、`placeOfAction`）；`level.ts` 读 `apps/web/public/village.ldtk`；`framing.ts` 放大和裁边（`frameVillage`）；`hits.ts` 点到了什么；`plots.ts` 地有哪几块（`beds`）和地上画什么；`sprites.ts` 读 `public/pixel/sprites.json`。
 - **引擎** `packages/engine`：`nav`（寻路）、`pixi`（光、天色、法线、粒子、小虫、节奏）、`audio`（合成器和响度）、`clock.ts`（一天的钟）。
-- **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
+- **HUD 和面板** `farm/hud/`、`farm/panels/`：农场卡、额度、特效层，右上角的「记忆树」到 `/tree`（`src/tree`，[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)）；收获、播种袋（`SeedForms.tsx`）、成就、仓库、计划板、菜单。
 - **农具和去处**：`farm/tools.ts` 的 `Tool`、`aimTool`（指着一块地时说点下去做什么）、`toolForKey`；`farm/commands.ts` 把点击变成接口调用；`farm/world/places.ts` 的 `yardPlaces` 是院子里每样东西打开哪个面板或页面。
 - **音效** `farm/sound.ts`：配方（`SOUNDS`）和分组（`SOUND_GROUPS`），`useFarmSounds` 从状态里响；合成在 `packages/engine/src/audio`。指针在 `apps/web/public/cursors/`，字体 Fusion Pixel 12px 在 `public/fonts/`。
 - **手机** `farm/phone/`：`Phone.tsx` 机身，`calls.ts` 来电和记录，`screens.tsx` 主屏；小游戏的规则是纯函数（`games/blocks.ts`、`dino.ts`、`sokoban.ts`、`bugSnake.ts`、`merge.ts`），画面是 `*Game.tsx`。
