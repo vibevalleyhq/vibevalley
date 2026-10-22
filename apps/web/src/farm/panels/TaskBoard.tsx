@@ -17,10 +17,9 @@ import { useCore, useFrames } from "../../data/frame";
 import { ready, useAgents, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../kit";
-import { commands, useFarm } from "../state";
+import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-
-type Answer = { ok: boolean; text: string };
+import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],
@@ -115,7 +114,7 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   const submit = async () => {
     if (!ok()) return;
     setBusy(true);
-    const answer = await commands.split({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() });
+    const answer = await graphs.split({ goal: goal(), project: where(), agent: splitter() === "auto" ? undefined : splitter() });
     setBusy(false);
     const id = /（(p\d+)）/.exec(answer.text)?.[1];
     if (answer.ok && id) props.onSplit(id);
@@ -164,7 +163,7 @@ function TaskView(props: { graph: TaskGraph }) {
   const [reviewing, setReviewing] = createSignal(false);
   const [adding, setAdding] = createSignal(false);
   const [only, setOnly] = createSignal<string>();
-  const act = async (a: GraphAction) => setSaid(await commands.actOnGraph(props.graph.id, a));
+  const act = async (a: GraphAction) => setSaid(await graphs.act(props.graph.id, a));
   const settled = () => props.graph.settled ?? 0;
   const xs = "text-[12px] text-bark-600";
   return (
@@ -261,7 +260,7 @@ function Confirm(props: { label: string; sure: string; onConfirm: () => void }) 
 }
 
 function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) {
-  const changes = useQuery(() => ({ queryKey: ["issues", "graph-changes", props.graph.id], queryFn: () => api.graph.changes({ id: props.graph.id }) }));
+  const changes = useGraphChanges(() => props.graph.id);
   return (
     <Switch fallback={<p class="py-10 text-center text-[13px] text-bark-600">正在看计划分支改了什么…</p>}>
       <Match when={changes.error}>
@@ -314,11 +313,7 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
               </FarmSection>
               <div class="mt-3 flex justify-end gap-2">
                 <PxButton onClick={() => props.onDone()}>先不收</PxButton>
-                <PxButton
-                  tone="primary"
-                  disabled={conflicts().size > 0}
-                  onClick={() => void commands.actOnGraph(props.graph.id, "merge").then((a) => props.onDone(a))}
-                >
+                <PxButton tone="primary" disabled={conflicts().size > 0} onClick={() => void graphs.act(props.graph.id, "merge").then((a) => props.onDone(a))}>
                   确认收获，合进 {c().base}
                 </PxButton>
               </div>
@@ -429,7 +424,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
     const s = session();
     return s ? doingOf(s) : undefined;
   };
-  const nodeAct = async (a: "retry" | "skip") => props.onSaid(await commands.actOnTask(props.graph.id, props.node.id, a));
+  const nodeAct = async (a: "retry" | "skip") => props.onSaid(await graphs.taskAct(props.graph.id, props.node.id, a));
   const tone = () => nodeTone[props.node.state];
   return (
     <div class="flex flex-col p-2.5" style={{ background: tone().card, border: `1.5px solid ${tone().edge ?? "transparent"}`, opacity: tone().opacity }}>
@@ -488,7 +483,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           <SmallBtn label="改" onClick={() => props.onEdit()} />
         </Show>
         <Show when={props.node.canRemove}>
-          <SmallBtn label="删" onClick={() => void commands.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
+          <SmallBtn label="删" onClick={() => void graphs.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
         </Show>
         <SmallBtn label="经过" onClick={() => props.onHistory()} />
       </div>
@@ -512,7 +507,7 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
   const isReady = () => id().trim() !== "" && brief().trim() !== "";
   const save = async () => {
     if (!isReady()) return;
-    const a = await commands.editTask(props.graph.id, id().trim(), { title: title(), brief: brief(), agent: agent(), check: check(), needs: needs() });
+    const a = await graphs.editTask(props.graph.id, id().trim(), { title: title(), brief: brief(), agent: agent(), check: check(), needs: needs() });
     if (a.ok) props.onDone(a);
     else setProblem(a.text);
   };
