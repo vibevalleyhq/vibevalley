@@ -1,10 +1,10 @@
 // 项目 and its map: what a codebase grows
 // (languages, the tilling calendar, growth by its newest commit), and every project as an island whose plots are its
-// helpers' worktrees. The room on an island only decides how many empty plots are drawn; whether work may start is the
-// server's (its noRoom rule), and the two must agree.
+// helpers' worktrees. The room on an island is roomLeft, the rule the server refuses a start by: an open plot is one
+// more that may start now, a shut one waits for the farm to free up.
 
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
-import { isBusy, phaseText } from "@vibevalley/protocol/rules";
+import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "./cast";
 
 interface LangDef {
@@ -266,7 +266,6 @@ export function islandsOf({
   plots: Readonly<Record<string, PlotView>>;
   issues: readonly Issue[];
 }): Island[] {
-  const free = Math.max(0, maxRunning - sessions.filter(isBusy).length);
   const known = new Map(projects.map((p) => [p.name, p]));
   const names = new Set([...known.keys(), ...sessions.flatMap((h) => (h.project ? [h.project] : []))]);
   const islands = [...names].map((name) => {
@@ -275,8 +274,10 @@ export function islandsOf({
     const working = mine.filter(isBusy).length;
     // A project the list does not have takes no more work: only its helpers show.
     const maxSessions = summary ? Math.round(summary.maxSessions) : working;
-    const room = Math.max(0, Math.min(maxSessions - working, maxRunning - mine.length));
-    const open = Math.min(room, free);
+    const left = roomLeft(sessions, name, maxRunning, maxSessions);
+    // No more plots are drawn than the farm has places.
+    const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
+    const open = Math.min(room, left.farm);
     const spots: Spot[] = [
       ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[plotKey(h)] ?? { crop: "seeded" } })),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),

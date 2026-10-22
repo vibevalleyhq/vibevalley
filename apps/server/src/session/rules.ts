@@ -4,7 +4,7 @@
 import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
-import { isBusy } from "@vibevalley/protocol/rules";
+import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
 import type { MergeFailure, Workplace } from "../project/project.ts";
@@ -149,14 +149,12 @@ export interface SessionLimits {
 
 /** Why one more cannot start; except is a session about to work again, which does not count against itself. */
 export function noRoom(sessions: readonly Session[], runtime: string, project: string, limits: SessionLimits, except = ""): string {
-  const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
-  if (busy.length >= limits.workspace) return `已经有 ${limits.workspace} 个帮工在干活了`;
-  const onRuntime = busy.filter((h) => h.runtime === runtime).length;
-  const inProject = busy.filter((h) => h.project === project).length;
+  const room = roomLeft(sessions, project, limits.workspace, limits.perProject, except);
+  if (room.farm === 0) return `已经有 ${limits.workspace} 个帮工在干活了`;
+  const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
   if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
     return `${runtimeLabel(runtime)} 上已经有 ${onRuntime} 个帮工在干活，最多同时 ${limits.perRuntime} 个（在 Runtime 页面可以改）`;
-  if (limits.perProject > 0 && inProject >= limits.perProject)
-    return `项目 ${project} 里已经有 ${inProject} 个帮工在干活，最多同时 ${limits.perProject} 个：人多了容易改到同一个文件`;
+  if (room.project === 0) return `项目 ${project} 里已经有 ${room.inProject} 个帮工在干活，最多同时 ${limits.perProject} 个：人多了容易改到同一个文件`;
   return "";
 }
 
