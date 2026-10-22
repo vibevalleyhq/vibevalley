@@ -17,7 +17,7 @@
 
 - 服务端 `apps/server/src/game`（`Game`）：`game.ts` 账本的存取、订阅、`chooseTitle`、什么时候数 commit、主人点的空地；`progress.ts` 账本的折法（`progressStep`、`progressFold`）和哪些事实记账（`entriesFor`、`catchUp`），只有 `game` 读。
 - 规则在 `apps/server/src/game`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`plotKey`、`viewOf`）、特效（`effectsOf`）、`viewOf` 里每个成就到了第几档、计数、下一档要多少；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`progress.ts` 成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）。成就单在 `apps/server/src/agent/seeds.json` 的 `achievements`（`seed.ts` 的 `achievements`），页面不另拿一份。
-- 核心状态里的游戏字段：`CoreState.progress`、`commits`、`Session.play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有，`state.json` 不存它。
+- 核心状态里的游戏字段：`WorkspaceState.progress`、`commits`、`Session.play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `db/queries/game_ledger.sql`。
 - 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。
 - 页面：`apps/web/src/farm/panels/Achievements.tsx`（任务与成就页、奖章，读一次 `game.achievements` 的说法和帧里的进度）、`farm/panels/Panels.tsx`（仓库）、`farm/hud/FxLayer.tsx`（把特效画成飘字、横幅、提示上的奖章）、`farm/effects.ts`（页面自己放的特效）。
@@ -54,7 +54,7 @@
 - **战绩**：`hired`、`harvested`、`failed` 三种条目带档案，折成 `Progress.Agents`（雇过、收成、没做成）。
 - **等级**：从 Lv.n 升到 Lv.n+1 要 `10n` 个 commit（`xpToNext`）；`farmLevelOf` 给出等级、这一级的经验和要多少。commit 数一样时 `commits` 事实不改状态。
 - **升级横幅只给数出来的增长**：`levelUps` 每跨一级放一个 `levelUp`；农场第一次数出 commit 数（之前 `commits` 是空的）只定下等级，不放横幅，但账本照样记 `level`。开机时 `catchUp` 比较 commit 的等级和账本里的 `farm_level`，落下的补记一条。
-- **仓库是关成 `merged` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `CoreState.issues` 读。
+- **仓库是关成 `merged` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `WorkspaceState.issues` 读。
 - **地块号**：`SessionPlay.station` 是 0–5（`maxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `play` 的帮工再雇不换地；读回的 `state.json` 里没有地块的帮工由 `withStations` 补上。`station` 事实只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
 - **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `report` 是 `failed` 给 `penalty`。
 - **成就的说法**（`achievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，页面读一次 `game.achievements`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。

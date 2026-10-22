@@ -17,7 +17,7 @@ import { createSubagents, type Subagent, type SubagentReport, type Subagents } f
 import { initialStatus, reduceStatus, stallOf } from "@botiverse/oar/observe";
 import {
   type Agent,
-  type CoreState,
+  type WorkspaceState,
   dayMs,
   type Fact,
   type IssueClose,
@@ -194,7 +194,7 @@ export interface RunStore {
 }
 
 /** A session's own fact as news; the rest are not the sessions'. */
-export function newsOf(fact: Fact, after: CoreState): SessionNews | undefined {
+export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefined {
   switch (fact.type) {
     case "hired": {
       const session = after.sessions.find((h) => h.id === fact.session.id);

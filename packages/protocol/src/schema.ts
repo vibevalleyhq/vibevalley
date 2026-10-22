@@ -607,7 +607,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   standing: IssueStanding,
 });
 
-export const CoreState: Schema.Codec<T.CoreState> = Schema.Struct({
+export const WorkspaceState: Schema.Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
   manager: ManagerState,
@@ -865,7 +865,7 @@ export const GameEffectAchievement: Schema.Codec<T.GameEffectAchievement> = Sche
 export const GameEffect: Schema.Codec<T.GameEffect> = Schema.Union([GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]);
 
 export const StateFrame: Schema.Codec<T.StateFrame> = Schema.Struct({
-  state: CoreState,
+  state: WorkspaceState,
   inbox: Schema.mutable(Schema.Array(InboxItem)),
   graphs: Schema.mutable(Schema.Array(TaskGraph)),
   view: FarmView,
@@ -1721,7 +1721,7 @@ export const Fact: Schema.Codec<T.Fact> = Schema.Union([
 export const SideEventSnapshot: Schema.Codec<T.SideEventSnapshot> = Schema.Struct({
   type: Schema.Literal("snapshot"),
   at: Schema.Number,
-  state: CoreState,
+  state: WorkspaceState,
 });
 
 export const SideEventSessionEvent: Schema.Codec<T.SideEventSessionEvent> = Schema.Struct({

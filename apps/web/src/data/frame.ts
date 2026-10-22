@@ -1,5 +1,5 @@
 import { createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
-import type { CoreState } from "@vibevalley/protocol";
+import type { WorkspaceState } from "@vibevalley/protocol";
 import { type Frames, frames } from "./frames";
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -33,7 +33,7 @@ export function createFrames(): Frames {
 export const useFrames = () => useContext(FramesContext);
 
 /** The folded state; undefined until the first frame. Read it inside JSX or a memo. */
-export function useCore(): () => CoreState | undefined {
+export function useCore(): () => WorkspaceState | undefined {
   const f = useFrames();
   return () => f.frame?.state;
 }

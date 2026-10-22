@@ -2,7 +2,7 @@
 
 import { type Accessor, createContext, createEffect, createMemo, createSignal, createStore, onSettled, snapshot, useContext } from "solid-js";
 
-import type { Conversation, CoreState, SessionEvent } from "@vibevalley/protocol";
+import type { Conversation, WorkspaceState, SessionEvent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { subscribeLive } from "../../data/live";
 import { chatPage, type Loaded, mergeLoaded, messagesOf, newestUnread } from "../../rules/chat";
@@ -21,7 +21,7 @@ export const HistoryContext = createContext<History>();
 export const useHistory = () => useContext(HistoryContext);
 
 /** For as long as the chat page is open. */
-export function createHistory(core: Accessor<CoreState | undefined>): History {
+export function createHistory(core: Accessor<WorkspaceState | undefined>): History {
   const [loaded, setLoaded] = createStore<Record<string, Loaded>>({});
   const reading = new Map<string, Promise<void>>();
 
@@ -55,7 +55,7 @@ export function createHistory(core: Accessor<CoreState | undefined>): History {
 }
 
 /** A shown conversation is read: the newest unread number goes to the server once it is drawn. */
-export function useMarkRead(core: Accessor<CoreState | undefined>, conversation: Accessor<Conversation | undefined>) {
+export function useMarkRead(core: Accessor<WorkspaceState | undefined>, conversation: Accessor<Conversation | undefined>) {
   createEffect(
     () => {
       const c = conversation();

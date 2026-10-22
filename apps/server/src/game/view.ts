@@ -7,7 +7,7 @@ import type {
   AchievementStanding,
   AchievementTier,
   Badge,
-  CoreState,
+  WorkspaceState,
   Crop,
   Fact,
   FarmLevel,
@@ -37,7 +37,7 @@ export function levelForCommits(total: number): [level: number, xp: number] {
   return [level, rest];
 }
 
-export function farmLevelOf(state: CoreState): FarmLevel {
+export function farmLevelOf(state: WorkspaceState): FarmLevel {
   const [level, xp] = levelForCommits(state.commits?.total ?? 0);
   return { level, xp, need: xpToNext(level) };
 }
@@ -127,7 +127,7 @@ export function levelUps(before: number | undefined, after: number): GameEffect[
   return out;
 }
 
-export function effectsOf(before: CoreState, fact: Fact): GameEffect[] {
+export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
   switch (fact.type) {
     case "commits":
       return levelUps(before.commits?.total, fact.commits.total);
@@ -148,7 +148,7 @@ export function effectsOf(before: CoreState, fact: Fact): GameEffect[] {
 /** The issue a session works is its plot; a session with none (not sent for an issue) is its own. */
 export const plotKey = (h: Session) => (h.issue ? h.issue : h.id);
 
-export function viewOf(state: CoreState): FarmView {
+export function viewOf(state: WorkspaceState): FarmView {
   const plots: Record<string, PlotView> = {};
   for (const h of state.sessions)
     plots[plotKey(h)] = plotOf(

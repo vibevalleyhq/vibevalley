@@ -4,7 +4,7 @@
 // Double-clicking the head makes it large.
 
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
-import { type Agent, type ChatMessage, type Conversation, type CoreState } from "@vibevalley/protocol";
+import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey, say } from "./say";
 import { playSound } from "../sound";
 import { farm } from "../store";
@@ -41,7 +41,7 @@ const phaseWords: Record<ChatPhase, string> = {
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
 /** What the manager is doing: on a call, what the call says; else from the farm's state. */
-const phaseOf = (v: VoiceCall, s: CoreState | undefined): ChatPhase => {
+const phaseOf = (v: VoiceCall, s: WorkspaceState | undefined): ChatPhase => {
   if (v.phase === "connecting" || v.phase === "ending") return "connecting";
   if (v.phase === "live")
     return !v.agentHere ? "connecting" : v.agentState === "speaking" ? "speaking" : v.agentState === "thinking" ? "thinking" : "listening";

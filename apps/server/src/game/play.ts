@@ -1,7 +1,7 @@
 // Where each session stands and what it has been doing, for the farm to draw:
 // no business rule reads a session's play.
 
-import { type CoreState, type FactDoing, type FactStation, maxRunning, type Session, type SessionAction, type SessionPlay } from "@vibevalley/protocol";
+import { type WorkspaceState, type FactDoing, type FactStation, maxRunning, type Session, type SessionAction, type SessionPlay } from "@vibevalley/protocol";
 import { sessionOf, withSession } from "../session/state.ts";
 import { farmOf } from "@vibevalley/protocol/rules";
 
@@ -23,7 +23,7 @@ export function freeStation(sessions: readonly Session[], project: string, prefe
 }
 
 /** Every session on a bed of its own farm: one without a bed, or on a bed another of its farm holds, moves to a free one. */
-export function withStations(state: CoreState): CoreState {
+export function withStations(state: WorkspaceState): WorkspaceState {
   const placed: Session[] = [];
   let moved = false;
   for (const h of state.sessions) {
@@ -78,7 +78,7 @@ export function playedDoing(p: SessionPlay, f: FactDoing): SessionPlay {
 }
 
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
-export function stationed(state: CoreState, f: FactStation): [CoreState, boolean] {
+export function stationed(state: WorkspaceState, f: FactStation): [WorkspaceState, boolean] {
   const h = sessionOf(state, f.id);
   if (!h || playOf(h).station === f.station) return [state, false];
   const others = state.sessions.filter((x) => x.id !== f.id);

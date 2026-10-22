@@ -1,7 +1,7 @@
 // Where an issue stands for the owner: one state out of the issue's status, its session's phase, the questions, a
 // conflict and the acceptance, with the one thing the owner is asked to do. The board, the farm and the page all say it.
 
-import type { CoreState, Issue, IssueAct, IssueStanding, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, IssueAct, IssueStanding, Session } from "@vibevalley/protocol";
 import { isForManager } from "./state.ts";
 import { sessionOf } from "../session/state.ts";
 
@@ -64,7 +64,7 @@ export function standingOf(t: Issue, session: Session | undefined): IssueStandin
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
 /** The issue's standing with its newest session as the state has it. */
-export function standingIn(t: Issue, state: CoreState): IssueStanding {
+export function standingIn(t: Issue, state: WorkspaceState): IssueStanding {
   const last = t.sessions.at(-1);
   return standingOf(t, last === undefined ? undefined : sessionOf(state, last));
 }

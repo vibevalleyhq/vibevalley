@@ -71,7 +71,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 种子袋 | 待办的工单（todo，`queued_at`） | 排队等空地的工单，有空地自动开工 | 队列 |
 | 播种袋里的种子 | issue template（`IssueTemplate`、`project.templates`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
 | 阶段 | phase | 到场、干活、成熟、失败、歇着 | 状态 |
-| 核心状态 | `CoreState` | 农场上的一切，只有服务端持有 | |
+| 核心状态 | `WorkspaceState` | 农场上的一切，只有服务端持有 | |
 | 事实 | fact | 改核心状态的一件事 | patch |
 | 收成清单 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情 |
 | 收获 | harvest；工单挪到 `done` | 过了验收的工单收下：代码活合进主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关），别的直接关上 | |

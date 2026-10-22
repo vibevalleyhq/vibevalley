@@ -4,7 +4,7 @@ process.env.TZ = "Asia/Shanghai";
 
 import { expect, test } from "vite-plus/test";
 import type { Recurrence, RecurrenceRequest, RecurrenceWhen } from "@vibevalley/protocol";
-import { emptyCoreState } from "../core/core.ts";
+import { emptyWorkspaceState } from "../core/core.ts";
 import { nextRun, nextText, whenText } from "./when.ts";
 import { reduce } from "../projection/reduce.ts";
 import { frameOf } from "../projection/frame.ts";
@@ -77,7 +77,7 @@ test("when it runs, in words", () => {
 
 test("the fold keeps the facts; the words are the frame's", () => {
   const s = make();
-  const [one] = reduce(emptyCoreState(), { type: "recurrence", at: 1, recurrence: s });
+  const [one] = reduce(emptyWorkspaceState(), { type: "recurrence", at: 1, recurrence: s });
   expect(one.recurrences).toEqual([s]);
   expect(frameOf(one).state.recurrences).toEqual([{ ...s, whenText: "每天 09:00", nextText: "10/12 09:00" }]);
   expect(reduce(one, { type: "recurrence", at: 2, recurrence: s })[1]).toBe(false);
@@ -85,7 +85,7 @@ test("the fold keeps the facts; the words are the frame's", () => {
   expect(frameOf(off).state.recurrences?.[0]?.nextText).toBe("关着");
   const [gone] = reduce(off, { type: "recurrenceGone", at: 4, id: "c1" });
   expect(gone.recurrences).toEqual([]);
-  expect(reduce(emptyCoreState(), { type: "recurrenceGone", at: 5, id: "c9" })[1]).toBe(false);
+  expect(reduce(emptyWorkspaceState(), { type: "recurrenceGone", at: 5, id: "c9" })[1]).toBe(false);
 });
 
 test("cron's next run", () => {

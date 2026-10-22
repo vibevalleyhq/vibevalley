@@ -19,7 +19,7 @@
 - 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`、`chooseAgent`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`execution.ts` 管家的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `ai/models.ts`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
-- 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `CoreState.sessions` 随 `state.json` 存。
+- 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.events`、`session.stop`、`issue.runs`、`issue.history`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：干活过程 `apps/web/src/pages/chat/WorkLog.tsx`，轨迹 `pages/Trajectory.tsx`（[轨迹](docs/reference/agents-and-runtimes.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `rules/rounds.ts`。
 
@@ -33,7 +33,7 @@
 | Run | `Run`、`session_run` | 一次触发到一次汇报，包着一个 oar turn；核心状态里是 `run` 到 `report` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 
-- **核心状态只放在地里的**：`CoreState.sessions` 是在地里的 Session，阶段是 `arriving`、`working`、`ripe`、`failed`、`resting`；`report` 事实按结果折成 `ripe`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么关的：`merged`、`merged_into_graph`、`dismissed`、`lost`、`answered`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
+- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session，阶段是 `arriving`、`working`、`ripe`、`failed`、`resting`；`report` 事实按结果折成 `ripe`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么关的：`merged`、`merged_into_graph`、`dismissed`、`lost`、`answered`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
 - **每个 Session 一个 oar 的 `Subagents`**，深度上限 1：帮工不能经 oar 再派帮工；农机自己派的子 agent（claude 的 Task、codex 的子线程）的事件带 oar 的 agent 路径，记在派它的那次调用下面（`under`），工具调用按「哪个 agent 的、哪一个」认，不按调用编号认。
 - **没有权限确认、不开沙箱**：边界是 Session 只在 `VIBEVALLEY_WORK_ROOT` 下的项目里、自己的 worktree 里开工，服务端只听 127.0.0.1（例外见根目录 [AGENTS.md](AGENTS.md)「帮工没有权限确认」）。帮工能在这台机器上执行任意命令，服务端不应对外。
 - **档案经 `spawn` 的选项进会话**：人设和技能拼成说明，`append` 放进追加的系统提示，`replace` 替换系统提示，`prompt` 写在交给它的活前面（中间隔 `jobBreak`）；档案的 MCP 服务器、禁用的工具、模型、思考强度、环境变量（农机设置的在前，档案的盖过它）一起交给 oar，不改共享的农机注册表。档案没写模型就用农机设置的默认模型；模型列表里没有的退回农机默认并提醒一次。

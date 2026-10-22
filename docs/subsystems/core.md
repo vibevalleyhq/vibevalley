@@ -1,6 +1,6 @@
 # 核心状态和接口
 
-农场上的一切是一个值：核心状态（`CoreState`），只有服务端持有，只在 `Core.apply` 里因事实（fact）而变，每条事实由纯函数 `reduce`（`apps/server/src/projection/reduce.ts`）折进去。外面的人只经两样东西碰它：`/api/v1` 下的接口（改）和三条 SSE 流（看）。农场里不画它本身，农场画面的全部数据都从它来。
+农场上的一切是一个值：核心状态（`WorkspaceState`），只有服务端持有，只在 `Core.apply` 里因事实（fact）而变，每条事实由纯函数 `reduce`（`apps/server/src/projection/reduce.ts`）折进去。外面的人只经两样东西碰它：`/api/v1` 下的接口（改）和三条 SSE 流（看）。农场里不画它本身，农场画面的全部数据都从它来。
 
 ## 管什么，不管什么
 
@@ -17,8 +17,8 @@
 ## 在哪
 
 - `apps/server/src/core/core.ts`（`Core`）：施加、存盘、各条流；`services.ts` 让它最先建、最后关。
-- `packages/protocol`：形状在 `shapes.ts`（`CoreState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
-- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`recurrence/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyCoreState` 在 `core.ts`。
+- `packages/protocol`：形状在 `shapes.ts`（`WorkspaceState`、`Fact`、`SideEvent`、`LiveEvent`、`StateFrame`，三条流的路径 `statePath`、`eventsPath`、`livePath`）；`api.ts` 的接口表 `endpoints`、`Handlers`、客户端 `VibeValleyApi`；`stream.ts` 的 `readStream`。
+- 折法和拼帧 `apps/server/src/projection`：`reduce.ts` 的 `reduce`、`frame.ts` 的 `frameOf`，用各模块的规则（`session/state.ts`、`channel/state.ts`、`issue/state.ts`、`game/play.ts`、`game/view.ts` 的 `effectsOf`、`notice/inbox.ts`、`task/`、`recurrence/when.ts`）；`projection.ts` 把它们交给 `core`（`Projection`）。`emptyWorkspaceState` 在 `core.ts`。
 - `apps/server/src/http`：`api.ts` 按 `endpoints` 挂每个接口，`streams.ts` 三条流，`app.ts` 组装和开始答 HTTP；`handlers.ts` 实现 `Handlers`。
 - 能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出，`docs:verify` 查它是不是最新。
 - 命令行 `apps/server/src/cli.ts`：每个接口一条命令（从 `endpoints` 来），`state`、`events`、`issue run`；`runtime chat` 和自己的 agent 不经服务端。

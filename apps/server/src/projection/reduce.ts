@@ -1,7 +1,7 @@
 // The farm's core state, in motion: reduce folds one fact into the state with each module's rules; the recorded runs of
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
-import type { CoreState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
 import { withConversation, withMessage } from "../channel/state.ts";
 import { withIssue, withIssueStatuses } from "../issue/state.ts";
 import { farmOf, same } from "@vibevalley/protocol/rules";
@@ -11,12 +11,12 @@ import { sessionOf, whileWorking, withSession } from "../session/state.ts";
 const ended = (outcome: Outcome): Phase => (outcome === "completed" ? { _tag: "ripe" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
 /** A fact that changes nothing says so (false), and is not sent; facts about sessions not on the farm change nothing. The issues' statuses follow whatever changed. */
-export function reduce(state: CoreState, fact: Fact): [CoreState, boolean] {
+export function reduce(state: WorkspaceState, fact: Fact): [WorkspaceState, boolean] {
   const [next, changed] = fold(state, fact);
   return changed && (next.issues ?? []).length > 0 ? [withIssueStatuses(next), true] : [next, changed];
 }
 
-function fold(state: CoreState, f: Fact): [CoreState, boolean] {
+function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
   switch (f.type) {
     case "call": {
       const reason = f.reason ? f.reason : undefined;

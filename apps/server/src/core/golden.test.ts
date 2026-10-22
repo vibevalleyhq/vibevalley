@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vite-plus/test";
 import { phaseText, standingWantsOwner } from "@vibevalley/protocol/rules";
-import { emptyCoreState } from "./core.ts";
+import { emptyWorkspaceState } from "./core.ts";
 import { targetOf } from "../channel/state.ts";
 import { nextRun, nextText, whenText } from "../recurrence/when.ts";
 import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "../task/graph.ts";
@@ -18,7 +18,7 @@ import { acceptanceChecks, graphText, readyTasks } from "../task/rules.ts";
 import { recurrenceProblem } from "../recurrence/rules.ts";
 import { yuan } from "../runtime/money.ts";
 import { graphChanges, graphEventText } from "../task/changes.ts";
-import type { Conversation, CoreState, Fact, Issue, Recurrence, RecurrenceRequest, Session, TaskGraph } from "@vibevalley/protocol";
+import type { Conversation, WorkspaceState, Fact, Issue, Recurrence, RecurrenceRequest, Session, TaskGraph } from "@vibevalley/protocol";
 
 const testdata = new URL("./testdata/", import.meta.url);
 
@@ -92,12 +92,12 @@ describe("the golden files", () => {
     expect(rows.length).toBeGreaterThan(1000);
     const f = failures("reduce.jsonl.gz", rows);
     let run = -1;
-    let state: CoreState = emptyCoreState();
+    let state: WorkspaceState = emptyWorkspaceState();
     rows.forEach((row, i) => {
       const line = i + 1;
       if (row.run !== run) {
         run = row.run as number;
-        state = emptyCoreState();
+        state = emptyWorkspaceState();
       }
       const fact = row.fact as Fact;
       const effects = effectsOf(state, fact);
@@ -191,7 +191,7 @@ describe("the golden files", () => {
           break;
         }
         case "patrol":
-          same("inbox", inbox(input.state as CoreState));
+          same("inbox", inbox(input.state as WorkspaceState));
           break;
         default:
           throw new Error(`line ${line}: no kind ${kind}`);

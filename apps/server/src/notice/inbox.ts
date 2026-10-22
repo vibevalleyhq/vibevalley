@@ -3,7 +3,7 @@
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // questions in their place; a quiet one still questions.
 
-import type { Question, CoreState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
+import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 import { addressOf, channelOf, generalOf, messagesIn } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
@@ -18,18 +18,18 @@ export interface InboxEntry {
 }
 
 /** Newest first; items of the same moment in the order they are gathered. */
-export const inbox = (state: CoreState): InboxItem[] =>
+export const inbox = (state: WorkspaceState): InboxItem[] =>
   inboxEntries(state)
     .map((e) => e.item)
     .sort((a, b) => b.at - a.at);
 
 type Unworded = Omit<InboxEntry, "item"> & { readonly item: Omit<InboxItem, "who" | "words"> };
 
-export function inboxEntries(state: CoreState): InboxEntry[] {
+export function inboxEntries(state: WorkspaceState): InboxEntry[] {
   return gathered(state).map((e) => ({ ...e, item: worded(e.item) }));
 }
 
-function gathered(state: CoreState): Unworded[] {
+function gathered(state: WorkspaceState): Unworded[] {
   const chat = state.chat;
   const general = generalOf(chat)?.id;
   const out: Unworded[] = [];
@@ -181,7 +181,7 @@ type Want =
 
 /** What a session questions of the owner. Its issue's standing says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
-function wantOf(h: Session, state: CoreState): Want | undefined {
+function wantOf(h: Session, state: WorkspaceState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues?.find((t) => t.id === h.issue && t.sessions.at(-1) === h.id);
   if (!issue) {
     const need = needOf(h);

@@ -445,7 +445,7 @@ export interface Chat {
   messages: ChatMessage[];
 }
 
-export interface CoreState {
+export interface WorkspaceState {
   call: CallState;
   callReason?: string;
   manager: ManagerState;
@@ -628,7 +628,7 @@ export interface FarmView {
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
 export interface StateFrame {
-  state: CoreState;
+  state: WorkspaceState;
   inbox: InboxItem[];
   graphs: TaskGraph[];
   view: FarmView;
@@ -1989,7 +1989,7 @@ export type SideEvent =
 export interface SideEventSnapshot {
   type: "snapshot";
   at: number;
-  state: CoreState;
+  state: WorkspaceState;
 }
 
 export interface SideEventSessionEvent {

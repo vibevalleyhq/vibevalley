@@ -3,7 +3,7 @@
 
 import {
   type Agent,
-  type CoreState,
+  type WorkspaceState,
   type GraphEvent,
   type GraphState,
   type Issue,
@@ -338,7 +338,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
   return out;
 }
 
-export function graphOf(state: CoreState, id: string): TaskGraph | undefined {
+export function graphOf(state: WorkspaceState, id: string): TaskGraph | undefined {
   const issues = state.issues ?? [];
   const t = issues.find((t) => t.id === id && t.graph);
   return t ? graphFrom(t, issues) : undefined;

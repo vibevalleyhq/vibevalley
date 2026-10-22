@@ -9,7 +9,7 @@
 | 定时的模型、五种时间写法、时区、下次什么时候 | 到点以后工单怎么派、重开、带话（[工单](docs/subsystems/issue.md)，`issue/issue.ts` 的 `scheduled`） |
 | 谁定的、要不要等主人同意 | 管家怎么接住到点的那句话、答完等主人点头（`manager`，[管家](docs/subsystems/manager.md)） |
 | 每隔一阵看一遍、到点先存再说再发布、错过的补一次 | 巡查：不调模型地看 Inbox、有事叫醒管家（`manager/manager.ts`，[管家](docs/subsystems/manager.md)） |
-| 定时在核心状态里的一份（`CoreState.Recurrences`） | 频道、频道的默认项目、提示怎么投递（[田头](docs/subsystems/channel.md)） |
+| 定时在核心状态里的一份（`WorkspaceState.Recurrences`） | 频道、频道的默认项目、提示怎么投递（[田头](docs/subsystems/channel.md)） |
 | | VibeValley 自己的 agent 自带的定时（`agent/brain/recurrences.ts` 的 `recurrences.json`）：当管家时关掉（`recurrences: false`） |
 
 ## 在哪

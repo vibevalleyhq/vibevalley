@@ -1,7 +1,7 @@
 // Notifications' rules: the patrol (巡查), no model. Each inbox item waits out its kind's grace (a question may be answered
 // in a minute), is reported once, and again only after reportAgainMs if it still stands.
 
-import type { CoreState, InboxKind } from "@vibevalley/protocol";
+import type { WorkspaceState, InboxKind } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";
 
 /** In ms. Kinds not here the manager does not hear of from the patrol: a failed run reaches it as it happens, a task
@@ -35,7 +35,7 @@ export const emptyPatrol = (): PatrolMemory => ({ firstSeen: {}, reported: {} })
 export const patrolAgo = (ms: number) => (ms >= 2 * 60 * 60_000 ? Math.round(ms / (60 * 60_000)) + " 小时" : Math.max(1, Math.round(ms / 60_000)) + " 分钟");
 
 /** Things no longer hanging are forgotten, so if they come back they are new. */
-export function patrolStep(state: CoreState, now: number, memory: PatrolMemory): [PatrolNote[], PatrolMemory] {
+export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMemory): [PatrolNote[], PatrolMemory] {
   const next = emptyPatrol();
   const report: PatrolNote[] = [];
   for (const e of inboxEntries(state)) {

@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { Session } from "@vibevalley/protocol";
-import { emptyCoreState } from "../core/core.ts";
+import { emptyWorkspaceState } from "../core/core.ts";
 import { playOf, withStations } from "./play.ts";
 import { reduce } from "../projection/reduce.ts";
 
@@ -16,8 +16,8 @@ const session = (id: string, project?: string): Session => ({
   phase: { _tag: "working", since: 0 } as Session["phase"],
 });
 
-const hire = (state = emptyCoreState(), h: Session) => reduce(state, { type: "hired", at: 0, session: h })[0];
-const bed = (state: ReturnType<typeof emptyCoreState>, id: string) => playOf(state.sessions.find((h) => h.id === id)!).station;
+const hire = (state = emptyWorkspaceState(), h: Session) => reduce(state, { type: "hired", at: 0, session: h })[0];
+const bed = (state: ReturnType<typeof emptyWorkspaceState>, id: string) => playOf(state.sessions.find((h) => h.id === id)!).station;
 
 test("each project's farm has its own beds: the first of each is on bed 0", () => {
   let s = hire(undefined, session("a1", "alpha"));
@@ -40,6 +40,6 @@ test("a bed taken on another project's farm is free on this one, and taken on it
 
 test("a saved bed another session of its farm holds moves to a free one", () => {
   const on = (h: Session, station: number): Session => ({ ...h, play: { ...playOf(h), station } });
-  const s = withStations({ ...emptyCoreState(), sessions: [on(session("a1", "alpha"), 0), on(session("a2", "alpha"), 0), on(session("b1", "beta"), 0)] });
+  const s = withStations({ ...emptyWorkspaceState(), sessions: [on(session("a1", "alpha"), 0), on(session("a2", "alpha"), 0), on(session("b1", "beta"), 0)] });
   expect(s.sessions.map((h) => playOf(h).station)).toEqual([0, 1, 0]);
 });

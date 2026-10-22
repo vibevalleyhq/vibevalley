@@ -12,7 +12,7 @@ flowchart LR
 
   subgraph Server[apps/server · Effect · 127.0.0.1:8787]
     API[handlers<br/>VibeValleyApi、三条 SSE]
-    SITE[Core<br/>核心状态 CoreState]
+    SITE[Core<br/>核心状态 WorkspaceState]
     FM[管家<br/>vibevalley 自己的 agent + 派活工具]
     CHAT[田头<br/>群聊 · PGlite]
     MCP[农场的工具<br/>/mcp]
@@ -69,7 +69,7 @@ flowchart LR
 
 ## 核心状态
 
-农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `CoreState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
+农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `WorkspaceState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
 
 每个帮工（`Session`）的阶段 `phase` 是它生命周期的唯一状态：
 

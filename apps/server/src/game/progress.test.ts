@@ -1,4 +1,4 @@
-import type { CoreState, Fact, LedgerEntry } from "@vibevalley/protocol";
+import type { WorkspaceState, Fact, LedgerEntry } from "@vibevalley/protocol";
 import { reduce } from "../projection/reduce.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
@@ -22,7 +22,7 @@ describe("the ledger's fold", () => {
           return { steps, progress: folded.progress, seen: folded.seen };
         }
         case "entries": {
-          const given = c.in as { before: CoreState; fact: Fact };
+          const given = c.in as { before: WorkspaceState; fact: Fact };
           const [after] = reduce(given.before, given.fact);
           return { entries: entriesFor(given.before, given.fact, after), catchUp: catchUp(given.before) };
         }

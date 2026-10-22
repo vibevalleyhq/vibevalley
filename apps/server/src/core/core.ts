@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type {
   CallState,
   CommitCount,
-  CoreState,
+  WorkspaceState,
   Fact,
   GameEffect,
   LiveEvent,
@@ -24,17 +24,17 @@ import { Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effec
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
-export const emptyCoreState = (): CoreState => ({ call: "idle", manager: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", manager: "idle", sessions: [] });
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
 export interface ProjectionShape {
-  readonly reduce: (state: CoreState, fact: Fact) => [CoreState, boolean];
+  readonly reduce: (state: WorkspaceState, fact: Fact) => [WorkspaceState, boolean];
   /** What a fact sets off on the farm, from the state before it. */
-  readonly effects: (before: CoreState, fact: Fact) => GameEffect[];
-  readonly frame: (state: CoreState, effects?: GameEffect[]) => StateFrame;
+  readonly effects: (before: WorkspaceState, fact: Fact) => GameEffect[];
+  readonly frame: (state: WorkspaceState, effects?: GameEffect[]) => StateFrame;
   /** The state read back from state.json, made whole (the sessions' places on the farm). */
-  readonly restore: (kept: CoreState) => CoreState;
+  readonly restore: (kept: WorkspaceState) => WorkspaceState;
 }
 
 export class Projection extends Context.Service<Projection, ProjectionShape>()("vibevalley/Projection") {}
@@ -48,16 +48,16 @@ export type FactIn = Fact extends infer F ? (F extends Fact ? Omit<F, "at"> : ne
 
 /** A fact with exactly the state it changed, even when it is read late. */
 export interface Transition {
-  readonly before: CoreState;
+  readonly before: WorkspaceState;
   readonly fact: Fact;
-  readonly after: CoreState;
+  readonly after: WorkspaceState;
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
 export type OwnerDid = { readonly kind: "reviewed"; readonly session: string } | { readonly kind: "talked" };
 
 export interface CoreShape {
-  readonly state: () => CoreState;
+  readonly state: () => WorkspaceState;
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
@@ -71,7 +71,7 @@ export interface CoreShape {
   readonly runtime: (info: RuntimeInfo) => Effect.Effect<void>;
   readonly did: (d: OwnerDid) => Effect.Effect<void>;
   /** The state now, then the transitions from here on. */
-  readonly transitions: Effect.Effect<readonly [CoreState, Stream.Stream<Transition>], never, Scope.Scope>;
+  readonly transitions: Effect.Effect<readonly [WorkspaceState, Stream.Stream<Transition>], never, Scope.Scope>;
   /** A snapshot of the state, then every side event. */
   readonly events: Stream.Stream<SideEvent>;
   /** Every side event from now on, subscribed before this returns: none applied after it is missed. */
@@ -87,10 +87,10 @@ export interface CoreShape {
 export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") {}
 
 /** What state.json keeps: the chat, progress, recurrences and issues are the database's. */
-const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: CoreState): CoreState => kept;
+const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: WorkspaceState): WorkspaceState => kept;
 
 /** Started again, nobody is on the call and the manager is not mid-sentence. */
-const restarted = (kept: CoreState): CoreState => ({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });
+const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, manager: "idle" });
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -111,10 +111,10 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
-  let kept = emptyCoreState();
+  let kept = emptyWorkspaceState();
   if (existsSync(file)) {
     try {
-      kept = { ...emptyCoreState(), ...(JSON.parse(readFileSync(file, "utf8")) as CoreState) };
+      kept = { ...emptyWorkspaceState(), ...(JSON.parse(readFileSync(file, "utf8")) as WorkspaceState) };
     } catch (e) {
       yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
     }

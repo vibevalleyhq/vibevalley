@@ -1,7 +1,7 @@
 // Words the HUD shows, from the frame: the clock, the warehouse, the runtimes' quotas, what a helper is doing, a plot's
 // title and what the manager last said.
 
-import type { Chat, CoreState, Crop, Doing, Issue, RuntimeInfo, Session } from "@vibevalley/protocol";
+import type { Chat, WorkspaceState, Crop, Doing, Issue, RuntimeInfo, Session } from "@vibevalley/protocol";
 import { generalOf, messagesIn } from "../../rules/chat";
 import { numberText } from "../kit/labels";
 import { beds, cropLabel, type Bed } from "../world/plots";
@@ -16,7 +16,7 @@ export function clockText(tod: number) {
 export const thousands = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 /** The issues harvested into their main branch, newest first: the warehouse. */
-export const harvestedOf = (s: CoreState | undefined): Issue[] =>
+export const harvestedOf = (s: WorkspaceState | undefined): Issue[] =>
   (s?.issues ?? []).filter((i) => i.closed === "merged").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0));
 
 /** A switched-off runtime's account is not the farm's business. */

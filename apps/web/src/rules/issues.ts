@@ -1,7 +1,7 @@
 // An issue's lane, title and status and priority words.
 
 import {
-  type CoreState,
+  type WorkspaceState,
   type Issue,
   type IssueStatus,
   managerAgent,
@@ -92,7 +92,7 @@ export function taskLine(g: TaskGraph) {
 export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at : undefined);
 
 /** The session on the farm now for an open issue. */
-export function issueSession(core: CoreState | undefined, issue: Issue): Session | undefined {
+export function issueSession(core: WorkspaceState | undefined, issue: Issue): Session | undefined {
   if (!core || issue.sessions.length === 0 || issue.closed !== undefined) return undefined;
   const last = issue.sessions[issue.sessions.length - 1];
   return core.sessions.find((s) => s.id === last);

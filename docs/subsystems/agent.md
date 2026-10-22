@@ -87,7 +87,7 @@
 - **管家（`manager`）、工具（`tool`）、种植计划（`task`）**：`Agents` 列能派的档案，`assess` 给每个能不能派和农机的样子，再交给 `session/rules.ts` 的 `chooseAgent`；管家把它们写进农场现状。
 - **记性（`memory`）**、**定时（`recurrence`）**：`Agents` 列档案（不填档案的检索、定时派给谁）。
 - **设置（`setting`）**：注册表里 VibeValley 自己的农机每次开会话取 DeepSeek 的钥匙。
-- **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `CoreState`。
+- **核心状态（`core`）**：`Core.runtime` 推农机的样子，`Core.notice` 发模型退回默认的提醒；档案和农机都不进 `WorkspaceState`。
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。
 - **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.check` 逐个调 `Runtimes.check`。
 

@@ -46,7 +46,7 @@
 - **管家以工单为单位。** 点名一件活的工具（`check`、`changes`、`merge`、`accept`、`tell`、`stop`、`dismiss`、`issue_update`、`issue_status`）都收 `issue`：工单编号（`#41`、`41`）、工单 id，或在做它的帮工的名字（找它的工单）；要帮工的（`tell`、`stop`、`dismiss`）找工单最新的、还在地里的那个。农场现状和 `roster` 里每个帮工带它的工单号。`issues` 找工单、看一批（状态、项目、字、`wants_owner` 在等主人的按等了多久排），填编号就是一张的全部；`issue_create` 记进备选、不派人（`draft` 让帮工起草）；`issue_update` 改各栏；`issue_status` 照 `statusMove` 挪，备选挪到待办而没写谁来做时照 `dispatch` 的规矩挑一个。规则都在工单服务里，工具只转发、写成一句话（`tool/words.ts` 的 `issueLine`、`issueDetail`）。
 - **合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：否则 `merge`、`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人；改工单和挪状态（`issue_update`、`issue_status`）也一样，回「没动：改工单、挪状态要主人说一声。……」。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
 - **挑档案**（`session/rules.ts` 的 `chooseAgent`，管家的 `dispatch` 和计划共用）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。界面和挑中以后的检查见[派给谁](docs/reference/agents-and-runtimes.md#派给谁)。
-- **管家的状态**在 `CoreState.Manager`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
+- **管家的状态**在 `WorkspaceState.Manager`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
 
 ## 怎么走
 

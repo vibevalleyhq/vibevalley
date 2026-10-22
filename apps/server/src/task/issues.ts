@@ -1,6 +1,6 @@
 // A task graph is issues: the graph's own and one per step.
 
-import type { CoreState, Issue, TaskGraph } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, TaskGraph } from "@vibevalley/protocol";
 import { asksForYou, blockedBy, graphSpent, isSettled, layersOf } from "./graph.ts";
 import { compare, compareText, or } from "../base/text.ts";
 
@@ -53,7 +53,7 @@ export function graphFrom(parent: Issue, issues: readonly Issue[]): TaskGraph {
   return graph;
 }
 
-export function graphsOf(state: CoreState): TaskGraph[] {
+export function graphsOf(state: WorkspaceState): TaskGraph[] {
   const issues = state.issues ?? [];
   return issues
     .filter((t) => t.graph)

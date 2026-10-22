@@ -1,22 +1,22 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { CoreState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
+import type { WorkspaceState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
 import { Effect, Fiber, Layer, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { emptyProgress } from "../game/progress.ts";
 import { Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { layer as projection } from "../projection/projection.ts";
-import { Core, emptyCoreState, layer, stateEveryMs } from "./core.ts";
+import { Core, emptyWorkspaceState, layer, stateEveryMs } from "./core.ts";
 
 const helper: Session = { id: "w1", name: "帮工", agent: "lab", runtime: "pi", brief: "写", hiredAt: 0, runs: 0, phase: { _tag: "ripe" } };
 
 describe("core", () => {
   it.effect("started again from state.json: idle, without the database's parts, the sessions at their stations", () => {
     const config = testConfig();
-    const was: CoreState = {
-      ...emptyCoreState(),
+    const was: WorkspaceState = {
+      ...emptyWorkspaceState(),
       call: "live",
       callReason: "挂了",
       manager: "speaking",

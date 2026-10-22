@@ -1,7 +1,7 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import type { CoreState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./board";
 import {
   endedAt,
@@ -41,7 +41,7 @@ export const cardProject = (c: BoardCard) => (c.kind === "task" ? c.graph.projec
 export const cardAgent = (c: BoardCard) => (c.kind === "task" ? undefined : c.issue.assignee);
 
 /** A task is its own card; a step of one is on the board once a helper has worked it. */
-export function buildCards(rows: IssueHistory[], core: CoreState | undefined, graphs: TaskGraph[]): BoardCard[] {
+export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefined, graphs: TaskGraph[]): BoardCard[] {
   const cards: BoardCard[] = [];
   for (const row of rows) {
     const issue = row.issue;

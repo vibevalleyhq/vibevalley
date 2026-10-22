@@ -5,7 +5,7 @@
 import {
   type Achievement,
   type AchievementDef,
-  type CoreState,
+  type WorkspaceState,
   everyone,
   type Fact,
   type LedgerEntry,
@@ -177,7 +177,7 @@ export const progressFold = (entries: readonly LedgerEntry[], from: Folded = emp
 
 const fullHouse = 6;
 
-const working = (state: CoreState) => state.sessions.filter((h) => h.phase._tag === "working").length;
+const working = (state: WorkspaceState) => state.sessions.filter((h) => h.phase._tag === "working").length;
 
 function graphEntry(graph: TaskGraph): Entry {
   const merged = new Set((graph.tasks ?? []).filter((n) => n.state === "merged").map((n) => n.id));
@@ -186,11 +186,11 @@ function graphEntry(graph: TaskGraph): Entry {
 }
 
 /** Whether a message is new to the state: the manager's words change as they stream in, and count once. */
-const isNew = (state: CoreState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
+const isNew = (state: WorkspaceState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
-export function entriesFor(before: CoreState, fact: Fact, after: CoreState): Entry[] {
+export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
     case "report": {
@@ -259,7 +259,7 @@ export function entriesFor(before: CoreState, fact: Fact, after: CoreState): Ent
 }
 
 /** A farm level the ledger has not told yet, from commits counted before it. */
-export function catchUp(state: CoreState): Entry[] {
+export function catchUp(state: WorkspaceState): Entry[] {
   const [level] = levelForCommits(state.commits?.total ?? 0);
   const known = state.progress?.counts.farm_level ?? 1;
   return level > known ? [{ kind: "level", level }] : [];

@@ -2,7 +2,7 @@
 // Voice captions carry no times, so the log keeps to the typed lines.
 
 import { For, Show } from "solid-js";
-import type { ChatMessage, CoreState, Issue, Outcome } from "@vibevalley/protocol";
+import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { generalOf, messagesIn, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
 import { AgentFace, ManagerFace } from "../../ui/Face";
@@ -17,9 +17,9 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
 };
 
 /** The turn reports, newest first. */
-const turnReportsOf = (s: CoreState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
+const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
 
-const issueOfSession = (s: CoreState | undefined, session: string): Issue | undefined => (s?.issues ?? []).find((i) => i.sessions.includes(session));
+const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined => (s?.issues ?? []).find((i) => i.sessions.includes(session));
 
 type Row = { kind: "said" | "report"; message: ChatMessage };
 

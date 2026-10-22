@@ -1,6 +1,6 @@
 // An issue in the core state: its status, who drafts it, its place in the list and its findings left standing.
 
-import { type CoreState, type Issue, type IssueClose, type IssueDrafting, type IssueStatus, managerAgent } from "@vibevalley/protocol";
+import { type WorkspaceState, type Issue, type IssueClose, type IssueDrafting, type IssueStatus, managerAgent } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
@@ -12,7 +12,7 @@ const closedStatus = (c: IssueClose | undefined): IssueStatus => (c === "merged"
 
 /** An issue for the manager is in progress while the manager is on it, and waits on the owner once its turn ended,
  * however it ended: only the owner closes it. */
-export function issueStatusOf(t: Issue, state: CoreState): IssueStatus {
+export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
   if (t.closed !== undefined || t.closedAt !== undefined) return closedStatus(t.closed);
   if (isForManager(t)) return t.handedBack ? "in_review" : "in_progress";
   if (t.graph) {
@@ -77,13 +77,13 @@ export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] 
 }
 
 /** The session drafting an unsent issue: the one on the farm for it with draft set. */
-export function issueDraftingOf(t: Issue, state: CoreState): IssueDrafting | undefined {
+export function issueDraftingOf(t: Issue, state: WorkspaceState): IssueDrafting | undefined {
   const h = state.sessions.find((h) => h.draft && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
 }
 
 /** The same array when none changed. */
-export function withIssueStatuses(state: CoreState): CoreState {
+export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   let next: Issue[] | undefined;
   (state.issues ?? []).forEach((t, i) => {
     const status = issueStatusOf(t, state);

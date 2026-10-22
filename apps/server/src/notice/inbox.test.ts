@@ -1,9 +1,9 @@
 // The inbox's kinds the golden files have no case of.
 
 import { expect, test } from "vite-plus/test";
-import type { CoreState, Issue, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, Session } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
-import { emptyCoreState } from "../core/core.ts";
+import { emptyWorkspaceState } from "../core/core.ts";
 import { inbox } from "./inbox.ts";
 
 test("a helper handed back with questions questions the owner to answer, not to harvest", () => {
@@ -21,8 +21,8 @@ test("a helper handed back with questions questions the owner to answer, not to 
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [{ question: "用 8787 还是 8797？" }] } as unknown as Issue;
   // As the server writes it: the questions make the standing.
-  const state = (questions: Issue["questions"]): CoreState => ({
-    ...emptyCoreState(),
+  const state = (questions: Issue["questions"]): WorkspaceState => ({
+    ...emptyWorkspaceState(),
     sessions: [session],
     issues: [{ ...issue, questions, standing: { state: questions.length > 0 ? "asking" : "reviewing", acts: [] } }],
   });
@@ -51,9 +51,9 @@ test("the inbox says what the issue's standing says: a round stopped halfway wan
     questions: [],
     standing: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
   } as unknown as Issue;
-  expect(inbox({ ...emptyCoreState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
+  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
   // Closed by the owner, the helper still on the farm questions nothing.
-  expect(inbox({ ...emptyCoreState(), sessions: [session], issues: [{ ...issue, standing: { state: "closed", acts: [] } }] })).toEqual([]);
+  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [{ ...issue, standing: { state: "closed", acts: [] } }] })).toEqual([]);
 });
 
 test("each item is worded for every route: the phone, the system notice, the tray", () => {
@@ -70,8 +70,10 @@ test("each item is worded for every route: the phone, the system notice, the tra
     lastRun: { outcome: "completed", summary: "打卡\n  写好了", at: 2 },
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [], standing: { state: "reviewing", acts: [] } } as unknown as Issue;
-  const recurrence = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<CoreState["recurrences"]>[number];
-  const [merged, asked] = [...inbox({ ...emptyCoreState(), sessions: [session], issues: [issue], recurrences: [recurrence] })].sort((a, b) => a.at - b.at);
+  const recurrence = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<
+    WorkspaceState["recurrences"]
+  >[number];
+  const [merged, asked] = [...inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue], recurrences: [recurrence] })].sort((a, b) => a.at - b.at);
   expect([merged!.who, merged!.words]).toEqual(["小吴", { label: "活熟了", title: "小吴 做完了", body: "打卡 写好了", tray: "小吴 做完了，可以收" }]);
   expect([asked!.who, asked!.words]).toEqual([
     "管家",

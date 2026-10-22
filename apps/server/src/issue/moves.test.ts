@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vite-plus/test";
 import { type Fact, type Issue, type IssueStatus, managerAgent, type Session } from "@vibevalley/protocol";
-import { emptyCoreState } from "../core/core.ts";
+import { emptyWorkspaceState } from "../core/core.ts";
 import { standingOf } from "./standing.ts";
 import { statusMove, statusMoves } from "./moves.ts";
 import { reduce } from "../projection/reduce.ts";
@@ -98,7 +98,7 @@ describe("moves and the standing", () => {
       moves: ["canceled"],
       standing: { state: "working", acts: [] },
     } as unknown as Issue;
-    let state = emptyCoreState();
+    let state = emptyWorkspaceState();
     for (const fact of [
       { type: "hired", at: 1, session: hired },
       { type: "issue", at: 1, issue },
