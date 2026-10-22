@@ -328,7 +328,7 @@ describe("the orchestrator", () => {
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
       helper = hired.session!.id;
       number = (yield* issues.get(hired.session!.issue!)).number;
-      yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "ripe"), "the work ripe");
+      yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
       const refused = yield* until(
@@ -350,7 +350,7 @@ describe("the orchestrator", () => {
       expect(merged.delivered).toBe("none");
       const general = (yield* Channels).general();
       yield* until(
-        () => messagesIn(core.state().chat, general).some((m) => m.from === orchestratorAgent && m.final && m.text === `合并：#${number} 完成了，没有改动要合`),
+        () => messagesIn(core.state().chat, general).some((m) => m.from === orchestratorAgent && m.final && m.text === `合并：#${number} 已完成，没有改动要合`),
         "what it delivered said",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -453,7 +453,7 @@ describe("the orchestrator", () => {
       const sessions = yield* Sessions;
       yield* enableLab;
       yield* orchestrator.say("帮我在 notes 里加个 CHANGELOG", {}, undefined, "");
-      yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "ripe"), "the work ripe");
+      yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/;
       yield* notices.patrol;
       yield* settle;
@@ -461,7 +461,7 @@ describe("the orchestrator", () => {
       offset = 3 * 3_600_000;
       yield* notices.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
-      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#田头 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没收：「加个 CHANGELOG」/);
+      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#田头 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/);
       offset = 3.5 * 3_600_000;
       yield* notices.patrol;
       yield* settle;

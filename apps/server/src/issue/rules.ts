@@ -20,7 +20,7 @@ import type {
   TemplateBlank,
   TemplateKind,
 } from "@vibevalley/protocol";
-import { shortTitle } from "@vibevalley/protocol/rules";
+import { closedText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
 
@@ -248,23 +248,6 @@ function firstBlank(text: string): TemplateBlank | undefined {
 
 // ── the issue's story ──
 
-const deliveredWords: Record<Delivery, string> = {
-  merged: "收获了，合进了主分支",
-  merged_into_parent: "完成了，合进了种植计划",
-  pull_request: "收获了，PR 合进去了",
-  kept: "完成了，分支留着没合",
-  none: "完成了，没有改动要合",
-};
-
-const canceledWords: Record<IssueCanceled, string> = {
-  dismissed: "没收就关了",
-  lost: "丢了",
-};
-
-/** What its close says: done with what it delivered, or canceled and why. */
-export const closedText = (t: Pick<Issue, "delivered" | "canceled">): string =>
-  t.delivered ? deliveredWords[t.delivered] : t.canceled ? canceledWords[t.canceled] : "关了";
-
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (t.kind) {
     case "refine":
@@ -274,7 +257,7 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
     case "issue":
       return ["started", first ? "开工" : "重开，接着做"];
     case "task":
-      return ["started", "照种植计划开工"];
+      return ["started", "照计划开工"];
     case "recurrence":
       return ["started", t.missed ? "定时开工（补跑）" : "定时开工"];
     case "runtime":

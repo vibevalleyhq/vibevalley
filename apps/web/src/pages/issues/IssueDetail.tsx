@@ -4,9 +4,9 @@ import type { Review, Question, Issue, IssueAct, Milestone, Session, SessionEven
 import { api } from "../../data/api";
 import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
-import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules/issues";
+import { issueTag, priorityLabel, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
-import { actLabel } from "@vibevalley/protocol/rules";
+import { actLabel, closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready } from "../../data/query";
@@ -28,7 +28,7 @@ function Dot(props: { tone: Tone }) {
 
 /** The workbench's issue page, answering the owner top to bottom: what it is, where it stands, the one thing asked of
  * the owner (only when there is one), how far it is against its criteria, what it made, and how it got here; the
- * side holds the facts. `onClose` opens the close dialog (`review`: straight on the harvest checklist). */
+ * side holds the facts. `onClose` opens the close dialog (`review`: straight on its changes). */
 export function IssueDetail(props: {
   issue: Issue;
   sessions: Session[];
@@ -43,7 +43,7 @@ export function IssueDetail(props: {
   // The box under the block holds an answer, the findings of 打回, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
     run: async (f) => (await run(async () => (await f(), true))) === true,
-    harvest: () => props.onClose(props.session ?? head(), true),
+    complete: () => props.onClose(props.session ?? head(), true),
     close: () => props.onClose(props.session ?? head(), false),
     told: (title, description) => toast(`${title}：${description}`),
   });
@@ -117,7 +117,7 @@ export function IssueDetail(props: {
                 </For>
               </Show>
             </Note>
-            <Show when={s().attention.state === "asking" || s().attention.state === "closed" || box()}>
+            <Show when={s().attention.state === "asking" || s().attention.state === "canceled" || box()}>
               <TextArea
                 class="mt-2.5"
                 rows={box() === "reject" ? 3 : 2}
@@ -125,7 +125,7 @@ export function IssueDetail(props: {
                 disabled={busy()}
                 onInput={(e) => setText(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().attention.state !== "closed") {
+                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().attention.state !== "canceled") {
                     e.preventDefault();
                     sayAct(box() === "tell" ? "tell" : "answer");
                   }
@@ -135,7 +135,7 @@ export function IssueDetail(props: {
                     ? "哪里没过，一行一条"
                     : s().attention.state === "asking"
                       ? "自己说……"
-                      : s().attention.state === "closed"
+                      : s().attention.state === "canceled"
                         ? "这次要它做什么（不填就是接着做完）"
                         : `给${head().name}带句话`
                 }
@@ -144,7 +144,7 @@ export function IssueDetail(props: {
                     ? "哪里没过"
                     : s().attention.state === "asking"
                       ? "回答"
-                      : s().attention.state === "closed"
+                      : s().attention.state === "canceled"
                         ? "重开这张工单"
                         : `给${head().name}带句话`
                 }
@@ -213,7 +213,7 @@ export function IssueDetail(props: {
 
       <section aria-label="做出了什么">
         <SheetLabel>做出了什么</SheetLabel>
-        <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "harvested" ? harvestedText(props.issue) : "没有可看的改动。"}</p>}>
+        <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : "没有可看的改动。"}</p>}>
           <Match when={s().showsChanges && changes()}>
             {(c) => (
               <Show
@@ -309,7 +309,7 @@ export function IssueDetail(props: {
               void act(() => api.issue.update({ id, body: { review: v as Review } }));
             }}
             options={[
-              { value: "glance", label: "看一眼就收" },
+              { value: "glance", label: "看一眼就算" },
               { value: "required", label: "必须过验收" },
             ]}
           />
@@ -345,7 +345,7 @@ export function IssueDetail(props: {
         </Show>
         <Property label="用时">{s().usedLine(steps(), now())}</Property>
         <Show when={s().pulled.length > 0}>
-          <Property label="拔了的草">
+          <Property label="已解决的验收意见">
             <For each={s().pulled}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
           </Property>
         </Show>
@@ -354,22 +354,6 @@ export function IssueDetail(props: {
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
-
-const harvestedText = (issue: Issue) => {
-  switch (issue.delivered) {
-    case "merged":
-      return "收获了：改动已经合进主分支。";
-    case "pull_request":
-      return "收获了：PR 合进去了。";
-    case "merged_into_parent":
-      return "合进了种植计划的分支。";
-    case "kept":
-      return "完成了：分支留着，没有合进主分支。";
-    case "none":
-    case undefined:
-      return "完成了：没有改动要合。";
-  }
-};
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 function Question(props: { ask: Question; busy: boolean; onPick: (words: string) => void }) {
@@ -543,7 +527,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
     <div>
       <div class="flex items-start gap-3 pr-10">
         <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
-        <span class="mt-1.5 text-xs text-muted">{tagLabel[tag()]}</span>
+        <span class="mt-1.5 text-xs text-muted">{tagText(props.issue)}</span>
       </div>
       <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">

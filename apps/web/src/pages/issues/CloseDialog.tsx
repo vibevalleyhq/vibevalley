@@ -15,7 +15,7 @@ import { Note } from "./Sheet";
 import { useIssueChanges } from "../../data/issues";
 import { useCore } from "../../data/frame";
 
-/** Closing an issue: harvest it (its checklist first) or let the helper go. `review` opens straight on the checklist. */
+/** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
@@ -29,24 +29,24 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   };
   return (
     <Dialog open onClose={props.onClose} title={`关上「${issueTitle(props.issue)}」`} wide={reviewing()}>
-      <Show when={!reviewing()} fallback={<HarvestReview issue={props.issue.id} onDone={props.onClose} />}>
+      <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} onDone={props.onClose} />}>
         <div>
           <p class="text-base">
             {working()
-              ? `${props.session.name} 还在干这张工单。关上就是叫停它、让它收工，分支上的改动不合进主分支。`
-              : acts().includes("harvest")
-                ? `收获就是把 ${props.session.name} 的分支合进项目的主分支，先看一遍收成清单；不收就是让它收工，改动不合进去。`
-                : `这张工单现在不能收获。直接收工会让 ${props.session.name} 离开，改动不合进主分支。`}
+              ? `${props.session.name} 还在干这张工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。`
+              : acts().includes("complete")
+                ? `完成就是把 ${props.session.name} 的分支合进项目的主分支，先看一遍改动；取消就是让它收工，改动不合进去。`
+                : `这张工单现在不能完成。取消会让 ${props.session.name} 离开，改动不合进主分支。`}
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
-            <Show when={acts().includes("harvest")}>
+            <Show when={acts().includes("complete")}>
               <Button tone="primary" onClick={() => setReviewing(true)}>
-                看收成清单，收获
+                看改动，完成
               </Button>
             </Show>
             <Show when={acts().includes("close")}>
               <Button tone="danger" onClick={() => void cancel()}>
-                {working() ? "叫停并收工" : "不收，直接收工"}
+                {working() ? "叫停并取消" : "取消工单"}
               </Button>
             </Show>
             <Button onClick={() => props.onClose()}>算了</Button>
@@ -58,15 +58,15 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
 }
 
 /** What the branch brings before it is merged. */
-export function HarvestReview(props: { issue: string; onDone: () => void }) {
+export function ChangesReview(props: { issue: string; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
   const acts = () => core()?.issues?.find((i) => i.id === props.issue)?.attention.acts ?? [];
   const take = async () => {
-    if (!acts().includes("harvest")) return;
+    if (!acts().includes("complete")) return;
     const id = props.issue;
-    const harvested = await run(() => api.issue.act({ id, body: { act: "harvest" } }));
-    if (harvested) props.onDone();
+    const completed = await run(() => api.issue.act({ id, body: { act: "complete" } }));
+    if (completed) props.onDone();
   };
   const resolve = async () => {
     if (!acts().includes("resolve")) return;
@@ -86,7 +86,7 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
               <span class="text-berry">看不了改动：{reasonOf(error())}</span>
             </Note>
             <Button class="mt-4" onClick={() => props.onDone()}>
-              先不收
+              先放着
             </Button>
           </div>
         )}
@@ -102,27 +102,27 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
                 fallback={
                   <Show when={empty()}>
                     <Note>
-                      <span class="text-muted">这一单没有改动。收获就是请它收工。</span>
+                      <span class="text-muted">这一单没有改动。完成就是请它收工。</span>
                     </Note>
                   </Show>
                 }
               >
                 <Note tone="berry">
-                  <div class="font-semibold text-berry">合进 {c().base} 会冲突，先没法收</div>
+                  <div class="font-semibold text-berry">合进 {c().base} 会冲突，先没法完成</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().conflicts}>{(f) => <span class="rounded bg-page px-1.5 font-mono text-xs text-berry">{f}</span>}</For>
                   </div>
-                  <div class="mt-1.5 text-xs text-muted">让它在自己的分支上把 {c().base} 合进来、解决冲突、跑一遍测试再提交；做完再来收。</div>
+                  <div class="mt-1.5 text-xs text-muted">让它在自己的分支上把 {c().base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。</div>
                 </Note>
               </Show>
               <Show when={c().behind > 0 && c().conflicts.length === 0}>
                 <p class="text-xs text-muted">
-                  它干活这段时间，{c().base} 上多了 {c().behind} 个提交；收获时会合在一起（多一个合并提交）。
+                  它干活这段时间，{c().base} 上多了 {c().behind} 个提交；完成时会合在一起（多一个合并提交）。
                 </p>
               </Show>
               <Show when={c().uncommitted.length > 0}>
                 <Note tone="wheat">
-                  <div>还有 {c().uncommitted.length} 个文件没提交，收获时会先帮它提交：</div>
+                  <div>还有 {c().uncommitted.length} 个文件没提交，完成时会先帮它提交：</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().uncommitted}>
                       {(f) => (
@@ -135,9 +135,9 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
                 </Note>
               </Show>
               <div class="flex flex-wrap gap-2">
-                <Show when={acts().includes("harvest")}>
+                <Show when={acts().includes("complete")}>
                   <Button tone="primary" onClick={() => void take()}>
-                    {empty() ? "请它收工" : `确认收获，合进 ${c().base}`}
+                    {empty() ? "完成，请它收工" : `完成，合进 ${c().base}`}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>
@@ -145,9 +145,9 @@ export function HarvestReview(props: { issue: string; onDone: () => void }) {
                     让它解决冲突
                   </Button>
                 </Show>
-                <Button onClick={() => props.onDone()}>先不收</Button>
+                <Button onClick={() => props.onDone()}>先放着</Button>
               </div>
-              <Show when={!acts().includes("harvest") && !acts().includes("resolve")}>
+              <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
                 <p class="text-xs text-muted">工单状态变了，先回到工单看看要你做的事。</p>
               </Show>
               <ChangesBody changes={c()} />

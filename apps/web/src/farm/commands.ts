@@ -66,7 +66,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
       fx(s, "spray");
     },
     async harvest(s) {
-      await send(s, { act: "harvest" });
+      await send(s, { act: "complete" });
       fx(s, "harvest", "收进仓库");
     },
     async shovel(s) {

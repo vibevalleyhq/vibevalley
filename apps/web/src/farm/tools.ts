@@ -51,7 +51,7 @@ export function actForTool(tool: Tool, acts: readonly IssueAct[]): IssueAct | un
     case "bug":
       return acts.includes("cure") ? "cure" : undefined;
     case "harvest":
-      return acts.includes("harvest") ? "harvest" : undefined;
+      return acts.includes("complete") ? "complete" : undefined;
     case "shovel":
       return acts.includes("stop") ? "stop" : acts.includes("close") ? "close" : undefined;
     case "hand":

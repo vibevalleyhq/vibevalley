@@ -38,7 +38,7 @@ flowchart LR
   CHAT -->|叫醒、提示| CREW
   CREW -->|channel_say、read_chat……<br/>带自己的令牌| MCP
   MCP --> CHAT
-  FM -->|写工单、派活、收获、拆计划| TK
+  FM -->|写工单、派活、完成、拆计划| TK
   TK -->|开执行、叫走| CREW
   TK -->|worktree、合并| PRJ
   CREW --> AGENTS
@@ -53,7 +53,7 @@ flowchart LR
 
 三条线：
 
-- **命令**：页面通过 HTTP 调 `VibeValleyApi`（`packages/protocol` 的客户端，按 `api.ts` 的接口表）：在田头说话、写和派工单、带话、叫停、收工、收获、种植计划、读配置。帮工在田头说话走另一个入口：服务端的 MCP 端点 `/mcp`（[田头](docs/subsystems/channel.md)）。
+- **命令**：页面通过 HTTP 调 `VibeValleyApi`（`packages/protocol` 的客户端，按 `api.ts` 的接口表）：在田头说话、写和派工单、带话、叫停、收工、完成、计划、读配置。帮工在田头说话走另一个入口：服务端的 MCP 端点 `/mcp`（[田头](docs/subsystems/channel.md)）。
 - **状态**：服务端的核心状态每变一次就是一条事实。页面收折好的帧（`GET /api/v1/state`），自己不折。
 - **语音**：页面和 Agora 频道之间是音频和字幕，服务端只签令牌、请语音管家进出频道（[语音](docs/subsystems/voice.md)）。
 
@@ -77,7 +77,7 @@ flowchart LR
 |---|---|---|
 | `arriving` | 会话正在打开 | — |
 | `working` | 一轮正在进行；可能带 `quietSince`（太久没动静）、`retry` | 没动静：看看过程，不对就叫停 |
-| `ripe` | 上一轮完成 | 收获；会冲突时先让它解决 |
+| `done` | 上一轮做完了，交回来 | 等你看：验收、完成；会冲突时先让它解决 |
 | `failed` | 上一轮失败 | 让它接着修，或请它收工 |
 | `resting` | 被叫停，或服务端重启后回来 | 带句话就接着干 |
 
@@ -147,8 +147,8 @@ flowchart LR
 | `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
 | `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
 | `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
-| `project.check_timeout_seconds` | 收获前在帮工 worktree 里运行 `.vibevalley/check` 的时限，超时拒绝合并 | 1200 |
-| `github.pr_projects` | 收获时提 PR 的项目名列表；还须项目的 `pullRequest.available` 为真，其他项目本地合并 | 空列表 |
+| `project.check_timeout_seconds` | 合进主分支前在帮工 worktree 里运行 `.vibevalley/check` 的时限，超时拒绝合并 | 1200 |
+| `github.pr_projects` | 完成时提 PR 的项目名列表；还须项目的 `pullRequest.available` 为真，其他项目本地合并 | 空列表 |
 | `github.pr_poll_seconds` | 查询开着的 PR 的间隔，单位秒，必须大于 0 | 180 |
 | `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
 | `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |

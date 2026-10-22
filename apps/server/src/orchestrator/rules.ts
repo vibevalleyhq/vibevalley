@@ -36,7 +36,7 @@ export const intake: Readonly<Record<Source, { readonly head: string; readonly n
   recurrence: { head: "[来源：定时]\n", now: false, trigger: "recurrence" },
   // The patrol's and the task graphs' lines are the farm's own.
   patrol: { head: "[来源：巡查]\n", now: false, trigger: "runtime" },
-  graph: { head: "[来源：种植计划]\n", now: false, trigger: "runtime" },
+  graph: { head: "[来源：计划]\n", now: false, trigger: "runtime" },
 };
 
 export function quotaText(info: RuntimeInfo | undefined): string {

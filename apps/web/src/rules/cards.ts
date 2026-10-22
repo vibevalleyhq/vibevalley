@@ -16,7 +16,7 @@ import {
   matchesQuery,
   moveOf,
   type Move,
-  tagLabel,
+  tagText,
   tagOpen,
   taskLine,
 } from "./issues";
@@ -150,7 +150,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       if (item.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(item.assignee === undefined ? "还没选帮工" : nameOf(item.assignee));
       if (item.assignee === undefined || item.project === undefined) lines.push("没选帮工或项目，开工前要选好");
-      lines.push(item.queuedAt !== undefined ? `等空地，${ago(item.queuedAt, now)}排上的` : `写于 ${ago(item.createdAt, now)}`);
+      lines.push(item.queuedAt !== undefined ? `等空位，${ago(item.queuedAt, now)}排上的` : `写于 ${ago(item.createdAt, now)}`);
       return { number: numberOf(item), title: item.title, status: item.status, priority: item.priority, flags, detail: lines.join("\n") };
     }
     case "issue": {
@@ -160,7 +160,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const now0 = session ?? head;
       // The board says what the page says: the attention, when it waits on the owner.
       if (attentionWantsOwner(issue.attention.state)) flags.push({ text: attentionLabel[issue.attention.state], tone: attentionTone[issue.attention.state] });
-      if (tag === "lost") flags.push({ text: "丢了", tone: "berry" });
+      if (issue.canceled === "lost") flags.push({ text: "丢了", tone: "berry" });
       if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);
       if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(`${tookText(now - phase.quietSince)}没动静`);
@@ -171,12 +171,12 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       lines.push([tag === "working" ? `第 ${turns + 1} 轮` : `${turns} 轮`, took, ...(cny !== undefined ? [`¥${cny.toFixed(2)}`] : [])].join(" · "));
       const said = now0.lastRun?.summary;
       if (tag === "waiting" && said) lines.push(said);
-      if (!tagOpen(tag)) lines.push(`${tagLabel[tag]} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
+      if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return {
         number: numberOf(issue),
         title: shortTitle(issueTitle(issue, graphs)),
         status: issue.status,
-        statusTone: tag === "lost" ? "berry" : undefined,
+        statusTone: issue.canceled === "lost" ? "berry" : undefined,
         priority: issue.priority,
         flags,
         detail: lines.join("\n"),
@@ -186,7 +186,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const { issue } = c;
       if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       const tag = issueTag(issue);
-      lines.push(tagOpen(tag) ? "管家在做" : `${tagLabel[tag]} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
+      lines.push(tagOpen(tag) ? "管家在做" : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };
     }
     case "missing":

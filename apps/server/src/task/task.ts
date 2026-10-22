@@ -1,5 +1,5 @@
 // Task graphs: a job split into steps, each worked by its own session on a branch of the graph's,
-// merged back into the graph's branch when it is verified, and the whole graph harvested into the main branch once every
+// merged back into the graph's branch when it is verified, and the whole graph merged into the main branch once every
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
@@ -156,7 +156,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellOrchestrator = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
+    const tellOrchestrator = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【计划】" + text));
 
     const usableAs = options.usable;
     const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;
@@ -366,12 +366,12 @@ export const make = (options: TaskOptions = {}) =>
           ...(isAcceptance(n) ? { frozen: verification?.frozen ?? [] } : {}),
           ...(session?.spent ? { spent: { ...session.spent } } : {}),
         }));
-        if (allSettled(next)) next = withNote({ ...next, state: "ripe" }, "");
+        if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
         yield* putSystem(next).pipe(Effect.mapError((e) => refused(`步骤「${task.title}」已合进计划分支，但完成状态没能保存：${reasonOf(e)}`)));
-        if (next.state === "ripe") {
-          yield* notice("info", "计划「" + next.title + "」都做完了：在「计划」里看看改动，收获进主分支");
+        if (next.state === "ready") {
+          yield* notice("info", "计划「" + next.title + "」都做完了：在「计划」里看看改动，合进主分支");
           yield* tellOrchestrator(
-            next.id + "「" + next.title + "」都做完了，等主人收获（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next),
+            next.id + "「" + next.title + "」都做完了，等主人合进主分支（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next),
           );
         }
       });
@@ -430,7 +430,7 @@ export const make = (options: TaskOptions = {}) =>
             continue;
           }
           if (isBusy(session)) continue;
-          if (session.phase._tag === "ripe") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? "做完了");
+          if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? "做完了");
           else yield* tell(session.id, "接着把这一步做完：" + task.title);
         }
       });
@@ -587,20 +587,20 @@ export const make = (options: TaskOptions = {}) =>
                 return "计划「" + graph.title + "」放弃了" + (graph.branch ? "，分支 " + graph.branch + " 留着" : "");
               }
               case "merge": {
-                if (graph.state !== "ripe" || !graph.branch) return yield* not();
+                if (graph.state !== "ready" || !graph.branch) return yield* not();
                 const merged = yield* Effect.result(projects.mergeBranch(graph.project, graph.branch));
                 if (merged._tag === "Failure") {
                   const f = merged.failure;
                   const why =
                     f.kind === "conflict" ? "合进 " + f.base + " 会冲突（" + f.files.join("、") + "）：" + f.base + " 在这期间变了" : f.reasonText || f.message;
-                  yield* put(withNote(graph, "没收进去：" + why), by);
-                  return yield* Effect.fail(refused("没收进去：" + why + "。计划分支 " + graph.branch + " 留着"));
+                  yield* put(withNote(graph, "没合进去：" + why), by);
+                  return yield* Effect.fail(refused("没合进去：" + why + "。计划分支 " + graph.branch + " 留着"));
                 }
                 yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(
                   Effect.mapError((e) => refused(`计划分支已合进主分支，但完成状态没能保存：${reasonOf(e)}`)),
                 );
-                yield* notice("info", "收了计划「" + graph.title + "」：" + merged.success);
-                return "收了计划「" + graph.title + "」：" + merged.success;
+                yield* notice("info", "计划「" + graph.title + "」合进去了：" + merged.success);
+                return "计划「" + graph.title + "」合进去了：" + merged.success;
               }
             }
             return yield* Effect.fail(refused(`不认识 ${String(action satisfies never)} 这个动作`));
@@ -637,7 +637,7 @@ export const make = (options: TaskOptions = {}) =>
                 if (task.state !== "waiting" && task.state !== "failed")
                   return yield* Effect.fail(refused(task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了"));
                 let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));
-                if (allSettled(next)) next = withNote({ ...next, state: "ripe" }, "");
+                if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
                 yield* put(next, by);
                 if (task.session) yield* dismiss(task.session);
                 yield* recurrence(graph.id);

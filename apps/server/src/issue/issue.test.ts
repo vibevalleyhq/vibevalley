@@ -353,7 +353,7 @@ describe("issues", () => {
       const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
       expect(hired.session).toBeDefined();
       const first = hired.session!;
-      yield* until(() => sessions.sessionOf(first.id)?.phase._tag === "ripe", "the dispatch's report");
+      yield* until(() => sessions.sessionOf(first.id)?.phase._tag === "done", "the dispatch's report");
       const issue = yield* issues.get(first.issue!);
       expect([first.branch, firstBranch]).toEqual([`vibevalley/issue-${issue.number}`, `vibevalley/issue-${issue.number}`]);
       const commit = git(first.worktree!, "rev-parse", "HEAD").trim();
@@ -636,7 +636,7 @@ describe("issues", () => {
       yield* sql`insert into session (id, agent, name, runtime, brief, hired_at, ended_at, closed) values ('ended', 'lab', 'old', 'pi', 'history', 1, 2, 'merged')`.pipe(
         Effect.orDie,
       );
-      const live = { id: "live", agent: "lab", name: "current", runtime: "pi", brief: "history", hiredAt: 3, runs: 0, phase: { _tag: "ripe" } } as Session;
+      const live = { id: "live", agent: "lab", name: "current", runtime: "pi", brief: "history", hiredAt: 3, runs: 0, phase: { _tag: "done" } } as Session;
       yield* core.apply({ type: "hired", session: live });
       for (const [id, at] of [
         ["ended", 1],
@@ -647,7 +647,7 @@ describe("issues", () => {
       const [got] = yield* issues.history();
       expect(got!.sessions.map((s) => [s.id, s.phase._tag])).toEqual([
         ["ended", "closed"],
-        ["live", "ripe"],
+        ["live", "done"],
       ]);
       expect(got!.missingSessions).toEqual(["missing"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

@@ -1,4 +1,6 @@
-// An issue's title in one short line, as the board, the phone and the orchestrator say it.
+// An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
+
+import type { Delivery, Issue, IssueCanceled, IssueStatus } from "../shapes";
 
 const titleMax = 40;
 
@@ -15,3 +17,33 @@ export function shortTitle(text: string): string {
   if (pause >= 4) return head.slice(0, pause).trim();
   return chars.slice(0, titleMax - 1).join("") + "…";
 }
+
+// ── an issue's state in words: the one word list the board, the page, the tools and the orchestrator say ──
+
+export const statusLabel: Readonly<Record<IssueStatus, string>> = {
+  backlog: "备选",
+  todo: "待办",
+  in_progress: "处理中",
+  in_review: "等你看",
+  done: "已完成",
+  canceled: "已取消",
+};
+
+/** What a done issue delivered. */
+export const deliveredLabel: Readonly<Record<Delivery, string>> = {
+  merged: "合进了主分支",
+  merged_into_parent: "合进了计划的分支",
+  pull_request: "PR 合进去了",
+  kept: "分支留着没合",
+  none: "没有改动要合",
+};
+
+/** Why a canceled issue was. dismissed is the owner's (a pull request closed unmerged too). */
+export const canceledLabel: Readonly<Record<IssueCanceled, string>> = {
+  dismissed: "取消了",
+  lost: "干活的目录丢了",
+};
+
+/** What its close says: done with what it delivered, or canceled and why. */
+export const closedText = (t: Pick<Issue, "status" | "delivered" | "canceled">): string =>
+  t.delivered ? "已完成，" + deliveredLabel[t.delivered] : t.canceled ? "已取消，" + canceledLabel[t.canceled] : statusLabel[t.status];

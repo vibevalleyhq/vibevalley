@@ -200,7 +200,7 @@ export function removeTask(graph: TaskGraph, id: string): EditResult {
 export function taskBrief(graph: TaskGraph, task: Task): string {
   const index = graph.tasks.findIndex((n) => n.id === task.id) + 1;
   const lines = [
-    `这是种植计划「${graph.title}」里的一步：${task.title}（步骤 ${task.id}，第 ${index}/${graph.tasks.length} 步）。`,
+    `这是计划「${graph.title}」里的一步：${task.title}（步骤 ${task.id}，第 ${index}/${graph.tasks.length} 步）。`,
     "整个计划要做的：" + graph.goal,
     "",
     "你这一步的工单：",
@@ -432,7 +432,7 @@ export function splitBrief(goal: string, project: string, agents: readonly Agent
     ],
   };
   const lines = [
-    "这一轮你是规划师：把下面这件事拆成一张种植计划，交给几个帮工分头去做。你自己不写代码、不改文件、不提交。",
+    "这一轮你是规划师：把下面这件事拆成一张计划，交给几个帮工分头去做。你自己不写代码、不改文件、不提交。",
     "",
     "要做的事：" + goal.trim(),
     `项目：${project}（你现在就在它的目录里）`,

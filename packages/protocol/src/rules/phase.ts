@@ -33,7 +33,7 @@ export type Need =
   | { readonly kind: "quiet"; readonly since: number }
   | { readonly kind: "retrying"; readonly retry: Retry }
   | { readonly kind: "conflict"; readonly conflict: Conflict }
-  | { readonly kind: "harvest" }
+  | { readonly kind: "review" }
   | { readonly kind: "fix" };
 
 export function needOf(h: Session): Need | undefined {
@@ -43,8 +43,8 @@ export function needOf(h: Session): Need | undefined {
       if (p.quietSince !== undefined) return { kind: "quiet", since: p.quietSince };
       if (p.retry !== undefined) return { kind: "retrying", retry: p.retry };
       return undefined;
-    case "ripe":
-      return h.conflict ? { kind: "conflict", conflict: h.conflict } : { kind: "harvest" };
+    case "done":
+      return h.conflict ? { kind: "conflict", conflict: h.conflict } : { kind: "review" };
     case "failed":
       return { kind: "fix" };
     case "resting":
@@ -84,8 +84,8 @@ export function phaseWords(h: Session): string {
       }
       return what;
     }
-    case "ripe":
-      return "这一轮做完了，等收获" + conflict;
+    case "done":
+      return "这一轮做完了，等你看" + conflict;
     case "failed":
       return "这一轮失败了";
     case "resting": {

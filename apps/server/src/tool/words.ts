@@ -13,7 +13,7 @@ import {
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, statusLabel, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
@@ -52,9 +52,9 @@ export function changesText(c: Changes): string {
           .map((f) => f.path + "（" + (f.added < 0 ? "二进制" : `+${f.added} −${f.removed}`) + "）")
           .join("、"),
     );
-  if (c.uncommitted.length > 0) lines.push("还没提交（收获时会一起提交）：" + paths(c.uncommitted));
+  if (c.uncommitted.length > 0) lines.push("还没提交（完成时会一起提交）：" + paths(c.uncommitted));
   if (c.behind > 0) lines.push(`这期间 ${c.base} 上多了 ${c.behind} 个提交。`);
-  lines.push(c.conflicts.length > 0 ? "合进去会冲突：" + c.conflicts.join("、") + "。收获前要先让它解决。" : "能干净地合进去。");
+  lines.push(c.conflicts.length > 0 ? "合进去会冲突：" + c.conflicts.join("、") + "。完成前要先让它解决。" : "能干净地合进去。");
   return lines.join("\n");
 }
 
@@ -104,17 +104,7 @@ export const priorityOf = (word: string): Priority | undefined => priorityNames[
 
 const priorityWords: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
-/** How a status is said back when the word for it is not known: the first word for each. */
-const statusWords: Readonly<Record<IssueStatus, string>> = {
-  backlog: "备选",
-  todo: "待办",
-  in_progress: "处理中",
-  in_review: "等你看",
-  done: "已完成",
-  canceled: "已取消",
-};
-
-export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusWords[s]).join("、");
+export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusLabel[s]).join("、");
 export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityWords[p]).join("、");
 
 /** A channel in one line: its name, what it is for, its default project. */

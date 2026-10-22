@@ -566,7 +566,7 @@ describe("projects", () => {
     30_000,
   );
 
-  it.effect("a local harvest checks the tree with main's changes in it", () => {
+  it.effect("a local merge checks the tree with main's changes in it", () => {
     const root = projectsDir();
     return projects(
       root,

@@ -10,8 +10,8 @@ export const attentionLabel: Record<Attention, string> = {
   asking: "等你回答",
   reviewing: "等你验收",
   stuck: "卡住了",
-  harvested: "收获了",
-  closed: "关了",
+  done: "已完成",
+  canceled: "已取消",
 };
 
 /** What each act is called, on its button and in a refusal. */
@@ -20,7 +20,7 @@ export const actLabel: Record<IssueAct, string> = {
   answer: "回答",
   accept: "验收通过",
   reject: "打回",
-  harvest: "收获",
+  complete: "完成",
   keep: "完成，分支留着",
   acknowledge: "知道了",
   resolve: "让它解决冲突",
@@ -28,7 +28,7 @@ export const actLabel: Record<IssueAct, string> = {
   cure: "接着修",
   tell: "带话",
   stop: "叫停这一轮",
-  close: "关上",
+  close: "取消",
   reopen: "重开",
 };
 

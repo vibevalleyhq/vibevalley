@@ -63,8 +63,8 @@ export function OlderLink(props: { hidden: number; onClick: () => void }) {
 const emptyText: Record<Lane, string> = {
   todo: "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
   working: "没有在干的活。",
-  waiting: "做完的、没做成的在这里等你看；拖到「已关」收获或收工。",
-  closed: "关了的工单；拖回「处理中」重开。",
+  waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
+  closed: "已完成、已取消的工单；拖回「处理中」重开。",
 };
 
 export interface BoardProps {
@@ -135,7 +135,7 @@ function LaneView(props: {
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
   const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
-  const head = () => (props.lane === "working" ? `${props.cards.filter((c) => c.kind === "issue").length} / ${maxRunning} 块地` : `${props.cards.length}`);
+  const head = () => (props.lane === "working" ? `${props.cards.filter((c) => c.kind === "issue").length} / ${maxRunning} 个空位` : `${props.cards.length}`);
   return (
     <section
       aria-label={laneLabel[props.lane]}

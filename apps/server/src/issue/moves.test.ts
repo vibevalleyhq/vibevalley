@@ -35,11 +35,11 @@ describe("status moves", () => {
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
   });
 
-  it("a round that failed is not harvested, from the board, the command line or the orchestrator alike", () => {
+  it("a round that failed is not completed, from the board, the command line or the orchestrator alike", () => {
     const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
-    // Stopped halfway is not failed: what is there may still be harvested.
+    // Stopped halfway is not failed: what is there may still be completed.
     expect(statusMoves(issue("in_review", true, { attention: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
   });
 
@@ -56,7 +56,7 @@ describe("status moves", () => {
 
 describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
-    ({ id: "w1", phase: { _tag: "ripe" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
+    ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
   const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], review: "glance", createdAt: 0 } as unknown as Issue;
   // One table: an act that takes the issue to done is offered exactly when the move is.
   it("agree on done, whatever the round came to", () => {
@@ -73,7 +73,7 @@ describe("moves and the attention", () => {
     for (const [more, s] of cases) {
       const t = { ...base, ...more } as Issue;
       const attention = attentionOf(t, s);
-      const offered = attention.acts.some((a) => a === "harvest" || a === "acknowledge");
+      const offered = attention.acts.some((a) => a === "complete" || a === "acknowledge");
       expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, attention }).includes("done") });
     }
   });

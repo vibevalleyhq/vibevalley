@@ -55,8 +55,8 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
       case "paused":
         graph("paused", after.note);
         break;
-      case "ripe":
-        graph("ripe");
+      case "ready":
+        graph("ready");
         break;
       case "done":
         graph("merged");
@@ -130,10 +130,10 @@ export function graphEventText(e: GraphChange, titleOf: (task: string) => string
       return "暂停了" + why;
     case "resumed":
       return "接着做了";
-    case "ripe":
-      return "都做完了，等收获";
+    case "ready":
+      return "都做完了，等主人合进主分支";
     case "merged":
-      return "收进了主分支";
+      return "合进了主分支";
     case "abandoned":
       return "放弃了" + why;
     case "noted":

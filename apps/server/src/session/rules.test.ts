@@ -157,7 +157,7 @@ describe("a session's events", () => {
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
     expect(exited.facts).toEqual([{ type: "report", id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
-    expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "ripe" } } as Session, none, ctx).facts).toEqual([]);
+    expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } } as Session, none, ctx).facts).toEqual([]);
   });
 
   it("near", () => {
@@ -238,7 +238,7 @@ describe("a run's report", () => {
 
 describe("room and names", () => {
   const h = (id: string, runtime: string, project: string, busy: boolean) =>
-    ({ id, name: id, agent: "zhou", runtime, project, phase: busy ? { _tag: "working", doing: thinking } : { _tag: "ripe" } }) as Session;
+    ({ id, name: id, agent: "zhou", runtime, project, phase: busy ? { _tag: "working", doing: thinking } : { _tag: "done" } }) as Session;
   const limits = { workspace: 3, perRuntime: 2, perProject: 2 };
 
   it("room in the workspace", () => {
@@ -294,7 +294,7 @@ describe("work that does not go in", () => {
 
 it("makes room with whoever has been idle longest", () => {
   const s = (id: string, hiredAt: number, tag: string) => ({ id, hiredAt, phase: { _tag: tag } }) as unknown as Session;
-  const farm = [s("a", 3, "ripe"), s("b", 1, "working"), s("c", 2, "resting")];
+  const farm = [s("a", 3, "done"), s("b", 1, "working"), s("c", 2, "resting")];
   expect(whoMakesRoom(farm, 4)).toBeUndefined();
   expect(whoMakesRoom(farm, 3)?.id).toBe("c");
   expect(whoMakesRoom([s("b", 1, "working")], 1)).toBeUndefined();

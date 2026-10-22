@@ -1,5 +1,6 @@
 // An issue's lane, title and status and priority words.
 
+import { closedText, statusLabel } from "@vibevalley/protocol/rules";
 import {
   type WorkspaceState,
   type Issue,
@@ -12,48 +13,28 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 
-export type IssueTag = "working" | "waiting" | "harvested" | "merged" | "kept" | "done" | "dropped" | "lost" | "closed";
-
-export const tagLabel: Record<IssueTag, string> = {
-  working: "处理中",
-  waiting: "等你看",
-  harvested: "已收获",
-  merged: "合进了计划",
-  kept: "完成，分支留着",
-  done: "完成了",
-  dropped: "没收就收工了",
-  lost: "丢了",
-  closed: "已关",
-};
-
-export const tagOpen = (t: IssueTag) => t === "working" || t === "waiting";
+/** Where a dispatched issue is on the board: not sent yet, in the works, waiting on the owner, or closed. */
+export type IssueTag = "queued" | "working" | "waiting" | "closed";
 
 export function issueTag(issue: Issue): IssueTag {
-  if (issue.status === "in_progress") return "working";
-  if (issue.status === "in_review") return "waiting";
-  switch (issue.delivered) {
-    case "merged":
-    case "pull_request":
-      return "harvested";
-    case "merged_into_parent":
-      return "merged";
-    case "kept":
-      return "kept";
-    case "none":
-      return "done";
-    case undefined:
-      return issue.canceled === "lost" ? "lost" : issue.canceled === "dismissed" ? "dropped" : "closed";
+  switch (issue.status) {
+    case "backlog":
+    case "todo":
+      return "queued";
+    case "in_progress":
+      return "working";
+    case "in_review":
+      return "waiting";
+    case "done":
+    case "canceled":
+      return "closed";
   }
 }
 
-export const statusLabel: Record<IssueStatus, string> = {
-  backlog: "草稿",
-  todo: "待办",
-  in_progress: "处理中",
-  in_review: "等你看",
-  done: "已关",
-  canceled: "收工了",
-};
+export const tagOpen = (t: IssueTag) => t !== "closed";
+
+/** The tag in words: the status while open, what its close says after. */
+export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? statusLabel[issue.status] : closedText(issue));
 
 export const priorityLabel: Record<Priority, string> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
 
@@ -79,10 +60,10 @@ export function taskLine(g: TaskGraph) {
       return `做到 ${Math.round(g.settled ?? 0)} / ${g.tasks.length} 步`;
     case "paused":
       return "暂停了";
-    case "ripe":
-      return "都做完了，等你收获";
+    case "ready":
+      return "都做完了，等你合进主分支";
     case "done":
-      return "收获了";
+      return "合进了主分支";
     case "abandoned":
       return "放弃了";
   }
@@ -162,7 +143,7 @@ export function runTriggerText(t: RunTrigger) {
     case "comment":
       return t.message ? `带话（#${t.message.slice(0, 8)}）` : "带话";
     case "task":
-      return "种植计划";
+      return "计划";
     case "recurrence":
       return t.missed ? "定时（补跑）" : "定时";
     case "refine":

@@ -1,10 +1,10 @@
 // The projects under the work root and their git: making and listing them, a session's
-// worktree on its own branch, what a branch changed, harvesting it into the main branch, a graph's branch, the project's
+// worktree on its own branch, what a branch changed, merging it into the main branch, a graph's branch, the project's
 // own check (.vibevalley/check), GitHub pull requests through gh, and what the code is written in.
 //
-// A harvest that would conflict is not attempted: the session is asked to merge the main branch in and resolve it.
+// A merge that would conflict is not attempted: the session is asked to merge the main branch in and resolve it.
 // Merging into a graph's branch never checks it out: merge-tree writes the tree, commit-tree and update-ref put it on
-// the branch. Two sessions sent to a new project at once must not both run git init, and two harvests must not merge
+// the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -63,7 +63,7 @@ export interface Merged {
   readonly warning?: string;
 }
 
-/** Why a harvest did not go in: a conflict (and with what), the check, or git. */
+/** Why a merge did not go in: a conflict (and with what), the check, or git. */
 export class MergeFailure extends Error {
   readonly _tag = "MergeFailure";
   constructor(
@@ -163,7 +163,7 @@ const failed = (e: unknown) => (e instanceof MergeFailure ? e : new MergeFailure
 const unchangedBranch = (path: string, branch: string, checked: string) =>
   Effect.gen(function* () {
     if ((yield* git(path, "rev-parse", "refs/heads/" + branch)) !== checked)
-      return yield* Effect.fail(new MergeFailure("check", "分支在检查以后又变了，请重新检查再收获"));
+      return yield* Effect.fail(new MergeFailure("check", "分支在检查以后又变了，请重新检查再合"));
   });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
@@ -755,7 +755,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                 yield* unchangedBranch(path, place.branch!, checked);
                 const head = yield* git(path, "symbolic-ref", "--short", "HEAD");
                 if (!(yield* gitOk(path, "merge-base", "--is-ancestor", head, checked)))
-                  return yield* Effect.fail(new MergeFailure("check", "主分支在检查期间又变了，请重新检查再收获"));
+                  return yield* Effect.fail(new MergeFailure("check", "主分支在检查期间又变了，请重新检查再合"));
                 const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`);
                 const warning = yield* cleanupMerged(place, path);
                 return {

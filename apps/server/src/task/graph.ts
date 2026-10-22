@@ -12,7 +12,7 @@ export const taskOf = (graph: TaskGraph, id: string) => (graph.tasks ?? []).find
 export const isSettled = (n: Task) => n.state === "merged" || n.state === "skipped";
 
 export const asksForYou = (graph: TaskGraph) =>
-  graph.state === "draft" || graph.state === "ripe" || (isOpen(graph) && (graph.tasks ?? []).some((n) => n.state === "failed"));
+  graph.state === "draft" || graph.state === "ready" || (isOpen(graph) && (graph.tasks ?? []).some((n) => n.state === "failed"));
 
 export function blockedBy(graph: TaskGraph, task: Task): string[] {
   return (task.needs ?? []).filter((id) => {
@@ -44,13 +44,13 @@ export const graphStateText: Record<GraphState, string> = {
   draft: "等你看过再开工",
   running: "在做",
   paused: "暂停了",
-  ripe: "做完了，等收获",
-  done: "收完了",
+  ready: "都做完了，等你合进主分支",
+  done: "合进了主分支",
   abandoned: "放弃了",
 };
 
 /** What each graph action is called; the buttons and the refusals say the same word. */
-export const graphActionText: Record<GraphAction, string> = { start: "开工", pause: "暂停", resume: "继续", abandon: "放弃", merge: "收获" };
+export const graphActionText: Record<GraphAction, string> = { start: "开工", pause: "暂停", resume: "继续", abandon: "放弃", merge: "合进主分支" };
 
 /** The short tag beside a graph's state in the list; graphStateText is the longer sentence. */
 export const graphStateTag: Record<GraphState, string> = {
@@ -58,8 +58,8 @@ export const graphStateTag: Record<GraphState, string> = {
   draft: "等你看",
   running: "在做",
   paused: "暂停了",
-  ripe: "可收获",
-  done: "收完了",
+  ready: "等你合",
+  done: "合进了",
   abandoned: "放弃了",
 };
 
@@ -112,7 +112,7 @@ export function graphActions(graph: TaskGraph): GraphAction[] {
   if (graph.state === "draft" && graphProblems(graph.tasks).length === 0) out.push("start");
   if (graph.state === "running") out.push("pause");
   if (graph.state === "paused") out.push("resume");
-  if (graph.state === "ripe" && graph.branch !== undefined) out.push("merge");
+  if (graph.state === "ready" && graph.branch !== undefined) out.push("merge");
   if (isOpen(graph)) out.push("abandon");
   return out;
 }

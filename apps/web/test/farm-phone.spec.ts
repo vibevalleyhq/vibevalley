@@ -63,20 +63,20 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     brief: made.title,
     hiredAt: Date.now() - 600_000,
     runs: 1,
-    phase: { _tag: "ripe" },
+    phase: { _tag: "done" },
     issue: made.id,
     lastRun: { outcome: "completed", summary: "做完了，测试全过", at: Date.now() - 60_000 } as never,
     play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as never,
   };
   const call: InboxItem = {
     id: "merge-w1-1",
-    kind: "merge",
+    kind: "review",
     from: { kind: "session", id: "w1", name: "阿狐", agent: "fox" },
     who: "阿狐",
     text: "记住我做完了，看看能不能收",
     at: Date.now(),
     target: { kind: "session", id: "w1" },
-    words: { label: "活熟了", title: "阿狐 做完了", body: "记住我做完了，看看能不能收", tray: "阿狐 做完了，可以收" },
+    words: { label: "等你看", title: "阿狐 做完了", body: "记住我做完了，看看能不能合", tray: "阿狐 做完了，等你看" },
   };
   const base: StateFrame = {
     ...frame,
@@ -92,7 +92,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const phone = page.getByRole("region", { name: "农场手机" });
   await expect(phone.getByText("来电…")).toBeVisible({ timeout: 10_000 });
   await expect(phone.getByText("阿狐")).toBeVisible();
-  await expect(phone.getByText("活熟了")).toBeVisible();
+  await expect(phone.getByText("等你看")).toBeVisible();
   await expect(page.getByRole("button", { name: "手机：来电" })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("phone-ringing.png") });
   // Answering is the call to the orchestrator, the chat's call button's one.
@@ -110,7 +110,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone).toHaveCount(0);
   await page.getByRole("button", { name: "手机" }).click();
   await phone.getByRole("button", { name: "记录" }).click();
-  await expect(phone.getByText("阿狐 · 活熟了")).toBeVisible();
+  await expect(phone.getByText("阿狐 · 等你看")).toBeVisible();
   await expect(phone.getByText("接了")).toBeVisible();
   await phone.getByRole("button", { name: "未接 0" }).click();
   await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();

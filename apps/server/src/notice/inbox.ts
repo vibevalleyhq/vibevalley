@@ -53,12 +53,12 @@ function gathered(state: WorkspaceState): Unworded[] {
         });
         break;
       }
-      case "merge":
+      case "review":
         out.push({
-          item: { id: `${h.id}:merge:${h.runs}`, kind: "merge", from, text: cut(summary, 40), at, target },
+          item: { id: `${h.id}:review:${h.runs}`, kind: "review", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
-          brief: who + "的活做完 {ago}了还没收：「" + slice(h.brief, 0, 60) + "」",
+          brief: who + "的活做完 {ago}了还没人看：「" + slice(h.brief, 0, 60) + "」",
         });
         break;
       case "fix":
@@ -108,14 +108,14 @@ function gathered(state: WorkspaceState): Unworded[] {
         out.push({
           item: { id: graph.id + ":draft", kind: "graph-draft", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
-          brief: "种植计划「" + graph.title + "」（" + graph.id + "）拆好了，{ago}还没人看",
+          brief: "计划「" + graph.title + "」（" + graph.id + "）拆好了，{ago}还没人看",
         });
         break;
-      case "ripe":
+      case "ready":
         out.push({
-          item: { id: graph.id + ":ripe", kind: "graph-ripe", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
+          item: { id: graph.id + ":ready", kind: "graph-ready", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
-          brief: "种植计划「" + graph.title + "」（" + graph.id + "）都做完了，{ago}还没收",
+          brief: "计划「" + graph.title + "」（" + graph.id + "）都做完了，{ago}还没合进主分支",
         });
         break;
       case "running":
@@ -129,7 +129,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           out.push({
             item: { id, kind: "task-failed", from: orchestrator, text: cut(graph.title + "：" + task.title, 40), at: graph.createdAt, target },
             channel: general,
-            brief: "种植计划「" + graph.title + "」（" + graph.id + "）的步骤 " + task.id + "「" + task.title + "」没做成，{ago}没人管了" + why,
+            brief: "计划「" + graph.title + "」（" + graph.id + "）的步骤 " + task.id + "「" + task.title + "」没做成，{ago}没人管了" + why,
           });
         }
         break;
@@ -167,7 +167,7 @@ function gathered(state: WorkspaceState): Unworded[] {
 
 type Want =
   | { readonly kind: "ask"; readonly questions: readonly Question[] }
-  | { readonly kind: "merge" | "fix" | "interrupted" | "conflict" }
+  | { readonly kind: "review" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
 /** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
@@ -180,8 +180,8 @@ function wantOf(h: Session, state: WorkspaceState): Want | undefined {
       case undefined:
       case "retrying":
         return undefined;
-      case "harvest":
-        return { kind: "merge" };
+      case "review":
+        return { kind: "review" };
       case "fix":
         return { kind: "fix" };
       case "conflict":
@@ -195,7 +195,7 @@ function wantOf(h: Session, state: WorkspaceState): Want | undefined {
     case "asking":
       return { kind: "ask", questions: issue.questions };
     case "reviewing":
-      return { kind: "merge" };
+      return { kind: "review" };
     case "stuck":
       switch (st.stuck) {
         case "failed":
@@ -213,8 +213,8 @@ function wantOf(h: Session, state: WorkspaceState): Want | undefined {
     case "draft":
     case "queued":
     case "working":
-    case "harvested":
-    case "closed":
+    case "done":
+    case "canceled":
       return undefined;
   }
 }
@@ -225,7 +225,7 @@ function clipLine(text: string, max = 140) {
 }
 
 const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWords>> = {
-  merge: (who, text) => ({ label: "活熟了", title: `${who} 做完了`, body: text, tray: `${who} 做完了，可以收` }),
+  review: (who, text) => ({ label: "等你看", title: `${who} 做完了`, body: text, tray: `${who} 做完了，等你看` }),
   ask: (who, text) => ({ label: "有问题问你", title: `${who} 有问题问你`, body: text }),
   fix: (who, text) => ({ label: "活没做成", title: `${who} 没做成`, body: text, tray: `${who} 没做成` }),
   interrupted: (who, text) => ({ label: "停在了半路", title: `${who} 停在了半路`, body: text }),
@@ -237,11 +237,11 @@ const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWord
     tray: `${who} 好一阵没动静`,
   }),
   "graph-draft": (_, text) => ({ label: "计划拆好了", title: `计划「${text}」拆好了`, body: "看过再开工", tray: `计划「${text}」等你看` }),
-  "graph-ripe": (_, text) => ({
-    label: "计划能收了",
+  "graph-ready": (_, text) => ({
+    label: "计划做完了",
     title: `计划「${text}」都做完了`,
-    body: "看看改动，收获进主分支",
-    tray: `计划「${text}」可以收获`,
+    body: "看看改动，合进主分支",
+    tray: `计划「${text}」等你合进主分支`,
   }),
   "task-failed": (_, text) => ({ label: "计划卡住了", title: `计划卡住了：${text}`, body: "重试、改工单，或者跳过", tray: `计划「${text}」没做成` }),
   mention: (who, text) => ({ label: "找你", title: `${who} 叫你`, body: text }),

@@ -1,4 +1,4 @@
-// A whole farm for the flow tests, which go through several services at once (an issue refined, sent, harvested; a
+// A whole farm for the flow tests, which go through several services at once (an issue refined, sent, completed; a
 // memory kept by one session and recalled by the next). No binary, login or model: the helpers are oar's scripted
 // runtime over real git repositories in temporary folders, doing what the words of their job say (testing/helper.ts).
 

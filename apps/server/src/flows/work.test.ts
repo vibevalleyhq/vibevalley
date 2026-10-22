@@ -103,7 +103,7 @@ describe("a session's work", () => {
         const sessions = yield* Sessions;
         const back = sessions.find(session!.id)!;
         expect(back).toBeDefined();
-        expect(back.session.phase._tag).toBe("ripe");
+        expect(back.session.phase._tag).toBe("done");
         expect(back.place.branch).toBe(session!.branch);
         expect(yield* sessions.tell(session!.id, "再加一句并提交", { kind: "comment" })).toMatch(/醒了/);
         yield* w.nextReport;

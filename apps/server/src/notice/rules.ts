@@ -12,7 +12,7 @@ const patrolGrace: Partial<Record<InboxKind, number>> = {
   ask: 15 * 60_000,
   interrupted: 30 * 60_000,
   quiet: 20 * 60_000,
-  merge: 2 * 60 * 60_000,
+  review: 2 * 60 * 60_000,
   conflict: 2 * 60 * 60_000,
   "task-failed": 30 * 60_000,
 };

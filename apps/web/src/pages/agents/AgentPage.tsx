@@ -466,7 +466,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             </Labeled>
             <Toggle
               label="每个帮工一个 git worktree"
-              hint="每个帮工在自己的分支上改，几个帮工不会互相覆盖；收获时合进项目。关掉就直接在项目里改，没有分支可合。"
+              hint="每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进项目。关掉就直接在项目里改，没有分支可合。"
               checked={draft().worktree}
               onChange={(worktree) => props.patch({ ...draft(), worktree })}
             />

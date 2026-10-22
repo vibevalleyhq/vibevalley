@@ -42,7 +42,7 @@
 | 主人在频道里 | 被 @ 的；没 @ 别人时是管家 | 这个频道里的帮工 |
 | 主人在串里 | 被 @ 的、这张工单现在的帮工、跟着这个串的；工单没人在干时只记下 | — |
 | 管家或帮工 | 被 @ 的；在工单串里说话叫醒这张工单现在的帮工 | — |
-| 帮工的汇报 | 没做成时叫醒管家 | 做完时给管家；种植计划里的帮工不给，计划自己告诉管家 |
+| 帮工的汇报 | 没做成时叫醒管家 | 做完时给管家；计划里的帮工不给，计划自己告诉管家 |
 | 派活消息、农场的提示（`notice`）、通话里说过的话 | 谁也不叫 | — |
 
   在串里说过话或被 @ 过，就跟着这个串（`channel_follow`）。`@主人` 不产生投递，它进 Inbox。
@@ -110,7 +110,7 @@
 - **管家（`orchestrator`）**：订阅 `forOrchestrator`（叫醒它的话，按对话分批）和 `orchestratorDigest`（只让它知道的汇报）；用 `orchestratorSays` 说话、`spoken` 记下通话里的话。主人的话经 `orchestrator.Say` 进田头，管家照田头的规则被叫醒。
 - **主人在串里的话**：`ownerInThread` 把主人在任何一个串里说完的话（不管经哪条路进来）告诉订阅的人；工单靠它知道主人在工单串里说了话。
 - **工单（`issue`）**：带话、验收意见、冲突和检查失败经 `tellSession`；首次派活时记下频道（`channelOf`）。
-- **定时（`recurrence`）、种植计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
+- **定时（`recurrence`）、计划**：到点时用 `notice` 在频道里说一句再派活；派活工具按 `channelByName`、`channelOf` 取频道和它的默认项目。
 - **工具（`tool`、`mcp`）**：管家和帮工的说话工具都调 `speak`、`read`、`Inbox`；`/mcp` 用每个会话自己的令牌认出是谁在说话，令牌只用来分清人，不用来防人。
 - **语音（`voice`）**：电话里说的和回答经 `spoken` 留在田头，不叫醒谁，管家在电话里已经听过。
 - **连接器 → 管家、田头**：收进来的话交给 `orchestrator.Say`；送出去的读核心事件里的 `message`，只读不改田头。主人在外面说话也让农场开门（通话状态成 `live`）。
@@ -140,7 +140,7 @@
 - 给 agent 的话从哪几条路来、什么时候交给它收成一处（每个 agent 一个信箱）：[编排层：每个 agent 一个信箱](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md)。
 - 不接受 MCP 的农机用的命令行版说话工具：[其他农机](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
 - 管家和帮工的工具按能力分配（现在是 `tool/tool.ts` 里两张写死的表）：[管家也是一个 agent](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md)。
-- 种植计划自己的串、串的静音和退出跟帖、Telegram 等别的渠道：还没有提案。
+- 计划自己的串、串的静音和退出跟帖、Telegram 等别的渠道：还没有提案。
 
 ## 怎么验证
 
