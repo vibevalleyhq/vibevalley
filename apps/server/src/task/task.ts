@@ -337,7 +337,8 @@ export const make = (options: TaskOptions = {}) =>
         const merged = yield* Effect.result(
           work.handOver(
             sessionId,
-            "merged_into_graph",
+            // Its issue is done, delivered into the graph's branch (graphIssues): the session leaves as a completed one.
+            "completed",
             (place) =>
               Effect.gen(function* () {
                 verification = yield* verified(graph, task, place.cwd);

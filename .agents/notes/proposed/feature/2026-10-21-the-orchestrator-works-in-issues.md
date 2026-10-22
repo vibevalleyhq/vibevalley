@@ -9,7 +9,7 @@ Status: proposed
 - **默认动作是派活。** 提示的第一条是「主人要做一件事：用 dispatch 派活」（`apps/server/src/orchestrator/orchestrator.ts`）；`dispatch` 把建单、选人和开工绑在一次调用里，直接 `Issue.hire`，满了就拒绝，不像主人在看板上开工那样排队。主人只想讨论、只想记下时，模型最顺手的仍是 `dispatch`：仓库里唯一的评测样例 `think-before-dispatch.json` 就是这一类错。
 - **换不了人。** `issue_update` 的 `agent` 只在派出去以前能改；重开（`reopen`）总派给上一次的档案（`issue.ts` 的 `reopen` 用 `last.agent`）。主人说「#41 换个人做」，管家只能取消再建一张，工单串、分支和来龙去脉都断了。
 - **停、缓、取消没分开说。** 三种动作服务端都有，提示里没有对照，模型会拿 `dismiss` 或「已取消」去执行「先停一下」。
-- **完成被说成合并。** 主人说「收下」，管家只有 `merge` 可用；「查一下」交回来的结论、没改代码的活、这次不想合的改动，管家都没法照实收尾（工单怎么完成见[工单为本：完成是主人对工单的结论，合并只是交付的一种](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)）。
+- **完成被说成合并。** 主人说「收下」，管家只有 `merge` 可用；「查一下」交回来的结论、没改代码的活、这次不想合的改动，管家都没法照实收尾（工单怎么完成见[工单](docs/subsystems/issue.md)「完成和交付」）。
 
 ## Proposal
 
@@ -67,7 +67,7 @@ Status: proposed
 
 ### 收尾是完成，不是合并
 
-`merge` 工具去掉，并进 `issue_status` 挪到已完成：带交付方式（不填照工单的默认），落地的规矩和 `merge` 一样，要这一轮有主人的话。工单怎么完成、交付怎么算，归工单服务（[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)）；管家这边只改工具和说法：完成以后照服务端的回答说交付了什么（「#41 合进 clock-in 的 main 了」「#41 收下了，没有改动」「#41 收下了，分支留着」），不把完成都说成合并。
+`merge` 工具去掉，并进 `issue_status` 挪到已完成：带交付方式（不填照工单的默认），落地的规矩和 `merge` 一样，要这一轮有主人的话。工单怎么完成、交付怎么算，归工单服务（[工单](docs/subsystems/issue.md)）；管家这边只改工具和说法：完成以后照服务端的回答说交付了什么（「#41 合进 clock-in 的 main 了」「#41 收下了，没有改动」「#41 收下了，分支留着」），不把完成都说成合并。
 
 ### 管家的提示照意图写
 
@@ -90,14 +90,14 @@ Status: proposed
 
 ### 拆出去的
 
-- 工单怎么完成、交付物和查询（`deliver: answer`）：[工单为本：完成是主人对工单的结论，合并只是交付的一种](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)。本文只管管家怎么用它。
+- 工单怎么完成、交付物和查询（`deliver: answer`）：[工单](docs/subsystems/issue.md)「完成和交付」。本文只管管家怎么用它。
 - 早报、项目健康度、工单之间的关系、分拣建议：[管家给主人报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。
 
 ### 步骤
 
 1. 按工单点名、`issues`、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」。
 2. 去掉 `dispatch`，`issue_create` 加 `start`；换人；提示照意图写；评测样例。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」和[工单](docs/subsystems/issue.md)「换人」。
-3. 跟着[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单（已经做了，评测样例 `answer-when-asked-to-check`）。
+3. 跟着[工单](docs/subsystems/issue.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单（已经做了，评测样例 `answer-when-asked-to-check`）。
 4. 跨轮的授权，和上面的分寸表落进工具。
 
 ## Alternatives considered

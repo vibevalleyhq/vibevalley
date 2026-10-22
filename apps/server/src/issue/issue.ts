@@ -165,22 +165,16 @@ const json = <T>(text: string | null): T | undefined => {
 
 const leftText: Readonly<Record<SessionClose, string>> = {
   merged: "完成了，改动已经合进项目的主分支",
-  merged_into_graph: "完成了，改动合进了计划的分支",
   completed: "工单完成了，改动没有合进主分支",
   dismissed: "取消了，改动没有合进主分支",
   lost: "干活的目录丢了，改动可能不在了",
 };
 
 /** What a session's leaving says of its issue, when the issue is still open then: its work merged is done, the rest is
- * canceled. A completion the owner chose (kept, none) is written before its session leaves, so it is not this. */
+ * canceled. A completion the owner chose (kept, none) is written before its session leaves, and a task graph's step
+ * closes with its graph, so neither is this. */
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
-  closed === "merged"
-    ? { delivered: "merged" }
-    : closed === "merged_into_graph"
-      ? { delivered: "merged_into_parent" }
-      : closed === "completed"
-        ? { delivered: "none" }
-        : { canceled: closed === "lost" ? "lost" : "dismissed" };
+  closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 const outcomeText = { completed: "做完了", failed: "没做成", interrupted: "被叫停了" } as const;
 

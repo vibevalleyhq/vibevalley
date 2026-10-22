@@ -7,7 +7,6 @@ export const farmActWords: Partial<Record<IssueAct, string>> = { complete: "收�
 
 const closedLabel: Record<SessionClose, string> = {
   merged: "收获了",
-  merged_into_graph: "合进计划了",
   completed: "完成了",
   dismissed: "收工了",
   lost: "目录丢了",

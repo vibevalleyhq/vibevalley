@@ -273,7 +273,7 @@ CREATE TABLE session (
   graph     text,
   hired_at  double precision not null,
   ended_at  double precision,
-  closed    text check (closed in ('merged', 'merged_into_graph', 'completed', 'dismissed', 'lost')),
+  closed    text check (closed in ('merged', 'completed', 'dismissed', 'lost')),
   place       text,
   oar_session text,
   last_text   text,

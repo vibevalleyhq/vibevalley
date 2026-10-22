@@ -1296,9 +1296,9 @@ export type Delivery = (typeof DeliveryValues)[number];
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
 
-/** How a session left: its work merged (into the main branch, or a task graph's branch), its issue completed without a
- * merge, sent home, or its workplace lost. */
-export const SessionCloseValues = ["merged", "merged_into_graph", "completed", "dismissed", "lost"] as const;
+/** How a session left: its work merged into the main branch, its issue completed otherwise (what it delivered is the
+ * issue's: a kept branch, nothing, a task graph's branch), sent home, or its workplace lost. */
+export const SessionCloseValues = ["merged", "completed", "dismissed", "lost"] as const;
 export type SessionClose = (typeof SessionCloseValues)[number];
 
 export const RunTriggerKindValues = ["issue", "comment", "task", "recurrence", "refine", "runtime"] as const;
