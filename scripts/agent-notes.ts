@@ -32,10 +32,10 @@ const ROOT_FILES = new Set(["README.md", "AGENTS.md", "CLAUDE.md", CATALOG]);
 
 /** The sections each lifecycle requires, and the ones it forbids. */
 const SECTIONS: Record<Lifecycle, { readonly required: readonly string[]; readonly forbidden: readonly string[] }> = {
-  proposed: { required: ["Problem", "Proposal", "Alternatives considered", "Review criteria", "Risks"], forbidden: [] },
+  proposed: { required: ["Problem", "Proposal", "Alternatives considered", "Acceptance criteria", "Risks"], forbidden: [] },
   implemented: {
     required: ["Problem", "Decision", "Alternatives considered", "Consequences"],
-    forbidden: ["Proposal", "Plan", "Migration plan", "Review criteria"],
+    forbidden: ["Proposal", "Plan", "Migration plan", "Acceptance criteria"],
   },
   rejected: { required: ["Problem", "Proposal", "Alternatives considered"], forbidden: [] },
 };
