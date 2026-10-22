@@ -103,7 +103,8 @@ export interface IssueShape {
   readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
   readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
-  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. */
+  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, agent?: string) => Effect.Effect<Issue, ApiError>;
   /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
    * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
   readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
@@ -159,8 +160,10 @@ const outcomeText = { completed: "做完了", failed: "没做成", interrupted: 
 
 const reopenDefault = "接着把这张工单做完";
 
-export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean): string {
-  let out = (text.trim() || reopenDefault) + `\n\n（这张工单重开了，上一次是 ${last.name}（${last.id}）做的。）`;
+/** handedOver: another profile takes it on from last. */
+export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
+  const how = handedOver ? `这张工单换你接手了，之前是 ${last.name}（${last.id}）在做` : `这张工单重开了，上一次是 ${last.name}（${last.id}）做的`;
+  let out = (text.trim() || reopenDefault) + `\n\n（${how}。）`;
   out += "\n这张工单原来是：" + cut(issueJob(issue), askedMax);
   if (last.phase._tag === "closed") out += "\n它是怎么关的：" + (closedText[last.phase.closed] ?? "");
   if (last.lastRun) out += `\n最后一轮${outcomeText[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
@@ -386,6 +389,7 @@ export const make = (options: IssueOptions = {}) =>
           .withTransaction(
             Effect.gen(function* () {
               yield* q.reopenIssue({ id });
+              yield* q.assignIssue({ id, assignee: session.agent });
               yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
               yield* qq.dequeueIssue({ issue: id });
             }),
@@ -530,7 +534,8 @@ export const make = (options: IssueOptions = {}) =>
       }),
     );
 
-    const reopen = (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }) =>
+    /** to: another profile takes it on; else the one the last session worked as. */
+    const reopen = (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) =>
       Effect.gen(function* () {
         const issue = yield* get(id);
         if (issue.graph || issue.task || issue.closed === "merged_into_graph")
@@ -539,12 +544,13 @@ export const make = (options: IssueOptions = {}) =>
         const last = yield* sessions.get(issue.sessions.at(-1)!);
         if (!last) return yield* Effect.fail(missing("工单 " + id));
         if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
-        const agent = store.agent(last.agent);
+        const agent = to ?? store.agent(last.agent);
         if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
         const where = issue.project ?? "";
         const changes = yield* Effect.option(projects.branchChanges(where, issueBranch(issue.number)));
         const previous = Option.isSome(changes) && changes.value.commits.length > 0;
-        const hired = yield* hire(agent, reopenTask(issue, last, text, previous), where, { channel, issue: issue.id, trigger: by });
+        const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
+        const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
         if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
         return hired.session.id;
       });
@@ -611,6 +617,20 @@ export const make = (options: IssueOptions = {}) =>
         const said = yield* chat.tellSession("user", session, text, sendKey);
         // Said in its thread, the issue hears it from the message's fact (heard below); with no thread there is no fact.
         if (!said) yield* ownerSaid(id);
+      });
+
+    /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
+     * moves, so a handover never leaves its session gone and no one sent. */
+    const takerOf = (t: Issue, to: IssueStatus, key: string) =>
+      Effect.gen(function* () {
+        const a = store.named(key.trim());
+        if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案"));
+        if (a.id === t.assignee) return undefined;
+        if (to !== "todo") return yield* Effect.fail(refused("换人是挪到待办时的事：挪到待办，填上谁来接手"));
+        if (t.status === "in_progress") return yield* Effect.fail(refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`));
+        if (!a.enabled) return yield* Effect.fail(refused(a.name + " 被停用了"));
+        for (const i of yield* runtimes.check(a)) if (i.level === "error") return yield* Effect.fail(refused(`${a.name} 派不出去：${i.text}`));
+        return a;
       });
 
     const cancel = (id: string) =>
@@ -869,27 +889,36 @@ export const make = (options: IssueOptions = {}) =>
           }
           return yield* get(id);
         }),
-      setStatus: (id, to, text, channel) =>
+      setStatus: (id, to, text, channel, agent) =>
         Effect.gen(function* () {
           if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
           const t = yield* get(id);
+          const taker = agent ? yield* takerOf(t, to, agent) : undefined;
           const [m, why] = statusMove(t, to);
           const said = text.trim();
           switch (m) {
             case "none":
               return yield* Effect.fail(refused(why));
             case "start":
+              if (taker) yield* shape.edit(id, { assignee: taker.id });
               yield* start(id, channel);
               break;
             case "unqueue":
               yield* queueRow(id, false, chat.general());
               break;
+            // Handed over: its session leaves first, so that one session at a time works the issue's branch.
             case "round":
+              if (taker) {
+                yield* cancel(id);
+                yield* closeAs(id, "dismissed");
+                yield* reopen(id, said, channel, { kind: "comment" }, taker);
+                break;
+              }
               if (!said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
               yield* comment(id, said);
               break;
             case "reopen":
-              yield* reopen(id, said, channel);
+              yield* reopen(id, said, channel, { kind: "comment" }, taker);
               break;
             case "revive":
               yield* reopenRow(id);

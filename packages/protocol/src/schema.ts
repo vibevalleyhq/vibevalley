@@ -1807,6 +1807,7 @@ export const MoveIssueRequest: Schema.Codec<T.MoveIssueRequest> = Schema.Struct(
 export const IssueStatusRequest: Schema.Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
 });
 

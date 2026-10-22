@@ -1,0 +1,139 @@
+{
+  "id": "answer-from-state",
+  "created": 1792271220000,
+  "model": "deepseek-flash",
+  "want": "主人问哪些在等他，管家派了个帮工去查。农场自己的数据就能答：用 issues（wants_owner）列出来，不建工单。",
+  "memory": "",
+  "tools": [
+    "issue_create",
+    "projects",
+    "channels",
+    "recurrence",
+    "list_recurrences",
+    "cancel_recurrence",
+    "open_channel",
+    "channel_settings",
+    "merge",
+    "changes",
+    "roster",
+    "check",
+    "tell",
+    "read_chat",
+    "stop",
+    "dismiss",
+    "graph_split",
+    "graphs",
+    "task_edit",
+    "graph_action",
+    "task_action",
+    "load_skill",
+    "remember",
+    "rewrite_memory",
+    "search_archive",
+    "issues",
+    "issue_update",
+    "issue_status"
+  ],
+  "before": [],
+  "input": {
+    "role": "custom",
+    "customType": "orchestratorInput",
+    "content": "[来源：主人]\n主人说：哪些在等我？",
+    "display": true,
+    "details": {
+      "conversation": "general"
+    },
+    "timestamp": 1792271220000
+  },
+  "did": [
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "toolCall",
+          "id": "call_1",
+          "name": "issue_create",
+          "arguments": {
+            "title": "看看哪些工单在等主人",
+            "project": "demo",
+            "start": true
+          }
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792271221800,
+      "durationMs": 0
+    },
+    {
+      "role": "toolResult",
+      "toolCallId": "call_1",
+      "toolName": "issue_create",
+      "content": [
+        {
+          "type": "text",
+          "text": "记下了：#8「看看哪些工单在等主人」，已在 #田头 派 测试小吴（w5）去 demo"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1792271221900,
+      "durationMs": 100
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "派小吴去看了，一会儿告诉你。"
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792271222900,
+      "durationMs": 0
+    }
+  ],
+  "expect": [
+    {
+      "kind": "notCalled",
+      "tool": "issue_create"
+    },
+    {
+      "kind": "called",
+      "tool": "issues",
+      "argContains": "wants_owner"
+    }
+  ]
+}

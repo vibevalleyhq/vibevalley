@@ -2043,6 +2043,9 @@ export interface MoveIssueRequest {
 export interface IssueStatusRequest {
   status: IssueStatus;
   text?: string;
+  /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
+   * kept, and this one goes on in the same issue. */
+  agent?: string;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
 }

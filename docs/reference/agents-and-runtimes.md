@@ -70,4 +70,4 @@ VibeValley 的帮工带读写文件、跑命令、ripgrep、抓网页、派帮�
 
 ## 派给谁
 
-`dispatch` 的 `agent` 怎么落到一个档案、挑中以后还要过哪些关，见 [管家](docs/subsystems/orchestrator.md)。
+管家的 `issue_create`、`issue_status` 的 `agent` 怎么落到一个档案、挑中以后还要过哪些关，见 [管家](docs/subsystems/orchestrator.md)。

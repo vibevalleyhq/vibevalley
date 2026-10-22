@@ -1,0 +1,144 @@
+{
+  "id": "one-line-after-starting",
+  "created": 1792270860000,
+  "model": "deepseek-flash",
+  "want": "主人让派活，管家开工以后又把整张工单复述了一遍（记住我、token 存 30 天、测试要过），频道里已经有那条派活了。应该只用一句话说派给了谁。",
+  "memory": "",
+  "tools": [
+    "issue_create",
+    "projects",
+    "channels",
+    "recurrence",
+    "list_recurrences",
+    "cancel_recurrence",
+    "open_channel",
+    "channel_settings",
+    "merge",
+    "changes",
+    "roster",
+    "check",
+    "tell",
+    "read_chat",
+    "stop",
+    "dismiss",
+    "graph_split",
+    "graphs",
+    "task_edit",
+    "graph_action",
+    "task_action",
+    "load_skill",
+    "remember",
+    "rewrite_memory",
+    "search_archive",
+    "issues",
+    "issue_update",
+    "issue_status"
+  ],
+  "before": [],
+  "input": {
+    "role": "custom",
+    "customType": "orchestratorInput",
+    "content": "[来源：主人]\n主人说：派个人去 clock-in 的登录页加「记住我」，勾上后 token 存 30 天，不勾就关浏览器失效，登录相关的测试要过",
+    "display": true,
+    "details": {
+      "conversation": "general"
+    },
+    "timestamp": 1792270860000
+  },
+  "did": [
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "toolCall",
+          "id": "call_1",
+          "name": "issue_create",
+          "arguments": {
+            "title": "登录页加「记住我」",
+            "description": "勾上后 token 存 30 天，不勾就关浏览器失效；登录相关的测试要过",
+            "project": "clock-in",
+            "start": true
+          }
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792270861800,
+      "durationMs": 0
+    },
+    {
+      "role": "toolResult",
+      "toolCallId": "call_1",
+      "toolName": "issue_create",
+      "content": [
+        {
+          "type": "text",
+          "text": "记下了：#7「登录页加「记住我」」，已在 #田头 派 后端老周（w1）去 clock-in，分支 vibevalley/issue-7"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1792270861900,
+      "durationMs": 100
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "派后端老周去 clock-in 了：在登录页加「记住我」，勾上后 token 存 30 天，不勾就关浏览器失效，登录相关的测试要过，改完提交。做完我告诉你。"
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792270862900,
+      "durationMs": 0
+    }
+  ],
+  "expect": [
+    {
+      "kind": "called",
+      "tool": "issue_create",
+      "argContains": "30 天"
+    },
+    {
+      "kind": "saysNot",
+      "contains": "30 天"
+    },
+    {
+      "kind": "saysNot",
+      "contains": "测试要过"
+    }
+  ]
+}

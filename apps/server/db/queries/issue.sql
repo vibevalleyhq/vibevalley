@@ -77,6 +77,10 @@ select id from issue where graph is not null;
 -- A recurrence's issue: the one it made last.
 select * from issue where recurrence = sqlc.arg(recurrence) order by created_at desc, id desc limit 1;
 
+-- name: AssignIssue :exec
+-- Who does it is the profile its latest session works as: another one when it was handed over.
+update issue set assignee = sqlc.arg(assignee) where id = sqlc.arg(id);
+
 -- name: ReopenIssue :exec
 update issue set closed_at = null, closed = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
 

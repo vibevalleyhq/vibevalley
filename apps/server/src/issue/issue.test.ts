@@ -10,6 +10,7 @@ import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
+import { reasonOf } from "../errors.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
 import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -575,6 +576,53 @@ describe("issues", () => {
       expect((yield* issues.get(issue.id)).queuedAt).toBe(queued.queuedAt);
       yield* core.apply({ type: "left", id: "occupied" });
       expect((yield* issues.dispatchQueued(issue.id)).session).toBeDefined();
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  // Handing an issue over is another round by another profile: the session on it leaves first (the farm has room for one),
+  // and the new one goes on in the same issue, told it takes over; one still working is refused until it is stopped.
+  it.live("an issue handed over goes on in the same issue with another profile", () => {
+    const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      const chat = yield* Channels;
+      const agents = yield* Agents;
+      yield* agents.saveAgent(lab());
+      yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
+      const issue = yield* issues.add({ title: "write hello", assignee: "lab", project: "demo" });
+      const inReview = (n: number) =>
+        until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
+      yield* issues.setStatus(issue.id, "todo", "", chat.general());
+      yield* inReview(1);
+      const [first] = (yield* issues.get(issue.id)).sessions;
+      const refused = (to: "done" | "todo", agent: string) => Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.general(), agent)), reasonOf);
+      expect(yield* refused("done", "lab2")).toContain("换人是挪到待办时的事");
+      expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的帮工档案");
+
+      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), "Lab Two");
+      expect([handed.assignee, handed.sessions.length, handed.closed]).toEqual(["lab2", 2, undefined]);
+      expect(sessions.find(first!)).toBeUndefined();
+      const second = (yield* sessions.get(handed.sessions[1]!))!;
+      expect(second.agent).toBe("lab2");
+      expect(second.brief).toMatch(/^接着写\n\n（这张工单换你接手了，之前是 /);
+      yield* inReview(2);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("an issue still being worked is not handed over", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const chat = yield* Channels;
+      const agents = yield* Agents;
+      yield* agents.saveAgent(lab());
+      yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
+      const issue = yield* issues.add({ title: "work on", assignee: "lab", project: "demo" });
+      yield* issues.setStatus(issue.id, "todo", "", chat.general());
+      yield* until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");
+      expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.general(), "lab2")))).toContain("先叫停，等它停下再换人");
+      expect((yield* issues.get(issue.id)).sessions).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

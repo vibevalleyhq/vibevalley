@@ -28,7 +28,6 @@ import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
-import { Core } from "../core/core.ts";
 import { Docs } from "../doc/doc.ts";
 import { type ApiError, reasonOf } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
@@ -89,7 +88,6 @@ export interface ToolShape {
 export class Tools extends Context.Service<Tools, ToolShape>()("vibevalley/Tool") {}
 
 export const labels: Record<string, string> = {
-  dispatch: "派活",
   projects: "项目",
   channels: "频道",
   open_channel: "开频道",
@@ -155,7 +153,6 @@ const spaces = /\s+/g;
 const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
 
 export const make = Effect.gen(function* () {
-  const core = yield* Core;
   const agents = yield* Agents;
   const projects = yield* Projects;
   const memory = yield* Memories;
@@ -214,8 +211,15 @@ export const make = Effect.gen(function* () {
   // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
   const participant = (c: Caller) => c.session || c.agent;
 
-  // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
-  const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(runtimes.choose(task, name, picked));
+  // Which profile takes a task: the one named (a profile's name or id, or a runtime), else the one the owner picked for
+  // this input, else by the farm's rule. A name that matches none is said, not taken for "anyone".
+  const choose = async (task: string, name: string, picked: string): Promise<Agent | string> => {
+    const key = name.trim();
+    const a = await go(runtimes.choose(task, key, picked));
+    if (!a) return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。";
+    if (key && a.id !== key && a.name !== key && a.runtime !== key) return "没有叫 " + key + " 的帮工档案或 runtime";
+    return a;
+  };
 
   // The orchestrator may say a profile's name or id.
   const profile = (key: string): string => {
@@ -357,34 +361,6 @@ export const make = Effect.gen(function* () {
       return lines.join("\n");
     });
 
-  const dispatch = (who: Who) =>
-    tool<{ brief: string; project?: string; agent?: string; channel?: string }>(
-      "dispatch",
-      "派一个帮工去某个项目里做一件事。brief 是工单：目标、做到什么程度算完。project 是工作目录下的项目文件夹名（新项目就起一个简短的英文名，会新建）；频道有默认项目时可以不填。agent 填帮工的名字或 id，或 runtime 名；不填就按农场的规则挑。活派在你正在回话的频道里（工单串开在那里），要派到别的频道就填 channel。",
-      async (p) => {
-        const c = await who();
-        let channel: Info;
-        if (p.channel) {
-          const byName = await go(chat.channelByName(p.channel));
-          if (!byName) return "没有 " + p.channel + " 这个频道：先用 channels 看看有哪些，或者用 open_channel 开一个。";
-          channel = byName;
-        } else channel = await go(chat.channelOf(c.here));
-        const project = (p.project ?? "").trim() || channel.project;
-        if (!project) return "#" + channel.name + " 没有默认项目：dispatch 时填上 project。";
-        const chosen = await choose(p.brief, p.agent ?? "", c.picked);
-        if (!chosen) return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。";
-        const hired = await go(issue.hire(chosen, p.brief, project, { channel: channel.id }));
-        if (hired.refused || !hired.session) {
-          await go(core.notice("warn", hired.refused ?? ""));
-          return "派不出去：" + (hired.refused ?? "");
-        }
-        const h = hired.session;
-        const branch = h.branch ? "，分支 " + h.branch : "";
-        const evicted = hired.evicted ? "为了腾地方，" + hired.evicted + " 先收工了。" : "";
-        return `已在 #${channel.name} 派 ${h.name}（${h.id}）去 ${h.project ?? project}${branch}。${evicted}`;
-      },
-    );
-
   const merge = (who: Who) =>
     tool<{ issue: string }>(
       "merge",
@@ -483,23 +459,31 @@ export const make = Effect.gen(function* () {
   );
 
   const issueCreate = (who: Who) =>
-    tool<{ title: string; description?: string; project?: string; agent?: string; priority?: string; draft?: boolean }>(
+    tool<{ title: string; description?: string; project?: string; agent?: string; priority?: string; draft?: boolean; start?: boolean; channel?: string }>(
       "issue_create",
-      "记下一张工单，放进备选，不派人：主人说「记一下」「回头做」「先写下来」时用；要马上做用 dispatch。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱）。",
+      "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空地就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
       async (p) => {
         const c = await who();
-        const channel = await go(chat.channelOf(c.here));
+        if (p.draft && p.start) return "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。";
+        let channel: Info;
+        if (p.channel) {
+          const byName = await go(chat.channelByName(p.channel));
+          if (!byName) return "没有 " + p.channel + " 这个频道：先用 channels 看看有哪些，或者用 open_channel 开一个。";
+          channel = byName;
+        } else channel = await go(chat.channelOf(c.here));
         const project = (p.project ?? "").trim() || channel.project;
+        if (p.start && !project) return "#" + channel.name + " 没有默认项目：填上 project。";
         const priority = p.priority ? priorityOf(p.priority) : undefined;
         if (p.priority && !priority) return noSuchPriority(p.priority);
         let assignee: string | undefined;
-        if (p.agent) {
-          const a = agents.named(p.agent!);
-          if (!a) return "没有叫 " + p.agent + " 的帮工档案";
+        if (p.agent || p.start) {
+          const a = await choose(p.title + "\n" + (p.description ?? ""), p.agent ?? "", p.start ? c.picked : "");
+          if (typeof a === "string") return "没记：" + a;
           assignee = a.id;
         }
+        let t: Issue;
         try {
-          const t = await go(
+          t = await go(
             issue.add({
               title: p.title,
               ...(p.description ? { description: p.description } : {}),
@@ -508,15 +492,28 @@ export const make = Effect.gen(function* () {
               ...(priority ? { priority } : {}),
             }),
           );
-          if (!p.draft) return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里`;
-          const refined = await go(issue.refine(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
-            () => "，帮工在起草",
-            (e: unknown) => "；起草没开始：" + toError(e).message,
-          );
-          return `记下了：#${t.number}「${shortTitle(t.title)}」，在备选里${refined}`;
         } catch (e) {
           return "没记下：" + toError(e).message;
         }
+        const noted = `记下了：#${t.number}「${shortTitle(t.title)}」`;
+        if (p.start) {
+          // Written down first: a start that fails leaves the issue in the backlog, and trying again starts it, not a second one.
+          try {
+            const sent = await go(issue.start(t.id, channel.id));
+            if (sent.queued) return `${noted}，在 #${channel.name} 排进待办：${sent.queued}`;
+            const h = sent.session ? run.find(sent.session)?.session : undefined;
+            const branch = h?.branch ? "，分支 " + h.branch : "";
+            return `${noted}，已在 #${channel.name} 派 ${h ? h.name + "（" + h.id + "）" : "帮工"}去 ${h?.project ?? project}${branch}`;
+          } catch (e) {
+            return `${noted}，在备选里；没开工：${toError(e).message}。要再开工用 issue_status 挪到待办，不要再建一张`;
+          }
+        }
+        if (!p.draft) return `${noted}，在备选里，没开工`;
+        const refined = await go(issue.refine(t.id, [p.title, p.description ?? ""].join("\n").trim(), channel.id)).then(
+          () => "，帮工在起草",
+          (e: unknown) => "；起草没开始：" + toError(e).message,
+        );
+        return `${noted}，在备选里${refined}`;
       },
     );
 
@@ -567,9 +564,9 @@ export const make = Effect.gen(function* () {
     );
 
   const issueStatus = (who: Who) =>
-    tool<{ issue: string; to: string; text?: string }>(
+    tool<{ issue: string; to: string; text?: string; agent?: string }>(
       "issue_status",
-      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；等你看挪到已完成是收获；挪到已取消是关上、帮工回家。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+      "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空地就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是收获；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
       async (p) => {
         const c = await who();
         if (!c.owner) return changeNotAsked;
@@ -577,13 +574,14 @@ export const make = Effect.gen(function* () {
         if (!to) return noSuchStatus(p.to, ["backlog", "todo", "done", "canceled"]);
         return withIssue(p.issue, async (t) => {
           try {
-            // Sent out with nobody named yet: chosen as dispatch would, the owner's pick first.
-            if (to === "todo" && t.status === "backlog" && !t.assignee) {
-              const chosen = await choose(t.title + "\n" + (t.description ?? ""), "", c.picked);
-              if (!chosen) return "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。";
-              await go(issue.edit(t.id, { assignee: chosen.id }));
+            // Sent out with nobody named yet: chosen by the farm's rule, the owner's pick first; another one named hands it over.
+            let agent: string | undefined;
+            if (p.agent || (to === "todo" && t.status === "backlog" && !t.assignee)) {
+              const chosen = await choose(t.title + "\n" + (t.description ?? ""), p.agent ?? "", p.agent ? "" : c.picked);
+              if (typeof chosen === "string") return "没挪：" + chosen;
+              agent = chosen.id;
             }
-            const done = await go(issue.setStatus(t.id, to, p.text ?? "", c.here));
+            const done = await go(issue.setStatus(t.id, to, p.text ?? "", c.here, agent));
             return "挪好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
           } catch (e) {
             return "没挪：" + toError(e).message;
@@ -871,7 +869,6 @@ export const make = Effect.gen(function* () {
 
   return Tools.of({
     orchestrator: (who) => [
-      dispatch(who),
       projectsTool,
       channelsTool,
       recurrenceTool(who),
