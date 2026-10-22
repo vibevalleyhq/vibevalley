@@ -20,7 +20,7 @@ import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { layer, Orchestrator } from "./orchestrator.ts";
-import { deepseekModel, sourceHead } from "./rules.ts";
+import { deepseekModel, intake } from "./rules.ts";
 
 const userText = (m: Message) => (m.role === "user" ? messageText(m) : undefined);
 const lastInput = (c: Request) =>
@@ -291,7 +291,7 @@ describe("the orchestrator", () => {
       yield* until(() => core.state().chat?.messages.some((m) => m.from === id && m.kind === "report"), "its report");
       const spoken = yield* chat.speak(id, "@管家 " + "长".repeat(5000), { anyway: true });
       expect(spoken.kind).toBe("sent");
-      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(sourceHead("chat") + "【田头】")), "the orchestrator asked");
+      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【田头】")), "the orchestrator asked");
       expect(line).not.toContain("长".repeat(797));
       expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 read_chat 读 " + spoken.target + "）");
     }).pipe(Effect.scoped, Effect.provide(f.layer));

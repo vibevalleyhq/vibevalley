@@ -4,6 +4,7 @@
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
+import { messageText } from "../agent/brain/messages.ts";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { newId } from "../base/ids.ts";
@@ -33,10 +34,6 @@ interface Message {
   readonly stopReason?: string;
   readonly errorMessage?: string;
 }
-
-/** The text of a message: its text parts, joined. */
-export const messageText = (m: Message) =>
-  typeof m.content === "string" ? m.content : (m.content ?? []).flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("");
 
 /** A tool result's text. */
 const resultText = (result: unknown) => {
@@ -78,6 +75,7 @@ export class AgentExecution {
       const by: RunTrigger = given.by.kind ? (given.by as RunTrigger) : { kind: "runtime" };
       const id = newId();
       yield* self.store.start(id, self.session, given.issue ?? "", by);
+      if (given.issue) yield* self.store.link(id, given.issue);
       self.run = id;
       self.outcome = "completed";
       self.summary = "";
@@ -114,7 +112,7 @@ export class AgentExecution {
           yield* self.store.heard(self.run, self.heard);
           self.store.consumed({ session: self.session, messages: [...input.heard] });
         }
-        self.journal.asked(input.asked || messageText(e.message as Message));
+        self.journal.asked(input.asked || messageText(e.message));
       }
       switch (e.type) {
         case "agent_end": {
@@ -128,7 +126,7 @@ export class AgentExecution {
           yield* self.begin({ by: { kind: "" } });
           for (const part of typeof m.content === "string" ? [] : (m.content ?? []))
             if (part.type === "thinking" && !part.redacted && part.thinking) self.journal.thought(part.thinking);
-          const text = messageText(m).trim();
+          const text = messageText(e.message).trim();
           self.journal.said(text);
           self.summary = text;
           if (m.stopReason === "error") {

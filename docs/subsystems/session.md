@@ -11,12 +11,12 @@
 | oar 事件读成核心状态的事实；干活过程（事件日志） | 农机的发现、模型、设置页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「在用的农机」「农具」） |
 | 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
-| 管家那一个 agent loop 的 run 和日志（`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
+| 进程内的 agent（管家）怎么跑：起大脑、排输入、边说边写、记 run 和日志、重启后接着做、做错的一轮存成评测（`session/host.ts`、`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
 | | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/pages/chat/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/pages/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/rules/rounds.ts`） |
 
 ## 在哪
 
-- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`、`chooseAgent`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`execution.ts` 管家的 run；`shell.ts` 读汇报里给主人的问题。
+- 服务端 `apps/server/src/session`（`Sessions`）：`session.ts` 生命周期（`send` 派、`deliver`/`tell` 带话、`stop`、`dismiss`、交出现场 `handOver`、重启后 `restore`、`/mcp` 认人的令牌）；`facts.ts`（纯函数）把一个 oar 事件读成事实和日志；`rules.ts` 的 `readReport`、`noRoom`、`workplaceRules`、`chooseAgent`（纯函数）；`journal.ts` 日志（开、关、删、推给页面）；`host.ts` 进程内 agent 的宿主（`AgentHost`：输入带着它看不懂的路由，话照路由交回）；`execution.ts` 进程内 agent 的 run；`shell.ts` 读汇报里给主人的问题。
 - `apps/server/src/runtime`（`Runtimes`）：农机的注册、探测和安装（`resolve`）、额度、价目（`price.ts`：VibeValley 自己的农机和 dsh 按 `ai/models.ts`，pi 按 pi-ai 自带的价目）、今天的花费；`rules.ts` 的 `agentIssues`、`moneyStop` 是「派不出去」的规则；`dsh.ts` 是 DeepSeek Harness 的农机，`pi.ts` 读 pi 自己的设置。
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
@@ -118,7 +118,7 @@
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。
 - **核心状态（`core`）**：`apply` 施加 `hired`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`；日志的事件推给页面；提醒经核心状态的 side event 发。
-- **管家（`orchestrator`）**：用 `execution.ts` 记它的 run 和日志（`session.events orchestrator`）。
+- **管家（`orchestrator`）**：建一个 `AgentHost`，给它提示、工具、路由和「话发到哪」；run 和日志由宿主经 `execution.ts` 记（`session.events orchestrator`）。帮工和管家的 run 走同一组写法（开、听到、结束），管家一轮接了几张工单时另外连上每一张。
 - **`/mcp`（`mcp`）**：凭 `Sessions.who` 认出调工具的是哪个 Session。
 
 ## 为什么这样

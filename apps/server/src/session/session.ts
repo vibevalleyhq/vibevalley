@@ -412,8 +412,20 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     // ── runs ──
 
-    const finishRun = (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
-      logged(`run ${id}`, qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id }));
+    // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
+    const runs = {
+      start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
+        tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() })),
+      /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
+      link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
+      heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
+      issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
+      finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
+        tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+    };
+    /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
+    const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>
+      Effect.catch(Effect.asVoid(e), (err) => Effect.logWarning(`vibevalley: ${what}: ${err.message}`));
 
     /** Called before the input goes out, so the turn it opens finds it. */
     const expect = (h: Hand, by: RunTrigger) => void h.triggers.push(by);
@@ -422,19 +434,19 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const startRun = (h: Hand) => {
       const by = h.triggers.shift() ?? { kind: "runtime" };
-      const issue = core.session(h.id)?.issue ?? null;
+      const issue = core.session(h.id)?.issue ?? "";
       const id = newId();
       // Known at once, so a report that follows closely finds the run; its row follows.
       h.run = id;
       h.heard = [];
       h.journal.runStarted(id);
-      fire(logged(`${h.id}'s run not kept`, qr.startRun({ id, session: h.id, issue, triggered_by: JSON.stringify(by), started_at: Date.now() })));
+      fire(keptRun(`${h.id}'s run not kept`, runs.start(id, h.id, issue, by)));
     };
 
     const heardInRun = (h: Hand, message: string) => {
       if (!h.run) return;
       h.heard.push(message);
-      fire(logged(`run ${h.run}`, qr.heardInRun({ heard: JSON.stringify(h.heard), id: h.run })));
+      fire(keptRun(`run ${h.run}`, runs.heard(h.run, h.heard)));
     };
 
     const endRun = (h: Hand, outcome: Outcome, summary: string, spent?: Spent) => {
@@ -443,7 +455,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.heard = [];
       if (!id) return;
       h.journal.runEnded(id, outcome);
-      fire(finishRun(id, outcome, summary, spent));
+      fire(keptRun(`run ${id}`, runs.finish(id, outcome, summary, spent)));
     };
 
     // ── following a session ──
@@ -794,7 +806,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
       // The runs still going when the server stopped stopped with it.
-      for (const r of yield* db(qr.openRuns())) yield* finishRun(r.id, "interrupted", "VibeValley 重启了，这一轮停在了半路");
+      for (const r of yield* db(qr.openRuns())) yield* keptRun(`run ${r.id}`, runs.finish(r.id, "interrupted", "VibeValley 重启了，这一轮停在了半路"));
       const kept = new Map((yield* db(qs.hands())).map((r) => [r.id, r]));
       // Numbering goes on from the highest id seen, so a new session never takes an old one's steps.
       hired = Math.max(
@@ -1021,20 +1033,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
       mcpUrl: () => mcpUrl,
       runStore: {
-        start: (id, session, issue, trigger) =>
-          tried(
-            sql.withTransaction(
-              Effect.gen(function* () {
-                yield* qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() });
-                if (issue) yield* qi.linkRunIssue({ run: id, issue });
-              }),
-            ),
-          ),
-        link: (r, issue) => tried(qi.linkRunIssue({ run: r, issue })),
-        heard: (r, heard) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
-        issues: (r) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
-        finish: (id, outcome, summary, spent) =>
-          tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+        ...runs,
         finished: (r) => PubSub.publishUnsafe(finishedHub, r),
         consumed: (c) => PubSub.publishUnsafe(consumedHub, c),
         register: (session, current) => void executions.set(session, current),

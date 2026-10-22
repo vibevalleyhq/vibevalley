@@ -1,6 +1,6 @@
 # 管家
 
-管家（assistant）是主人直接说话的 agent：听田头、工单串、电话和农场自己的提醒，用工具派活、盯进度、转告结果，自己不读文件、不跑命令、不写代码。它跑在 VibeValley 自己的 agent（`apps/server/src/agent/brain`）上，只接 DeepSeek；同一个 agent 包成农机 `vibevalley` 也当帮工。农场里它是田头上那个替主人张罗的人，界面上叫管家。
+管家（代码里叫 orchestrator，编排者）是主人直接说话的 agent：收下要做的事，派给帮工，盯进度，转告结果；自己不读文件、不跑命令、不写代码。它听田头、工单串、电话和农场自己的提醒。它跑在 VibeValley 自己的 agent（`apps/server/src/agent/brain`）上，只接 DeepSeek；同一个 agent 包成农机 `vibevalley` 也当帮工。农场里它是田头上那个替主人张罗的人，界面上叫管家。
 
 ## 管什么，不管什么
 
@@ -10,7 +10,7 @@
 | 管家的对话、压缩、记性的快照、提示的开头 | 帮工档案的记性、想起和外面的来源（[记性](docs/subsystems/memory.md)）；管家的 `memory_search`、`memory_add` 只是那边的入口 |
 | 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `recurrence`（[定时](docs/subsystems/recurrence.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
-| 管家的一轮：叫停、重启后接着做、做错的一轮存成评测 | 一轮记成 Run、日志和结局（`session/execution.ts`） |
+| 管家收什么、每种来源怎么进（意图表）、农场现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、边说边写、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
 | VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
 | 帮工档案的存储（`agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
@@ -18,7 +18,7 @@
 
 ## 在哪
 
-- **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 起大脑（`brainOf`）、收输入和它的路由与来源、农场现状、把字送回频道、叫停、接着做、听巡查、做错的一轮存成样例；提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：农场现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、用量那一行字、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
+- **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；农场现状、频道的汇报、听巡查和计划的消息；把一个 `AgentHost` 配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、农场现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 28 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
 - **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。
@@ -107,6 +107,8 @@
 
 ## 为什么这样
 
+- **管家叫 orchestrator，跑它的机器归执行。** 它在系统里的位置是编排者（收活、派给帮工、盯进度、转告），「助理」只说了它跟主人说话。起大脑、排输入、边说边写、记 run、重启接着做、存评测是任何进程内 agent 都要的，放在执行模块的 `AgentHost`；`orchestrator.ts` 只剩编排的策略，测编排不用碰 agent 的机器。放弃了「只改名」：边界不动，名字说的和代码做的对不上。
+- **每种来源怎么进只在一张表里。** 原来「马上还是排队、算不算主人的话、记成什么触发、开头那行」分在田头、几个入口函数和重启的代码里，加一种来源要改四处。现在是 `intake: Record<Source, …>`，加一种编译器逼你填齐；通话、HTTP、连接器只交「来源 + 话 + 回答到哪」。
 - **自己的 agent，搭在 pi-agent-core 上，管家和帮工同一份代码。** 循环、工具调用、流式交给 pi-agent-core 和 pi-ai；定时、子 agent、MCP、按需技能、压缩、对话文件是我们自己的，在 `agent/brain` 里。没用 nanobot（Python，自己的总线和渠道会和田头、连接器重复）和 Vercel AI SDK、LangChain.js 这类框架（压缩、前缀缓存和取消都要绕过它们）。先当管家再当帮工：管家要的是受控的工具和低延迟，在这里先把循环、会话、压缩磨稳。大脑放在服务端里：它要和档案、种植计划一起长。DeepSeek 的工具调用不如 Claude 稳，靠步数上限（40）、坏参数时给模型一句看得懂的错兜住。
 - **管家是档案，但不用捏帮工页。** 模型、记性都按档案走，派活时排除它；管家的大半配置（农机、技能、人设交给农机的方式、worktree）对它没有意义，所以另开一页，只放它真有的：记性、轨迹、旧账、声音。记性不搬进数据库：`remember`、`rewrite_memory` 和系统提示都写死了 `MEMORY.md`，页面直接读写那个文件。
 - **提示的开头在两次压缩之间一字不变。** DeepSeek 按前缀缓存，从第一个不同的字起全价；系统提示里放秒级时间、每次重读的记性、农场现状时，每次请求都从第一段起命不中。没选「时间改成到天」（现状和记性照样常变），也没选「现状做成每次请求都换、不存下的最后一条」（一轮里每调一次工具就全价带一遍完整现状）；存下差异只在每条输入带一次，模型还看得到现状怎么变过来的。差异不在输入被读时才算：那要改 agent 循环的队列，忙时放全文更简单。

@@ -1,66 +1,40 @@
-// The orchestrator (管家): it takes the channels', issues', patrol's and task graphs' lines and the owner's
-// voice, hands them to VibeValley's own agent (agent/brain) with tool's tools, and sends the answers back where each came
-// from.
-//
-// Every input carries where it came from (its channel, the profile the owner picked, whether it is quiet, the voice stream
-// that waits for it) into the agent's steering or follow-up queue; the time, the farm (whole, or the lines that changed),
-// what memory gained, the news and the line itself go in as one input, read by the first request. An input given while the
-// orchestrator is busy may be taken after one given later, so it carries the whole farm, and the one after it does too. Queuing
-// does not change the channel being answered: output follows the agent's events, and tools read the input consumed last.
-// Runs and their logs are session's (execution.ts); only an input that is consumed starts or joins one.
+// The orchestrator (管家): the owner's agent that takes the work in, hands it to helpers, follows it and tells the owner.
+// Every input comes in through take, with its source; the intake table (rules.ts) says, per source, its first words,
+// whether it joins the run under way and what its run is triggered by. Each input carries the time, the farm (whole, or
+// what changed since the model last saw it), what memory gained, the channels' news and the line, and a route: where its
+// answer goes. Running the agent (starting it, queuing inputs, streaming words, recording runs, going on after a restart)
+// is the host's (session/host.ts).
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
-import { type OrchestratorEval, orchestratorAgent, type RunTrigger } from "@vibevalley/protocol";
+import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
+import { orchestratorAgent } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
 import { Context, Effect, FiberSet, Layer, Stream } from "effect";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
-import { Brain, type BrainEvent, sessionUnfinished } from "../agent/brain/agent.ts";
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
-import { memoryFile } from "../agent/brain/memory.ts";
-import { type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
 import { localeMinute } from "../agent/brain/recurrences.ts";
 import { selfTools } from "../agent/brain/self.ts";
-import { readLines, replay } from "../agent/brain/session.ts";
 import { projectsDir, Settings } from "../base/config.ts";
-import { newId } from "../base/ids.ts";
 import { Channels, type OrchestratorNews } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import type { ApiError } from "../errors.ts";
 import { Issues, type OrchestratorWork } from "../issue/issue.ts";
 import { orchestratorHome } from "../memory/memory.ts";
 import { Notices, type Overdue } from "../notice/notice.ts";
 import { Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { Recurrences } from "../recurrence/recurrence.ts";
-import { AgentExecution, type RunInput } from "../session/execution.ts";
-import type { Journal } from "../session/journal.ts";
+import { AgentHost, Caller } from "../session/host.ts";
 import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
 import { Tasks } from "../task/task.ts";
 import { Tools } from "../tool/tool.ts";
-import {
-  deepseekModel,
-  orchestratorInboxLines,
-  orchestratorModel,
-  patrolText,
-  quotaText,
-  situationDelta,
-  type Source,
-  sourceHead,
-  tokensOf,
-  triggerOf,
-  usageText,
-} from "./rules.ts";
+import { deepseekModel, intake, orchestratorInboxLines, orchestratorModel, patrolText, quotaText, situationDelta, type Source } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
 const keepEvents = 1000;
-const streamEveryMs = 120;
 /** A run cut off longer ago than this is left: what it was for has likely moved on. */
 const resumeWithinMs = 30 * 60_000;
 
@@ -111,9 +85,10 @@ export interface Pick {
   readonly project?: string;
 }
 
-/** Where an input came from, travelling with it through the agent's queues and kept in its transcript. */
-interface Routing {
+/** Where an input's answer goes and what it is worth; kept with it in the transcript. */
+interface Route {
   readonly conversation: string;
+  /** The profile the owner picked beside the words. */
   readonly agent?: string;
   readonly quiet?: boolean;
   readonly source: Source;
@@ -123,46 +98,18 @@ interface Routing {
   readonly owner?: boolean;
 }
 
-/** One answer streamed to a caller: a call's or chat/completions'. A newer one ends the one before. */
-class Caller {
-  private readonly queue: string[] = [];
-  private ended = false;
-  private wake: (() => void) | undefined;
-
-  push(text: string) {
-    if (!this.ended) this.queue.push(text);
-    this.wake?.();
-  }
-
-  end() {
-    this.ended = true;
-    this.wake?.();
-  }
-
-  async *words(signal?: AbortSignal): AsyncGenerator<string> {
-    while (!signal?.aborted) {
-      const next = this.queue.shift();
-      if (next !== undefined) {
-        yield next;
-        continue;
-      }
-      if (this.ended) return;
-      await new Promise<void>((resolve) => {
-        this.wake = resolve;
-        signal?.addEventListener("abort", () => resolve(), { once: true });
-      });
-      this.wake = undefined;
-    }
-  }
-}
-
-/** What an input carries in process only: never in the transcript. */
-interface Local {
+/** One input as its producer gives it: the intake table fills in the rest by its source. */
+interface Intake {
+  readonly source: Source;
+  readonly line: string;
+  readonly conversation: string;
+  readonly agent?: string;
+  readonly owner?: boolean;
+  readonly issue?: string;
+  /** What started its run, when the producer knows better than its source (an issue's trigger, a missed recurrence). */
+  readonly by?: RunTrigger;
   readonly caller?: Caller;
-  readonly run: RunInput;
 }
-
-const isInput = (m: AgentMessage): m is CustomMessage & { details: Routing } => m.role === "custom" && (m as CustomMessage).customType === "orchestratorInput";
 
 export interface OrchestratorShape {
   /** The owner's words in a conversation; sendKey: the client's key for this send, a retry with the same key is the message already said. */
@@ -205,35 +152,21 @@ export const make = (options: OrchestratorOptions = {}) =>
     const tasks = yield* Tasks;
     const recurrence = yield* Recurrences;
     const tool = yield* Tools;
+    const notices = yield* Notices;
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const go = yield* FiberSet.makeRuntimePromise<never>();
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
-    const notices = yield* Notices;
     const home = orchestratorHome(config.home);
-    const sessionFile = join(home, orchestratorAgent + ".jsonl");
 
-    const trace: Journal = run.trajectories.openLog(orchestratorAgent, keepEvents);
-    const execution = new AgentExecution(orchestratorAgent, trace, tool.start, run.runStore);
-
-    const local = new WeakMap<AgentMessage, Local>();
-    let input: Routing & Local = { conversation: general, source: "owner", run: { by: { kind: "" } } };
     const selected = new Map<string, Pick>();
     let latestCall: Caller | undefined;
     /** What the orchestrator last said it cannot start for, per conversation: said once, not to every line, until it starts. */
     const cannot = new Map<string, string>();
-    let toCaller = 0;
-    let said = 0;
-    let open = false;
-    let lastPush = 0;
-    let prefixChanged: string[] = [];
     /** The farm's situation as the model last saw it in an input; "" when it should see the whole of it next. */
     let shown = "";
-    let closing = false;
-    let brain: Brain | undefined;
-    let starting: Promise<Brain> | undefined;
 
     const llmOf = (): LLM => {
       if (options.llm) return options.llm();
@@ -241,18 +174,9 @@ export const make = (options: OrchestratorOptions = {}) =>
       return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
     };
 
-    // Tools run within the request; each reads who is calling from the input consumed last.
-    const requestInput = (): Routing & Local => {
-      const messages = brain?.core.state.messages ?? [];
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const m = messages[i]!;
-        if (isInput(m)) return { ...m.details, ...(local.get(m) ?? { run: { by: { kind: "" } } }) };
-      }
-      return input;
-    };
-    const orchestratorTools = () =>
+    const toolsFor = (current: () => Route) =>
       tool.orchestrator(() => {
-        const at = requestInput();
+        const at = current();
         return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
       });
 
@@ -265,141 +189,31 @@ export const make = (options: OrchestratorOptions = {}) =>
       });
     };
 
-    const keyNow = () => {
-      if (!open) {
-        open = true;
-        said++;
-      }
-      return `m${said}`;
-    };
-
-    const grow = async (text: string) => {
-      if (input.caller && text.length > toCaller) {
-        input.caller.push(text.slice(toCaller));
-        toCaller = text.length;
-      }
-      const key = keyNow();
-      if (input.quiet || Date.now() - lastPush < streamEveryMs) return;
-      lastPush = Date.now();
-      await go(core.setOrchestrator("speaking"));
-      await go(chat.orchestratorSays(input.conversation, key, text, false, execution.currentRun()));
-    };
-
-    const done = async (text: string) => {
-      if (input.caller && text.length > toCaller) input.caller.push(text.slice(toCaller));
-      if (input.caller && text) input.caller.push("\n");
-      toCaller = 0;
-      const key = keyNow();
-      open = false;
-      if (text && !input.quiet) await go(chat.orchestratorSays(input.conversation, key, text, true, execution.currentRun()));
-    };
-
-    // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
-    const settled = async (aborted: boolean) => {
-      if (aborted && !closing) trace.note("run/error", "主人叫停了");
-      input.caller?.end();
-      input = { conversation: input.conversation, source: input.source, run: input.run };
-      open = false;
-      await go(core.setOrchestrator("listening"));
-    };
-
-    // An answer that failed before any token came has none to tell.
-    const noteUsage = (u: Usage | undefined) => {
-      if (!u || (u.input === 0 && u.cacheRead === 0 && u.output === 0)) return;
-      const changed = prefixChanged;
-      prefixChanged = [];
-      const tokens = tokensOf(u);
-      trace.usage(tokens, usageText(tokens, changed));
-    };
-
-    const event = async (e: BrainEvent) => {
-      let runInput: RunInput | undefined;
-      if (e.type === "message_start" && isInput(e.message)) runInput = local.get(e.message)?.run ?? { by: { kind: "" } };
-      if (
-        e.type !== "agent_settled" &&
-        e.type !== "compaction_start" &&
-        e.type !== "compaction_end" &&
-        e.type !== "prefix_changed" &&
-        e.type !== "tasks_changed"
-      )
-        await go(execution.observe(e, runInput)).catch((err: Error) => notice("error", "管家的执行没能记下：" + err.message));
-      switch (e.type) {
-        case "message_start":
-          if (isInput(e.message)) {
-            const next = { ...e.message.details, ...(local.get(e.message) ?? { run: { by: { kind: "" } } }) };
-            // A line that joins the run takes the words from here on: the one before has what it got, and ends now,
-            // or a caller waiting on it (a brief, a call's line) would wait for the run's end with no words.
-            if (input.caller && input.caller !== next.caller) input.caller.end();
-            input = next;
-            toCaller = 0;
-          }
-          return;
-        case "agent_start":
-          return go(core.setOrchestrator("thinking"));
-        case "message_update": {
-          if (e.message.role !== "assistant") return;
-          const text = messageText(e.message);
-          if (text) await grow(text);
-          return;
-        }
-        case "message_end": {
-          if (e.message.role !== "assistant") return;
-          const m = e.message as AssistantMessage;
-          noteUsage(m.usage);
-          await done(messageText(m).trim());
-          if (m.stopReason === "error") notice("error", "管家出错了：" + (m.errorMessage || "模型出错了"));
-          return;
-        }
-        case "compaction_end":
-          if (e.usage) {
-            const tokens = tokensOf(e.usage);
-            trace.usage(tokens, "整理对话，" + usageText(tokens));
-          }
-          if (e.compaction) shown = "";
-          return;
-        case "prefix_changed":
-          logs.info(`vibevalley: the orchestrator's prompt start changed between compactions: ${e.parts.join(",")}`);
-          prefixChanged = e.parts;
-          return;
-        case "agent_settled":
-          return settled(e.run.aborted);
-      }
-    };
-
-    // The agent's events, handled one at a time in order.
-    let events = Promise.resolve();
-    const follow = (e: BrainEvent) => {
-      events = events.then(() => event(e)).catch((err) => logs.error("vibevalley: the orchestrator could not follow its agent:", err));
-    };
-
-    // Started on first use: loading it is not free, and a farm without a model works otherwise.
-    const brainOf = (): Promise<Brain> => {
-      if (brain) return Promise.resolve(brain);
-      starting ??= (async () => {
-        const llm = llmOf();
-        const b = await Brain.start({
-          name: orchestratorAgent,
-          instructions: systemPrompt + agentPrompt,
-          llm,
-          home,
-          cwd: projectsDir(config),
-          tools: orchestratorTools(),
-          noSkills: true,
-          noSubagents: true,
-          recurrences: false,
-          wakeSoon,
-        });
+    const host = new AgentHost<Route>({
+      name: orchestratorAgent,
+      label: "管家",
+      inputType: "orchestratorInput",
+      home,
+      cwd: projectsDir(config),
+      instructions: systemPrompt + agentPrompt,
+      llm: llmOf,
+      tools: toolsFor,
+      wakeSoon,
+      first: { conversation: general, source: "owner" },
+      quiet: (r) => r.quiet ?? false,
+      say: (r, key, text, final, runId) => go(chat.orchestratorSays(r.conversation, key, text, final, runId)),
+      state: (s) => go(core.setOrchestrator(s)),
+      fresh: () => {
         shown = "";
-        // Listening before the first line is sent.
-        b.subscribe(follow);
-        logs.info(`vibevalley: the orchestrator is on vibevalley's own agent, model ${llm.model.id}`);
-        brain = b;
-        return b;
-      })().finally(() => {
-        starting = undefined;
-      });
-      return starting;
-    };
+      },
+      restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
+      journal: run.trajectories.openLog(orchestratorAgent, keepEvents),
+      toolStart: tool.start,
+      runStore: run.runStore,
+      notice,
+      log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
+      go,
+    });
 
     const agentLines = async () => {
       const lines: string[] = [];
@@ -449,10 +263,9 @@ export const make = (options: OrchestratorOptions = {}) =>
     };
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while
-    // the brain is busy may be taken after one given later, so it carries the whole, and the one after it does too.
-    const situationNow = async (b: Brain, conversation: string) => {
+    // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
+    const situationNow = async (busy: boolean, conversation: string) => {
       const now = await situation(conversation);
-      const busy = b.busy() || b.core.hasQueuedMessages();
       const shownNow = !busy && shown !== "" ? situationDelta(shown, now) : now;
       shown = busy ? "" : now;
       return shownNow;
@@ -464,63 +277,42 @@ export const make = (options: OrchestratorOptions = {}) =>
       return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + orchestratorInboxLines(digest), digest.map((m) => m.id)];
     };
 
-    // Held from reading the situation to handing the input over, so that each input's changes follow the one before.
-    let inputs = Promise.resolve();
-    const serially = <A>(f: () => Promise<A>): Promise<A> => {
-      const next = inputs.then(f);
-      inputs = next.then(
-        () => undefined,
-        () => undefined,
+    /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. */
+    const take = async (i: Intake): Promise<boolean> => {
+      const rule = intake[i.source];
+      const asked = rule.head + i.line;
+      const route: Route = {
+        conversation: i.conversation,
+        ...(i.agent ? { agent: i.agent } : {}),
+        source: i.source,
+        ...(i.issue ? { issue: i.issue } : {}),
+        ...(i.owner ? { owner: true } : {}),
+      };
+      const taken = await host.submit(
+        async (busy, memoryNews) => {
+          const [heard, ids] = await news();
+          // The log shows the line; the model also gets the time, the farm and the news before it.
+          const text = ["【现在】" + localeMinute(new Date()), await situationNow(busy, i.conversation), memoryNews, heard, asked]
+            .filter((p) => p !== "")
+            .join("\n\n");
+          return { text, heard: ids };
+        },
+        { route, run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked }, ...(i.caller ? { caller: i.caller } : {}) },
+        rule.now,
       );
-      return next;
-    };
-
-    const sendInput = async (line: string, routing: Routing, extra: Local, now: boolean): Promise<boolean> => {
-      const runInput: RunInput = { ...extra.run, by: extra.run.by.kind ? extra.run.by : { kind: "comment" } };
-      const conversation = routing.conversation;
-      let b: Brain;
-      try {
-        b = await brainOf();
-      } catch (err) {
-        const why = err instanceof Error ? err.message : String(err);
-        const id = await go(execution.failedStart(runInput, line, "起不来：" + why)).catch((e: Error) => {
-          notice("error", "管家的执行没能记下：" + e.message);
-          return "";
-        });
-        notice("error", "管家起不来：" + why);
-        const words =
-          why === noDeepSeekKey
-            ? "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
-            : "我这边起不来：" + why;
-        const again = cannot.get(conversation) === words;
-        cannot.set(conversation, words);
-        if (!again) await go(chat.orchestratorSays(conversation, `failed${Date.now()}`, words, true, id));
-        extra.caller?.push("我这边起不来：" + why);
-        extra.caller?.end();
-        return false;
+      if (taken.ok) {
+        cannot.clear();
+        return true;
       }
-      cannot.clear();
-      await serially(async () => {
-        const [heard, ids] = await news();
-        const asked: RunInput = { ...runInput, heard: ids, asked: line };
-        // The log shows the line; the model also gets the time, the farm and the news before it.
-        const text = ["【现在】" + localeMinute(new Date()), await situationNow(b, conversation), b.memoryNews(), heard, line]
-          .filter((p) => p !== "")
-          .join("\n\n");
-        const message = customMessage("orchestratorInput", text, { details: routing });
-        local.set(message, { ...(extra.caller ? { caller: extra.caller } : {}), run: asked });
-        if (now) b.send(message);
-        else b.later(message);
-      });
-      return true;
+      const words =
+        taken.why === noDeepSeekKey
+          ? "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
+          : "我这边起不来：" + taken.why;
+      const again = cannot.get(i.conversation) === words;
+      cannot.set(i.conversation, words);
+      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${Date.now()}`, words, true, taken.run));
+      return false;
     };
-
-    /** now joins the run under way; otherwise the line waits until the run would stop. false: the orchestrator could not start. */
-    const ask = (line: string, routing: Routing, extra: Partial<Local>, now: boolean) =>
-      sendInput(sourceHead(routing.source) + line, routing, { ...extra, run: extra.run ?? { by: { kind: "" } } }, now);
-
-    const send = (source: Source, line: string, conversation: string, now: boolean) =>
-      ask(line, { conversation, source }, { run: { by: { kind: "runtime" } } }, now);
 
     const pickedNote = (picked: Pick) => {
       let note = "";
@@ -533,7 +325,6 @@ export const make = (options: OrchestratorOptions = {}) =>
     const heardInChat = async (n: OrchestratorNews) => {
       const fromPerson = n.messages.every((m) => m.from === "user");
       const owner = n.messages.some((m) => m.from === "user");
-      const source: Source = fromPerson ? "owner" : "chat";
       let picked: Pick = {};
       for (const m of n.messages) {
         const p = selected.get(m.id);
@@ -542,17 +333,11 @@ export const make = (options: OrchestratorOptions = {}) =>
           selected.delete(m.id);
         }
       }
-      const routing: Routing = { conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), source, owner };
-      if (fromPerson && n.conversation === general) {
-        await ask(pickedNote(picked) + "主人说：" + n.messages.map((m) => m.text).join("\n"), routing, {}, true);
-        return;
-      }
-      await ask(
-        pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + orchestratorInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。",
-        routing,
-        {},
-        fromPerson,
-      );
+      const line =
+        fromPerson && n.conversation === general
+          ? pickedNote(picked) + "主人说：" + n.messages.map((m) => m.text).join("\n")
+          : pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + orchestratorInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。";
+      await take({ source: fromPerson ? "owner" : "chat", line, conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), owner });
     };
 
     // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
@@ -564,27 +349,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";
         line = `【定时任务「${s.name}」到点了${missed}】\n${s.text}\n\n这是 #${channel.name} 的定时（${s.id}），你的回答会发在那里；照着做，做完说一两句。`;
       }
-      await ask(line, { conversation: channel.id, source: s ? "recurrence" : "issue", issue: w.issue.id }, { run: { issue: w.issue.id, by: w.by } }, false);
-    };
-
-    // The run the last start was cut off in goes on, answering where its input came from. Its first message is in the
-    // conversation already, so the input is read back from there; the run it makes is linked to that input's issue, which
-    // waits on the owner again when it ends (the issue was closed as lost when the farm started).
-    const resume = async () => {
-      let b: Brain;
-      try {
-        b = await brainOf();
-      } catch (err) {
-        logs.error("vibevalley: the orchestrator could not go on with its last run:", err);
-        return;
-      }
-      const at = requestInput();
-      input = at;
-      toCaller = 0;
-      execution.resume({ ...(at.issue ? { issue: at.issue } : {}), by: { kind: triggerOf(at.source) } });
-      if (b.resume(resumeWithinMs)) return;
-      execution.resume(undefined);
-      if (!b.busy()) trace.note("run/error", "上一轮停在了半路，太久了，没有接着做");
+      await take({ source: s ? "recurrence" : "issue", line, conversation: channel.id, issue: w.issue.id, by: w.by });
     };
 
     // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
@@ -600,7 +365,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         },
         { once: true },
       );
-      void ask(line, { conversation: general, source: "owner", owner: true }, { caller: me }, true);
+      void take({ source: "owner", line, conversation: general, owner: true, caller: me });
       return me.words(signal);
     };
 
@@ -616,28 +381,20 @@ export const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(
         Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
           Effect.flatMap(chat.channelOf(o.channel), (c) =>
-            handled("the patrol", (text: string) => send("patrol", text, o.channel, false))(patrolText(c.name, o.notes)),
+            handled("the patrol", (line: string) => take({ source: "patrol", line, conversation: o.channel }))(patrolText(c.name, o.notes)),
           ),
         ),
       );
       yield* Effect.forkScoped(
         Stream.runForEach(
           yield* tasks.news,
-          handled("a task graph's line", (line: string) => send("graph", line, general, false)),
+          handled("a task graph's line", (line: string) => take({ source: "graph", line, conversation: general })),
         ),
       );
-      if (sessionUnfinished(sessionFile) && (options.llm || settings.deepseekApiKey())) void resume();
+      if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
     }
 
-    yield* Effect.addFinalizer(() =>
-      Effect.promise(async () => {
-        closing = true;
-        const b = brain ?? (await starting?.catch(() => undefined));
-        await b?.close();
-        await events;
-        await go(execution.close()).catch((err: Error) => logs.error("orchestrator execution:", err.message));
-      }),
-    );
+    yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
 
     const modelId = () => {
       try {
@@ -646,46 +403,6 @@ export const make = (options: OrchestratorOptions = {}) =>
         return store.agent(orchestratorAgent)?.model ?? "";
       }
     };
-
-    const markWrong = (on: number, want: string): Effect.Effect<OrchestratorEval, ApiError> =>
-      Effect.suspend(() => {
-        const w = want.trim();
-        if (!w) return Effect.fail(refused("写一句它应该怎样"));
-        const asked = trace.events().find((e) => e.seq === on);
-        if (!asked) return Effect.fail(missing(`管家轨迹里没有第 ${on} 步`));
-        if (asked.type !== "user/message") return Effect.fail(refused(`第 ${on} 步不是管家收到的话`));
-        const lines = readLines(sessionFile);
-        const at = turnAt(lines, asked.text, asked.time);
-        if (at < 0) return Effect.fail(refused(`第 ${on} 步收到的话没进管家的对话（那时管家没起来？）`));
-        let memoryText = "";
-        try {
-          memoryText = readFileSync(memoryFile(home), "utf8");
-        } catch {
-          memoryText = "";
-        }
-        const tools = [...orchestratorTools(), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name);
-        const id = newId();
-        const evalCase = {
-          id,
-          created: Date.now(),
-          model: modelId(),
-          want: w,
-          memory: memoryText,
-          tools,
-          before: replay(lines.slice(0, at)),
-          input: lines[at],
-          did: turnOf(lines.slice(at + 1)),
-          expect: [],
-        };
-        const file = join(home, "evals", id + ".json");
-        try {
-          mkdirSync(join(home, "evals"), { recursive: true });
-          writeFileSync(file, JSON.stringify(evalCase, null, 2) + "\n", { mode: 0o600 });
-        } catch (err) {
-          return Effect.fail(refused(err instanceof Error ? err.message : String(err)));
-        }
-        return Effect.succeed({ id, file });
-      });
 
     return Orchestrator.of({
       say: (text, pick, conversation, sendKey) =>
@@ -699,14 +416,16 @@ export const make = (options: OrchestratorOptions = {}) =>
         Effect.gen(function* () {
           if (yield* chat.spoken("user", text, sendKey)) return;
           const picked = agent ? store.agent(agent)?.id : undefined;
-          void ask(
-            pickedNote(picked ? { agent: picked } : {}) +
+          void take({
+            source: "owner",
+            line:
+              pickedNote(picked ? { agent: picked } : {}) +
               "（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说：" +
               text,
-            { conversation: general, ...(picked ? { agent: picked } : {}), source: "owner", owner: true },
-            {},
-            true,
-          );
+            conversation: general,
+            ...(picked ? { agent: picked } : {}),
+            owner: true,
+          });
         }),
       call: (text, signal) => {
         void go(Effect.ignore(chat.spoken("user", text, "")));
@@ -714,42 +433,21 @@ export const make = (options: OrchestratorOptions = {}) =>
       },
       brief: async (line) => {
         const me = new Caller();
-        void ask(line, { conversation: general, source: "issue" }, { caller: me }, false);
+        void take({ source: "issue", line, conversation: general, caller: me });
         let said = "";
         for await (const w of me.words()) said += w;
         return said.trim();
       },
       answerer: (model) => (model === orchestratorModel ? (text, signal) => answer("主人说：" + text, signal) : undefined),
-      stop: () =>
-        Effect.promise(async () => {
-          await brain?.stop();
-        }),
-      markWrong,
+      stop: () => Effect.promise(() => host.stop()),
+      markWrong: (on, want) =>
+        host.markWrong(
+          on,
+          want,
+          modelId(),
+          [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name),
+        ),
     });
   });
 
 export const layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));
-
-const isInputLine = (m: AgentMessage) => m.role === "custom" && (m as CustomMessage).customType === "orchestratorInput";
-
-/** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
- * than the step, and it holds the step's words (trimmed and maybe cut; the message puts the time, the farm and the news
- * before them). Of those, the newest: an older one with the same words was taken before. -1 when none is. */
-export function turnAt(lines: readonly AgentMessage[], text: string, time: number): number {
-  const head = text.endsWith("…") ? text.slice(0, -1) : text;
-  let at = -1;
-  lines.forEach((m, i) => {
-    if (isInputLine(m) && m.timestamp <= time && messageText(m).includes(head) && (at < 0 || m.timestamp >= lines[at]!.timestamp)) at = i;
-  });
-  return at;
-}
-
-/** What followed an input until the next one, without the compactions written after a run. */
-export function turnOf(rest: readonly AgentMessage[]): AgentMessage[] {
-  const out: AgentMessage[] = [];
-  for (const m of rest) {
-    if (isInputLine(m)) break;
-    if (m.role !== "compactionSummary") out.push(m);
-  }
-  return out;
-}

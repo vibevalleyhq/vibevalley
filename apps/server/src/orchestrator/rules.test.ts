@@ -1,6 +1,6 @@
 import { type InboxMessage } from "../channel/rules.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { orchestratorInboxLines, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
+import { orchestratorInboxLines, patrolText, situationDelta, intake } from "./rules.ts";
 
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
@@ -45,15 +45,8 @@ describe("the orchestrator's rules", () => {
     expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
   });
 
-  it("word a model answer's tokens", () => {
-    expect(usageText({ input: 1_000, cacheRead: 1_000, output: 1_234_567 }, ["memory", "tools"])).toBe(
-      "缓存命中 50%：读缓存 1 000，没命中 1 000，输出 1 234 567；开头变了：记性、工具",
-    );
-    expect(usageText({ input: 0, cacheRead: 0, output: 12 })).toBe("没报读了多少：输出 12");
-  });
-
   it("give every source its head", () => {
-    for (const s of sources) expect(sourceHead(s)).toMatch(/^\[来源：.+\]/);
+    for (const s of Object.values(intake)) expect(s.head).toMatch(/^\[来源：.+\]/);
   });
 
   it("word the patrol's finds", () => {
