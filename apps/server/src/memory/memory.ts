@@ -43,7 +43,6 @@ export interface MemoryShape {
   readonly write: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly list: (agent: string) => Effect.Effect<Memory[]>;
   readonly sources: () => MemorySourceInfo[];
-  readonly writeOrchestrator: (text: string) => Effect.Effect<Memory, ApiError>;
   readonly archive: (query: string) => ArchiveListing;
   readonly archiveFile: (name: string) => string | undefined;
 }
@@ -187,7 +186,6 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       write,
       list,
       sources: () => sources.info(),
-      writeOrchestrator,
       archive: (query) => ({
         files: archiveFiles(home),
         hits: query.trim() ? searchArchive(home, query) : [],

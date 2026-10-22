@@ -77,7 +77,6 @@ export interface CoreShape {
   readonly facts: Stream.Stream<Fact>;
   readonly live: Stream.Stream<LiveEvent>;
   readonly owner: Stream.Stream<OwnerDid>;
-  readonly effects: Stream.Stream<GameEffect>;
   /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
   readonly states: Stream.Stream<StateFrame>;
 }
@@ -140,7 +139,6 @@ export const make = Effect.gen(function* () {
 
   const events = yield* PubSub.unbounded<SideEvent>();
   const transitions = yield* PubSub.unbounded<Transition>();
-  const effects = yield* PubSub.unbounded<GameEffect>();
   const owner = yield* PubSub.unbounded<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
   const changes = yield* PubSub.unbounded<GameEffect | undefined>();
@@ -171,7 +169,6 @@ export const make = Effect.gen(function* () {
         PubSub.publishUnsafe(transitions, t);
       }
       for (const e of made) {
-        PubSub.publishUnsafe(effects, e);
         PubSub.publishUnsafe(changes, e);
       }
     });
@@ -222,7 +219,6 @@ export const make = Effect.gen(function* () {
       Stream.filter((e): e is LiveEvent => e !== undefined),
     ),
     owner: Stream.fromPubSub(owner),
-    effects: Stream.fromPubSub(effects),
     states,
   };
   return shape;

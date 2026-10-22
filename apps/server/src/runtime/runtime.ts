@@ -22,7 +22,7 @@ import { FileWriter } from "../base/files.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
-import { inCny, type Price, price, type Rate } from "./price.ts";
+import { inCny, price, type Rate } from "./price.ts";
 import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
@@ -70,12 +70,10 @@ export interface RuntimeShape {
   readonly choose: (task: string, named: string, picked: string) => Effect.Effect<Agent | undefined>;
   readonly resolve: (agent: Agent) => Effect.Effect<Resolved, ApiError>;
   readonly runtime: (id: string) => Runtime | undefined;
-  readonly price: (id: string, model: string) => Price | undefined;
   readonly quote: (id: string, model: string) => Rate | undefined;
   readonly spend: (id: string, cny: number) => void;
   /** Reads the runtime's quota a little after a run, several runs sharing one read. */
   readonly usageSoon: (id: string) => void;
-  readonly usageAsked: (id: string) => number;
 }
 
 export class Runtimes extends Context.Service<Runtimes, RuntimeShape>()("vibevalley/Runtime") {}
@@ -183,7 +181,6 @@ export const make = (options: RuntimeOptions = {}) =>
     const reads = new Map<string, number>();
     const pending = new Map<string, NodeJS.Timeout>();
     const pushes = new Map<string, NodeJS.Timeout>();
-    const asked = new Map<string, number>();
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");
@@ -434,7 +431,6 @@ export const make = (options: RuntimeOptions = {}) =>
           };
         }),
       runtime: (id) => registry.get(id),
-      price,
       quote: (id, model) => {
         const p = price(id, model);
         return p ? inCny(p, config.cnyPerUsd) : undefined;
@@ -461,7 +457,6 @@ export const make = (options: RuntimeOptions = {}) =>
           );
       },
       usageSoon: (id) => {
-        asked.set(id, (asked.get(id) ?? 0) + 1);
         if (closed || pending.has(id)) return;
         pending.set(
           id,
@@ -471,7 +466,6 @@ export const make = (options: RuntimeOptions = {}) =>
           }, usageAfterRunMs),
         );
       },
-      usageAsked: (id) => asked.get(id) ?? 0,
     };
     return Object.assign(shape, { refreshUsage, cached: cache, spent: () => spent, setSpent: (s: Spent) => (spent = s) });
   });
