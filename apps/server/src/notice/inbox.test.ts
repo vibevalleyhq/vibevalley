@@ -20,17 +20,17 @@ test("a helper handed back with questions questions the owner to answer, not to 
     lastRun: { outcome: "completed", summary: "做完了", at: 2000 },
   } as unknown as Session;
   const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [{ question: "用 8787 还是 8797？" }] } as unknown as Issue;
-  // As the server writes it: the questions make the standing.
+  // As the server writes it: the questions make the attention.
   const state = (questions: Issue["questions"]): WorkspaceState => ({
     ...emptyWorkspaceState(),
     sessions: [session],
-    issues: [{ ...issue, questions, standing: { state: questions.length > 0 ? "asking" : "reviewing", acts: [] } }],
+    issues: [{ ...issue, questions, attention: { state: questions.length > 0 ? "asking" : "reviewing", acts: [] } }],
   });
   expect(inbox(state(issue.questions)).map((i) => [i.kind, i.text])).toEqual([["ask", "用 8787 还是 8797？"]]);
   expect(inbox(state([])).map((i) => i.kind)).toEqual(["merge"]);
 });
 
-test("the inbox says what the issue's standing says: a round stopped halfway wants the owner too", () => {
+test("the inbox says what the issue's attention says: a round stopped halfway wants the owner too", () => {
   const session = {
     id: "w1",
     name: "阿狐",
@@ -49,11 +49,11 @@ test("the inbox says what the issue's standing says: a round stopped halfway wan
     title: "写打卡",
     sessions: ["w1"],
     questions: [],
-    standing: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
+    attention: { state: "stuck", stuck: "interrupted", since: 2, acts: [] },
   } as unknown as Issue;
   expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [issue] }).map((i) => i.kind)).toEqual(["interrupted"]);
   // Closed by the owner, the helper still on the farm questions nothing.
-  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [{ ...issue, standing: { state: "closed", acts: [] } }] })).toEqual([]);
+  expect(inbox({ ...emptyWorkspaceState(), sessions: [session], issues: [{ ...issue, attention: { state: "closed", acts: [] } }] })).toEqual([]);
 });
 
 test("each item is worded for every route: the phone, the system notice, the tray", () => {
@@ -69,7 +69,7 @@ test("each item is worded for every route: the phone, the system notice, the tra
     phase: { _tag: "ripe" },
     lastRun: { outcome: "completed", summary: "打卡\n  写好了", at: 2 },
   } as unknown as Session;
-  const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [], standing: { state: "reviewing", acts: [] } } as unknown as Issue;
+  const issue = { id: "t1", number: 41, title: "写打卡", sessions: ["w1"], questions: [], attention: { state: "reviewing", acts: [] } } as unknown as Issue;
   const recurrence = { id: "s1", name: "每天看测试", channel: "c1", created: 3, pending: true } as unknown as NonNullable<
     WorkspaceState["recurrences"]
   >[number];

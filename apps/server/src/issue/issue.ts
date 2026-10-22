@@ -35,11 +35,11 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { actLabel, isBusy, standingLabel } from "@vibevalley/protocol/rules";
+import { actLabel, isBusy, attentionLabel } from "@vibevalley/protocol/rules";
 import { isForManager, issueDraftingOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
-import { standingIn } from "./standing.ts";
+import { attentionIn } from "./attention.ts";
 import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../recurrence/rules.ts";
@@ -107,8 +107,8 @@ export interface IssueShape {
   readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
   readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string) => Effect.Effect<Issue, ApiError>;
-  /** One of what the issue's standing offers the owner (Issue.standing.acts), done as its page's button does it: the
-   * page, the command line and the manager's tools all go by it. Any act the standing does not offer is refused. */
+  /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
+   * page, the command line and the manager's tools all go by it. Any act the attention does not offer is refused. */
   readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
   /** An issue's id from what the owner and the manager call it: #41 or 41, its id, or the id of a session that worked it. */
   readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
@@ -171,7 +171,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   return out + "\n先看看项目现在的样子，再接着做。";
 }
 
-/** The findings still standing, numbered, then the owner's own words. */
+/** The findings still attention, numbered, then the owner's own words. */
 function failedText(findings: readonly Finding[], text: string): string {
   let out = "验收没过，这几处要修：";
   let n = 0;
@@ -244,14 +244,14 @@ export const make = (options: IssueOptions = {}) =>
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
         ...(handedBack ? { handedBack } : {}),
-        standing: { state: "draft", acts: [] },
+        attention: { state: "draft", acts: [] },
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
       out.status = issueStatusOf(out, state);
       const drafter = issueDraftingOf(out, state);
       if (drafter) out.drafting = drafter;
-      // The moves read the standing: a round that failed is not harvested.
-      out.standing = standingIn(out, state);
+      // The moves read the attention: a round that failed is not harvested.
+      out.attention = attentionIn(out, state);
       out.moves = statusMoves(out);
       return out;
     }
@@ -833,7 +833,8 @@ export const make = (options: IssueOptions = {}) =>
           const t = yield* get(ref);
           const id = t.id;
           const name = actLabel[req.act];
-          if (!t.standing.acts.includes(req.act)) return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${standingLabel[t.standing.state]}`));
+          if (!t.attention.acts.includes(req.act))
+            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`));
           const said = (req.text ?? "").trim();
           const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
           switch (req.act) {

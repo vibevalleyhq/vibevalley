@@ -17,7 +17,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`harvest.ts` 收获（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
-- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForManager`、`openFindings`，`standing.ts` 的 `standingOf`（给主人看的状态和能做的事）和 `standingIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`standing.ts` 的 `standingLabel`、`actLabel`（每个动作叫什么）、`standingWantsOwner`。
+- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueDraftingOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForManager`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`draftBrief` 起草的规矩、`parseDraft` 读草稿、`draftDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；农场的播种袋在 `farm/panels/SeedForms.tsx`。
@@ -27,7 +27,7 @@
 - **一张工单一个 id**，从写下到关上不变；重开是同一张工单的下一个帮工，不是新工单。
 - **状态六个**，和 Linear 一样：`backlog`、`todo`、`in_progress`、`in_review`、`done`、`canceled`。只存主人的意思（排没排上队 `queued_at`、怎么关的 `closed`），帮工那一半（在做、交回来了）从核心状态里帮工的阶段算，不另存一份。
 - **数据库是家，核心状态有一份**：开着的和最近关的 50 家在 `WorkspaceState.issues`，`Issues` 每改一次库就施加一条 `issue` 事实；页面只读核心状态。
-- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `standing.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。
+- **主人只挪到 `backlog`、`todo`、`done`、`canceled`**；`in_progress`、`in_review` 是帮工干出来的。每张工单的 `moves`（能挪到哪）和 `attention.acts`（能做什么）是同一张表的两面，都在 reduce 里和状态一起算（`withIssueStatuses`）：帮工这一轮一结束，看板、地块详情、命令行读到的就是新的，不等服务端再发布这张工单；服务端的拒绝调同一个 `statusMove`。
 - **动作是服务端的**（`issue.act`，`Issues.act`）：站位给出的每个动作（开工、回答、验收通过、打回、收获、知道了、让它解决冲突、接着做、接着修、带话、叫停、关上、重开）在服务端只有一份实现，带给帮工的话也在这里拼；站位没给的动作拒绝（「#41 现在不能「接着修」：它在做」）。页面只收集要说的话、先开收获清单和关单对话框；命令行的 `issue act` 和管家的工具走同一个入口。
 - **工单认编号**（`Issues.idOf`）：接口里的工单可以写 `#41`、`41`、工单 id 或干过它的帮工 id；命令行、管家的工具都用编号。
 - **一块地最多一个 worktree**：代码活的分支是 `vibevalley/issue-<号>`，worktree 是 `worktrees/<项目>.<号>`；重开、换帮工、重启都还是这一块。
@@ -80,7 +80,7 @@
 
 **缺肥**：帮工汇报里「要问主人：」开头的行，`readReport` 读出来放进 `report` 事实的 `questions`，工单服务记到 `questions`（`{ question, options? }`：句末「（选项：A｜B）」是它想到的回答，少于两个就不算选项）；主人在工单串里说一句就算回答，点一个选项就是把这句原样说出去，问题清掉。
 
-**给主人看的状态**（`Issue.standing`，`standingOf`）：从 `status`、帮工的阶段、`questions`、冲突、上一轮的结果和验收算出来，`issueOf` 读工单时和核心状态折事实时（`withIssueStatuses`）都填，页面不自己拼。每种状态带开始的时间（`since`），和主人能做的事（`acts`），其中最多一件是主动作（`lead`）：
+**给主人看的状态**（`Issue.attention`，`attentionOf`）：从 `status`、帮工的阶段、`questions`、冲突、上一轮的结果和验收算出来，`issueOf` 读工单时和核心状态折事实时（`withIssueStatuses`）都填，页面不自己拼。每种状态带开始的时间（`since`），和主人能做的事（`acts`），其中最多一件是主动作（`lead`）：
 
 | 状态 | 什么时候 | 主动作 |
 |---|---|---|
@@ -93,7 +93,7 @@
 | 收获了 `harvested` | `done` | 无（可以重开） |
 | 关了 `closed` | `canceled` | 重开 |
 
-冲突排在问题前面，问题排在没做成前面。种植计划里的工单有状态、没有动作：在计划那边操作。派给管家的工单答完了是「等你看」（主动作「知道了」，还能「关上」），没答成是「卡住了」（只能「关上」）。每种组合钉在 `apps/server/src/core/testdata/rules.jsonl.gz`（`standingOf`）。
+冲突排在问题前面，问题排在没做成前面。种植计划里的工单有状态、没有动作：在计划那边操作。派给管家的工单答完了是「等你看」（主动作「知道了」，还能「关上」），没答成是「卡住了」（只能「关上」）。每种组合钉在 `apps/server/src/core/testdata/rules.jsonl.gz`（`attentionOf`）。
 
 **时间线**（`issue.timeline`，`milestonesOf`）：从已经存着的事实拼，不另存：开单；每次干活的开始（开工、你带了话、重开、定时、起草）和结束（交回来了、问你、没做成、停在了半路、起草好了）；打回（同一时刻的意见合成一条）；验收通过；关单。新的在上，带时间和是哪个帮工；同时给出所有干活加起来花了多少（`spent`）。
 

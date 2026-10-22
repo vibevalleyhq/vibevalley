@@ -179,7 +179,7 @@ type Want =
   | { readonly kind: "merge" | "fix" | "interrupted" | "conflict" }
   | { readonly kind: "quiet"; readonly since: number };
 
-/** What a session questions of the owner. Its issue's standing says it, the one the issue page and the phone both read; a
+/** What a session questions of the owner. Its issue's attention says it, the one the issue page and the phone both read; a
  * session whose issue the state does not hold says it by its phase. */
 function wantOf(h: Session, state: WorkspaceState): Want | undefined {
   const issue = h.issue === undefined ? undefined : state.issues?.find((t) => t.id === h.issue && t.sessions.at(-1) === h.id);
@@ -199,7 +199,7 @@ function wantOf(h: Session, state: WorkspaceState): Want | undefined {
         return { kind: "quiet", since: need.since };
     }
   }
-  const st = issue.standing;
+  const st = issue.attention;
   switch (st.state) {
     case "asking":
       return { kind: "ask", questions: issue.questions };

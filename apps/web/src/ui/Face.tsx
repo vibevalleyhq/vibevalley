@@ -5,7 +5,7 @@ import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "../rules/cast";
 import { ready, useSprites } from "../data/query";
 
-/** A helper's head: its standing drawing, cropped to the head, on a leaf green ground. */
+/** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */
 export function AgentFace(props: { agentId: string; look?: Look; size?: number; muted?: boolean }) {
   const sprites = useSprites();
   const size = () => props.size ?? 24;

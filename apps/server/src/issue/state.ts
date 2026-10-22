@@ -1,10 +1,10 @@
-// An issue in the core state: its status, who drafts it, its place in the list and its findings left standing.
+// An issue in the core state: its status, who drafts it, its place in the list and its findings left attention.
 
 import { type WorkspaceState, type Issue, type IssueClose, type IssueDrafting, type IssueStatus, managerAgent } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { statusMoves } from "./moves.ts";
-import { standingIn } from "./standing.ts";
+import { attentionIn } from "./attention.ts";
 import { compare, compareText, or } from "../base/text.ts";
 
 /** Done is what was asked for: merged, or answered by the manager. The rest, and a close that does not say how, is canceled. */
@@ -88,17 +88,17 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   (state.issues ?? []).forEach((t, i) => {
     const status = issueStatusOf(t, state);
     const drafting = issueDraftingOf(t, state);
-    const standing = standingIn({ ...t, status, drafting }, state);
-    // The moves read the standing: a round that failed is not harvested, from the moment it fails.
-    const moves = statusMoves({ ...t, status, drafting, standing });
-    if (status === t.status && same(drafting, t.drafting) && same(standing, t.standing) && same(moves, t.moves)) return;
+    const attention = attentionIn({ ...t, status, drafting }, state);
+    // The moves read the attention: a round that failed is not harvested, from the moment it fails.
+    const moves = statusMoves({ ...t, status, drafting, attention });
+    if (status === t.status && same(drafting, t.drafting) && same(attention, t.attention) && same(moves, t.moves)) return;
     next ??= [...state.issues!];
-    next[i] = { ...t, status, drafting, standing, moves };
+    next[i] = { ...t, status, drafting, attention, moves };
   });
   return next ? { ...state, issues: next } : state;
 }
 
-/** The weeds a failed acceptance left standing. */
+/** The weeds a failed acceptance left attention. */
 export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.pulled).length;
 
 export const isForManager = (t: Issue) => t.assignee === managerAgent;

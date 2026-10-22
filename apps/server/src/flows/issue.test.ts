@@ -309,7 +309,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // An act is the server's: only what the standing offers, with the words the server puts to the helper, by number too.
+  // An act is the server's: only what the attention offers, with the words the server puts to the helper, by number too.
   it.live("does an act as the issue's page does it", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -330,7 +330,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       yield* await_(
         () => issues.get(issue.id),
-        (i) => i.standing.stuck === "failed",
+        (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
       refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "harvest" }, "")), "现在不能「收获」");
@@ -356,7 +356,7 @@ describe("an issue", () => {
       yield* w.nextReport;
       const failed = yield* await_(
         () => issues.get(issue.id),
-        (i) => i.standing.stuck === "failed",
+        (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
       expect(failed.status).toBe("in_review");

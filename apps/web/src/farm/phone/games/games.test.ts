@@ -148,9 +148,9 @@ describe("小恐龙", () => {
 
   test("a cactus ends a run on the ground; jumped in time, it passes under", () => {
     const cactus: Obstacle = { kind: "cactus", x: 22, y: dinoGround - 12, w: 6, h: 12 };
-    const standing = withObstacles(newDino(2), [cactus], 999);
-    expect(runFor(standing, 400).over).toBe(true);
-    expect(runFor(jump(withObstacles(standing, [{ ...cactus, x: 26 }], 999)), 400).over).toBe(false);
+    const attention = withObstacles(newDino(2), [cactus], 999);
+    expect(runFor(attention, 400).over).toBe(true);
+    expect(runFor(jump(withObstacles(attention, [{ ...cactus, x: 26 }], 999)), 400).over).toBe(false);
   });
 
   test("a high bird is ducked under", () => {

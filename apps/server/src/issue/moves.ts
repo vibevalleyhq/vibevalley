@@ -1,5 +1,5 @@
 // Where an issue may be moved, and what each move does: the table the board, the command line, the manager's tools and
-// the server's refusals all go by. Worked out with the issue's status and standing in reduce (withIssueStatuses), so a
+// the server's refusals all go by. Worked out with the issue's status and attention in reduce (withIssueStatuses), so a
 // round that ends changes what the issue may do at once, wherever it is read.
 
 import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
@@ -62,7 +62,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       // Every issue has an acceptance; a glance one is passed by this harvest itself, so a round that failed is never
       // harvested: done is what was asked for, not how the round ended.
       if (to === "done") {
-        if (t.standing.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
+        if (t.attention.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
         return t.acceptance === "required" && t.acceptedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能收获"] : ["merge", ""];
       }
       if (to === "canceled") return ["cancel", ""];

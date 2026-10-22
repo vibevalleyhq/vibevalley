@@ -61,7 +61,7 @@ describe("the atlas", () => {
     }
   });
 
-  test("a variant falls back to the plainer sprite; the anchor is the standing pixel's bottom", () => {
+  test("a variant falls back to the plainer sprite; the anchor is the attention pixel's bottom", () => {
     expect(atlas.first(["nope-such-sprite", "icon-board"]).name).toBe("icon-board");
     expect(atlas.has("nope-such-sprite")).toBe(false);
     const s = atlas.get("plot-empty");

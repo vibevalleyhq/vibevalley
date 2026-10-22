@@ -1075,7 +1075,7 @@ export interface Issue {
   drafting?: IssueDrafting;
   /** An issue for the manager: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
   handedBack?: HandedBack;
-  standing: IssueStanding;
+  attention: IssueAttention;
 }
 
 export interface HandedBack {
@@ -1100,8 +1100,8 @@ export interface CriterionCheck {
 }
 
 /** Where an issue stands for the owner, the one set of states the board, the farm and the page all say. */
-export const StandingValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
-export type Standing = (typeof StandingValues)[number];
+export const AttentionValues = ["draft", "queued", "working", "asking", "reviewing", "stuck", "harvested", "closed"] as const;
+export type Attention = (typeof AttentionValues)[number];
 
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
@@ -1127,8 +1127,8 @@ export type IssueAct = (typeof IssueActValues)[number];
 
 /** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
  * it can do, lead first. */
-export interface IssueStanding {
-  state: Standing;
+export interface IssueAttention {
+  state: Attention;
   since?: number;
   stuck?: StuckReason;
   lead?: IssueAct;
@@ -1221,7 +1221,7 @@ export interface Finding {
   pulled?: boolean;
 }
 
-/** One of what the owner may do (Issue.standing.acts). text: what answer, tell and reopen say, and reject's findings
+/** One of what the owner may do (Issue.attention.acts). text: what answer, tell and reopen say, and reject's findings
  * one a line unless findings is given; sendKey: answer and tell said again with the same key are said once. */
 export interface IssueActRequest {
   act: IssueAct;

@@ -1,15 +1,15 @@
 // Where an issue stands for the owner: one state out of the issue's status, its session's phase, the questions, a
 // conflict and the acceptance, with the one thing the owner is asked to do. The board, the farm and the page all say it.
 
-import type { WorkspaceState, Issue, IssueAct, IssueStanding, Session } from "@vibevalley/protocol";
+import type { WorkspaceState, Issue, IssueAct, IssueAttention, Session } from "@vibevalley/protocol";
 import { isForManager } from "./state.ts";
 import { sessionOf } from "../session/state.ts";
 
 /** session is the issue's newest one, when it is on the farm. A task graph's issues and one for the manager go with the
  * graph or the manager: they stand, but the owner acts on them elsewhere. */
-export function standingOf(t: Issue, session: Session | undefined): IssueStanding {
+export function attentionOf(t: Issue, session: Session | undefined): IssueAttention {
   const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined || isForManager(t);
-  const own = (s: IssueStanding): IssueStanding => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
+  const own = (s: IssueAttention): IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
   switch (t.status) {
     case "done":
@@ -63,8 +63,8 @@ export function standingOf(t: Issue, session: Session | undefined): IssueStandin
 
 const at = (since: number | undefined) => (since !== undefined ? { since } : {});
 
-/** The issue's standing with its newest session as the state has it. */
-export function standingIn(t: Issue, state: WorkspaceState): IssueStanding {
+/** The issue's attention with its newest session as the state has it. */
+export function attentionIn(t: Issue, state: WorkspaceState): IssueAttention {
   const last = t.sessions.at(-1);
-  return standingOf(t, last === undefined ? undefined : sessionOf(state, last));
+  return attentionOf(t, last === undefined ? undefined : sessionOf(state, last));
 }

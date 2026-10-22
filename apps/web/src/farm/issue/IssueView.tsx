@@ -1,7 +1,7 @@
-// A plot's issue, opened by clicking the plot or its helper: the helper standing on its crop at the side; then, as the
+// A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.standing, worded by src/rules/issueState.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
 
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -125,7 +125,7 @@ function IssueBody(props: {
   }));
   const changed = () => ready(changes, undefined);
   const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.standing.state, s().head.runs, props.issue.findings.length],
+    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, s().head.runs, props.issue.findings.length],
     queryFn: () => api.issue.timeline({ id: props.issue.id }),
     placeholderData: <T,>(prev: T) => prev,
   }));
@@ -135,7 +135,7 @@ function IssueBody(props: {
     () => true,
   );
   const agent = () => ready(agentsQuery, []).find((a) => a.id === s().head.agent);
-  const state = () => s().standing.state;
+  const state = () => s().attention.state;
 
   const act = async (run: () => Promise<unknown>) => {
     setBusy(true);
@@ -228,7 +228,7 @@ function IssueBody(props: {
   );
   /** The block questions for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
-  const rowActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
+  const rowActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
   const boxShown = () => state() === "asking" || state() === "closed" || box() !== undefined;
 
   return (
@@ -244,7 +244,7 @@ function IssueBody(props: {
             <span class={xs}>{s().project}</span>
           </Show>
         </div>
-        <p class="mt-1 text-[13px]" style={{ color: s().standing.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
+        <p class="mt-1 text-[13px]" style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
 

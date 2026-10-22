@@ -63,7 +63,7 @@ export interface LifeFrame {
 }
 
 export interface LifeLayers {
-  /** In the lit world, over everything standing: smoke, dust, leaves, ripples, butterflies, birds. */
+  /** In the lit world, over everything attention: smoke, dust, leaves, ripples, butterflies, birds. */
   readonly world: Container;
   /** Over the lit world, added: what shines (sparks, twinkles, glints, fireflies, the mast's waves and lamp). */
   readonly glows: Container;

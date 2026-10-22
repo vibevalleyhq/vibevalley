@@ -93,7 +93,7 @@ export function groupsOf(shelf: string, pictures: readonly Picture[]): Group[] {
   );
 }
 
-/** The frames a picture moves through, or undefined: the pixel walk has two steps around a standing frame (x-1, x, x-2, x). */
+/** The frames a picture moves through, or undefined: the pixel walk has two steps around a attention frame (x-1, x, x-2, x). */
 export function framesOf(name: string, has: (n: string) => boolean): string[] | undefined {
   const base = /^(.*)-(\d+)$/.exec(name)?.[1] ?? name;
   const numbered: string[] = [];

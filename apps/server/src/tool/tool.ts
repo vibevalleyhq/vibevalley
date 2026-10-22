@@ -17,7 +17,7 @@ import {
   type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
@@ -461,11 +461,11 @@ export const make = Effect.gen(function* () {
       let found = (await go(issue.list())).filter(
         (t) =>
           (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
-          (!p.wants_owner || standingWantsOwner(t.standing.state)) &&
+          (!p.wants_owner || attentionWantsOwner(t.attention.state)) &&
           (!p.project || t.project === p.project.trim()) &&
           words.every((w) => (t.title + "\n" + (t.description ?? "")).includes(w)),
       );
-      if (p.wants_owner) found = found.sort((a, b) => (a.standing.since ?? now) - (b.standing.since ?? now));
+      if (p.wants_owner) found = found.sort((a, b) => (a.attention.since ?? now) - (b.attention.since ?? now));
       if (found.length === 0) return p.wants_owner ? "没有在等主人的工单。" : "没有这样的工单。";
       const limit = p.limit && p.limit > 0 ? Math.trunc(p.limit) : 20;
       const more = found.length > limit ? `\n（还有 ${found.length - limit} 张没列）` : "";

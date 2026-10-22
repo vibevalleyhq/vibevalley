@@ -16,7 +16,7 @@ Status: proposed
 
 ## Proposal
 
-**管家以工单为单位干活。** 所有工具都能用工单编号（`#41`、`41`）点名，帮工只是工单此刻由谁在做；照 Linear 老用户的日常补齐记、找、改、问、报五件事。规则不在管家里重写：每个工具都是转发给已有的服务方法（`Issues`、`standingOf`、`issueStatusOf`），管家只决定什么时候调、怎么跟主人说。
+**管家以工单为单位干活。** 所有工具都能用工单编号（`#41`、`41`）点名，帮工只是工单此刻由谁在做；照 Linear 老用户的日常补齐记、找、改、问、报五件事。规则不在管家里重写：每个工具都是转发给已有的服务方法（`Issues`、`attentionOf`、`issueStatusOf`），管家只决定什么时候调、怎么跟主人说。
 
 ### 一、按工单点名
 
@@ -29,7 +29,7 @@ Status: proposed
 |---|---|---|---|
 | 随手记一件事，以后再说 | 建在 Triage / Backlog | `issue_create`：写进备选，可以顺手起草；不派 | `issue.create`、`issue.draft` |
 | 记之前先查重 | Duplicate 提示 | `issue_search`：按字找，开着的和最近关的都找 | `issue.list` + 文字匹配 |
-| 按条件看一批 | 自定义视图、筛选 | `issues`：按状态、站位（等你回答 / 等你验收 / 卡住了…）、项目、优先级、谁在做、多久没动筛，按等了多久排 | `issue.list`、`standingOf` |
+| 按条件看一批 | 自定义视图、筛选 | `issues`：按状态、站位（等你回答 / 等你验收 / 卡住了…）、项目、优先级、谁在做、多久没动筛，按等了多久排 | `issue.list`、`attentionOf` |
 | 看一张的来龙去脉 | 工单详情、活动记录 | `issue_get`：各栏、站位、验收标准逐条、时间线 | `issue.get`、`issue.timeline` |
 | 改属性 | 改优先级、项目、负责人 | `issue_update`：优先级、项目、验收方式、验收标准、先后 | `issue.update`、`issue.move` |
 | 挪状态 | 拖看板 | `issue_status`：照 `moves` 挪，挪不了就照拒绝的话说 | `issue.status` |
@@ -39,7 +39,7 @@ Status: proposed
 
 ### 三、主人的 Inbox 和项目的健康度
 
-**「哪些在等我」**：站位里已经有答案（`standingWantsOwner`：等你回答、等你验收、卡住了）。`issues` 带 `wantsOwner: true` 就是主人的 Inbox，按等了多久排；管家一句话一条：编号、短标题、要主人做什么、等了多久。
+**「哪些在等我」**：站位里已经有答案（`attentionWantsOwner`：等你回答、等你验收、卡住了）。`issues` 带 `wantsOwner: true` 就是主人的 Inbox，按等了多久排；管家一句话一条：编号、短标题、要主人做什么、等了多久。
 
 **项目的健康度**（Linear 的 Project update，On track / At risk / Off track）：由规则算，不让模型判。放在 `packages/protocol/src/rules`（页面也要画），输入是这个项目的工单和今天的花费：
 
@@ -115,7 +115,7 @@ Status: proposed
 
 ### 七、要动的地方
 
-- **`packages/protocol`**：`Issue.kind`、`Issue.answer`；`Issue.relations`（`{ kind: "duplicate" | "related"; issue: string }[]`，存在 `issue` 表的一列 JSON）；健康度的规则（`rules/health.ts`）和它的黄金数据；`IssueAct` 加 `acknowledge`、`spinoff`。和工单页共用站位（`packages/protocol/src/rules/standing.ts`），那边先落地。
+- **`packages/protocol`**：`Issue.kind`、`Issue.answer`；`Issue.relations`（`{ kind: "duplicate" | "related"; issue: string }[]`，存在 `issue` 表的一列 JSON）；健康度的规则（`rules/health.ts`）和它的黄金数据；`IssueAct` 加 `acknowledge`、`spinoff`。和工单页共用站位（`packages/protocol/src/rules/attention.ts`），那边先落地。
 - **`apps/server/src/tool`**：按工单点名；新的七个工具；`Caller.Owner` 挡「定主意」和「落地」两档；`testdata/tool_schemas.json` 跟着改。
 - **`apps/server/src/issue`**：查询的派活（和起草共用「只读 worktree + 交回就重置」，抽成一个函数）、`questionBrief`、`parseAnswer`、查询的 `statusMove`、`relations` 的读写。
 - **`apps/server/src/manager`**：提示改成以工单为单位，加记、找、改、问、报的说法和分寸；「农场现状」里的帮工带上它的工单编号；样例进 `testdata/evals`。

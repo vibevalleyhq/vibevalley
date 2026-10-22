@@ -118,7 +118,7 @@ export const glowTexture = (radius: number, color: number, strength = 0.55) =>
   });
 
 /**
- * A shadow on the ground under something standing, `w` by `h`: an ellipse in two hard steps, like the rest of the
+ * A shadow on the ground under something attention, `w` by `h`: an ellipse in two hard steps, like the rest of the
  * pixel art, darker in the middle. A soft edge would read as haze beside the feet, not as ground under them.
  */
 export const shadowTexture = (w: number, h: number, color = 0x1f160c) =>

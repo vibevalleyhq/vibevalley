@@ -661,7 +661,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     },
   };
 
-  /** Shows picture `name` on a sprite, standing where the sprite is: on its feet, as the atlas says where they are. */
+  /** Shows picture `name` on a sprite, attention where the sprite is: on its feet, as the atlas says where they are. */
   function stand(sprite: Sprite, name: string) {
     sprite.texture = texture(name);
     const a = atlas.anchorOf(name);

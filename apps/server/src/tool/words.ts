@@ -13,7 +13,7 @@ import {
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
@@ -116,13 +116,13 @@ export function spanWords(ms: number): string {
 
 /** One line: its number and short title first, so the manager names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
-  const st = t.standing;
+  const st = t.attention;
   const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
-  const parts = [`#${t.number}「${shortTitle(t.title)}」${standingLabel[st.state]}${stuck}`];
+  const parts = [`#${t.number}「${shortTitle(t.title)}」${attentionLabel[st.state]}${stuck}`];
   if (t.project) parts.push(t.project);
   if (who) parts.push(who);
   if (t.priority !== "medium") parts.push(priorityWords[t.priority] + "优先级");
-  if (standingWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
+  if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
 

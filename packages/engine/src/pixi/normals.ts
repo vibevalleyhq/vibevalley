@@ -14,7 +14,7 @@ export interface NormalOptions {
   readonly strength: number;
 }
 
-/** Things standing up: helpers, props, buildings drawn as sprites. */
+/** Things attention up: helpers, props, buildings drawn as sprites. */
 export const SPRITE_NORMALS: NormalOptions = { bevel: 3, relief: 0.35, strength: 1 };
 /** Low things on the ground (plots): barely rounded. */
 export const LOW_NORMALS: NormalOptions = { bevel: 1.5, relief: 0.3, strength: 0.8 };

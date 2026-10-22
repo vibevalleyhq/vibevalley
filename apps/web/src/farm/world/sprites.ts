@@ -74,7 +74,7 @@ export class SpriteAtlas {
     return this.sprites.keys();
   }
 
-  /** Pixi's anchor, as a share of the size: the standing pixel's bottom edge, so the feet sit on the point. */
+  /** Pixi's anchor, as a share of the size: the attention pixel's bottom edge, so the feet sit on the point. */
   anchorOf(name: string): { x: number; y: number } {
     const s = this.sprites.get(name);
     return s ? { x: s.ax / s.w, y: (s.ay + 1 / this.density) / s.h } : { x: 0.5, y: 1 };

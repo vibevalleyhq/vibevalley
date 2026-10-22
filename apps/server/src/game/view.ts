@@ -19,7 +19,7 @@ import type {
   Progress,
   Session,
 } from "@vibevalley/protocol";
-import { needOf, standingLabel } from "@vibevalley/protocol/rules";
+import { needOf, attentionLabel } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
 import { achievements } from "../agent/seed.ts";
 import { sessionOf } from "../session/state.ts";
@@ -70,8 +70,8 @@ const badgeConflict: Badge = { text: "有冲突", tone: "bug" };
 const badgeQuiet: Badge = { text: "没动静", tone: "stuck" };
 const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
-const badgeReview: Badge = { text: standingLabel.reviewing, tone: "wait" };
-const badgeQuestions: Badge = { text: standingLabel.asking, tone: "wait" };
+const badgeReview: Badge = { text: attentionLabel.reviewing, tone: "wait" };
+const badgeQuestions: Badge = { text: attentionLabel.asking, tone: "wait" };
 
 /**
  * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer

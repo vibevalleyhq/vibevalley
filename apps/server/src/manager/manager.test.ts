@@ -421,7 +421,7 @@ describe("the manager", () => {
       const id = handed.id;
       expect(handed.closed).toBeUndefined();
       expect(handed.handedBack?.outcome).toBe("completed");
-      expect(handed.standing).toMatchObject({ state: "reviewing", lead: "acknowledge" });
+      expect(handed.attention).toMatchObject({ state: "reviewing", lead: "acknowledge" });
       expect(handed.moves).toEqual(["done", "canceled"]);
       const done = yield* issues.setStatus(id, "done", "", "");
       expect([done.status, done.closed]).toEqual(["done", "answered"]);

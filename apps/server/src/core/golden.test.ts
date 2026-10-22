@@ -5,12 +5,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vite-plus/test";
-import { phaseText, standingWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { emptyWorkspaceState } from "./core.ts";
 import { targetOf } from "../channel/state.ts";
 import { nextRun, nextText, whenText } from "../recurrence/when.ts";
 import { asksForYou, blockedBy, graphProblems, graphSpent, layersOf } from "../task/graph.ts";
-import { standingOf } from "../issue/standing.ts";
+import { attentionOf } from "../issue/attention.ts";
 import { effectsOf, viewOf } from "../game/view.ts";
 import { inbox } from "../notice/inbox.ts";
 import { reduce } from "../projection/reduce.ts";
@@ -107,20 +107,20 @@ describe("the golden files", () => {
       f.check(line, `${fact.type} effects`, effects, row, "effects");
       f.check(line, `${fact.type} view`, viewOf(next), row, "view");
       f.check(line, `${fact.type} inbox`, inbox(next), row, "inbox");
-      // One source: what the inbox says of an issue's helper is what its standing says, every step of the way.
+      // One source: what the inbox says of an issue's helper is what its attention says, every step of the way.
       const asked = new Set(inbox(next).flatMap((it) => (it.from.kind === "session" ? [it.from.id] : [])));
       for (const t of next.issues ?? []) {
         const last = t.sessions.at(-1);
         const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
         if (!h || h.graph || t.task || t.graph || t.parent) continue;
-        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: standingWantsOwner(t.standing.state) });
+        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: attentionWantsOwner(t.attention.state) });
       }
       state = next;
     });
     await f.done();
   });
 
-  test("rules: targetOf, phaseText, yuan, standingOf", async () => {
+  test("rules: targetOf, phaseText, yuan, attentionOf", async () => {
     const rows = await lines("rules.jsonl.gz");
     const f = failures("rules.jsonl.gz", rows);
     rows.forEach((row, i) => {
@@ -132,8 +132,8 @@ describe("the golden files", () => {
           return f.check(i + 1, "phaseText", phaseText(input.session as Session, input.now as number) || null, row, "out");
         case "yuan":
           return f.check(i + 1, "yuan", yuan(row.in as number), row, "out");
-        case "standingOf":
-          return f.check(i + 1, "standingOf", standingOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
+        case "attentionOf":
+          return f.check(i + 1, "attentionOf", attentionOf(input.issue as Issue, (input.session as Session | null) ?? undefined), row, "out");
         default:
           throw new Error(`line ${i + 1}: no rule ${String(row.fn)}`);
       }

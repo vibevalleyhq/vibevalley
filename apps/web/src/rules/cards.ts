@@ -21,8 +21,8 @@ import {
   taskLine,
 } from "./issues";
 import { ago, tookText } from "./time";
-import { shortTitle, standingLabel, standingWantsOwner } from "@vibevalley/protocol/rules";
-import { standingTone } from "./issueState";
+import { shortTitle, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { attentionTone } from "./issueState";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
@@ -158,8 +158,8 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const head = sessions[sessions.length - 1]!;
       const phase = session?.phase;
       const now0 = session ?? head;
-      // The board says what the page says: the standing, when it waits on the owner.
-      if (standingWantsOwner(issue.standing.state)) flags.push({ text: standingLabel[issue.standing.state], tone: standingTone[issue.standing.state] });
+      // The board says what the page says: the attention, when it waits on the owner.
+      if (attentionWantsOwner(issue.attention.state)) flags.push({ text: attentionLabel[issue.attention.state], tone: attentionTone[issue.attention.state] });
       if (tag === "lost") flags.push({ text: "丢了", tone: "berry" });
       if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);

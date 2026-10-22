@@ -71,7 +71,7 @@ export function navMap({ w, h, cell = 8, walkable, cost, clearance = 24 }: NavOp
     }
   }
 
-  // The price of standing on each cell: its own cost, plus a little more the closer it is to an edge.
+  // The price of attention on each cell: its own cost, plus a little more the closer it is to an edge.
   const room = clearance / cell;
   const weight = new Float32Array(n);
   for (let i = 0; i < n; i++) {

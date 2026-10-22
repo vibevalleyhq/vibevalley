@@ -543,12 +543,12 @@ export const CriterionCheck: Schema.Codec<T.CriterionCheck> = Schema.Struct({
   proof: Schema.optionalKey(Schema.String),
 });
 
-export const Standing: Schema.Codec<T.Standing> = Schema.Literals(T.StandingValues);
+export const Attention: Schema.Codec<T.Attention> = Schema.Literals(T.AttentionValues);
 export const StuckReason: Schema.Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
 export const IssueAct: Schema.Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
-export const IssueStanding: Schema.Codec<T.IssueStanding> = Schema.Struct({
-  state: Standing,
+export const IssueAttention: Schema.Codec<T.IssueAttention> = Schema.Struct({
+  state: Attention,
   since: Schema.optionalKey(Schema.Number),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
@@ -604,7 +604,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
   drafting: Schema.optionalKey(IssueDrafting),
   handedBack: Schema.optionalKey(HandedBack),
-  standing: IssueStanding,
+  attention: IssueAttention,
 });
 
 export const WorkspaceState: Schema.Codec<T.WorkspaceState> = Schema.Struct({

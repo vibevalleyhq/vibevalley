@@ -3,7 +3,7 @@
 // words say); the rest serve a frame and the issue's history with one in place, for states it does not reach.
 
 import type { Page, Route } from "@playwright/test";
-import type { Agent, Changes, Issue, IssueHistory, IssueStanding, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
@@ -25,7 +25,7 @@ async function openIssue(
   page: Page,
   server: { url: string },
   made: Issue,
-  standing: IssueStanding,
+  attention: IssueAttention,
   more: Partial<Issue>,
   helper: Partial<Session>,
   timeline: IssueTimeline,
@@ -46,8 +46,8 @@ async function openIssue(
     branch: "vibevalley/1",
     ...helper,
   };
-  const closed = standing.state === "harvested" || standing.state === "closed";
-  const issue: Issue = { ...made, sessions: ["w1"], project: "farm-site", standing, ...more };
+  const closed = attention.state === "harvested" || attention.state === "closed";
+  const issue: Issue = { ...made, sessions: ["w1"], project: "farm-site", attention, ...more };
   const fixture: StateFrame = { ...frame, state: { ...frame.state, sessions: closed ? [] : [session], issues: [issue] } };
   const history: IssueHistory[] = [
     { issue, sessions: [closed ? { ...session, phase: { _tag: "closed", at: now, closed: "merged" } } : session], missingSessions: [] },

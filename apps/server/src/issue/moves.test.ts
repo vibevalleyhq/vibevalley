@@ -1,15 +1,15 @@
-// Where an issue may be moved: the table, and how it reads the standing.
+// Where an issue may be moved: the table, and how it reads the attention.
 
 import { describe, expect, it } from "vite-plus/test";
 import { type Fact, type Issue, type IssueStatus, managerAgent, type Session } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
-import { standingOf } from "./standing.ts";
+import { attentionOf } from "./attention.ts";
 import { statusMove, statusMoves } from "./moves.ts";
 import { reduce } from "../projection/reduce.ts";
 
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
-    ({ status, sessions: sent ? ["w1"] : [], standing: { state: "reviewing", acts: [] }, ...more }) as Issue;
+    ({ status, sessions: sent ? ["w1"] : [], attention: { state: "reviewing", acts: [] }, ...more }) as Issue;
   it("where each status may go", () => {
     for (const [from, sent, to] of [
       ["backlog", false, ["todo", "canceled"]],
@@ -36,11 +36,11 @@ describe("status moves", () => {
   });
 
   it("a round that failed is not harvested, from the board, the command line or the manager alike", () => {
-    const failed = issue("in_review", true, { standing: { state: "stuck", stuck: "failed", acts: [] } });
+    const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
     // Stopped halfway is not failed: what is there may still be harvested.
-    expect(statusMoves(issue("in_review", true, { standing: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
+    expect(statusMoves(issue("in_review", true, { attention: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
   });
 
   it("the manager's issue waits on the owner once its turn ended, and only an answer is taken as done", () => {
@@ -53,7 +53,7 @@ describe("status moves", () => {
   });
 });
 
-describe("moves and the standing", () => {
+describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "ripe" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
   const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], acceptance: "glance", createdAt: 0 } as unknown as Issue;
@@ -70,9 +70,9 @@ describe("moves and the standing", () => {
     ];
     for (const [more, s] of cases) {
       const t = { ...base, ...more } as Issue;
-      const standing = standingOf(t, s);
-      const offered = standing.acts.some((a) => a === "harvest" || a === "acknowledge");
-      expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, standing }).includes("done") });
+      const attention = attentionOf(t, s);
+      const offered = attention.acts.some((a) => a === "harvest" || a === "acknowledge");
+      expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, attention }).includes("done") });
     }
   });
 
@@ -96,7 +96,7 @@ describe("moves and the standing", () => {
       priority: "medium",
       status: "in_progress",
       moves: ["canceled"],
-      standing: { state: "working", acts: [] },
+      attention: { state: "working", acts: [] },
     } as unknown as Issue;
     let state = emptyWorkspaceState();
     for (const fact of [

@@ -1,9 +1,9 @@
 // Where an issue stands for the owner: one state out of the issue's status, its session's phase, the questions, a
 // conflict and the acceptance, with the one thing the owner is asked to do. The board, the farm and the page all say it.
 
-import type { IssueAct, Standing } from "../shapes";
+import type { IssueAct, Attention } from "../shapes";
 
-export const standingLabel: Record<Standing, string> = {
+export const attentionLabel: Record<Attention, string> = {
   draft: "草稿",
   queued: "排队",
   working: "在做",
@@ -32,4 +32,4 @@ export const actLabel: Record<IssueAct, string> = {
 };
 
 /** Questions the owner for something: the page leads with it, the board flags it. */
-export const standingWantsOwner = (s: Standing) => s === "asking" || s === "reviewing" || s === "stuck";
+export const attentionWantsOwner = (s: Attention) => s === "asking" || s === "reviewing" || s === "stuck";

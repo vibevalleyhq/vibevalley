@@ -52,7 +52,7 @@ describe("an issue as a job", () => {
       acceptance: "glance",
       findings: [{ id: "f1", text: "少了测试", at: 400 }],
       questions: [{ question: "全交给 w3 还是分着做？", options: ["全交给 w3", "分着做"] }],
-      standing: { state: "asking", acts: [] },
+      attention: { state: "asking", acts: [] },
     } as Issue;
     const runs: Run[] = [
       {

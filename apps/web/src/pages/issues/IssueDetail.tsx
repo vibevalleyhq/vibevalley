@@ -5,7 +5,7 @@ import { api } from "../../data/api";
 import { newSendKey } from "./write";
 import type { Tone } from "../../rules/cards";
 import { issueTag, priorityLabel, runText, tagLabel, tagOpen } from "../../rules/issues";
-import { changesLine, type CriterionRow, issueState, noStepsText, standingTone } from "../../rules/issueState";
+import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
 import { actLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
@@ -56,7 +56,7 @@ export function IssueDetail(props: {
   }));
   const changes = () => ready(changesQuery, undefined);
   const timelineQuery = useQuery(() => ({
-    queryKey: ["issues", "timeline", props.issue.id, props.issue.standing.state, head().runs, props.issue.findings.length],
+    queryKey: ["issues", "timeline", props.issue.id, props.issue.attention.state, head().runs, props.issue.findings.length],
     queryFn: () => api.issue.timeline({ id: props.issue.id }),
     placeholderData: <T,>(prev: T) => prev,
   }));
@@ -140,7 +140,7 @@ export function IssueDetail(props: {
   );
 
   const parent = () => graphs().find((g) => g.id === props.issue.parent);
-  const tone = () => standingTone[s().standing.state];
+  const tone = () => attentionTone[s().attention.state];
   const heading = (
     <div class="pr-10">
       <Show when={s().inTask ? props.onTask : undefined}>
@@ -177,13 +177,13 @@ export function IssueDetail(props: {
               <Show when={ask().line}>
                 <div class="mt-1 line-clamp-4 whitespace-pre-wrap">{ask().line}</div>
               </Show>
-              <Show when={s().standing.state === "asking"}>
+              <Show when={s().attention.state === "asking"}>
                 <For each={props.issue.questions}>
                   {(a) => <Question ask={a} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
                 </For>
               </Show>
             </Note>
-            <Show when={s().standing.state === "asking" || s().standing.state === "closed" || box()}>
+            <Show when={s().attention.state === "asking" || s().attention.state === "closed" || box()}>
               <TextArea
                 class="mt-2.5"
                 rows={box() === "reject" ? 3 : 2}
@@ -191,7 +191,7 @@ export function IssueDetail(props: {
                 disabled={busy()}
                 onInput={(e) => setText(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().standing.state !== "closed") {
+                  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && box() !== "reject" && s().attention.state !== "closed") {
                     e.preventDefault();
                     sayAct(box() === "tell" ? "tell" : "answer");
                   }
@@ -199,18 +199,18 @@ export function IssueDetail(props: {
                 placeholder={
                   box() === "reject"
                     ? "哪里没过，一行一条"
-                    : s().standing.state === "asking"
+                    : s().attention.state === "asking"
                       ? "自己说……"
-                      : s().standing.state === "closed"
+                      : s().attention.state === "closed"
                         ? "这次要它做什么（不填就是接着做完）"
                         : `给${head().name}带句话`
                 }
                 aria-label={
                   box() === "reject"
                     ? "哪里没过"
-                    : s().standing.state === "asking"
+                    : s().attention.state === "asking"
                       ? "回答"
-                      : s().standing.state === "closed"
+                      : s().attention.state === "closed"
                         ? "重开这张工单"
                         : `给${head().name}带句话`
                 }
@@ -267,7 +267,7 @@ export function IssueDetail(props: {
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
         <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看改动判断。</p>}>
-          <Criteria rows={s().criteria} checking={s().standing.state === "reviewing" && props.issue.acceptedAt === undefined} />
+          <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.acceptedAt === undefined} />
         </Show>
         <Show when={s().weeds.length > 0}>
           <div class="mt-2">
@@ -279,7 +279,7 @@ export function IssueDetail(props: {
 
       <section aria-label="做出了什么">
         <SheetLabel>做出了什么</SheetLabel>
-        <Switch fallback={<p class="text-sm text-muted">{s().standing.state === "harvested" ? harvestedText(props.issue) : "没有可看的改动。"}</p>}>
+        <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "harvested" ? harvestedText(props.issue) : "没有可看的改动。"}</p>}>
           <Match when={s().showsChanges && changes()}>
             {(c) => (
               <Show
@@ -331,7 +331,7 @@ export function IssueDetail(props: {
             </Show>
           </Fold>
           <Fold label="每次干活" summary={s().historyLine}>
-            <Runs issue={props.issue.id} version={`${props.issue.standing.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
+            <Runs issue={props.issue.id} version={`${props.issue.attention.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>
         </div>
       </section>
@@ -339,7 +339,7 @@ export function IssueDetail(props: {
   );
 
   // The acts the block above does not offer: a word, a stop, a close.
-  const sideActs = () => (s().ask ? s().standing.acts.filter((a) => a === "close" || a === "stop") : s().standing.acts);
+  const sideActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
   const side = (
     <>
       <Show when={sideActs().length > 0}>
@@ -350,7 +350,7 @@ export function IssueDetail(props: {
       <SheetLabel>时间</SheetLabel>
       <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>
       <Property label="开工">{wallClockText(props.sessions[0]!.hiredAt)}</Property>
-      <Show when={s().ask && s().standing.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
+      <Show when={s().ask && s().attention.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
       <Show when={props.issue.acceptedAt}>
         {(at) => (
           <Property label="验收过">
@@ -599,14 +599,14 @@ export function ManagerIssueDetail(props: { issue: Issue }) {
         <h1 class="flex-1 text-xl font-semibold">{props.issue.title}</h1>
         <span class="mt-1.5 text-xs text-muted">{tagLabel[tag()]}</span>
       </div>
-      <Show when={props.issue.standing.acts.length > 0}>
+      <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
-          <Show when={props.issue.standing.state === "stuck"}>
+          <Show when={props.issue.attention.state === "stuck"}>
             <span class="text-sm text-berry">管家这一轮没答成：在频道里看它说了什么</span>
           </Show>
-          <For each={props.issue.standing.acts}>
+          <For each={props.issue.attention.acts}>
             {(a) => (
-              <Button tone={a === props.issue.standing.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
+              <Button tone={a === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
                 {actLabel[a]}
               </Button>
             )}

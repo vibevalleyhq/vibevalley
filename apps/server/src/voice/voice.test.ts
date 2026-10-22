@@ -137,7 +137,7 @@ const issueOf = (id: string, number: number, session: string) =>
     acceptance: "glance",
     findings: [],
     questions: [],
-    standing: { state: "working", acts: [] },
+    attention: { state: "working", acts: [] },
   }) as Issue;
 
 const credentials = (voice?: Partial<VoiceSettings>) =>
