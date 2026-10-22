@@ -324,17 +324,6 @@ export const schemas: Record<string, Schema> = {
     },
     type: "object",
   },
-  merge: {
-    additionalProperties: true,
-    properties: {
-      issue: {
-        description: "工单编号（#41 或 41）；也可以写在做它的帮工的名字",
-        type: "string",
-      },
-    },
-    required: ["issue"],
-    type: "object",
-  },
   open_channel: {
     additionalProperties: true,
     properties: {

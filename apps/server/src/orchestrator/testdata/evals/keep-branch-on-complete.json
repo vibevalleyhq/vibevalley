@@ -1,0 +1,133 @@
+{
+  "id": "keep-branch-on-complete",
+  "created": 1792271460000,
+  "model": "deepseek-flash",
+  "want": "主人说 #41 就这样、先别合、分支留着，管家照常完成，把改动合进了主分支。应该挪到已完成时填 keep_branch。",
+  "memory": "",
+  "tools": [
+    "issue_create",
+    "projects",
+    "channels",
+    "recurrence",
+    "list_recurrences",
+    "cancel_recurrence",
+    "open_channel",
+    "channel_settings",
+    "changes",
+    "roster",
+    "check",
+    "tell",
+    "read_chat",
+    "stop",
+    "dismiss",
+    "graph_split",
+    "graphs",
+    "task_edit",
+    "graph_action",
+    "task_action",
+    "load_skill",
+    "remember",
+    "rewrite_memory",
+    "search_archive",
+    "issues",
+    "issue_update",
+    "issue_status"
+  ],
+  "before": [],
+  "input": {
+    "role": "custom",
+    "customType": "orchestratorInput",
+    "content": "[来源：主人]\n主人说：#41 就这样吧，先别合，分支留着",
+    "display": true,
+    "details": {
+      "conversation": "general"
+    },
+    "timestamp": 1792271460000
+  },
+  "did": [
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "toolCall",
+          "id": "call_1",
+          "name": "issue_status",
+          "arguments": {
+            "issue": "#41",
+            "to": "已完成"
+          }
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792271461800,
+      "durationMs": 0
+    },
+    {
+      "role": "toolResult",
+      "toolCallId": "call_1",
+      "toolName": "issue_status",
+      "content": [
+        {
+          "type": "text",
+          "text": "#41 收获了，合进了主分支"
+        }
+      ],
+      "isError": false,
+      "timestamp": 1792271461900,
+      "durationMs": 100
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "#41 收好了，合进主分支了。"
+        }
+      ],
+      "api": "openai-completions",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "usage": {
+        "input": 0,
+        "output": 10,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 10,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792271462900,
+      "durationMs": 0
+    }
+  ],
+  "expect": [
+    {
+      "kind": "called",
+      "tool": "issue_status",
+      "argContains": "keep_branch"
+    }
+  ]
+}

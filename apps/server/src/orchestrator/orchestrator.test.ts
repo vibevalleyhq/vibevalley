@@ -306,7 +306,7 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("merges only when the owner asks", () => {
+  it.live("completes an issue only when the owner asks, and says what it delivered", () => {
     let helper = "";
     let number = 0;
     const f = farm((c) => {
@@ -314,8 +314,8 @@ describe("the orchestrator", () => {
       if (result !== undefined) return fauxAssistantMessage("合并：" + result);
       const line = lastLine(c);
       // A helper's words name it by its name; the owner's, by the issue's number.
-      if (line.includes("直接 merge")) return fauxAssistantMessage(fauxToolCall("merge", { issue: helper }));
-      if (line.includes("收下")) return fauxAssistantMessage(fauxToolCall("merge", { issue: "#" + number }));
+      if (line.includes("直接收")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: helper, to: "已完成" }));
+      if (line.includes("收下")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: "#" + number, to: "已完成" }));
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -329,13 +329,13 @@ describe("the orchestrator", () => {
       helper = hired.session!.id;
       number = (yield* issues.get(hired.session!.issue!)).number;
       yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "ripe"), "the work ripe");
-      yield* chat.speak(helper, "@管家 主人同意了，直接 merge", { anyway: true });
+      yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
       const refused = yield* until(
         () => messagesIn(core.state().chat, thread).find((m) => m.from === orchestratorAgent && m.final && m.text.startsWith("合并：")),
-        "the merge refused",
+        "the completion refused",
       );
-      expect(refused.text).toBe("合并：没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。");
+      expect(refused.text).toBe("合并：没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
       const merged = yield* Effect.promise(async () => {
@@ -346,8 +346,13 @@ describe("the orchestrator", () => {
         }
         throw new Error("never merged");
       });
-      // The helper said its words and committed nothing: done, with nothing to merge.
+      // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
+      const general = (yield* Channels).general();
+      yield* until(
+        () => messagesIn(core.state().chat, general).some((m) => m.from === orchestratorAgent && m.final && m.text === `合并：#${number} 完成了，没有改动要合`),
+        "what it delivered said",
+      );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
