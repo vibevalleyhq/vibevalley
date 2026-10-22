@@ -37,8 +37,8 @@ Status: proposed
 | 进行中 | 「#41 换个人做」 | 上一个帮工收工、分支留着，新档案在同一张工单上接着做 | `issue_status` 挪回待办，填 `agent` | 有（第 2 步） |
 | 进行中 | 「这件太大，拆开做」 | 拆成子工单，有先后 | `graph_split` | 有（计划是有子工单的工单） |
 | 完成 | 「检查一下达到要求没有」 | 照验收标准验，过了或打回 | `changes`、`accept` | 有 |
-| 完成 | 「收下」「合进去」 | 完成，交付照工单默认：改动合进上级或开 PR，没改动、结论就不碰 git | `issue_status` 挪到已完成 | 缺：现在是 `merge`，只会合并 |
-| 完成 | 「先别合，分支留着」 | 完成，交付是留着分支 | `issue_status` 挪到已完成（`delivery: kept`） | 缺 |
+| 完成 | 「收下」「合进去」 | 完成，交付照工单默认：改动合进上级或开 PR，没改动、结论就不碰 git | `issue_status` 挪到已完成 | 有（第 3 步） |
+| 完成 | 「先别合，分支留着」 | 完成，交付是留着分支 | `issue_status` 挪到已完成（`keep_branch`） | 有（第 3 步） |
 | 完成 | 「#41 不做了」 | 不做了，分支上有提交就留着 | `issue_status` 挪到已取消 | 有 |
 
 「暂停一件事」不另加状态：排着队的挪回备选，在干的叫停，整个计划用 `graph_action pause`。
@@ -97,7 +97,7 @@ Status: proposed
 
 1. 按工单点名、`issues`、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」。
 2. 去掉 `dispatch`，`issue_create` 加 `start`；换人；提示照意图写；评测样例。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」和[工单](docs/subsystems/issue.md)「换人」。
-3. 跟着[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单。
+3. 跟着[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单。
 4. 跨轮的授权，和上面的分寸表落进工具。
 
 ## Alternatives considered

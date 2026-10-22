@@ -20,6 +20,7 @@ import {
 } from "@vibevalley/protocol";
 import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
+import { closedText } from "../issue/rules.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
@@ -68,7 +69,7 @@ export interface Caller {
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
-  /** The owner's own words are in this input: only then may a merge happen. */
+  /** The owner's own words are in this input: only then may an issue be changed, moved or completed, or a task graph started or merged. */
   readonly owner: boolean;
 }
 
@@ -95,7 +96,6 @@ export const labels: Record<string, string> = {
   recurrence: "定时",
   list_recurrences: "看定时",
   cancel_recurrence: "取消定时",
-  merge: "收获",
   accept: "验收",
   changes: "看改动",
   roster: "花名册",
@@ -361,26 +361,8 @@ export const make = Effect.gen(function* () {
       return lines.join("\n");
     });
 
-  const merge = (who: Who) =>
-    tool<{ issue: string }>(
-      "merge",
-      "收获一张工单：把它分支上的提交合进项目的主分支（能提 PR 的项目开 PR），然后帮工收工。会冲突时不合并，帮工留在地里，结果里有让它解决冲突的话；这一轮没做成、要验收还没过的不收。",
-      async (p) => {
-        const c = await who();
-        return withIssue(p.issue, async (t) => {
-          if (!c.owner) return mergeNotAsked;
-          try {
-            const done = await go(issue.act(t.id, { act: "harvest" }, c.here));
-            return done.pullRequest?.state === "open" ? `#${done.number} 的 PR 开着：${done.pullRequest.url}` : `#${done.number} 收获了`;
-          } catch (e) {
-            return toError(e).message;
-          }
-        });
-      },
-    );
-
-  // Review is judging what came back against what the issue asked for; a pass only makes it ready, the harvest stays
-  // the owner's (merge).
+  // Review is judging what came back against what the issue asked for; a pass only makes it ready, completing it stays
+  // the owner's (issue_status to done).
   const accept = tool<{ issue: string; pass: boolean; findings?: string[]; text?: string }>(
     "accept",
     "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能收获；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
@@ -584,6 +566,9 @@ export const make = Effect.gen(function* () {
             const done = await go(
               issue.setStatus(t.id, to, p.text ?? "", c.here, { ...(agent ? { agent } : {}), ...(p.keep_branch ? { keepBranch: true } : {}) }),
             );
+            // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
+            if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
+            if (to === "done" && done.pullRequest?.state === "open") return `#${done.number} 的 PR 开着：${done.pullRequest.url}，合了才算完成`;
             return "挪好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
           } catch (e) {
             return "没挪：" + toError(e).message;
@@ -878,7 +863,6 @@ export const make = Effect.gen(function* () {
       cancelRecurrence,
       openChannel,
       channelSettings,
-      merge(who),
       accept,
       changes,
       roster,
