@@ -300,6 +300,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
         project,
         // A helper's issue split under it keeps who it was given to.
         assignee: was.get(graph.id)?.assignee,
+        deliver: "change",
         graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
       },
       graphClosed(graph.state),
@@ -314,6 +315,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
           title: n.title,
           description: n.brief,
           project,
+          deliver: "change",
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
           parent: graph.id,

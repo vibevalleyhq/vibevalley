@@ -26,6 +26,7 @@ function frame(attention: IssueAttention, session: Session = helper): StateFrame
     number: 1,
     title: "提交打卡页",
     priority: "medium",
+    deliver: "change",
     createdAt: 0,
     sessions: [session.id],
     status: "in_review",

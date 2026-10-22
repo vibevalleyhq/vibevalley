@@ -111,12 +111,14 @@ CREATE TABLE issue (
   canceled    text check (canceled in ('dismissed', 'lost')),
   pull_request text,
   review  text not null default 'glance' check (review in ('glance', 'required')),
+  deliver text not null default 'change' check (deliver in ('change', 'answer')),
   reviewed_at double precision,
   findings    text,
   questions        text,
   criteria    text,
   checks      text,
-  handed_back text,
+  -- An in-process agent's latest run on it (JSON IssueRun): no end while it goes on.
+  last_run text,
   check (delivered is null or canceled is null)
 );
 CREATE INDEX issue_by_parent on issue (parent);

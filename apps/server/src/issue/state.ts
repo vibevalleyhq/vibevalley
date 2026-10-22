@@ -7,12 +7,12 @@ import { statusMoves } from "./moves.ts";
 import { attentionIn } from "./attention.ts";
 import { compare, compareText, or } from "../base/text.ts";
 
-/** An issue for the orchestrator is in progress while the orchestrator is on it, and waits on the owner once its turn ended,
- * however it ended: only the owner closes it. */
+/** One rule whoever does the work: a session on the farm says where its issue stands; an issue run by no session (an
+ * in-process agent's, the orchestrator's) is in progress while its latest run goes on and waits on the owner once it
+ * ended, however it ended: only the owner closes it. */
 export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
   if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
-  if (isForOrchestrator(t)) return t.handedBack ? "in_review" : "in_progress";
   if (t.graph) {
     switch (t.graph.state) {
       case "splitting":
@@ -47,6 +47,7 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
     const h = sessionOf(state, sessions[sessions.length - 1]!);
     return !h ? "canceled" : isBusy(h) ? "in_progress" : "in_review";
   }
+  if (t.lastRun) return t.lastRun.endedAt === undefined ? "in_progress" : "in_review";
   return t.queuedAt !== undefined ? "todo" : "backlog";
 }
 

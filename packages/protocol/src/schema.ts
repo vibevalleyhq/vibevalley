@@ -577,10 +577,13 @@ export const IssueTimeline: Schema.Codec<T.IssueTimeline> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
 });
 
-export const HandedBack: Schema.Codec<T.HandedBack> = Schema.Struct({
-  at: Schema.Number,
-  outcome: Outcome,
+export const IssueRun: Schema.Codec<T.IssueRun> = Schema.Struct({
+  startedAt: Schema.Number,
+  endedAt: Schema.optionalKey(Schema.Number),
+  outcome: Schema.optionalKey(Outcome),
 });
+
+export const Deliverable: Schema.Codec<T.Deliverable> = Schema.Literals(T.DeliverableValues);
 
 export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   id: Schema.String,
@@ -606,13 +609,14 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
   review: Review,
+  deliver: Deliverable,
   reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
   drafting: Schema.optionalKey(IssueRefining),
-  handedBack: Schema.optionalKey(HandedBack),
+  lastRun: Schema.optionalKey(IssueRun),
   attention: IssueAttention,
 });
 
@@ -1336,6 +1340,7 @@ export const IssueRequest: Schema.Codec<T.IssueRequest> = Schema.Struct({
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
   review: Schema.optionalKey(Review),
+  deliver: Schema.optionalKey(Deliverable),
 });
 
 export const RunTriggerKind: Schema.Codec<T.RunTriggerKind> = Schema.Literals(T.RunTriggerKindValues);

@@ -1083,20 +1083,24 @@ export interface Issue {
   moves: IssueStatus[];
   pullRequest?: PullRequest;
   review: Review;
+  /** What it delivers: a change that goes into the project, or an answer that stays on the issue. */
+  deliver: Deliverable;
   reviewedAt?: number;
   findings: Finding[];
   questions: Question[];
   criteria?: string[];
   checks?: CriterionCheck[];
   refining?: IssueRefining;
-  /** An issue for the orchestrator: how its last turn on it ended. Set, the issue waits on the owner; only the owner closes it. */
-  handedBack?: HandedBack;
+  /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
+   * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
+  lastRun?: IssueRun;
   attention: IssueAttention;
 }
 
-export interface HandedBack {
-  at: number;
-  outcome: Outcome;
+export interface IssueRun {
+  startedAt: number;
+  endedAt?: number;
+  outcome?: Outcome;
 }
 
 /** A question the helper is waiting on the owner for; options are the answers it thought of, each one a reply as it is. */
@@ -1262,7 +1266,12 @@ export interface IssueRequest {
   assignee?: string;
   priority?: Priority;
   review?: Review;
+  deliver?: Deliverable;
 }
+
+/** What an issue delivers, said when it is written: a change (its branch, into the project) or an answer (on the issue). */
+export const DeliverableValues = ["change", "answer"] as const;
+export type Deliverable = (typeof DeliverableValues)[number];
 
 /** What a completed issue delivered: its branch merged into the project's main branch, into its parent's branch (a step of
  * a task graph), by a pull request, its branch kept unmerged, or nothing (no change, or an answer). */
