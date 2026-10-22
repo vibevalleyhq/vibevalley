@@ -9,7 +9,6 @@ import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
 import { aria } from "../../app/util";
-import { ready, useAgents } from "../../data/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
@@ -17,6 +16,7 @@ import { createCall } from "../../voice/CallButton";
 import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
+import { useAgent } from "../../data/agents";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 
@@ -47,10 +47,10 @@ export const PhoneGlyph = (props: { size: number; lit?: boolean }) => (
 );
 
 function CallerFace(props: { call: InboxItem; size: number }) {
-  const agents = useAgents();
+  const agent = useAgent(() => (props.call.from.kind !== "orchestrator" ? props.call.from.agent : undefined));
   return (
     <Show when={props.call.from.kind !== "orchestrator" ? props.call.from : undefined} fallback={<OrchestratorFace size={props.size} />}>
-      {(from) => <AgentFace agentId={from().agent || from().id} look={ready(agents, []).find((a) => a.id === from().agent)?.look} size={props.size} />}
+      {(from) => <AgentFace agentId={from().agent || from().id} look={agent()?.look} size={props.size} />}
     </Show>
   );
 }

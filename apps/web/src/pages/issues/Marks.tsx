@@ -3,8 +3,8 @@ import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/
 import type { BoardCard, Tone } from "../../rules/cards";
 import { cardAgent } from "../../rules/cards";
 import { priorityLabel, statusLabel } from "../../rules/issues";
-import { ready, useAgents } from "../../data/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
+import { useAgent } from "../../data/agents";
 
 export const toneVar = (t: Tone) => `var(--color-${t})`;
 
@@ -170,8 +170,7 @@ export function FlagChip(props: { text: string; tone: Tone }) {
 
 /** A helper's head by its id, its look read from the profiles. */
 export function AgentFaceOf(props: { agent: string; size?: number }) {
-  const agents = useAgents();
-  const found = () => ready(agents, []).find((a) => a.id === props.agent);
+  const found = useAgent(() => props.agent);
   return (
     <Show when={props.agent !== orchestratorAgent} fallback={<OrchestratorFace size={props.size ?? 18} />}>
       <span title={found()?.name ?? props.agent} class="inline-flex">

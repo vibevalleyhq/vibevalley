@@ -11,18 +11,17 @@ import { farm } from "../store";
 import { threadOwnerOf, typedName } from "../../rules/chat";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { ready, useAgents } from "../../data/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { CallButton } from "../../voice/CallButton";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
 import { useFarm } from "../state";
+import { useAgent } from "../../data/agents";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
   const pick = useFarm((s) => s.pick);
-  const agents = useAgents();
-  const agent = () => ready(agents, []).find((a) => a.id === pick());
+  const agent = useAgent(pick);
   return (
     <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
       {(a) => (

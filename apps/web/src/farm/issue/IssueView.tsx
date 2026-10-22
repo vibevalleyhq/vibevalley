@@ -22,11 +22,12 @@ import { createSessionEvents } from "../../pages/chat/data";
 import { WorkLog } from "../../pages/chat/WorkLog";
 import { useCore, useFrames } from "../../data/frame";
 import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";
-import { ready, useAgents } from "../../data/query";
+import { ready } from "../../data/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
 import { useVillage } from "../support";
+import { useAgent } from "../../data/agents";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
@@ -112,7 +113,6 @@ function IssueBody(props: {
   onTask?: () => void;
 }) {
   const frames = useFrames();
-  const agentsQuery = useAgents();
   const now = useNow();
   // The farm carries out an answer, a word to the helper and the fixes with its own commands (and their effects).
   const water = (words: string) => commands.water(props.session, words);
@@ -153,7 +153,7 @@ function IssueBody(props: {
     () => s().head.id,
     () => true,
   );
-  const agent = () => ready(agentsQuery, []).find((a) => a.id === s().head.agent);
+  const agent = useAgent(() => s().head.agent);
   const state = () => s().attention.state;
 
   const setReview = (a: Review) => {

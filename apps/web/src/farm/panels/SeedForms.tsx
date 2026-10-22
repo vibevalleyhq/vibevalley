@@ -5,7 +5,7 @@
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import { orchestratorAgent, type ProjectTemplates, type Session } from "@vibevalley/protocol";
+import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
 import { playSound } from "../sound";
@@ -13,10 +13,11 @@ import { newSendKey } from "../../data/api";
 import { writeIssue } from "../../pages/issues/write";
 import { aria } from "../../app/util";
 import { useRouter } from "../../app/router";
-import { ready, useAgents, useProjects, useQuery } from "../../data/query";
+import { ready, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";
+import { useWorkAgents } from "../../data/agents";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -65,8 +66,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const farmProject = useFarm((s) => s.project);
   const project = () => farmProject() || undefined;
   const pick = useFarm((s) => s.pick);
-  const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== orchestratorAgent && a.enabled);
+  const agents = useWorkAgents(true);
   const router = useRouter();
   const [text, setText] = createSignal("");
   const [selection, setSelection] = createSignal<readonly [number, number]>();

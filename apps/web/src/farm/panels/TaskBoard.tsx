@@ -5,7 +5,7 @@
 
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
-import { type GraphAction, type GraphEvent, type GraphState, orchestratorAgent, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
+import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { doingOf } from "../hud/rules";
 import { farm } from "../store";
@@ -14,12 +14,13 @@ import { spentText } from "../../rules/chat";
 import { lineCounts } from "../../rules/issueState";
 import { aria, Keyed } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents, useProjects, useQuery } from "../../data/query";
+import { ready, useProjects, useQuery } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
+import { useAgent, useWorkAgents } from "../../data/agents";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],
@@ -95,8 +96,7 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   const core = useCore();
   const frames = useFrames();
   const projectsQuery = useProjects();
-  const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== orchestratorAgent && a.enabled);
+  const agents = useWorkAgents(true);
   const [goal, setGoal] = createSignal("");
   const [project, setProject] = createSignal<string>();
   const [splitter, setSplitter] = createSignal("auto");
@@ -414,9 +414,8 @@ function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) =
 }
 
 function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onSaid: (a: Answer) => void; onHistory: () => void }) {
-  const agentsQuery = useAgents();
   const core = useCore();
-  const agent = () => (props.node.agent ? ready(agentsQuery, []).find((a) => a.id === props.node.agent) : undefined);
+  const agent = useAgent(() => props.node.agent);
   const session = () => (props.node.session ? core()?.sessions.find((s) => s.id === props.node.session) : undefined);
   const titleOf = (id: string) => taskOf(props.graph, id)?.title ?? id;
   const waits = () => (props.node.state === "waiting" ? (props.node.blockedBy ?? []) : []);
@@ -492,8 +491,7 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
 }
 
 function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer) => void }) {
-  const agentsQuery = useAgents();
-  const agents = () => ready(agentsQuery, []).filter((a) => a.id !== orchestratorAgent && a.enabled);
+  const agents = useWorkAgents(true);
   // The editor starts from the step as it is when opened, and edits its own copy.
   const start = untrack(() => props.node);
   const [id, setId] = createSignal(start?.id ?? "");

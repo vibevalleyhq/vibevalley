@@ -2,9 +2,9 @@ import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { type DotTone, phaseIcon } from "../../rules/chat";
-import { ready, useAgents } from "../../data/query";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
+import { useAgent } from "../../data/agents";
 
 const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };
 
@@ -32,8 +32,8 @@ export function PhaseGlyph(props: { phase: Phase; size?: number }) {
 
 /** A helper's face by its profile's look; for a sender without a profile, by its id. */
 export function HelperFace(props: { agent: string; size?: number; muted?: boolean }) {
-  const agents = useAgents();
-  const look = () => ready(agents, []).find((a) => a.id === props.agent)?.look;
+  const agent = useAgent(() => props.agent);
+  const look = () => agent()?.look;
   return <AgentFace agentId={props.agent} look={look()} size={props.size ?? 24} muted={props.muted} />;
 }
 

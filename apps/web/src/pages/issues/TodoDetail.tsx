@@ -55,8 +55,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const [busy, setBusy] = createSignal(false);
   const [word, setWord] = createSignal("");
   const [newProject, setNewProject] = createSignal(false);
-  const workAgents = useWorkAgents();
-  const agents = () => workAgents().filter((a) => a.enabled);
+  const agents = useWorkAgents(true);
   const projectList = useProjects();
   const projects = () => ready(projectList, []).map((p) => p.name);
 

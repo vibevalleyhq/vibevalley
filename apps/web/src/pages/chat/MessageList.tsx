@@ -20,13 +20,13 @@ import {
 import { aria, useNow } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { useCore } from "../../data/frame";
-import { ready, useAgents } from "../../data/query";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, StreamingCaret, Tag, ThinkingDots } from "./bits";
 import { useMarkRead, useHistory } from "./data";
 import { TurnSteps } from "./WorkLog";
+import { useAgent } from "../../data/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
   completed: { label: "做完了", fill: "#b4cb7c", icon: "icon-harvest" },
@@ -178,11 +178,11 @@ function Dispatch(props: { text: string }) {
 
 function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conversation }) {
   const core = useCore();
-  const agents = useAgents();
+  const agentOf = useAgent(() => props.m.agent);
   const session = () => (props.m.fromKind === "agent" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
   const who = () => {
     if (props.m.fromKind !== "agent") return "";
-    const agent = ready(agents, []).find((a) => a.id === props.m.agent);
+    const agent = agentOf();
     const s = session();
     return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.role ? roleShort(agent.role) : ""].filter(Boolean).join(" ");
   };

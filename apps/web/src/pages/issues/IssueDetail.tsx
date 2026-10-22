@@ -9,7 +9,7 @@ import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone 
 import { actLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
-import { ready, useAgents, useQuery } from "../../data/query";
+import { ready, useQuery } from "../../data/query";
 import { useNow } from "../../app/util";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
@@ -19,6 +19,7 @@ import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "../../data/issues";
+import { useAgent } from "../../data/agents";
 
 function Dot(props: { tone: Tone }) {
   return <span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${props.tone})` }} />;
@@ -48,8 +49,7 @@ export function IssueDetail(props: {
   const { busy, text, setText, box, setBox, go, act } = acts;
   const doAct = acts.send;
   const sayAct = acts.say;
-  const agents = useAgents();
-  const agent = () => ready(agents, []).find((a) => a.id === head().agent);
+  const agent = useAgent(() => head().agent);
   const stepsQuery = useQuery(() => ({
     queryKey: ["issues", "events", head().id, head().runs, head().phase._tag],
     queryFn: () => api.session.events({ id: head().id }),
