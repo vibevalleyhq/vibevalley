@@ -1,5 +1,5 @@
 // Words the HUD shows, from the frame: the clock, the warehouse, the runtimes' quotas, what a helper is doing, a plot's
-// title and what the assistant last said.
+// title and what the orchestrator last said.
 
 import type { Chat, WorkspaceState, Crop, Doing, Issue, RuntimeInfo, Session } from "@vibevalley/protocol";
 import { generalOf, messagesIn } from "../../rules/chat";
@@ -24,7 +24,7 @@ export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) =>
 
 export type QuotaLevel = "plenty" | "low" | "gold" | "empty" | "unknown";
 
-/** Below this much left (percent) the farm warns and the assistant sends someone else if it can (protocol.QuotaLow). */
+/** Below this much left (percent) the farm warns and the orchestrator sends someone else if it can (protocol.QuotaLow). */
 export const quotaLow = 15;
 
 /** How full a quota's bottle is drawn, by the share left. */
@@ -63,12 +63,12 @@ export function plotTitle(bed: Bed, session: Session | undefined, crop: Crop) {
   return `${session.name} · ${cropLabel[crop]}`;
 }
 
-/** The assistant's last typed line in the general channel (voice lines are not on the web yet). */
-export function lastAssistantSaid(chat: Chat | undefined) {
+/** The orchestrator's last typed line in the general channel (voice lines are not on the web yet). */
+export function lastOrchestratorSaid(chat: Chat | undefined) {
   const general = generalOf(chat);
   if (!general) return undefined;
   const typed = messagesIn(chat, general.id)
-    .filter((m) => m.fromKind === "assistant" && m.kind === "chat")
+    .filter((m) => m.fromKind === "orchestrator" && m.kind === "chat")
     .at(-1);
   return typed && { key: `m${typed.id}`, text: typed.text, final: typed.final, at: typed.at };
 }

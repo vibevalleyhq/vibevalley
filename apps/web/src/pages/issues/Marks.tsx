@@ -1,10 +1,10 @@
 import { For, Match, Show, Switch } from "solid-js";
-import { type IssueStatus, assistantAgent, type Priority } from "@vibevalley/protocol";
+import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/protocol";
 import type { BoardCard, Tone } from "../../rules/cards";
 import { cardAgent } from "../../rules/cards";
 import { priorityLabel, statusLabel } from "../../rules/issues";
 import { ready, useAgents } from "../../data/query";
-import { AgentFace, AssistantFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace } from "../../ui/Face";
 
 export const toneVar = (t: Tone) => `var(--color-${t})`;
 
@@ -173,7 +173,7 @@ export function AgentFaceOf(props: { agent: string; size?: number }) {
   const agents = useAgents();
   const found = () => ready(agents, []).find((a) => a.id === props.agent);
   return (
-    <Show when={props.agent !== assistantAgent} fallback={<AssistantFace size={props.size ?? 18} />}>
+    <Show when={props.agent !== orchestratorAgent} fallback={<OrchestratorFace size={props.size ?? 18} />}>
       <span title={found()?.name ?? props.agent} class="inline-flex">
         <AgentFace agentId={props.agent} look={found()?.look} size={props.size ?? 18} />
       </span>
@@ -181,7 +181,7 @@ export function AgentFaceOf(props: { agent: string; size?: number }) {
   );
 }
 
-/** Who works it: the helper's face, the assistant's head, or a dashed circle for nobody yet. A task has none. */
+/** Who works it: the helper's face, the orchestrator's head, or a dashed circle for nobody yet. A task has none. */
 export function CardFace(props: { card: BoardCard; size?: number }) {
   const size = () => props.size ?? 18;
   return (
@@ -193,8 +193,8 @@ export function CardFace(props: { card: BoardCard; size?: number }) {
       }
     >
       <Match when={props.card.kind === "task"}>{null}</Match>
-      <Match when={props.card.kind === "assistant"}>
-        <AssistantFace size={size()} />
+      <Match when={props.card.kind === "orchestrator"}>
+        <OrchestratorFace size={size()} />
       </Match>
     </Switch>
   );

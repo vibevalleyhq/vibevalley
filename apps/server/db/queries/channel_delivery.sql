@@ -61,10 +61,10 @@ join channel_participant s on s.id = m.sender_id
 join channel_participant r on r.id = d.recipient_id
 where m.conversation_id = sqlc.arg(conversation)
   and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), '')
-  and s.kind in ('agent', 'assistant') and r.kind in ('agent', 'assistant') and d.wakes and d.held_by is null;
+  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;
 
 -- name: LastAgentWake :one
 select coalesce(max(d.created_at), 0)::float8 as at from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
-where d.recipient_id = sqlc.arg(recipient_id) and s.kind in ('agent', 'assistant') and d.wakes and d.held_by is null;
+where d.recipient_id = sqlc.arg(recipient_id) and s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;

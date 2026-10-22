@@ -16,7 +16,7 @@ import type { ProjectShape, Workplace } from "../project/project.ts";
 import { type RuntimeShape, usable } from "../runtime/runtime.ts";
 import { chooseAgent } from "../session/rules.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
-import { isForAssistant } from "./state.ts";
+import { isForOrchestrator } from "./state.ts";
 import { refinementBrief, refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
 
 /** What drafting needs of the issues around it. */
@@ -110,7 +110,7 @@ export function refinement(d: RefinementDeps) {
     drafting.withPermits(1)(
       Effect.gen(function* () {
         const t = yield* unsent(id);
-        if (isForAssistant(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
+        if (isForOrchestrator(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
         if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
         if (t.refining) return yield* Effect.fail(refused(t.refining.name + " 正在起草：等它交回来"));
         const chosen = yield* refiner(t);

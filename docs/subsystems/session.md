@@ -11,7 +11,7 @@
 | oar 事件读成核心状态的事实；干活过程（事件日志） | 农机的发现、模型、设置页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「在用的农机」「农具」） |
 | 农场的规矩、汇报怎么读（结论、失败、缺肥）、没动静 | worktree、分支、合并、PR 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
-| 管家那一个 agent loop 的 run 和日志（`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/assistant.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
+| 管家那一个 agent loop 的 run 和日志（`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
 | | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/pages/chat/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/pages/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/rules/rounds.ts`） |
 
 ## 在哪
@@ -44,8 +44,8 @@
 - **起草的 Session**（`Session.draft`，派活时 `HireOptions.draft`）：为一张备选工单写草稿，不是这张工单的帮工；它带着 `issue`（工单串、run 都记在这张工单上），但不进 `issue_session`。交回来以后由工单服务重置它的 worktree、请它收工（[工单](docs/subsystems/issue.md#怎么走)「起草」）。田头的派活消息写「看代码，起草这张工单」，再起草写「再起草一版」。
 - **干活时插进来的话不开新的 run**，记在这一轮的 `heard` 里；不能插话的农机排队，是下一次 run 的触发。叫不醒、被拒的不算 run。
 - **一次 run 的花费从这一次算**：`spent` 事实是这个 Session 的累计，按 oar 报的 token 总数和上一次的差算；换了 oar 会话从零算。汇报带上这一轮开始以来的差（`spent`）。
-- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`assistant/thinking`、`assistant/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `actionText`，页面不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给页面（合并到 0.3 秒一次），下一条事件之前写下。
-- **日志的大小**：一个 Session 留最近 240 条，管家（id `assistant`）留 1000 条；工具输入留 4000 字，输出留开头 2000、结尾 4000 字（按 UTF-16 数）。日志不进核心状态。
+- **日志只追加**：一条 `SessionEvent`（`seq`、`time`、`type`）写下后不再改；类型照 DeepSeek Harness：`run/start`、`user/message`、`memory/recalled`、`orchestrator/thinking`、`orchestrator/message`、`tool/call`（输入，和动作的说法 `actionText`，写下时取 `actionText`，页面不带这份说法）、`tool/result`（输出和成没成，`call` 指它的调用）、`llm/retry`、`llm/usage`（一次回答的 token：没命中缓存的输入、读缓存的、输出；只有管家记）、`run/error`、`run/end`（带结果）。`run/start` 和 `run/end` 之间的事件都带这个 `run`。流式的话和还没拿到输入的调用是一份草稿，带着它将来的 `seq` 实时推给页面（合并到 0.3 秒一次），下一条事件之前写下。
+- **日志的大小**：一个 Session 留最近 240 条，管家（id `orchestrator`）留 1000 条；工具输入留 4000 字，输出留开头 2000、结尾 4000 字（按 UTF-16 数）。日志不进核心状态。
 - **走了的 Session 一直是 `session` 表的一行**；它的日志在走了 `session.trajectory_days` 天（默认 30，0 是一直留）后、下次开机时删掉。
 - **评论对整张工单说**（`issue.comment`），不挂在某一条事件上。
 
@@ -118,7 +118,7 @@
 - **农机（`runtime`）**：定农机和安装、模型的价格、记花费、一轮结束后读额度、查档案能不能派。
 - **记性（`memory`）**：开一轮前想起，一轮结束记下，离开时收尾；同一个 Session 想起过的不再提，接不上换新会话时重新想起。
 - **核心状态（`core`）**：`apply` 施加 `hired`、`run`、`doing`、`quiet`、`retry`、`spent`、`report`、`conflict`、`left`；日志的事件推给页面；提醒经核心状态的 side event 发。
-- **管家（`assistant`）**：用 `execution.ts` 记它的 run 和日志（`session.events assistant`）。
+- **管家（`orchestrator`）**：用 `execution.ts` 记它的 run 和日志（`session.events orchestrator`）。
 - **`/mcp`（`mcp`）**：凭 `Sessions.who` 认出调工具的是哪个 Session。
 
 ## 为什么这样

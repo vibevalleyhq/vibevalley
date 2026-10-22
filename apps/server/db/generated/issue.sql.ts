@@ -202,7 +202,7 @@ export const RefineIssueParams = Schema.Struct({
 export type RefineIssueParams = typeof RefineIssueParams.Type
 
 
-export const RefineIssueSql = "-- name: RefineIssue :exec\n-- A draft handed back: its words, its criteria and what it questions, in one write.\nupdate issue set title = $1, description = $2, criteria = $3, questions = $4\nwhere id = $5;"
+export const RefineIssueSql = "-- name: RefineIssue :exec\n-- A draft handed back: its words, its criteria and what it asks, in one write.\nupdate issue set title = $1, description = $2, criteria = $3, questions = $4\nwhere id = $5;"
 
 export const refineIssue = Effect.fn("RefineIssue")(function* (params: RefineIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -609,7 +609,7 @@ export const SetHandedBackParams = Schema.Struct({
 export type SetHandedBackParams = typeof SetHandedBackParams.Type
 
 
-export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the assistant's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
+export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the orchestrator's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
 
 export const setHandedBack = Effect.fn("SetHandedBack")(function* (params: SetHandedBackParams) {
   const sql = yield* SqlClient.SqlClient

@@ -1,11 +1,11 @@
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
-import { type Conversation, everyone, generalName, assistantAgent, type MessageKind, type Outcome, type SenderKind } from "@vibevalley/protocol";
+import { type Conversation, everyone, generalName, orchestratorAgent, type MessageKind, type Outcome, type SenderKind } from "@vibevalley/protocol";
 
-const chatNamed: Readonly<Record<string, string>> = { 管家: assistantAgent, 主人: "user", 所有人: everyone };
+const chatNamed: Readonly<Record<string, string>> = { 管家: orchestratorAgent, 主人: "user", 所有人: everyone };
 
-export const mentionOf: Readonly<Record<string, string>> = { [assistantAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Readonly<Record<string, string>> = { [orchestratorAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;
@@ -79,22 +79,22 @@ export interface AudienceInput {
 export function chatAudience(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
   if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken) return out;
-  const byAgent = i.fromKind === "agent" || i.fromKind === "assistant";
+  const byAgent = i.fromKind === "agent" || i.fromKind === "orchestrator";
   const present = i.present ?? i.sessions ?? [];
   let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
     if (recipient === i.from || out.some((d) => d.recipient === recipient)) return;
-    if (recipient !== assistantAgent && !present.includes(recipient)) return;
+    if (recipient !== orchestratorAgent && !present.includes(recipient)) return;
     let heldBy: HeldBy | undefined;
     if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
-    else if (wakes && byAgent && recipient !== assistantAgent && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
+    else if (wakes && byAgent && recipient !== orchestratorAgent && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
     else if (wakes && i.fromKind !== "user" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
     if (wakes && byAgent && !heldBy) hops++;
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
 
   if (i.kind === "report") {
-    if (!i.forTask) add(assistantAgent, "addressed", i.outcome === "failed");
+    if (!i.forTask) add(orchestratorAgent, "addressed", i.outcome === "failed");
     return out;
   }
   const mentions = i.mentions ?? [];
@@ -109,7 +109,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     if (owner) add(owner, "own_thread", true);
     if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
     else {
-      if (!mentions.some((m) => m !== "user")) add(assistantAgent, "addressed", true);
+      if (!mentions.some((m) => m !== "user")) add(orchestratorAgent, "addressed", true);
       for (const h of i.sessions ?? []) add(h, "general", false);
     }
   } else if (owner) add(owner, "own_thread", true);
@@ -158,7 +158,7 @@ export const retryWindowMs = 60_000;
 
 export const heldShown = 3;
 
-/** A message as the assistant and a session read it. */
+/** A message as the orchestrator and a session read it. */
 export interface InboxMessage {
   readonly id: string;
   readonly number: number;
@@ -175,5 +175,5 @@ export function messageLine(m: InboxMessage): string {
   return `[target=${m.target} msg=${m.number} from=${from}] ${m.text.trim().replaceAll("\n", "\n  │ ")}`;
 }
 
-/** One line each, in order: how the assistant and a session read what came to them. */
+/** One line each, in order: how the orchestrator and a session read what came to them. */
 export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");

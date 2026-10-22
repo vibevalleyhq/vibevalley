@@ -1,4 +1,4 @@
-// 帮工: the assistant and every profile as cards; a card opens its profile, the last card
+// 帮工: the orchestrator and every profile as cards; a card opens its profile, the last card
 // makes a new one. /agents/<id> is a profile, /agents/new a new one.
 
 import { createMemo, For, Show } from "solid-js";
@@ -13,7 +13,7 @@ import { useAgentIssues, useWorkAgents } from "../../data/agents";
 import { useCore } from "../../data/frame";
 import { ready, useRuntimes } from "../../data/query";
 import { useFarm } from "../../farm/state";
-import { AgentFace, AssistantFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useSkills } from "../settings/SkillsPage";
 import { AgentPage } from "./AgentPage";
@@ -52,7 +52,7 @@ function AgentsPage() {
           </A>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <AssistantCard />
+          <OrchestratorCard />
           <For each={agents()}>
             {(a) => (
               <AgentCard
@@ -98,13 +98,13 @@ function CardShell(props: { to: string; label: string; muted?: boolean; corner?:
 
 const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-xs text-muted";
 
-function AssistantCard() {
-  const look = useFarm((s) => s.assistantLook);
+function OrchestratorCard() {
+  const look = useFarm((s) => s.orchestratorLook);
   return (
-    <CardShell to="/assistant" label="管家">
+    <CardShell to="/orchestrator" label="管家">
       <div class="flex items-start gap-3 pb-3">
         <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
-          <AssistantFace size={68} look={look()} />
+          <OrchestratorFace size={68} look={look()} />
         </span>
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="text-base font-semibold">管家</span>

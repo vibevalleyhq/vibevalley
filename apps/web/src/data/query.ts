@@ -35,7 +35,7 @@ export const useSprites = () =>
     staleTime: Infinity,
   }));
 
-/** Every profile, the assistant's too. */
+/** Every profile, the orchestrator's too. */
 export const useAgents = () => useQuery(() => ({ queryKey: ["agents"], queryFn: () => api.agent.list() }));
 
 export const useProjects = () => useQuery(() => ({ queryKey: ["projects"], queryFn: () => api.project.list(), refetchInterval: 30_000 }));

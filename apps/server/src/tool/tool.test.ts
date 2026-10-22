@@ -8,8 +8,8 @@ import { toolStart } from "./tool.ts";
 import { spentText } from "./words.ts";
 
 describe("the tools", () => {
-  // The assistant's parameters are its prompt's prefix: the contract kept (testdata/tool_schemas.json).
-  it("keep the assistant's parameters", () => {
+  // The orchestrator's parameters are its prompt's prefix: the contract kept (testdata/tool_schemas.json).
+  it("keep the orchestrator's parameters", () => {
     const baseline = JSON.parse(readFileSync(resolve(import.meta.dirname, "testdata/tool_schemas.json"), "utf8")) as Record<string, Record<string, unknown>>;
     expect(Object.keys(schemas).sort()).toEqual(Object.keys(baseline).sort());
     // Omitted additionalProperties lets unknown fields through as true does.

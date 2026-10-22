@@ -3,7 +3,7 @@
 //
 // Each app's account has one generation of work at a time (receiving, the inbox, the outbox); a login or logout cancels
 // and waits for the generation before it replaces the account. What an app hands over is accepted into connector_inbound
-// (a durable acceptance, with the page's cursor) and delivered to the assistant from there; a delivery the assistant took but
+// (a durable acceptance, with the page's cursor) and delivered to the orchestrator from there; a delivery the orchestrator took but
 // whose mark was not written yet may come again after a restart. Some apps let a bot answer only on the context of the
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
@@ -21,7 +21,7 @@ import { newId } from "../base/ids.ts";
 import { causeMessage } from "../base/db.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { Assistant } from "../assistant/assistant.ts";
+import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
 import { digestOver, flushText, forOwner, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
@@ -135,7 +135,7 @@ export function feishuAdapter(api: FeishuApi): Adapter {
       const linked = await api.login(signal, (url) => progress({ state: "waiting", qr: url }));
       return { secrets: { appId: linked.app.appId, appSecret: linked.app.appSecret, domain: linked.app.domain }, owner: linked.owner };
     },
-    // Returning to the SDK acknowledges only a durable inbox write; the assistant's work runs elsewhere.
+    // Returning to the SDK acknowledges only a durable inbox write; the orchestrator's work runs elsewhere.
     receive: async (signal, secrets, io) => {
       try {
         await api.listen(signal, appOf(secrets), (m) =>
@@ -239,7 +239,7 @@ export interface ConnectorOptions {
   /** Held messages are tried again after retryFirstMs, then twice as long after each try that fails, up to retryMostMs. */
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
-  /** What the owner said, to the assistant; the assistant's say when absent. */
+  /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
   readonly say?: (text: string, conversation: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
@@ -249,7 +249,7 @@ export const make = (options: ConnectorOptions = {}) =>
     const sql = yield* SqlClient.SqlClient;
     const core = yield* Core;
     const chat = yield* Channels;
-    const assistant = yield* Assistant;
+    const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
@@ -260,7 +260,7 @@ export const make = (options: ConnectorOptions = {}) =>
     const general = chat.general();
     const life = new AbortController();
     const say = (text: string, conversation: string | undefined) =>
-      options.say ? options.say(text, conversation, chat) : assistant.say(text, {}, conversation, "");
+      options.say ? options.say(text, conversation, chat) : orchestrator.say(text, {}, conversation, "");
 
     const bridgeOf = (adapter: Adapter) => {
       const id = adapter.id;
@@ -459,7 +459,7 @@ export const make = (options: ConnectorOptions = {}) =>
         await runHere(Effect.mapError(say(m.text, conversation), (e) => new Error("reason" in e ? String(e.reason) : e._tag)));
       };
 
-      // The inbox: what the app handed over, delivered to the assistant in order.
+      // The inbox: what the app handed over, delivered to the orchestrator in order.
       let wakeInbox: (() => void) | undefined;
       const accept = async (messages: readonly Inbound[], cursor: string) => {
         try {

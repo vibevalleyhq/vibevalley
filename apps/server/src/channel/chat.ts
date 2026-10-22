@@ -13,7 +13,7 @@ import {
   type FactLeft,
   type FactReport,
   generalName,
-  assistantAgent,
+  orchestratorAgent,
   type MessageKind,
   type Outcome,
   type RunTrigger,
@@ -102,8 +102,8 @@ export interface ReadResult {
   readonly older: boolean;
 }
 
-/** What came to the assistant in one conversation, to wake it with. */
-export interface AssistantNews {
+/** What came to the orchestrator in one conversation, to wake it with. */
+export interface OrchestratorNews {
   readonly conversation: string;
   readonly target: string;
   readonly messages: InboxMessage[];
@@ -117,7 +117,7 @@ interface Meta {
   spent?: Spent;
   forTask?: boolean;
   code?: string;
-  /** Said on a call: the assistant heard it there, so it wakes no one here. */
+  /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
   spoken?: boolean;
 }
 
@@ -145,7 +145,7 @@ type MsgRow = qm.MessageByIDResult;
 type ConvRow = qc.ConversationByIDResult;
 type DeliveryRow = qd.OpenDeliveriesResult;
 
-const senderKind = (kind: string): SenderKind => (kind === "user" || kind === "assistant" || kind === "agent" ? kind : "system");
+const senderKind = (kind: string): SenderKind => (kind === "user" || kind === "orchestrator" || kind === "agent" ? kind : "system");
 const messageKind = (kind: string): MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
 const conversationKind = (kind: string): ConversationKind => (kind === "thread" || kind === "channel" ? kind : "general");
 const subjectKind = (kind: string | null): SubjectKind | undefined => (kind === "issue" || kind === "graph" || kind === "talk" ? kind : undefined);
@@ -238,12 +238,12 @@ export interface ChannelShape {
   readonly say: (text: string, conversation: string | undefined, sendKey: string) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
   /** Words to a session in its thread; with no thread the session hears them straight. */
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
-  /** A session's or the assistant's words, through channel_say. */
+  /** A session's or the orchestrator's words, through channel_say. */
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
   /** Words said on a call, kept in 田头 as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** The assistant's words as they stream: the same key again replaces them until final; delivered once final. */
-  readonly assistantSays: (conversation: string, key: string, text: string, final: boolean, run: string) => Effect.Effect<void>;
+  /** The orchestrator's words as they stream: the same key again replaces them until final; delivered once final. */
+  readonly orchestratorSays: (conversation: string, key: string, text: string, final: boolean, run: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (conversation: string, text: string, code: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
@@ -255,12 +255,12 @@ export interface ChannelShape {
   /** The conversations and messages the core state holds now. */
   readonly now: () => Chat | undefined;
   /** Subscribed before it returns. */
-  readonly forAssistant: Effect.Effect<Stream.Stream<AssistantNews>, never, Scope.Scope>;
+  readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
   /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
    * Subscribed before it returns. */
   readonly ownerInThread: Effect.Effect<Stream.Stream<{ readonly thread: string; readonly message: ChatMessage }>, never, Scope.Scope>;
-  /** What came to the assistant and does not wake it. */
-  readonly assistantDigest: () => Effect.Effect<InboxMessage[]>;
+  /** What came to the orchestrator and does not wake it. */
+  readonly orchestratorDigest: () => Effect.Effect<InboxMessage[]>;
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
@@ -317,7 +317,7 @@ export interface Helpers {
   /** On the farm now: it can be handed a message. */
   readonly present: (id: string) => boolean;
   readonly deliver: (id: string, text: string, by: RunTrigger) => Effect.Effect<Delivered>;
-  /** The run a participant is in now (a helper's, the assistant's), for what it says; undefined between runs. */
+  /** The run a participant is in now (a helper's, the orchestrator's), for what it says; undefined between runs. */
   readonly currentRun: (id: string) => string | undefined;
   /** A helper's report, from what it last said in full. */
   readonly report: (id: string) => string;
@@ -340,7 +340,7 @@ export const make = Effect.gen(function* () {
   const apply = (...facts: Parameters<typeof core.apply>) => Effect.runSync(core.apply(...facts));
   const lock = Semaphore.makeUnsafe(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
-  const assistantHub = yield* PubSub.unbounded<AssistantNews>();
+  const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();
@@ -370,7 +370,7 @@ export const make = Effect.gen(function* () {
 
   for (const [id, kind, name] of [
     ["user", "user", "主人"],
-    [assistantAgent, "assistant", "管家"],
+    [orchestratorAgent, "orchestrator", "管家"],
     ["system", "system", "农场"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: Date.now() }));
@@ -516,18 +516,18 @@ export const make = Effect.gen(function* () {
       const known = new Set((yield* db(qp.participants())).map((p) => p.id));
       const named: { id: string; how: "delivered" | "not_on_farm" | "unknown" }[] = [];
       for (const m of mentions) {
-        const how = m === assistantAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "not_on_farm" : "unknown";
+        const how = m === orchestratorAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "not_on_farm" : "unknown";
         named.push({ id: m, how });
         yield* db(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
       }
       if (mentions.length > 0) yield* db(qm.updateMessageMeta({ meta: metaText({ ...meta, mentions }), id: row.id }));
       let followers: string[] = [];
       if (conv.kind === "thread") {
-        // A dispatch handing the issue to its next session makes no one a follower: the assistant would be woken by every word in it.
+        // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
         if (row.sender_id !== "system" && row.kind !== "dispatch")
           yield* db(qf.follow({ conversation_id: conv.id, participant_id: row.sender_id, reason: "replied", from_number: row.number }));
         for (const m of named)
-          if (m.how === "delivered" && (m.id === assistantAgent || present.includes(m.id)))
+          if (m.how === "delivered" && (m.id === orchestratorAgent || present.includes(m.id)))
             yield* db(qf.follow({ conversation_id: conv.id, participant_id: m.id, reason: "mentioned", from_number: row.number - 1 }));
         followers = (yield* db(qf.followers({ conversation_id: conv.id }))).map((f) => f.participant_id);
       }
@@ -680,13 +680,13 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
       const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
-      if (recipient === assistantAgent) {
+      if (recipient === orchestratorAgent) {
         const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
         const now = Date.now();
         for (const [conversation, rs] of byConversation) {
           const messages = rs.map(asInbox);
-          PubSub.publishUnsafe(assistantHub, { conversation, target: messages[0]!.target, messages });
-          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: assistantAgent, message_id: r.message_id }));
+          PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
+          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
         }
         return;
       }
@@ -799,7 +799,7 @@ export const make = Effect.gen(function* () {
             : head(h.brief.replace(/\s+/g, " "), 80);
       yield* write({
         conversation: channel,
-        from: assistantAgent,
+        from: orchestratorAgent,
         kind: "dispatch",
         text: `派 @${h.id}（${h.name}）去 ${h.project ?? "项目"}：${what}`,
         final: true,
@@ -822,7 +822,7 @@ export const make = Effect.gen(function* () {
       // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
       const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
       const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
-      yield* write({ conversation: thread, from: assistantAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
+      yield* write({ conversation: thread, from: orchestratorAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
     });
 
   const sessionsLeft = Effect.gen(function* () {
@@ -901,7 +901,7 @@ export const make = Effect.gen(function* () {
   const resolveTarget = (who: string, target: string): Effect.Effect<string, ApiError> =>
     Effect.gen(function* () {
       if (!target.trim()) {
-        if (who !== assistantAgent && who !== "user") {
+        if (who !== orchestratorAgent && who !== "user") {
           const own = yield* threadOfSession(who);
           if (own) return own;
         }
@@ -997,7 +997,7 @@ export const make = Effect.gen(function* () {
               yield* db(qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: shown.at(-1)!.number, updated_at: now }));
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length } as Spoken;
           }
-          const answers = from !== assistantAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
+          const answers = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
           const run = helpers?.currentRun(from);
           const written = yield* write({
             conversation,
@@ -1024,16 +1024,16 @@ export const make = Effect.gen(function* () {
           return false;
         }).pipe(Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false))),
       ),
-    assistantSays: (conversation, key, text, final, run) =>
+    orchestratorSays: (conversation, key, text, final, run) =>
       locked(
         Effect.gen(function* () {
           const id = streaming.get(key);
           if (!id && !text.trim() && !final) return;
-          const written = yield* write({ ...(id ? { id } : {}), conversation, from: assistantAgent, kind: "chat", text, final, meta: run ? { run } : {} });
+          const written = yield* write({ ...(id ? { id } : {}), conversation, from: orchestratorAgent, kind: "chat", text, final, meta: run ? { run } : {} });
           if (final) streaming.delete(key);
           else streaming.set(key, written.id);
         }),
-      ).pipe(logged("the assistant's words")),
+      ).pipe(logged("the orchestrator's words")),
     notice: (conversation, text, code) =>
       locked(write({ conversation, from: "system", kind: "notice", text, final: true, meta: { code } })).pipe(logged("notice")),
     read: (who, opt = {}) =>
@@ -1069,7 +1069,7 @@ export const make = Effect.gen(function* () {
         }),
       ),
     jobThread: threadOfSession,
-    forAssistant: Effect.map(PubSub.subscribe(assistantHub), Stream.fromSubscription),
+    forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
     ownerInThread: Effect.map(
       core.subscribe,
       Stream.flatMap((e) =>
@@ -1078,8 +1078,10 @@ export const make = Effect.gen(function* () {
           : Stream.empty,
       ),
     ),
-    assistantDigest: () =>
-      locked(Effect.map(db(qd.openDeliveries({ recipient_id: assistantAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox))),
+    orchestratorDigest: () =>
+      locked(
+        Effect.map(db(qd.openDeliveries({ recipient_id: orchestratorAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox)),
+      ),
     channels: () => Effect.map(loadChannels, (rows) => rows.map(infoOf)),
     openChannel: (name, description, project) =>
       locked(

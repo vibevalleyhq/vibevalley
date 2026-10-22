@@ -23,8 +23,8 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       if (state.call === f.state && state.callReason === reason) return [state, false];
       return [{ ...state, call: f.state, callReason: reason }, true];
     }
-    case "assistant":
-      return state.assistant === f.state ? [state, false] : [{ ...state, assistant: f.state }, true];
+    case "orchestrator":
+      return state.orchestrator === f.state ? [state, false] : [{ ...state, orchestrator: f.state }, true];
     case "message":
       if (state.chat?.messages?.some((m) => m.id === f.message.id && same(m, f.message))) return [state, false];
       return [{ ...state, chat: withMessage(state.chat, f.message) }, true];

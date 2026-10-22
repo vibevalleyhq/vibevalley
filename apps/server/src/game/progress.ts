@@ -9,7 +9,7 @@ import {
   everyone,
   type Fact,
   type LedgerEntry,
-  assistantAgent,
+  orchestratorAgent,
   type Progress,
   type ProgressNews,
   type TaskGraph,
@@ -185,7 +185,7 @@ function graphEntry(graph: TaskGraph): Entry {
   return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
 }
 
-/** Whether a message is new to the state: the assistant's words change as they stream in, and count once. */
+/** Whether a message is new to the state: the orchestrator's words change as they stream in, and count once. */
 const isNew = (state: WorkspaceState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
@@ -242,7 +242,7 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions ?? [])
-          if (named !== assistantAgent && named !== "user" && named !== everyone && sessionOf(before, named)) out.push({ kind: "called", session: named });
+          if (named !== orchestratorAgent && named !== "user" && named !== everyone && sessionOf(before, named)) out.push({ kind: "called", session: named });
       } else if (fact.message.fromKind === "agent" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }

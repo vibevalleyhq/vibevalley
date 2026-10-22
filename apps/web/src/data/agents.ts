@@ -1,13 +1,13 @@
 import { keepPreviousData } from "@tanstack/solid-query";
-import { type Agent, type AgentIssue, assistantAgent } from "@vibevalley/protocol";
+import { type Agent, type AgentIssue, orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "../app/util";
 import { ready, useAgents, useQuery } from "./query";
 
-/** The profiles work is sent to: the assistant's is apart. */
+/** The profiles work is sent to: the orchestrator's is apart. */
 export function useWorkAgents() {
   const all = useAgents();
-  return (): Agent[] => ready(all, []).filter((a) => a.id !== assistantAgent);
+  return (): Agent[] => ready(all, []).filter((a) => a.id !== orchestratorAgent);
 }
 
 /** What the server says is wrong with each of these drafts (agent.check), by id; empty until it answers. */

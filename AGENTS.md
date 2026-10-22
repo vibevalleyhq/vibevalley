@@ -7,7 +7,7 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 apps/server/               服务端（Effect v4，Node 24 上用 tsx 跑）：src/ 里一块业务一个文件夹，名字用单数，每个导出一个服务
                            （Context.Service）：core、setting、agent、project、memory、doc、runtime、session、channel、recurrence、issue、
-                           task、notice、tool、mcp、assistant、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
+                           task、notice、tool、mcp、orchestrator、lan、voice、connector、game；projection 是核心状态的折法和拼帧（读各模块的
                            规则，组装时交给 core）；agent/brain 是 VibeValley 自己的 agent（搭在
                            pi-agent-core 上，也是 oar 的 vibevalley runtime）；base 是地基，services.ts 按次序把它们组装起来，
                            handlers.ts 是全部接口的处理，http/ 是路由、流和 /mcp；cli.ts 是命令行（农场的每个接口、和农机直接聊、
@@ -43,7 +43,7 @@ cd apps/server && npm run cli -- issue list                     # 命令行：�
 bun run server:check                                            # 改完服务端或 packages/protocol：规则的测试、类型、查询是否最新、vitest
 cd apps/server && bun run db:generate                           # 改完 db/queries 或 db/migrations：用 effect-sqlc 重写 db/generated
 bun run golden:update                                           # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（-- <模块> 只重写那一处，核心状态的是 core）
-cd apps/server && npm run evals                                 # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；verify-assistant-evals）
+cd apps/server && npm run evals                                 # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；verify-orchestrator-evals）
 bun run web:check                                               # 改完 apps/、packages/：各包的类型（手机壳也在内）、宿主的桥和手机壳的规则、页面能构建
 cd apps/web && bun run test                                     # 改完页面：规则的 vitest，加 Playwright 对着真的服务端（每个 worker 一个，临时家目录，环境里没有钥匙）
 cd apps/web && bun run test:dev                                 # 改了页面的响应式写法：Playwright 跑在 Solid 的开发版上，它的诊断（没被追踪的读、不该建的原语、追踪几千个源）连调用栈打出来

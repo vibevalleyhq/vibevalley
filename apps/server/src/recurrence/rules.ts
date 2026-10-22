@@ -21,15 +21,15 @@ export const isMissed = (s: Recurrence, now: number) => now - (nextRun(s) ?? now
 export const afterRun = (s: Recurrence, now: number): Recurrence => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
 /**
- * Whether a recurrence waits for the owner's yes before it can come due. The owner's own never waits, nor the assistant's when
- * the owner asked in this run. Without the owner, the assistant may only set itself a one-off follow-up: one that comes back
+ * Whether a recurrence waits for the owner's yes before it can come due. The owner's own never waits, nor the orchestrator's when
+ * the owner asked in this run. Without the owner, the orchestrator may only set itself a one-off follow-up: one that comes back
  * again, or sends a helper (who spends money) straight away, waits.
  */
 export function needsOK(req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean): boolean {
   switch (by) {
     case "owner":
       return false;
-    case "assistant":
+    case "orchestrator":
       return ownerInRun ? false : req.when.kind !== "once" || (req.agent ?? "").trim() !== "";
   }
 }

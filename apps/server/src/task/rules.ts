@@ -13,7 +13,7 @@ import {
   type TaskEdit,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { isForAssistant } from "../issue/state.ts";
+import { isForOrchestrator } from "../issue/state.ts";
 import { slice } from "../base/text.ts";
 import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, maxTasks, taskOf, taskStateText } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
@@ -264,7 +264,7 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
   if (session.refining) return "你在起草这张工单，还没开工：把要拆的想法写进草稿";
   if (issue.graph || issue.task) return "这张工单已经是计划了";
   if (issue.closed !== undefined || issue.closedAt !== undefined) return "这张工单已经关了";
-  if (isForAssistant(issue)) return "这是派给管家的工单";
+  if (isForOrchestrator(issue)) return "这是派给管家的工单";
   if (!issue.project) return "这张工单没有项目，没法开分支";
   if (issue.sessions.length === 0 || issue.sessions.at(-1) !== session.id) return "这张工单现在不归你做";
   if (!session.branch) return "你直接在项目里干活，没有自己的分支：拆了没处开计划的分支";

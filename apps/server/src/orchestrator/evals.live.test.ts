@@ -1,9 +1,9 @@
-// The assistant's evals on the real model, and so never in the default run: VIBEVALLEY_EVALS_LIVE=1 with DEEPSEEK_API_KEY
+// The orchestrator's evals on the real model, and so never in the default run: VIBEVALLEY_EVALS_LIVE=1 with DEEPSEEK_API_KEY
 // (npm run evals), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
-// do; VIBEVALLEY_EVALS adds a folder of cases (a home's assistant/evals), VIBEVALLEY_EVAL_MODEL another model.
+// do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
 
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import { assistantAgent } from "@vibevalley/protocol";
+import { orchestratorAgent } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,19 +16,19 @@ import { transcript } from "../agent/brain/messages.ts";
 import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
-import { agentPrompt, systemPrompt } from "./assistant.ts";
+import { agentPrompt, systemPrompt } from "./orchestrator.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
 const key = process.env.DEEPSEEK_API_KEY ?? "";
 const noResult = "（评测里没有这个工具的结果）";
 
-/** The assistant's tool definitions, from a farm that is let go at once: every call is answered by stubs. */
-const assistantTools = () =>
+/** The orchestrator's tool definitions, from a farm that is let go at once: every call is answered by stubs. */
+const orchestratorTools = () =>
   Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
         const t = yield* Tools;
-        return t.assistant(() => ({ agent: assistantAgent, session: "", project: "", here: "", picked: "", owner: true }));
+        return t.orchestrator(() => ({ agent: orchestratorAgent, session: "", project: "", here: "", picked: "", owner: true }));
       }).pipe(Effect.provide(world())),
     ),
   );
@@ -49,14 +49,14 @@ function stubbed(tools: readonly AgentTool[], did: readonly AgentMessage[]): Age
   }));
 }
 
-/** One sample: the brain as the assistant makes it, with the case's memory and conversation; the turn the input begins, and
+/** One sample: the brain as the orchestrator makes it, with the case's memory and conversation; the turn the input begins, and
  * the tokens it took. */
 async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): Promise<{ turn: AgentMessage[]; tokens: number }> {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));
   writeFileSync(memoryFile(home), c.memory);
-  writeFileSync(join(home, assistantAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
+  writeFileSync(join(home, orchestratorAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
   const brain = await Brain.start({
-    name: assistantAgent,
+    name: orchestratorAgent,
     instructions: systemPrompt + agentPrompt,
     llm: deepseek(model, key),
     home,
@@ -92,13 +92,13 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
   }
 }
 
-describe.skipIf(!live || !key)("the assistant's evals, live", () => {
+describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
   it("pass on the real model", { timeout: 60 * 60_000 }, async () => {
     const n = Number(process.env.VIBEVALLEY_EVAL_N || 5);
     expect(Number.isInteger(n) && n >= 1).toBe(true);
     const need = Math.max(n - 1, 1);
     const cases = [...casesIn(committed), ...(process.env.VIBEVALLEY_EVALS ? casesIn(process.env.VIBEVALLEY_EVALS) : [])];
-    const tools = await assistantTools();
+    const tools = await orchestratorTools();
     const rows = ["| case | model | passed | tokens |", "|---|---|---|---|"];
     const short: string[] = [];
     for (const { file, case: c } of cases) {

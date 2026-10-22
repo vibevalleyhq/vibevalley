@@ -321,7 +321,7 @@
     "requestUrl": "https://api-eu-west-1.agora.io/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/join"
   },
   {
-    "name": "the assistant on the voice line",
+    "name": "the orchestrator on the voice line",
     "voice": {
       "area": "AP",
       "language": "zh-CN",
@@ -329,7 +329,7 @@
         "vendor": "ares"
       },
       "answer": {
-        "vendor": "assistant"
+        "vendor": "orchestrator"
       },
       "tts": {
         "vendor": "minimax",
@@ -393,7 +393,7 @@
           "url": "https://line.example.com/llm/line1/chat/completions",
           "api_key": "line-key-placeholder",
           "params": {
-            "model": "vibevalley-assistant",
+            "model": "vibevalley-orchestrator",
             "max_tokens": 512,
             "temperature": 0.7,
             "top_p": 0.95

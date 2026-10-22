@@ -1,4 +1,4 @@
--- Durable platform acceptance and assistant delivery (connector/inbox.ts).
+-- Durable platform acceptance and orchestrator delivery (connector/inbox.ts).
 
 -- name: AcceptInbound :exec
 insert into connector_inbound (connector, ext_id, message_id, created_at, payload, delivered)

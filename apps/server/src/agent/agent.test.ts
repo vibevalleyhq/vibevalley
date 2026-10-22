@@ -1,11 +1,11 @@
 import { chmodSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { type Agent, assistantAgent } from "@vibevalley/protocol";
+import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
 import { Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Agents, layer, assistantRuntime, withCast } from "./agent.ts";
+import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
 
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
@@ -52,25 +52,25 @@ describe("profiles", () => {
     expect([kept.look.species, kept.look.outfit]).toEqual(["owl", "rain"]);
   });
 
-  it.effect("the assistant is built in: not sent work, never deleted, only on VibeValley's own agent", () => {
+  it.effect("the orchestrator is built in: not sent work, never deleted, only on VibeValley's own agent", () => {
     const config = testConfig();
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        const assistant = s.agent(assistantAgent)!;
-        expect([assistant.runtime, assistant.enabled]).toEqual([assistantRuntime, true]);
-        expect(s.agents().some((a) => a.id === assistantAgent)).toBe(false);
-        expect(s.all().some((a) => a.id === assistantAgent)).toBe(true);
-        expect((yield* Effect.flip(s.deleteAgent(assistantAgent)))._tag).toBe("Refused");
-        expect(Exit.isFailure(yield* Effect.exit(s.saveAgent({ ...assistant, runtime: "claude" })))).toBe(true);
-        yield* s.saveAgent({ ...assistant, model: "deepseek-pro" });
+        const orchestrator = s.agent(orchestratorAgent)!;
+        expect([orchestrator.runtime, orchestrator.enabled]).toEqual([orchestratorRuntime, true]);
+        expect(s.agents().some((a) => a.id === orchestratorAgent)).toBe(false);
+        expect(s.all().some((a) => a.id === orchestratorAgent)).toBe(true);
+        expect((yield* Effect.flip(s.deleteAgent(orchestratorAgent)))._tag).toBe("Refused");
+        expect(Exit.isFailure(yield* Effect.exit(s.saveAgent({ ...orchestrator, runtime: "claude" })))).toBe(true);
+        yield* s.saveAgent({ ...orchestrator, model: "deepseek-pro" });
       }),
     ).pipe(
       Effect.andThen(
         run(
           config,
-          Effect.map(Agents, (again) => expect(again.agent(assistantAgent)?.model).toBe("deepseek-pro")),
+          Effect.map(Agents, (again) => expect(again.agent(orchestratorAgent)?.model).toBe("deepseek-pro")),
         ),
       ),
     );

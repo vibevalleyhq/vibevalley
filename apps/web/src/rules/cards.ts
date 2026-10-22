@@ -8,7 +8,7 @@ import {
   issueSession,
   issueTag,
   type IssueTag,
-  isForAssistant,
+  isForOrchestrator,
   issueTitle,
   type Lane,
   laneOf,
@@ -32,8 +32,8 @@ export type BoardCard =
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
   | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: Session }
   | { kind: "missing"; id: string; lane: Lane; issue: Issue; missing: string[] }
-  /** An issue for the assistant: open while the assistant works on it, closed once it has answered; never dragged. */
-  | { kind: "assistant"; id: string; lane: Lane; issue: Issue }
+  /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
+  | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
   /** `issue` is the task's own issue: its number, when it was made and last moved. */
   | { kind: "task"; id: string; lane: Lane; graph: TaskGraph; issue?: Issue };
 
@@ -46,7 +46,7 @@ export function buildCards(rows: IssueHistory[], core: WorkspaceState | undefine
   for (const row of rows) {
     const issue = row.issue;
     const base = { id: issue.id, lane: laneOf(issue.status), issue };
-    if (isForAssistant(issue)) cards.push({ kind: "assistant", ...base });
+    if (isForOrchestrator(issue)) cards.push({ kind: "orchestrator", ...base });
     else if (issue.graph === undefined && (issue.parent === undefined || issue.sessions.length > 0)) {
       if (issue.sessions.length === 0) cards.push({ kind: "todo", ...base, lane: "todo" });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
@@ -71,7 +71,7 @@ function cardWords(c: BoardCard): (string | undefined)[] {
       const head = c.sessions[c.sessions.length - 1]!;
       return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
     }
-    case "assistant":
+    case "orchestrator":
       return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, "管家"];
     case "task":
       return [c.graph.title, c.graph.goal, c.graph.project, c.graph.id];
@@ -94,7 +94,7 @@ const issueUpdated = (i: Issue) => Math.max(i.createdAt, i.queuedAt ?? 0, i.clos
 export function rowFacts(c: BoardCard): RowFacts {
   switch (c.kind) {
     case "todo":
-    case "assistant":
+    case "orchestrator":
     case "missing":
       return {
         lane: c.lane,
@@ -182,7 +182,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
         detail: lines.join("\n"),
       };
     }
-    case "assistant": {
+    case "orchestrator": {
       const { issue } = c;
       if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       const tag = issueTag(issue);

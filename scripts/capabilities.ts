@@ -32,7 +32,7 @@ let text = head;
 for (const [g, list] of groups) {
   text += `\n## ${g}\n\n| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |\n|---|---|---|---|---|\n`;
   for (const e of list)
-    text += `| \`${e.op}\` | \`${e.method} ${e.path}\` | ${mark(e.can.includes("owner"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("assistant"))} |\n`;
+    text += `| \`${e.op}\` | \`${e.method} ${e.path}\` | ${mark(e.can.includes("owner"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} |\n`;
 }
 
 if (process.argv.includes("--check")) {

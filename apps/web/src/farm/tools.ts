@@ -67,7 +67,7 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
 }
 
 /** The young farmer stands in for a look not painted. */
-export const assistantSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
+export const orchestratorSprite = (look: string, suffix: string, has: (name: string) => boolean) =>
   has(`manager-${look}${suffix}`) ? `manager-${look}${suffix}` : `manager${suffix}`;
 
 export const lookReady = (look: string, has: (name: string) => boolean) => look === "farmer" || has(`manager-${look}`);
@@ -98,8 +98,8 @@ export function farmKey(
   return tool ? { kind: "pick", tool } : undefined;
 }
 
-/** The assistant's looks: sprite assistant-<id>, the plain one is farmer. */
-export const assistantLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
+/** The orchestrator's looks: sprite orchestrator-<id>, the plain one is farmer. */
+export const orchestratorLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
   { id: "farmer", name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
   { id: "foreman", name: "包工头", blurb: "安全帽、反光背心，对讲机不离身，一喊就到。" },
   { id: "auntie", name: "农场大婶", blurb: "头巾围裙，小本子上记着每块地的活。" },

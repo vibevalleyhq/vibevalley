@@ -1,4 +1,4 @@
-// The tools agents call, defined once: the assistant gets them in process, a session over /mcp. A
+// The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
@@ -11,7 +11,7 @@ import {
   generalName,
   type GraphAction,
   type Issue,
-  assistantAgent,
+  orchestratorAgent,
   type Memory,
   type RecurrenceWhen,
   type TaskAction,
@@ -55,12 +55,12 @@ import { schemas, sessionSchemas } from "./schemas.ts";
 
 /** Who is calling, at the moment of the call. */
 export interface Caller {
-  /** The profile: assistantAgent for the assistant. */
+  /** The profile: orchestratorAgent for the orchestrator. */
   readonly agent: string;
-  /** The session working as agent, and the project it works in; both empty for the assistant. */
+  /** The session working as agent, and the project it works in; both empty for the orchestrator. */
   readonly session: string;
   readonly project: string;
-  /** The conversation the assistant is answering. A session's default is its own issue thread, which the channel service knows. */
+  /** The conversation the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
@@ -72,11 +72,11 @@ export interface Caller {
 export type Who = () => Caller | Promise<Caller>;
 
 export interface ToolShape {
-  /** The assistant's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly assistant: (who: Who) => AgentTool[];
+  /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
+  readonly orchestrator: (who: Who) => AgentTool[];
   /** A session's tools, served on /mcp. */
   readonly session: (who: Who) => AgentTool[];
-  /** How a tool call reads in the assistant's trajectory: its label and the first naming argument. */
+  /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
   readonly start: (name: string, args: unknown) => ToolStart;
   readonly sessionLine: (w: Roster) => string;
 }
@@ -172,13 +172,13 @@ export const make = Effect.gen(function* () {
   const sessionSchemaTool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
     textTool<P>({ name, label: labels[name] ?? name, description, parameters: sessionSchemas[name]!, run: (p) => runIt(p) });
 
-  // The assistant may name a session by its id, its name, or words that contain its name.
+  // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
     const all = run.roster();
     return all.find((w) => w.session.id === key) ?? all.find((w) => w.session.name === key) ?? all.find((w) => key.includes(w.session.name));
   };
 
-  // The assistant names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
+  // The orchestrator names an issue by its number (#41, 41), its id, or the name or id of a helper working it.
   const findIssue = async (key: string): Promise<Issue | string> => {
     const k = key.trim().replace(/^#/, "");
     const all = await go(issue.list());
@@ -201,20 +201,20 @@ export const make = Effect.gen(function* () {
     return last === undefined ? undefined : run.roster().find((w) => w.session.id === last);
   };
   const whoOf = (t: Issue) =>
-    workerOf(t)?.session.name ?? (t.assignee === assistantAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
+    workerOf(t)?.session.name ?? (t.assignee === orchestratorAgent ? "管家" : t.assignee ? (agents.agents().find((a) => a.id === t.assignee)?.name ?? "") : "");
   const nobodyOn = (t: Issue) => `#${t.number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status 挪到待办`;
   const numberOf = (w: Roster) => (w.session.issue ? issue.onBoard().find((t) => t.id === w.session.issue)?.number : undefined);
 
-  // Who reads and speaks in a channel: a session as itself, the assistant as the assistant.
+  // Who reads and speaks in a channel: a session as itself, the orchestrator as the orchestrator.
   const participant = (c: Caller) => c.session || c.agent;
 
   // Which profile takes a task: the one named, else the one the owner picked for this input, else by the farm's rule.
   const choose = (task: string, name: string, picked: string): Promise<Agent | undefined> => go(issue.pickAgent(task, name, picked));
 
-  // The assistant may say a profile's name or id.
+  // The orchestrator may say a profile's name or id.
   const profile = (key: string): string => {
     const k = key.trim();
-    if (k === assistantAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
+    if (k === orchestratorAgent || k === "管家") throw new Error("你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive");
     const a = agents.agents().find((x) => x.id === k || x.name === k);
     if (!a) throw new Error("没有叫 " + k + " 的帮工档案");
     return a.id;
@@ -258,7 +258,7 @@ export const make = Effect.gen(function* () {
     "看收获一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者收获前想确认时用。",
     async (t) => {
       try {
-        return changesText(await go(issue.changes(t.id, "assistant")));
+        return changesText(await go(issue.changes(t.id, "orchestrator")));
       } catch (e) {
         return "看不了改动：" + toError(e).message;
       }
@@ -645,7 +645,7 @@ export const make = Effect.gen(function* () {
                 ...(p.project ? { project: p.project } : {}),
                 ...(p.tz ? { tz: p.tz } : {}),
               },
-              "assistant",
+              "orchestrator",
               c.owner,
             ),
           );
@@ -696,7 +696,7 @@ export const make = Effect.gen(function* () {
   const graphSplit = tool<{ goal: string; project: string; agent?: string }>(
     "graph_split",
     "起一个种植计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "assistant")),
+    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "orchestrator")),
   );
 
   const graphsTool = tool<{ id?: string }>("graphs", "列出种植计划：每件的状态、谁在做、结论。", (p) => {
@@ -712,7 +712,7 @@ export const make = Effect.gen(function* () {
     "task_edit",
     "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
     (p) => {
-      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "assistant"));
+      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "orchestrator"));
       const edit: TaskEdit = {
         ...(p.title !== undefined ? { title: p.title } : {}),
         ...(p.brief !== undefined ? { brief: p.brief } : {}),
@@ -720,7 +720,7 @@ export const make = Effect.gen(function* () {
         ...(p.agent !== undefined ? { agent: p.agent } : {}),
         ...(p.check !== undefined ? { check: p.check } : {}),
       };
-      return answered(tasks.editTask(p.graph, p.task, edit, "assistant"));
+      return answered(tasks.editTask(p.graph, p.task, edit, "orchestrator"));
     },
   );
 
@@ -732,14 +732,14 @@ export const make = Effect.gen(function* () {
         const c = await who();
         if (p.action === "merge" && !c.owner) return mergeNotAsked;
         if (p.action === "start" && !c.owner) return startNotAsked;
-        return answered(tasks.act(p.graph, p.action, "assistant"));
+        return answered(tasks.act(p.graph, p.action, "orchestrator"));
       },
     );
 
   const taskAction = tool<{ graph: string; task: string; action: TaskAction }>(
     "task_action",
     "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
-    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "assistant")),
+    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "orchestrator")),
   );
 
   const issueSplit = (who: Who) =>
@@ -765,8 +765,8 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  const memorySearch = (who: Who, forAssistant: boolean) =>
-    forAssistant
+  const memorySearch = (who: Who, forOrchestrator: boolean) =>
+    forOrchestrator
       ? tool<{ query?: string; agent?: string; project?: string }>(
           "memory_search",
           "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
@@ -790,15 +790,15 @@ export const make = Effect.gen(function* () {
           },
         );
 
-  const memoryAdd = (who: Who, forAssistant: boolean) =>
-    forAssistant
+  const memoryAdd = (who: Who, forOrchestrator: boolean) =>
+    forOrchestrator
       ? tool<{ agent: string; text: string; project?: string }>(
           "memory_add",
           "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
           async (p) => {
             try {
               const id = profile(p.agent);
-              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "assistant" }));
+              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "orchestrator" }));
               return "替 " + id + " 记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
             } catch (e) {
               return "没成：" + toError(e).message;
@@ -866,7 +866,7 @@ export const make = Effect.gen(function* () {
     );
 
   return Tools.of({
-    assistant: (who) => [
+    orchestrator: (who) => [
       dispatch(who),
       projectsTool,
       channelsTool,

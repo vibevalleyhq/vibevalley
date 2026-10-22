@@ -1,8 +1,8 @@
 import { type InboxMessage } from "../channel/rules.ts";
 import { describe, expect, it } from "vite-plus/test";
-import { assistantInboxLines, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
+import { orchestratorInboxLines, patrolText, situationDelta, sourceHead, sources, usageText } from "./rules.ts";
 
-describe("the assistant's rules", () => {
+describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {
     const before =
       "【农场现状】\n项目：demo\n可以派的帮工：\n- 老周\n- 小吴\n- 阿郑\n各频道和地里的帮工：\n#田头\n  （没有帮工）\n#clock-in\n  （没有帮工）\n你正在回话的频道：#田头";
@@ -29,7 +29,7 @@ describe("the assistant's rules", () => {
 
   it("cut what others said long, never the owner's words", () => {
     const line = (text: string) =>
-      assistantInboxLines([{ id: "m4", number: 4, target: "#田头:3", from: "w1", fromKind: "agent", name: "测试小吴", text } as InboxMessage]);
+      orchestratorInboxLines([{ id: "m4", number: 4, target: "#田头:3", from: "w1", fromKind: "agent", name: "测试小吴", text } as InboxMessage]);
     const head = "[target=#田头:3 msg=4 from=w1 测试小吴] ";
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],
@@ -39,7 +39,7 @@ describe("the assistant's rules", () => {
       ["spaces around do not count", "  " + "a".repeat(800) + "\n", "a".repeat(800)],
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
-    const owner = assistantInboxLines([
+    const owner = orchestratorInboxLines([
       { id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "主人", text: "字".repeat(900) } as InboxMessage,
     ]);
     expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));

@@ -1,9 +1,9 @@
 // What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
 // a place opens a farm panel or a workbench page.
 
-export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "assistant" | "taskBoard";
+export type FarmPanel = "shop" | "warehouse" | "graphs" | "log" | "orchestrator" | "taskBoard";
 
-export const farmPanels: readonly FarmPanel[] = ["shop", "warehouse", "graphs", "log", "assistant", "taskBoard"];
+export const farmPanels: readonly FarmPanel[] = ["shop", "warehouse", "graphs", "log", "orchestrator", "taskBoard"];
 
 export interface YardPlace {
   readonly id: string;
@@ -21,7 +21,7 @@ export const yardPlaces: readonly YardPlace[] = [
   { id: "log", label: "农场日志", hint: "说过的话和收成，按时间倒着排", panel: "log" },
   { id: "taskBoard", label: "种植计划", hint: "一件长活拆成几步，交给几个帮工", panel: "taskBoard" },
   { id: "agents", label: "帮工名册", hint: "每个帮工用哪台农机、带什么人设和技能、长什么样", route: "/agents" },
-  { id: "manager", label: "管家", hint: "换管家的样子", panel: "assistant" },
+  { id: "manager", label: "管家", hint: "换管家的样子", panel: "orchestrator" },
   { id: "runtimes", label: "工坊 · 农具", hint: "每台农机是一种 runtime：装没装、用量", route: "/runtimes" },
   { id: "skills", label: "书屋 · 技能书", hint: "帮工能带的技能", route: "/settings/skills" },
 ];

@@ -37,7 +37,7 @@ Workspace（工作目录，一张大地图）
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
 | Workspace | `Config.workRoot`、`Config.home` | 全部项目、工单、群聊、档案；同时干活的上限（6）是它的 |
-| 管家 | `Assistant` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
+| 管家 | `Orchestrator` | 主人的助理 agent：听主人说，拆成工单，派出去，转告结果 |
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |

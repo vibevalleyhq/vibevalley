@@ -582,11 +582,11 @@ function WorkLog(props: { steps: SessionEvent[] }) {
   );
 }
 
-/** An issue for the assistant: what it was asked, and its runs; the answers are in its channel. */
-export function AssistantIssueDetail(props: { issue: Issue }) {
+/** An issue for the orchestrator: what it was asked, and its runs; the answers are in its channel. */
+export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const tag = () => issueTag(props.issue);
   const [busy, setBusy] = createSignal(false);
-  // The assistant's answer is the owner's to take as done or put away; one that did not end well can only be put away.
+  // The orchestrator's answer is the owner's to take as done or put away; one that did not end well can only be put away.
   const go = async (a: IssueAct) => {
     const id = props.issue.id;
     setBusy(true);

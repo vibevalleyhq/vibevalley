@@ -8,7 +8,7 @@
 |---|---|
 | 工单的模型、状态和能挪到哪 | 帮工怎么跑一轮、事件日志（[帮工](docs/subsystems/session.md)） |
 | 起草：派谁起草、交给它的规矩、读回草稿写进工单、起草完重置 worktree | worktree 的重置和清理怎么做（`project.Reset`、`project.Clear`） |
-| 派活、排队、重开、取消 | 挑哪个档案（[管家](docs/subsystems/assistant.md)） |
+| 派活、排队、重开、取消 | 挑哪个档案（[管家](docs/subsystems/orchestrator.md)） |
 | 验收、草、缺肥、帮工对每条标准的自评 | 汇报怎么读（`session/rules.ts` 读出「结论：」「要问主人：」和「标准 N：」交给它） |
 | 收获：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 给主人看的状态和主人能做的事；工单的时间线 | 怎么画（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」和工单详情、`apps/web/src/rules/issueState.ts`） |
@@ -17,7 +17,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/issue`（`Issues`）：`issue.ts` 存取和核心状态、挪状态、派活和重开、排队、带话和取消、验收和缺肥、执行历史、派给管家的工单；`draft.ts` 起草（谁来起草、交回来的草稿怎么读进工单，和派活时挑哪个档案 `pickAgent`）；`harvest.ts` 收获（本地合或提 PR、合不进去怎么说、PR 的轮询）；`rules.ts` 是只有工单用的纯规则。worktree、检查、推送和 `gh` 的 git 操作在 `apps/server/src/project`。
-- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForAssistant`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
+- 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题），`attention.ts` 的 `attentionLabel`、`actLabel`（每个动作叫什么）、`attentionWantsOwner`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.draft`（`POST /api/v1/issues/{id}/draft`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
 - 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；农场的播种袋在 `farm/panels/SeedForms.tsx`。

@@ -58,7 +58,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
   return platform(config).pipe(agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
 }
 
-/** The farm up to its notifications, with the tools and /mcp: no assistant, gateway or game, and no startup (farm.ts adds
+/** The farm up to its notifications, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
   return worldBelowTasks(options).pipe(

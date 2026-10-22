@@ -44,7 +44,7 @@ export interface Shelf {
 
 export const shelves: readonly Shelf[] = [
   { id: "helpers", label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修", match: isHelper },
-  { id: "assistant", label: "管家", hint: "六种样子，各有说话、听和头像", match: (n) => n.startsWith("manager-") },
+  { id: "orchestrator", label: "管家", hint: "六种样子，各有说话、听和头像", match: (n) => n.startsWith("manager-") },
   { id: "dog", label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……", match: (n) => n.startsWith("dog-") },
   { id: "plots", label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着", match: (n) => n.startsWith("plot-") },
   { id: "yard", label: "院子", hint: "地图、道具、镜头前的草木、小动物", match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n) },

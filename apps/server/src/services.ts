@@ -24,7 +24,7 @@ import { layer as setting } from "./setting/setting.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
 import { layer as mcp, type McpOptions } from "./mcp/mcp.ts";
-import { layer as assistantAgent, type AssistantOptions } from "./assistant/assistant.ts";
+import { layer as orchestratorAgent, type OrchestratorOptions } from "./orchestrator/orchestrator.ts";
 import { layer as game, start as gameStart } from "./game/game.ts";
 import { layer as lan, type LanOptions } from "./lan/lan.ts";
 import { layer as voice, type VoiceOptions } from "./voice/voice.ts";
@@ -46,7 +46,7 @@ export interface ServiceOptions {
   readonly issue?: IssueOptions;
   readonly task?: TaskOptions;
   readonly notice?: NoticeOptions;
-  readonly assistant?: AssistantOptions;
+  readonly orchestrator?: OrchestratorOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
   readonly voice?: VoiceOptions;
@@ -99,11 +99,11 @@ export const notifications =
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
     below.pipe(on(notice(o.notice)));
 
-/** Assistant: the workspace's assistant agent and its tools. */
-export const assistant =
+/** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
+export const orchestrator =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(tool), on(assistantAgent(o.assistant)));
+    below.pipe(on(tool), on(orchestratorAgent(o.orchestrator)));
 
 /** Gamification: the ledger, progress and achievements, from events only. */
 export const gamification = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(game));
@@ -137,7 +137,7 @@ export const services = (config: Config, options: ServiceOptions = {}) =>
     agentSessions(options),
     issues(options),
     notifications(options),
-    assistant(options),
+    orchestrator(options),
     gamification,
     gateway(options),
     sourceControlStart,

@@ -19,7 +19,7 @@ describe("core", () => {
       ...emptyWorkspaceState(),
       call: "live",
       callReason: "挂了",
-      assistant: "speaking",
+      orchestrator: "speaking",
       sessions: [helper],
       progress: emptyProgress(),
       recurrences: [],
@@ -28,7 +28,7 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.assistant]).toEqual(["idle", undefined, "idle"]);
+      expect([s.call, s.callReason, s.orchestrator]).toEqual(["idle", undefined, "idle"]);
       expect([s.progress, s.recurrences, s.issues]).toEqual([undefined, undefined, undefined]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
@@ -44,17 +44,17 @@ describe("core", () => {
           const seen = yield* core.events.pipe(Stream.take(4), Stream.runCollect, Effect.forkScoped);
           yield* Effect.yieldNow;
           yield* core.apply({ type: "hired", session: { ...helper, phase: { _tag: "arriving" } } });
-          yield* core.setAssistant("thinking");
-          yield* core.setAssistant("thinking");
+          yield* core.setOrchestrator("thinking");
+          yield* core.setOrchestrator("thinking");
           yield* core.apply({ type: "progress", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
           const got = (yield* Fiber.join(seen)) as SideEvent[];
-          expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "assistant", "progress"]);
+          expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "orchestrator", "progress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
         }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
       );
       const kept = JSON.parse(readFileSync(join(config.home, "state.json"), "utf8")) as Record<string, unknown>;
-      expect(kept.assistant).toBe("thinking");
+      expect(kept.orchestrator).toBe("thinking");
       expect(kept.progress).toBeUndefined();
       expect(JSON.stringify(kept)).not.toMatch(/phaseText|whenText/);
     });
@@ -68,12 +68,12 @@ describe("core", () => {
         Stream.runForEach((f) => Queue.offer(frames, f)),
         Effect.forkScoped,
       );
-      expect((yield* Queue.take(frames)).state.assistant).toBe("idle");
-      yield* core.setAssistant("speaking");
+      expect((yield* Queue.take(frames)).state.orchestrator).toBe("idle");
+      yield* core.setOrchestrator("speaking");
       yield* core.setCommits({ total: 2 } as never);
       yield* TestClock.adjust(stateEveryMs);
       const next = yield* Queue.take(frames);
-      expect([next.state.assistant, next.state.commits?.total]).toEqual(["speaking", 2]);
+      expect([next.state.orchestrator, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),

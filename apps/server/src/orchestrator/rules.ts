@@ -1,4 +1,4 @@
-// The assistant's pure rules: where an input came from, how the farm reads to it and what changed
+// The orchestrator's pure rules: where an input came from, how the farm reads to it and what changed
 // in it, what the patrol finds, and how a model answer's tokens are worded.
 
 import type { EventTokens, RunTriggerKind, RuntimeInfo } from "@vibevalley/protocol";
@@ -7,11 +7,11 @@ import { type InboxMessage, messageLine } from "../channel/rules.ts";
 import { quotaLow, yuan } from "../runtime/money.ts";
 import type { PatrolNote } from "../notice/rules.ts";
 
-/** The model the assistant answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
-export const assistantModel = "vibevalley-assistant";
+/** The model the orchestrator answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
+export const orchestratorModel = "vibevalley-orchestrator";
 export const chatCompletionsPath = "/v1/chat/completions";
 
-/** Who woke the assistant: what the input's words are worth. */
+/** Who woke the orchestrator: what the input's words are worth. */
 export type Source =
   /** The owner's words alone: in 田头, on a call, over chat/completions, from a connector. */
   | "owner"
@@ -70,7 +70,7 @@ export function quotaText(info: RuntimeInfo | undefined): string {
   return "额度：" + (info?.quota ? info.quota.text : "不报额度") + low + today;
 }
 
-/** The assistant answers only on DeepSeek: its profile's model as DeepSeek names it. */
+/** The orchestrator answers only on DeepSeek: its profile's model as DeepSeek names it. */
 export function deepseekModel(configured: string, fallback: string): string {
   if (configured === "") return fallback;
   const slash = configured.indexOf("/");
@@ -127,7 +127,7 @@ export function situationDelta(before: string, now: string): string {
 export const lineMax = 800;
 
 /** As inboxLines, but what others said past lineMax is cut, with where to read it whole. The owner's words stay whole. */
-export const assistantInboxLines = (messages: readonly InboxMessage[]) =>
+export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
   messages
     .map((m) => {
       const text = m.text.trim();

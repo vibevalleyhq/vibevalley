@@ -93,7 +93,7 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
   );
 });
 
-/** Starts and ends a call to the assistant while another program is in front (the page's voiceShortcut). */
+/** Starts and ends a call to the orchestrator while another program is in front (the page's voiceShortcut). */
 const voiceShortcut = "Alt+Shift+Space";
 
 if (!app.requestSingleInstanceLock()) {

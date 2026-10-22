@@ -1,5 +1,5 @@
 // The village on a Pixi stage: the map, the plots, the helpers walking between their plot and the
-// buildings, the assistant and the pet, the effects over the plots, and the light: the sky by the time of day, lit on
+// buildings, the orchestrator and the pet, the effects over the plots, and the light: the sky by the time of day, lit on
 // every pixel by the way it faces, the lamps and the helpers' lanterns after dark, shadows away from the sun; and the
 // yard's own life (life.ts). What it shows comes from the server's folded state; the scene only adds what moves with
 // the clock, and keeps only that (walkers, animation clocks, particles) in its own objects.
@@ -25,7 +25,7 @@ import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js
 import { castPrefix } from "../../rules/cast";
 import { playSound } from "../sound";
 import { clock, farmState, type BedFx } from "../store";
-import { assistantLooks, assistantSprite } from "../tools";
+import { orchestratorLooks, orchestratorSprite } from "../tools";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
@@ -212,17 +212,17 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     return { bed, sprite, ring, shown: "", ripe: false };
   });
 
-  const assistant = new Sprite(texture("manager"));
-  stand(assistant, "manager");
-  assistant.position.set(v.assistant.x, v.assistant.y);
-  assistant.zIndex = depth(v.assistant.y);
+  const orchestrator = new Sprite(texture("manager"));
+  stand(orchestrator, "manager");
+  orchestrator.position.set(v.orchestrator.x, v.orchestrator.y);
+  orchestrator.zIndex = depth(v.orchestrator.y);
   const dog = new Sprite(texture("dog-sleep"));
   stand(dog, "dog-sleep");
   dog.position.set(v.dog.x, v.dog.y);
   dog.zIndex = depth(v.dog.y);
   const pup = villageDog();
   const grounded = [
-    { at: v.assistant, footing: footing(14) },
+    { at: v.orchestrator, footing: footing(14) },
     { at: v.dog, footing: footing(16) },
   ];
   for (const { at, footing: f } of grounded) {
@@ -230,7 +230,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     f.contact.zIndex = depth(at.y) - 5;
     world.addChild(f.cast, f.contact);
   }
-  world.addChild(assistant, dog);
+  world.addChild(orchestrator, dog);
 
   const props = v.props.flatMap((p) => {
     if (!has(p.sprite)) return [];
@@ -520,7 +520,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       glow(p.sprite, p.spot === spot);
       p.sprite.y = p.y - (p.spot === spot ? 1 : 0);
     }
-    glow(assistant, spot === "manager");
+    glow(orchestrator, spot === "manager");
 
     const moveOn = t - whereAt >= whereTick;
     if (moveOn) whereAt = t;
@@ -590,14 +590,15 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     };
     fx.update(dt, store.bedFx as readonly BedFx[], store.rewards, bedOfSession);
 
-    // The assistant talks and listens; the pet wakes up for a call.
-    const mood = state.assistant;
-    const chosen = store.assistantLook;
-    const lookId = chosen !== "farmer" && assistantLooks.some((l) => l.id === chosen) && has(`manager-${chosen}`) ? chosen : "farmer";
+    // The orchestrator talks and listens; the pet wakes up for a call.
+    const mood = state.orchestrator;
+    const chosen = store.orchestratorLook;
+    const lookId = chosen !== "farmer" && orchestratorLooks.some((l) => l.id === chosen) && has(`manager-${chosen}`) ? chosen : "farmer";
     const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;
-    const assistantPose = mood === "speaking" ? assistantSprite(lookId, "-talk", has) : mood === "listening" ? assistantSprite(lookId, "-listen", has) : base;
-    stand(assistant, has(assistantPose) ? assistantPose : base);
-    rise(assistant, mood === "speaking" ? frameAt(t, 2, 4) : frameAt(t, 2, 0.6));
+    const orchestratorPose =
+      mood === "speaking" ? orchestratorSprite(lookId, "-talk", has) : mood === "listening" ? orchestratorSprite(lookId, "-listen", has) : base;
+    stand(orchestrator, has(orchestratorPose) ? orchestratorPose : base);
+    rise(orchestrator, mood === "speaking" ? frameAt(t, 2, 4) : frameAt(t, 2, 0.6));
     const dogLook = pup.look(t, state.call === "live");
     const awake = dogLook.picture !== "dog-sleep";
     const pet = store.pet;

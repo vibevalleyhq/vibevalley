@@ -81,7 +81,7 @@ export interface TaskShape {
   /** The task graphs now, as the board has them. */
   readonly graphs: () => TaskGraph[];
   readonly changes: (id: string) => Effect.Effect<Changes, ApiError>;
-  /** What the assistant is told about graphs, subscribed before it returns. */
+  /** What the orchestrator is told about graphs, subscribed before it returns. */
   readonly news: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>;
   /** Once the sessions came back (Agent Sessions' startup): a graph cut off while splitting is abandoned, one cut off with
    * steps at work pauses, and a running one goes on. */
@@ -156,7 +156,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellAssistant = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
+    const tellOrchestrator = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【种植计划】" + text));
 
     const candidates = Effect.forEach(store.agents(), (agent) =>
       options.usable ? Effect.succeed({ agent, usable: options.usable(agent) }) : Effect.map(runtimes.assess(agent), (a) => ({ agent, usable: usable(a) })),
@@ -213,7 +213,7 @@ export const make = (options: TaskOptions = {}) =>
         splitters.delete(graph.id);
         if (splitter) yield* dismiss(splitter);
         yield* notice("warn", "计划「" + graph.title + "」没拆成：" + why);
-        yield* tellAssistant(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
+        yield* tellOrchestrator(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
       });
 
     const split = (graph: TaskGraph, session: Session, outcome: string, summary: string) =>
@@ -240,7 +240,7 @@ export const make = (options: TaskOptions = {}) =>
         splitterTries.delete(graph.id);
         yield* dismiss(session.id);
         yield* notice("info", `计划「${draft.title}」拆好了，${draft.tasks.length} 步：在「计划」里看过再开工`);
-        yield* tellAssistant(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
+        yield* tellOrchestrator(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
       });
 
     const recurrence = (id: string): Effect.Effect<void, ApiError> =>
@@ -283,7 +283,7 @@ export const make = (options: TaskOptions = {}) =>
       Effect.gen(function* () {
         yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
         yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
-        yield* tellAssistant(
+        yield* tellOrchestrator(
           graph.id +
             " 的「" +
             task.title +
@@ -371,7 +371,7 @@ export const make = (options: TaskOptions = {}) =>
         yield* putSystem(next).pipe(Effect.mapError((e) => refused(`步骤「${task.title}」已合进计划分支，但完成状态没能保存：${reasonOf(e)}`)));
         if (next.state === "ripe") {
           yield* notice("info", "计划「" + next.title + "」都做完了：在「计划」里看看改动，收获进主分支");
-          yield* tellAssistant(
+          yield* tellOrchestrator(
             next.id + "「" + next.title + "」都做完了，等主人收获（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next),
           );
         }
@@ -541,7 +541,7 @@ export const make = (options: TaskOptions = {}) =>
             );
             yield* recurrence(graph.id);
             yield* notice("info", `${session!.name} 把工单「${graph.title}」拆成了 ${tasks.length} 张子工单，开工了`);
-            yield* tellAssistant(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
+            yield* tellOrchestrator(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
             return `拆好了：工单「${graph.title}」下面 ${tasks.length} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`;
           }),
         ),

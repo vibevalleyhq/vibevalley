@@ -71,7 +71,7 @@ export function useMarkRead(core: Accessor<WorkspaceState | undefined>, conversa
   );
 }
 
-/** A session's log (the assistant's is "assistant"): the read one, with what the live stream brought since merged in by seq. */
+/** A session's log (the orchestrator's is "orchestrator"): the read one, with what the live stream brought since merged in by seq. */
 export function createSessionEvents(id: Accessor<string>, enabled: Accessor<boolean>): Accessor<SessionEvent[]> {
   const read = useQuery(() => ({ queryKey: ["session-events", id()], queryFn: () => api.session.events({ id: id() }), enabled: enabled() }));
   const [arrived, setArrived] = createSignal<SessionEvent[]>([]);

@@ -92,7 +92,7 @@ function RecurrenceCard(props: { s: Recurrence }) {
       props.s.whenText ?? "",
       props.s.pending ? (props.s.nextText ?? "") : `下次 ${props.s.nextText ?? ""}`,
       ...(props.s.agent ? [`直接派 ${props.s.agent}`] : []),
-      ...(props.s.by === "assistant" ? ["管家定的"] : []),
+      ...(props.s.by === "orchestrator" ? ["管家定的"] : []),
     ].join(" · ");
   return (
     <div class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]} aria-label={`定时「${props.s.name}」`}>

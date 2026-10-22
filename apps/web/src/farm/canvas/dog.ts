@@ -1,4 +1,4 @@
-// The dog by the assistant's door, as the page draws it (it is not the farm's state). It sleeps most of the day and
+// The dog by the orchestrator's door, as the page draws it (it is not the farm's state). It sleeps most of the day and
 // stirs now and then (lifts its head and yawns, or gets up to stretch and scratch); it sits up with you while the farm
 // is open or the voice is live, and keeps busy there (a wag, a scratch, a yawn, a lie-down, a look around). It answers
 // you: pointed at, it lifts its head (awake, it wags); pressed, it ducks; patted, it wakes, and every pat after that

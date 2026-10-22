@@ -1,6 +1,6 @@
 // Harvesting an issue: its session's work taken into the main branch, by a local merge or a pull request, and the pull
 // requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
-// here, for the board, the command line and the assistant's tool alike.
+// here, for the board, the command line and the orchestrator's tool alike.
 
 import type { Changes, Conflict, Issue, IssueClose, PullRequest, PullRequestState } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
@@ -112,7 +112,7 @@ export function harvesting(d: HarvestDeps) {
     prLock.withPermits(1)(
       Effect.gen(function* () {
         const issue = yield* get(id);
-        // Whoever asks (the board, the command line, the assistant's tool) is held to the same table: a round that
+        // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table: a round that
         // failed, or a required acceptance not passed, is not harvested.
         if (!issue.graph && !issue.task) {
           const [m, why] = statusMove(issue, "done");

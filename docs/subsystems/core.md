@@ -10,7 +10,7 @@
 | `state.json`：存什么、什么时候存、开机怎么读回 | 库里的表、各 Session 的日志（[帮工](docs/subsystems/session.md)、[architecture.md](docs/architecture.md)「存了什么」） |
 | 给页面的帧 `StateFrame`（`frameOf`）和特效的发出 | 地里长什么、特效和账本怎么算（[游戏](docs/subsystems/game.md)、[farm-ui.md](docs/reference/farm-ui.md)） |
 | 三条 SSE 流 `/api/v1/state`、`/api/v1/events`、`/api/v1/live` | 帮工的 `/mcp`（[田头](docs/subsystems/channel.md)）、语音线路（[语音](docs/subsystems/voice.md)） |
-| 接口表 `api.ts` 的 `endpoints`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/assistant.md)） |
+| 接口表 `api.ts` 的 `endpoints`、能力表 `can`、`/api/v1` 版本、命令行这张皮 | 每个接口做什么（拥有它的服务）；「连接到本机」的配对和钥匙（[连接到本机](docs/subsystems/lan.md)）；管家和帮工的工具（`apps/server/src/tool`，[管家](docs/subsystems/orchestrator.md)） |
 | 重启时核心状态怎么回来，各拥有者在哪一步接手 | 各拥有者自己怎么恢复（链接见「怎么走」） |
 | 跨模块的接口约定：调用方交意图，拥有者负责协调和结果 | 某个模块的具体动作 |
 
@@ -60,9 +60,9 @@
 
 **接口和能力表**
 
-- **一个操作是 `endpoints` 的一行**：操作名（`组.动作`，页面里是 `api.组.动作`）、方法和路径、路径和查询参数、请求和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`assistant`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
+- **一个操作是 `endpoints` 的一行**：操作名（`组.动作`，页面里是 `api.组.动作`）、方法和路径、路径和查询参数、请求和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
 - **「连接到本机」只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`chatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
-- **`assistant` 一列只是记录**：代码不按它放行，管家和帮工能调什么由 `apps/server/src/tool` 的工具表定。
+- **`orchestrator` 一列只是记录**：代码不按它放行，管家和帮工能调什么由 `apps/server/src/tool` 的工具表定。
 - **都在 `/api/v1` 下**，包括 `/api/v1/health` 和三条流。`endpoints` 里的路径就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
 - **命名五条**：组是概念（`lan`、`game`、`channel`）；动词一套 `list`、`get`、`create`、`update`、`delete`，`save` 只给带 id 的整份写入（编辑、导入），`check` 只校验，领域动词只给不是增删改查的；工单的生命周期挂在工单上（`issue.status`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段，路径里的 id 算数。
 - **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：工单的收成清单收「谁在看」，主人看才算进游戏。
@@ -100,14 +100,14 @@
 2. 各拥有者在构造时从库里施加事实放回核心状态：工单（开着的和最近关的 50 家）、田头的频道和最近的对话、定时。这时还没有订阅者，这些事实不算进游戏。
 3. 全部服务建好以后，开机的活接手：帮工回到各自的地上歇着，停在半路的那一轮记成 `interrupted`（[帮工](docs/subsystems/session.md)「重启」）；定时补跑错过的（[定时](docs/subsystems/recurrence.md)）。
 4. 其余各拥有者自己恢复，次序不相干：种植计划跟着工单回来：停在拆的放弃，有件在做的暂停（[种植计划](docs/subsystems/task.md)「重启」）。
-5. 田头里交出去还没看到的消息退回 `pending`，过一会儿再叫（[田头](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/assistant.md)「重启后接着做」）。
+5. 田头里交出去还没看到的消息退回 `pending`，过一会儿再叫（[田头](docs/subsystems/channel.md)）；管家没做完的一轮接着做（[管家](docs/subsystems/orchestrator.md)「重启后接着做」）。
 6. 账本整本重折出金币、连胜、成就，规则改了重启就按新规则算（[游戏](docs/subsystems/game.md)）。
 
 **加一个能力**：写服务的方法 → 在 `api.ts` 的 `endpoints` 加一行（方法、路径、Schema、`can`）→ 在 `handlers.ts` 实现 → `bun run capabilities`。页面的客户端、命令行的命令、「连接到本机」的放行都从同一张表来。
 
 ## 和谁打交道
 
-- **施加事实的**：工单、帮工、田头、定时、管家（`setAssistant`）；`assistant.open`、主人说话、语音和连接器经 `open`、`setCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
+- **施加事实的**：工单、帮工、田头、定时、管家（`setOrchestrator`）；`orchestrator.open`、主人说话、语音和连接器经 `open`、`setCall` 让通话在线；游戏（commit 数、`progress`、`station`）。它们都排在 `core` 后面，`core` 只用 `base` 和 `packages/protocol`：折法和拼帧要读它们的规则，由组装时交给它的 `Projection` 带进来。
 - **订阅的**：游戏的账本和种植计划读 `transitions`；别的读 `facts`、`events`；账本另读 `owner`。
 - **读的**：任何服务用 `state()`、`session(id)` 读当前值；`http/streams.ts` 把三条流交给页面。
 - **外面**：页面读帧和窄流、调 `VibeValleyApi`；命令行按 `endpoints` 发 HTTP；「连接到本机」后的设备经同一套接口，由 `lan` 按 `can` 放行。
@@ -129,7 +129,7 @@
 ## 还没做的
 
 - 按概念分模块、农场只画它们的整体方向：[概念先行，农场是皮](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)。
-- `can` 只留 `owner`、`remote`，agent 能调什么写在档案上；管家派活先写工单、满了排队：[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-assistant-is-an-agent.md)。
+- `can` 只留 `owner`、`remote`，agent 能调什么写在档案上；管家派活先写工单、满了排队：[管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md)。
 
 ## 怎么验证
 

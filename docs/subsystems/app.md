@@ -56,7 +56,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
-**工作台的路由**（`app/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/assistant` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
+**工作台的路由**（`app/router.ts`、`app/App.tsx`）：`/farm/<项目>` 是这个项目的农场，`/` 进这台设备上次进的那座（`localStorage` 的 `vibevalley.farm.project`，列表还在路上时先信它；没记过时进最近有提交的那个项目的，没有项目时是 `/farm/` 那座），`/pair` 是配对；其余在 `Shell` 外框里：`/chat`、`/issues`、`/docs`、`/agents`（`/orchestrator` 也算在「帮工」下）、`/runtimes`、`/projects`、`/catalog`，最下面是 `/settings`。`/settings` 跳到 DeepSeek 分区；带 id 的路径打开同一页的详情；不认识的路径回农场。
 
 **通知和菜单栏**（`src/app/Follow.tsx`，挂在每一页上）：
 

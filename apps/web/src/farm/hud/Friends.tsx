@@ -3,7 +3,7 @@
 // its profile.
 
 import { createSignal, For, Show } from "solid-js";
-import { type Agent, assistantAgent } from "@vibevalley/protocol";
+import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
 import { bottleSprite, quotaOf } from "./rules";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
@@ -125,7 +125,7 @@ export function Friends(props: { height: number }) {
   const frames = useFrames();
   const open = useFarm((s) => s.friendsOpen);
   const sorted = () => {
-    const work = ready(agents, []).filter((a) => a.id !== assistantAgent);
+    const work = ready(agents, []).filter((a) => a.id !== orchestratorAgent);
     return [...work.filter((a) => a.enabled), ...work.filter((a) => !a.enabled)];
   };
   const statuses = () => {

@@ -1,11 +1,11 @@
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { assistantAgent } from "@vibevalley/protocol";
+import { orchestratorAgent } from "@vibevalley/protocol";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "../../rules/board";
 import { type BoardCard, cardLook, cardProject, laneOrder, rowFacts } from "../../rules/cards";
 import { closedShown, laneLabel, laneStatus } from "../../rules/issues";
 import { ago } from "../../rules/time";
-import { AssistantFace } from "../../ui/Face";
+import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { EmptyNote, IconButton, OlderLink, QuickAdd } from "./Board";
 import { useGraphs, useNameOf } from "./hooks";
@@ -30,8 +30,9 @@ export function IssueList(props: {
   const [adding, setAdding] = createSignal<string | null>(null);
   const nameOf = useNameOf();
 
-  // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the assistant's), or the one group.
-  const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? g.key !== assistantAgent : true);
+  // Only where a new 待办 belongs: the 待办 group, a project's, a helper's (not the orchestrator's), or the one group.
+  const canAdd = (g: RowGroup<BoardCard>) =>
+    props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? g.key !== orchestratorAgent : true;
   const add = (g: RowGroup<BoardCard>, text: string) => {
     setAdding(null);
     props.onAdd(text, props.grouping === "project" ? { project: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
@@ -72,7 +73,7 @@ export function IssueList(props: {
                 case "project":
                   return <Icon name="button-folder" size={14} />;
                 case "agent":
-                  return !key ? <NoFaceMark size={14} /> : key === assistantAgent ? <AssistantFace size={16} /> : <AgentFaceOf agent={key} size={16} />;
+                  return !key ? <NoFaceMark size={14} /> : key === orchestratorAgent ? <OrchestratorFace size={16} /> : <AgentFaceOf agent={key} size={16} />;
                 default:
                   return null;
               }

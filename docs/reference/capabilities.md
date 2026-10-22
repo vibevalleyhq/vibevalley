@@ -18,16 +18,16 @@
 |---|---|---|---|---|
 | `server.health` | `GET /api/v1/health` | ✓ | ✓ |   |
 
-## assistant
+## orchestrator
 
 | 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `assistant.open` | `POST /api/v1/assistant/open` | ✓ | ✓ |   |
-| `assistant.stop` | `POST /api/v1/assistant/stop` | ✓ | ✓ |   |
-| `assistant.hear` | `POST /api/v1/assistant/hear` | ✓ | ✓ |   |
-| `assistant.listArchive` | `GET /api/v1/assistant/archive` | ✓ | ✓ | ✓ |
-| `assistant.getArchive` | `GET /api/v1/assistant/archive/{name}` | ✓ | ✓ |   |
-| `assistant.markWrong` | `POST /api/v1/assistant/evals` | ✓ | ✓ |   |
+| `orchestrator.open` | `POST /api/v1/orchestrator/open` | ✓ | ✓ |   |
+| `orchestrator.stop` | `POST /api/v1/orchestrator/stop` | ✓ | ✓ |   |
+| `orchestrator.hear` | `POST /api/v1/orchestrator/hear` | ✓ | ✓ |   |
+| `orchestrator.listArchive` | `GET /api/v1/orchestrator/archive` | ✓ | ✓ | ✓ |
+| `orchestrator.getArchive` | `GET /api/v1/orchestrator/archive/{name}` | ✓ | ✓ |   |
+| `orchestrator.markWrong` | `POST /api/v1/orchestrator/evals` | ✓ | ✓ |   |
 
 ## setting
 

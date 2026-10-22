@@ -1,4 +1,4 @@
-// The assistant's evals (assistant.markWrong saves them): a turn the owner marked wrong, with what the model saw before it, and
+// The orchestrator's evals (orchestrator.markWrong saves them): a turn the owner marked wrong, with what the model saw before it, and
 // the checks that catch the error, written by whoever fixes it. evals.test.ts holds the committed cases (testdata/evals) to
 // their checks; evals.live.test.ts replays them on the real model.
 
@@ -19,7 +19,7 @@ export interface Expect {
   readonly contains?: string;
 }
 
-/** As saved in evals/<id>.json under the assistant's home. before, input and did are lines of assistant.jsonl as written there:
+/** As saved in evals/<id>.json under the orchestrator's home. before, input and did are lines of orchestrator.jsonl as written there:
  * what the model saw when the turn began (compactions applied), the input that began it, and the turn up to the next input. */
 export interface EvalCase {
   readonly id: string;
@@ -38,8 +38,8 @@ export interface EvalCase {
 
 export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as const;
 
-/** The assistant's tools by name, as its brain has them: the farm's and its own (no skills, subagents or recurrences). */
-export const assistantToolNames = () => [...Object.keys(schemas), ...selfTools({ home: "", skills: () => [], memory: true }).map((t) => t.name)];
+/** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or recurrences). */
+export const orchestratorToolNames = () => [...Object.keys(schemas), ...selfTools({ home: "", skills: () => [], memory: true }).map((t) => t.name)];
 
 /** "" when it is whole: the fields its kind reads are there. */
 export function problemOf(e: Expect): string {
@@ -104,6 +104,6 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   return names.sort().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 
-export const isInput = (m: AgentMessage) => m.role === "custom" && (m as { customType?: string }).customType === "assistantInput";
+export const isInput = (m: AgentMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
 
 export const committed = join(import.meta.dirname, "testdata", "evals");

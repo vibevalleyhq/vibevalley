@@ -1,5 +1,5 @@
 // The page following the farm for the host around it: each new call in the inbox as a system notice while the window is
-// not in front, the farm at a glance in the tray, and the key that calls the assistant from anywhere. Mounted once, over
+// not in front, the farm at a glance in the tray, and the key that calls the orchestrator from anywhere. Mounted once, over
 // every page, the farm's too.
 
 import { createEffect, onSettled } from "solid-js";

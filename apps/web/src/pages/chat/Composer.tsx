@@ -5,7 +5,7 @@ import { insertName, type Nameable, nameables, offeredFor, typedName } from "../
 import { toast } from "../../ui/toasts";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { AssistantFace } from "../../ui/Face";
+import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { DictationButton } from "../../voice/DictationButton";
 import { HelperFace } from "./bits";
@@ -31,7 +31,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
   });
-  const stoppable = () => core()?.assistant === "thinking" || core()?.assistant === "speaking";
+  const stoppable = () => core()?.orchestrator === "thinking" || core()?.orchestrator === "speaking";
   const canSend = () => text().trim() !== "" && !busy();
 
   const edit = (value: string, at: number) => {
@@ -59,7 +59,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
     if (key?.draft !== said) key = { draft: said, key: newSendKey() };
     setBusy(true);
     try {
-      await api.assistant.open();
+      await api.orchestrator.open();
       await api.channel.say({
         body: { text: said, conversation: props.conversation?.kind === "general" ? undefined : props.conversation?.id, sendKey: key.key },
       });
@@ -73,7 +73,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
     }
   };
 
-  const stop = () => api.assistant.stop().catch((e) => toast(reasonOf(e), "bad"));
+  const stop = () => api.orchestrator.stop().catch((e) => toast(reasonOf(e), "bad"));
 
   const onKey = (e: KeyboardEvent) => {
     // Enter that picks a word in an input method neither sends nor names.
@@ -122,7 +122,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
                 }}
                 class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === active() }]}
               >
-                <Show when={n().session} fallback={n().name === "管家" ? <AssistantFace size={20} /> : <span class="size-5" />}>
+                <Show when={n().session} fallback={n().name === "管家" ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
                   {(s) => <HelperFace agent={s().agent} size={20} />}
                 </Show>
                 <span class="font-mono text-xs">{n().token}</span>

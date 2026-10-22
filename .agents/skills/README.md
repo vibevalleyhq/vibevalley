@@ -10,4 +10,4 @@
 | [verify-server](.agents/skills/verify-server/SKILL.md) | 改了 `apps/server` 的接口、服务、表结构、开机 | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动 |
 | [verify-app](.agents/skills/verify-app/SKILL.md) | 改了 `apps/web` 的页面、组件、贴图 | 对着真的服务端，页面画出来是对的（截图） |
 | [verify-mobile](.agents/skills/verify-mobile/SKILL.md) | 改了 `apps/mobile`、宿主的桥、「连接到本机」的配对 | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
-| [verify-assistant-evals](.agents/skills/verify-assistant-evals/SKILL.md) | 改了管家的提示、工具描述或 `agent/brain` 的提示拼法；加了管家的样例 | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了（花钱，先问主人） |
+| [verify-orchestrator-evals](.agents/skills/verify-orchestrator-evals/SKILL.md) | 改了管家的提示、工具描述或 `agent/brain` 的提示拼法；加了管家的样例 | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了（花钱，先问主人） |

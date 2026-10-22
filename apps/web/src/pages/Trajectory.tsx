@@ -1,11 +1,11 @@
 // A trajectory a row per step: the round in the gutter, what kind of step in the tag, its text cut to a line until the
-// row is opened; a waterfall of the rounds over it and their totals under it. The assistant's lets a round be marked
+// row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import type { AssistantEval, SessionEvent } from "@vibevalley/protocol";
+import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
 import { api, reasonOf } from "../data/api";
 import {
   cacheHit,
@@ -34,8 +34,8 @@ import { Icon } from "../ui/Icon";
 import { Markdown } from "../ui/Markdown";
 import { Quiet } from "./kit";
 
-/** Saves the round its user/message `step` began as a case of the assistant's evals; `want` is what it should have done. */
-export type MarkWrong = (step: number, want: string) => Promise<AssistantEval>;
+/** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
+export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
 const laneNames: Record<Lane, string> = { asked: "收到", model: "模型", tool: "工具" };
 
@@ -63,7 +63,7 @@ function summaryText(s: TrajectorySummary) {
   ].join(" · ");
 }
 
-/** A session's (or the assistant's) trajectory, read and then followed live. */
+/** A session's (or the orchestrator's) trajectory, read and then followed live. */
 export function TrajectoryLog(props: { id: string; asked?: string; empty?: string; onMarkWrong?: MarkWrong; title?: string; about?: string }) {
   const steps = createSessionEvents(
     () => props.id,

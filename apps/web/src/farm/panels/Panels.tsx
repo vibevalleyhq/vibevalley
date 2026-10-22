@@ -1,11 +1,11 @@
 // The layers over the farm a click or a key opens, from the store's overlays: the harvest, the sowing and watering
-// forms, a panel (shop, warehouse, tasks, log, the assistant's looks, the task board) and the Esc menu. A plot's issue
+// forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
 
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
-import { lookReady, assistantLooks, assistantSprite, petName } from "../tools";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../tools";
 import { aria, Keyed } from "../../app/util";
 import { useCore } from "../../data/frame";
 import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../kit";
@@ -24,7 +24,7 @@ const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDial
   warehouse: ["仓库", "icon-crate", "lg"],
   graphs: ["任务与成就", "icon-tasks", "lg"],
   log: ["农场日志", "icon-log", "lg"],
-  assistant: ["管家和宠物", "manager-face", "wide"],
+  orchestrator: ["管家和宠物", "manager-face", "wide"],
   taskBoard: ["种植计划", "machine-seeder", "lg"],
 };
 
@@ -95,8 +95,8 @@ function Layer(props: { o: FarmOverlay }) {
               <Match when={panel() === "shop"}>
                 <Shop />
               </Match>
-              <Match when={panel() === "assistant"}>
-                <AssistantLooks />
+              <Match when={panel() === "orchestrator"}>
+                <OrchestratorLooks />
               </Match>
             </Switch>
           </FarmDialog>
@@ -132,21 +132,21 @@ function Tile(props: { chosen: boolean; ready: boolean; onClick: () => void; chi
   );
 }
 
-function AssistantLooks() {
+function OrchestratorLooks() {
   const loaded = useVillage();
-  const current = useFarm((s) => s.assistantLook);
+  const current = useFarm((s) => s.orchestratorLook);
   const pet = useFarm((s) => s.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
     <div class="flex flex-col">
       <p class="text-[13px] text-bark-900">挑一个你喜欢的管家，农场和对话里马上换上。</p>
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <For each={assistantLooks}>
+        <For each={orchestratorLooks}>
           {(look) => (
-            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => farm.setAssistantLook(look.id)}>
+            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => farm.setOrchestratorLook(look.id)}>
               <span class="h-28">
                 <Show when={loaded().village}>
-                  <SpriteIcon name={assistantSprite(look.id, "", has)} size={112} />
+                  <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
                 </Show>
               </span>
               <span class="mt-1.5 text-[13px]">{look.name}</span>

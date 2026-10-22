@@ -3,12 +3,12 @@ import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { type DotTone, phaseIcon } from "../../rules/chat";
 import { ready, useAgents } from "../../data/query";
-import { AgentFace, AssistantFace, OwnerFace } from "../../ui/Face";
+import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 
 const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };
 
-/** A phase or the assistant's mood: a round dot ringed in the page colour. */
+/** A phase or the orchestrator's mood: a round dot ringed in the page colour. */
 export function Dot(props: { tone: DotTone | "idle"; size?: number; class?: string }) {
   return (
     <span
@@ -43,8 +43,8 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
       <Match when={props.m.fromKind === "user"}>
         <OwnerFace size={props.size ?? 36} />
       </Match>
-      <Match when={props.m.fromKind === "assistant"}>
-        <AssistantFace size={props.size ?? 36} />
+      <Match when={props.m.fromKind === "orchestrator"}>
+        <OrchestratorFace size={props.size ?? 36} />
       </Match>
       <Match when={props.m.fromKind === "agent" || props.m.fromKind === "system"}>
         <HelperFace agent={props.m.agent ?? props.m.from} size={props.size ?? 36} />

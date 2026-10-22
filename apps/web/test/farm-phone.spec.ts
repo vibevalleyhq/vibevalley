@@ -93,7 +93,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("活熟了")).toBeVisible();
   await expect(page.getByRole("button", { name: "手机：来电" })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("phone-ringing.png") });
-  // Answering is the call to the assistant, the chat's call button's one.
+  // Answering is the call to the orchestrator, the chat's call button's one.
   const calling = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
   await phone.getByRole("button", { name: "接听" }).click();
   await calling;
@@ -108,7 +108,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   await expect(phone.getByText("没有未接来电。地里都好好的。")).toBeVisible();
 });
 
-test("calling the assistant on the phone is the chat's call: one call, the same answer", async ({ page }) => {
+test("calling the orchestrator on the phone is the chat's call: one call, the same answer", async ({ page }) => {
   await openFarm(page);
   await page.getByRole("button", { name: "手机" }).click();
   const phone = page.getByRole("region", { name: "农场手机" });

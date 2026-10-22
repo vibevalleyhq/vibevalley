@@ -4,7 +4,7 @@
 import type { WorkspaceState, InboxKind } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";
 
-/** In ms. Kinds not here the assistant does not hear of from the patrol: a failed run reaches it as it happens, a task
+/** In ms. Kinds not here the orchestrator does not hear of from the patrol: a failed run reaches it as it happens, a task
  * waiting is the person's to look at. */
 const patrolGrace: Partial<Record<InboxKind, number>> = {
   mention: 15 * 60_000,

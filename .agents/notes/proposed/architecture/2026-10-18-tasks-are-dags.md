@@ -66,7 +66,7 @@ type Task struct {
 - **工具**：`task_add`（写图或往图里加）、`task_update`（改一件）、`task_graph`（看全图）；每次调用回整张图（Hermes `todo`）。
 - **帮手**：ready 的 `helper` 节点自动派，后台并行跑，最多 `MaxHelpers`（默认 3），帮手不能再派；失败重试一次；做完的结果交回 agent，agent 闲着就开一轮，忙着就排到这一轮之后（Hermes `delegate_task`，但不同步等）。agent 被叫停时帮手一起停，节点退回 `waiting`；有帮手在跑时新来的话不打断这一轮，和 [编排层](.agents/notes/proposed/architecture/2026-10-18-one-mailbox-per-agent.md) 同一条规则。
 - **提醒**：一轮停下时还有 ready 的 `self` 节点、又没有别的输入，提醒一次；图连续 `MaxNudges`（默认 3）次没变就不再提醒。不用另一个模型判断做没做完（Hermes `judge_goal` 不取）。
-- **看得见**：图不进系统提示（[提示开头不变](docs/subsystems/assistant.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
+- **看得见**：图不进系统提示（[提示开头不变](docs/subsystems/orchestrator.md)）。模型每次调任务工具、每个帮手交回都拿到整张图，所以不另拼变化；压缩时把打开的图接在摘要后面，被压掉的那几轮里的图由它接上；`brain` 发 `TasksChanged` 事件，`oarruntime` 写成原始记录里的一帧，帮工的轨迹里看得到。
 - **谁开**：农机 `vibevalley` 和命令行；管家先不开（开了要改它的工具，要重放评测），以后只开 `self`，派活仍用 `dispatch`。
 
 ### 6. 种植计划并进 Task（第二阶段）
@@ -117,7 +117,7 @@ type Task struct {
 ## Acceptance criteria
 
 - 第一阶段：模型写一张三件、有先后的图，库里（`task_graph`）有它；成环、重复、等不存在的整批被拒；做完一件下一件变成可以做；全部做完图收起来。`helper` 节点自动派、并行不超过上限、结果交回；叫停时帮手一起停；提醒有次数上限；系统提示的哈希不因图变化而变。`agent/brain` 和 `task/engine` 的测试覆盖，模型用 `ai.FauxProvider`。
-- 第二阶段：代码里没有 playbook、plan（`stale-names` 查）；`protocol` 里没有从父子工单拼回 `TaskGraph` 的那一层；种植计划的 ready、状态、重试走引擎；开工和收获不是主人说的就不动手，有测试；照 `verify-server` 用 `vibevalley task …` 建一个三步、有先后的种植计划，第二步等第一步合进去才开工；`verify-assistant-evals` 重放通过（要花钱，先问主人）。
+- 第二阶段：代码里没有 playbook、plan（`stale-names` 查）；`protocol` 里没有从父子工单拼回 `TaskGraph` 的那一层；种植计划的 ready、状态、重试走引擎；开工和收获不是主人说的就不动手，有测试；照 `verify-server` 用 `vibevalley task …` 建一个三步、有先后的种植计划，第二步等第一步合进去才开工；`verify-orchestrator-evals` 重放通过（要花钱，先问主人）。
 - `bun run server:check` 通过。
 
 ## Risks
