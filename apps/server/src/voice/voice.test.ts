@@ -133,6 +133,7 @@ const issueOf = (id: string, number: number, session: string) =>
     number,
     title: "写打卡",
     priority: "medium",
+    deliver: "change",
     createdAt: Date.now(),
     sessions: [session],
     status: "in_progress",

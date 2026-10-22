@@ -60,7 +60,7 @@ VibeValley 以工单为单位：工单写明要什么、怎么算完，帮工的
 每一步单独能上线：
 
 1. 关单拆成结论和交付；`complete` 一个挪法，没提交时交付 `none`，有提交时能选留着分支；不开空 PR。改 `packages/protocol` 的形状和 `issue` 表，`moves.ts`、`harvest.ts`、`attention.ts`、页面的收获清单和看板。已经做了，现状在[工单](docs/subsystems/issue.md)「完成和交付」；帮工离开的方式另成 `SessionClose`（多了 `completed`），不再和工单共用一个类型。
-2. 派给管家的工单并进同一套：删 `orchestratorMove` 和 `handedBack`。
+2. 派给管家的工单并进同一套：删 `orchestratorMove` 和 `handedBack`。已经做了：`handedBack` 成了 `Issue.lastRun`（地里没有帮工做的工单由它自己的这一轮说站在哪），`Issue.deliver` 提前到这一步（派给管家的默认 `answer`，完成的动作跟着交付物），现状在[工单](docs/subsystems/issue.md)「谁干活不改变工单怎么走」。
 3. `Issue.deliver` 和 `answer` 工单：只读的执行、`Issue.answer`、`parseAnswer`，管家记「查一下」时填它。
 4. 计划的步骤改走 `complete`，交付进父工单的分支。
 

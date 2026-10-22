@@ -3,7 +3,6 @@
 // round that ends changes what the issue may do at once, wherever it is read.
 
 import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
-import { isForOrchestrator } from "./state.ts";
 
 /** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -14,20 +13,16 @@ export type Move =
   | "unqueue"
   /** in_review → todo: another round, with the owner's words */
   | "round"
-  /** done, canceled → todo: a new session picks it up, with the owner's words */
+  /** done, canceled → todo: its doer takes it up again (a new session, or the orchestrator), with the owner's words */
   | "reopen"
   /** canceled before it was ever sent → backlog */
   | "revive"
   /** in_review → done: what it delivers follows the issue (its branch's commits, the owner's choice to keep it) */
   | "complete"
-  /** in_progress, in_review → canceled: its session goes home */
+  /** in_progress, in_review → canceled: its session, if any, goes home */
   | "cancel"
   /** backlog, todo → canceled: never sent */
-  | "drop"
-  /** the orchestrator's issue, in_review → done: the owner takes its answer */
-  | "answered"
-  /** the orchestrator's issue, in_review → canceled */
-  | "putAway";
+  | "drop";
 
 export const statusWords: Readonly<Record<IssueStatus, string>> = {
   backlog: "备选",
@@ -41,11 +36,11 @@ export const statusWords: Readonly<Record<IssueStatus, string>> = {
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const from = t.status;
-  if (isForOrchestrator(t)) return orchestratorMove(t, to);
   if (t.graph || t.task || t.delivered === "merged_into_parent") return ["none", "这是种植计划的工单，跟着计划走：在计划里改"];
   if (from === to) return ["none", "它已经是这个状态了"];
   if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
-  const sent = t.sessions.length > 0;
+  // Run before: by a session, or by an in-process agent (the orchestrator), whoever it was.
+  const sent = t.sessions.length > 0 || t.lastRun !== undefined;
   switch (from) {
     case "backlog":
       if (to === "todo") return t.refining ? ["none", t.refining.name + " 正在起草：等它交回来再开工"] : ["start", ""];
@@ -56,7 +51,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       if (to === "canceled") return ["drop", ""];
       break;
     case "in_progress":
-      return to === "canceled" ? ["cancel", ""] : ["none", "帮工还在干：等它交回来，或者挪到已取消让它回家"];
+      return to === "canceled" ? ["cancel", ""] : ["none", "还在干这一轮：等它交回来，或者挪到已取消"];
     case "in_review":
       if (to === "todo") return ["round", ""];
       // Every issue has an acceptance; a glance one is passed by this harvest itself, so a round that failed is never
@@ -74,16 +69,6 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       return sent ? ["none", "关上的工单挪回待办，就是带一句话重开"] : ["none", "没开过工就取消的工单，挪回备选再说"];
   }
   return ["none", "不能从" + statusWords[from] + "挪到" + statusWords[to]];
-}
-
-/** The orchestrator closes nothing: it answers, and the owner takes the answer as done or puts it away. */
-function orchestratorMove(t: Issue, to: IssueStatus): [Move, string] {
-  if (t.status === "in_progress") return ["none", "管家还在答：等它答完"];
-  if (t.status !== "in_review") return ["none", "这是派给管家的工单：再问管家一次就开了"];
-  if (to === "canceled") return ["putAway", ""];
-  if (to !== "done") return ["none", "管家答完的工单只能挪到已完成或已取消；要它接着做，在串里跟管家说"];
-  if (t.handedBack && t.handedBack.outcome !== "completed") return ["none", "管家这一轮没答成：再问它一次，或者挪到已取消"];
-  return ["answered", ""];
 }
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");

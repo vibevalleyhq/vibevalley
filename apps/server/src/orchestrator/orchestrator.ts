@@ -353,7 +353,8 @@ export const make = (options: OrchestratorOptions = {}) =>
     // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
     const onWork = async (w: OrchestratorWork) => {
       const channel = await go(chat.channelOf(w.channel));
-      let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
+      const again = w.said ? `\n\n主人这次又说：${w.said}` : "";
+      let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}${again}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
       const s = w.recurrence;
       if (s) {
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";

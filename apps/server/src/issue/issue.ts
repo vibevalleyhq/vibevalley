@@ -12,7 +12,9 @@ import {
   type CriterionCheck,
   type Dispatched,
   type Finding,
-  type HandedBack,
+  type IssueRun,
+  type Deliverable,
+  type Outcome,
   type Issue,
   type IssueReviewRequest,
   type IssueActRequest,
@@ -87,6 +89,8 @@ export interface OrchestratorWork {
   readonly by: RunTrigger;
   /** The recurrence that came due, when one did. */
   readonly recurrence?: Recurrence;
+  /** What the owner said with it, asking again (another round, a reopen). */
+  readonly said?: string;
 }
 
 /** Who looked at changes: the owner's look counts for the game, the orchestrator's does not. */
@@ -235,7 +239,7 @@ export const make = (options: IssueOptions = {}) =>
       const criteria = json<string[]>(row.criteria);
       const checks = json<CriterionCheck[]>(row.checks);
       const pullRequest = json<PullRequest>(row.pull_request);
-      const handedBack = json<HandedBack>(row.handed_back);
+      const lastRun = json<IssueRun>(row.last_run);
       const out: Issue = {
         id: row.id,
         number: row.number,
@@ -259,12 +263,13 @@ export const make = (options: IssueOptions = {}) =>
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
         review: row.review as Issue["review"],
+        deliver: row.deliver as Deliverable,
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: json<Finding[]>(row.findings) ?? [],
         questions: json<Question[]>(row.questions) ?? [],
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
-        ...(handedBack ? { handedBack } : {}),
+        ...(lastRun ? { lastRun } : {}),
         attention: { state: "draft", acts: [] },
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
@@ -360,6 +365,8 @@ export const make = (options: IssueOptions = {}) =>
             created_at: Date.now(),
             recurrence: recurrence ?? null,
             review: req.review || "glance",
+            // The orchestrator never changes code: what it is given is answered.
+            deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
           }),
         );
         yield* publish(id);
@@ -371,17 +378,18 @@ export const make = (options: IssueOptions = {}) =>
     /** Not done, and why. */
     const cancelAs = (id: string, canceled: IssueCanceled) => Effect.andThen(db(q.cancelIssue({ closed_at: Date.now(), canceled, id })), publish(id));
 
-    /** The orchestrator's turn on its issue ended; a session's run on one is not this. */
-    const handBack = (id: string, h: HandedBack) =>
+    /** A run no session carries (an in-process agent's, the orchestrator's) ended on the issue: the issue keeps how. */
+    const endRun = (id: string, outcome: Outcome) =>
       Effect.gen(function* () {
         const t = yield* get(id);
-        if (!isForOrchestrator(t)) return;
-        // A turn cut off by a restart closed its issue as lost; the turn it goes on in hands back all the same.
+        // A run cut off by a restart closed its issue as lost; the run it goes on in ends on it all the same.
         if (isClosed(t.status)) {
           if (t.canceled !== "lost") return;
           yield* db(q.reopenIssue({ id }));
         }
-        yield* db(q.setHandedBack({ id, handed_back: JSON.stringify(h) }));
+        const now = Date.now();
+        const run: IssueRun = { startedAt: t.lastRun?.startedAt ?? now, endedAt: now, outcome };
+        yield* db(q.setLastRun({ id, last_run: JSON.stringify(run) }));
         yield* publish(id);
       });
 
@@ -505,19 +513,22 @@ export const make = (options: IssueOptions = {}) =>
         hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去")),
       );
 
-    const toOrchestrator = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence) =>
+    /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
+    const toOrchestrator = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence, said?: string) =>
       Effect.gen(function* () {
-        if (isClosed(issue.status)) yield* reopenRow(issue.id);
-        else if (issue.handedBack) yield* Effect.andThen(db(q.setHandedBack({ id: issue.id, handed_back: null })), publish(issue.id));
-        PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}) });
+        if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
+        const run: IssueRun = { startedAt: Date.now() };
+        yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
+        yield* publish(issue.id);
+        PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
       });
 
-    /** by undefined: the issue sent out. */
-    const start = (id: string, channel: string, by?: RunTrigger): Effect.Effect<Dispatched, ApiError> =>
+    /** by undefined: the issue sent out. said: the owner's words with it, when it is asked again. */
+    const start = (id: string, channel: string, by?: RunTrigger, said?: string): Effect.Effect<Dispatched, ApiError> =>
       Effect.gen(function* () {
         const mine = yield* Effect.option(get(id));
         if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
-          yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" });
+          yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, undefined, said);
           return {};
         }
         const [issue, agent, project] = yield* ready(id);
@@ -567,7 +578,13 @@ export const make = (options: IssueOptions = {}) =>
         const issue = yield* get(id);
         if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
           return yield* Effect.fail(refused("这是种植计划的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
-        if (issue.sessions.length === 0) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
+        if (issue.sessions.length === 0) {
+          // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
+          if (!issue.lastRun) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
+          if (!isClosed(issue.status)) return yield* Effect.fail(refused("这张工单还开着：挪回待办就是再来一轮"));
+          yield* start(id, channel, by, text);
+          return "";
+        }
         const last = yield* sessions.get(issue.sessions.at(-1)!);
         if (!last) return yield* Effect.fail(missing("工单 " + id));
         if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
@@ -666,10 +683,13 @@ export const make = (options: IssueOptions = {}) =>
         return a;
       });
 
+    /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
     const cancel = (id: string) =>
       Effect.gen(function* () {
-        const session = yield* liveSession(id);
-        if (!(yield* sessions.dismiss(session))) return yield* Effect.fail(missing("帮工 " + session));
+        const t = yield* get(id);
+        const last = t.sessions.at(-1);
+        if (last === undefined || !sessions.find(last)) return;
+        if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last));
       });
 
     // ── drafts ──
@@ -740,8 +760,11 @@ export const make = (options: IssueOptions = {}) =>
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
-    // The orchestrator's turn on its issues stopped with the server; one it had answered still waits on the owner.
-    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) if (r.handed_back === null) yield* cancelAs(r.id, "lost");
+    // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
+    for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) {
+      const run = json<IssueRun>(r.last_run);
+      if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
+    }
 
     const news = yield* sessions.news;
     const ownerWords = yield* chat.ownerInThread;
@@ -767,7 +790,7 @@ export const make = (options: IssueOptions = {}) =>
     yield* Effect.forkScoped(
       // However the orchestrator's turn ended, the issue waits on the owner: a turn that did not fail is not an answer yet.
       Stream.runForEach(finished, (run) =>
-        Effect.forEach(run.issues, (id) => handBack(id, { at: Date.now(), outcome: run.outcome }).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
+        Effect.forEach(run.issues, (id) => endRun(id, run.outcome).pipe(logged(`run ${run.id} finished on issue ${id}`)), {
           discard: true,
         }),
       ),
@@ -958,7 +981,9 @@ export const make = (options: IssueOptions = {}) =>
                 break;
               }
               if (!said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
-              yield* comment(id, said);
+              // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again.
+              if (t.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
+              else yield* comment(id, said);
               break;
             case "reopen":
               yield* reopen(id, said, channel, { kind: "comment" }, taker);
@@ -990,12 +1015,6 @@ export const make = (options: IssueOptions = {}) =>
             case "drop":
               yield* clearRefinement(t);
               yield* drop(id);
-              break;
-            case "answered":
-              yield* complete(id, "none");
-              break;
-            case "putAway":
-              yield* cancelAs(id, "dismissed");
               break;
           }
           return yield* get(id);

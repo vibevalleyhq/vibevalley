@@ -435,9 +435,10 @@ describe("the orchestrator", () => {
       const handed = yield* until(() => core.state().issues?.find((t) => t.recurrence === s.id && t.status === "in_review"), "handed back");
       const id = handed.id;
       expect(handed.closedAt).toBeUndefined();
-      expect(handed.handedBack?.outcome).toBe("completed");
+      expect([handed.deliver, handed.lastRun?.outcome]).toEqual(["answer", "completed"]);
       expect(handed.attention).toMatchObject({ state: "reviewing", lead: "acknowledge" });
-      expect(handed.moves).toEqual(["done", "canceled"]);
+      // One table whoever did the work: asked again (todo), taken (done), or put away (canceled).
+      expect(handed.moves).toEqual(["todo", "done", "canceled"]);
       const done = yield* issues.setStatus(id, "done", "", "");
       expect([done.status, done.delivered]).toEqual(["done", "none"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

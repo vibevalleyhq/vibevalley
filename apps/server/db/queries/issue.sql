@@ -10,9 +10,9 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review, deliver)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(review));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(review), sqlc.arg(deliver));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
@@ -92,14 +92,13 @@ select * from issue where recurrence = sqlc.arg(recurrence) order by created_at 
 update issue set assignee = sqlc.arg(assignee) where id = sqlc.arg(id);
 
 -- name: ReopenIssue :exec
-update issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, handed_back = null where id = sqlc.arg(id);
+update issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, last_run = null where id = sqlc.arg(id);
 
 -- name: OpenOf :many
-select id, handed_back from issue where assignee = sqlc.arg(assignee) and closed_at is null;
+select id, last_run from issue where assignee = sqlc.arg(assignee) and closed_at is null;
 
--- name: SetHandedBack :exec
--- How the orchestrator's last turn on its issue ended (JSON); null while it is on it.
-update issue set handed_back = sqlc.narg(handed_back) where id = sqlc.arg(id);
+-- name: SetLastRun :exec
+update issue set last_run = sqlc.narg(last_run) where id = sqlc.arg(id);
 
 -- name: SetIssuePullRequest :exec
 update issue set pull_request = sqlc.narg(pull_request) where id = sqlc.arg(id);

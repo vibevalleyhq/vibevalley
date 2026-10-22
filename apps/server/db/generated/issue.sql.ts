@@ -31,17 +31,18 @@ export const ListIssuesResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type ListIssuesResult = typeof ListIssuesResult.Type
 
 
-export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue order by rank, created_at, id;"
+export const ListIssuesSql = "-- Issues (issue/issue.ts).\n\n-- name: ListIssues :many\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue order by rank, created_at, id;"
 
 export const listIssues = Effect.fn("ListIssues")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -79,17 +80,18 @@ export const GetIssueResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type GetIssueResult = typeof GetIssueResult.Type
 
 
-export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where id = $1;"
+export const GetIssueSql = "-- name: GetIssue :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue where id = $1;"
 
 export const getIssue = Effect.fn("GetIssue")(function* (params: GetIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -127,17 +129,18 @@ export const IssueByNumberResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type IssueByNumberResult = typeof IssueByNumberResult.Type
 
 
-export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where number = $1;"
+export const IssueByNumberSql = "-- name: IssueByNumber :one\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue where number = $1;"
 
 export const issueByNumber = Effect.fn("IssueByNumber")(function* (params: IssueByNumberParams) {
   const sql = yield* SqlClient.SqlClient
@@ -158,17 +161,18 @@ export const AddIssueParams = Schema.Struct({
   ["created_at"]: Schema.Number,
   ["recurrence"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
 })
 export type AddIssueParams = typeof AddIssueParams.Type
 
 
-export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4, $5,\n        $6, (select coalesce(max(rank), 0) + 1 from issue), $7, $8, $9);"
+export const AddIssueSql = "-- name: AddIssue :exec\ninsert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review, deliver)\nvalues ($1, (select coalesce(max(number), 0) + 1 from issue), $2, $3, $4, $5,\n        $6, (select coalesce(max(rank), 0) + 1 from issue), $7, $8, $9, $10);"
 
 export const addIssue = Effect.fn("AddIssue")(function* (params: AddIssueParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: AddIssueParams,
-    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["project"], p["assignee"], p["priority"], p["created_at"], p["recurrence"], p["review"]]),
+    execute: (p) => sql.unsafe(AddIssueSql, [p["id"], p["title"], p["description"], p["project"], p["assignee"], p["priority"], p["created_at"], p["recurrence"], p["review"], p["deliver"]]),
   })(params)
 })
 
@@ -432,17 +436,18 @@ export const KeptIssuesResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type KeptIssuesResult = typeof KeptIssuesResult.Type
 
 
-export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
+export const KeptIssuesSql = "-- name: KeptIssues :many\n-- What the core state keeps: the open issues and the latest closed ones, each with its sub-issues.\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue\nwhere closed_at is null or id in (select id from latest) or parent in (select id from latest)\n   or parent in (select id from issue where closed_at is null);"
 
 export const keptIssues = Effect.fn("KeptIssues")(function* (params: KeptIssuesParams) {
   const sql = yield* SqlClient.SqlClient
@@ -480,17 +485,18 @@ export const FamilyResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type FamilyResult = typeof FamilyResult.Type
 
 
-export const FamilySql = "-- name: Family :many\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where id = $1 or parent = $1;"
+export const FamilySql = "-- name: Family :many\n-- An issue and its sub-issues.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue where id = $1 or parent = $1;"
 
 export const family = Effect.fn("Family")(function* (params: FamilyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -581,17 +587,18 @@ export const LatestOfRecurrenceResult = Schema.Struct({
   ["canceled"]: Schema.NullOr(Schema.String),
   ["pull_request"]: Schema.NullOr(Schema.String),
   ["review"]: Schema.String,
+  ["deliver"]: Schema.String,
   ["reviewed_at"]: Schema.NullOr(Schema.Number),
   ["findings"]: Schema.NullOr(Schema.String),
   ["questions"]: Schema.NullOr(Schema.String),
   ["criteria"]: Schema.NullOr(Schema.String),
   ["checks"]: Schema.NullOr(Schema.String),
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type LatestOfRecurrenceResult = typeof LatestOfRecurrenceResult.Type
 
 
-export const LatestOfRecurrenceSql = "-- name: LatestOfRecurrence :one\n-- A recurrence's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"handed_back\" from issue where recurrence = $1 order by created_at desc, id desc limit 1;"
+export const LatestOfRecurrenceSql = "-- name: LatestOfRecurrence :one\n-- A recurrence's issue: the one it made last.\nselect \"issue\".\"id\", \"issue\".\"number\", \"issue\".\"title\", \"issue\".\"description\", \"issue\".\"project\", \"issue\".\"assignee\", \"issue\".\"priority\", \"issue\".\"rank\", \"issue\".\"parent\", \"issue\".\"blocked_by\", \"issue\".\"graph\", \"issue\".\"task\", \"issue\".\"recurrence\", \"issue\".\"created_at\", \"issue\".\"queued_at\", \"issue\".\"closed_at\", \"issue\".\"delivered\", \"issue\".\"canceled\", \"issue\".\"pull_request\", \"issue\".\"review\", \"issue\".\"deliver\", \"issue\".\"reviewed_at\", \"issue\".\"findings\", \"issue\".\"questions\", \"issue\".\"criteria\", \"issue\".\"checks\", \"issue\".\"last_run\" from issue where recurrence = $1 order by created_at desc, id desc limit 1;"
 
 export const latestOfRecurrence = Effect.fn("LatestOfRecurrence")(function* (params: LatestOfRecurrenceParams) {
   const sql = yield* SqlClient.SqlClient
@@ -625,7 +632,7 @@ export const ReopenIssueParams = Schema.Struct({
 export type ReopenIssueParams = typeof ReopenIssueParams.Type
 
 
-export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, handed_back = null where id = $1;"
+export const ReopenIssueSql = "-- name: ReopenIssue :exec\nupdate issue set closed_at = null, delivered = null, canceled = null, queued_at = null, checks = null, last_run = null where id = $1;"
 
 export const reopenIssue = Effect.fn("ReopenIssue")(function* (params: ReopenIssueParams) {
   const sql = yield* SqlClient.SqlClient
@@ -643,12 +650,12 @@ export type OpenOfParams = typeof OpenOfParams.Type
 
 export const OpenOfResult = Schema.Struct({
   ["id"]: Schema.String,
-  ["handed_back"]: Schema.NullOr(Schema.String),
+  ["last_run"]: Schema.NullOr(Schema.String),
 })
 export type OpenOfResult = typeof OpenOfResult.Type
 
 
-export const OpenOfSql = "-- name: OpenOf :many\nselect id, handed_back from issue where assignee = $1 and closed_at is null;"
+export const OpenOfSql = "-- name: OpenOf :many\nselect id, last_run from issue where assignee = $1 and closed_at is null;"
 
 export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
   const sql = yield* SqlClient.SqlClient
@@ -659,20 +666,20 @@ export const openOf = Effect.fn("OpenOf")(function* (params: OpenOfParams) {
   })(params)
 })
 
-export const SetHandedBackParams = Schema.Struct({
-  ["handed_back"]: Schema.NullOr(Schema.String),
+export const SetLastRunParams = Schema.Struct({
+  ["last_run"]: Schema.NullOr(Schema.String),
   ["id"]: Schema.String,
 })
-export type SetHandedBackParams = typeof SetHandedBackParams.Type
+export type SetLastRunParams = typeof SetLastRunParams.Type
 
 
-export const SetHandedBackSql = "-- name: SetHandedBack :exec\n-- How the orchestrator's last turn on its issue ended (JSON); null while it is on it.\nupdate issue set handed_back = $1 where id = $2;"
+export const SetLastRunSql = "-- name: SetLastRun :exec\nupdate issue set last_run = $1 where id = $2;"
 
-export const setHandedBack = Effect.fn("SetHandedBack")(function* (params: SetHandedBackParams) {
+export const setLastRun = Effect.fn("SetLastRun")(function* (params: SetLastRunParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: SetHandedBackParams,
-    execute: (p) => sql.unsafe(SetHandedBackSql, [p["handed_back"], p["id"]]),
+    Request: SetLastRunParams,
+    execute: (p) => sql.unsafe(SetLastRunSql, [p["last_run"], p["id"]]),
   })(params)
 })
 

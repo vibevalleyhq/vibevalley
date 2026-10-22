@@ -45,6 +45,7 @@ describe("an issue as a job", () => {
       number: 1,
       title: "评估",
       priority: "medium",
+      deliver: "change",
       createdAt: 100,
       sessions: ["w1"],
       status: "in_review",
