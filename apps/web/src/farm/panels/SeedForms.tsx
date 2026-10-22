@@ -9,7 +9,8 @@ import { orchestratorAgent, type ProjectTemplates, type Session } from "@vibeval
 import { api, reasonOf } from "../../data/api";
 import { fire } from "../commands";
 import { playSound } from "../sound";
-import { newSendKey, writeIssue } from "../../pages/issues/write";
+import { newSendKey } from "../../data/api";
+import { writeIssue } from "../../pages/issues/write";
 import { aria } from "../../app/util";
 import { useRouter } from "../../app/router";
 import { ready, useAgents, useProjects, useQuery } from "../../data/query";

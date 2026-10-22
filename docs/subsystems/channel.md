@@ -22,7 +22,7 @@
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
 - **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`orchestrator.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
 - **配置**：`chat.notice_batch_ms`（忙时攒多久再提示，默认 3000）、`chat.retry_wake_ms`（叫醒没开口以后多久再叫，默认 3000）。
-- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`）；整页的聊天页 `/chat`（`apps/web/src/pages/chat`）；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/data/channelForm.ts` 的 `createChannelForm`；连接器页 `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`）。
+- **页面**：农场窗口的田头和频道菜单（`apps/web/src/farm/chat`，`ChannelMenu.tsx`）；整页的聊天页 `/chat`（`apps/web/src/pages/chat`）；两边的输入框（回车发送、@ 叫人、失败了同一稿用同一把钥匙重发）在 `apps/web/src/data/composer.ts` 的 `createComposer`，两边只画；开频道和改频道的表单两边各画一份，栏、忙和服务端的拒绝都在 `apps/web/src/data/channelForm.ts` 的 `createChannelForm`；连接器页 `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`）。
 
 ## 模型和不变量
 

@@ -5,7 +5,8 @@
 
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
-import { newSendKey, say } from "./say";
+import { newSendKey } from "../../data/api";
+import { say } from "../../data/composer";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { channelOf, conversationOf, feedOf, generalOf, parentOf, phaseText, threadOwnerOf, threadTitle, unreadIn, unreadTotal } from "../../rules/chat";

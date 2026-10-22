@@ -1,5 +1,4 @@
 // Writing an issue from a sentence and remembering the last pick: framework-free, for the board and the farm.
-export { newSendKey } from "../../data/api";
 
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { api } from "../../data/api";
