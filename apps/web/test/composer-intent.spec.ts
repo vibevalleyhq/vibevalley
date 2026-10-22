@@ -8,6 +8,9 @@ async function openFarmChat(page: Page) {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  // 田头 is the farm phone's right screen: take the phone out and unfold it.
+  await page.getByRole("button", { name: "手机" }).click();
+  await page.getByRole("button", { name: /^展开田头/ }).click();
   return page.getByRole("textbox", { name: "对管家说，@ 叫帮工…" });
 }
 

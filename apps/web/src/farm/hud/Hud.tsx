@@ -216,10 +216,13 @@ function TopRight() {
 
 function BottomLeft() {
   const phoneOpen = useFarm((s) => s.phoneOpen);
+  const box = useFarm((s) => s.screen?.shown);
+  // The phone fits between the top row and the two buttons under it, inside the farm's box.
+  const room = () => ({ w: (box()?.w ?? 0) - 2 * edge, h: (box()?.h ?? 0) - 2 * edge - top - 2 * bottom - 4 * gap });
   return (
     <div class="absolute flex flex-col items-start" style={{ left: `${edge}px`, bottom: `${edge}px`, gap: `${gap}px` }}>
       <Show when={phoneOpen()}>
-        <Phone />
+        <Phone room={room()} />
       </Show>
       <PhoneButton height={bottom} />
       <Friends height={bottom} />

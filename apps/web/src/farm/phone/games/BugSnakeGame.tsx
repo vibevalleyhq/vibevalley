@@ -160,12 +160,12 @@ export function BugSnakeGame() {
 }
 
 /** A caterpillar on the ground, heading for a seed. */
-export function BugSnakeIcon() {
+export function BugSnakeIcon(props: { size?: number }) {
   const rows = ["    # #   ", "    ###   ", "++..#o#  #", "++..###  +"];
   const fill: Readonly<Record<string, string>> = { "#": lcd.ink, "+": lcd.dark, ".": lcd.mid, o: lcd.paper };
   const cells = rows.flatMap((row, y) => [...row].flatMap((c, x) => (fill[c] ? [{ x, y, fill: fill[c] }] : [])));
   return (
-    <svg width="28" height="28" viewBox="0 -1 10 10" shape-rendering="crispEdges" aria-hidden="true">
+    <svg width={props.size ?? 28} height={props.size ?? 28} viewBox="0 -1 10 10" shape-rendering="crispEdges" aria-hidden="true">
       <For each={cells}>{(c) => <rect x={c.x} y={c.y + 2} width={1} height={1} fill={c.fill} />}</For>
       <rect x="0" y="6" width="10" height="1" fill={lcd.dark} />
     </svg>

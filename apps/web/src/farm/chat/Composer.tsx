@@ -72,6 +72,8 @@ export function FarmComposer(props: {
 
   const box = createComposer(core, () => input, {
     target: () => ({ conversation: props.conversation?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
+    // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
+    echo: true,
     failed: (reason) => props.onProblem(`没发出去：${reason}`),
     edited: (value, at) => {
       props.onProblem(undefined);

@@ -43,7 +43,7 @@ const RULES: readonly Rule[] = [
     pattern: /["'`]\/api\/(?!v1\/)/,
     says: "every route is under /api/v1",
     // EverOS's own API, which the memory source speaks: its versions are its own.
-    except: /^apps\/server\/src\/memory\/(everos|outside)(\.test)?\.ts$/,
+    except: /^apps\/server\/src\/memory\/(everos|outside|source-lifetime)(\.test)?\.ts$/,
   },
   {
     name: "the word ticket",
