@@ -1067,6 +1067,7 @@ export const ConnectorLogin: Schema.Codec<T.ConnectorLogin> = Schema.Struct({
 
 export const VoiceAgent: Schema.Codec<T.VoiceAgent> = Schema.Struct({
   agentId: Schema.String,
+  answeredBy: Schema.optionalKey(Schema.Literals(["orchestrator", "agora"])),
 });
 
 export const AgoraGrant: Schema.Codec<T.AgoraGrant> = Schema.Struct({

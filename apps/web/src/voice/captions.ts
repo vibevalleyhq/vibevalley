@@ -14,7 +14,36 @@ export interface Caption {
   readonly turn: number;
   text: string;
   done: boolean;
+  /** When it was done, by the page's clock. */
+  doneAt?: number;
   interrupted: boolean;
+}
+
+/** A line said on a call as 田头 has it: whose, and its words. */
+export interface SpokenLine {
+  readonly speaker: Speaker;
+  readonly text: string;
+}
+
+/** How long a finished turn's caption waits for its line in 田头 before it goes. */
+export const captionLinger = 8_000;
+
+/** The captions to draw live in 田头 during a call, before their turns are lines there: every turn still being said, and a
+ * finished one until 田头 has its words or captionLinger passes. The orchestrator's are left out when it answers on the
+ * line: its words go into 田头 as it says them, and would show twice. */
+export function liveCaptions(
+  turns: readonly Caption[],
+  answeredBy: "orchestrator" | "agora" | undefined,
+  spoken: readonly SpokenLine[],
+  now: number,
+): Caption[] {
+  return turns.filter((c) => {
+    if (c.speaker === "orchestrator" && answeredBy !== "agora") return false;
+    if (!c.text.trim()) return false;
+    if (!c.done) return true;
+    if (c.doneAt !== undefined && now - c.doneAt > captionLinger) return false;
+    return !spoken.some((l) => l.speaker === c.speaker && l.text.trim() === c.text.trim());
+  });
 }
 
 type Message = Record<string, unknown>;
@@ -53,6 +82,7 @@ export class LiveCaptions {
       case "message.interrupt": {
         const c = this.find("orchestrator", turn);
         if (!c) return false;
+        if (!c.done) c.doneAt = Date.now();
         c.done = true;
         c.interrupted = true;
         this.answer(c);
@@ -74,10 +104,11 @@ export class LiveCaptions {
   private put(speaker: Speaker, turn: number, text: string, done: boolean) {
     const c = this.find(speaker, turn);
     if (!c) {
-      this.turns.push({ speaker, turn, text, done, interrupted: false });
+      this.turns.push({ speaker, turn, text, done, ...(done ? { doneAt: Date.now() } : {}), interrupted: false });
       if (this.turns.length > LiveCaptions.keep) this.turns.shift();
     } else if (!c.interrupted) {
       c.text = text;
+      if (done && !c.done) c.doneAt = Date.now();
       c.done = done;
     }
     if (speaker === "you" && done && text.trim() && !this.heard.has(turn)) {

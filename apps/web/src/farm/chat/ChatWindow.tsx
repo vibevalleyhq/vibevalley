@@ -7,6 +7,7 @@ import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../data/api";
 import { arrived, pending, say } from "../../data/composer";
+import { liveCaptions, type SpokenLine } from "../../voice/captions";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { channelLabel, channelOf, conversationOf, feedOf, generalOf, parentOf, phaseText, threadOwnerOf, threadTitle, unreadIn } from "../../rules/chat";
@@ -158,6 +159,18 @@ function Window() {
     const messages = chat()?.messages ?? [];
     return pending().filter((p) => p.conversation === here && !arrived(p, messages));
   });
+  // What is being said on the call, drawn as it is said: the turns 田头 does not have as lines yet. A copy each time, so
+  // the rows read the words they grew to.
+  const tick = useNow(1000);
+  const captions = createMemo(() => {
+    const c = call();
+    const here = shown();
+    if (c.phase !== "live" || here?.kind !== "general") return [];
+    const spoken: SpokenLine[] = (chat()?.messages ?? [])
+      .filter((m) => m.spoken && m.conversation === here.id)
+      .map((m) => ({ speaker: m.fromKind === "user" ? "you" : "orchestrator", text: m.text }));
+    return liveCaptions(c.captions.turns, c.answeredBy, spoken, tick()).map((t) => ({ ...t }));
+  });
   const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "orchestrator";
   const showSuggestions = () => !thread() && (core()?.call === "live" || (chat()?.messages ?? []).length === 0);
 
@@ -227,6 +240,24 @@ function Window() {
                 <div class="opacity-70" aria-label="发送中">
                   <ChatRow mine first title="发送中">
                     <span class="whitespace-pre-line">{p().text}</span>
+                  </ChatRow>
+                </div>
+              )}
+            </For>
+            <For each={captions()} keyed={(t) => t.speaker + t.turn}>
+              {(t) => (
+                <div class="opacity-70" aria-label="实时字幕">
+                  <ChatRow
+                    mine={t().speaker === "you"}
+                    first
+                    face={t().speaker === "you" ? undefined : <OrchestratorFace size={30} look={look()} />}
+                    name={t().speaker === "you" ? undefined : "管家"}
+                    title={t().done ? "说完了" : "正在说"}
+                  >
+                    <span class="whitespace-pre-line">{t().text}</span>
+                    <Show when={!t().done}>
+                      <span class="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden="true" />
+                    </Show>
                   </ChatRow>
                 </div>
               )}

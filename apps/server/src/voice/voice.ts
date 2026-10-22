@@ -624,7 +624,7 @@ export const make = (options: VoiceOptions = {}) =>
               ending: false,
             });
             if (about) tell([], about);
-            return { agentId: id };
+            return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
           });
           const agent = yield* Effect.tapError(started, () =>
             Effect.sync(() => {

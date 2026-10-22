@@ -764,6 +764,9 @@ export interface ConnectorLogin {
 
 export interface VoiceAgent {
   agentId: string;
+  /** Who answers on the call, as the call started: the orchestrator on the voice line, whose words go into 田头 as it
+   * says them, or Agora's model, whose words reach 田头 only when its turn is over. Set on start. */
+  answeredBy?: "orchestrator" | "agora";
 }
 
 export interface AgoraGrant {

@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { LiveCaptions } from "./captions";
+import { captionLinger, LiveCaptions, liveCaptions } from "./captions";
 
 function chunked(id: string, message: Record<string, unknown>, parts: number) {
   const encoded = Buffer.from(JSON.stringify(message), "utf8").toString("base64");
@@ -48,4 +48,25 @@ test("the agent's state is what it last said; only the last few turns are kept; 
   expect(c.turns).toHaveLength(LiveCaptions.keep);
   expect(c.turns[0]!.text).toBe("第 3 句");
   expect(heard).toHaveLength(LiveCaptions.keep + 3);
+});
+
+// What a call shows in 田头 as it is said: turns still being said, and a finished one until 田头 has its line.
+test("live captions draw what is being said until 田头 has the line, and not the orchestrator's twice", () => {
+  const c = new LiveCaptions();
+  c.apply({ object: "user.transcription", turn_id: 1, text: "帮我看看", final: false });
+  c.apply({ object: "assistant.transcription", turn_id: 1, text: "好，我看", turn_status: 0 });
+  const said = (turns: typeof c.turns) => turns.map((t) => [t.speaker, t.text]);
+  // On the line the orchestrator's own words go into 田头 as it says them; Agora's model's only when its turn is over.
+  expect(said(liveCaptions(c.turns, "orchestrator", [], Date.now()))).toEqual([["you", "帮我看看"]]);
+  expect(said(liveCaptions(c.turns, "agora", [], Date.now()))).toEqual([
+    ["you", "帮我看看"],
+    ["orchestrator", "好，我看"],
+  ]);
+  c.apply({ object: "user.transcription", turn_id: 1, text: "帮我看看进度", final: true });
+  const done = c.turns.find((t) => t.speaker === "you")!;
+  expect([done.done, done.doneAt !== undefined]).toEqual([true, true]);
+  // Finished, it stays until 田头 has the line, or for captionLinger at most.
+  expect(said(liveCaptions(c.turns, "orchestrator", [], Date.now()))).toEqual([["you", "帮我看看进度"]]);
+  expect(liveCaptions(c.turns, "orchestrator", [{ speaker: "you", text: "帮我看看进度" }], Date.now())).toEqual([]);
+  expect(liveCaptions(c.turns, "orchestrator", [], done.doneAt! + captionLinger + 1)).toEqual([]);
 });
