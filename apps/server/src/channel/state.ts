@@ -1,6 +1,6 @@
 // The chat in the core state.
 
-import { type Chat, type ChatMessage, type Conversation, generalName } from "@vibevalley/protocol";
+import { type Chat, type ChatMessage, type Conversation, generalName, type OwnerMention } from "@vibevalley/protocol";
 import { compareText } from "../base/text.ts";
 
 /** The database keeps them all; the state these many. */
@@ -10,6 +10,8 @@ export const keepConversations = 100;
 export const isChannel = (c: Conversation) => c.kind !== "thread";
 
 const emptyChat = (): Chat => ({ conversations: [], messages: [] });
+
+export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
 
 export const messagesIn = (chat: Chat | undefined, conversation: string) => (chat?.messages ?? []).filter((m) => m.conversation === conversation);
 

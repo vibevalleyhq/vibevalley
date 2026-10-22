@@ -7,7 +7,7 @@ import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
-import { type Found, lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, sourceLabels } from "./recall.ts";
+import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabels } from "./recall.ts";
 import { termsOf } from "./terms.ts";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
@@ -41,10 +41,10 @@ export interface Source {
   readonly prefetch: (cue: RecallCue, signal: AbortSignal) => Promise<RecalledLine[]>;
   readonly syncTurn: (run: FinishedRun, signal: AbortSignal) => Promise<void>;
   readonly sessionEnded: (s: EndedSession, signal: AbortSignal) => Promise<void>;
-  readonly search: (q: SearchQuery, signal: AbortSignal) => Promise<Found[]>;
+  readonly search: (q: SearchQuery, signal: AbortSignal) => Promise<SourceSearch>;
   readonly list: (agent: string, signal: AbortSignal) => Promise<Memory[]>;
   readonly add: (n: Note, signal: AbortSignal) => Promise<Memory | undefined>;
-  readonly forget: (agent: string, id: string) => Promise<void>;
+  readonly forget: (agent: string, id: string, signal: AbortSignal) => Promise<void>;
   readonly can: Abilities;
 }
 
@@ -79,7 +79,7 @@ export function localSource(m: Memories, profiles: () => string[], run: <A>(e: E
         all.push(...(await run(m.list(agent))));
         Object.assign(matches, await run(m.matches(agent, q.text)));
       }
-      return search(all, q, matches);
+      return { found: search(all, q, matches) };
     },
     list: (agent) => run(m.listed(agent)),
     add: (n) => run(m.write(n)),
@@ -154,14 +154,47 @@ export function mergeRecalled(groups: readonly (readonly RecalledLine[])[]): Rec
   );
 }
 
-/** The sources, following the settings: built again whenever their settings change, used from the next read or write. */
+interface Generation {
+  readonly all: Source[];
+  readonly off: MemorySourceInfo[];
+  readonly control: AbortController;
+  readonly active: Set<Promise<unknown>>;
+  queue: Promise<void>;
+  closing?: Promise<void>;
+}
+
+/** A canceled operation has no further access to its source; adapters seal their resources when stopped. */
+const abortable = <A>(work: () => Promise<A>, signal: AbortSignal): Promise<A> =>
+  new Promise<A>((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    Promise.resolve()
+      .then(() => {
+        signal.throwIfAborted();
+        return work();
+      })
+      .then(
+        (value) => {
+          signal.removeEventListener("abort", abort);
+          if (signal.aborted) reject(signal.reason);
+          else resolve(value);
+        },
+        (error: unknown) => {
+          signal.removeEventListener("abort", abort);
+          reject(error);
+        },
+      );
+  });
+
+/** Owns source generations and every accepted operation, including retirement and shutdown. */
 export class Sources {
-  private all: Source[];
-  private off: MemorySourceInfo[] = [];
+  private current: Generation | undefined;
+  private readonly generations = new Set<Generation>();
   private built: string | undefined;
   private stopped = false;
-  private queue: Promise<void> = Promise.resolve();
   private queued = 0;
+  private stopping: Promise<void> | undefined;
 
   constructor(
     private readonly local: Source,
@@ -169,31 +202,22 @@ export class Sources {
     private readonly build: (c: MemorySourceConfig) => Source | undefined,
     private readonly log: (line: string) => void,
     private readonly timeoutMs = prefetchTimeoutMs,
-  ) {
-    this.all = [local];
-  }
+  ) {}
 
-  current(): Source[] {
-    if (this.stopped) return [this.local];
+  private snapshot(): Generation | undefined {
+    if (this.stopped) return undefined;
     const configured = this.configured();
     const key = JSON.stringify(configured);
     if (key !== this.built) {
-      for (const one of this.all) if (one !== this.local) void one.stop();
-      this.all = [this.local];
-      this.off = [];
+      if (this.current) void this.retire(this.current, "memory sources changed; outside operation canceled");
+      const next: Generation = { all: [this.local], off: [], control: new AbortController(), active: new Set(), queue: Promise.resolve() };
+      this.current = next;
+      this.generations.add(next);
       this.built = key;
       for (const c of configured) {
         const name = c.kind;
         const off = (why: string) =>
-          this.off.push({
-            name,
-            label: sourceLabels[name] ?? name,
-            on: false,
-            canList: false,
-            canForget: false,
-            transcripts: false,
-            off: why,
-          } as MemorySourceInfo);
+          next.off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
         if (!c.enabled) {
           off("没打开");
           continue;
@@ -209,25 +233,50 @@ export class Sources {
           off(why);
           continue;
         }
-        this.all.push(one);
+        next.all.push(one);
       }
     }
-    return [...this.all];
+    return this.current;
   }
 
-  /** Questions every source at once; the local one is waited for, any other only up to the timeout. */
-  async askAll<T>(what: string, ask: (one: Source, signal: AbortSignal) => Promise<T[]>, sources = this.current()): Promise<T[][]> {
+  private lease<A>(generation: Generation, signal: AbortSignal, work: () => Promise<A>): Promise<A> {
+    const pending = abortable(work, signal);
+    generation.active.add(pending);
+    void pending.then(
+      () => generation.active.delete(pending),
+      () => generation.active.delete(pending),
+    );
+    return pending;
+  }
+
+  private retire(generation: Generation, why: string): Promise<void> {
+    if (generation.closing) return generation.closing;
+    generation.control.abort(new Error(why));
+    generation.closing = (async () => {
+      await generation.queue;
+      await Promise.allSettled([...generation.active]);
+      await Promise.all(
+        generation.all
+          .filter((one) => one !== this.local)
+          .map(async (one) => {
+            try {
+              await abortable(one.stop, AbortSignal.timeout(prefetchTimeoutMs));
+            } catch (e) {
+              this.log(`stopping memory source ${one.name}: ${String(e)}`);
+            }
+          }),
+      );
+      this.generations.delete(generation);
+    })();
+    return generation.closing;
+  }
+
+  private readAll<T>(generation: Generation, what: string, ask: (one: Source, signal: AbortSignal) => Promise<T[]>, all = generation.all): Promise<T[][]> {
     return Promise.all(
-      sources.map(async (one) => {
-        const signal = one === this.local ? new AbortController().signal : AbortSignal.timeout(this.timeoutMs);
+      all.map(async (one) => {
+        const signal = one === this.local ? new AbortController().signal : AbortSignal.any([generation.control.signal, AbortSignal.timeout(this.timeoutMs)]);
         try {
-          if (one === this.local) return await ask(one, signal);
-          return await Promise.race([
-            ask(one, signal),
-            new Promise<never>((_, reject) =>
-              signal.addEventListener("abort", () => reject(new Error(`took longer than ${this.timeoutMs} ms`)), { once: true }),
-            ),
-          ]);
+          return await this.lease(generation, signal, () => ask(one, signal));
         } catch (e) {
           this.log(`memory from ${one.name} for ${what}: ${e instanceof Error ? e.message : String(e)}`);
           return [];
@@ -236,41 +285,114 @@ export class Sources {
     );
   }
 
-  /** Writes to sources outside the farm go one at a time in the background, in the order they were made. */
-  later(what: string, write: (signal: AbortSignal) => Promise<void>) {
-    if (this.stopped) return;
-    if (this.queued >= writeQueue) return this.log(`${what}: too many writes waiting, dropped`);
-    this.queued++;
-    this.queue = this.queue.then(async () => {
-      try {
-        await write(AbortSignal.timeout(writeTimeoutMs));
-      } catch (e) {
-        this.log(`${what}: ${e instanceof Error ? e.message : String(e)}`);
-      } finally {
-        this.queued--;
+  private enqueue(what: string, write: (one: Source, signal: AbortSignal) => Promise<unknown>) {
+    const generation = this.snapshot();
+    if (!generation) return;
+    for (const one of generation.all.slice(1)) {
+      if (this.queued >= writeQueue) {
+        this.log(`${what}: too many writes waiting, dropped`);
+        continue;
       }
+      this.queued++;
+      generation.queue = generation.queue.then(async () => {
+        const signal = AbortSignal.any([generation.control.signal, AbortSignal.timeout(writeTimeoutMs)]);
+        try {
+          await this.lease(generation, signal, () => write(one, signal));
+        } catch (e) {
+          this.log(`${what} (${one.name}): ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+          this.queued--;
+        }
+      });
+    }
+  }
+
+  prefetch(cue: RecallCue): Promise<RecalledLine[][]> {
+    const generation = this.snapshot();
+    return generation
+      ? this.readAll(generation, cue.agent, async (one, signal) =>
+          (await one.prefetch(cueFor(one, cue), signal)).map((line) => ({ ...line, id: idOf(one, line.id) })),
+        )
+      : Promise.resolve([]);
+  }
+
+  async list(agent: string): Promise<{ memories: Memory[]; sources: MemorySourceInfo[] }> {
+    const generation = this.snapshot();
+    if (!generation) return { memories: [], sources: [] };
+    const listing = generation.all.filter((one) => one.can.list);
+    const groups = await this.readAll(generation, `the memories of ${agent}`, (one, signal) => one.list(agent, signal), listing);
+    return {
+      memories: groups.flatMap((listed, i) => {
+        const one = listing[i]!;
+        return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
+      }),
+      sources: this.infoOf(generation),
+    };
+  }
+
+  async search(query: SearchQuery): Promise<(SourceSearch & { source: string })[]> {
+    const generation = this.snapshot();
+    if (!generation) return [];
+    const groups = await this.readAll(generation, "a search", async (one, signal) => [await one.search(query, signal)]);
+    return generation.all.map((one, i) => {
+      const page = groups[i]?.[0];
+      return {
+        source: one.name,
+        found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
+        coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
+      };
     });
   }
 
-  info(): MemorySourceInfo[] {
-    const on = this.current().map(
-      (one) =>
-        ({
-          name: one.name,
-          label: sourceLabels[one.name] ?? one.name,
-          on: true,
-          canList: one.can.list,
-          canForget: one.can.forget,
-          transcripts: one.can.transcripts,
-        }) as MemorySourceInfo,
-    );
-    return [...on, ...this.off];
+  async forget(agent: string, id: string): Promise<void> {
+    const generation = this.snapshot();
+    if (!generation) throw new Error("记性来源已经停下");
+    const [one, own] = owner(generation.all, id);
+    if (!one.can.forget) throw new Error(`${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`);
+    const signal = one === this.local ? new AbortController().signal : AbortSignal.any([generation.control.signal, AbortSignal.timeout(writeTimeoutMs)]);
+    await this.lease(generation, signal, () => one.forget(agent, own, signal));
   }
 
-  /** Waits for the writes already queued; none are taken after. */
-  async stop() {
+  add(note: Note) {
+    this.enqueue(`a note for ${note.agent} did not reach its source`, (one, signal) => one.add(note, signal));
+  }
+
+  keep(run: FinishedRun) {
+    this.enqueue(`what ${run.session} learned was not kept outside`, (one, signal) => one.syncTurn(run, signal));
+  }
+
+  endSession(session: EndedSession) {
+    this.enqueue(`the end of ${session.session} did not reach its source`, (one, signal) => one.sessionEnded(session, signal));
+  }
+
+  private infoOf(generation: Generation): MemorySourceInfo[] {
+    return [
+      ...generation.all.map((one) => ({
+        name: one.name,
+        label: sourceLabels[one.name] ?? one.name,
+        on: true,
+        canList: one.can.list,
+        canForget: one.can.forget,
+        transcripts: one.can.transcripts,
+      })),
+      ...generation.off,
+    ];
+  }
+
+  info(): MemorySourceInfo[] {
+    const generation = this.snapshot();
+    return generation ? this.infoOf(generation) : [];
+  }
+
+  stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
     this.stopped = true;
-    await this.queue;
-    for (const one of this.all) await one.stop();
+    this.stopping = Promise.all(
+      [...this.generations].map(async (g) => {
+        if (!g.closing) await abortable(() => g.queue, AbortSignal.timeout(prefetchTimeoutMs)).catch(() => {});
+        await this.retire(g, "memory sources stopped; outside operation canceled");
+      }),
+    ).then(() => this.local.stop());
+    return this.stopping;
   }
 }

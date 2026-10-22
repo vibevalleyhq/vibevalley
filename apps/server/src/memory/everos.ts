@@ -5,10 +5,11 @@
 // first: a helper's words may carry a key.
 
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
+import { createHash } from "node:crypto";
 import { newId } from "../base/ids.ts";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
-import { clip, recallCount } from "./recall.ts";
+import { clip, recallCount, type MemoryScope } from "./recall.ts";
 import { prefetchTimeoutMs, type Source } from "./sources.ts";
 
 /** app_id on everything written, so its memories can be told from another app's. */
@@ -25,23 +26,38 @@ interface Message {
 
 interface FoundBody {
   readonly data?: {
-    readonly episodes?: readonly { id: string; subject?: string; summary?: string; episode?: string; score?: number }[];
-    readonly agent_cases?: readonly { id: string; task_intent?: string; approach?: string; key_insight?: string; score?: number }[];
+    readonly episodes?: readonly { id: string; subject?: string; summary?: string; episode?: string; score?: number; app_id?: string; project_id?: string }[];
+    readonly agent_cases?: readonly {
+      id: string;
+      task_intent?: string;
+      approach?: string;
+      key_insight?: string;
+      score?: number;
+      app_id?: string;
+      project_id?: string;
+    }[];
   };
 }
+
+// EverOS scope ids are ASCII and at most 128 characters; a real project named "global" must stay separate from global notes.
+const scopeOf = (project: string) => (project ? "project-" + createHash("sha256").update(project).digest("hex") : "global");
 
 /** A farm's session ids (w1, w2…) are its own only: another farm on the same EverOS has a w1 too. */
 const sessionOf = (session: string) => `${app}-${session}`;
 const agentOf = (agent: string) => `${app}-${agent}`;
 
 export function everos(c: MemorySourceConfig): Source {
+  let closed = false;
+  const life = new AbortController();
   const user = c.user || "owner";
   /** Sessions given messages and not yet told to extract; flushed when the session ends, or when the farm stops. */
   const pending = new Map<string, string>();
   /** Sessions whose job it was given already: a later run sends only what the helper said. */
   const told = new Set<string>();
 
-  const post = async (path: string, body: unknown, signal: AbortSignal) => {
+  const post = async (path: string, body: unknown, signal: AbortSignal, closing = false) => {
+    if (!closing) signal = AbortSignal.any([signal, life.signal]);
+    signal.throwIfAborted();
     const res = await fetch(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(c.key ? { authorization: `Bearer ${c.key}` } : {}) },
@@ -49,22 +65,26 @@ export function everos(c: MemorySourceConfig): Source {
       signal,
     });
     const text = (await res.text()).slice(0, 4 << 20);
+    signal.throwIfAborted();
     if (!res.ok) throw new Error(`memory/${path}: ${res.status} ${text.slice(0, 300)}`);
     return text;
   };
 
   const add = async (session: string, project: string, messages: Message[], signal: AbortSignal) => {
     for (const m of messages) m.content = redact(m.content);
-    await post("add", { session_id: session, messages, app_id: app, ...(project ? { project_id: project } : {}) }, signal);
+    await post("add", { session_id: session, messages, app_id: app, project_id: scopeOf(project) }, signal);
     pending.set(session, project);
   };
 
-  const flush = (session: string, project: string, signal: AbortSignal) =>
-    post("flush", { session_id: session, app_id: app, ...(project ? { project_id: project } : {}) }, signal);
+  const flush = (session: string, project: string, signal: AbortSignal, closing = false) =>
+    post("flush", { session_id: session, app_id: app, project_id: scopeOf(project) }, signal, closing);
 
   /** A profile's cases, or with kind issue the owner's episodes. */
-  const find = async (agent: string, query: string, limit: number, kind: MemoryKind, signal: AbortSignal) => {
+  const findIn = async (agent: string, query: string, limit: number, kind: MemoryKind, project: string, signal: AbortSignal) => {
+    const scope = scopeOf(project);
     const body = {
+      app_id: app,
+      project_id: scope,
       query: redact(query).trim().slice(0, 1000),
       top_k: Math.max(1, Math.min(limit, most)),
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
@@ -76,47 +96,63 @@ export function everos(c: MemorySourceConfig): Source {
     } catch {
       throw new Error("memory/search answered what it should not: " + text.slice(0, 200));
     }
-    const hits: { id: string; text: string; score: number }[] = [];
+    const ownership = (hit: { app_id?: string; project_id?: string }): MemoryScope =>
+      hit.app_id !== app || hit.project_id !== scope ? { kind: "unknown" } : project ? { kind: "project", project } : { kind: "global" };
+    const hits: { id: string; text: string; score: number; scope: MemoryScope }[] = [];
     for (const k of found.data?.agent_cases ?? [])
       hits.push({
-        id: k.id,
+        id: `${scope}:${k.id}`,
         text: [k.task_intent, k.approach, k.key_insight]
           .map((p) => (p ?? "").trim())
           .filter((p) => p !== "")
           .join("；"),
         score: k.score ?? 0,
+        scope: ownership(k),
       });
     for (const ep of found.data?.episodes ?? []) {
       const t = ep.summary || ep.episode || "";
-      hits.push({ id: ep.id, text: ep.subject ? `${ep.subject}：${t}` : t, score: ep.score ?? 0 });
+      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${t}` : t, score: ep.score ?? 0, scope: ownership(ep) });
     }
     return hits;
   };
+
+  const find = async (agent: string, query: string, limit: number, kind: MemoryKind, project: string, signal: AbortSignal) =>
+    (await Promise.all((project ? [project, ""] : [""]).map((p) => findIn(agent, query, limit, kind, p, signal)))).flat().sort((a, b) => b.score - a.score);
 
   return {
     name: "everos",
     unavailable: () => (c.url ? undefined : "没填地址"),
     // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
     stop: async () => {
+      if (closed) return;
+      closed = true;
+      life.abort(new Error("EverOS source has stopped"));
       const all = [...pending];
       pending.clear();
-      for (const [session, project] of all) await flush(session, project, AbortSignal.timeout(prefetchTimeoutMs)).catch(() => {});
+      told.clear();
+      const signal = AbortSignal.timeout(prefetchTimeoutMs);
+      await Promise.allSettled(all.map(([session, project]) => flush(session, project, signal, true)));
     },
     prefetch: async (cue, signal) => {
       if (!c.read || cue.text.trim() === "") return [];
-      const hits = await find(cue.agent, cue.text, recallCount, "note", signal);
+      const hits = await find(cue.agent, cue.text, recallCount, "note", cue.project, signal);
       return hits
-        .filter((h) => !cue.skip?.has(h.id) && h.text !== "")
+        .filter((h) => !cue.skip?.has(h.id) && h.text !== "" && h.scope.kind !== "unknown")
+        .slice(0, recallCount)
         .map((h) => ({ id: h.id, line: "- （EverOS）" + clip(h.text, lineMost), score: h.score }));
     },
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: async (q, signal) => {
-      if (!c.read || q.text.trim() === "" || (q.agent === "" && q.kind !== "issue")) return [];
+      if (!c.read || q.text.trim() === "") return { found: [] };
+      if (q.project === "") return { found: [], coverage: "不支持跨项目检索，请指定一个项目；本次未包含 EverOS" };
+      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: "此查询需要指定帮工档案，本次未包含 EverOS" };
       const kind: MemoryKind = q.kind || "note";
-      const hits = await find(q.agent, q.text, q.limit, kind, signal);
-      return hits
-        .filter((h) => h.text !== "")
-        .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score }) as never);
+      const hits = await find(q.agent, q.text, q.limit, kind, q.project, signal);
+      return {
+        found: hits
+          .filter((h) => h.text !== "")
+          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
+      };
     },
     list: async () => {
       throw new Error("EverOS 的记忆不在这里列出");

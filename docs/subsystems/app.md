@@ -23,7 +23,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
 - **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`bun run package:mac`）。
-- **手机壳** `apps/mobile`：`App.tsx`（配对了显示农场，没配对或农场忘了这台手机就配对）、`src/PairScreen.tsx`（扫码、粘贴或收到 `vibevalley://pair` 链接）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（钥匙存在系统钥匙串）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
+- **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
 - **检查**：`bun run web:check`、`cd apps/web && bun run test`、`bun run desktop:test`；手机壳是 `cd apps/mobile && bun run check && bun run test` 和 `scripts/e2e.ts`。
 
 ## 模型和不变量
@@ -66,6 +66,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - ⌥⇧Space 切换和管家的通话（`voiceCall.toggle`）。
 
 **手机壳**：第一次开（或者农场忘了这台手机）是配对页：相机扫「连接到本机」的二维码，或粘贴链接，或打开 `vibevalley://pair?u=<地址>&c=<码>` 这种链接（这一种当场就请主人放行）；那台电脑点头后，钥匙和地址存进系统钥匙串（`expo-secure-store`），之后直接是 WebView。WebView 在页面加载前把钥匙写进 `vibevalley_lan_key` 的 cookie，和浏览器配对后一样；页面要去自己的 `/pair` 时（钥匙不认了），壳忘掉这个农场、回到配对页。iOS 开着 audio 后台模式和 `NSAllowsLocalNetworking`（「连接到本机」是局域网里的明文 HTTP），安卓开着明文流量。
+
+当前农场由 `FarmConnection` 持有，初次读盘、选择新农场、配对、取消和忘记都经它。新选择、取消或退出使旧请求失效，旧答复不能改当前选择；钥匙串写入串行完成，存好才打开新农场。取消配对恢复上次保存的农场，没有旧农场就回到配对页；旧写入已开始时先恢复上次提交的选择，恢复失败留在配对页说明原因。App 和配对页只订阅选择、提交意图。
 
 手机的每条通话线路在桥上带自己的身份；静音、续期、挂断和字幕只归这一条。原生宿主（`apps/mobile/src/host.ts`）属于当前加载的页面；重新加载、返回配对或换农场时关闭宿主，连还在等麦克风权限、等入线的电话一起取消。原生声网只有一个引擎，`rtc.ts` 在下一次入线前结束旧尝试，按频道和本机用户号认回调；旧权限答复、旧频道排队的事件和迟到的挂断不能碰新线路。异步入线失败只认带连接身份的失败状态，不把引擎的全局错误当作某条电话的结果。锁屏不关闭页面宿主，通话继续。
 

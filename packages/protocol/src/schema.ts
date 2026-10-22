@@ -476,9 +476,16 @@ export const Recurrence: Schema.Codec<T.Recurrence> = Schema.Struct({
   nextText: Schema.optionalKey(Schema.String),
 });
 
+export const OwnerMention: Schema.Codec<T.OwnerMention> = Schema.Struct({
+  message: ChatMessage,
+  channel: Schema.String,
+  address: Schema.String,
+});
+
 export const Chat: Schema.Codec<T.Chat> = Schema.Struct({
   conversations: Schema.mutable(Schema.Array(Conversation)),
   messages: Schema.mutable(Schema.Array(ChatMessage)),
+  ownerMentions: Schema.optionalKey(Schema.mutable(Schema.Array(OwnerMention))),
 });
 
 export const Priority: Schema.Codec<T.Priority> = Schema.Literals(T.PriorityValues);
@@ -1582,6 +1589,12 @@ export const FactConversation: Schema.Codec<T.FactConversation> = Schema.Struct(
   conversation: Conversation,
 });
 
+export const FactOwnerMentions: Schema.Codec<T.FactOwnerMentions> = Schema.Struct({
+  type: Schema.Literal("ownerMentions"),
+  at: Schema.Number,
+  mentions: Schema.mutable(Schema.Array(OwnerMention)),
+});
+
 export const FactHired: Schema.Codec<T.FactHired> = Schema.Struct({
   type: Schema.Literal("hired"),
   at: Schema.Number,
@@ -1702,6 +1715,7 @@ export const Fact: Schema.Codec<T.Fact> = Schema.Union([
   FactOrchestrator,
   FactMessage,
   FactConversation,
+  FactOwnerMentions,
   FactHired,
   FactStation,
   FactRun,
@@ -1751,6 +1765,7 @@ export const SideEvent: Schema.Codec<T.SideEvent> = Schema.Union([
   FactOrchestrator,
   FactMessage,
   FactConversation,
+  FactOwnerMentions,
   FactHired,
   FactStation,
   FactRun,
@@ -1915,14 +1930,20 @@ export const BlockAttrs: Schema.Codec<T.BlockAttrs> = Schema.Struct({
   memoryId: Schema.optionalKey(Schema.String),
 });
 
-export const Block: Schema.Codec<T.Block> = Schema.Struct({
+const blockInputFields = {
   id: Schema.String,
-  docId: Schema.String,
   parentId: Schema.optionalKey(Schema.String),
   orderKey: Schema.String,
   type: Schema.String,
   attrs: BlockAttrs,
   text: Schema.mutable(Schema.Array(DocSpan)),
+};
+
+export const BlockInput: Schema.Codec<T.BlockInput> = Schema.Struct(blockInputFields);
+
+export const Block: Schema.Codec<T.Block> = Schema.Struct({
+  ...blockInputFields,
+  docId: Schema.String,
   rev: Schema.Number,
   deleted: Schema.optionalKey(Schema.Boolean),
   updatedBy: Schema.String,
@@ -1949,7 +1970,7 @@ export const DocMarkdown: Schema.Codec<T.DocMarkdown> = Schema.Struct({
 
 export const DocOpInsertBlock: Schema.Codec<T.DocOpInsertBlock> = Schema.Struct({
   op: Schema.Literal("insert_block"),
-  block: Block,
+  block: BlockInput,
 });
 
 export const DocOpUpdateText: Schema.Codec<T.DocOpUpdateText> = Schema.Struct({
@@ -1995,7 +2016,7 @@ export const DocOpSplitBlock: Schema.Codec<T.DocOpSplitBlock> = Schema.Struct({
   blockId: Schema.String,
   baseRev: Schema.Number,
   offset: Schema.Number,
-  newBlock: Block,
+  newBlock: BlockInput,
 });
 
 export const DocOpMergeBlocks: Schema.Codec<T.DocOpMergeBlocks> = Schema.Struct({

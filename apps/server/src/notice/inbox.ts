@@ -4,7 +4,7 @@
 // questions in their place; a quiet one still questions.
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
-import { addressOf, channelOf, generalOf, messagesIn } from "../channel/state.ts";
+import { generalOf } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
@@ -153,23 +153,14 @@ function gathered(state: WorkspaceState): Unworded[] {
     });
   }
 
-  // A message said in full that names the owner, not read and not answered in its conversation yet.
-  if (chat) {
-    const lastFromUser = new Map<string, number>();
-    for (const m of chat.messages ?? []) if (m.from === "user") lastFromUser.set(m.conversation, Math.max(lastFromUser.get(m.conversation) ?? 0, m.number));
-    for (const c of chat.conversations ?? []) {
-      const read = c.read ?? 0;
-      for (const m of messagesIn(chat, c.id)) {
-        if (!m.final || m.from === "user" || m.number <= read || (lastFromUser.get(c.id) ?? 0) > m.number || !(m.mentions ?? []).includes("user")) continue;
-        const from: InboxFrom = m.fromKind === "agent" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
-        out.push({
-          item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: c.id } },
-          channel: channelOf(chat, c)?.id,
-          since: m.at,
-          brief: m.name + " 在 " + addressOf(chat, c) + " 问主人的话，{ago}没人回：「" + slice(oneLine(m.text), 0, 80) + "」",
-        });
-      }
-    }
+  for (const { message: m, channel, address } of chat?.ownerMentions ?? []) {
+    const from: InboxFrom = m.fromKind === "agent" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
+    out.push({
+      item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: m.conversation } },
+      channel,
+      since: m.at,
+      brief: m.name + " 在 " + address + " 问主人的话，{ago}没人回：「" + slice(oneLine(m.text), 0, 80) + "」",
+    });
   }
   return out;
 }

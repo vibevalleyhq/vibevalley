@@ -18,6 +18,23 @@ select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, 
 -- name: MessageBySendKey :one
 select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
 
+-- name: OwnerMentions :many
+-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at,
+       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,
+       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,
+       coalesce(ch.name, c.name, '')::text as channel_name
+from channel_mention n
+join channel_message m on m.id = n.message_id
+join channel_participant p on p.id = m.sender_id
+join channel_conversation c on c.id = m.conversation_id
+left join channel_conversation ch on ch.id = c.channel_id
+left join channel_read_cursor r on r.participant_id = 'user' and r.conversation_id = c.id
+where n.target_id = 'user' and m.sender_id <> 'user' and m.final
+  and m.number > coalesce(r.read_number, 0)
+  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'user' and reply.number > m.number)
+order by m.id;
+
 -- name: RecentMessages :many
 select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit sqlc.arg(n)::int;
 

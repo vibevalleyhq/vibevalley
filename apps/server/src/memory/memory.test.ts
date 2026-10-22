@@ -162,11 +162,11 @@ describe("memory", () => {
       const m = yield* Memories;
       const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: "owner" });
       yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: "owner" });
-      const found = yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 });
+      const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
       yield* m.forgetOf("lab", note.id);
-      expect(yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).toEqual([]);
+      expect((yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found).toEqual([]);
     }).pipe(Effect.provide(world())),
   );
 

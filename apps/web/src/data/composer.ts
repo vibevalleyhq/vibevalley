@@ -3,8 +3,9 @@
 // someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
-import { createMemo, createSignal } from "solid-js";
-import { type Conversation, type WorkspaceState } from "@vibevalley/protocol";
+import { createMemo, createSignal, onSettled } from "solid-js";
+import { type Conversation, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
+import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "../rules/chat";
 import { api, newSendKey, reasonOf } from "./api";
 
@@ -14,8 +15,8 @@ export async function say(text: string, conversation: Conversation | undefined, 
 }
 
 export interface ComposerWays {
-  /** Sends the line with its key. */
-  readonly send: (said: string, sendKey: string) => Promise<void>;
+  /** Every routing field of the next message; its text and retry identity belong to the composer. */
+  readonly target: () => Omit<SayRequest, "text" | "sendKey">;
   readonly failed: (reason: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
@@ -27,8 +28,14 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
-  // One key per draft: sending the same draft again, after a failure, reuses its key.
-  let key: { draft: string; key: string } | undefined;
+  let attempt: { body: Omit<SayRequest, "sendKey">; key: string } | undefined;
+  let edits = 0;
+  let sending = false;
+  let disposed = false;
+  onSettled(() => () => {
+    disposed = true;
+  });
+  const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
 
   const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
@@ -37,6 +44,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   });
 
   const edit = (value: string, at: number) => {
+    edits++;
     setText(value);
     setCaret(at);
     setActive(0);
@@ -56,18 +64,24 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   };
 
   const send = async () => {
-    const said = text().trim();
-    if (!said || busy()) return;
-    if (key?.draft !== said) key = { draft: said, key: newSendKey() };
+    if (disposed || sending) return;
+    const body = intent();
+    if (!body.text) return;
+    if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
+    const sent = attempt;
+    const editedAt = edits;
+    sending = true;
     setBusy(true);
     try {
-      await ways.send(said, key.key);
-      key = undefined;
-      edit("", 0);
+      await api.channel.say({ body: { ...sent.body, sendKey: sent.key } });
+      attempt = undefined;
+      // The user may have edited, or chosen another destination, while this response was in flight.
+      if (!disposed && edits === editedAt && same(intent(), sent.body)) edit("", 0);
     } catch (e) {
-      ways.failed(reasonOf(e));
+      if (!disposed) ways.failed(reasonOf(e));
     } finally {
-      setBusy(false);
+      sending = false;
+      if (!disposed) setBusy(false);
     }
   };
 

@@ -230,6 +230,7 @@ interface Written {
   thread: string;
   /** A send with a key already written: nothing new is written or delivered. */
   again: boolean;
+  ownerMentionsChanged?: boolean;
 }
 
 export interface ChannelShape {
@@ -434,6 +435,18 @@ export const make = Effect.gen(function* () {
       if (row) apply({ type: "conversation", conversation: yield* toConversation(row) });
     });
 
+  const publishOwnerMentions = Effect.gen(function* () {
+    const rows = yield* db(qm.ownerMentions());
+    apply({
+      type: "ownerMentions",
+      mentions: rows.map((r) => ({
+        message: toMessage(r),
+        channel: r.channel_id ?? general,
+        address: targetOfRow(r.conversation_kind, r.parent_number, null, r.channel_id, r.channel_name),
+      })),
+    });
+  });
+
   const publishMessage = (id: string, answers: string | undefined) =>
     Effect.gen(function* () {
       const row = yield* one(qm.messageByID({ id }));
@@ -493,7 +506,7 @@ export const make = Effect.gen(function* () {
         yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
         yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
       }),
-    );
+    ).pipe(Effect.andThen(who === "user" ? publishOwnerMentions : Effect.void));
 
   /** Speaking acknowledges the launch's handed messages without advancing past unseen messages. */
   const heardLaunch = (who: string, launch: string) =>
@@ -562,6 +575,7 @@ export const make = Effect.gen(function* () {
           qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
         );
       const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
+      written.ownerMentionsChanged = row.sender_id === "user" || mentions.includes("user");
       // The breaker is reset only after the message's transaction commits.
       if (row.sender_id === "user") written.resetWake = deliveries.filter((d) => d.wakes).map((d) => d.recipient);
       if (deliveries.some((d: Delivery) => d.heldBy === "hop_limit")) written.held = (yield* db(qm.holdNoticeSinceUser({ conversation: conv.id }))).n === 0;
@@ -619,6 +633,7 @@ export const make = Effect.gen(function* () {
       for (const r of written.resetWake) breaker.reset(r);
       yield* publishMessage(written.id, answers);
       yield* publishConversation(conversation);
+      if (written.ownerMentionsChanged) yield* publishOwnerMentions;
       if (written.thread) yield* publishConversation(written.thread);
       if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
       for (const r of written.recipients) yield* kick(r);
@@ -856,6 +871,7 @@ export const make = Effect.gen(function* () {
       for (const c of [...convs].reverse()) apply({ type: "conversation", conversation: yield* toConversation(c) });
       const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
       for (const m of [...msgs].reverse()) apply({ type: "message", message: toMessage(m) });
+      yield* publishOwnerMentions;
     }),
   );
 

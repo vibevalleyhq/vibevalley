@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
-import { createComposer, say } from "../../data/composer";
+import { createComposer } from "../../data/composer";
 import { toast } from "../../ui/toasts";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
@@ -16,7 +16,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
   const box = createComposer(core, () => input, {
-    send: (said, sendKey) => say(said, props.conversation, sendKey, undefined),
+    target: () => ({ conversation: props.conversation?.id }),
     failed: (reason) => {
       setProblem(reason);
       toast(`没发出去：${reason}`, "bad");

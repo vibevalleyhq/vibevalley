@@ -140,6 +140,44 @@ export const messageBySendKey = Effect.fn("MessageBySendKey")(function* (params:
   })(params)
 })
 
+export const OwnerMentionsParams = Schema.Struct({
+
+})
+export type OwnerMentionsParams = typeof OwnerMentionsParams.Type
+
+
+export const OwnerMentionsResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["conversation_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["sender_id"]: Schema.String,
+  ["kind"]: Schema.String,
+  ["body"]: Schema.String,
+  ["final"]: Schema.Boolean,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+  ["sender_name"]: Schema.String,
+  ["sender_kind"]: Schema.String,
+  ["sender_agent"]: Schema.NullOr(Schema.String),
+  ["conversation_kind"]: Schema.String,
+  ["parent_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["channel_id"]: Schema.NullOr(Schema.String),
+  ["channel_name"]: Schema.NullOr(Schema.String),
+})
+export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
+
+
+export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.conversation_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user' and m.final\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
+
+export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: OwnerMentionsParams,
+    Result: OwnerMentionsResult,
+    execute: () => sql.unsafe(OwnerMentionsSql, []),
+  })({})
+})
+
 export const RecentMessagesParams = Schema.Struct({
   ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })

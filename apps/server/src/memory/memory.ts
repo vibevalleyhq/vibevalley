@@ -13,10 +13,22 @@ import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
 import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
-import { clip, foundText, type Found, fromOwner, localName, noteMaxChars, recallChars, searchLimit, type SearchQuery } from "./recall.ts";
-import { cueFor, type EndedSession, idOf, interleave, localSource, mergeRecalled, owner, type RecalledLine, type Source, Sources } from "./sources.ts";
+import {
+  clip,
+  foundText,
+  type Found,
+  fromOwner,
+  inProject,
+  noteMaxChars,
+  recallChars,
+  searchLimit,
+  type SearchQuery,
+  type SearchResult,
+  sourceLabels,
+} from "./recall.ts";
+import { type EndedSession, interleave, localSource, mergeRecalled, type Source, Sources } from "./sources.ts";
 
-export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery };
+export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery, SearchResult };
 export { foundText };
 
 /** What a run recalls: the memories' ids (not to give the same session again) and the lines it is told, as told. */
@@ -36,7 +48,7 @@ export interface MemoryShape {
   /** What a run is told as it starts; only what is told is counted as recalled. */
   readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
   /** Behind memory_search: every source's best, taken in turns, the same memory once. */
-  readonly search: (q: SearchQuery) => Effect.Effect<Found[]>;
+  readonly search: (q: SearchQuery) => Effect.Effect<SearchResult>;
   /** The local rows keep the run before this returns; the other sources get it in the background. */
   readonly keep: (run: FinishedRun) => Effect.Effect<void>;
   readonly endSession: (s: EndedSession) => Effect.Effect<void>;
@@ -94,38 +106,17 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     yield* Effect.forkScoped(local.recutTerms);
     const home = orchestratorHome(config.home);
 
-    const prefetchAll = (cue: RecallCue) =>
-      sources.askAll(cue.agent, async (one, signal) =>
-        (await one.prefetch(cueFor(one, cue), signal)).map((l): RecalledLine => ({ ...l, id: idOf(one, l.id) })),
-      );
-
-    const list = (agent: string) =>
-      Effect.promise(async () => {
-        const listing = sources.current().filter((one) => one.can.list);
-        const groups = await sources.askAll(`the memories of ${agent}`, (one, signal) => one.list(agent, signal), listing);
-        return groups.flatMap((listed, i) => {
-          const one = listing[i]!;
-          return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
-        });
-      });
+    const list = (agent: string) => Effect.promise(async () => (await sources.list(agent)).memories);
 
     const write = (n: Note) =>
       Effect.gen(function* () {
-        const all = sources.current();
         const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
-        for (const one of all.slice(1)) sources.later(`a note for ${n.agent} did not reach ${one.name}`, (signal) => one.add(n, signal).then(() => {}));
+        sources.add(n);
         return kept;
       });
 
     const forget = (agent: string, id: string) =>
-      Effect.gen(function* () {
-        const [one, own] = owner(sources.current(), id);
-        if (!one.can.forget)
-          return yield* Effect.fail(
-            refused(`${one.name === "nowledge" ? "Nowledge Mem" : one.name === "everos" ? "EverOS" : one.name} 里的记忆到它自己那里删`),
-          );
-        yield* Effect.promise(() => one.forget(agent, own));
-      });
+      Effect.tryPromise({ try: () => sources.forget(agent, id), catch: (e) => refused(e instanceof Error ? e.message : String(e)) });
 
     const writeOrchestrator = (text: string) =>
       Effect.gen(function* () {
@@ -142,20 +133,19 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const preview = (agent: string, project: string, text: string) =>
       Effect.promise(async (): Promise<RecallPreview> => {
-        const lines = mergeRecalled(await prefetchAll({ agent, project, text, peek: true }));
+        const lines = mergeRecalled(await sources.prefetch({ agent, project, text, peek: true }));
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
 
     const shape: MemoryShape = {
-      memoriesOf: (agent) =>
-        agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.map(list(agent), (memories) => ({ memories, sources: sources.info() })),
+      memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.promise(() => sources.list(agent))),
       remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
       forgetOf: (agent, id) => (agent === orchestratorAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
       recallOf: (agent, project, text) =>
         agent === orchestratorAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text),
       recall: (cue) =>
         Effect.gen(function* () {
-          const told = mergeRecalled(yield* Effect.promise(() => prefetchAll(cue)));
+          const told = mergeRecalled(yield* Effect.promise(() => sources.prefetch(cue)));
           const ids = told.map((l) => l.id).filter((id) => id !== "");
           yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
           return { ids, lines: told.map((l) => l.line) };
@@ -163,26 +153,25 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       search: (q) =>
         Effect.promise(async () => {
           const query = { ...q, limit: q.limit > 0 ? q.limit : searchLimit };
-          const groups = await sources.askAll("a search", async (one, signal) =>
-            (await one.search(query, signal)).map((f) => ({ ...f, id: idOf(one, f.id), source: one.name })),
-          );
-          return interleave(
-            groups,
+          const pages = await sources.search(query);
+          const coverage = pages.flatMap((page) => {
+            const notes = page.coverage ? [page.coverage] : [];
+            if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push("有命中的项目范围未经确认，已从本项目检索中排除");
+            return notes.map((note) => `${sourceLabels[page.source] ?? page.source}：${note}`);
+          });
+          const found = interleave(
+            pages.map((page) => page.found),
             (f) => f.text,
-            () => true,
+            (f) => inProject(f.scope, query.project),
           ).slice(0, query.limit);
+          return { found, coverage };
         }),
       keep: (r) =>
         Effect.gen(function* () {
-          const all = sources.current();
           yield* local.keep(r);
-          for (const one of all.slice(1)) sources.later(`${one.name} did not keep what ${r.session} learned`, (signal) => one.syncTurn(r, signal));
+          sources.keep(r);
         }),
-      endSession: (s) =>
-        Effect.sync(() => {
-          for (const one of sources.current().slice(1))
-            sources.later(`${one.name} did not take the end of ${s.session}`, (signal) => one.sessionEnded(s, signal));
-        }),
+      endSession: (s) => Effect.sync(() => sources.endSession(s)),
       write,
       list,
       sources: () => sources.info(),

@@ -5,7 +5,7 @@
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { createComposer, say } from "../../data/composer";
+import { createComposer } from "../../data/composer";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { threadOwnerOf, typedName } from "../../rules/chat";
@@ -71,7 +71,7 @@ export function FarmComposer(props: {
   const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");
 
   const box = createComposer(core, () => input, {
-    send: (said, sendKey) => say(said, props.conversation, sendKey, props.thread || pick() === "auto" ? undefined : pick()),
+    target: () => ({ conversation: props.conversation?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
     failed: (reason) => props.onProblem(`没发出去：${reason}`),
     edited: (value, at) => {
       props.onProblem(undefined);
