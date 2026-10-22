@@ -22,10 +22,11 @@ test("the phone opens over its button, a game takes the pad, and Esc puts it awa
   await page.getByRole("button", { name: "手机" }).click();
   const phone = page.getByRole("region", { name: "农场手机" });
   await expect(phone.getByText("农场通")).toBeVisible();
-  await expect(phone.getByRole("button", { name: "上" })).toHaveAttribute("aria-disabled", "true");
+  // The pad shows only while a game takes it.
+  await expect(phone.getByRole("button", { name: "上" })).toHaveCount(0);
   await phone.getByRole("button", { name: "方块" }).click();
   await expect(phone.getByText("按 A 开始")).toBeVisible();
-  await expect(phone.getByRole("button", { name: "上" })).toHaveAttribute("aria-disabled", "false");
+  await expect(phone.getByRole("button", { name: "上" })).toBeVisible();
   await page.keyboard.press("Space");
   await expect(phone.getByText("按 A 开始")).toHaveCount(0);
   await page.keyboard.press("ArrowLeft");
@@ -116,6 +117,7 @@ test("calling the orchestrator on the phone is the chat's call: one call, the sa
   await phone.getByRole("button", { name: "打给管家" }).click();
   // The test's server has no Agora credentials: the call does not get through, and both say why.
   await expect(phone.getByText(/没接通：还没有 Agora 的凭据/)).toBeVisible();
+  await phone.getByRole("button", { name: /^展开田头/ }).click();
   await expect(page.getByRole("region", { name: "田头" }).getByRole("button", { name: "语音说话" })).toHaveAttribute(
     "title",
     /上次没接通：还没有 Agora 的凭据/,

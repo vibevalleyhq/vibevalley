@@ -7,7 +7,6 @@ import type { FarmSoundInput } from "./sound";
 import { farm } from "./store";
 import { FramesContext, useFrames } from "../data/frame";
 import { VillageCanvas } from "./canvas/VillageCanvas";
-import { ChatWindow } from "./chat/ChatWindow";
 import { DebugPanel } from "./debug/DebugPanel";
 import { Hud } from "./hud/Hud";
 import { IssueView } from "./issue/IssueView";
@@ -40,9 +39,6 @@ export function FarmPage(props: { project: string }) {
         <VillageCanvas />
         <Hud />
       </FramesContext>
-      <div class="absolute right-3 bottom-3">
-        <ChatWindow />
-      </div>
       <FramesContext value={scoped}>
         <IssueView />
         <Panels />

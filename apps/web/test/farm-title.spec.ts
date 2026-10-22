@@ -35,5 +35,7 @@ test("with a farm, 继续游戏 is picked and Enter goes in", async ({ page, api
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Enter");
   await expect(title).toHaveCount(0);
+  await page.getByRole("button", { name: "手机" }).click();
+  await page.getByRole("button", { name: /^展开田头/ }).click();
   await expect(page.getByRole("region", { name: "田头" }).getByText("早", { exact: true })).toBeVisible();
 });

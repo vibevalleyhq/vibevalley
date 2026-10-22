@@ -72,6 +72,7 @@ export function FarmComposer(props: {
 
   const box = createComposer(core, () => input, {
     send: (said, sendKey) => say(said, props.conversation, sendKey, props.thread || pick() === "auto" ? undefined : pick()),
+    where: () => props.conversation,
     failed: (reason) => props.onProblem(`没发出去：${reason}`),
     edited: (value, at) => {
       props.onProblem(undefined);

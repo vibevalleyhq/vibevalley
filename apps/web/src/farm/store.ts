@@ -62,9 +62,10 @@ export interface FarmUi {
   readonly hoverSpot: string | null;
   /** Held Alt (or the first visit): every name tag shows. */
   readonly revealNames: boolean;
+  /** The phone is unfolded, its right screen the chat; folded whenever the phone is put away, so it opens folded. */
   readonly chatOpen: boolean;
   readonly chatLarge: boolean;
-  /** The conversation the chat window shows: null is the general channel, else a thread's or channel's id. */
+  /** The conversation the chat shows: null is the general channel, else a thread's or channel's id. */
   readonly chatShown: string | null;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
@@ -140,7 +141,7 @@ let state: FarmUi = {
   hoverBed: null,
   hoverSpot: null,
   revealNames: false,
-  chatOpen: true,
+  chatOpen: false,
   chatLarge: false,
   chatShown: null,
   phoneOpen: false,
@@ -208,11 +209,12 @@ export const farm = {
   hold: (tool: Tool) => set({ tool }),
   hover: (bed: number | null, spot: string | null) => set({ hoverBed: bed, hoverSpot: spot }),
   revealNames: (on: boolean) => set({ revealNames: on }),
-  chatOpen: (open: boolean) => set({ chatOpen: open }),
+  /** Unfolds the phone (taking it out) or folds it. */
+  chatOpen: (open: boolean) => set(open ? { chatOpen: true, phoneOpen: true } : { chatOpen: false }),
   chatLarge: (large: boolean) => set({ chatLarge: large }),
-  /** Shows a conversation in the chat window and opens it. */
-  showChat: (conversation: string | null) => set({ chatShown: conversation, chatOpen: true }),
-  phoneOpen: (open: boolean) => set({ phoneOpen: open }),
+  /** Shows a conversation in the chat: the phone comes out unfolded. */
+  showChat: (conversation: string | null) => set({ chatShown: conversation, chatOpen: true, phoneOpen: true }),
+  phoneOpen: (open: boolean) => set(open ? { phoneOpen: true } : { phoneOpen: false, chatOpen: false }),
   friendsOpen: (open: boolean) => set({ friendsOpen: open }),
   /** Leaves the title screen; it does not show again on this machine. */
   closeTitle: () => {
@@ -269,7 +271,7 @@ export function resetFarm() {
     hoverBed: null,
     hoverSpot: null,
     revealNames: false,
-    chatOpen: true,
+    chatOpen: false,
     chatLarge: false,
     chatShown: null,
     phoneOpen: false,

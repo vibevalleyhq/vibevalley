@@ -10,6 +10,8 @@ test.beforeEach(async ({ page }) => {
 test("a call without Agora's keys says why, offers 设置, and the button tries again", async ({ page }) => {
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+  await page.getByRole("button", { name: "手机" }).click();
+  await page.getByRole("button", { name: /^展开田头/ }).click();
   const chat = page.getByRole("region", { name: "田头" });
   const call = chat.getByRole("button", { name: "语音说话" });
   await expect(call).toHaveAttribute("title", "按一下，和管家语音说话");
