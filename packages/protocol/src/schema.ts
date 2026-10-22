@@ -275,11 +275,19 @@ export const PhaseClosed: Schema.Codec<T.PhaseClosed> = Schema.Struct({
 
 export const Phase: Schema.Codec<T.Phase> = Schema.Union([PhaseArriving, PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]);
 
+export const IssueAnswer: Schema.Codec<T.IssueAnswer> = Schema.Struct({
+  conclusion: Schema.String,
+  evidence: Schema.mutable(Schema.Array(Schema.String)),
+  unsure: Schema.mutable(Schema.Array(Schema.String)),
+  next: Schema.mutable(Schema.Array(Schema.String)),
+});
+
 export const LastRun: Schema.Codec<T.LastRun> = Schema.Struct({
   outcome: Outcome,
   summary: Schema.String,
   at: Schema.Number,
   spent: Schema.optionalKey(Spent),
+  answer: Schema.optionalKey(IssueAnswer),
 });
 
 export const SessionGraph: Schema.Codec<T.SessionGraph> = Schema.Struct({
@@ -617,6 +625,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
   drafting: Schema.optionalKey(IssueRefining),
   lastRun: Schema.optionalKey(IssueRun),
+  answer: Schema.optionalKey(IssueAnswer),
   attention: IssueAttention,
 });
 
@@ -1158,6 +1167,7 @@ export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
   priority: Schema.optionalKey(Priority),
   review: Schema.optionalKey(Review),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  deliver: Schema.optionalKey(Deliverable),
 });
 
 export const IssueDispatchRequest: Schema.Codec<T.IssueDispatchRequest> = Schema.Struct({
@@ -1665,6 +1675,7 @@ export const FactReport: Schema.Codec<T.FactReport> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
   questions: Schema.optionalKey(Schema.mutable(Schema.Array(Question))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
+  answer: Schema.optionalKey(IssueAnswer),
 });
 
 export const FactConflict: Schema.Codec<T.FactConflict> = Schema.Struct({

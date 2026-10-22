@@ -8,7 +8,7 @@ import { type Runtime } from "@botiverse/oar";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { factsOf, presetOf } from "../agent/seed.ts";
-import { criteriaHead } from "../issue/rules.ts";
+import { answerOpening, criteriaHead } from "../issue/rules.ts";
 import { jobBreak } from "../session/rules.ts";
 
 const sessionGit = (cwd: string, ...args: string[]) =>
@@ -53,6 +53,23 @@ async function draft(turn: ScriptedTurn, input: string) {
   );
 }
 
+/** An answer issue's round (or 接着修 on one whose answer could not be read): 顺手提交 changes and commits what it should
+ * not, 乱写 hands back no block; else a conclusion that rests on clock.ts. */
+async function answer(turn: ScriptedTurn, input: string) {
+  const cwd = turn.options.cwd!;
+  if (input.includes("顺手提交")) {
+    await turn.tool("bash", `{"command":"git commit"}`, () => {
+      writeFileSync(join(cwd, "probe.ts"), "export const probe = 1\n");
+      sessionGit(cwd, "add", "probe.ts");
+      sessionGit(cwd, "commit", "-q", "-m", "查的时候不该有的提交");
+      return "";
+    });
+  }
+  if (input.includes("乱写")) return turn.say("看了一圈，说不清。\n\n结论：没查出来");
+  const found = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
+  turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
+}
+
 /** The helper every flow hires: what it does is in the words of its job (the part after the reminders). 只起草工单 drafts;
  * 必败 fails; 发呆 idles a while; 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
  * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
@@ -65,6 +82,7 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
       const parts = turn.input.split(jobBreak);
       const input = parts[parts.length - 1]!;
       if (input.includes("只起草工单")) return draft(turn, input);
+      if (input.includes(answerOpening) || input.includes("结论读不出来")) return answer(turn, input);
       if (input.includes("必败")) throw new Error("provider said no");
       if (input.includes("发呆") && (await idle(turn, 1500))) return;
       const cwd = turn.options.cwd!;

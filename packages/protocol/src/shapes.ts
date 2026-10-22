@@ -283,6 +283,8 @@ export interface LastRun {
   summary: string;
   at: number;
   spent?: Spent;
+  /** The conclusion it handed back in the block an answer issue asks for, when one could be read. */
+  answer?: IssueAnswer;
 }
 
 export interface SessionGraph {
@@ -1094,7 +1096,18 @@ export interface Issue {
   /** Its latest run as the issue keeps it, for a run no session on the farm carries (an in-process agent's, the
    * orchestrator's): going on while it has no end; ended, the issue waits on the owner. */
   lastRun?: IssueRun;
+  /** An answer issue's conclusion, read from what its latest round handed back; none when that round gave none it could read. */
+  answer?: IssueAnswer;
   attention: IssueAttention;
+}
+
+/** What an answer issue concludes, as its helper hands it back: the conclusion, what it rests on (files and lines, commands
+ * and what they printed), what it is unsure of, and what to do next. */
+export interface IssueAnswer {
+  conclusion: string;
+  evidence: string[];
+  unsure: string[];
+  next: string[];
 }
 
 export interface IssueRun {
@@ -1232,6 +1245,7 @@ export interface IssueUpdate {
   priority?: Priority;
   review?: Review;
   criteria?: string[];
+  deliver?: Deliverable;
 }
 
 export const ReviewValues = ["glance", "required"] as const;
@@ -1951,6 +1965,7 @@ export interface FactReport {
   spent?: Spent;
   questions?: Question[];
   checks?: CriterionCheck[];
+  answer?: IssueAnswer;
 }
 
 export interface FactConflict {

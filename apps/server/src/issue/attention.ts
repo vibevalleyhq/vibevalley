@@ -53,7 +53,9 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
       const since = last?.at;
       if (session?.conflict) return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: ["resolve", "tell", "close"] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: ["answer", "close"] };
-      if (last?.outcome === "failed") return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: ["cure", "tell", "close"] };
+      // An answer issue's round that handed back no answer it could read did not get it done either.
+      const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;
+      if (last?.outcome === "failed" || unread) return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: ["cure", "tell", "close"] };
       // Stopped halfway (叫停, the server restarted): the work goes on first; what is there can still be completed.
       if (last?.outcome === "interrupted")
         return { state: "stuck", stuck: "interrupted", ...at(since), lead: "resume", acts: ["resume", finish, ...keep, "tell", "close"] };

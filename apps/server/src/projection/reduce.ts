@@ -67,7 +67,7 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
           ...x,
           runs: f.runs,
           phase: ended(f.outcome),
-          lastRun: { outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent },
+          lastRun: { outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, ...(f.answer ? { answer: f.answer } : {}) },
         }))[0],
         true,
       ];

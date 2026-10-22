@@ -75,6 +75,7 @@ export function refinement(d: RefinementDeps) {
               priority: t.priority,
               review: t.review,
               criteria: jsonOrNull(t.criteria, (t.criteria ?? []).length > 0),
+              deliver: t.deliver,
               id: t.id,
             }),
           );

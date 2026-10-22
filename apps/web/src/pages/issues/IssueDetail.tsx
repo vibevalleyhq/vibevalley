@@ -1,12 +1,23 @@
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
-import type { Review, Question, Issue, IssueAct, Milestone, Session, SessionEvent } from "@vibevalley/protocol";
+import {
+  type Deliverable,
+  DeliverableValues,
+  type Review,
+  type Question,
+  type Issue,
+  type IssueAct,
+  type IssueAnswer,
+  type Milestone,
+  type Session,
+  type SessionEvent,
+} from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
 import { issueTag, priorityLabel, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
-import { actLabel, closedText } from "@vibevalley/protocol/rules";
+import { actLabel, closedText, deliverableLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready } from "../../data/query";
@@ -200,7 +211,10 @@ export function IssueDetail(props: {
         <Show when={s().inTask}>
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
-        <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看改动判断。</p>}>
+        <Show
+          when={s().criteria.length > 0}
+          fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看{props.issue.deliver === "answer" ? "结论" : "改动"}判断。</p>}
+        >
           <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().weeds.length > 0}>
@@ -214,6 +228,11 @@ export function IssueDetail(props: {
       <section aria-label="做出了什么">
         <SheetLabel>做出了什么</SheetLabel>
         <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : "没有可看的改动。"}</p>}>
+          <Match when={props.issue.deliver === "answer"}>
+            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">还没有结论。</p>}>
+              {(a) => <AnswerView answer={a()} />}
+            </Show>
+          </Match>
           <Match when={s().showsChanges && changes()}>
             {(c) => (
               <Show
@@ -299,6 +318,18 @@ export function IssueDetail(props: {
         <Property label="模型">{agent()!.model}</Property>
       </Show>
       <Show when={!s().inTask}>
+        <Property label="交付">
+          <Pick
+            label="交付"
+            value={props.issue.deliver}
+            disabled={busy() || !s().open}
+            onChange={(v) => {
+              const id = props.issue.id;
+              void act(() => api.issue.update({ id, body: { deliver: v as Deliverable } }));
+            }}
+            options={DeliverableValues.map((v) => ({ value: v, label: deliverableLabel[v] }))}
+          />
+        </Property>
         <Property label="验收">
           <Pick
             label="验收"
@@ -317,7 +348,7 @@ export function IssueDetail(props: {
       </Show>
       <More>
         <Show when={s().crewLine}>
-          <Property label="地上的人">{s().crewLine}</Property>
+          <Property label="一起干活的">{s().crewLine}</Property>
         </Show>
         <Property label="档案">{agent()?.name ?? head().name}</Property>
         <Show when={head().branch}>
@@ -559,6 +590,26 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       </div>
       <h2 class="mt-5 mb-2 text-sm font-semibold">每次干活</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
+    </div>
+  );
+}
+
+/** An answer issue's conclusion: the answer, what it rests on, what it is unsure of, what to do next. */
+export function AnswerView(props: { answer: IssueAnswer }) {
+  const list = (head: string, lines: readonly string[]) => (
+    <Show when={lines.length > 0}>
+      <div class="mt-2">
+        <div class="text-xs text-muted">{head}</div>
+        <For each={lines}>{(l) => <div class="text-sm">· {l}</div>}</For>
+      </div>
+    </Show>
+  );
+  return (
+    <div>
+      <p class="text-base">{props.answer.conclusion}</p>
+      {list("依据", props.answer.evidence)}
+      {list("拿不准的", props.answer.unsure)}
+      {list("建议接着做", props.answer.next)}
     </div>
   );
 }

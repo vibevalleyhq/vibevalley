@@ -4,10 +4,9 @@
 
 import { reportVerdict } from "../session/rules.ts";
 import type {
+  Deliverable,
   Question,
   Issue,
-  Delivery,
-  IssueCanceled,
   IssueStatus,
   IssueTemplate,
   IssueTimeline,
@@ -29,13 +28,37 @@ export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 export const criteriaHead =
   "验收标准（主人照这几条验收；做完逐条对照，在结论前面每条写一行「标准 N：做到了」「标准 N：没做到」或「标准 N：不确定」，后面接凭据：跑了什么命令、结果如何，或改了哪个文件）：";
 
-/** The criteria go last, so whoever works it checks each one before it hands the work back. */
-export function issueJob(t: Pick<Issue, "title" | "description" | "criteria">): string {
+/** The criteria go last, so whoever works it checks each one before it hands the work back. An answer issue is read
+ * only, and its job ends with the block its conclusion comes back in (parseAnswer). */
+export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
   let job = t.title;
   if (t.description) job += "\n\n" + t.description;
   if (t.criteria && t.criteria.length > 0) job += "\n\n" + criteriaHead + "\n" + t.criteria.map((c, i) => `${i + 1}. ${c}`).join("\n");
-  return job;
+  return t.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
 }
+
+// ── an answer issue ──
+
+export const answerOpening =
+  "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
+
+const answerExample = {
+  conclusion: "看板拖卡还在调旧的 start 接口，所以挪到已完成时没反应。",
+  evidence: ["apps/web/src/pages/issues/Board.tsx:120 拖放调的是 api.issue.start", "rg 'issue.start' 只在 Board.tsx 里出现一次"],
+  unsure: ["不确定命令行有没有走同一条路"],
+  next: ["把拖放改成 issue.status"],
+};
+
+const answerFormat = [
+  "汇报的最后，用一个 json 代码块交结论，格式照这个：",
+  "```json",
+  JSON.stringify(answerExample, null, 2),
+  "```",
+  "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
+].join("\n");
+
+/** 接着修 for an answer that could not be read: what was wrong with it, and the format again. */
+export const answerCureWords = (problem: string) => `接着修：上一轮交回的结论读不出来（${problem}）。接着查清楚，最后照这个格式交：\n${answerFormat}`;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
  * short title (shortTitle) and the whole job is the description. */

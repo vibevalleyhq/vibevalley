@@ -58,6 +58,22 @@ describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
   const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], review: "glance", createdAt: 0 } as unknown as Issue;
+  const answeredSession = {
+    ...session("completed"),
+    lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
+  } as Session;
+  // An answer issue's round that got through but handed back no answer to read did not get it done.
+  it("an answer issue waits on a conclusion it can read", () => {
+    const answerIssue = { ...base, deliver: "answer" } as Issue;
+    expect(attentionOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
+    expect(attentionOf(answerIssue, answeredSession)).toMatchObject({
+      state: "reviewing",
+      lead: "acknowledge",
+      acts: ["acknowledge", "reject", "tell", "close"],
+    });
+    // A change issue's round needs no such block.
+    expect(attentionOf({ ...base, deliver: "change" } as Issue, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
+  });
   // One table: an act that takes the issue to done is offered exactly when the move is.
   it("agree on done, whatever the round came to", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [
@@ -66,6 +82,8 @@ describe("moves and the attention", () => {
       [{}, session("interrupted")],
       [{ review: "required" }, session("completed")],
       [{ review: "required", reviewedAt: 5 }, session("completed")],
+      [{ deliver: "answer" }, session("completed")],
+      [{ deliver: "answer" }, answeredSession],
       [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
       [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" } }, undefined],
       [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],

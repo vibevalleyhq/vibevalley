@@ -401,6 +401,68 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  // An answer issue is read only: its conclusion is read into the issue, whatever the round changed goes, and completing it
+  // delivers nothing. An answer that cannot be read is a round not done: 接着修 says what was wrong with it.
+  it.live("answers with a conclusion and leaves nothing on its branch", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      const core = yield* Core;
+      const chat = yield* Channels;
+      yield* (yield* Agents).saveAgent(lab());
+      const project = join(f.config.workRoot, "projects", "clock");
+      const asked = yield* issues.add({ title: "查一下打卡为什么慢，顺手提交", project: "clock", assignee: "lab", deliver: "answer" });
+      expect(asked.deliver).toBe("answer");
+      yield* issues.setStatus(asked.id, "todo", "", "");
+      yield* w.nextReport;
+      const answered = yield* await_(
+        () => issues.get(asked.id),
+        (i) => i.answer !== undefined && i.attention.state === "reviewing",
+        "its conclusion",
+      );
+      expect(answered.answer).toEqual({
+        conclusion: "打卡慢是因为每次都重读配置",
+        evidence: ["clock.ts:1 每次调用都读一遍配置"],
+        unsure: [],
+        next: ["把配置读一次缓存起来"],
+      });
+      expect(answered.attention.acts).toEqual(["acknowledge", "reject", "tell", "close"]);
+      const branch = `vibevalley/issue-${answered.number}`;
+      yield* until(() => git(project, "rev-parse", branch) === git(project, "rev-parse", "main"), "what it committed gone");
+      yield* issues.act(asked.id, { act: "acknowledge" }, "");
+      const done = yield* await_(
+        () => issues.get(asked.id),
+        (i) => i.closedAt !== undefined,
+        "done",
+      );
+      expect([done.status, done.delivered, done.answer?.conclusion]).toEqual(["done", "none", "打卡慢是因为每次都重读配置"]);
+
+      const garbled = yield* issues.add({ title: "查一下 乱写", project: "clock", assignee: "lab", deliver: "answer" });
+      yield* issues.setStatus(garbled.id, "todo", "", "");
+      yield* w.nextReport;
+      const stuck = yield* await_(
+        () => issues.get(garbled.id),
+        (i) => i.attention.stuck === "failed",
+        "stuck: no answer read",
+      );
+      expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
+      refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "")), "这一轮没做成");
+      yield* issues.act(garbled.id, { act: "cure" }, "");
+      const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
+      yield* until(
+        () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
+        "what was wrong with it, said",
+      );
+      yield* w.nextReport;
+      yield* await_(
+        () => issues.get(garbled.id),
+        (i) => i.answer !== undefined && i.attention.state === "reviewing",
+        "answered the second time",
+      );
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   // Done is what was asked for, not how a round ended: a round that failed is not completed, whoever asks.
   it.live("does not complete a round that failed", () => {
     const f = farm();

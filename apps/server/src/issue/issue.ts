@@ -13,6 +13,7 @@ import {
   type Dispatched,
   type Finding,
   type IssueRun,
+  type IssueAnswer,
   type Deliverable,
   type Outcome,
   type Issue,
@@ -47,6 +48,7 @@ import { statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../recurrence/rules.ts";
 import {
+  answerCureWords,
   cureWords,
   filledKinds,
   findingsOf,
@@ -80,7 +82,7 @@ import { type Due, Recurrences } from "../recurrence/recurrence.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
-import { conflictBrief, conflictOf } from "../session/rules.ts";
+import { conflictBrief, conflictOf, parseAnswer } from "../session/rules.ts";
 
 /** An issue for the orchestrator, handed to it. */
 export interface OrchestratorWork {
@@ -189,6 +191,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   const how = handedOver ? `这张工单换你接手了，之前是 ${last.name}（${last.id}）在做` : `这张工单重开了，上一次是 ${last.name}（${last.id}）做的`;
   let out = (text.trim() || reopenDefault) + `\n\n（${how}。）`;
   out += "\n这张工单原来是：" + cut(issueJob(issue), askedMax);
+  if (issue.answer) out += "\n上一次的结论：" + cut(issue.answer.conclusion, askedMax);
   if (last.phase._tag === "closed") out += "\n它是怎么关的：" + leftText[last.phase.closed];
   if (last.lastRun) out += `\n最后一轮${outcomeText[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
   if (previous) out += "\n这条分支上已经有上次的提交，接着做。";
@@ -240,6 +243,7 @@ export const make = (options: IssueOptions = {}) =>
       const checks = json<CriterionCheck[]>(row.checks);
       const pullRequest = json<PullRequest>(row.pull_request);
       const lastRun = json<IssueRun>(row.last_run);
+      const answer = json<IssueAnswer>(row.answer);
       const out: Issue = {
         id: row.id,
         number: row.number,
@@ -270,6 +274,7 @@ export const make = (options: IssueOptions = {}) =>
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
         ...(lastRun ? { lastRun } : {}),
+        ...(answer ? { answer } : {}),
         attention: { state: "draft", acts: [] },
       };
       if ((out.sessions.length === 0 || out.task) && row.rank) out.rank = row.rank;
@@ -401,6 +406,17 @@ export const make = (options: IssueOptions = {}) =>
 
     /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
     const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
+
+    /** An answer issue's round reported: a round that got through gives its conclusion (none when none can be read, and
+     * the issue is stuck on it); whatever the round changed goes, so the issue never delivers a change. */
+    const answered = (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) =>
+      Effect.gen(function* () {
+        const t = yield* get(id);
+        if (t.deliver !== "answer" || t.sessions.at(-1) !== session) return;
+        if (outcome === "completed") yield* db(q.setIssueAnswer({ id, answer: jsonOrNull(answer, answer !== undefined) }));
+        yield* sessions.discardWork(session);
+        yield* publish(id);
+      });
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
     const judged = (id: string, at: number, findings: readonly Finding[]) =>
@@ -739,6 +755,7 @@ export const make = (options: IssueOptions = {}) =>
             const checks = e.checks ?? [];
             if (issue && checks.length > 0) yield* checked(issue, checks);
             if (issue) yield* asked(issue, e.questions);
+            if (issue) yield* answered(issue, e.id, e.outcome, e.answer);
             yield* handedBack(e);
             return;
           }
@@ -826,10 +843,11 @@ export const make = (options: IssueOptions = {}) =>
       get,
       timeline,
       add: (req) => add(req),
-      /** The words and who does it only before it is sent; how it is accepted while it is open. */
+      /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
+       * next round goes by them. */
       edit: (id, upd) =>
         Effect.gen(function* () {
-          const wordsOnly =
+          const whileOpen =
             upd.title === undefined &&
             upd.description === undefined &&
             upd.project === undefined &&
@@ -837,7 +855,7 @@ export const make = (options: IssueOptions = {}) =>
             upd.priority === undefined &&
             upd.criteria === undefined;
           let was: Issue;
-          if (wordsOnly) {
+          if (whileOpen) {
             was = yield* get(id);
             if (isClosed(was.status)) return yield* Effect.fail(refused("这张工单关上了"));
           } else was = yield* unsent(id);
@@ -856,6 +874,7 @@ export const make = (options: IssueOptions = {}) =>
               priority: upd.priority ?? was.priority,
               review: upd.review || was.review || "glance",
               criteria: jsonOrNull(criteria, criteria.length > 0),
+              deliver: upd.deliver ?? was.deliver,
               id,
             }),
           );
@@ -945,7 +964,15 @@ export const make = (options: IssueOptions = {}) =>
               break;
             case "cure": {
               const last = t.sessions.at(-1);
-              yield* comment(id, cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title));
+              // An answer that could not be read goes back with what was wrong with it; a failed round with the job again.
+              const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
+              const unread = t.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
+              yield* comment(
+                id,
+                unread
+                  ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
+                  : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title),
+              );
               break;
             }
             case "stop":

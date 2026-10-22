@@ -26,7 +26,7 @@ Status: proposed
 | — | 「先想想怎么做」「先别派」 | 不动工单，就着已有信息说 | — | 有 |
 | — | 「哪些在等我」「#41 怎么样了」 | 不动工单，读 | `issues`、`check` | 有 |
 | 写下 | 「记一下：登录偶尔白屏」 | 查重，记进备选，交付物是改动 | `issues`（`text`）、`issue_create` | 有 |
-| 写下 | 「查一下为什么测试偶尔挂」 | 记一张交付物是结论的工单（`deliver: answer`），要马上查就开工 | `issue_create`（`deliver`） | 缺：交付物（另一篇 Note 第 3 步） |
+| 写下 | 「查一下为什么测试偶尔挂」 | 记一张交付物是结论的工单（`deliver: answer`），要马上查就开工 | `issue_create`（`deliver`） | 有（另一篇 Note 第 3 步） |
 | 写下 | 「这张让 Codex 做，先别开始」 | 写上谁来做，不开工 | `issue_create`、`issue_update` 填 `agent` | 有 |
 | 写下 + 安排 | 「帮我把 README 写了」 | 记下并开工，满了排队 | `issue_create`（`start`） | 有（第 2 步） |
 | 安排 | 「#41 开工」 | 开工，满了排队 | `issue_status` 挪到待办 | 有 |
@@ -97,7 +97,7 @@ Status: proposed
 
 1. 按工单点名、`issues`、`issue_create`、`issue_update`、`issue_status`。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「管家以工单为单位」。
 2. 去掉 `dispatch`，`issue_create` 加 `start`；换人；提示照意图写；评测样例。已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」和[工单](docs/subsystems/issue.md)「换人」。
-3. 跟着[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单。
+3. 跟着[工单为本](.agents/notes/proposed/architecture/2026-10-22-an-issue-closes-on-its-own-terms.md)：它的第 1 步上线后，`merge` 并进 `issue_status` 挪到已完成（已经做了，现状在[管家](docs/subsystems/orchestrator.md)「先认意图，再动工单」）；第 3 步上线后，`issue_create` 加 `deliver`，「查一下」记成结论工单（已经做了，评测样例 `answer-when-asked-to-check`）。
 4. 跨轮的授权，和上面的分寸表落进工具。
 
 ## Alternatives considered

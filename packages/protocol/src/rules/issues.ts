@@ -1,6 +1,6 @@
 // An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
 
-import type { Delivery, Issue, IssueCanceled, IssueStatus } from "../shapes";
+import type { Deliverable, Delivery, Issue, IssueCanceled, IssueStatus } from "../shapes";
 
 const titleMax = 40;
 
@@ -27,6 +27,12 @@ export const statusLabel: Readonly<Record<IssueStatus, string>> = {
   in_review: "等你看",
   done: "已完成",
   canceled: "已取消",
+};
+
+/** What an issue is to deliver, as the owner picks it. */
+export const deliverableLabel: Readonly<Record<Deliverable, string>> = {
+  change: "改动，合进项目",
+  answer: "结论，只查不改代码",
 };
 
 /** What a done issue delivered. */

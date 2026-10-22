@@ -12,6 +12,7 @@ import {
   filledKinds,
   filledTemplate,
   issueJob,
+  answerOpening,
   kept,
   nextTaskId,
   parseRefinement,
@@ -32,6 +33,14 @@ describe("an issue as a job", () => {
     expect(issueJob({ title: "写打卡", description: "细节在 README\n还有测试" })).toBe("写打卡\n\n细节在 README\n还有测试");
     expect(issueJob({ title: "只有标题" })).toBe("只有标题");
     expect(splitJob("  ")).toEqual(["", ""]);
+  });
+
+  it("an answer issue's job is read only and ends with the block its conclusion comes back in", () => {
+    const job = issueJob({ title: "查一下打卡为什么慢", description: "主人觉得最近慢了", deliver: "answer" });
+    expect(job.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
+    expect(job).toContain('"conclusion"');
+    expect(job).toContain('"evidence"');
+    expect(issueJob({ title: "写打卡", deliver: "change" })).toBe("写打卡");
   });
 
   it("a job written as one long line keeps a short title and all of it as the description", () => {

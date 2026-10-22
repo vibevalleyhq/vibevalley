@@ -1,5 +1,6 @@
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
-import { type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import { type Deliverable, DeliverableValues, type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import { deliverableLabel } from "@vibevalley/protocol/rules";
 import { api } from "../../data/api";
 import { rememberPick } from "./write";
 import { isRefined, newIssueTitle, priorityLabel } from "../../rules/issues";
@@ -22,6 +23,7 @@ interface Draft {
   agent: string;
   priority: Priority;
   acceptance: Review;
+  deliver: Deliverable;
 }
 
 const draftOf = (i: Issue): Draft => ({
@@ -32,6 +34,7 @@ const draftOf = (i: Issue): Draft => ({
   agent: i.assignee ?? "",
   priority: i.priority,
   acceptance: i.review,
+  deliver: i.deliver,
 });
 
 const criteriaList = (text: string) =>
@@ -81,6 +84,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       assignee: x.agent,
       priority: x.priority,
       review: x.acceptance,
+      deliver: x.deliver,
       criteria: criteriaList(x.criteria),
     };
   };
@@ -285,6 +289,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
           options={PriorityValues.map((p) => ({ value: p, label: priorityLabel[p] }))}
+        />
+      </Property>
+      <Property label="交付">
+        <Pick
+          label="交付"
+          value={d().deliver}
+          onChange={(v) => edit({ deliver: v as Deliverable })}
+          options={DeliverableValues.map((v) => ({ value: v, label: deliverableLabel[v] }))}
         />
       </Property>
       <More>
