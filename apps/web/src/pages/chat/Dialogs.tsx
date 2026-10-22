@@ -1,9 +1,9 @@
 // A channel has no members to pick: helpers are in the channel their job was arranged in.
 
-import { createSignal, For, Show, untrack } from "solid-js";
+import { For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Conversation } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { createChannelForm } from "../../data/channelForm";
 import { channelName } from "../../rules/chat";
 import { autofocus } from "../../app/util";
 import { ready, useProjects } from "../../data/query";
@@ -63,41 +63,23 @@ export function NewChannelDialog(props: { open: boolean; onClose: () => void; on
 }
 
 function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) => void }) {
-  const [name, setName] = createSignal("");
-  const [description, setDescription] = createSignal("");
-  const [project, setProject] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string>();
+  const form = createChannelForm();
   const submit = async () => {
-    setBusy(true);
-    try {
-      const id = await api.channel.create({ body: { name: name(), description: description().trim() || undefined, project: project().trim() || undefined } });
-      props.onCreated(id);
-      props.onClose();
-    } catch (e) {
-      setError(reasonOf(e));
-      setBusy(false);
-    }
+    const id = await form.save();
+    if (id === undefined) return;
+    props.onCreated(id);
+    props.onClose();
   };
   return (
-    <Form submit="创建频道" onSubmit={submit} onCancel={() => props.onClose()} busy={busy()} error={error()} ready={name().trim() !== ""}>
+    <Form submit="创建频道" onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()} ready={form.ready()}>
       <Field label="名称" hint="字母、数字、汉字、- 和 _，不超过 24 个字">
-        <TextInput
-          ref={autofocus()}
-          required
-          value={name()}
-          placeholder="例如 clock-in"
-          onInput={(e) => {
-            setName(e.currentTarget.value);
-            setError(undefined);
-          }}
-        />
+        <TextInput ref={autofocus()} required value={form.name()} placeholder="例如 clock-in" onInput={(e) => form.setName(e.currentTarget.value)} />
       </Field>
       <Field label="描述（可不填）">
-        <TextArea rows={3} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
+        <TextArea rows={3} value={form.description()} onInput={(e) => form.setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
       </Field>
       <Field label="默认项目（可不填）" hint="在这个频道里派活、没说项目时，就在这个项目里干">
-        <ProjectInput value={project()} onChange={setProject} />
+        <ProjectInput value={form.project()} onChange={form.setProject} />
       </Field>
     </Form>
   );
@@ -112,28 +94,18 @@ export function ChannelSettingsDialog(props: { channel: Conversation; open: bool
 }
 
 function ChannelSettingsForm(props: { channel: Conversation; onClose: () => void }) {
-  // The form starts from the channel as it is when opened (the dialog mounts it then), and edits its own copy.
-  const [description, setDescription] = createSignal(untrack(() => props.channel.description ?? ""));
-  const [project, setProject] = createSignal(untrack(() => props.channel.project ?? ""));
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string>();
+  // The dialog mounts the form when it opens: it starts from the channel as it is then.
+  const form = createChannelForm(untrack(() => props.channel));
   const submit = async () => {
-    setBusy(true);
-    try {
-      await api.channel.update({ id: props.channel.id, body: { description: description(), project: project() } });
-      props.onClose();
-    } catch (e) {
-      setError(reasonOf(e));
-      setBusy(false);
-    }
+    if ((await form.save()) !== undefined) props.onClose();
   };
   return (
-    <Form submit="保存" onSubmit={submit} onCancel={() => props.onClose()} busy={busy()} error={error()}>
+    <Form submit="保存" onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
       <Field label="描述（可不填）">
-        <TextArea rows={3} value={description()} onInput={(e) => setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
+        <TextArea rows={3} value={form.description()} onInput={(e) => form.setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
       </Field>
       <Field label="默认项目（可不填）" hint="空着就没有：派活时管家要问在哪个项目">
-        <ProjectInput value={project()} onChange={setProject} />
+        <ProjectInput value={form.project()} onChange={form.setProject} />
       </Field>
     </Form>
   );

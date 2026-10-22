@@ -3,7 +3,7 @@
 
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { createChannelForm } from "../../data/channelForm";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { channelsOf, chatPath, unreadUnder } from "../../rules/chat";
@@ -132,36 +132,25 @@ function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: () 
 function NewChannel(props: { onDone: () => void; onBack: () => void }) {
   const projects = useProjects();
   const names = () => ready(projects, []).map((p) => p.name);
-  const [name, setName] = createSignal("");
-  const [description, setDescription] = createSignal("");
-  const [project, setProject] = createSignal("");
-  const [error, setError] = createSignal<string>();
-  const [busy, setBusy] = createSignal(false);
+  const form = createChannelForm();
   const submit = async () => {
-    setBusy(true);
-    try {
-      const made = await api.channel.create({
-        body: { name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined },
-      });
-      playSound("open");
-      farm.showChat(made);
-      props.onDone();
-    } catch (e) {
-      setError(reasonOf(e));
-      setBusy(false);
-    }
+    const made = await form.save();
+    if (made === undefined) return;
+    playSound("open");
+    farm.showChat(made);
+    props.onDone();
   };
   return (
     <div class="flex flex-col gap-1.5">
       <p class="text-[13px]">开新频道</p>
       <p class="text-[12px] text-bark-500">一件长期的事、一个项目，单独一个地方说话、派活。在这里叫管家，活就派在这里。</p>
-      <PxTextInput value={name()} onChange={setName} placeholder="名字，比如 clock-in" label="频道名" autoFocus />
-      <PxTextInput value={description()} onChange={setDescription} placeholder="做什么的（可以不填）" label="频道说明" />
-      <PxTextInput value={project()} onChange={setProject} placeholder="默认项目（可以不填）" label="默认项目" suggestions={names()} />
-      <Show when={error()}>
-        <p class="text-[12px] text-berry">{error()}</p>
+      <PxTextInput value={form.name()} onChange={form.setName} placeholder="名字，比如 clock-in" label="频道名" autoFocus />
+      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder="做什么的（可以不填）" label="频道说明" />
+      <PxTextInput value={form.project()} onChange={form.setProject} placeholder="默认项目（可以不填）" label="默认项目" suggestions={names()} />
+      <Show when={form.error()}>
+        <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit="开" onSubmit={busy() || !name().trim() ? undefined : () => void submit()} />
+      <FormButtons onBack={() => props.onBack()} submit="开" onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }
@@ -169,27 +158,20 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
 function ChannelSettings(props: { channel: Conversation; onDone: () => void; onBack: () => void }) {
   const projects = useProjects();
   const names = () => ready(projects, []).map((p) => p.name);
-  // The form starts from the channel as it is when opened, and edits its own copy.
-  const [description, setDescription] = createSignal(untrack(() => props.channel.description ?? ""));
-  const [project, setProject] = createSignal(untrack(() => props.channel.project ?? ""));
-  const [error, setError] = createSignal<string>();
+  // It starts from the channel as it is when opened.
+  const form = createChannelForm(untrack(() => props.channel));
   const submit = async () => {
-    try {
-      await api.channel.update({ id: props.channel.id, body: { description: description(), project: project() } });
-      props.onDone();
-    } catch (e) {
-      setError(reasonOf(e));
-    }
+    if ((await form.save()) !== undefined) props.onDone();
   };
   return (
     <div class="flex flex-col gap-1.5">
       <p class="text-[13px]">{channelLabel(props.channel)} 的设置</p>
-      <PxTextInput value={description()} onChange={setDescription} placeholder="做什么的" label="频道说明" />
-      <PxTextInput value={project()} onChange={setProject} placeholder="默认项目（空着就没有）" label="默认项目" suggestions={names()} />
-      <Show when={error()}>
-        <p class="text-[12px] text-berry">{error()}</p>
+      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder="做什么的" label="频道说明" />
+      <PxTextInput value={form.project()} onChange={form.setProject} placeholder="默认项目（空着就没有）" label="默认项目" suggestions={names()} />
+      <Show when={form.error()}>
+        <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit="存" onSubmit={() => void submit()} />
+      <FormButtons onBack={() => props.onBack()} submit="存" onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }

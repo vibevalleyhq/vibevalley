@@ -58,7 +58,6 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
     if (key?.draft !== said) key = { draft: said, key: newSendKey() };
     setBusy(true);
     try {
-      await api.orchestrator.open();
       await api.channel.say({
         body: { text: said, conversation: props.conversation?.kind === "general" ? undefined : props.conversation?.id, sendKey: key.key },
       });
