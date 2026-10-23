@@ -74,9 +74,10 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
   | 0 | 成功，或要了帮助 |
   | 1 | 服务端出错 |
   | 2 | 命令写错了：不认的参数、少参数、请求体不对 |
-  | 3 | 服务端拒绝（`Refused`） |
+  | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
+  | 130 | 按了 Ctrl+C：`state --watch`、`issue run` 放下请求再走 |
 
 1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
 

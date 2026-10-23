@@ -2,11 +2,12 @@
 // is routed to its handler. A path parameter that should be a number and is not is a 404, a query one is none; a body
 // that does not decode is a 400 with why; no answer is a 204; a refusal is its tagged JSON at its status.
 
-import { type ApiError, type Endpoint, endpoints, errorStatus, type Handlers } from "@vibevalley/protocol/api";
+import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers } from "@vibevalley/protocol/api";
 import { Cause, Effect, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-const isApiError = (e: unknown): e is ApiError => typeof e === "object" && e !== null && "_tag" in e && (e as ApiError)._tag in errorStatus;
+// The same Schema the clients read it back with: a refusal that does not fit it is the server's bug, a 500.
+const isApiError = Schema.is(ApiError);
 
 const notFound = HttpServerResponse.text("404 page not found\n", { status: 404 });
 
