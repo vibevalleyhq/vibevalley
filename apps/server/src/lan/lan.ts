@@ -17,7 +17,7 @@ import { Context, Effect, FiberSet, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
-import { missing } from "../errors.ts";
+import { missing, lookIn } from "../errors.ts";
 import { callbackLog } from "../base/log.ts";
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
@@ -158,7 +158,7 @@ export const make = (options: LanOptions = {}) =>
     // forget and its dry run judge by this.
     const known = (id: string) => {
       const d = devices.get(id);
-      return d ? Effect.succeed(d) : Effect.fail(missing(`没有 ${id} 这台设备`, [{ say: "看连着的设备，找它的 id", run: ["lan", "status"] }]));
+      return d ? Effect.succeed(d) : Effect.fail(missing(`没有 ${id} 这台设备`, [lookIn.device]));
     };
     const dropPairing = () => {
       pairing?.answer?.(false);

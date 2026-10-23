@@ -8,7 +8,7 @@ import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
 import type { ChannelShape } from "../channel/chat.ts";
 import type { CoreShape } from "../core/core.ts";
-import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { type Merged, MergeFailure, type ProjectShape, type Workplace } from "../project/project.ts";
 import { NotTakenIn, type SessionShape } from "../session/session.ts";
 import { statusMove } from "./moves.ts";
@@ -57,7 +57,7 @@ export function merging(d: MergeDeps) {
   const mergeSession = (id: string) =>
     Effect.gen(function* () {
       const session = sessions.sessionOf(id);
-      if (!session) return yield* Effect.fail(missing("帮工 " + id));
+      if (!session) return yield* Effect.fail(missing("帮工 " + id, [lookIn.session]));
       const merged = yield* handedOver(id, (place) => projects.merge(place));
       yield* core.notice("info", `${session.name} 的活合进去了：${merged.text}`);
       return merged.text;

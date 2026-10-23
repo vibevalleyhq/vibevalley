@@ -107,8 +107,9 @@ ${[...groups].map(([g, ms]) => `\n  readonly ${g} = {\n${ms.join("\n")}\n  };\n`
     const text = await res.text();
     const decoded: unknown = text === "" ? undefined : JSON.parse(text);
     if (!res.ok) {
-      const j = (decoded ?? {}) as { _tag?: unknown; reason?: unknown };
-      const reason = typeof j.reason === "string" ? j.reason : "服务端答 " + res.status;
+      const j = (decoded ?? {}) as { _tag?: unknown; reason?: unknown; what?: unknown };
+      // Missing says what is not there; every other ApiError gives its reason.
+      const reason = typeof j.reason === "string" ? j.reason : typeof j.what === "string" ? j.what : "服务端答 " + res.status;
       throw new VibeValleyApiError(
         res.status,
         typeof j._tag === "string" ? j._tag : undefined,

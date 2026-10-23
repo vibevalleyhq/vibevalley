@@ -72,13 +72,13 @@ agent 改完代码，最贵的一步是证明改对了。现在证明的路有�
 ### 做到哪了
 
 1. 第一、二节和第四节里命令行自己的那一半：已经做了。`effect/cli` 搭的命令行（`apps/server/src/cli.ts`、`src/cli/`），每个接口一条命令、有帮助，`--json` 收文本、`-`、`@文件` 并照 Schema 先查；stdout 只放 JSON（终端里排开，不是终端时一行，流一行一帧），失败是 stderr 最后一行带 `next` 的 JSON，退出码照上表。没加 `--output`：是不是终端已经够分。
-2. 服务端的拒绝带 `next`（第四节的另一半）：已经做了工单的。`ApiError` 的 `Refused`、`Missing` 有可选的 `next`；工单的拒绝给出它现在能做的动作和挪法（`nextSteps`），找不到工单给 `issue list`。别的服务的拒绝还没带。
+2. 服务端的拒绝带 `next`（第四节的另一半）：已经做了工单的。`ApiError` 的 `Refused`、`Missing` 有可选的 `next`；工单的拒绝给出它现在能做的动作和挪法（`nextSteps`），找不到工单给 `issue list`。后来推到了别的服务：`missing(what, next)` 的 `next` 是必填的，每个找不到的都要说去哪儿找，去处写在 `errors.ts` 的 `lookIn`（一种东西一条列出它们的命令，`cli.test.ts` 跑每一条的帮助）；说「没有 X」却用 `Refused` 的（计划、频道、对话、帮工）改成 `Missing`；请求里点到不存在的档案或频道、没有能派的帮工，仍是拒绝，带上去哪儿找；计划和步骤的动作被拒时给出它现在能做的（`graphActions`、`taskActions`，`task.ts` 的 `graphNext`、`stepNext`）。其余的拒绝是规则（没说要做什么、分支没能建），下一步要主人想，不硬给命令。
 3. 试跑（第三节）：已经做了工单的。接口表的一项带 `dryRun`，指向同参数、同请求体、答复 `Preview` 的另一个接口（不用查询参数 `dryRun`：答复的形状不一样，分开两个接口各自的 Schema 都准）；`issue.status`、`issue.act`、`issue.delete` 有了，`setStatus` 拆成算出挪法（`settledMove`）和动手两步。命令行的 `--dry-run` 调 `dryRun` 指的那个；只读的照跑；别的改东西的命令带它会被拒。每个删除都有了试跑（定时、计划的一步、档案、技能、记性、连接到本机的设备和配对码），各服务把「能不能删」写成一处判断（如 `deletableAgent`、`forgettable`、`known`），删和试跑都过它，找不到的两边都是 `Missing`、带上去哪儿找；`cli.test.ts` 查每个 `DELETE` 都带 `dryRun`。
 4. 验证 skill 改成只用命令行（第五节）：已经做了。`scripts/verify-server.ts --scripted-helper` 让沙箱里的 pi 是服务端测试里照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`），`verify-server` 的 skill 写着一遍只用命令行的：建工单、`issue run` 等它交回来、试跑完成、真完成、`git log` 看合进去的提交；`scripts/verify-server.test.ts` 跑着同样的一遍。
 
 5. 命令行自己也尽量用 Effect：已经做了。请求走 `HttpClient`（`FetchHttpClient.layer`），流用 `Sse.decode`，读写走 `Stdio`、`@文件` 走 `FileSystem`，`VIBEVALLEY_SERVER` 是 `--server` 的 `Flag.withFallbackConfig`，JSON 和服务端的错误照 Schema 解（protocol 的 `ApiError` 有了 Schema，服务端认错误也用它）；`issue run` 跟着 `/api/v1/state` 的帧走，不再轮询；进程由 `NodeRuntime.runMain` 起，Ctrl+C 中断，退出码 130。和农机、自己的 agent 聊（`cli/chat.ts`）仍是 Promise：底下的 Brain 和 oar 会话就是 Promise，它自己接 Ctrl+C，所以在不可中断的一段里跑。
 
-还没做的：别的服务的拒绝带 `next`；命令行的黄金数据（`--help`、几条典型错误的 JSON）。
+还没做的：命令行的黄金数据（`--help`、几条典型错误的 JSON）。
 
 ## Alternatives considered
 

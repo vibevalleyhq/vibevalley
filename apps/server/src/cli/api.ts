@@ -187,7 +187,11 @@ const frames = (base: string, path: string) =>
         Stream.decodeText,
         Stream.pipeThroughChannel(Sse.decode()),
         Stream.map((e) => e.data),
-        Stream.mapError((e) => (e._tag === "HttpClientError" ? unreachable(base)(e) : new Failure({ code: exit.other, tag: "Server", text: String(e) }))),
+        Stream.mapError((e) =>
+          e._tag === "HttpClientError"
+            ? unreachable(base)(e)
+            : new Failure({ code: exit.other, tag: "Server", text: e._tag === "Retry" ? "服务端要流重连，命令行不接着连" : `流读不下去：${e.message}` }),
+        ),
       );
     }),
   );

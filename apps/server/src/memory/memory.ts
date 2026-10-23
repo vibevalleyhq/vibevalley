@@ -16,7 +16,7 @@ import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import { type ApiError, memoriesOf, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
 import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
@@ -154,7 +154,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         if (problem) return yield* Effect.fail(refused(problem));
         const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
         const m = listed.memories.find((x) => x.id === id);
-        if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [{ say: "列出它的记性，找那一条的 id", run: ["memory", "list", agent] }]));
+        if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
         return m;
       });
 

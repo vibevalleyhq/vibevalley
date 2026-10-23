@@ -8,7 +8,7 @@ import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];
@@ -132,11 +132,11 @@ export const make = Effect.gen(function* () {
   const deletableAgent = (id: string) => {
     if (id === orchestratorAgent) return Effect.fail(refused("管家删不了：每个工作区都有一个"));
     const a = s.agents.find((x) => x.id === id);
-    return a ? Effect.succeed(a) : Effect.fail(missing(`没有 ${id} 这个档案`, [{ say: "列出档案，找它的 id", run: ["agent", "list"] }]));
+    return a ? Effect.succeed(a) : Effect.fail(missing(`没有 ${id} 这个档案`, [lookIn.agent]));
   };
   const deletableSkill = (id: string) => {
     const k = s.skills.find((x) => x.id === id);
-    return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [{ say: "列出技能，找它的 id", run: ["skill", "list"] }]));
+    return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [lookIn.skill]));
   };
 
   const shape: AgentShape = {

@@ -6,7 +6,7 @@ import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnap
 import { Context, Effect, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { newId } from "../base/ids.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import { type ApiError, missing, lookIn, refused } from "../errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
@@ -48,7 +48,7 @@ export interface DocShape {
 
 export class Docs extends Context.Service<Docs, DocShape>()("vibevalley/Doc") {}
 
-const missingDoc = (id: string) => missing("文档 " + id);
+const missingDoc = (id: string) => missing("文档 " + id, [lookIn.doc]);
 
 const titleOf = (title: string) => title.trim() || "没起名的文档";
 
@@ -306,7 +306,7 @@ export const make = (options: DocOptions = {}) =>
           .filter((a) => a.enabled)
           .slice(0, demoScript.length)
           .map((a) => a.id);
-        if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个"));
+        if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]));
         if (demoOn) return yield* Effect.fail(refused("演示正在写，写完再点"));
         demoOn = true;
         // The demo lives as long as the service: stopping the farm stops it.

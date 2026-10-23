@@ -42,7 +42,7 @@ export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core, type FactIn } from "../core/core.ts";
-import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { Memories } from "../memory/memory.ts";
 import { type Merged, MergeFailure, Projects, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/project.ts";
 import { probeInstallation, Runtimes } from "../runtime/runtime.ts";
@@ -892,11 +892,11 @@ export const make = (options: SessionOptionsIn = {}) =>
     ) =>
       Effect.gen(function* () {
         const h = hands.get(id);
-        if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
+        if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
         return yield* h.access.withPermits(1)(
           Effect.gen(function* () {
             const current = core.session(id);
-            if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id));
+            if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
             if (closed === "merged" && current.graph)
               return yield* Effect.fail<ApiError | NotTakenIn>(
                 refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`),

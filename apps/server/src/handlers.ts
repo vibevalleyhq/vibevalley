@@ -3,7 +3,7 @@
 import { docOwner, type IssueUpdate } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
-import { missing, reasonOf, refused } from "./errors.ts";
+import { missing, lookIn, reasonOf, refused } from "./errors.ts";
 import { Projects } from "./project/project.ts";
 import { Effect } from "effect";
 import { Settings } from "./base/config.ts";
@@ -104,9 +104,10 @@ export const handlers = Effect.gen(function* () {
     "project.languages": ({ id }) =>
       projects.languages(id).pipe(
         Effect.mapError((e) => refused(e.message)),
-        Effect.flatMap((l) => (l ? Effect.succeed(l) : Effect.fail(missing("项目 " + id)))),
+        Effect.flatMap((l) => (l ? Effect.succeed(l) : Effect.fail(missing("项目 " + id, [lookIn.project])))),
       ),
-    "project.activity": ({ id }) => Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing("项目 " + id)))),
+    "project.activity": ({ id }) =>
+      Effect.flatMap(projects.activity(id), (a) => (a ? Effect.succeed(a) : Effect.fail(missing("项目 " + id, [lookIn.project])))),
     "agent.list": () => Effect.sync(agents.all),
     "agent.create": ({ body }) => agents.createAgent(body),
     "agent.save": ({ id, body }) => (body.id !== id ? Effect.fail(refused(`路径里的档案 ${id} 和请求里的 ${body.id} 不是一个`)) : agents.saveAgent(body)),
@@ -126,21 +127,22 @@ export const handlers = Effect.gen(function* () {
     "orchestrator.getArchive": ({ name }) =>
       Effect.suspend(() => {
         const text = memory.archiveFile(name);
-        return text !== undefined ? Effect.succeed(text) : Effect.fail(missing("旧账 " + name));
+        return text !== undefined ? Effect.succeed(text) : Effect.fail(missing("旧账 " + name, [lookIn.archive]));
       }),
     "runtime.list": () => Effect.sync(runtimes.list),
-    "runtime.refresh": ({ id }) => Effect.flatMap(runtimes.refresh(id), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id)))),
+    "runtime.refresh": ({ id }) =>
+      Effect.flatMap(runtimes.refresh(id), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
     "runtime.update": ({ id, body }) =>
-      Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id)))),
+      Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
     "agent.check": ({ body }) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.check(agent), (issues) => ({ id: agent.id, issues }))),
-    "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing("帮工 " + id))),
+    "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing("帮工 " + id, [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
-    "session.get": ({ id }) => Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing("帮工 " + id)))),
+    "session.get": ({ id }) => Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing("帮工 " + id, [lookIn.session])))),
     "session.events": ({ id, run }) => Effect.sync(() => sessions.events(id, run ?? "") ?? []),
     "channel.create": ({ body }) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, body }) => channels.updateChannel(id, body.description, body.project),
     "channel.history": ({ id, before, limit }) => channels.history(id, before, limit),
-    "channel.markRead": ({ id, body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e)))),
+    "channel.markRead": ({ id, body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
     "recurrence.create": ({ body }) => recurrences.add(body, "owner", true),
     "recurrence.list": () => Effect.sync(recurrences.list),
     "recurrence.update": ({ id, body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),

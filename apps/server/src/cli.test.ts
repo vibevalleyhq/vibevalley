@@ -5,6 +5,7 @@ import { NodeServices } from "@effect/platform-node";
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 import { kebab } from "./cli/api.ts";
+import { lookIn, memoriesOf } from "./errors.ts";
 import { run } from "./cli.ts";
 import { app } from "./http/app.ts";
 import { testConfig } from "./testing/layers.ts";
@@ -189,6 +190,16 @@ describe("the command line", () => {
         const real = yield* run(args);
         expect([args.join(" "), dry.code, real.code, dry.failure?.message === real.failure?.message]).toEqual([args.join(" "), 4, 4, true]);
         expect(dry.failure?.next?.[0]?.run).toBeDefined();
+      }
+    }),
+  );
+
+  it.effect("every place a missing thing points to is a command that is there", () =>
+    Effect.gen(function* () {
+      for (const next of [...Object.values(lookIn), memoriesOf("docs")]) {
+        if (!next.run) continue;
+        const help = yield* cli([...next.run, "--help"]);
+        expect({ run: next.run, code: help.code }).toEqual({ run: next.run, code: 0 });
       }
     }),
   );

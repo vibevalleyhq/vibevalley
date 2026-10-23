@@ -282,7 +282,10 @@ describe("the chat", () => {
         expect(yield* Effect.promise(() => f.deliveryOf("w5", said.id))).toBeUndefined();
         expect((yield* f.chat.read("w4", { target: "#clock-in" })).target).toBe("#clock-in");
         expect((yield* f.chat.speak("w4", "今天能好", { target: "#clock-in", anyway: true, confirm: true })).kind).toBe("sent");
-        expect(yield* Effect.flip(f.chat.read("w4", { target: "#nowhere" }))).toMatchObject({ reason: expect.stringContaining("没有叫 #nowhere 的频道") });
+        expect(yield* Effect.flip(f.chat.read("w4", { target: "#nowhere" }))).toMatchObject({
+          _tag: "Missing",
+          what: expect.stringContaining("没有叫 #nowhere 的频道"),
+        });
         expect((yield* f.chat.channelOf(thread.id)).name).toBe("clock-in");
         yield* f.chat.updateChannel(channel.id, undefined, "");
         expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
@@ -407,7 +410,7 @@ describe("the chat", () => {
         const older = yield* f.chat.read("user", { target: "#田头", before: page.messages[0]!.number, limit: 2 });
         expect([older.messages.map((m) => m.number), older.older]).toEqual([[seqs[0], seqs[1]], false]);
         yield* f.chat.markRead(general, seqs[1]!);
-        expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Refused");
+        expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Missing");
         expect(generalOf(f.core.state().chat)?.read).toBe(seqs[4]);
         expect((yield* Effect.flip(f.chat.say("  ", undefined, "")))._tag).toBe("Refused");
         expect(yield* f.chat.orchestratorDigest()).toEqual([]);
