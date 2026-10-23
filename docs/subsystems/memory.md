@@ -10,9 +10,9 @@
 | 开工想起什么（`pick`），和「下回开工会想起什么」的预览 | 什么时候算新的一轮、同一个会话想起过哪些（`session`，存在库里它那一行） |
 | 管理器：本地和外面的来源一起读、一起写，合并、去重、超时 | 外面来源的地址和 key 怎么存、怎么校验（`setting`，`settings.json` 的 `memorySources`） |
 | `memory_search`、`memory_add` 背后的检索和写入，回给模型的话（`foundText`） | 工具的参数、谁能用、范围由谁定（`apps/server/src/tool`；帮工经 `/mcp`，`mcp`） |
-| 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`agent/brain/memory.ts`；[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「管家页」） |
+| 管家的 `MEMORY.md` 和旧账 `archive/` 给页面的读写口子 | 管家怎么把 `MEMORY.md` 带进系统提示、`remember` 和 `search_archive` 工具（`agent/brain/memory.ts`；[管家](docs/subsystems/orchestrator.md)） |
 | 送往外面来源之前抹密钥 | 抹密钥的规则本身（`base/redact.ts`，和服务端日志同一份；[设置](docs/subsystems/setting.md)） |
-| | 技能书（程序性的「记性」走技能书，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」） |
+| | 技能书（程序性的「记性」走技能书，[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 

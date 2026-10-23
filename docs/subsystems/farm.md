@@ -12,8 +12,8 @@
 | 地图：每个项目一座岛，地是它的 worktree 和空位 | 项目的上限、worktree（[项目](docs/subsystems/project.md)） |
 | 农场手机：来电响铃、接听去哪、通话记录、小游戏 | 哪些事算来电、怎么说（Inbox，[通知](docs/subsystems/notice.md)） |
 | 系统通知和菜单栏的说法（[客户端](docs/subsystems/app.md)「通知和菜单栏」） | 通知送到页面没开着的手机上（连接器，[田头](docs/subsystems/channel.md)） |
-| 合成音效、图鉴 | 首页（[pixel-village.md](docs/reference/pixel-village.md)「首页」） |
-| 素材怎么读进页面（`sprites.json`、密度） | 生图和切图的流水线：`design/`（[pixel-village.md](docs/reference/pixel-village.md)「素材」） |
+| 合成音效、图鉴 | 首页的生命周期（[客户端](docs/subsystems/app.md#怎么走)）和界面（[farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
+| 素材怎么读进页面（`sprites.json`、密度） | 生图和切图的流水线：`design/`（[工程流程](docs/subsystems/process.md#怎么走)） |
 | | 页面的目录和数据层（[客户端](docs/subsystems/app.md)、[农场的 README](apps/web/src/farm/README.md)）；每个界面的清单（[farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
 
 ## 在哪
@@ -63,6 +63,7 @@
 - **世界坐标只有一套：384×256 个像素格。** 素材画成两倍密，`world/sprites.ts` 用地图图片的宽除以 384 得出密度，把 `sprites.json` 里的宽高和落脚点都除以它；关卡、点击区、HUD 的坐标都按格子写，不随密度改。
 - **放大只用整数倍**（`frameVillage`）：从能盖满窗口的倍数往下找，第一个满足「左右每边裁掉不超过村子宽度的 5%（`villageCutAcross`），上下每边不超过高度的 8%（`villageCutDown`）」的就用。1152×768 正好放下，所以桌面窗口默认是这么大、拖动时保持 3:2（[客户端](docs/subsystems/app.md)）；1440×900 放大 4 倍、左右各裁 48、上下各裁 62 屏幕像素；1920×1080 放大 5 倍、只裁上下；竖着的手机放大 1 倍。盖不满的地方留边，边上垫一张放大、压暗的农场。最外一圈至多左右各 19 格、上下各 20 格可能看不到，能点的东西应放在这圈里面。
 - **HUD 和字是盖在画布上的 DOM**（`farm/hud/`），任何缩放下都清楚，贴着农场在窗口里露出来的那一块的边；字号只用 12 和 24。
+- **指针跟着农具和指向处变**（`canvas/VillageCanvas.tsx`）：指着道具、农具能用或不能用、按下时各选一张 CSS 指针；`public/cursors/cursors.json` 的 `hx`、`hy` 是热点，不是精灵的落脚点。
 - **地图数据在 LDtk**：Ground 层标能走的地方；Things 层是地块、帮工去的地点（`Place`）、道具、灯、大门、排队处、管家和狗。地块和道具的底由游戏从 Ground 里扣掉（`walkable`），因为它们会动。
 - **寻路**（`packages/engine/src/nav`）：能走的地方铺成格子（像素村用 2 格一个），靠近障碍的格子贵一点，所以帮工走在过道中间；不从两个挡住的格子之间斜着挤过去；找到的路把能直走、不更贵的拐角拉直。到不了就直走过去。
 - **光是页面算的**：法线贴图在加载时从画里生成，不另画夜景；天光随钟点变（约 06:00 日出、19:00 日落），天黑后窗户、路灯、提灯是点光源；镜头前的一层植物往鼠标那边偏几个像素，院子本身不动。
@@ -77,7 +78,7 @@
 - **打电话是手机的事**：田头没有通话键，输入行左边也不再有管家的头像（它是旧的小窗用来收起的）；手机的「管家」一屏就是这通电话（打给管家、通话中、挂断、没接通的原因），田头头上写管家在听、在想，没接通的原因和「去设置」在田头头下，都读同一个 `voiceCall`。
 - **小游戏的规则是纯函数**：一局是一个值，每一步是值到值，带种子的随机，能重放；画面只跑动画帧、接十字键和 A、B、画在 canvas 上。最好成绩只在这次打开里；推箱子的棋盘放在农场的 store 里，收起手机、来电都不丢，5 个固定关卡，能逐步撤销、重开本关。小游戏不进账本、不给金币。
 - **通知和来电用同一套规则**：都从帧里的 `inbox` 读，话是来电自带的 `words`，同一个来电只响一次（`freshOf`）；窗口在前面时不弹系统通知。页面没开着时什么都收不到，那时靠连接器把话送到微信、飞书或 QQ。
-- **地图上的地 = worktree + 空位**（`rules/projects.ts` 的 `islandsOf`）：项目里的每个帮工一块（不管在干、熟了还是歇着，它的 worktree 都在），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.maxSessions`（`project.max_sessions`，默认 3；没设或超过 6 时是 6）；空位和服务端拒绝开工（`noRoom`）用的是同一条规则 `roomLeft`（`packages/protocol/src/rules/phase.ts`），不各算一份。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
+- **地图上的地 = 在做的工单 + 空位**（`rules/projects.ts` 的 `islandsOf`）：项目里的每个帮工一块（不管在干、熟了还是歇着），按来的先后排；后面是空位，个数是项目的上限减去在干活的，也不超过农场还空着的地；被农场的地挡住的画成锁住的地。一座岛最多 6 块。上限来自 `ProjectSummary.maxSessions`（`project.max_sessions`，默认 3；没设或超过 6 时是 6）；空位和服务端拒绝开工（`noRoom`）用的是同一条规则 `roomLeft`（`packages/protocol/src/rules/phase.ts`），不各算一份。排上队的待办（`queuedAt`）按先后是院门外的种子袋。不在项目列表里的项目只画它的帮工、不再给空位。岛下面的名牌写着「进岛」并带箭头，点它或岛进这个项目的岛视图。
 - **每块地写着项目**：几个项目的地混在一个农场里，有帮工的地在牌子那一栏写它的项目名；有牌子（等你验收、等你回答……）时项目名在牌子下面一行。
 - **岛是整张的画**：六种样子（`islandLooks`），项目用哪座由名字定；每座中间留一块空院子，`process.py` 找出院子、把岛缩到院子 150 格宽，院子的位置写进 `sprites.json` 的 `yard`，页面按它摆地。
 - **图鉴只读已打包的东西**：图来自 `sprites.json`，指针来自 `cursors.json`，音效来自 `sound.ts` 的配方；没有自己的清单，切了新图就出现。分类按名字前缀（`shelves`），帧按编号认（`framesOf`），重画和重切的命令按清单里的 `sheet`（切自哪张原图）给出（`remakeOf`）；改了命名前缀要同时改 `shelves`，否则新图落进「其他」。
@@ -117,7 +118,7 @@
 - **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
 - **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
-- **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `apps/web/public/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。步骤见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
+- **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `apps/web/public/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。操作命令见[开发](docs/development.md#素材音效和官网)。
 
 ## 为什么这样
 

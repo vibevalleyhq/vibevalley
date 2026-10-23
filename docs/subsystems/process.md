@@ -11,12 +11,12 @@
 | `docs:verify` 的四个检查：Note、skill、链接和路径、旧名字 | 服务端和页面的检查：黄金数据、`schema.test.ts`、`server:check`、`web:check`（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
 | 项目自己的 skill 和验证 skill 的格式 | 每个验证 skill 的步骤（[.agents/skills](.agents/skills/README.md)） |
 | 写作规范为什么是现在这样 | 写作规范本身（[style/writing.md](docs/style/writing.md)）、代码怎么写（[style/code.md](docs/style/code.md)） |
-| 素材的生图和切图流水线 | 客户端怎么读图、密度、像素村（[农场的皮](docs/subsystems/farm.md)）；操作步骤（[pixel-village.md](docs/reference/pixel-village.md)「素材」） |
+| 素材的生图和切图流水线 | 客户端怎么读图、密度、像素村（[农场的皮](docs/subsystems/farm.md)）；操作步骤（[development.md](docs/development.md#素材音效和官网)） |
 | 名字：VibeValley、码农场物语、小写的 `vibevalley` | 渠道各自的 bundle id 和目录（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪
 
-- **`scripts/`**（Bun 跑，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `bun run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统。
+- **`scripts/`**（Bun 跑，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `bun run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统。
 - **`.agents/`**：`notes/` 是 Agent Notes，`CATALOG.md` 是生成的清单；`skills/` 是项目自己的 skill，`.claude/skills` 是指向它的符号链接。
 - **`docs/`**：分层见 [docs/AGENTS.md](docs/AGENTS.md)；`docs/style/` 是 `writing.md` 和 `code.md`。
 - **`design/`**：`pixel/gen.sh`（codex 生图）、`pixel/process.py`（切图，写 `apps/web/public/pixel/` 和 `sprites.json`）、`pixel/prompts/`（提示词）、`pixel/icons/`（Hugeicons 的 SVG 和排参考图的 `ref.py`）；`assets/` 只留最早一套手绘界面的 `gen.sh`、提示词和原图；`art.sh` 把单独仓库 vibevalley-art 里的原图链接进来；`names.md` 是给档案和人物起名的梗。
@@ -24,6 +24,7 @@
 ## 模型和不变量
 
 - **一个事实一个家。** 常驻规矩在根目录 `AGENTS.md`，一条一到三行、链接到它的家；当前的行为在 `docs/`，子系统写沉淀下来的样子和理由；包的对外约定在包的 README；计划在 Note。别处只链接。
+- **索引和操作各有自己的家。** `docs/README.md` 是唯一的手工文档地图，其他目录不另列子系统或参考清单；`docs/**/*.md` 除地图自身外都要从地图链到，`doc-links.ts` 查漏收。界面清单在 `reference/farm-ui.md`，素材生成和切图的操作在 `development.md`，流程和理由留在这里。
 - **Note 是计划，子系统是沉淀。** Note 走 `proposed/` → `implemented/`；做完以后仍然成立的决定和放弃的路写进子系统的「为什么这样」，Note 删掉，指向它的链接改指子系统；子系统的「还没做的」只放 `proposed/` 的链接。没沉淀之前，`implemented/` 的 Note 跟着代码改事实（路径、名字、默认值）。
 - **生命周期和类别都在路径里**：`.agents/notes/{lifecycle}/{class}/yyyy-mm-dd-topic.md`。类别是封闭的集合，以 `agent-notes.ts` 的 `AGENT_NOTE_CLASSES` 为准；`Status:` 行要和所在目录一致，每个生命周期有必需和禁止的章节。
 - **清单只有一份，是生成的。** `CATALOG.md` 只来自路径和每篇的 `# Agent Note:` 标题，按生命周期、类别列，新的在前，否决的带上理由；不手改，`notes:catalog` 重写；手写的 `INDEX.md` 放进来就报错。合并冲突时重新生成。
@@ -46,7 +47,7 @@
 
 **写一个验证 skill**（照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md)）：先问能不能改成代码或检查 → 在真的改动上完整验证一遍，记下命令和看到的输出 → 写成固定的六节 → 让一个没有上下文的子 agent 照着做一遍。「证据」一节列出 agent 说「验证过了」时要附上的输出或截图，主人看证据，不看过程。验证 skill 默认不派真的帮工（花钱，要主人点头）。
 
-**加一张素材**：`design/art.sh` 链接原图 → `design/pixel/gen.sh <名字>`（两倍密是 `hd-<名字>`）让 codex 照参考图出一张品红底的整图到 `design/pixel/raw/` → `process.py` 里写「哪张图、几行几列、每格叫什么」，去品红、切格、缩成像素画、算落脚点，写出 PNG 和 `sprites.json`。按钮图标先 `python3 icons/ref.py <表>` 把 Hugeicons 的形状排成参考图，再生图、切图。步骤和应用图标见 [pixel-village.md](docs/reference/pixel-village.md)「素材」。
+**加一张素材**：`design/art.sh` 链接原图 → `design/pixel/gen.sh <名字>`（两倍密是 `hd-<名字>`）让 codex 照参考图出一张品红底的整图到 `design/pixel/raw/` → `process.py` 里写「哪张图、几行几列、每格叫什么」，去品红、切格、缩成像素画、算落脚点，写出 PNG 和 `sprites.json`。按钮图标先 `python3 icons/ref.py <表>` 把 Hugeicons 的形状排成参考图，再生图、切图。操作命令和应用图标的位置见[开发](docs/development.md#素材音效和官网)。
 
 ## 和谁打交道
 

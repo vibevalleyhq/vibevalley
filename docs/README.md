@@ -9,7 +9,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [guide.md](docs/guide.md) | 教程：派第一张工单，看着它干，完成它，处理冲突和失败，管住花费，用语音 |
 | [development.md](docs/development.md) | 教程：本机跑起来，检查和测试，改形状、规则和表，打包 |
 | [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
-| [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口、存储、配置。改 `server/`、`app/` 之前读 |
+| [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口和存储。改 `apps/`、`packages/` 之前读 |
 
 子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](docs/subsystems/README.md)）：
 
@@ -19,6 +19,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、规矩和汇报、事件日志、额度和上限 |
 | [project.md](docs/subsystems/project.md) | 项目：工作目录、worktree、检查、GitHub 检测、地契 |
 | [channel.md](docs/subsystems/channel.md) | 田头：频道、谁听见、工单串、连接器、Inbox |
+| [notice.md](docs/subsystems/notice.md) | 通知：Inbox、刚来的、巡查，经通话、手机、系统通知送到主人 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 管家：自己的 agent、提示和工具、来源、巡查、评测 |
 | [schedule.md](docs/subsystems/recurrence.md) | 定时：一张工单的触发：间隔和 cron、补跑、回头看 |
 | [task.md](docs/subsystems/task.md) | 计划：带子工单的父工单、按图推进；agent 自己的任务图 |
@@ -42,9 +43,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
 | [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调：主人、「连接到本机」、管家；`scripts/capabilities.ts` 写出 |
-| [agents-and-runtimes.md](docs/reference/agents-and-runtimes.md) | 帮工档案、农机、技能书 |
-| [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、精力瓶和计分的表 |
-| [pixel-village.md](docs/reference/pixel-village.md) | 首页、素材的流水线 |
+| [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、轨迹和精力瓶 |
 
 怎么写（`style/`）：
 
@@ -104,7 +103,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 农场里 | 实际是 | 代码里 |
 |---|---|---|
-| 地 | 一张工单（代码活带一个 worktree）；一座岛上的空位是这个项目的空位 | `FarmView.plots` 按工单做键；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
+| 地 | 一张工单（开 worktree 的代码工单带一个 worktree）；一座岛上的空位是这个项目的空位 | `FarmView.plots` 按工单做键；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
 | 种子袋 | 待办（排队等空位的工单） | `todo`、`queued_at` |
 | 播种袋里的种子 | 工单模板 | `IssueTemplate` |
 | 播种、发芽、长叶 | 处理中 | `in_progress`，帮工 `working` |

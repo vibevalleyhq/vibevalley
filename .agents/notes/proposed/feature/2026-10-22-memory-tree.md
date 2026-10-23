@@ -44,7 +44,7 @@ Status: proposed
 - **阶段由服务端算**：阶段的名字（芽、小苗、小树、大树、老树）和门槛是规则，归 `memory`，结论写进 `MemoryTree.stage`；页面只把累计轮数画成树的大小（`grow.ts` 的 `growthOf`），不算阶段。
 - **累计的数**：累计轮数、累计想起次数现在没有存（`recalled` 跟着条目，条目删了就没了），要在库里加一个只增不减的计数。
 - **EverOS**：现在只读回 cases 给检索用、不列（`Can().List` 为假）。要列出某个档案的 cases 和 skills，才能画果和种子；先确认 EverOS 有没有列的接口和 skill 的形状。
-- **播种**：一门手艺（skill）被主人点头以后写进技能书（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)「技能书」），写给哪些档案要定：默认全农场。
+- **播种**：一门手艺（skill）被主人点头以后写进技能书（[档案和农机](docs/subsystems/agent.md)），写给哪些档案要定：默认全农场。
 - **按钮上的角标**：有新长出的果或种子时 HUD 的按钮带一个点。这要进帧（`StateFrame` 加一个计数），和「`/tree` 打开时才读」分开做。
 - **田头里的「想起了」**：帮工开工想起了记性时，田头里说一句「想起了：……」，点开跳到树上那颗果。农场里不再画摘果。
 - **关联的来处**（`MemoryTree.links`）：金线是 EverOS skill 的来源 cases，本地是同一个 Session 写下的笔记和做过的活；淡蓝线从每个 Session 存在库里的「想起过的 id」两两数出来（[子系统](docs/subsystems/memory.md)「想起」第 4 步），要定数到多少次才算「常一起」。

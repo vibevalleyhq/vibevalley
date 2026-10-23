@@ -12,19 +12,19 @@
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家收什么、每种来源怎么进（意图表）、现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、边说边写、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
-| VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
-| 帮工档案的存储（`agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)） |
+| VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[界面清单](docs/reference/farm-ui.md#界面清单)） |
+| 帮工档案的存储（`agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[界面清单](docs/reference/farm-ui.md#界面清单)） |
 | | 语音线路和电话（[语音](docs/subsystems/voice.md)）；管家只收转来的话 |
 
 ## 在哪
 
 - **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；现状、频道的汇报、听巡查和计划的消息；向 `Sessions.host` 要一个 `AgentHost`，配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 26 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
-- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
+- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手和自己的任务图、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。同一个包当帮工用时，`coding.ts` 提供读写和编辑文件、列目录、ripgrep、跑命令、抓网页，`self.ts` 提供 `spawn_agent`、`load_skill`，`tasks.ts` 提供自己的任务图工具；管家不带编码工具和帮手。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/orchestrator/`**（`orchestratorHome`）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
 - **接口**：`orchestrator.stop`、`orchestrator.hear`、`orchestrator.markWrong`、`orchestrator.listArchive`、`orchestrator.getArchive`，记性走 `memory.*`（档案 `orchestrator`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `agent/brain/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley orchestrator …`。
-- **页面**：管家页 `apps/web/src/pages/orchestrator/OrchestratorPage.tsx`（记性、轨迹、旧账、声音，[管家页](docs/reference/agents-and-runtimes.md#管家页orchestrator)）；田头的输入框（农场的 `farm/chat/Composer.tsx`、聊天页的 `pages/chat/Composer.tsx`）在管家说话时有停止键（`orchestrator.stop`）。
+- **页面**：管家页 `apps/web/src/pages/orchestrator/OrchestratorPage.tsx`（记性、轨迹、旧账、声音，[界面清单](docs/reference/farm-ui.md#界面清单)）；田头的输入框（农场的 `farm/chat/Composer.tsx`、聊天页的 `pages/chat/Composer.tsx`）在管家说话时有停止键（`orchestrator.stop`）。
 
 ## 模型和不变量
 
@@ -46,7 +46,7 @@
 - **管家以工单为单位。** 点名一件活的工具（`check`、`changes`、`accept`、`tell`、`stop`、`dismiss`、`issue_update`、`issue_status`）都收 `issue`：工单编号（`#41`、`41`）、工单 id，或在做它的帮工的名字（找它的工单）；要帮工的（`tell`、`stop`、`dismiss`）找工单最新的、还在地里的那个。现状和 `roster` 里每个帮工带它的工单号。`issues` 找工单、看一批（状态、项目、字、`wants_owner` 在等主人的按等了多久排），填编号就是一张的全部；`issue_create` 是唯一建工单的入口：不填 `start` 记进备选、不开工（填 `agent` 是指派，`draft` 让帮工起草），`start: true` 记下就开工，走和看板开工同一条路（`Issues.start`，满了排进待办；开不了工时工单留在备选，回答里有编号，再调一次不多建一张），`channel` 定工单串开在哪个频道；`issue_update` 改各栏；`issue_status` 照 `statusMove` 挪，备选挪到待办而没写谁来做时按下面「挑档案」挑一个，挪到待办时 `agent` 填另一个档案就是换人（[工单](docs/subsystems/issue.md)「换人」）。规则都在工单服务里，工具只转发、写成一句话（`tool/words.ts` 的 `issueLine`、`issueDetail`）。
 - **先认意图，再动工单。** 提示开头照主人的意图对到工单的动作：讨论、问现状不建工单；记下、指派不开工；只有主人要马上做才 `start`；叫停（`stop`）不是取消；接着做、换人、收尾都在原来那张上，不新建；收尾（「收下」「合进去」）是 `issue_status` 挪到已完成，交付照工单（有提交才合并或开 PR，没有改动不碰 git），「先别合」填 `keep_branch`，完成以后照工具的回答说交付了什么；停哪张、换哪张、收哪张不唯一时先问一句。对照表和理由见[管家以工单为单位](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)。
 - **完成工单、合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：完成、改工单和挪状态（`issue_status`、`issue_update`）否则回「没动：改工单、挪状态要主人说一声。……」；`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
-- **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。界面和挑中以后的检查见[派给谁](docs/reference/agents-and-runtimes.md#派给谁)。
+- **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **管家的状态**在 `WorkspaceState.Orchestrator`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
 
 ## 怎么走

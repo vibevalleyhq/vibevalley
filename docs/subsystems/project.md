@@ -1,24 +1,24 @@
 # 项目
 
-项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Projects`）管工作目录、项目的新建和导入、每张工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
+项目（`project`）是工作目录 `projects/` 下的一个 git 仓库，农场里是一座岛，岛上的地是它在做的工单。`apps/server/src/project`（`Projects`）管工作目录、项目的新建和导入、开了 worktree 时工单的 worktree 和分支，以及读改动、冲突预检、检查、合并、推送和 `gh` 这些 git 操作；什么时候做这些，由工单和计划决定。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[architecture.md](docs/architecture.md)「配置」） |
+| 工作目录：`projects/` 下的项目，`worktrees/` 下的 worktree，工作目录的 `AGENTS.md` | 工作目录放在哪（配置 `work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 新建项目、从 GitHub 克隆，项目名的校验 | 派活时挑哪个项目（[管家](docs/subsystems/orchestrator.md)；档案的默认项目在帮工档案上） |
-| 一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
+| 开了 worktree 时，一张工单一个 worktree 和分支：开、复用、留着、清掉 | 帮工什么时候开、换、离开（[帮工](docs/subsystems/session.md)）；一个项目同时几个帮工在干（`session/rules.ts` 的 `noRoom`，上限从这里取） |
 | 改动：提交、文件和 diff、没提交的、落后几个、会不会冲突 | 完成的流程：什么时候查冲突、交回帮工、本地合还是提 PR、PR 的轮询（[工单](docs/subsystems/issue.md#怎么走)） |
 | 检查（`.vibevalley/check`）、合并、推送、开 PR、查 PR 的状态、快进主分支 | 计划的分支和每一件的检查什么时候跑（[计划](docs/subsystems/task.md)） |
 | GitHub 检测：`gh` 装没装、登没登录，每个项目能不能提 PR | `github.pr_projects` 里放哪些项目（主人的配置） |
 | 地契：项目列表、最近一次提交、种了什么（tokei）、一年的提交 | 项目页和地图怎么画（[farm-ui.md](docs/reference/farm-ui.md) 界面 12、19） |
-| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`game/view.ts` 的 `xpToNext`、`levelUps`；[farm-ui.md](docs/reference/farm-ui.md)「计分」） |
+| 数工作目录里你名下的 commit | 经验和等级怎么算（`game/game.ts`、`game/view.ts` 的 `xpToNext`、`levelUps`；[游戏](docs/subsystems/game.md#模型和不变量)） |
 
 ## 在哪
 
 - 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、合并前的提交、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`git.ts` 跑 git 和别的命令；`stack.ts` 认项目的栈。
-- 配置（`Config`，[architecture.md](docs/architecture.md)「配置」）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
+- 配置（`Config`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.check`、`project.create`、`project.languages`、`project.activity`、`github.status`、`github.refresh`；工单的改动是 `issue.changes`（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：项目页 `apps/web/src/pages/projects/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/rules/projects.ts`。

@@ -10,7 +10,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://gi
 Workspace（工作目录，一张大地图）
 ├── 项目（一个 git 仓库，大地图上的一座岛）
 └── 工单（可以指一个项目）
-    ├── 分支和 worktree（代码相关的工单才有；岛上围着篱笆的那一块，重开还是这一块）
+    ├── 分支和 worktree（代码相关且档案开了 worktree 的工单才有；岛上围着篱笆的那一块，重开还是这一块）
     └── Session（在这块地上干活的帮工；派一次是一个，重开是下一个）
         └── run（一次干活：一次触发到一次汇报）
 ```
@@ -20,9 +20,9 @@ Workspace（工作目录，一张大地图）
 ## 一件活怎么走
 
 1. 主人或管家写下一张**工单**，选一个 **agent 档案**和一个**项目**，派出去。
-2. 服务端开一个 **Session**：档案在一个 runtime 上接的这份活，在这张工单的 worktree 里、工单的分支上干（`vibevalley/issue-<工单号>`）。
+2. 服务端开一个 **Session**：档案在一个 runtime 上接的这份活。档案开了 worktree 时，它在这张工单的 worktree 里、工单的分支上干（`vibevalley/issue-<工单号>`）；没开时在项目目录里干。
 3. 每次 **run** 从一次触发开始（派出去、一条 comment、计划走到下一步、定时），到一次汇报结束；中间每一**步**都记下来。
-4. 主人看**改动**，挪工单的状态：挪到已完成是合进主分支或提 PR（工单关上），带句话挪回待办是再干一轮，挪到已取消是不合就关（[工单](docs/subsystems/issue.md)）。
+4. 主人看**改动**，决定**完成**还是**取消**。完成是工单的结论，交付另记：本地合进主分支、PR 合入、保留分支或没有改动要合；取消是不再做，分支上有提交就留着（[完成和交付](docs/subsystems/issue.md#完成和交付)）。
 
 说话都在**频道**里，结构照 Discord：频道 → 消息 → 挂在消息下面的串，每张工单一个串。现在只有一个人：主人，没有成员和权限；在频道里说话的是主人、管家和档案（经它的 Session）。同时干活的 Session 有上限，派不出去的排队。
 
@@ -41,12 +41,12 @@ Workspace（工作目录，一张大地图）
 | agent 档案 | `Agent` | 能派活的「同事」：runtime、模型、人设、技能、MCP、环境变量、长相 |
 | runtime | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 项目 | `project` | 一个 git 仓库，和能同时在里面做的工单数（`project.max_sessions`，`ProjectSummary.maxSessions`） |
-| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的有自己的分支和 worktree；每张都有验收（`acceptance`）；关上的能重开 |
-| Session | `Session`（服务是 `Sessions`，派活是 `Issues` 的 `hire`） | 档案为一张工单接的活，在工单的 worktree 和分支上干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
-| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一次干活：一次触发到一次汇报，包着一个 oar turn |
+| 工单 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，主人挪状态就是派活；代码相关的开不开 worktree 由档案设置决定；每张都有验收（`acceptance`）；关上的能重开 |
+| Session | `Session`（服务是 `Sessions`，派活是 `Issues` 的 `hire`） | 档案为一张工单接的活，在档案配置的项目目录或工单的 worktree 里干，直到工单完成或它收工；跨好几次 run，重启后还是同一个 |
+| Run | `Run`（`session_run` 表）；核心状态里是 `run` 到 `report` 两个事实 | 一次干活：一次触发到一次汇报；帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
-| 合并 | `issue.status` 挪到 `done`（`issue/issue.ts`） | 把工单的分支合进主分支（`github.pr_projects` 里的项目是提 PR，PR 合了才关），关上工单 |
+| 完成 | 动作 `complete`；工单的 `status` 是 `done` | 主人对工单的结论；交付由 `delivered` 另记。合并只是交付的一种，PR 合入后才完成（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
 | 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 |
 | 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
 | 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |
@@ -62,7 +62,7 @@ Workspace（工作目录，一张大地图）
 | 农场里 | 画的是 |
 |---|---|
 | 岛 | 一个项目 |
-| 一块地 | 一张工单；代码相关的带一个 worktree（岛上围着篱笆的那块）。一座岛上的空位是这个项目同时在做的工单数 |
+| 一块地 | 一张工单；开了 worktree 的代码工单带一个 worktree（岛上围着篱笆的那块）。一座岛上的空位是这个项目同时在做的工单数 |
 | 院门外的种子袋 | 排队等空地的工单（待办） |
 | 地里的小动物 | 在这块地上干活的帮工（Session），可以换人 |
 | 庄稼 | 这一轮做到哪了；交回来以后看工单：干裂是缺肥，开花是等验收，杂草是没过验收，结出来是验收过了（[farm-ui.md](docs/reference/farm-ui.md)「地里长什么」；叫法见[用语表](docs/README.md#用语)） |

@@ -8,7 +8,7 @@ Status: proposed
 
 ## Proposal
 
-- 商店：金币买外观（稻草人、彩旗、狗窝……）和种子（常用工单模板）、开垦新地。只卖外观，不卖生产力（[farm-ui.md](docs/reference/farm-ui.md)「计分」）。农场的「商店」面板已经摆出这几样和价钱，还没开张（`apps/web/src/farm/panels`）。
+- 商店：金币买外观（稻草人、彩旗、狗窝……）和种子（常用工单模板）、开垦新地。只卖外观，不卖生产力（[游戏](docs/subsystems/game.md#模型和不变量)）。农场的「商店」面板已经摆出这几样和价钱，还没开张（`apps/web/src/farm/panels`）。
 - 每日任务：比如今天收 3 次菜、不长虫做完 2 单；完成给金币。
 
 ## Alternatives considered

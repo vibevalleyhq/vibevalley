@@ -62,7 +62,7 @@ flowchart LR
 仓库的目录见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约**：`packages/protocol` 是服务端和页面之间唯一的契约。形状写在 `src/shapes.ts`，`src/schema.ts` 给每个形状一个由它定类型的 Effect Schema（读写 JSON 时解码），接口写在 `src/api.ts`（路径、参数、请求体、答复、谁能调）；`src/rules` 只放两边都跑的纯函数（帮工在干什么的话、一行的标题、站位的名字、Inbox 里哪些是刚来的、文档的顺序键）。只有服务端跑的规则在它的模块里（`apps/server/src/<模块>`），结论写进帧（[理由](docs/subsystems/foundation.md)）。
-- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十个模块，从下往上是 Platform（`base`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`、`ai`）、Source Control（`project`）、Collaboration（`channel`、`doc`）、Agent Sessions（`session`）、Issues（`issue`、`task`、`recurrence`）、Notifications（`notice`）、Orchestrator（`orchestrator`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、整理被打断的种植计划、定时开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。
+- **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十个模块，从下往上是 Platform（`base`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`、`ai`）、Source Control（`project`）、Collaboration（`channel`、`doc`）、Agent Sessions（`session`）、Issues（`issue`、`task`、`recurrence`）、Notifications（`notice`）、Orchestrator（`orchestrator`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、整理被打断的种植计划、定时开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[管家](docs/subsystems/orchestrator.md)）。
 - **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
 - **存盘**：PGlite（进程里的 Postgres），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 effect-sqlc 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
 - **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
@@ -71,17 +71,7 @@ flowchart LR
 
 农场上的一切（通话、管家、帮工、田头、工单和计划、定时、commit 数、金币和成就）是一个值 `WorkspaceState`（`packages/protocol/src/shapes.ts`；[理由](docs/subsystems/core.md)）。只有服务端持有它，只在 `Core.apply`（`apps/server/src/core/core.ts`）里改：每个事实（雇了一个帮工、开始一轮、这一轮结束、一张工单变了……）由纯函数 `reduce(state, fact)`（`apps/server/src/projection/reduce.ts`，用各模块的规则）折进去。折法和拼帧读每个模块的规则，所以放在组装那一层（`projection/`），组装时交给 Platform 里的 `core`（`Projection`），`core` 不 import 上面的模块。不改变状态的事实不发。
 
-每个帮工（`Session`）的阶段 `phase` 是它生命周期的唯一状态：
-
-| 阶段 | 含义 | 要你做什么 |
-|---|---|---|
-| `arriving` | 会话正在打开 | — |
-| `working` | 一轮正在进行；可能带 `quietSince`（太久没动静）、`retry` | 没动静：看看过程，不对就叫停 |
-| `done` | 上一轮做完了，交回来 | 等你看：验收、完成；会冲突时先让它解决 |
-| `failed` | 上一轮失败 | 让它接着修，或请它收工 |
-| `resting` | 被叫停，或服务端重启后回来 | 带句话就接着干 |
-
-在做什么、要你做什么、能不能收都由阶段推出来（protocol 的纯函数）。`play` 是地里那一层（在哪块地、最近的步骤、碰过的文件），`conflict` 是最近一次 git 检查的结果，不属于阶段。帮工离开就从状态里删掉。
+帮工的阶段和每种阶段要主人做什么见[帮工](docs/subsystems/session.md#模型和不变量)。核心状态只保留在场的帮工，离开就删掉。
 
 工单（`Issue`）里开着的和最近关的 50 张（`keepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `issueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`graphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](docs/subsystems/recurrence.md)、[游戏](docs/subsystems/game.md)）。
 
@@ -97,7 +87,7 @@ flowchart LR
 
 ## HTTP 接口
 
-接口的唯一定义是 `packages/protocol/src/api.ts` 的接口表 `endpoints`：每个接口的 `op`（`issue.create`）、方法和路径、路径参数、查询参数、请求体和答复的 Schema、`can`（谁能调）。服务端照它挂路由、解码请求体、编码答复，页面和命令行都照它调。**都在 `/api/v1` 下**：不兼容的改动另起 `/api/v2`，v1 留到设备都升级（[理由](docs/subsystems/core.md)）。不在表里的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）、给语音管家的 `/v1/chat/completions`（[语音](docs/subsystems/voice.md)）。「连接到本机」只放 `can` 里有 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
+接口的唯一定义是 `packages/protocol/src/api.ts` 的接口表 `endpoints`：每个接口的 `op`（`issue.create`）、方法和路径、路径参数、查询参数、请求体和答复的 Schema、`can`（谁能调）。服务端照它挂路由、解码请求体、编码答复，页面和命令行都照它调。**当前都在 `/api/v1` 下**，没有 v2 或版本协商；不兼容改动和 v1 的保留照[接口版本](docs/subsystems/core.md#为什么这样)。不在表里的：`/api/v1/events`、`/api/v1/state`、`/api/v1/live` 三条流，和给帮工的 `/mcp`（每个会话带自己的令牌，[田头](docs/subsystems/channel.md)）、给语音管家的 `/v1/chat/completions`（[语音](docs/subsystems/voice.md)）。「连接到本机」只放 `can` 里有 `remote` 的（[能力表](docs/reference/capabilities.md)、[连接到本机](docs/subsystems/lan.md)）。
 
 ## 存了什么
 
@@ -111,6 +101,7 @@ flowchart LR
 | `state.json` | 核心状态，田头、进度、定时和工单除外：帮工、commit 数 |
 | `db/` | PGlite 的库：田头、工单和它们的帮工、文档、每次干活（`session_run`）、计划的经过、账本、记性、定时、连接器、「连接到本机」的设备；新建的行主键是 uuidv7，工单和每条消息另有自己的顺序号（表名是「模块_概念」、单数，结构在 `apps/server/db/migrations/0001_schema.up.sql`，一个基线，改表直接改它，旧库删掉重建）。查询都在 `db/queries/`，一张表一个文件。启动时把工单、最近的对话、定时放回核心状态，把账本折成进度 |
 | `events/<id>.json` | 每个 Session 的事件日志（走了留 30 天；是谁、为哪张工单、怎么关的在库里的 `session` 表，一直留着）；管家的是 `orchestrator.json` |
+| `workers/<oar 会话 id>.jsonl` | VibeValley 自己的帮工的对话，每个 oar 会话一份 |
 | `spend.json` | 今天每台农机花了多少 |
 | `orchestrator/` | 管家（VibeValley 自己的 agent）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的旧对话 `archive/`、主人标出的做错的一轮 `evals/` |
 | `logs/` | 每个帮工会话的原始记录 |
@@ -120,39 +111,4 @@ flowchart LR
 
 ## 配置
 
-配置只有两个来源（`base/config.ts` 的 `loadConfig`；[理由](docs/subsystems/setting.md)）：
-
-1. `$VIBEVALLEY_HOME/vibevalley.yaml`，或 `--config` 给的文件；
-2. 环境变量，比文件优先：`VIBEVALLEY_` 加上键名，点换成下划线，比如 `session.stall_seconds` 是 `VIBEVALLEY_SESSION_STALL_SECONDS`。三个外家的钥匙用它们自己的名字：`DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`。
-
-家目录不在文件里：它由 `VIBEVALLEY_HOME` 定，默认 `~/.vibevalley`。写错的数字、不是端口的端口、`--config` 给了却找不到的文件，服务端都不起来。「设置」里存的钥匙和语音设置比配置优先。
-
-| 键 | 用途 | 默认 |
-|---|---|---|
-| `work_root` | 工作目录：`projects/` 是项目，`worktrees/` 是 worktree，帮工只在这里面干活（[项目](docs/subsystems/project.md)） | `~/vibevalley-dev` |
-| `db` | 库：PGlite 的文件夹；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/db` |
-| `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
-| `web` | 同时在 `/` 提供的页面（`apps/web/dist`）；也可以用 `--web` 给 | 无 |
-| `agent.model` | 命令行里自己的 agent 用的模型；空着是 DeepSeek 的默认 | |
-| `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
-| `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
-| `voice.id` | 语音管家的音色的默认；声音页里改过的优先 | 声音页的默认 |
-| `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
-| `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/lan.md)）；0 是随便一个 | 8790 |
-| `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
-| `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
-| `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
-| `patrol.heartbeat_minutes` | 巡查的间隔，0 是关掉 | 10 |
-| `recurrence.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
-| `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
-| `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
-| `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
-| `project.check_timeout_seconds` | 合进主分支前在帮工 worktree 里运行 `.vibevalley/check` 的时限，超时拒绝合并 | 1200 |
-| `github.pr_projects` | 完成时提 PR 的项目名列表；还须项目的 `pullRequest.available` 为真，其他项目本地合并 | 空列表 |
-| `github.pr_poll_seconds` | 查询开着的 PR 的间隔，单位秒，必须大于 0 | 180 |
-| `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
-| `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
-
-桌面版起服务端时另设 `VIBEVALLEY_PORT=0`（自己挑端口，由 `--ready-json` 报回地址）和页面的位置（[页面](docs/subsystems/app.md)）。
-
-密钥只在服务端；页面只拿 App ID、频道名、uid 和自己的令牌。
+配置的来源、优先级、校验和每个键的用途、默认值见[设置和配置](docs/subsystems/setting.md#模型和不变量)。桌面版起服务端时的端口和页面位置见[客户端](docs/subsystems/app.md#怎么走)。

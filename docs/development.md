@@ -13,7 +13,7 @@ cd apps/server && npm start -- --web ../web/dist   # 只听 127.0.0.1:8787，读
 bun run desktop:dev                          # 或者桌面版：Electron 带着服务端起来，打开它的页面；改页面自己刷新，改服务端自己重启（同一个端口）
 ```
 
-- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见 [architecture.md](docs/architecture.md)「配置」。
+- 帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活：项目在 `projects/`，worktree 在 `worktrees/`；设置和记录在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；其余配置见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
 - 语音的凭据见 [语音](docs/subsystems/voice.md)；没有也能打字用。
 - 服务端不自动重载，改了 `apps/server` 要重启；页面改了要重新构建（不开 `vite dev`）。
 - 改表结构：直接改 `apps/server/db/migrations/0001_schema.up.sql`，跑 `cd apps/server && npm run db:generate`，本机的旧库服务端开机时自己挪到 `db.<旧哈希>-<时间>`、新建一个（不删）；不加迁移，也不写数据搬运（AGENTS.md「不留兼容」）。
@@ -56,7 +56,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 调试台
 
-农场页里按 `` ` `` 打开（`apps/web/src/farm/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。
+农场页里按 `` ` `` 打开（`apps/web/src/farm/debug/`），对着真的服务端：控制通话、管家和钟点，看帮工，试听音效，看收到的帧和事件。开发或截图时在地址后加 `?tod=0.9`，把首页和农场的钟点固定在一天中的 0.9；不设时首页按打开时的钟点选背景。
 
 ## 只用命令行派一个活
 
@@ -114,6 +114,17 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 素材、音效和官网
 
-- 贴图在 `design/pixel/` 里生成、切图，落到 `apps/web/public/pixel`（[pixel-village.md](docs/reference/pixel-village.md)「素材」），不手改 `sprites.json`。
-- 音效配方在 `apps/web/src/farm/sound.ts`（[pixel-village.md](docs/reference/pixel-village.md)「音效」）。
-- 官网见 [site/README.md](site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。
+原图在单独的 vibevalley-art 仓库。把它克隆到这个仓库旁边，或用 `VIBEVALLEY_ART` 指到它的位置，再让 `design/art.sh` 把原图目录链接进 `design/`。生成和切图：
+
+```bash
+design/art.sh
+design/pixel/gen.sh <名字>             # 生成一张原图；两倍密用 hd-<名字>
+python3 design/pixel/process.py         # 切全部已有原图
+python3 design/pixel/process.py map plots  # 只切指定素材
+```
+
+`process.py` 按各类素材的配置去品红、切格、缩放和调色，写出 `apps/web/public/pixel/` 和 `sprites.json`；不手改生成物。切图规则、按钮图标的参考图和为什么这样分工见[工程流程](docs/subsystems/process.md#怎么走)。
+
+应用图标的原图用 `design/pixel/gen.sh app-icon` 生成。页面和官网用 `apps/web/public/icons/` 里的 `app-32.png`、`app-64.png`、`app-256.png`，桌面应用用 `apps/desktop/resources/icon.icns`。
+
+音效配方在 `apps/web/src/farm/sound.ts`，合成和响度见[农场的皮](docs/subsystems/farm.md#模型和不变量)。官网见 [site/README.md](site/README.md)；`bun run site:deploy` 构建并发到 Cloudflare。
