@@ -72,6 +72,9 @@ export class VibeValleyApi {
       this.call("PUT", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
     delete: (a: { id: string }): Promise<void> =>
       this.call("DELETE", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    /** What delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
   };
 
   readonly issue = {
@@ -150,6 +153,14 @@ export class VibeValleyApi {
         undefined,
         undefined,
       ) as Promise<string>,
+    /** What deleteTask would do, refused as it would be; nothing changes. */
+    previewDeleteTask: (a: { id: string; task: string }): Promise<T.Preview> =>
+      this.call(
+        "POST",
+        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)) + "/delete/preview",
+        undefined,
+        undefined,
+      ) as Promise<T.Preview>,
     act: (a: { id: string; body: T.GraphActRequest }): Promise<string> =>
       this.call("POST", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<string>,
     taskAct: (a: { id: string; task: string; body: T.TaskActRequest }): Promise<string> =>
@@ -194,6 +205,9 @@ export class VibeValleyApi {
       this.call("PUT", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Agent>,
     delete: (a: { id: string }): Promise<void> =>
       this.call("DELETE", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    /** What delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/agents/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
   };
 
   readonly memory = {
@@ -218,6 +232,14 @@ export class VibeValleyApi {
         undefined,
         undefined,
       ) as Promise<void>,
+    /** What delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> =>
+      this.call(
+        "POST",
+        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/" + encodeURIComponent(String(a.memory)) + "/delete/preview",
+        undefined,
+        undefined,
+      ) as Promise<T.Preview>,
   };
 
   readonly skill = {
@@ -228,6 +250,9 @@ export class VibeValleyApi {
       this.call("PUT", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Skill>,
     delete: (a: { id: string }): Promise<void> =>
       this.call("DELETE", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    /** What delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/skills/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
   };
 
   readonly project = {
@@ -271,10 +296,15 @@ export class VibeValleyApi {
     update: (a: { body: T.SetOpenRequest }): Promise<T.LanStatus> => this.call("PUT", "/api/v1/lan", undefined, a.body) as Promise<T.LanStatus>,
     startPairing: (): Promise<T.LanStatus> => this.call("POST", "/api/v1/lan/pairing", undefined, undefined) as Promise<T.LanStatus>,
     stopPairing: (): Promise<T.LanStatus> => this.call("DELETE", "/api/v1/lan/pairing", undefined, undefined) as Promise<T.LanStatus>,
+    /** What stopPairing would do, refused as it would be; nothing changes. */
+    previewStopPairing: (): Promise<T.Preview> => this.call("POST", "/api/v1/lan/pairing/stop/preview", undefined, undefined) as Promise<T.Preview>,
     answerPairing: (a: { body: T.AnswerPairingRequest }): Promise<T.LanStatus> =>
       this.call("POST", "/api/v1/lan/pairing/answer", undefined, a.body) as Promise<T.LanStatus>,
     deleteDevice: (a: { id: string }): Promise<T.LanStatus> =>
       this.call("DELETE", "/api/v1/lan/devices/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.LanStatus>,
+    /** What deleteDevice would do, refused as it would be; nothing changes. */
+    previewDeleteDevice: (a: { id: string }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/lan/devices/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
     pair: (a: { body: T.LanPairRequest }): Promise<T.LanPaired> => this.call("POST", "/api/v1/lan/pair", undefined, a.body) as Promise<T.LanPaired>,
     me: (): Promise<T.LanDevice> => this.call("GET", "/api/v1/lan/me", undefined, undefined) as Promise<T.LanDevice>,
   };

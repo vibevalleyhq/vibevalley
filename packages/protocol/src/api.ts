@@ -94,6 +94,8 @@ export interface Handlers<R = never> {
   /** Only what the body gives changes. */
   readonly "recurrence.update": (a: { readonly id: string; readonly body: T.RecurrenceUpdate }) => Effect.Effect<void, ApiError, R>;
   readonly "recurrence.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What delete would do, refused as it would be; nothing changes. */
+  readonly "recurrence.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.update": (a: { readonly id: string; readonly body: T.ChannelUpdate }) => Effect.Effect<void, ApiError, R>;
   /** The v1 caption relay without a call id is accepted only with one active call. */
   readonly "orchestrator.hear": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
@@ -136,6 +138,8 @@ export interface Handlers<R = never> {
   readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.updateTask": (a: { readonly id: string; readonly task: string; readonly body: T.TaskEdit }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.deleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
+  /** What deleteTask would do, refused as it would be; nothing changes. */
+  readonly "graph.previewDeleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "graph.act": (a: { readonly id: string; readonly body: T.GraphActRequest }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.taskAct": (a: { readonly id: string; readonly task: string; readonly body: T.TaskActRequest }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.history": (a: { readonly id: string; readonly before?: number; readonly limit?: number }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
@@ -156,6 +160,8 @@ export interface Handlers<R = never> {
   readonly "agent.create": (a: { readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.save": (a: { readonly id: string; readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What delete would do, refused as it would be; nothing changes. */
+  readonly "agent.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
    * its prompt carries; every other agent's are rows. */
   readonly "memory.list": (a: { readonly agent: string }) => Effect.Effect<T.MemoryList, ApiError, R>;
@@ -163,6 +169,8 @@ export interface Handlers<R = never> {
   readonly "memory.recall": (a: { readonly agent: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.RecallPreview, ApiError, R>;
   readonly "memory.create": (a: { readonly agent: string; readonly body: T.MemoryRequest }) => Effect.Effect<T.Memory, ApiError, R>;
   readonly "memory.delete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<void, ApiError, R>;
+  /** What delete would do, refused as it would be; nothing changes. */
+  readonly "memory.previewDelete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "orchestrator.listArchive": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
   readonly "orchestrator.getArchive": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
   /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
@@ -172,6 +180,8 @@ export interface Handlers<R = never> {
   readonly "skill.create": (a: { readonly body: T.Skill }) => Effect.Effect<T.Skill, ApiError, R>;
   readonly "skill.save": (a: { readonly id: string; readonly body: T.Skill }) => Effect.Effect<T.Skill, ApiError, R>;
   readonly "skill.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What delete would do, refused as it would be; nothing changes. */
+  readonly "skill.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "project.list": () => Effect.Effect<T.ProjectSummary[], ApiError, R>;
   /** The first thing Create would refuse in this project, without making it. */
   readonly "project.check": (a: { readonly body: T.NewProject }) => Effect.Effect<T.ProjectCheck, ApiError, R>;
@@ -196,8 +206,12 @@ export interface Handlers<R = never> {
   readonly "lan.update": (a: { readonly body: T.SetOpenRequest }) => Effect.Effect<T.LanStatus, ApiError, R>;
   readonly "lan.startPairing": () => Effect.Effect<T.LanStatus, ApiError, R>;
   readonly "lan.stopPairing": () => Effect.Effect<T.LanStatus, ApiError, R>;
+  /** What stopPairing would do, refused as it would be; nothing changes. */
+  readonly "lan.previewStopPairing": () => Effect.Effect<T.Preview, ApiError, R>;
   readonly "lan.answerPairing": (a: { readonly body: T.AnswerPairingRequest }) => Effect.Effect<T.LanStatus, ApiError, R>;
   readonly "lan.deleteDevice": (a: { readonly id: string }) => Effect.Effect<T.LanStatus, ApiError, R>;
+  /** What deleteDevice would do, refused as it would be; nothing changes. */
+  readonly "lan.previewDeleteDevice": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "lan.pair": (a: { readonly body: T.LanPairRequest }) => Effect.Effect<T.LanPaired, ApiError, R>;
   readonly "lan.me": () => Effect.Effect<T.LanDevice, ApiError, R>;
   /** The documents, the newest change first; their blocks are in doc.get. */
@@ -328,6 +342,17 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: undefined,
+    can: ["owner", "remote", "orchestrator"],
+    dryRun: "recurrence.previewDelete",
+  },
+  {
+    op: "recurrence.previewDelete",
+    method: "POST",
+    path: "/api/v1/recurrences/{id}/delete/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.Preview,
     can: ["owner", "remote", "orchestrator"],
   },
   {
@@ -599,6 +624,20 @@ export const endpoints: readonly Endpoint[] = [
     body: undefined,
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
+    dryRun: "graph.previewDeleteTask",
+  },
+  {
+    op: "graph.previewDeleteTask",
+    method: "POST",
+    path: "/api/v1/graphs/{id}/tasks/{task}/delete/preview",
+    pathParams: [
+      { name: "id", number: false },
+      { name: "task", number: false },
+    ],
+    query: [],
+    body: undefined,
+    result: S.Preview,
+    can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.act",
@@ -767,6 +806,17 @@ export const endpoints: readonly Endpoint[] = [
     body: undefined,
     result: undefined,
     can: ["owner"],
+    dryRun: "agent.previewDelete",
+  },
+  {
+    op: "agent.previewDelete",
+    method: "POST",
+    path: "/api/v1/agents/{id}/delete/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.Preview,
+    can: ["owner"],
   },
   {
     op: "memory.list",
@@ -812,6 +862,20 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: undefined,
+    can: ["owner", "remote"],
+    dryRun: "memory.previewDelete",
+  },
+  {
+    op: "memory.previewDelete",
+    method: "POST",
+    path: "/api/v1/memories/{agent}/{memory}/delete/preview",
+    pathParams: [
+      { name: "agent", number: false },
+      { name: "memory", number: false },
+    ],
+    query: [],
+    body: undefined,
+    result: S.Preview,
     can: ["owner", "remote"],
   },
   {
@@ -873,6 +937,17 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: undefined,
+    can: ["owner"],
+    dryRun: "skill.previewDelete",
+  },
+  {
+    op: "skill.previewDelete",
+    method: "POST",
+    path: "/api/v1/skills/{id}/delete/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.Preview,
     can: ["owner"],
   },
   {
@@ -1058,7 +1133,27 @@ export const endpoints: readonly Endpoint[] = [
   { op: "lan.status", method: "GET", path: "/api/v1/lan", pathParams: [], query: [], body: undefined, result: S.LanStatus, can: ["owner"] },
   { op: "lan.update", method: "PUT", path: "/api/v1/lan", pathParams: [], query: [], body: S.SetOpenRequest, result: S.LanStatus, can: ["owner"] },
   { op: "lan.startPairing", method: "POST", path: "/api/v1/lan/pairing", pathParams: [], query: [], body: undefined, result: S.LanStatus, can: ["owner"] },
-  { op: "lan.stopPairing", method: "DELETE", path: "/api/v1/lan/pairing", pathParams: [], query: [], body: undefined, result: S.LanStatus, can: ["owner"] },
+  {
+    op: "lan.stopPairing",
+    method: "DELETE",
+    path: "/api/v1/lan/pairing",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.LanStatus,
+    can: ["owner"],
+    dryRun: "lan.previewStopPairing",
+  },
+  {
+    op: "lan.previewStopPairing",
+    method: "POST",
+    path: "/api/v1/lan/pairing/stop/preview",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.Preview,
+    can: ["owner"],
+  },
   {
     op: "lan.answerPairing",
     method: "POST",
@@ -1077,6 +1172,17 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: undefined,
     result: S.LanStatus,
+    can: ["owner"],
+    dryRun: "lan.previewDeleteDevice",
+  },
+  {
+    op: "lan.previewDeleteDevice",
+    method: "POST",
+    path: "/api/v1/lan/devices/{id}/delete/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.Preview,
     can: ["owner"],
   },
   {

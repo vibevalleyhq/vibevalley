@@ -3,12 +3,20 @@
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
 import { join } from "node:path";
-import { type ArchiveListing, orchestratorAgent, type Memory, type MemoryList, type MemorySourceInfo, type RecallPreview } from "@vibevalley/protocol";
+import {
+  type ArchiveListing,
+  orchestratorAgent,
+  type Memory,
+  type MemoryList,
+  type MemorySourceInfo,
+  type Preview,
+  type RecallPreview,
+} from "@vibevalley/protocol";
 import { Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
-import { type ApiError, refused } from "../errors.ts";
+import { type ApiError, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
 import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
@@ -44,6 +52,8 @@ export interface MemoryShape {
   readonly memoriesOf: (agent: string) => Effect.Effect<MemoryList>;
   readonly remember: (n: Note) => Effect.Effect<Memory, ApiError>;
   readonly forgetOf: (agent: string, id: string) => Effect.Effect<void, ApiError>;
+  /** What forgetOf would do, refused as it would be; nothing changes. */
+  readonly previewForgetOf: (agent: string, id: string) => Effect.Effect<Preview, ApiError>;
   readonly recallOf: (agent: string, project: string, text: string) => Effect.Effect<RecallPreview, ApiError>;
   /** What a run is told as it starts; only what is told is counted as recalled. */
   readonly recall: (cue: RecallCue) => Effect.Effect<Recalled>;
@@ -137,10 +147,26 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
 
+    // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
+    const forgettable = (agent: string, id: string) =>
+      Effect.gen(function* () {
+        const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
+        if (problem) return yield* Effect.fail(refused(problem));
+        const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
+        const m = listed.memories.find((x) => x.id === id);
+        if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [{ say: "列出它的记性，找那一条的 id", run: ["memory", "list", agent] }]));
+        return m;
+      });
+
     const shape: MemoryShape = {
       memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.promise(() => sources.list(agent))),
       remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
-      forgetOf: (agent, id) => (agent === orchestratorAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
+      forgetOf: (agent, id) =>
+        Effect.andThen(forgettable(agent, id), agent === orchestratorAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
+      previewForgetOf: (agent, id) =>
+        Effect.map(forgettable(agent, id), (m) => ({
+          does: [agent === orchestratorAgent ? `从管家的 MEMORY.md 删掉这一行：「${m.text}」` : `从 ${agent} 的记性里忘掉：「${m.text}」`],
+        })),
       recallOf: (agent, project, text) =>
         agent === orchestratorAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text),
       recall: (cue) =>

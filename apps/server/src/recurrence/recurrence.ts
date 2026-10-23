@@ -2,7 +2,7 @@
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
-import type { Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
+import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -11,7 +11,7 @@ import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { type ApiError, refused } from "../errors.ts";
+import { type ApiError, missing, refused } from "../errors.ts";
 import * as q from "../../db/generated/recurrence.sql.ts";
 
 export interface Due {
@@ -26,6 +26,8 @@ export interface RecurrenceShape {
   /** Turned on is the owner's yes. */
   readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Recurrence, ApiError>;
   readonly remove: (id: string) => Effect.Effect<Recurrence, ApiError>;
+  /** What remove would do, refused as it would be; nothing changes. */
+  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
   readonly tick: Effect.Effect<void>;
   /** What comes due from now on, subscribed before it returns. */
   readonly due: Effect.Effect<Stream.Stream<Due>, never, Scope.Scope>;
@@ -93,7 +95,7 @@ export const make = (options: RecurrenceOptions = {}) =>
 
     const find = (id: string) => {
       const s = (core.state().recurrences ?? []).find((x) => x.id === id);
-      return s ? Effect.succeed(s) : Effect.fail(refused(`没有 ${id} 号定时`));
+      return s ? Effect.succeed(s) : Effect.fail(missing(`没有 ${id} 号定时`, [{ say: "列出定时，找它的 id", run: ["recurrence", "list"] }]));
     };
 
     const ran = (id: string, at: number, enabled: boolean) => db(q.recurrenceRan({ last_run: at, enabled, id }));
@@ -195,6 +197,10 @@ export const make = (options: RecurrenceOptions = {}) =>
             return was;
           }),
         ),
+      previewRemove: (id) =>
+        Effect.map(find(id), (was) => ({
+          does: [`删掉定时「${was.name}」${was.whenText ? `（${was.whenText}）` : ""}：以后不再到点开工，它开过的工单留着`],
+        })),
       tick,
       due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),
     };

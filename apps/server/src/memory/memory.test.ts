@@ -88,7 +88,8 @@ describe("memory", () => {
       expect([note.text, note.project, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
       expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: "owner" }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forgetOf("lab", note.id);
-      yield* m.forgetOf("lab", "not-a-number");
+      // One that is not there is missing, not silently passed over.
+      expect((yield* Effect.flip(m.forgetOf("lab", "not-a-number")))._tag).toBe("Missing");
       expect(yield* m.list("lab")).toHaveLength(3);
       expect(yield* m.list("other")).toHaveLength(0);
     }).pipe(Effect.provide(world())),

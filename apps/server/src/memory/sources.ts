@@ -344,11 +344,19 @@ export class Sources {
     });
   }
 
-  async forget(agent: string, id: string): Promise<void> {
+  /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
+  forgetProblem(id: string): string | undefined {
     const generation = this.snapshot();
-    if (!generation) throw new Error("记性来源已经停下");
+    if (!generation) return "记性来源已经停下";
+    const [one] = owner(generation.all, id);
+    return one.can.forget ? undefined : `${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`;
+  }
+
+  async forget(agent: string, id: string): Promise<void> {
+    const problem = this.forgetProblem(id);
+    if (problem) throw new Error(problem);
+    const generation = this.snapshot()!;
     const [one, own] = owner(generation.all, id);
-    if (!one.can.forget) throw new Error(`${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`);
     const signal = one === this.local ? new AbortController().signal : AbortSignal.any([generation.control.signal, AbortSignal.timeout(writeTimeoutMs)]);
     await this.lease(generation, signal, () => one.forget(agent, own, signal));
   }

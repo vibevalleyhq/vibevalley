@@ -3,12 +3,12 @@
 
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { type Agent, orchestratorAgent, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
+import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
-import { type ApiError, refused } from "../errors.ts";
+import { type ApiError, missing, refused } from "../errors.ts";
 
 interface Stored {
   readonly agents: readonly Agent[];
@@ -73,9 +73,13 @@ export interface AgentShape {
   readonly saveAgent: (a: Agent) => Effect.Effect<Agent, ApiError>;
   readonly createAgent: (draft: Agent) => Effect.Effect<Agent, ApiError>;
   readonly deleteAgent: (id: string) => Effect.Effect<void, ApiError>;
+  /** What deleteAgent would do, refused as it would be; nothing changes. */
+  readonly previewDeleteAgent: (id: string) => Effect.Effect<Preview, ApiError>;
   readonly saveSkill: (s: Skill) => Effect.Effect<Skill, ApiError>;
   readonly createSkill: (draft: Skill) => Effect.Effect<Skill, ApiError>;
   readonly deleteSkill: (id: string) => Effect.Effect<void, ApiError>;
+  /** What deleteSkill would do, refused as it would be; nothing changes. */
+  readonly previewDeleteSkill: (id: string) => Effect.Effect<Preview, ApiError>;
   readonly saveSettings: (runtime: string, s: RuntimeSettings) => Effect.Effect<RuntimeSettings, ApiError>;
 }
 
@@ -124,6 +128,17 @@ export const make = Effect.gen(function* () {
   /** The profiles work is sent to: every one but the orchestrator's. */
   const sendable = () => all().filter((a) => a.id !== orchestratorAgent);
 
+  // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
+  const deletableAgent = (id: string) => {
+    if (id === orchestratorAgent) return Effect.fail(refused("管家删不了：每个工作区都有一个"));
+    const a = s.agents.find((x) => x.id === id);
+    return a ? Effect.succeed(a) : Effect.fail(missing(`没有 ${id} 这个档案`, [{ say: "列出档案，找它的 id", run: ["agent", "list"] }]));
+  };
+  const deletableSkill = (id: string) => {
+    const k = s.skills.find((x) => x.id === id);
+    return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [{ say: "列出技能，找它的 id", run: ["skill", "list"] }]));
+  };
+
   const shape: AgentShape = {
     agents: () => sendable(),
     all,
@@ -152,9 +167,12 @@ export const make = Effect.gen(function* () {
         return created;
       }),
     deleteAgent: (id) =>
-      id === orchestratorAgent
-        ? Effect.fail(refused("管家删不了：每个工作区都有一个"))
-        : change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
+      Effect.andThen(
+        deletableAgent(id),
+        change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
+      ),
+    previewDeleteAgent: (id) =>
+      Effect.map(deletableAgent(id), (a) => ({ does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`] })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
@@ -175,11 +193,19 @@ export const make = Effect.gen(function* () {
         return created;
       }),
     deleteSkill: (id) =>
-      change((x) => ({
-        ...x,
-        skills: x.skills.filter((k) => k.id !== id),
-        agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
-      })),
+      Effect.andThen(
+        deletableSkill(id),
+        change((x) => ({
+          ...x,
+          skills: x.skills.filter((k) => k.id !== id),
+          agents: x.agents.map((a) => ({ ...a, skills: a.skills.filter((skill) => skill !== id) })),
+        })),
+      ),
+    previewDeleteSkill: (id) =>
+      Effect.map(deletableSkill(id), (k) => {
+        const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => `「${a.name}」`);
+        return { does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])] };
+      }),
     saveSettings: (runtime, settings) =>
       Effect.as(
         change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } })),

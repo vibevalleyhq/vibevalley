@@ -242,6 +242,10 @@ describe("task graphs", () => {
           ["d", "b,c"],
         ]);
         expect(f.news[0]).toMatch(new RegExp("^【计划】" + id + " 拆好了"));
+        // A step's removal, tried: what goes and who stops waiting for it, and the graph as it was.
+        const preview = yield* f.tasks.previewRemoveTask(id, "b");
+        expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一步`, `「${taskOf(draft, "d")!.title}」不再等它`]);
+        expect((yield* f.until(id, () => true)).tasks.map((n) => n.id)).toEqual(["a", "b", "c", "d"]);
         yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "orchestrator");
         expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
         const ready = yield* f.until(id, (g) => g.state === "ready");
