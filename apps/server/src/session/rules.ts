@@ -5,6 +5,8 @@ import type { FailedTurn, FailureClass, McpServer, TurnOutcome } from "@botivers
 import { failureAdvice } from "@botiverse/oar/observe";
 import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, IssueAnswer, MCPServer, Outcome, Session, Skill } from "@vibevalley/protocol";
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
+import { Result, Schema } from "effect";
+import { lines, linesOf, text as textField } from "../base/json.ts";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
 import type { MergeFailure, Workplace } from "../project/project.ts";
@@ -86,12 +88,12 @@ export interface SessionRead {
 /** A json block in what a session said: the last one wins. */
 const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
-const answerLines = (v: unknown, field: string): string[] => {
-  if (v === undefined || v === null) return [];
-  if (typeof v === "string") return [v.trim()].filter(Boolean);
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return (v as string[]).map((l) => l.trim()).filter(Boolean);
-  throw new Error(`${field}：要是字符串或字符串的数组`);
-};
+/** An answer as a helper writes it in its json block; its lines are trimmed and the empty ones dropped. */
+const readAnswer = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Struct({ conclusion: textField, evidence: lines, unsure: lines, next: lines })));
+const answerLines = (v: string | readonly string[] | null | undefined) =>
+  linesOf(v)
+    .map((l) => l.trim())
+    .filter(Boolean);
 
 /** The last block that reads as an answer with a conclusion and something it rests on; problem says why none did. */
 export function parseAnswer(text: string): { answer?: IssueAnswer; problem: string } {
@@ -99,20 +101,18 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
   if (blocks.length === 0) return { problem: "没找到结论：要用一个 json 代码块给出" };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
-    let a: IssueAnswer;
-    try {
-      const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
-      a = {
-        conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
-        evidence: answerLines(raw.evidence, "evidence"),
-        unsure: answerLines(raw.unsure, "unsure"),
-        next: answerLines(raw.next, "next"),
-      };
-    } catch (e) {
-      problem = "json 读不了：" + (e instanceof Error ? e.message : String(e));
+    const read = readAnswer(blocks[i]!);
+    if (Result.isFailure(read)) {
+      problem = "json 读不了：" + read.failure.message;
       continue;
     }
+    const raw = read.success;
+    const a: IssueAnswer = {
+      conclusion: (raw.conclusion ?? "").trim(),
+      evidence: answerLines(raw.evidence),
+      unsure: answerLines(raw.unsure),
+      next: answerLines(raw.next),
+    };
     if (!a.conclusion) problem = "结论是空的";
     else if (a.evidence.length === 0) problem = "结论没有依据：evidence 至少一条";
     else return { answer: a, problem: "" };

@@ -32,7 +32,7 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
+import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -223,19 +223,24 @@ const localeCompare = (a: string, b: string) => {
   return x < y ? -1 : x > y ? 1 : a < b ? -1 : a > b ? 1 : 0;
 };
 
+// What tools answer, read by the fields used; one that does not read is as one that is not JSON.
+const tokeiOutput = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Record(Schema.String, Schema.Struct({ code: Schema.Number, comments: Schema.Number, blanks: Schema.Number, reports: Schema.Array(Schema.Unknown) })),
+  ),
+);
+const ghPermission = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ viewerPermission: Schema.optionalKey(Schema.String) })));
+const ghPullRequests = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Number }))));
+const ghPullRequestState = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ state: Schema.optionalKey(Schema.String), mergedAt: Schema.optionalKey(Schema.NullOr(Schema.String)) })),
+);
+
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
 export function countsOf(output: string): LanguageCount[] | undefined {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(output);
-  } catch {
-    return undefined;
-  }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+  const raw = Option.getOrUndefined(tokeiOutput(output));
+  if (!raw) return undefined;
   const out: LanguageCount[] = [];
-  for (const [name, body] of Object.entries(raw as Record<string, unknown>)) {
-    const l = body as { code?: unknown; comments?: unknown; blanks?: unknown; reports?: unknown };
-    if (typeof l?.code !== "number" || typeof l.comments !== "number" || typeof l.blanks !== "number" || !Array.isArray(l.reports)) return undefined;
+  for (const [name, l] of Object.entries(raw)) {
     if (name === "Total" || l.code + l.comments <= 0) continue;
     out.push({ name, files: l.reports.length, code: Math.trunc(l.code), comments: Math.trunc(l.comments), blanks: Math.trunc(l.blanks) });
   }
@@ -887,12 +892,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           if (!p.git || origin.code !== 0 || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
           else {
             const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-            let permission: string | undefined;
-            try {
-              permission = view.ok ? (JSON.parse(view.out) as { viewerPermission?: string }).viewerPermission : undefined;
-            } catch {
-              permission = undefined;
-            }
+            const permission = view.ok ? Option.getOrUndefined(ghPermission(view.out))?.viewerPermission : undefined;
             c =
               permission === undefined
                 ? { available: false, reason: "无法检测 GitHub 仓库权限" }
@@ -929,12 +929,9 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           // Recover a creation whose receipt was lost before it was saved.
           const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
           if (!listed.ok) return yield* fail("查询已有 PR 失败；分支已推送，可重试");
-          let existing: PullRequest[];
-          try {
-            existing = JSON.parse(listed.out) as PullRequest[];
-          } catch {
-            return yield* fail("无法读取已有 PR");
-          }
+          const read = ghPullRequests(listed.out);
+          if (Option.isNone(read)) return yield* fail("无法读取已有 PR");
+          const existing = read.value;
           if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
           const check = lexists(join(place.cwd, ".vibevalley/check")) ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。";
           const created = yield* gh(
@@ -965,12 +962,9 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       if (repo === "") return yield* fail("不是 GitHub 仓库");
       const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
       if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
-      let result: { state?: string; mergedAt?: string | null };
-      try {
-        result = JSON.parse(viewed.out) as typeof result;
-      } catch {
-        return yield* fail(`无法读取 PR #${n} 状态`);
-      }
+      const read = ghPullRequestState(viewed.out);
+      if (Option.isNone(read)) return yield* fail(`无法读取 PR #${n} 状态`);
+      const result = read.value;
       if (result.mergedAt || result.state === "MERGED") return "merged" as const;
       if (result.state === "OPEN") return "open" as const;
       if (result.state === "CLOSED") return "closed" as const;

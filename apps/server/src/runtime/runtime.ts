@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, Schedule } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
@@ -25,6 +25,7 @@ import { piBalance } from "./pi.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
+import { jsonOrNone } from "../base/json.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
@@ -110,6 +111,8 @@ interface Spent {
   byRuntime: Record<string, number>;
 }
 
+const spentOf = jsonOrNone<Spent>(Schema.Struct({ day: Schema.String, byRuntime: Schema.Record(Schema.String, Schema.Number) }));
+
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -188,12 +191,9 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
   const disk = new FileWriter(spendFile);
   let spent: Spent = { day: today(), byRuntime: {} };
   if (existsSync(spendFile)) {
-    try {
-      const kept = JSON.parse(readFileSync(spendFile, "utf8")) as Spent;
-      if (kept.day === today() && kept.byRuntime) spent = kept;
-    } catch {
-      // An unreadable tally starts the day again.
-    }
+    // An unreadable tally starts the day again.
+    const kept = spentOf(readFileSync(spendFile, "utf8"));
+    if (kept && kept.day === today()) spent = kept;
   }
   /** A new day starts from nothing. */
   const tally = () => {

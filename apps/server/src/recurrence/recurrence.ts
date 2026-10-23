@@ -13,6 +13,8 @@ import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 import * as q from "../../db/generated/recurrence.sql.ts";
+import { jsonOrNone } from "../base/json.ts";
+import * as S from "@vibevalley/protocol/schema";
 
 export interface Due {
   readonly recurrence: Recurrence;
@@ -49,6 +51,8 @@ export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+const whenOf = jsonOrNone(S.RecurrenceWhen);
+
 export const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
@@ -60,14 +64,9 @@ export const make = Effect.gen(function* () {
   const dueHub = yield* PubSub.unbounded<Due>();
 
   for (const row of yield* db(q.recurrences())) {
-    let when: Recurrence["when"] | undefined;
-    try {
-      when = JSON.parse(row.spec) as Recurrence["when"];
-    } catch {
-      when = undefined;
-    }
     // A recurrence whose time this code cannot read any more is left out.
-    if (!when?.kind) continue;
+    const when = whenOf(row.spec);
+    if (!when) continue;
     const s: Recurrence = {
       id: row.id,
       name: row.name,

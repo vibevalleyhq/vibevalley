@@ -43,7 +43,7 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
@@ -58,6 +58,8 @@ import * as qm from "../../db/generated/channel_message.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
+import { jsonOrNone } from "../base/json.ts";
+import * as S from "@vibevalley/protocol/schema";
 
 const reportMax = 1500;
 const readLimit = 30;
@@ -121,17 +123,21 @@ interface Meta {
   spoken?: boolean;
 }
 
+const readMeta = jsonOrNone<Meta>(
+  Schema.Struct({
+    run: Schema.optionalKey(Schema.String),
+    mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+    session: Schema.optionalKey(Schema.String),
+    outcome: Schema.optionalKey(S.Outcome),
+    spent: Schema.optionalKey(S.Spent),
+    forTask: Schema.optionalKey(Schema.Boolean),
+    code: Schema.optionalKey(Schema.String),
+    spoken: Schema.optionalKey(Schema.Boolean),
+  }),
+);
+
 /** Anything unreadable is no meta. */
-function metaOf(raw: string | null): Meta {
-  if (!raw) return {};
-  try {
-    const m = JSON.parse(raw) as Meta;
-    if (m.outcome !== undefined && !["completed", "failed", "interrupted"].includes(m.outcome)) return {};
-    return m ?? {};
-  } catch {
-    return {};
-  }
-}
+const metaOf = (raw: string | null): Meta => readMeta(raw) ?? {};
 
 /** As Go's omitempty writes it: nothing empty kept. */
 const metaText = (m: Meta | undefined) =>

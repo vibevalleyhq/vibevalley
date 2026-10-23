@@ -43,7 +43,9 @@ describe("an answer handed back", () => {
     expect(parseAnswer("说不清").problem).toBe("没找到结论：要用一个 json 代码块给出");
     expect(parseAnswer(block({ conclusion: "", evidence: ["a.ts"] })).problem).toBe("结论是空的");
     expect(parseAnswer(block({ conclusion: "猜的", evidence: [] })).problem).toBe("结论没有依据：evidence 至少一条");
-    expect(parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem).toBe("json 读不了：evidence：要是字符串或字符串的数组");
+    // The Schema says which field did not read, and that is what the helper is told to fix.
+    const wrong = parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem;
+    expect([wrong.startsWith("json 读不了："), wrong.includes('["evidence"]')]).toEqual([true, true]);
   });
   it("a completed report carries it; a failed one does not", () => {
     const said = block({ conclusion: "慢在读配置", evidence: ["clock.ts:1"] });

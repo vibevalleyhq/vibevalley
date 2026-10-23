@@ -12,7 +12,7 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Clock, Context, Effect, FiberSet, Layer, Option, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -27,6 +27,7 @@ import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitTe
 import { baseUrl, failed as weixinFailed, quoted, restricted, staleToken, text as weixinText, type WeixinApi, WeixinClient, WeixinError } from "./weixin.ts";
 import { callbackLog } from "../base/log.ts";
 import { Notices } from "../notice/notice.ts";
+import { jsonOrNone } from "../base/json.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -243,6 +244,9 @@ export interface ConnectorOptions {
   readonly say?: (text: string, conversation: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
+/** The saved secrets of a connector: names to values. */
+const secretsOf = jsonOrNone(Schema.Record(Schema.String, Schema.String));
+
 export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {}) {
   const logs = yield* callbackLog;
   const sql = yield* SqlClient.SqlClient;
@@ -281,12 +285,11 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
         return;
       }
       const r = row.value;
-      let secrets: Record<string, string> = {};
-      try {
-        secrets = JSON.parse(r.secrets) as Record<string, string>;
-      } catch (e) {
+      const read = secretsOf(r.secrets);
+      const secrets: Record<string, string> = read ? { ...read } : {};
+      if (!read) {
         err = "存着的登录信息读不出来，断开重新连一次";
-        logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
+        logs.error(`vibevalley: ${id}: the saved secrets cannot be read`);
       }
       account = {
         secrets,
