@@ -340,8 +340,7 @@ export const make = Effect.gen(function* () {
   const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
   const inTx = <A, E>(e: Effect.Effect<A, E>) =>
     sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
-  const apply = (...facts: Parameters<typeof core.apply>) => Effect.runSync(core.apply(...facts));
-  const lock = Semaphore.makeUnsafe(1);
+  const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
 
@@ -430,12 +429,12 @@ export const make = Effect.gen(function* () {
 
   const publishConversation = Effect.fn("Channels.publishConversation")(function* (id: string) {
     const row = yield* one(qc.conversationByID({ id }));
-    if (row) apply({ type: "conversation", conversation: yield* toConversation(row) });
+    if (row) yield* core.apply({ type: "conversation", conversation: yield* toConversation(row) });
   });
 
   const publishOwnerMentions = Effect.gen(function* () {
     const rows = yield* db(qm.ownerMentions());
-    apply({
+    yield* core.apply({
       type: "ownerMentions",
       mentions: rows.map((r) => ({
         message: toMessage(r),
@@ -450,7 +449,7 @@ export const make = Effect.gen(function* () {
     if (!row) return;
     const conv = yield* one(qc.conversationByID({ id: row.conversation_id }));
     const thread = conv?.kind === "thread" && conv.subject_kind === "issue" && conv.subject_id ? conv.subject_id : undefined;
-    apply({ type: "message", message: toMessage(row), ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    yield* core.apply({ type: "message", message: toMessage(row), ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
   });
 
   // ── threads ──
@@ -865,9 +864,9 @@ export const make = Effect.gen(function* () {
       yield* db(qm.finalizeAll({ updated_at: Date.now() }));
       yield* db(qd.rollbackAll());
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
-      for (const c of [...convs].reverse()) apply({ type: "conversation", conversation: yield* toConversation(c) });
+      for (const c of [...convs].reverse()) yield* core.apply({ type: "conversation", conversation: yield* toConversation(c) });
       const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
-      for (const m of [...msgs].reverse()) apply({ type: "message", message: toMessage(m) });
+      for (const m of [...msgs].reverse()) yield* core.apply({ type: "message", message: toMessage(m) });
       yield* publishOwnerMentions;
     }),
   );

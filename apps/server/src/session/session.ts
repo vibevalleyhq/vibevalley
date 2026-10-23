@@ -378,6 +378,8 @@ export const make = (options: SessionOptionsIn = {}) =>
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((err) => (err instanceof Error ? err : new Error(String(err)))));
     const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
+    // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
+    // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
     const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
     const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
 
@@ -387,7 +389,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
     const trajectories = new Trajectories(config.home, (id, e) => Effect.runSync(core.sessionEvent(id, e)));
     // A hand is acquired before admission; no path holding admission waits for a hand.
-    const admission = Semaphore.makeUnsafe(1);
+    const admission = yield* Semaphore.make(1);
 
     const launchesHub = yield* PubSub.unbounded<LaunchActivity>();
     // The sessions' own facts, told as news in the order they were applied.
@@ -687,7 +689,7 @@ export const make = (options: SessionOptionsIn = {}) =>
         const stopped = yield* Effect.result(stopOar(allocation));
         if (stopped._tag === "Success") return { refused: why, retained: false };
         allocation.failure = why + "；" + reasonOf(stopped.failure);
-        notice("error", allocation.failure);
+        yield* core.notice("error", allocation.failure);
         return { refused: allocation.failure, retained: true };
       });
 
@@ -760,7 +762,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       hands.delete(h.id);
       const session = core.session(h.id);
       if (session) yield* memories.endSession({ agent: session.agent, session: h.id, project: h.place.project });
-      apply({ type: "left", id: h.id, closed, ...(merged > 0 ? { merged } : {}) });
+      yield* core.apply({ type: "left", id: h.id, closed, ...(merged > 0 ? { merged } : {}) });
       save();
     });
 
@@ -908,7 +910,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           );
           if (merged.pullRequest) return merged;
           yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
-          if (merged.warning) notice("warn", merged.warning);
+          if (merged.warning) yield* core.notice("warn", merged.warning);
           return merged;
         }),
       );
@@ -921,7 +923,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
       const conflict = conflictOf(changes);
       const session = core.session(id);
-      if (session && !sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+      if (session && !sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
       return changes;
     });
 
@@ -930,7 +932,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const session = core.session(id);
       if (!place || !session) return;
       const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
-      if (!sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+      if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
     });
 
     // ── bringing the farm back ──
@@ -957,10 +959,10 @@ export const make = (options: SessionOptionsIn = {}) =>
         const row = kept.get(session.id);
         const place = row?.place ? json<Workplace>(row.place) : undefined;
         if (!row || !place || !existsSync(place.cwd)) {
-          apply({ type: "left", id: session.id, closed: "lost" });
+          yield* core.apply({ type: "left", id: session.id, closed: "lost" });
           trajectories.finish(session.id);
           yield* ended(session.id, "lost");
-          notice("warn", `${session.name} 没接回来：${place ? "干活的目录不见了（" + place.cwd + "）" : "库里没有它的记录"}`);
+          yield* core.notice("warn", `${session.name} 没接回来：${place ? "干活的目录不见了（" + place.cwd + "）" : "库里没有它的记录"}`);
           continue;
         }
         const s = { place, oarSessionId: row.oar_session ?? "", lastText: row.last_text ?? "", recalled: json<string[]>(row.recalled) ?? [] };
@@ -980,8 +982,8 @@ export const make = (options: SessionOptionsIn = {}) =>
           heard: [],
         });
         if (isBusy(session)) {
-          apply({ type: "report", id: session.id, outcome: "interrupted", summary: "VibeValley 重启了，这一轮停在了半路", runs: session.runs });
-          notice("info", `VibeValley 重启过，${session.name} 那一轮停下了；给它带句话就能接着干`);
+          yield* core.apply({ type: "report", id: session.id, outcome: "interrupted", summary: "VibeValley 重启了，这一轮停在了半路", runs: session.runs });
+          yield* core.notice("info", `VibeValley 重启过，${session.name} 那一轮停下了；给它带句话就能接着干`);
         }
       }
       if (hands.size > 0) yield* Effect.logInfo(`vibevalley: 接回 ${hands.size} 个帮工`);
@@ -1068,7 +1070,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             if (retained) return { refused: why, retainedWork: true };
             revokeToken(id);
             const released = yield* projects.release(place);
-            if (released.kept) notice("warn", released.reason);
+            if (released.kept) yield* core.notice("warn", released.reason);
             return { refused: why, ...(released.kept ? { retainedWork: true as const } : {}) };
           });
         const opened = yield* open(agent, session, place, withRecall(recall, task), "");
@@ -1099,7 +1101,7 @@ export const make = (options: SessionOptionsIn = {}) =>
           heard: [],
         };
         hands.set(id, h);
-        apply({ type: "hired", session });
+        yield* core.apply({ type: "hired", session });
         attach(h, opened.session, agent.runtime);
         return { session };
       }, admission.withPermits(1)),
@@ -1137,11 +1139,11 @@ export const make = (options: SessionOptionsIn = {}) =>
             yield* closeOar(h);
             if (work === "discard" && h.place.branch) {
               const reset = yield* Effect.result(projects.reset(h.place));
-              if (reset._tag === "Failure") notice("warn", `${name} 的工作目录没能重置：${reset.failure.message}`);
+              if (reset._tag === "Failure") yield* core.notice("warn", `${name} 的工作目录没能重置：${reset.failure.message}`);
             }
             yield* leave(h, closed, 0);
             const kept = yield* projects.release(h.place);
-            if (kept.kept) notice("info", `${name} 收工了：${kept.reason}`);
+            if (kept.kept) yield* core.notice("info", `${name} 收工了：${kept.reason}`);
             return true;
           }),
         );
@@ -1154,7 +1156,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             const s = core.session(id);
             if (hands.get(id) !== h || !s || isBusy(s)) return;
             const reset = yield* Effect.result(projects.reset(h.place));
-            if (reset._tag === "Failure") notice("warn", `${s.name} 的工作目录没能重置：${reset.failure.message}`);
+            if (reset._tag === "Failure") yield* core.notice("warn", `${s.name} 的工作目录没能重置：${reset.failure.message}`);
           }),
         );
       }),

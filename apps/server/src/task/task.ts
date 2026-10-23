@@ -162,7 +162,7 @@ export const make = (options: TaskOptions = {}) =>
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
-    const lock = Semaphore.makeUnsafe(1);
+    const lock = yield* Semaphore.make(1);
     const newsHub = yield* PubSub.unbounded<string>();
     const splitters = new Map<string, string>();
     const splitterTries = new Map<string, number>();

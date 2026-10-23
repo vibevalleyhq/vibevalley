@@ -82,7 +82,7 @@ export const make = (options: DocOptions = {}) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-    const lock = Semaphore.makeUnsafe(1);
+    const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;
 

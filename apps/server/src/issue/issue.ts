@@ -225,7 +225,7 @@ export const make = (options: IssueOptions = {}) =>
       sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
     const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
     /** One round of the queue at a time. */
-    const trying = Semaphore.makeUnsafe(1);
+    const trying = yield* Semaphore.make(1);
 
     // ── reading ──
 

@@ -63,7 +63,7 @@ export const make = (options: RecurrenceOptions = {}) =>
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
     const now = options.now ?? Date.now;
     // The ticker, the tools and the pages all change the list.
-    const lock = Semaphore.makeUnsafe(1);
+    const lock = yield* Semaphore.make(1);
     const dueHub = yield* PubSub.unbounded<Due>();
 
     for (const row of yield* db(q.recurrences())) {
