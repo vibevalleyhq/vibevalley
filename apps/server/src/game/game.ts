@@ -5,7 +5,7 @@
 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
-import { Context, Effect, Layer, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, Schedule, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
@@ -137,6 +137,6 @@ export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const game = yield* Game;
     const core = yield* Core;
-    yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.flatMap(game.count(), core.setCommits), Effect.sleep(countEveryMs))));
+    yield* Effect.forkScoped(Effect.flatMap(game.count(), core.setCommits).pipe(Effect.repeat(Schedule.spaced(countEveryMs))));
   }),
 );

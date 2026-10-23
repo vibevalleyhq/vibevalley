@@ -4,7 +4,7 @@
 
 import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
@@ -205,6 +205,6 @@ export const start = Layer.effectDiscard(
     const config = yield* Settings;
     const recurrences = yield* Recurrences;
     const every = Math.max(config.recurrence.tickMs, 1);
-    yield* Effect.forkScoped(Effect.forever(Effect.andThen(recurrences.tick, Effect.sleep(every))));
+    yield* Effect.forkScoped(recurrences.tick.pipe(Effect.repeat(Schedule.spaced(every))));
   }),
 );
