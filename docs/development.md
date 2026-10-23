@@ -62,6 +62,21 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 先起服务端（见上）。另开终端，命令行在 `apps/server` 下是 `npm run cli --`；下面写成 `vibevalley`。它默认连 `http://127.0.0.1:8787`，别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
+命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条 `<组> <操作>` 命令（`issue create`、`issue status <id>`），`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
+
+- **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
+- **请求体** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段。
+- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）。退出码分得出是哪一种：
+
+  | 退出码 | 意思 |
+  |---|---|
+  | 0 | 成功，或要了帮助 |
+  | 1 | 服务端出错 |
+  | 2 | 命令写错了：不认的参数、少参数、请求体不对 |
+  | 3 | 服务端拒绝（`Refused`） |
+  | 4 | 没有这个东西（`Missing`） |
+  | 5 | 连不上服务端 |
+
 1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
 
    ```bash

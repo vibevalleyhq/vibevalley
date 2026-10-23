@@ -42,6 +42,7 @@ export default defineConfig({
       {
         files: [
           "apps/server/src/cli.ts",
+          "apps/server/src/cli/**",
           "apps/server/src/agent/brain/**",
           "apps/server/src/session/journal.ts",
           "apps/server/src/**/*.test.ts",
