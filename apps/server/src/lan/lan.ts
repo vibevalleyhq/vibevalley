@@ -13,7 +13,7 @@ import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
-import { Context, Effect, FiberSet, Layer, Option } from "effect";
+import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
@@ -151,6 +151,9 @@ export const make = (options: LanOptions = {}) =>
     let port = 0;
     let problem = "";
     let pairing: Pairing | undefined;
+    // Opening binds the port after its write: a shut that came in between would find no server yet and leave the one
+    // bound after it listening. One open or shut at a time.
+    const opening = yield* Semaphore.make(1);
     let upstream = "";
     /** Forgetting a device ends them. */
     const conns = new Map<string, Set<AbortController>>();
@@ -309,7 +312,7 @@ export const make = (options: LanOptions = {}) =>
           shut();
         }
         return status();
-      }),
+      }, opening.withPermits(1)),
       startPairing: () =>
         Effect.suspend(() => {
           if (!open || !server) return Effect.fail(refuse("还没允许连接：先打开它"));

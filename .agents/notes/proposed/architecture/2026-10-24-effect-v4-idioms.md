@@ -21,7 +21,7 @@ Status: proposed
 1. **方法有名字**：服务的方法改成 `Effect.fn("<服务>.<方法>")(function* (...) {...})`，只有一个 `yield*` 的短方法照旧。机械改动，先做。
 2. **服务里不另起运行时**：`Effect.runSync(core.apply(...))` 改成在纤程里调；给自己的回调用的 `FiberSet.makeRuntimePromise` 改成回调只往 `Queue` 放、一个 `forkScoped` 的纤程消费。给 oar、MCP 的回调保留。
 3. **定时归作用域**：防抖存盘用 `forkScoped` 的纤程加打断（或 `Stream.debounce`），超时用 `Effect.timeout`，重复用 `Schedule`；服务关的时候作用域收掉它们，不再手动 `clearTimeout`。先做 `session`、`runtime`。
-4. **状态在 Ref 里**：要跟锁一起改的状态换成 `SynchronizedRef`（`modifyEffect` 把读、判断、写放在一处），要往外推变化的换成 `SubscriptionRef`。先做 `agent`、`lan`。
+4. **状态在 Ref 里**：读和写之间隔着异步的状态，换成 `SynchronizedRef`（`modifyEffect` 把读、判断、写放在一处）或用一把锁；同步的读改写不动。先看 `agent`、`lan`。
 5. **读写和配置**：服务里的同步 `fs` 换成 `FileSystem`，JSON 用 `Schema.fromJsonString`，环境变量收进 `Config`，日志用 `Effect.log*`。
 
 做完再扫一遍，把还剩的、新看到的写回这篇或新开一篇。
@@ -31,6 +31,7 @@ Status: proposed
 1. 方法有名字：已经做了。服务的 `make` 里返回的方法和内部的帮手函数，整个函数就是一段 `Effect.gen`（或套一层 `x.withPermits(n)`）的，都改成了 `Effect.fn("<服务>.<名字>")`，锁作为第二个参数；共 135 处。模块顶层的 `make` 和自己写了返回类型的没动。
 2. 服务里不另起运行时：已经做了。在 `Effect.gen` 里经 `Effect.runSync` 施加事实、发提醒的 19 处改成 `yield* core.apply`、`yield* core.notice`（`session`、`channel/chat`），`chat` 的那个帮手删了；`session` 的留给 oar 的回调（事件、汇报、太久没动静），它们不在纤程里、要照 oar 给的次序落下。服务的 `make` 里的锁 `Semaphore.makeUnsafe` 改成 `yield* Semaphore.make`（两个普通的工厂函数照旧）。其余的 `FiberSet.makeRuntime*` 都是给外面的库（oar、记性的来源、MCP、node 的 http）的回调用的，纤程归服务的作用域，是 v4 给这种交界的写法，留着。
 3. 定时归作用域：已经做了我们自己的服务。`session`（存盘的防抖、每个会话太久没动静）、`runtime`（花费的存盘、推一次新的花费、跑完一轮后查额度）、`core`（state.json 的合并写）、`channel/chat`（攒一下再提醒、叫醒失败后再试）的 `setTimeout` 都换成服务自己的 `FiberMap`：同一个键再来一次就换掉上一个（防抖），`onlyIfMissing` 是已经在等就不再排（合并写、一个窗口推一次）；服务关的时候作用域收掉它们，关前要写的照旧在终结器里写。`chat` 等完以后把活交给 `forkHere`，叫停只取消还在等的，不打断已经在锁里跑的。`session` 关时等农机收尾的 `Promise.race` 换成 `Effect.timeoutOption`，`lan` 等主人点头的超时也是。还剩的 `setTimeout` 在和外面打交道的地方（`voice`、连接器、`agent/brain`、`runtime/dsh.ts`、`project/git.ts` 的进程超时、`session/journal.ts` 这个类），最后一遍扫的时候再看。
+4. 状态在 Ref 里：看过以后不整体改。服务里的 `let` 多是句柄（监听、子进程、隧道）、关没关的标记、计数，或者像档案那样读、改、写在同一步里做完、中间没有 `yield*` 的同步状态；换成 `Ref` 要在各处同步地取（`getUnsafe`），没有消掉哪一种竞争。真有竞争的是读和写之间隔着异步的：`lan` 的 `setOpen` 写库以后才绑端口，同时来一个关，会找不到还没绑上的监听、留下它开着；给它一把锁（`Effect.fn` 的第二个参数），一次只开或关一个。这个竞争的窗口是绑回环端口的那一下，测试里造不出来，没写测试。
 
 ## Alternatives considered
 
