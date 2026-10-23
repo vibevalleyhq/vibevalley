@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "effect": "4.0.5",
     "eslint-plugin-solid": "0.18.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

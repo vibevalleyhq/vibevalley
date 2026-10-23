@@ -21,6 +21,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
+      effect:
+        specifier: 4.0.5
+        version: 4.0.5
       eslint-plugin-solid:
         specifier: 0.18.1
         version: 0.18.1(eslint@10.13.0(jiti@2.7.0))(typescript@7.0.2)
