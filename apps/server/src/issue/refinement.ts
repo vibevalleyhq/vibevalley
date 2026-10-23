@@ -43,63 +43,60 @@ export function refinement(d: RefinementDeps) {
   const drafting = Semaphore.makeUnsafe(1);
 
   /** Who drafts: its assignee; else whoever was last sent to work in its project, if they can work now; else chooseAgent. */
-  const refiner = (t: Issue) =>
-    Effect.gen(function* () {
-      const candidates = yield* runtimes.candidates;
-      let named = "";
-      if (t.assignee) {
-        if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
-        named = t.assignee;
-      } else if (t.project) {
-        const last = (yield* one(qs.lastAssigneeIn({ project: t.project })))?.assignee;
-        if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
-      }
-      const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
-      if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草", [lookIn.agent]));
-      return chosen;
-    });
+  const refiner = Effect.fnUntraced(function* (t: Issue) {
+    const candidates = yield* runtimes.candidates;
+    let named = "";
+    if (t.assignee) {
+      if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
+      named = t.assignee;
+    } else if (t.project) {
+      const last = (yield* one(qs.lastAssigneeIn({ project: t.project })))?.assignee;
+      if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
+    }
+    const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
+    if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草", [lookIn.agent]));
+    return chosen;
+  });
 
   /** Before its session is sent: the owner's first word is its title, the refiner and the project are its own unless it names them, and an answer clears what it asked. */
-  const beforeRefinement = (t: Issue, word: string, agent: string, where: string) =>
-    Effect.gen(function* () {
-      let [title, description] = [t.title, t.description ?? ""];
-      if (word && t.questions.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
-      yield* inTx(
-        Effect.gen(function* () {
-          yield* db(
-            q.editIssue({
-              title,
-              description,
-              project: nullText(t.project ?? where),
-              assignee: nullText(t.assignee ?? agent),
-              priority: t.priority,
-              review: t.review,
-              criteria: jsonOrNull(t.criteria, (t.criteria ?? []).length > 0),
-              deliver: t.deliver,
-              id: t.id,
-            }),
-          );
-          if (word && t.questions.length > 0) yield* db(q.setIssueQuestions({ id: t.id, questions: null }));
-        }),
-      );
-      yield* publish(t.id);
-    });
+  const beforeRefinement = Effect.fnUntraced(function* (t: Issue, word: string, agent: string, where: string) {
+    let [title, description] = [t.title, t.description ?? ""];
+    if (word && t.questions.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
+    yield* inTx(
+      Effect.gen(function* () {
+        yield* db(
+          q.editIssue({
+            title,
+            description,
+            project: nullText(t.project ?? where),
+            assignee: nullText(t.assignee ?? agent),
+            priority: t.priority,
+            review: t.review,
+            criteria: jsonOrNull(t.criteria, (t.criteria ?? []).length > 0),
+            deliver: t.deliver,
+            id: t.id,
+          }),
+        );
+        if (word && t.questions.length > 0) yield* db(q.setIssueQuestions({ id: t.id, questions: null }));
+      }),
+    );
+    yield* publish(t.id);
+  });
 
-  const refined = (id: string, d: IssueRefinement, questions: readonly Question[] | undefined) =>
-    Effect.gen(function* () {
-      const criteria = kept(d.criteria);
-      const open = openQuestions(questions);
-      yield* db(
-        q.refineIssue({
-          id,
-          title: d.title,
-          description: refinementDescription(d),
-          criteria: jsonOrNull(criteria, criteria.length > 0),
-          questions: jsonOrNull(open, open.length > 0),
-        }),
-      );
-      yield* publish(id);
-    });
+  const refined = Effect.fnUntraced(function* (id: string, d: IssueRefinement, questions: readonly Question[] | undefined) {
+    const criteria = kept(d.criteria);
+    const open = openQuestions(questions);
+    yield* db(
+      q.refineIssue({
+        id,
+        title: d.title,
+        description: refinementDescription(d),
+        criteria: jsonOrNull(criteria, criteria.length > 0),
+        questions: jsonOrNull(open, open.length > 0),
+      }),
+    );
+    yield* publish(id);
+  });
 
   const draft = (id: string, word: string, channel: string) =>
     drafting.withPermits(1)(
@@ -127,35 +124,33 @@ export function refinement(d: RefinementDeps) {
     );
 
   /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
-  const handedBack = (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) =>
-    Effect.gen(function* () {
-      const h = sessions.sessionOf(f.id);
-      if (!h?.refining || !h.issue) return;
-      const id = h.issue;
-      const r = sessions.find(f.id);
-      const said = r?.lastText ?? "";
-      const thread = yield* chat.jobThread(f.id);
-      const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
-      if (f.outcome === "completed") {
-        const { draft: d, problem } = parseRefinement(said);
-        if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
-        else yield* refined(id, d, f.questions);
-      } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
-      yield* sessions.dismiss(f.id, "discard");
-      yield* publish(id);
-    });
+  const handedBack = Effect.fnUntraced(function* (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) {
+    const h = sessions.sessionOf(f.id);
+    if (!h?.refining || !h.issue) return;
+    const id = h.issue;
+    const r = sessions.find(f.id);
+    const said = r?.lastText ?? "";
+    const thread = yield* chat.jobThread(f.id);
+    const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
+    if (f.outcome === "completed") {
+      const { draft: d, problem } = parseRefinement(said);
+      if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
+      else yield* refined(id, d, f.questions);
+    } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
+    yield* sessions.dismiss(f.id, "discard");
+    yield* publish(id);
+  });
 
   /** An unsent issue going away takes its draft with it: whoever drafts it goes home, and what drafts left is removed. */
-  const clearRefinement = (t: Issue): Effect.Effect<WorkplaceRelease, ApiError> =>
-    Effect.gen(function* () {
-      if (t.refining) yield* sessions.dismiss(t.refining.session, "discard");
-      if (t.project) {
-        const kept = yield* sessions.clearWorkplace(t.id, t.project, t.number);
-        if (kept.kept) yield* core.notice("warn", `「${cut(t.title, 40)}」取消了：${kept.reason}`);
-        return kept;
-      }
-      return { kept: false };
-    });
+  const clearRefinement = Effect.fnUntraced(function* (t: Issue): Effect.fn.Return<WorkplaceRelease, ApiError> {
+    if (t.refining) yield* sessions.dismiss(t.refining.session, "discard");
+    if (t.project) {
+      const kept = yield* sessions.clearWorkplace(t.id, t.project, t.number);
+      if (kept.kept) yield* core.notice("warn", `「${cut(t.title, 40)}」取消了：${kept.reason}`);
+      return kept;
+    }
+    return { kept: false };
+  });
 
   return { draft, handedBack, clearRefinement };
 }

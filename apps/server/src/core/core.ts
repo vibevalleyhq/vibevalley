@@ -196,7 +196,7 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const shape: CoreShape = {
+  const shape = Core.of({
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
@@ -225,7 +225,7 @@ export const make = Effect.gen(function* () {
     ),
     owner: Stream.fromPubSub(owner),
     states,
-  };
+  });
   return shape;
 });
 

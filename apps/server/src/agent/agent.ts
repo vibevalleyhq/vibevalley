@@ -139,7 +139,7 @@ export const make = Effect.gen(function* () {
     return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [lookIn.skill]));
   };
 
-  const shape: AgentShape = {
+  const shape = Agents.of({
     agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
@@ -208,7 +208,7 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } })),
         settings,
       ),
-  };
+  });
   return shape;
 });
 

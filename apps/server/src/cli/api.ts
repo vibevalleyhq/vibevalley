@@ -74,14 +74,13 @@ const send = (base: string, request: HttpClientRequest.HttpClientRequest) =>
   Effect.flatMap(HttpClient.HttpClient, (client) => client.execute(request)).pipe(Effect.mapError(unreachable(base)));
 
 /** One call: its answer's text, or the failure the server answered with. */
-export const request = (base: string, method: Endpoint["method"], path: string, body?: string) =>
-  Effect.gen(function* () {
-    const plain = HttpClientRequest.make(method)(base + path);
-    const res = yield* send(base, body === undefined ? plain : HttpClientRequest.bodyText(plain, body, "application/json"));
-    const text = yield* res.text.pipe(Effect.mapError(unreachable(base)));
-    if (res.status < 200 || res.status >= 300) return yield* Effect.fail(failureOf(res.status, text));
-    return text;
-  });
+export const request = Effect.fnUntraced(function* (base: string, method: Endpoint["method"], path: string, body?: string) {
+  const plain = HttpClientRequest.make(method)(base + path);
+  const res = yield* send(base, body === undefined ? plain : HttpClientRequest.bodyText(plain, body, "application/json"));
+  const text = yield* res.text.pipe(Effect.mapError(unreachable(base)));
+  if (res.status < 200 || res.status >= 300) return yield* Effect.fail(failureOf(res.status, text));
+  return text;
+});
 
 const endpointOf = (op: keyof Handlers) => endpoints.find((e) => e.op === op)!;
 
@@ -128,13 +127,12 @@ const bodyText = (given: string, path: readonly string[]) =>
 const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The body checked against the endpoint's Schema here, so a wrong field is named before anything is sent. */
-const checkedBody = (e: Endpoint, given: string, path: readonly string[]) =>
-  Effect.gen(function* () {
-    const text = given === "" ? "{}" : yield* bodyText(given, path);
-    const value = yield* json(text).pipe(Effect.mapError((issue) => usage(path, `--json 不是 JSON：${issue.message}`, "InvalidJson")));
-    yield* Schema.decodeUnknownEffect(e.body!)(value).pipe(Effect.mapError((issue) => usage(path, `--json 不合 ${e.op} 的请求体：${issue.message}`)));
-    return text;
-  });
+const checkedBody = Effect.fnUntraced(function* (e: Endpoint, given: string, path: readonly string[]) {
+  const text = given === "" ? "{}" : yield* bodyText(given, path);
+  const value = yield* json(text).pipe(Effect.mapError((issue) => usage(path, `--json 不是 JSON：${issue.message}`, "InvalidJson")));
+  yield* Schema.decodeUnknownEffect(e.body!)(value).pipe(Effect.mapError((issue) => usage(path, `--json 不合 ${e.op} 的请求体：${issue.message}`)));
+  return text;
+});
 
 const param = (name: string, number: boolean) => (number ? Argument.Int(name) : Argument.String(name));
 const queryFlag = (name: string, number: boolean): Flag.Flag<Option.Option<unknown>> =>

@@ -9,12 +9,11 @@ import { chatCompletionsPath } from "../orchestrator/rules.ts";
 import { Mcp } from "../mcp/mcp.ts";
 import { callbackLog } from "../base/log.ts";
 
-const web = (handle: (r: Request) => Promise<Response>) =>
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const asked = yield* Effect.orDie(HttpServerRequest.toWeb(request));
-    return HttpServerResponse.fromWeb(yield* Effect.promise(() => handle(asked)));
-  });
+const web = Effect.fnUntraced(function* (handle: (r: Request) => Promise<Response>) {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const asked = yield* Effect.orDie(HttpServerRequest.toWeb(request));
+  return HttpServerResponse.fromWeb(yield* Effect.promise(() => handle(asked)));
+});
 
 export const mcpRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {

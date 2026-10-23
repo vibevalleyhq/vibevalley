@@ -122,7 +122,7 @@ export const make = Effect.gen(function* () {
     };
   };
 
-  const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
+  const save = Effect.fnUntraced(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
     if (problem) return yield* new SettingRefused({ message: problem });
     const next: Record<string, unknown> = { ...stored };
@@ -148,7 +148,7 @@ export const make = Effect.gen(function* () {
     return status();
   });
 
-  const shape: SettingShape = {
+  const shape = Setting.of({
     status,
     check: (u) => {
       const problem = settingsProblem(u);
@@ -169,7 +169,7 @@ export const make = Effect.gen(function* () {
       keys: { asrKey: stored.asrKey ?? "", llmKey: stored.llmKey ?? "", ttsKey: stored.ttsKey ?? "" },
       deepseekApiKey: pick(stored.deepseekApiKey, fromConfig.deepseek)?.[0] ?? "",
     }),
-  };
+  });
   return shape;
 });
 

@@ -72,38 +72,39 @@ export const makeMemories = Effect.gen(function* () {
       ),
     );
 
-  const insertNote = (agent: string, body: string, project: string | undefined, session: string | undefined, author: MemoryAuthor) =>
-    Effect.gen(function* () {
-      const at = Date.now();
-      const id = newId();
-      yield* db(
-        q.addNote({
-          id,
-          agent,
-          body,
-          terms: termsText(body),
-          terms_of: termsVersion,
-          project: project ?? null,
-          session: session ?? null,
-          author,
-          created_at: at,
-        }),
-      );
-      return { id, at };
-    });
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: MemoryAuthor) {
+    const at = Date.now();
+    const id = newId();
+    yield* db(
+      q.addNote({
+        id,
+        agent,
+        body,
+        terms: termsText(body),
+        terms_of: termsVersion,
+        project: project ?? null,
+        session: session ?? null,
+        author,
+        created_at: at,
+      }),
+    );
+    return { id, at };
+  });
 
   /** Every agent memory sharing any of text's words, how well (higher better); none when the index cannot say. */
-  const matches = (agent: string, text: string) =>
-    Effect.gen(function* () {
+  const matches = Effect.fnUntraced(
+    function* (agent: string, text: string) {
       const words = termsList(text);
       if (words.length === 0) return {} as Record<string, number>;
       const rows = yield* db(q.matchMemories({ words, agent }));
       return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0])) as Record<string, number>;
-    }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>)));
+    },
+    (e, agent) => e.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>))),
+  );
 
   /** What a run would recall; nothing is counted as recalled until markRecalled. */
-  const recallable = (cue: RecallCue) =>
-    Effect.gen(function* () {
+  const recallable = Effect.fnUntraced(
+    function* (cue: RecallCue) {
       const all = yield* list(cue.agent);
       const picked: PickCue = {
         session: cue.session,
@@ -114,7 +115,9 @@ export const makeMemories = Effect.gen(function* () {
         matches: yield* matches(cue.agent, cue.text),
       };
       return pick(all, picked);
-    }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as Memory[])));
+    },
+    (e, cue) => e.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`${cue.agent} could not recall: ${String(e)}`), [] as Memory[]))),
+  );
 
   const markRecalled = (ids: readonly string[]) =>
     Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: Date.now(), id })), { discard: true }).pipe(
@@ -153,36 +156,37 @@ export const makeMemories = Effect.gen(function* () {
           )
           .pipe(Effect.catch((e) => Effect.logWarning(`what ${run.session} learned was not kept: ${String(e)}`)));
 
-  const listed = (agent: string) =>
-    Effect.gen(function* () {
+  const listed = Effect.fnUntraced(
+    function* (agent: string) {
       const all = yield* list(agent);
       const fading = new Set(nextForgotten(all, fadingSoon));
       return all.map((m) => ({ ...m, fading: fading.has(m.id) }));
-    }).pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as Memory[])));
+    },
+    (e, agent) => e.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`memories of ${agent}: ${String(e)}`), [] as Memory[]))),
+  );
 
-  const write = (n: Note) =>
-    Effect.gen(function* () {
-      const body = clip(n.text, noteMaxChars);
-      if (body === "") return yield* new MemoryRefused({ message: "要记的话是空的" });
-      const project = n.project.trim() || undefined;
-      const session = n.session || undefined;
-      const { id, at } = yield* insertNote(n.agent, body, project, session, n.by).pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: "没记下来：数据库写不进去" }))),
-        ),
-      );
-      return {
-        id,
-        agent: n.agent,
-        kind: "note",
-        text: body,
-        author: n.by,
-        at,
-        recalled: 0,
-        ...(project ? { project } : {}),
-        ...(session ? { session } : {}),
-      } as Memory;
-    });
+  const write = Effect.fnUntraced(function* (n: Note) {
+    const body = clip(n.text, noteMaxChars);
+    if (body === "") return yield* new MemoryRefused({ message: "要记的话是空的" });
+    const project = n.project.trim() || undefined;
+    const session = n.session || undefined;
+    const { id, at } = yield* insertNote(n.agent, body, project, session, n.by).pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: "没记下来：数据库写不进去" }))),
+      ),
+    );
+    return {
+      id,
+      agent: n.agent,
+      kind: "note",
+      text: body,
+      author: n.by,
+      at,
+      recalled: 0,
+      ...(project ? { project } : {}),
+      ...(session ? { session } : {}),
+    } as Memory;
+  });
 
   const forget = (agent: string, id: string) => db(q.forget({ agent, id })).pipe(Effect.orDie);
 

@@ -210,7 +210,7 @@ export const make = (options: TaskOptions = {}) =>
         { discard: true },
       );
 
-    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: GraphActor, why = "") {
+    const put = Effect.fnUntraced(function* (graph: TaskGraph, by: GraphActor, why = "") {
       const before = get(graph.id);
       yield* issues.putTask(graph).pipe(Effect.catchDefect((d) => Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`))));
       yield* record(before, graph, by, why);
@@ -218,7 +218,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const putSystem = (graph: TaskGraph) => put(graph, "system");
 
-    const giveUp = Effect.fn("Tasks.giveUp")(function* (graph: TaskGraph, why: string) {
+    const giveUp = Effect.fnUntraced(function* (graph: TaskGraph, why: string) {
       const splitter = splitters.get(graph.id);
       yield* putSystem(withNote({ ...graph, state: "abandoned" }, why));
       splitters.delete(graph.id);
@@ -227,7 +227,7 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
     });
 
-    const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
+    const split = Effect.fnUntraced(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
       if (outcome === "interrupted") return yield* giveUp(graph, "规划被叫停了");
@@ -253,43 +253,42 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
     });
 
-    const recurrence = (id: string): Effect.Effect<void, ApiError> =>
-      Effect.gen(function* () {
-        let graph = get(id);
-        if (!graph || graph.state !== "running") return;
-        for (const task of startable(graph)) {
-          const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
-          let refusal = "没有能派的帮工";
-          let hired: Session | undefined;
-          if (agent) {
-            const tag: SessionGraph = { id: graph.id, task: task.id };
-            const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
-              worktree: true,
-              taskGraph: tag,
-              base: graph.branch ?? "",
-              trigger: { kind: "task" },
-              issue: taskIssueID(graph.id, task.id),
-            });
-            hired = got.session;
-            refusal = got.refused ?? refusal;
-          }
-          if (!hired) {
-            // Not now: it waits, and is tried again when a session finishes or leaves.
-            const note = "「" + task.title + "」先等着：" + refusal;
-            if (graph.note !== note) yield* putSystem(withNote(graph, note));
-            return;
-          }
-          const session = hired.id;
-          graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
-          const saved = yield* Effect.result(putSystem(graph));
-          if (saved._tag === "Failure") {
-            yield* dismiss(session);
-            return yield* Effect.fail(saved.failure);
-          }
+    const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
+      let graph = get(id);
+      if (!graph || graph.state !== "running") return;
+      for (const task of startable(graph)) {
+        const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
+        let refusal = "没有能派的帮工";
+        let hired: Session | undefined;
+        if (agent) {
+          const tag: SessionGraph = { id: graph.id, task: task.id };
+          const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
+            worktree: true,
+            taskGraph: tag,
+            base: graph.branch ?? "",
+            trigger: { kind: "task" },
+            issue: taskIssueID(graph.id, task.id),
+          });
+          hired = got.session;
+          refusal = got.refused ?? refusal;
         }
-      });
+        if (!hired) {
+          // Not now: it waits, and is tried again when a session finishes or leaves.
+          const note = "「" + task.title + "」先等着：" + refusal;
+          if (graph.note !== note) yield* putSystem(withNote(graph, note));
+          return;
+        }
+        const session = hired.id;
+        graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
+        const saved = yield* Effect.result(putSystem(graph));
+        if (saved._tag === "Failure") {
+          yield* dismiss(session);
+          return yield* Effect.fail(saved.failure);
+        }
+      }
+    });
 
-    const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
+    const taskFailed = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
       yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
       yield* tellOrchestrator(
@@ -304,7 +303,7 @@ export const make = (options: TaskOptions = {}) =>
       );
     });
 
-    const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
+    const sendBack = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
       if (task.tries >= autoRetries) return yield* taskFailed(graph, task, why);
       yield* put(
         withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 })),
@@ -315,29 +314,28 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
-    const verified = (graph: TaskGraph, task: Task, cwd: string): Effect.Effect<Verification> =>
-      Effect.gen(function* () {
-        const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
-        let changed: string[] = [];
-        if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
-          const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-          if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
-          changed = files.success;
-        }
-        if (isAcceptance(task) && task.check) {
-          if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
-          return { frozen: changed };
-        }
-        const touched = frozenTouched(graph, task, changed);
-        if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
-        for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
-          const ran = yield* projects.run(cwd, check);
-          if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
-        }
-        return { frozen: [] };
-      });
+    const verified = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, cwd: string): Effect.fn.Return<Verification> {
+      const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
+      let changed: string[] = [];
+      if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
+        const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
+        if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
+        changed = files.success;
+      }
+      if (isAcceptance(task) && task.check) {
+        if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
+        return { frozen: changed };
+      }
+      const touched = frozenTouched(graph, task, changed);
+      if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
+      for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
+        const ran = yield* projects.run(cwd, check);
+        if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
+      }
+      return { frozen: [] };
+    });
 
-    const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
+    const taskDone = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
       if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
       const target = graph.branch;
@@ -385,7 +383,7 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const taskEnded = Effect.fn("Tasks.taskEnded")(function* (graph: TaskGraph, task: Task, session: Session, outcome: string, summary: string) {
+    const taskEnded = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, session: Session, outcome: string, summary: string) {
       if (outcome === "completed") return yield* taskDone(graph, task, session.id, summary);
       if (outcome === "failed") return yield* sendBack(graph, task, session.id, retryText(task), summary);
       if (graph.state !== "running") return;
@@ -426,7 +424,7 @@ export const make = (options: TaskOptions = {}) =>
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
-    const resumeWorking = Effect.fn("Tasks.resumeWorking")(function* (id: string) {
+    const resumeWorking = Effect.fnUntraced(function* (id: string) {
       for (const task of get(id)?.tasks ?? []) {
         if (task.state !== "working") continue;
         const graph = get(id);
@@ -442,13 +440,13 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from = "") {
+    const openBranch = Effect.fnUntraced(function* (graph: TaskGraph, from = "") {
       const branch = "vibevalley/task-" + graph.id + "-" + Date.now().toString(36);
       yield* projects.openBranch(graph.project, branch, from).pipe(Effect.mapError((e) => refused(e.message)));
       return branch;
     });
 
-    const edited = Effect.fn("Tasks.edited")(function* (id: string, change: (g: TaskGraph) => EditResult, by: GraphActor) {
+    const edited = Effect.fnUntraced(function* (id: string, change: (g: TaskGraph) => EditResult, by: GraphActor) {
       const result = change(yield* need(id));
       if (!result.ok) return yield* Effect.fail(refused(result.problem));
       yield* put(result.graph, by);
@@ -472,7 +470,7 @@ export const make = (options: TaskOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
-    const shape: TaskShape = {
+    const shape = Tasks.of({
       graphs: () => graphsOf(core.state()),
       comeBack,
       split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
@@ -686,7 +684,7 @@ export const make = (options: TaskOptions = {}) =>
         return yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    };
+    });
     return shape;
   });
 

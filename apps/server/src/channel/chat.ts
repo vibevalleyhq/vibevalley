@@ -415,7 +415,7 @@ export const make = Effect.gen(function* () {
   };
   const targetOfConv = (row: ConvRow) => targetOfRow(row.kind, row.parent_number, row.name, row.channel_id, null);
 
-  const toConversation = Effect.fn("Channels.toConversation")(function* (row: ConvRow) {
+  const toConversation = Effect.fnUntraced(function* (row: ConvRow) {
     const read = yield* one(qr.readCursor({ participant_id: "user", conversation_id: row.id }));
     const sk = subjectKind(row.subject_kind);
     return {
@@ -436,7 +436,7 @@ export const make = Effect.gen(function* () {
     } as Conversation;
   });
 
-  const publishConversation = Effect.fn("Channels.publishConversation")(function* (id: string) {
+  const publishConversation = Effect.fnUntraced(function* (id: string) {
     const row = yield* one(qc.conversationByID({ id }));
     if (row) yield* core.apply({ type: "conversation", conversation: yield* toConversation(row) });
   });
@@ -453,7 +453,7 @@ export const make = Effect.gen(function* () {
     });
   });
 
-  const publishMessage = Effect.fn("Channels.publishMessage")(function* (id: string, answers: string | undefined) {
+  const publishMessage = Effect.fnUntraced(function* (id: string, answers: string | undefined) {
     const row = yield* one(qm.messageByID({ id }));
     if (!row) return;
     const conv = yield* one(qc.conversationByID({ id: row.conversation_id }));
@@ -480,7 +480,7 @@ export const make = Effect.gen(function* () {
   };
 
   /** Inside the parent's transaction: a thread and its first follower appear together. */
-  const threadFor = Effect.fn("Channels.threadFor")(function* (parent: { id: string; number: number; conversation: string }, subject: ThreadSubject) {
+  const threadFor = Effect.fnUntraced(function* (parent: { id: string; number: number; conversation: string }, subject: ThreadSubject) {
     const existing = yield* one(qc.threadByParent({ parent_id: parent.id }));
     if (existing) return existing.id;
     const id = newId();
@@ -523,7 +523,7 @@ export const make = Effect.gen(function* () {
 
   // ── writing ──
 
-  const settle = Effect.fn("Channels.settle")(function* (id: string) {
+  const settle = Effect.fnUntraced(function* (id: string) {
     const row = (yield* one(qm.messageByID({ id })))!;
     const conv = (yield* one(qc.conversationByID({ id: row.conversation_id })))!;
     const meta = metaOf(row.meta);
@@ -587,60 +587,58 @@ export const make = Effect.gen(function* () {
     return written;
   });
 
-  const write = (w: Write): Effect.Effect<Written> =>
-    Effect.gen(function* () {
-      const written = yield* inTx(
-        Effect.gen(function* () {
-          if (!w.id && w.sendKey) {
-            const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-            if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
-          }
-          let id = w.id ?? "";
-          let number: number;
-          if (!id) {
-            id = newId();
-            number = (yield* db(
-              qm.insertMessage({
-                id,
-                conversation: w.conversation,
-                sender: w.from,
-                kind: w.kind,
-                body: w.text,
-                final: w.final,
-                meta: metaText(w.meta),
-                send_key: w.sendKey || null,
-                created_at: Date.now(),
-              }),
-            )).number;
-            yield* db(qc.touchConversation({ number, id: w.conversation }));
-          } else {
-            yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: Date.now(), id }));
-            const row = yield* one(qm.messageByID({ id }));
-            if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
-            number = row.number;
-          }
-          const out: Written = w.final ? yield* settle(id) : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
-          out.id = id;
-          out.number = number;
-          if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
-          if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
-          return out;
-        }),
-      );
-      if (!written.again) yield* after(w.conversation, written, w.answers);
-      return written;
-    });
+  const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
+    const written = yield* inTx(
+      Effect.gen(function* () {
+        if (!w.id && w.sendKey) {
+          const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
+          if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
+        }
+        let id = w.id ?? "";
+        let number: number;
+        if (!id) {
+          id = newId();
+          number = (yield* db(
+            qm.insertMessage({
+              id,
+              conversation: w.conversation,
+              sender: w.from,
+              kind: w.kind,
+              body: w.text,
+              final: w.final,
+              meta: metaText(w.meta),
+              send_key: w.sendKey || null,
+              created_at: Date.now(),
+            }),
+          )).number;
+          yield* db(qc.touchConversation({ number, id: w.conversation }));
+        } else {
+          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: Date.now(), id }));
+          const row = yield* one(qm.messageByID({ id }));
+          if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
+          number = row.number;
+        }
+        const out: Written = w.final ? yield* settle(id) : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
+        out.id = id;
+        out.number = number;
+        if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
+        if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
+        return out;
+      }),
+    );
+    if (!written.again) yield* after(w.conversation, written, w.answers);
+    return written;
+  });
 
-  const after = (conversation: string, written: Written, answers: string | undefined): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      for (const r of written.resetWake) breaker.reset(r);
-      yield* publishMessage(written.id, answers);
-      yield* publishConversation(conversation);
-      if (written.ownerMentionsChanged) yield* publishOwnerMentions;
-      if (written.thread) yield* publishConversation(written.thread);
-      if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
-      for (const r of written.recipients) yield* kick(r);
-    });
+  const after = Effect.fnUntraced(function* (conversation: string, written: Written, answers: string | undefined): Effect.fn.Return<void> {
+    for (const r of written.resetWake) breaker.reset(r);
+    yield* publishMessage(written.id, answers);
+    yield* publishConversation(conversation);
+    if (written.ownerMentionsChanged) yield* publishOwnerMentions;
+    if (written.thread) yield* publishConversation(written.thread);
+    if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
+    for (const r of written.recipients) yield* kick(r);
+  });
 
   // ── delivering ──
 
@@ -671,7 +669,7 @@ export const make = Effect.gen(function* () {
     return out as UnreadRow[];
   };
 
-  const inboxRows = Effect.fn("Channels.inboxRows")(function* (who: string) {
+  const inboxRows = Effect.fnUntraced(function* (who: string) {
     const h = sessionOf(who);
     const channel = h ? channelOfSession(h) : general;
     const rows = yield* db(qc.inboxOf({ participant: who, channel }));
@@ -691,93 +689,89 @@ export const make = Effect.gen(function* () {
   const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
     helpers ? helpers.deliver(recipient, text, { kind: "comment", message } as RunTrigger) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
-  const kick = (recipient: string): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
-      const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
-      if (recipient === orchestratorAgent) {
-        const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
-        const now = Date.now();
-        for (const [conversation, rs] of byConversation) {
-          const messages = rs.map(asInbox);
-          PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
-          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
-        }
-        return;
-      }
-      const session = sessionOf(recipient);
-      if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
-      if (isBusy(session)) {
-        // Gathered for a moment: a burst of messages is one notice.
-        if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
-        return;
-      }
-      if (waking.length === 0 || breaker.isOpen(recipient)) return;
-      const messages = waking.map(asInbox);
-      const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
-      const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
-      if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
+  const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+    const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
+    const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
+    if (recipient === orchestratorAgent) {
+      const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
       const now = Date.now();
-      for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
-    });
+      for (const [conversation, rs] of byConversation) {
+        const messages = rs.map(asInbox);
+        PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
+        for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
+      }
+      return;
+    }
+    const session = sessionOf(recipient);
+    if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
+    if (isBusy(session)) {
+      // Gathered for a moment: a burst of messages is one notice.
+      if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
+      return;
+    }
+    if (waking.length === 0 || breaker.isOpen(recipient)) return;
+    const messages = waking.map(asInbox);
+    const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
+    const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
+    if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
+    const now = Date.now();
+    for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+  });
 
-  const notify = (recipient: string): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      if (compacting.has(recipient)) return;
-      const session = sessionOf(recipient);
-      if (!session) return;
-      if (!isBusy(session)) return yield* kick(recipient);
-      const rows = (yield* db(qd.openDeliveries({ recipient_id: recipient }))).filter((r) => r.state === "pending" && r.held_by === null);
-      if (rows.length === 0) return;
-      const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
-      if (delivered.kind === "refused") return;
-      const now = Date.now();
-      for (const r of rows)
-        yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
-    });
+  const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+    if (compacting.has(recipient)) return;
+    const session = sessionOf(recipient);
+    if (!session) return;
+    if (!isBusy(session)) return yield* kick(recipient);
+    const rows = (yield* db(qd.openDeliveries({ recipient_id: recipient }))).filter((r) => r.state === "pending" && r.held_by === null);
+    if (rows.length === 0) return;
+    const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
+    if (delivered.kind === "refused") return;
+    const now = Date.now();
+    for (const r of rows) yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+  });
 
-  const onActivity = (a: LaunchActivity): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      if (closed) return;
-      switch (a.kind) {
-        case "spoke":
-          breaker.spoke(a.id);
-          return yield* heardLaunch(a.id, a.launch);
-        case "ended": {
-          if (!a.spoke) {
-            const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
-            if (rolled.length > 0) {
-              const { count: failed, tripped } = breaker.failed(a.id);
-              if (tripped) {
-                const where = (yield* threadOfSession(a.id)) ?? general;
-                const name = sessionOf(a.id)?.name ?? a.id;
-                yield* write({
-                  conversation: where,
-                  from: "system",
-                  kind: "notice",
-                  text: `${name} 连续 ${failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。`,
-                  final: true,
-                  meta: { code: "wake_breaker" },
-                });
-              }
-              // Not straight away: what failed may fail again.
-              later(`wake:${a.id}`, config.chat.retryWakeMs, () => kick(a.id));
-              return;
+  const onActivity = Effect.fnUntraced(function* (a: LaunchActivity): Effect.fn.Return<void> {
+    if (closed) return;
+    switch (a.kind) {
+      case "spoke":
+        breaker.spoke(a.id);
+        return yield* heardLaunch(a.id, a.launch);
+      case "ended": {
+        if (!a.spoke) {
+          const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
+          if (rolled.length > 0) {
+            const { count: failed, tripped } = breaker.failed(a.id);
+            if (tripped) {
+              const where = (yield* threadOfSession(a.id)) ?? general;
+              const name = sessionOf(a.id)?.name ?? a.id;
+              yield* write({
+                conversation: where,
+                from: "system",
+                kind: "notice",
+                text: `${name} 连续 ${failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。`,
+                final: true,
+                meta: { code: "wake_breaker" },
+              });
             }
+            // Not straight away: what failed may fail again.
+            later(`wake:${a.id}`, config.chat.retryWakeMs, () => kick(a.id));
+            return;
           }
-          return yield* kick(a.id);
         }
-        case "closed":
-          yield* db(qd.rollbackHanded({ recipient_id: a.id }));
-          return yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
-        case "compacting":
-          if (a.on) compacting.add(a.id);
-          else {
-            compacting.delete(a.id);
-            yield* kick(a.id);
-          }
+        return yield* kick(a.id);
       }
-    });
+      case "closed":
+        yield* db(qd.rollbackHanded({ recipient_id: a.id }));
+        return yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
+      case "compacting":
+        if (a.on) compacting.add(a.id);
+        else {
+          compacting.delete(a.id);
+          yield* kick(a.id);
+        }
+    }
+  });
 
   /** Reading a digest only proposes context; the execution acknowledges what it actually took. */
   const consumed = (input: InputConsumed) =>
@@ -785,7 +779,7 @@ export const make = Effect.gen(function* () {
 
   // ── sessions coming and going ──
 
-  const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
+  const openJob = Effect.fnUntraced(function* (h: Session) {
     yield* db(qp.upsertParticipant({ id: h.id, kind: "agent", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: Date.now() }));
     const job = jobOf(h);
     const thread = yield* threadOf(job);
@@ -815,7 +809,7 @@ export const make = Effect.gen(function* () {
    * The issue already has its thread (reopened, or sent to another session): the next session is told of in it and follows
    * it, in one transaction, so a restart neither says it twice nor leaves it out.
    */
-  const handedOn = Effect.fn("Channels.handedOn")(function* (h: Session, thread: string) {
+  const handedOn = Effect.fnUntraced(function* (h: Session, thread: string) {
     const followers = (yield* db(qf.followers({ conversation_id: thread }))).map((f) => f.participant_id);
     if (followers.includes(h.id)) return;
     const channel = channelOfSession(h);
@@ -839,13 +833,7 @@ export const make = Effect.gen(function* () {
     }
   });
 
-  const postReport = Effect.fn("Channels.postReport")(function* (
-    id: string,
-    outcome: Outcome,
-    summary: string,
-    spent: Spent | undefined,
-    run: string | undefined,
-  ) {
+  const postReport = Effect.fnUntraced(function* (id: string, outcome: Outcome, summary: string, spent: Spent | undefined, run: string | undefined) {
     const w = sessionOf(id);
     if (!w || outcome === "interrupted") return;
     const thread = yield* threadOfSession(id);
@@ -902,38 +890,35 @@ export const make = Effect.gen(function* () {
   );
 
   /** A target as who would mean it: empty is a session's own thread (or 田头), a channel by name, or a thread by its parent's number. */
-  const resolveTarget = (who: string, target: string): Effect.Effect<string, ApiError> =>
-    Effect.gen(function* () {
-      if (!target.trim()) {
-        if (who !== orchestratorAgent && who !== "user") {
-          const own = yield* threadOfSession(who);
-          if (own) return own;
-        }
-        return general;
+  const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
+    if (!target.trim()) {
+      if (who !== orchestratorAgent && who !== "user") {
+        const own = yield* threadOfSession(who);
+        if (own) return own;
       }
-      const parsed = parseChatTarget(target);
-      if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
-      let channel = general;
-      const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
-      if (name) {
-        const found = yield* one(qc.channelByName({ name }));
-        if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
-        channel = found.id;
-      }
-      if (parsed.kind === "channel") return channel;
-      const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
-      if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
-      const thread = yield* inTx(
-        threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }),
-      );
-      yield* publishConversation(thread);
-      return thread;
-    });
+      return general;
+    }
+    const parsed = parseChatTarget(target);
+    if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
+    let channel = general;
+    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
+    if (name) {
+      const found = yield* one(qc.channelByName({ name }));
+      if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
+      channel = found.id;
+    }
+    if (parsed.kind === "channel") return channel;
+    const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
+    if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
+    const thread = yield* inTx(threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }));
+    yield* publishConversation(thread);
+    return thread;
+  });
 
   const messageOrFail = (id: string) =>
     Effect.flatMap(one(qm.messageByID({ id })), (row) => (row ? Effect.succeed(row) : Effect.fail(refused("写进去了，但读不回来"))));
 
-  const shape: ChannelShape = {
+  const shape = Channels.of({
     now: () => core.state().chat,
     general: () => general,
     messageLocation: Effect.fn("Channels.messageLocation")(function* (id) {
@@ -1139,7 +1124,7 @@ export const make = Effect.gen(function* () {
     activity: (a) => locked(onActivity(a)).pipe(logged(`${a.id} ${a.kind}`)),
     consumed: (c) => locked(consumed(c)).pipe(logged(`input consumed by ${c.session}`)),
     sessionNews: onSessionNews,
-  };
+  });
   return shape;
 });
 

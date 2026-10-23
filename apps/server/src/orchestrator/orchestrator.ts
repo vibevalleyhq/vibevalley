@@ -152,317 +152,316 @@ export interface OrchestratorOptions {
   readonly listen?: boolean;
 }
 
-export const make = (options: OrchestratorOptions = {}) =>
-  Effect.gen(function* () {
-    const logs = yield* callbackLog;
-    const config = yield* Settings;
-    const core = yield* Core;
-    const store = yield* Agents;
-    const settings = yield* Setting;
-    const runtimes = yield* Runtimes;
-    const projects = yield* Projects;
-    const run = yield* Sessions;
-    const issue = yield* Issues;
-    const chat = yield* Channels;
-    const tasks = yield* Tasks;
-    const recurrence = yield* Recurrences;
-    const tool = yield* Tools;
-    const notices = yield* Notices;
+export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = {}) {
+  const logs = yield* callbackLog;
+  const config = yield* Settings;
+  const core = yield* Core;
+  const store = yield* Agents;
+  const settings = yield* Setting;
+  const runtimes = yield* Runtimes;
+  const projects = yield* Projects;
+  const run = yield* Sessions;
+  const issue = yield* Issues;
+  const chat = yield* Channels;
+  const tasks = yield* Tasks;
+  const recurrence = yield* Recurrences;
+  const tool = yield* Tools;
+  const notices = yield* Notices;
 
-    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const go = yield* FiberSet.makeRuntimePromise<never>();
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
-    const general = chat.general();
-    const home = orchestratorHome(config.home);
+  // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
+  const go = yield* FiberSet.makeRuntimePromise<never>();
+  const forkHere = yield* FiberSet.makeRuntime<never>();
+  const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
+  const general = chat.general();
+  const home = orchestratorHome(config.home);
 
-    const selected = new Map<string, Pick>();
-    let latestCall: Caller | undefined;
-    /** What the orchestrator last said it cannot start for, per conversation: said once, not to every line, until it starts. */
-    const cannot = new Map<string, string>();
-    /** The farm's situation as the model last saw it in an input; "" when it should see the whole of it next. */
-    let shown = "";
+  const selected = new Map<string, Pick>();
+  let latestCall: Caller | undefined;
+  /** What the orchestrator last said it cannot start for, per conversation: said once, not to every line, until it starts. */
+  const cannot = new Map<string, string>();
+  /** The farm's situation as the model last saw it in an input; "" when it should see the whole of it next. */
+  let shown = "";
 
-    const llmOf = (): LLM => {
-      if (options.llm) return options.llm();
-      // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-      return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
-    };
+  const llmOf = (): LLM => {
+    if (options.llm) return options.llm();
+    // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
+    return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
+  };
 
-    const toolsFor = (current: () => Route) =>
-      tool.orchestrator(() => {
-        const at = current();
-        return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
-      });
-
-    // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
-    const wakeSoon = (withinMs: number) => {
-      const by = Date.now() + withinMs;
-      return recurrence.list().some((s) => {
-        const next = nextRun(s);
-        return next !== undefined && (!s.agent || s.agent === orchestratorAgent) && next <= by;
-      });
-    };
-
-    const host = run.host<Route>({
-      name: orchestratorAgent,
-      label: "管家",
-      inputType: "orchestratorInput",
-      home,
-      cwd: projectsDir(config),
-      instructions: systemPrompt + agentPrompt,
-      llm: llmOf,
-      tools: toolsFor,
-      wakeSoon,
-      first: { conversation: general, source: "owner" },
-      quiet: (r) => r.quiet ?? false,
-      say: (r, key, text, final, runId) => go(chat.orchestratorSays(r.conversation, key, text, final, runId)),
-      state: (s) => go(core.setOrchestrator(s)),
-      fresh: () => {
-        shown = "";
-      },
-      restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
-      keepEvents,
-      toolStart: tool.start,
-      notice,
-      log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
-      go,
+  const toolsFor = (current: () => Route) =>
+    tool.orchestrator(() => {
+      const at = current();
+      return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
     });
 
-    const agentLines = async () => {
-      const lines: string[] = [];
-      for (const a of store.agents()) {
-        const assessed = await go(runtimes.assess(a));
-        const p = assessed.agent;
-        let line = `- ${p.name}（id ${p.id}，${runtimeLabel(p.runtime)}）` + traitsOf(p);
-        if (p.enabled && assessed.blocking.length === 0) line += "；" + quotaText(assessed.info);
-        else if (assessed.blocking.length > 0) line += "；现在派不了：" + assessed.blocking[0]!.text;
-        else line += "；现在派不了：停用了";
-        lines.push(line);
-      }
-      return lines;
-    };
-
-    // conversation is where the input it goes with will be answered. Said last and on a line of its own, so that
-    // answering in another channel changes one line of it.
-    const situation = async (conversation: string) => {
-      const sessions = await agentLines();
-      const roster = run.roster();
-      const here = await go(chat.channelOf(conversation));
-      const byChannel = (await go(chat.channels())).map((c) => {
-        const theirs = roster.filter((w) => (w.session.channel ?? general) === c.id).map((w) => tool.sessionLine(w));
-        const head = channelLine(c);
-        return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : "  （没有帮工）");
-      });
-      const all = await go(projects.list());
-      const folders = all.length > 0 ? all.map((p) => p.name).join("、") : "（还没有）";
-      const open = tasks.graphs().filter(isOpen).map(graphText);
-      const graphs = open.length > 0 ? "\n计划：\n" + open.join("\n") : "";
-      return (
-        "【现状】\n项目（工作目录 " +
-        projects.root +
-        " 下的文件夹）：" +
-        folders +
-        "\n可以派的帮工：\n" +
-        sessions.join("\n") +
-        "\n各频道里在场的帮工：\n" +
-        byChannel.join("\n") +
-        graphs +
-        "\n你正在回话的频道：#" +
-        here.name
-      );
-    };
-
-    // The situation for the next input: the whole of it, or what changed since the input before. An input given while
-    // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
-    const situationNow = async (busy: boolean, conversation: string) => {
-      const now = await situation(conversation);
-      const shownNow = !busy && shown !== "" ? situationDelta(shown, now) : now;
-      shown = busy ? "" : now;
-      return shownNow;
-    };
-
-    const news = async (): Promise<[string, string[]]> => {
-      const digest = await go(chat.orchestratorDigest());
-      if (digest.length === 0) return ["", []];
-      return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + orchestratorInboxLines(digest), digest.map((m) => m.id)];
-    };
-
-    /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. */
-    const take = async (i: Intake): Promise<boolean> => {
-      const rule = intake[i.source];
-      const asked = rule.head + i.line;
-      const route: Route = {
-        conversation: i.conversation,
-        ...(i.agent ? { agent: i.agent } : {}),
-        source: i.source,
-        ...(i.issue ? { issue: i.issue } : {}),
-        ...(i.owner ? { owner: true } : {}),
-      };
-      const taken = await host.submit(
-        async (busy, memoryNews) => {
-          const [heard, ids] = await news();
-          // The log shows the line; the model also gets the time, the farm and the news before it.
-          const text = ["【现在】" + localeMinute(new Date()), await situationNow(busy, i.conversation), memoryNews, heard, asked]
-            .filter((p) => p !== "")
-            .join("\n\n");
-          return { text, heard: ids };
-        },
-        { route, run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked }, ...(i.caller ? { caller: i.caller } : {}) },
-        rule.now,
-      );
-      if (taken.ok) {
-        cannot.clear();
-        return true;
-      }
-      const words =
-        taken.why === noDeepSeekKey
-          ? "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
-          : "我这边起不来：" + taken.why;
-      const again = cannot.get(i.conversation) === words;
-      cannot.set(i.conversation, words);
-      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${Date.now()}`, words, true, taken.run));
-      return false;
-    };
-
-    const pickedNote = (picked: Pick) => {
-      let note = "";
-      const a = picked.agent ? store.agent(picked.agent) : undefined;
-      if (a) note += "（主人在对话框里选定了帮工：" + a.name + "）\n";
-      if (picked.project) note += "（主人选定了项目：" + picked.project + "，派活就派在这个项目里）\n";
-      return note;
-    };
-
-    const heardInChat = async (n: OrchestratorNews) => {
-      const fromPerson = n.messages.every((m) => m.from === "user");
-      const owner = n.messages.some((m) => m.from === "user");
-      let picked: Pick = {};
-      for (const m of n.messages) {
-        const p = selected.get(m.id);
-        if (p) {
-          picked = p;
-          selected.delete(m.id);
-        }
-      }
-      const line =
-        fromPerson && n.conversation === general
-          ? pickedNote(picked) + "主人说：" + n.messages.map((m) => m.text).join("\n")
-          : pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + orchestratorInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。";
-      await take({ source: fromPerson ? "owner" : "chat", line, conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), owner });
-    };
-
-    // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
-    const onWork = async (w: OrchestratorWork) => {
-      const channel = await go(chat.channelOf(w.channel));
-      const again = w.said ? `\n\n主人这次又说：${w.said}` : "";
-      let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}${again}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
-      const s = w.recurrence;
-      if (s) {
-        const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";
-        line = `【定时任务「${s.name}」到点了${missed}】\n${s.text}\n\n这是 #${channel.name} 的定时（${s.id}），你的回答会发在那里；照着做，做完说一两句。`;
-      }
-      await take({ source: s ? "recurrence" : "issue", line, conversation: channel.id, issue: w.issue.id, by: w.by });
-    };
-
-    // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
-    const answer = (line: string, signal?: AbortSignal): AsyncIterable<string> => {
-      const me = new Caller();
-      latestCall?.end();
-      latestCall = me;
-      signal?.addEventListener(
-        "abort",
-        () => {
-          me.end();
-          if (latestCall === me) latestCall = undefined;
-        },
-        { once: true },
-      );
-      void take({ source: "owner", line, conversation: general, owner: true, caller: me });
-      return me.words(signal);
-    };
-
-    const handled =
-      <A>(what: string, f: (a: A) => Promise<unknown>) =>
-      (a: A) =>
-        Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the orchestrator could not take ${what}:`, err)));
-
-    // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
-    if (options.listen ?? true) {
-      yield* Effect.forkScoped(Stream.runForEach(yield* chat.forOrchestrator, handled("a line", heardInChat)));
-      yield* Effect.forkScoped(Stream.runForEach(yield* issue.forOrchestrator, handled("an issue", onWork)));
-      yield* Effect.forkScoped(
-        Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
-          Effect.flatMap(chat.channelOf(o.channel), (c) =>
-            handled("the patrol", (line: string) => take({ source: "patrol", line, conversation: o.channel }))(patrolText(c.name, o.notes)),
-          ),
-        ),
-      );
-      yield* Effect.forkScoped(
-        Stream.runForEach(
-          yield* tasks.news,
-          handled("a task graph's line", (line: string) => take({ source: "graph", line, conversation: general })),
-        ),
-      );
-      if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
-    }
-
-    yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
-
-    const modelId = () => {
-      try {
-        return llmOf().model.id;
-      } catch {
-        return store.agent(orchestratorAgent)?.model ?? "";
-      }
-    };
-
-    return Orchestrator.of({
-      say: Effect.fn("Orchestrator.say")(function* (text, pick, conversation, sendKey) {
-        const a = pick.agent ? store.agent(pick.agent) : undefined;
-        const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
-        yield* core.open();
-        const { message, again } = yield* chat.say(text, conversation, sendKey);
-        if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
-      }),
-      heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
-        yield* core.open();
-        if (yield* chat.spoken("user", text, sendKey)) return;
-        const picked = agent ? store.agent(agent)?.id : undefined;
-        void take({
-          source: "owner",
-          line:
-            pickedNote(picked ? { agent: picked } : {}) +
-            "（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说：" +
-            text,
-          conversation: general,
-          ...(picked ? { agent: picked } : {}),
-          owner: true,
-        });
-      }),
-      brief: async (line) => {
-        const me = new Caller();
-        void take({ source: "issue", line, conversation: general, caller: me });
-        let said = "";
-        for await (const w of me.words()) said += w;
-        return said.trim();
-      },
-      answerer: (on) => (model) => {
-        if (model !== orchestratorModel) return undefined;
-        if (on === "api") return (text, signal) => answer("主人说：" + text, signal);
-        return (text, signal) => {
-          void go(Effect.ignore(chat.spoken("user", text, "")));
-          return answer(voiceNote + "\n主人说：" + text, signal);
-        };
-      },
-      stop: () => Effect.promise(() => host.stop()),
-      markWrong: (on, want) =>
-        host.markWrong(
-          on,
-          want,
-          modelId(),
-          [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name),
-        ),
+  // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
+  const wakeSoon = (withinMs: number) => {
+    const by = Date.now() + withinMs;
+    return recurrence.list().some((s) => {
+      const next = nextRun(s);
+      return next !== undefined && (!s.agent || s.agent === orchestratorAgent) && next <= by;
     });
+  };
+
+  const host = run.host<Route>({
+    name: orchestratorAgent,
+    label: "管家",
+    inputType: "orchestratorInput",
+    home,
+    cwd: projectsDir(config),
+    instructions: systemPrompt + agentPrompt,
+    llm: llmOf,
+    tools: toolsFor,
+    wakeSoon,
+    first: { conversation: general, source: "owner" },
+    quiet: (r) => r.quiet ?? false,
+    say: (r, key, text, final, runId) => go(chat.orchestratorSays(r.conversation, key, text, final, runId)),
+    state: (s) => go(core.setOrchestrator(s)),
+    fresh: () => {
+      shown = "";
+    },
+    restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
+    keepEvents,
+    toolStart: tool.start,
+    notice,
+    log: (level, text) => (level === "error" ? logs.error(text) : logs.info(text)),
+    go,
   });
+
+  const agentLines = async () => {
+    const lines: string[] = [];
+    for (const a of store.agents()) {
+      const assessed = await go(runtimes.assess(a));
+      const p = assessed.agent;
+      let line = `- ${p.name}（id ${p.id}，${runtimeLabel(p.runtime)}）` + traitsOf(p);
+      if (p.enabled && assessed.blocking.length === 0) line += "；" + quotaText(assessed.info);
+      else if (assessed.blocking.length > 0) line += "；现在派不了：" + assessed.blocking[0]!.text;
+      else line += "；现在派不了：停用了";
+      lines.push(line);
+    }
+    return lines;
+  };
+
+  // conversation is where the input it goes with will be answered. Said last and on a line of its own, so that
+  // answering in another channel changes one line of it.
+  const situation = async (conversation: string) => {
+    const sessions = await agentLines();
+    const roster = run.roster();
+    const here = await go(chat.channelOf(conversation));
+    const byChannel = (await go(chat.channels())).map((c) => {
+      const theirs = roster.filter((w) => (w.session.channel ?? general) === c.id).map((w) => tool.sessionLine(w));
+      const head = channelLine(c);
+      return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : "  （没有帮工）");
+    });
+    const all = await go(projects.list());
+    const folders = all.length > 0 ? all.map((p) => p.name).join("、") : "（还没有）";
+    const open = tasks.graphs().filter(isOpen).map(graphText);
+    const graphs = open.length > 0 ? "\n计划：\n" + open.join("\n") : "";
+    return (
+      "【现状】\n项目（工作目录 " +
+      projects.root +
+      " 下的文件夹）：" +
+      folders +
+      "\n可以派的帮工：\n" +
+      sessions.join("\n") +
+      "\n各频道里在场的帮工：\n" +
+      byChannel.join("\n") +
+      graphs +
+      "\n你正在回话的频道：#" +
+      here.name
+    );
+  };
+
+  // The situation for the next input: the whole of it, or what changed since the input before. An input given while
+  // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
+  const situationNow = async (busy: boolean, conversation: string) => {
+    const now = await situation(conversation);
+    const shownNow = !busy && shown !== "" ? situationDelta(shown, now) : now;
+    shown = busy ? "" : now;
+    return shownNow;
+  };
+
+  const news = async (): Promise<[string, string[]]> => {
+    const digest = await go(chat.orchestratorDigest());
+    if (digest.length === 0) return ["", []];
+    return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + orchestratorInboxLines(digest), digest.map((m) => m.id)];
+  };
+
+  /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. */
+  const take = async (i: Intake): Promise<boolean> => {
+    const rule = intake[i.source];
+    const asked = rule.head + i.line;
+    const route: Route = {
+      conversation: i.conversation,
+      ...(i.agent ? { agent: i.agent } : {}),
+      source: i.source,
+      ...(i.issue ? { issue: i.issue } : {}),
+      ...(i.owner ? { owner: true } : {}),
+    };
+    const taken = await host.submit(
+      async (busy, memoryNews) => {
+        const [heard, ids] = await news();
+        // The log shows the line; the model also gets the time, the farm and the news before it.
+        const text = ["【现在】" + localeMinute(new Date()), await situationNow(busy, i.conversation), memoryNews, heard, asked]
+          .filter((p) => p !== "")
+          .join("\n\n");
+        return { text, heard: ids };
+      },
+      { route, run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked }, ...(i.caller ? { caller: i.caller } : {}) },
+      rule.now,
+    );
+    if (taken.ok) {
+      cannot.clear();
+      return true;
+    }
+    const words =
+      taken.why === noDeepSeekKey
+        ? "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
+        : "我这边起不来：" + taken.why;
+    const again = cannot.get(i.conversation) === words;
+    cannot.set(i.conversation, words);
+    if (!again) await go(chat.orchestratorSays(i.conversation, `failed${Date.now()}`, words, true, taken.run));
+    return false;
+  };
+
+  const pickedNote = (picked: Pick) => {
+    let note = "";
+    const a = picked.agent ? store.agent(picked.agent) : undefined;
+    if (a) note += "（主人在对话框里选定了帮工：" + a.name + "）\n";
+    if (picked.project) note += "（主人选定了项目：" + picked.project + "，派活就派在这个项目里）\n";
+    return note;
+  };
+
+  const heardInChat = async (n: OrchestratorNews) => {
+    const fromPerson = n.messages.every((m) => m.from === "user");
+    const owner = n.messages.some((m) => m.from === "user");
+    let picked: Pick = {};
+    for (const m of n.messages) {
+      const p = selected.get(m.id);
+      if (p) {
+        picked = p;
+        selected.delete(m.id);
+      }
+    }
+    const line =
+      fromPerson && n.conversation === general
+        ? pickedNote(picked) + "主人说：" + n.messages.map((m) => m.text).join("\n")
+        : pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + orchestratorInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。";
+    await take({ source: fromPerson ? "owner" : "chat", line, conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), owner });
+  };
+
+  // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
+  const onWork = async (w: OrchestratorWork) => {
+    const channel = await go(chat.channelOf(w.channel));
+    const again = w.said ? `\n\n主人这次又说：${w.said}` : "";
+    let line = `【工单「${w.issue.title}」交给你了】\n${w.issue.description ?? ""}${again}\n\n你的回答会发在 #${channel.name}；照着做，做完说一两句。`;
+    const s = w.recurrence;
+    if (s) {
+      const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";
+      line = `【定时任务「${s.name}」到点了${missed}】\n${s.text}\n\n这是 #${channel.name} 的定时（${s.id}），你的回答会发在那里；照着做，做完说一两句。`;
+    }
+    await take({ source: s ? "recurrence" : "issue", line, conversation: channel.id, issue: w.issue.id, by: w.by });
+  };
+
+  // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
+  const answer = (line: string, signal?: AbortSignal): AsyncIterable<string> => {
+    const me = new Caller();
+    latestCall?.end();
+    latestCall = me;
+    signal?.addEventListener(
+      "abort",
+      () => {
+        me.end();
+        if (latestCall === me) latestCall = undefined;
+      },
+      { once: true },
+    );
+    void take({ source: "owner", line, conversation: general, owner: true, caller: me });
+    return me.words(signal);
+  };
+
+  const handled =
+    <A>(what: string, f: (a: A) => Promise<unknown>) =>
+    (a: A) =>
+      Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the orchestrator could not take ${what}:`, err)));
+
+  // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
+  if (options.listen ?? true) {
+    yield* Effect.forkScoped(Stream.runForEach(yield* chat.forOrchestrator, handled("a line", heardInChat)));
+    yield* Effect.forkScoped(Stream.runForEach(yield* issue.forOrchestrator, handled("an issue", onWork)));
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
+        Effect.flatMap(chat.channelOf(o.channel), (c) =>
+          handled("the patrol", (line: string) => take({ source: "patrol", line, conversation: o.channel }))(patrolText(c.name, o.notes)),
+        ),
+      ),
+    );
+    yield* Effect.forkScoped(
+      Stream.runForEach(
+        yield* tasks.news,
+        handled("a task graph's line", (line: string) => take({ source: "graph", line, conversation: general })),
+      ),
+    );
+    if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
+  }
+
+  yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
+
+  const modelId = () => {
+    try {
+      return llmOf().model.id;
+    } catch {
+      return store.agent(orchestratorAgent)?.model ?? "";
+    }
+  };
+
+  return Orchestrator.of({
+    say: Effect.fn("Orchestrator.say")(function* (text, pick, conversation, sendKey) {
+      const a = pick.agent ? store.agent(pick.agent) : undefined;
+      const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+      yield* core.open();
+      const { message, again } = yield* chat.say(text, conversation, sendKey);
+      if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
+    }),
+    heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
+      yield* core.open();
+      if (yield* chat.spoken("user", text, sendKey)) return;
+      const picked = agent ? store.agent(agent)?.id : undefined;
+      void take({
+        source: "owner",
+        line:
+          pickedNote(picked ? { agent: picked } : {}) +
+          "（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说：" +
+          text,
+        conversation: general,
+        ...(picked ? { agent: picked } : {}),
+        owner: true,
+      });
+    }),
+    brief: async (line) => {
+      const me = new Caller();
+      void take({ source: "issue", line, conversation: general, caller: me });
+      let said = "";
+      for await (const w of me.words()) said += w;
+      return said.trim();
+    },
+    answerer: (on) => (model) => {
+      if (model !== orchestratorModel) return undefined;
+      if (on === "api") return (text, signal) => answer("主人说：" + text, signal);
+      return (text, signal) => {
+        void go(Effect.ignore(chat.spoken("user", text, "")));
+        return answer(voiceNote + "\n主人说：" + text, signal);
+      };
+    },
+    stop: () => Effect.promise(() => host.stop()),
+    markWrong: (on, want) =>
+      host.markWrong(
+        on,
+        want,
+        modelId(),
+        [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name),
+      ),
+  });
+});
 
 export const layer = (options?: OrchestratorOptions) => Layer.effect(Orchestrator, make(options));

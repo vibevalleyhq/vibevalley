@@ -71,7 +71,7 @@ export const make = (options: NoticeOptions = {}) =>
       for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
     });
 
-    const shape: NoticeShape = {
+    const shape = Notices.of({
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
       overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
       toOwner: Effect.map(
@@ -83,7 +83,7 @@ export const make = (options: NoticeOptions = {}) =>
         known = freshOf(undefined, inbox(core.state())).known;
         primed = true;
       }),
-    };
+    });
     return shape;
   });
 
