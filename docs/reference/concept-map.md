@@ -1,20 +1,12 @@
 # 概念在各层的名字
 
-一个概念在每一层叫什么：从农场里看到的，到页面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](docs/concepts.md)，叫法见[用语表](docs/README.md#用语)。小队还没做，见[提案](docs/subsystems/session.md)。
+一个概念在每一层叫什么：从农场里看到的，到页面、协议、HTTP、服务端、存储，最后到 oar。概念本身是什么见 [concepts.md](docs/concepts.md)，叫法见[用语表](docs/README.md#用语)。分层和存盘见[架构](docs/architecture.md#分层)与[存了什么](docs/architecture.md#存了什么)，Session、Run 和 oar 会话见[帮工](docs/subsystems/session.md#模型和不变量)。
 
-## 各层
-
-从上往下：
-
-1. **农场里**：像素村里画出来的样子和玩法（[farm-ui.md](docs/reference/farm-ui.md)、[pixel-village.md](docs/reference/pixel-village.md)）。
-2. **页面**：Solid 的页面和组件，在 `apps/web/src/`（农场在 `farm/`，工作台在 `pages/`）。页面只读折好的状态，不折事实。
-3. **协议**：`packages/protocol` 的形状（`shapes.ts`）、事实和规则（`src/rules`）；服务端和页面 import 同一份。
-4. **HTTP 和 MCP**：`/api/v1/...`（`packages/protocol/src/api.ts` 的 `endpoints`），核心状态经 `GET /api/v1/state` 推给页面；编码 agent 经 `/mcp` 用农场的工具，现在是帮工在频道里说话。
-5. **服务端**：`apps/server/src/<模块>` 一个模块一个服务（`Issues`、`Sessions`……），下面写成「服务.方法」或文件名（[地基](docs/subsystems/foundation.md)）。
-6. **存储**：`$VIBEVALLEY_HOME` 下的文件和库里的表（[architecture.md](docs/architecture.md)「存储」）。
-7. **oar**：npm 的 `@botiverse/oar` 里的类型。
+这里只查名字，不补成完整的接口或存储清单。完整接口和权限见[能力表](docs/reference/capabilities.md)。
 
 ## 看得见的几层
+
+农场、页面、协议和代表 HTTP 入口的对照：
 
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
@@ -31,7 +23,7 @@
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issues/{id}/runs` |
 | 干活过程 | 干活过程 | `pages/chat/WorkLog.tsx`、`pages/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
-| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/accept`；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
+| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/act`（验收通过是 `act: "accept"`，打回是 `act: "reject"`）；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
 | 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`pages/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrences` |
@@ -42,9 +34,11 @@
 | 语音 | 麦克风 | `/settings/voice`（`pages/settings/VoiceForm.tsx`）、`src/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`WorkspaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievements` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
-| 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 工单的分支和 worktree（服务端 `issueBranch`、`worktrees/<项目>.<工单号>`）；地里长什么按工单做键（`FarmView.plots`、`plotKey`）；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/say` 的 `bed` |
+| 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<项目>.<工单号>`，否则直接在项目目录且 `branch` 为空；`FarmView.plots` 按工单做键，服务端 `game/view.ts` 的 `plotKey`；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/say` 的 `station` |
 
 ## 服务端以下
+
+服务、存储和 oar 的对照；存储只列主要归属，完整存盘见[架构](docs/architecture.md#存了什么)。
 
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
@@ -56,14 +50,14 @@
 | 管家 | `Orchestrator` | `orchestrator/` | 不经 oar 的子会话：跑在 VibeValley 自己的 agent 上（`agent/brain`） |
 | 工单 | `Issues`（`issue/issue.ts`；派给管家的在 `orchestrator/orchestrator.ts`） | `issue`、`issue_session` 表（一行是一个帮工） | |
 | 计划 | `Tasks`（`task/task.ts`） | `issue` 表（带 `graph` 的父工单、带 `task` 的子工单）、`task_event` 表 | |
-| 帮工 | `Sessions`（`session/session.ts`） | `state.json`（核心状态里的帮工）、`sessions.json`（目录、农机的会话 id、最后一轮的原话） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
-| 一次干活（run） | `Sessions`（`session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
+| 帮工 | `Sessions`（`session/session.ts`） | `state.json`（在场帮工的核心状态）、`session` 表（工作目录、oar 会话 id、最后一轮原话和想起过的记性） | 一个帮工是一个 `Subagent`，包着一个 oar 的会话；每个帮工有自己的 `Subagents` |
+| 一次干活（run） | `Sessions`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 干活过程 | `Sessions`（`session/journal.ts`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
-| 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 工单的分支和 worktree | |
+| 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
 | 田头、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Recurrences` | `recurrence` 表 | |
-| 巡查 | `Orchestrator`（规则在 `orchestrator/rules.ts`） | 不存：每轮从核心状态算 | |
-| 来电 | 不存：`inbox` 从核心状态算 | | |
+| 巡查 | `Notices`（`notice/notice.ts`；规则在 `notice/rules.ts`） | 不存：每轮从核心状态算 | |
+| 来电 | `Notices`（`notice/notice.ts`、`notice/inbox.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |
 | 连接器 | `Connectors`；三家的接口在 `connector/weixin.ts`、`feishu.ts`、`qq.ts` | `connector_account`、`connector_inbound`、`connector_outbox` 表 | |
 | 「连接到本机」 | `Lan` | `lan`、`lan_device` 表 | |
 | 语音 | `Voice`（`voice/voice.ts`；声网的令牌和语音 agent 用 npm 的 `agora-token`、`agora-agents`） | `settings.json` | |
@@ -75,15 +69,15 @@
 
 ## oar 那一层
 
-oar 是驱动各家编码 agent 的运行时（npm 的 `@botiverse/oar`，钉在一个版本上：`runtime/dsh.ts` 用到它的内部文件）。从下往上：
+oar（`@botiverse/oar`）是驱动各家编码 agent 的运行时。它的术语和 VibeValley 的用法对照：
 
 | oar | 是什么 | 我们这边用在哪 |
 |---|---|---|
 | `Runtime`、`RuntimeRegistry` | 一种编码 agent 程序和它的安装 | `Runtimes` 探测、算额度和花费 |
-| session | 农机原生的一个会话，可以接着上回的 | 一个帮工的会话；会话 id 存在 `sessions.json` |
-| turn | 会话里的一轮：一个 prompt 开始，农机说结束时结束，结果是完成、中止或失败 | 一次 run 包着一个 oar turn |
+| session | 农机原生的一个会话，可以接着上回的 | 一个帮工的会话；会话 id 存在 `session.oar_session` |
+| turn | 会话里的一轮：一个 prompt 开始，农机说结束时结束，结果是完成、中止或失败 | 帮工的一次 run 包着一个 oar turn |
 | event | 一轮里的文字、思考、工具调用、用量、任务 | 读成事实和干活过程 |
 | `prompt`、`steer`、`queue`、`withdraw`、`abort` | 往会话里送话、插话、排队、撤回、叫停 | 带话、叫停 |
 | `Subagents`、`Subagent`、`SubagentReport`（`@botiverse/oar/agents`） | 宿主在任意农机上开的子会话，每结束一轮交一份报告；oar 把这种用法叫 crew | 每个帮工是一个 `Subagent` |
 
-oar 的会话在开的时候能设系统提示词（替换或追加）、MCP、禁用的工具和环境变量；`Subagents` 的 `spawn` 只带农机、任务、名字、目录、模型、思考档位、服务档位、接着哪个会话和环境变量。所以 `session/session.ts` 给每个帮工单独一个 `Subagents`，底下的农机在开会话时带上档案的人设、技能、MCP 和禁用的工具（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）。kimi、opencode、antigravity、dsh 不接系统提示词。
+档案怎么进 oar 会话见[帮工](docs/subsystems/session.md#模型和不变量)，农机接受哪些选项见[档案和农机](docs/subsystems/agent.md#模型和不变量)。

@@ -9,7 +9,7 @@
 | 账本：哪些事实记一笔、一笔怎么折成金币、连胜、成就、称号、战绩 | 工单的状态、验收、收获本身（[工单](docs/subsystems/issue.md)）；计划怎么推进（[种植计划](docs/subsystems/task.md)） |
 | 等级：commit 数怎么换成等级、什么时候放升级横幅 | 怎么数 commit（`project.Contributions`，[项目](docs/subsystems/project.md)「数 commit」） |
 | 主人点的空地：下一个帮工挪过去 | 雇谁、派给谁（[管家](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
-| 特效：金币、升级、成就、没做成的惩罚 | 特效、庄稼、奖章怎么画，横幅和提示怎么放（[farm-ui.md](docs/reference/farm-ui.md)、[pixel-village.md](docs/reference/pixel-village.md)） |
+| 特效：金币、升级、成就、没做成的惩罚 | 特效、庄稼、奖章怎么画，横幅和提示怎么放（[farm-ui.md](docs/reference/farm-ui.md)、[农场的皮](docs/subsystems/farm.md)） |
 | 地块的样子（`FarmView`）和帮工在哪块地、做过什么（`SessionPlay`）的规则 | 地里长什么对应工单的哪一段（[工单](docs/subsystems/issue.md)「三段和状态」） |
 | | 精力瓶：农机的额度（[帮工](docs/subsystems/session.md)，`quotaLow`）；手机里的小游戏（`apps/web/src/farm/phone`，[farm-ui.md](docs/reference/farm-ui.md)「农场手机」） |
 
@@ -35,20 +35,22 @@
 - **连胜**：每收进一件 +1，`bestStreak` 记最长；有帮工一轮没做成（`failed`）清零。`Progress.multiplier` 是现在的倍率。
 - **成就**：计数在 `Progress.counts`，每档到了记一个 `Unlock`（成就、档、日期），按顺序各一次。各计数从哪来：
 
-| 计数 | 怎么涨 |
-|---|---|
-| `harvests` | 每收进一件 |
-| `first_try` | 收进的这件只跑了一轮（`Runs ≤ 1`），没被带过话、没失败过 |
-| `untangle`、`comeback` | 收进的这件冲突过、失败过 |
-| `thrifty` | 收进的这件知道花费且不到 ¥0.05（只报 token 的农机不算） |
-| `every_machine` | 收进过活的农机种数 |
-| `steady` | 最长连胜 |
-| `big_graph`、`parallel_graph` | 收获的计划里合进去的件数取最大；计划里同一层有两件以上合进去，算一次「同时做」 |
-| `handoff` | 帮工回了别的帮工点它的话 |
-| `farm_level` | 农场等级 |
-| `night_owl`、`weekend` | 收进的时间在服务端时区的 0–5 点、周六日 |
-| `full_house` | 在干活的帮工从不到 6 个变成 6 个，每填满一次一条 |
-| 新手任务 `s_open`、`s_hire`、`s_tell`、`s_review`、`s_voice`、`s_split`、`s_call` | 开工（`call` 变成 `live`）、派出帮工、给帮工带话、看过收成清单再收获、语音接通、拆好一张计划、在田头 @ 一个帮工 |
+| 类 | 成就（计数） | 怎么涨 | 档位 |
+|---|---|---|---|
+| 新手任务 | 开门、派活、带话、验收、说话、规划、点名（`s_open`、`s_hire`、`s_tell`、`s_review`、`s_voice`、`s_split`、`s_call`） | 开工（`call` 变成 `live`）、派出帮工、给帮工带话、看过收成清单再收获、语音接通、拆好一张计划、在田头 @ 一个帮工 | 一次 |
+| 收成 | 开张大吉 → 小有收成 → 粮仓满了（`harvests`） | 每收进一件 | 1 / 20 / 100 |
+| | 一气呵成（`first_try`） | 收进的这件只跑了一轮（`Runs ≤ 1`），没被带过话、没失败过 | 1 / 10 / 50 |
+| | 五谷丰登（`big_graph`） | 收获的计划里合进去的件数最多的一张 | 3 / 5 / 10 |
+| | 小有规模 → 远近闻名 → 一方粮仓（`farm_level`） | 农场等级 | 5 / 10 / 20 |
+| 手艺 | 稳如老农（`steady`） | 最长连胜 | 5 / 15 / 40 |
+| | 解铃人（`untangle`） | 收进的这件冲突过 | 1 / 5 / 20 |
+| | 浴火重生（`comeback`） | 收进的这件失败过 | 1 / 5 / 20 |
+| 精打细算 | 一分钱一分货（`thrifty`） | 收进的这件知道花费且不到 ¥0.05（只报 token 的农机不算） | 1 / 10 / 50 |
+| | 物尽其用（`every_machine`） | 收进过活的农机种数 | 2 / 3 / 5 |
+| 协作 | 交接（`handoff`） | 帮工回了别的帮工点它的话 | 1 / 5 / 20 |
+| | 运筹帷幄（`parallel_graph`） | 计划里同一层有两件以上合进去，算一次「同时做」 | 1 / 3 / 10 |
+| 彩蛋 | 夜猫子、周末农夫（`night_owl`、`weekend`） | 收进的时间在服务端时区的 0–5 点、周六日 | 一次 |
+| | 满园春色（`full_house`） | 在干活的帮工从不到 6 个变成 6 个，每填满一次一条 | 一次 |
 
 - **称号**：只能挂拿到的档，新手任务的不能挂；别的取值（空的、没拿到的）都是摘掉称号。
 - **战绩**：`hired`、`harvested`、`failed` 三种条目带档案，折成 `Progress.Agents`（雇过、收成、没做成）。

@@ -6,11 +6,10 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 配置的来源、优先级、键名到环境变量名、开机时的校验 | 每个键的用途和默认值的查表（[architecture.md](docs/architecture.md)「配置」） |
+| 配置的来源、优先级、键名到环境变量名、开机时的校验、每个键的用途和默认值 | oar 的 `OAR_*`、各家农机自己的环境变量和配置（`CODEX_HOME`、pi 的 `models.json`） |
 | `settings.json`：存、读、校验、只给页面看来源和末四位 | 语音设置的每一项、谁接电话（[语音](docs/subsystems/voice.md)「配置」） |
 | 钥匙从哪取：设置 > 配置 | 记性来源怎么接、怎么读写（[记性](docs/subsystems/memory.md)） |
 | 日志和送出农场的文字里抹密钥（`base/redact.ts`） | 档案、技能书、农机的设置：`config.json`（`agent` 包） |
-| | oar 的 `OAR_*`、各家农机自己的环境变量和配置（`CODEX_HOME`、pi 的 `models.json`） |
 | | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`apps/web/src/pages/settings/SettingsForm.tsx`） |
 | | GitHub 检测（`project`，[工单](docs/subsystems/issue.md)「和谁打交道」） |
 
@@ -34,6 +33,34 @@
 - **读完再整理**：`work_root`、`tokei`、`web`、`db` 里开头的 `~/` 换成用户目录；`db` 是 `memory` 时用内存库，空的是家目录的 `db` 文件夹（`dbDir`），别的是那个文件夹。
 - **主接口的地址固定**：`serverAddress` 是 `127.0.0.1:<port>`，没有 `host` 配置，设了 `VIBEVALLEY_HOST` 也不认。
 - **服务只读 `Config` 的字段**：开机读一次，作为 `Settings` 服务交给各服务，不读 `process.env`；测试从 `testing/layers.ts` 的 `testConfig()` 出发改字段。不热重载：改了配置要重启服务端。
+
+**配置键**（默认值由 `defaults()` 给出）：
+
+| 键 | 用途 | 默认 |
+|---|---|---|
+| `work_root` | 工作目录：`projects/` 是项目，`worktrees/` 是 worktree，帮工只在这里面干活（[项目](docs/subsystems/project.md)） | `~/vibevalley-dev` |
+| `db` | 库：PGlite 的文件夹；`memory` 是只在内存里 | `$VIBEVALLEY_HOME/db` |
+| `port` | 主接口固定听 `127.0.0.1`，只能选端口；0 由系统分配。HTTP 和帮工的 `/mcp` 使用同一实际监听地址 | 8787 |
+| `web` | 同时在 `/` 提供的页面（`apps/web/dist`）；也可以用 `--web` 给 | 无 |
+| `agent.model` | 命令行里自己的 agent 用的模型；空着是 DeepSeek 的默认 | |
+| `deepseek.api_key` | 管家和 VibeValley 农机用的 DeepSeek 钥匙（`DEEPSEEK_API_KEY`） | |
+| `agora.app_id`、`agora.app_certificate` | 语音：签 RTC 令牌、请语音管家（`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`）；都没有时语音不可用，别的照常 | |
+| `voice.id` | 语音管家的音色的默认；声音页里改过的优先 | 声音页的默认 |
+| `voice.line.port`、`voice.line.url` | 语音线路（「想」选农场的管家时）：只给声网用的那个监听的端口；你自己的隧道的公网地址，没有就用 cloudflared 临时隧道 | 8788、（无） |
+| `lan.port` | 「连接到本机」的端口：打开「连接到本机」时在所有网卡上听，只放配对过的设备（[连接到本机](docs/subsystems/lan.md)）；0 是随便一个 | 8790 |
+| `git_emails` | 算经验时也算作「你」的 commit 邮箱；环境变量里用逗号分隔 | git 全局和各仓库的 user.email 本来就算 |
+| `tokei` | 数项目种了什么用的 tokei 在哪 | PATH 上的 `tokei` |
+| `cny_per_usd` | 价目表是美元，折成人民币的汇率 | 7.2 |
+| `patrol.heartbeat_minutes` | 巡查的间隔，0 是关掉 | 10 |
+| `recurrence.tick_ms` | 多久看一遍有没有到点的定时 | 20000 |
+| `session.stall_seconds` | 一轮里多久没动静就提醒 | 240 |
+| `session.trajectory_days` | Session 走了以后，它的事件日志留几天（`session` 表里的行一直留着）；0 是一直留着 | 30 |
+| `project.max_sessions` | 一个项目里最多几个帮工同时干活 | 3 |
+| `project.check_timeout_seconds` | 合进主分支前在帮工 worktree 里运行 `.vibevalley/check` 的时限，超时拒绝合并 | 1200 |
+| `github.pr_projects` | 完成时提 PR 的项目名列表；还须项目的 `pullRequest.available` 为真，其他项目本地合并 | 空列表 |
+| `github.pr_poll_seconds` | 查询开着的 PR 的间隔，单位秒，必须大于 0 | 180 |
+| `chat.notice_batch_ms` | 忙着的帮工收到的提示，攒多久合成一条 | 3000 |
+| `chat.retry_wake_ms` | 叫醒在开口前就失败了，多久以后再叫一次 | 3000 |
 
 **设置**：
 
@@ -68,7 +95,7 @@
 
 ## 和谁打交道
 
-- **谁依赖配置**：几乎所有服务的 `make` 都拿 `Settings`；每个键归哪个子系统，见 [architecture.md](docs/architecture.md)「配置」的表。
+- **谁依赖配置**：几乎所有服务的 `make` 都拿 `Settings`；每个键归哪个子系统，见本篇「配置键」的表。
 - **谁依赖设置**：`orchestrator`、`runtime`、`voice`、`memory` 拿 `Setting`，只调取值的方法；`handlers.ts` 调 `status`、`check`、`save`，`check` 的结果里补上 `project` 的 GitHub 状态。
 - **「连接到本机」**：配对过的设备能看设置、能检查（`setting.load`、`setting.check`），不能保存：`setting.save` 没有 `remote`（[连接到本机](docs/subsystems/lan.md)）。
 - **桌面版**：起服务端时设 `VIBEVALLEY_PORT=0` 和登录 shell 的 `PATH`，别的照环境和家目录的配置（[客户端](docs/subsystems/app.md)）。
@@ -78,7 +105,7 @@
 
 - **配置只有 YAML 和环境变量两个来源，照默认值的形状读。** 放弃了环境变量照旧散着读：值从哪来还要翻每个服务，测试只能改进程的环境。`defaults()` 的每个键就是能配的全部，环境变量名、数和一串怎么读都从它推出，不另写一张表。不热重载。不读 `.env`、不从 pi 的 `models.json` 找我们的钥匙、没有 `DEEPSEEK_BASE_URL`。
 - **配置用 YAML，不用 JSON。** 它是人手写的文件，YAML 能写注释；`config.json`、`settings.json` 由程序写。
-- **一个有类型的 `Config`，服务不读 `process.env`。** 一个值从哪来，看 `Config` 的字段和 architecture.md 的表就够；测试改字段，不改进程的环境。
+- **一个有类型的 `Config`，服务不读 `process.env`。** 一个值从哪来，看 `Config` 的字段和本篇的配置键表就够；测试改字段，不改进程的环境。
 - **写错的值让服务端起不来，不悄悄用默认。** 悄悄落回默认时，主人以为改了的值其实没生效。
 - **钥匙存在服务端的家目录（`settings.json`），不存在页面里。** 放弃了存在页面里、每次带给服务端：几台设备各一份，钥匙还经过页面。服务端本来就是持有钥匙的一方。放弃了写回 `vibevalley.yaml`：那是人手写的文件，程序改它要保住注释和顺序；另一个文件也能单独设 0600。
 - **设置比配置优先。** 主人在应用里最后填的那把最该算数；装好应用的人不知道还有一个配置文件。

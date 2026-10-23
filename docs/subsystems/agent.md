@@ -12,7 +12,7 @@
 | 农机接受哪些开会话的选项（`runtimeFacts` 和适配器的 `refusedSessionOptions`） | 选项怎么交给 oar、人设和技能怎么拼进会话、安装身份怎么用（[帮工](docs/subsystems/session.md)） |
 | 档案照现在的农机派不派得出去（`agentIssues`，`agent.check`、`assess`）；派活时用哪个模型、思考强度、环境变量、安装（`resolve`） | 挑哪个档案（`session.ChooseAgent`，[管家](docs/subsystems/orchestrator.md)「挑档案」）；派活的其余关口（[工单](docs/subsystems/issue.md)） |
 | 技能库的存取；这台机器上装的技能从农机清单里来 | 档案的记性（[记性](docs/subsystems/memory.md)） |
-| | 捏帮工、农具、技能书、管家页的界面（[agents-and-runtimes.md](docs/reference/agents-and-runtimes.md)）；种子档案的名单（[farm-ui.md](docs/reference/farm-ui.md)「角色」） |
+| | 捏帮工、农具、技能书、管家页的界面（[界面清单](docs/reference/farm-ui.md#界面清单)）；种子档案的名单见本篇「种子档案」 |
 | | VibeValley 自己的 agent 怎么跑（`agent/brain`，[管家](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
@@ -38,6 +38,7 @@
 - **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `rules/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **帮工头像右下角标出运行工具**：档案读 `Agent.runtime`，执行读 `Session.runtime`；现成的像素 logo 放在头像外框上，悬停和辅助阅读给出农机清单里的全名。没有专用 logo 用扳手图标，不按档案 id 猜农机；主人、管家和导航的示意头像不加帮工的标识。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`runtime.list` 照这个顺序给，农具页和捏帮工的农机列表也照它列。每台都有一份 `runtimePresets`，顺序一样。注册表（`registryOf`）是 oar 的内置农机（`defaultRuntimes`）加 VibeValley 自己的 agent（`agent/brain/runtime.ts`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.update` 回 404。
+- **四种已接通的农机这样承载**：VibeValley 和 pi 在服务端进程里，claude 走命令行，codex 走 app-server。真实项目的验证范围见[其他农机的提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
 - **农机接受什么**（`RuntimeFacts`）：`steer`（干活时能不能插话）、`refused`（不接受的开会话选项：`systemPrompt`、`appendSystemPrompt`、`effort`、`env`、`mcpServers`、`disallowedTools`，带原因）、`capabilities`（`RuntimeCapability`：oar 的适配器能问它什么，农具页照它列）、`inProcess`。探测时 `refusals` 先取适配器自己的 `refusedSessionOptions`，再用 `seeds.json` 的 `runtimeFacts` 盖上去（农场的说法更严时以它为准），结果和种子的其余几项一起放在 `RuntimeInfo.facts`；`agentIssues` 优先用探测到的这份，没探测到才用种子。页面只读 `info.facts`，目录里没有的农机什么都不接受。
 - **农机的样子**（`RuntimeInfo`）：名字、介绍和长相（`preset`，种子里没有的取 `fallbackPreset`、名字是 id）、接受什么（`facts`）、安装（`available` 带经由 `executable` 或 `bundled`、命令、版本；`not_found`；`unsupported` 带原因；`checking` 是服务端刚起来、还没探到）、模型（去掉 `disabled` 的，带思考强度的档和默认）、额度、清单（技能、MCP、工具）、设置、今天的花费、额度的字（`quota`）、为什么现在不派（`stop`）、检测时间。读不到的模型和清单是 `null`，不是空列表。每次给出去前现算今天的花费、`stop` 和 `quota`。没装、不支持的农机也在 `runtime.list` 里，带着 `preset` 和 `facts`。
 - **一份缓存，新的读不被旧的盖掉**：每台农机每次读（探测或读额度）开始时取下一个号，缓存记着自己那份的号；开始得早的读晚到了就丢掉（`testASlowProbeDoesNotOverwriteANewerOne`）。缓存里同时存着这次接受的安装（`found`），之后读额度、`resolve` 都用它。
@@ -53,6 +54,22 @@
   - 档案停用（`enabled` 为假）不在 `agentIssues` 里：`Assess().Usable()` 和 `hire` 另查。
 - **启停和钱只挡派新活**：`resolve` 不重查档案、农机是否启用或派活预算，已有 Session 叫醒时仍可解析有效配置；每次重新打开 oar 会话都检查选项是否受支持。
 - **命令路径是探测的输入**：农机设置的 `binPath` 作为 `oar.InstallationOptions.Binary` 交给探测，不改服务端进程的环境变量；留空时按 PATH 和农机的默认候选找，填了但不存在就是没找到，不退回别的。独立的 `oar` 命令行没给路径时仍认 `OAR_<RUNTIME>_BIN`。
+
+## 种子档案
+
+第一次启动时预置的档案在 `apps/server/src/agent/seeds.json` 的 `agents`：
+
+| 档案 | 农机 | 动物 | 职责 |
+|---|---|---|---|
+| 后端老周 | pi | 熊 | 写接口、改 server、跑 Go 测试 |
+| 测试小吴 | pi | 兔子 | 跑测试、修测试、盯 CI |
+| 前端阿郑 | pi | 小狐狸 | 页面、3D 场景、交互动画 |
+| 文档员 Kimi | pi | 猫 | 通读文档、写 README、整理说明 |
+| 情报 Grok | pi | 猫头鹰 | 查资料、读外部文档、调研方案 |
+| 夜班反重力 | pi | 浣熊 | 杂活、小改动、夜里补班 |
+| Claude 师傅 | claude | 熊 | 读大代码库、重构、查难缠的 bug |
+| Codex 老匠 | codex | 小狐狸 | 照工单把功能做出来，改到测试通过 |
+| Pi 实验员 | pi | 刺猬 | 写原型、试新做法 |
 
 ## 怎么走
 
@@ -98,14 +115,14 @@
 
 `agent/brain/taskGraph.ts` 是 VibeValley 自己的 agent（`agent/brain`）在会话里给自己记的图：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `helper`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。
 
-- 一张图最多 30 件（`maxTasks`）；`add` 整批收或整批不收，回给模型的问题说清是哪一条；改只让没开始和没做成的改正文和先后。交给帮手的件失败后重来 1 次（`retries`）；叫回或进程没了，在做的退回等着。
+- 一张图最多 30 件（`maxTasks`）；`add` 整批收或整批不收，回给模型的问题说清是哪一条；改只让没开始和没做成的改正文和先后。交给帮手的件在依赖做完后自动派，最多三个同时做，结果交回这个 agent；失败后重来 1 次（`retries`）；叫回或进程没了，在做的退回等着。
 - 存储（`agent/brain/taskStore.ts`）是一个主人没做完的那张图：库里的存在表 `agent_task`，按会话 id 分开，做完的盖上 `finished_at` 留着；内存里的给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个库里的存储。
 - 它不进工单、不进核心状态、没有分支和检查，和计划不相通。
 - 测试在 `agent/brain/taskGraph.test.ts`：加进来的件等着、第一件能开工；一批里有问题就整批不收；做完或跳过让下一件开工；一件能变成什么；给模型看的图；交给帮手的件出去再回来；存储留着图、把做完的收起来；一个主人的图不是另一个的。
 
 ## 为什么这样
 
-- **派活派档案，不派农机。** 同一台农机配不同的人设、模型、技能是不同的帮工；一个档案同时派出好几个帮工，各自一个 worktree。
+- **派活派档案，不派农机。** 同一台农机配不同的人设、模型、技能是不同的帮工；一个档案同时派出好几个帮工，每个帮工按档案的 `worktree` 设置在项目目录或工单的 worktree 里干活。
 - **档案存在一个 JSON 文件，不进表。** 只有几十份、整份读写、没有查询；主人能直接看、能备份。没有迁移：形状变了照「不留兼容」，旧文件作废。
 - **事务给回调一份独立的副本，写盘成功才发布。** 放弃了每个回调各自记着复制（嵌套的环境变量、MCP 参数、预算指针会漏），也放弃了直接改当前版本、失败再读文件恢复（别的引用可能已经看到了改动）。
 - **读不了的配置改名留着，不用种子覆盖。** 种子写过去，主人捏的档案就没了；宁可不开机。

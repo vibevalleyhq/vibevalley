@@ -10,7 +10,7 @@
 | 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/orchestrator.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
 | 形状、Schema 和接口表放在哪 | 核心状态折什么、帧里有什么（[architecture.md](docs/architecture.md)「核心状态」） |
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
-| 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件和配置键（[architecture.md](docs/architecture.md)「存了什么」「配置」） |
+| 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 测试的地基：`src/testing`、黄金数据、oar 的 `scriptedRuntime`；旧名字和能力表的检查 | 接口的处理（`handlers.ts`）、页面的分层（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪

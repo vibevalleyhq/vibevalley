@@ -32,6 +32,8 @@ test/             Playwright against a real server per worker (fixtures.ts)
 - **Words** are the farm's (docs/README.md#用语), in Chinese.
 - **Icons are the pixel drawings** (`<Icon name="icon-tasks" />`, from `public/pixel`; the site uses the same files); no line icons,
   no characters standing in for icons.
+- **App icons** are in `public/icons/`: `app-32.png`, `app-64.png` and `app-256.png`. The site build copies these packaged
+  files; it does not keep another set.
 - **The host** (`@vibevalley/host`, `currentHost()`) is the only way to the machine; a capability that is null is not drawn.
 - **Solid 2, not 1.x and not React.** The package ships its own guide (`node_modules/solid-js/CHEATSHEET.md` and
   `skills/`); `vp check` runs `eslint-plugin-solid`'s v2 rules over `src`. What this page adds to it:

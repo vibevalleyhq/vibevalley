@@ -2,7 +2,7 @@
 // change it here. Labels are in the dictionaries (features.tally), by key.
 
 export const FACTS = [
-  // The machines in use: VibeValley's own, pi, claude, codex (docs/reference/agents-and-runtimes.md; the rest are off for now).
+  // The machines in use: VibeValley's own, pi, claude, codex (.agents/notes/proposed/feature/2026-10-10-other-runtimes.md).
   { key: 'machines', n: 4, icon: 'machine-tractor' },
   // 7 species × 4 outfits (packages/protocol/src/shapes.ts).
   { key: 'looks', n: 28, icon: 'bear-farmer-side' },

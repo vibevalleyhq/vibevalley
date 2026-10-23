@@ -19,7 +19,7 @@ const head = `# 能力表
 
 帮工没有接口：它们经 \`/mcp\` 用 \`apps/server/src/tool\` 的工具。
 
-\`GET /api/v1/state\`、\`GET /api/v1/events\` 和 \`GET /api/v1/live\` 是 SSE，不在 \`endpoints\` 里：主人和连进来的设备都能读；\`/state\` 给折好的帧，\`/live\` 只给页面要的三种 side event，\`/events\` 留给命令行和调试。接口都在 \`/api/v1\` 下；换成不兼容的形状时另起 \`/api/v2\`，\`v1\` 留到设备都升级（[理由](docs/subsystems/core.md)）。
+\`GET /api/v1/state\`、\`GET /api/v1/events\` 和 \`GET /api/v1/live\` 是 SSE，不在 \`endpoints\` 里：主人和连进来的设备都能读；\`/state\` 给折好的帧，\`/live\` 只给页面要的三种 side event，\`/events\` 留给命令行和调试。接口都在 \`/api/v1\` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 `;
 
 const groups = new Map<string, typeof endpoints>();

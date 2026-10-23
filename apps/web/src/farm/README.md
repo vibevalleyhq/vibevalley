@@ -100,7 +100,8 @@ the API and then plays the bed's effect. A task graph's calls are `data/graphs.t
 ## Assets
 
 Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.json`,
-`/cursors/`, `/fonts/fusion-pixel-12px-proportional-zh_hans.otf` (the `font-pixel` family; sharp at 12 and 24 px),
+`/cursors/<name>.png` and `/cursors/cursors.json` (CSS cursor hotspots `hx`, `hy`),
+`/fonts/fusion-pixel-12px-proportional-zh_hans.otf` (the `font-pixel` family; sharp at 12 and 24 px),
 `/title/`. The farm's colours are Tailwind tokens in `src/style.css` (`bg-cream-100`, `border-bark-900`, `text-leaf-600`,
 `shadow-px`…).
 

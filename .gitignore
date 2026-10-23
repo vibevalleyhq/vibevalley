@@ -10,8 +10,7 @@ design/assets/rejected/
 design/mockups/*/logs/
 design/mockups/v2/rejected/
 
-# Secrets: Agora credentials and keys for the server ($VIBEVALLEY_HOME/.env, or a file passed with --env-file), and the
-# Agora CLI's project binding for this machine.
+# Secrets: local environment files, Agora credentials, and the Agora CLI's project binding for this machine.
 .agora/
 .env
 .env.*

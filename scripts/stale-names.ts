@@ -79,7 +79,7 @@ const RULES: readonly Rule[] = [
   {
     name: "an old home file or its mover",
     pattern: /\b(workers\.json|MoveSessionFiles|moveActivities|moveHeads|splitAllResults)\b/,
-    says: "sessions.json, events/, and the one-time import (see the one-way migration note)",
+    says: "session table, events/; old files are not imported",
   },
   {
     name: "a removed endpoint",
