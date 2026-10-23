@@ -71,7 +71,7 @@ import { causeMessage } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { type ApiError, missing, reasonOf, refused } from "../errors.ts";
+import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { issueBranch, Projects } from "../project/project.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { merging } from "./merge.ts";
@@ -178,7 +178,6 @@ const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | 
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 /** An issue not found: the list says which there are. */
-const issueListNext = [{ say: "列出工单，找它的编号", run: ["issue", "list"] }] as const;
 
 const reopenDefault = "接着把这张工单做完";
 
@@ -301,7 +300,7 @@ export const make = (options: IssueOptions = {}) =>
         const number = /^#?(\d+)$/.exec(r)?.[1];
         if (number !== undefined) {
           const row = yield* one(q.issueByNumber({ number: Number(number) }));
-          if (!row) return yield* Effect.fail(missing("工单 #" + number, issueListNext));
+          if (!row) return yield* Effect.fail(missing("工单 #" + number, [lookIn.issue]));
           return row.id;
         }
         return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
@@ -312,7 +311,7 @@ export const make = (options: IssueOptions = {}) =>
       Effect.gen(function* () {
         const issue = yield* idOf(ref);
         const row = yield* one(q.getIssue({ id: issue }));
-        if (!row) return yield* Effect.fail(missing("工单 " + ref, issueListNext));
+        if (!row) return yield* Effect.fail(missing("工单 " + ref, [lookIn.issue]));
         return issueOf(
           row,
           (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
@@ -339,7 +338,7 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     const liveSession = (id: string) =>
-      Effect.flatMap(latest(id), (session) => (sessions.find(session) ? Effect.succeed(session) : Effect.fail(missing("帮工 " + session))));
+      Effect.flatMap(latest(id), (session) => (sessions.find(session) ? Effect.succeed(session) : Effect.fail(missing("帮工 " + session, [lookIn.session]))));
 
     // ── writing ──
 
@@ -600,7 +599,7 @@ export const make = (options: IssueOptions = {}) =>
           return "";
         }
         const last = yield* sessions.get(issue.sessions.at(-1)!);
-        if (!last) return yield* Effect.fail(missing("工单 " + id));
+        if (!last) return yield* Effect.fail(missing("工单 " + id, [lookIn.issue]));
         if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
         const agent = to ?? store.agent(last.agent);
         if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
@@ -688,7 +687,7 @@ export const make = (options: IssueOptions = {}) =>
     const takerOf = (t: Issue, to: IssueStatus, key: string) =>
       Effect.gen(function* () {
         const a = store.named(key.trim());
-        if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案"));
+        if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案", [lookIn.agent]));
         if (a.id === t.assignee) return undefined;
         if (to !== "todo") return yield* Effect.fail(refused("换人是挪到待办时的事：挪到待办，填上谁来接手"));
         if (t.status === "in_progress") return yield* Effect.fail(refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`));
@@ -703,7 +702,7 @@ export const make = (options: IssueOptions = {}) =>
         const t = yield* get(id);
         const last = t.sessions.at(-1);
         if (last === undefined || !sessions.find(last)) return;
-        if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last));
+        if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last, [lookIn.session]));
       });
 
     // ── a move worked out before it is made ──
@@ -1186,7 +1185,7 @@ export const make = (options: IssueOptions = {}) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
           const changes = yield* sessions.changes(session);
-          if (!changes) return yield* Effect.fail(missing("帮工 " + session));
+          if (!changes) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
           if (by === "owner") yield* core.did({ kind: "reviewed", session });
           return changes;
         }),
@@ -1196,7 +1195,7 @@ export const make = (options: IssueOptions = {}) =>
         Effect.gen(function* () {
           const session = yield* liveSession(id);
           const h = sessions.sessionOf(session);
-          if (!h) return yield* Effect.fail(missing("帮工 " + session));
+          if (!h) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
           // A preview that fails (git broken) is said as it is, not taken for no conflict.
           const changes = h.conflict ? undefined : yield* sessions.changes(session);
           const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
@@ -1249,7 +1248,7 @@ export const make = (options: IssueOptions = {}) =>
       templates: (name) =>
         Effect.gen(function* () {
           const stack = yield* projects.stack(name);
-          if (!stack) return yield* Effect.fail(missing("项目 " + name));
+          if (!stack) return yield* Effect.fail(missing("项目 " + name, [lookIn.project]));
           return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
         }),
       hire,

@@ -221,7 +221,7 @@ export class AgentHost<R> {
       const w = want.trim();
       if (!w) return Effect.fail(refused("写一句它应该怎样"));
       const asked = this.journal.events().find((e) => e.seq === on);
-      if (!asked) return Effect.fail(missing(`${this.o.label}轨迹里没有第 ${on} 步`));
+      if (!asked) return Effect.fail(missing(`${this.o.label}轨迹里没有第 ${on} 步`, [{ say: "步数在页面上它的日志里，每一步前面的编号" }]));
       if (asked.type !== "user/message") return Effect.fail(refused(`第 ${on} 步不是${this.o.label}收到的话`));
       const lines = readLines(this.transcript);
       const at = turnAt(lines, asked.text, asked.time, this.o.inputType);

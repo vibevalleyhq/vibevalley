@@ -22,7 +22,7 @@ import {
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
-import { graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskOf } from "./graph.ts";
+import { graphActions, graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskActions, taskActionText, taskOf } from "./graph.ts";
 import { graphsOf } from "./issues.ts";
 import { clip } from "../base/text.ts";
 import {
@@ -58,7 +58,7 @@ import { Agents } from "../agent/agent.ts";
 import { causeMessage } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
-import { type ApiError, reasonOf, refused } from "../errors.ts";
+import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { MergeFailure, ProjectError, type ProjectShape, Projects } from "../project/project.ts";
 import { chooseAgent } from "../runtime/rules.ts";
@@ -68,6 +68,17 @@ import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
+
+/** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
+const graphNext = (graph: TaskGraph): Next[] =>
+  graphActions(graph).map((action) => ({ say: graphActionText[action], run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })] }));
+
+/** What the step allows now, as commands. */
+const stepNext = (graph: TaskGraph, task: Task): Next[] =>
+  taskActions(graph, task).map((action) => ({
+    say: `${taskActionText[action]}「${task.title}」`,
+    run: ["graph", "task-act", graph.id, task.id, "--json", JSON.stringify({ action })],
+  }));
 
 export interface TaskShape {
   readonly split: (goal: string, project: string, agent: string, by: GraphActor) => Effect.Effect<string, ApiError>;
@@ -167,7 +178,7 @@ export const make = (options: TaskOptions = {}) =>
     const get = (id: string) => graphOf(core.state(), id);
     const need = (id: string) => {
       const g = get(id);
-      return g ? Effect.succeed(g) : Effect.fail(refused(`没有 ${id} 这个计划`));
+      return g ? Effect.succeed(g) : Effect.fail(missing(`没有 ${id} 这个计划`, [lookIn.graph]));
     };
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
@@ -484,7 +495,7 @@ export const make = (options: TaskOptions = {}) =>
             if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：项目是工作目录下的一个文件夹"));
             const all = yield* candidates;
             const chosen = chooseAgent(all, "规划 计划 拆分 " + goal, agent, "");
-            if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来拆计划"));
+            if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来拆计划", [lookIn.agent]));
             const id = yield* issues.nextTaskId();
             const graph: TaskGraph = {
               id,
@@ -552,7 +563,7 @@ export const make = (options: TaskOptions = {}) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
             const graph = yield* need(id);
-            const not = () => Effect.fail(refused(`计划「${graph.title}」${graphStateText[graph.state]}，不能${graphActionText[action]}`));
+            const not = () => Effect.fail(refused(`计划「${graph.title}」${graphStateText[graph.state]}，不能${graphActionText[action]}`, graphNext(graph)));
             switch (action) {
               case "start": {
                 if (graph.state !== "draft") return yield* not();
@@ -615,11 +626,12 @@ export const make = (options: TaskOptions = {}) =>
           Effect.gen(function* () {
             const graph = yield* need(id);
             const task = taskOf(graph, taskId);
-            if (!task) return yield* Effect.fail(refused(`计划里没有「${taskId}」这一步`));
-            if (graph.state !== "running" && graph.state !== "paused") return yield* Effect.fail(refused("计划" + graphStateText[graph.state]));
+            if (!task) return yield* Effect.fail(missing(`计划里没有「${taskId}」这一步`, [lookIn.graph]));
+            if (graph.state !== "running" && graph.state !== "paused")
+              return yield* Effect.fail(refused("计划" + graphStateText[graph.state], graphNext(graph)));
             switch (action) {
               case "retry": {
-                if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试"));
+                if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试", stepNext(graph, task)));
                 const session = task.session ? live.sessionOf(task.session) : undefined;
                 if (session && !isBusy(session)) {
                   // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
@@ -639,7 +651,9 @@ export const make = (options: TaskOptions = {}) =>
               }
               case "skip": {
                 if (task.state !== "waiting" && task.state !== "failed")
-                  return yield* Effect.fail(refused(task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了"));
+                  return yield* Effect.fail(
+                    refused(task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了", stepNext(graph, task)),
+                  );
                 let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));
                 if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
                 yield* put(next, by);

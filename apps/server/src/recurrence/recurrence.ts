@@ -11,7 +11,7 @@ import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
-import { type ApiError, missing, refused } from "../errors.ts";
+import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 import * as q from "../../db/generated/recurrence.sql.ts";
 
 export interface Due {
@@ -95,7 +95,7 @@ export const make = (options: RecurrenceOptions = {}) =>
 
     const find = (id: string) => {
       const s = (core.state().recurrences ?? []).find((x) => x.id === id);
-      return s ? Effect.succeed(s) : Effect.fail(missing(`没有 ${id} 号定时`, [{ say: "列出定时，找它的 id", run: ["recurrence", "list"] }]));
+      return s ? Effect.succeed(s) : Effect.fail(missing(`没有 ${id} 号定时`, [lookIn.recurrence]));
     };
 
     const ran = (id: string, at: number, enabled: boolean) => db(q.recurrenceRan({ last_run: at, enabled, id }));
@@ -128,11 +128,11 @@ export const make = (options: RecurrenceOptions = {}) =>
             if (problem) return yield* Effect.fail(refused(problem));
             const want = req.channel ?? chat.general();
             const channel = (yield* chat.channels()).find((c) => c.id === want);
-            if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`));
+            if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`, [lookIn.channel]));
             const named = (req.agent ?? "").trim();
             const agents = store.agents();
             const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-            if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`));
+            if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]));
             const project = (req.project ?? "").trim();
             if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
             const tz = req.tz ?? localZone();

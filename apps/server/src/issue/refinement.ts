@@ -11,7 +11,7 @@ import type { AgentShape } from "../agent/agent.ts";
 import { cut } from "../base/text.ts";
 import type { ChannelShape } from "../channel/chat.ts";
 import type { CoreShape } from "../core/core.ts";
-import { type ApiError, refused } from "../errors.ts";
+import { type ApiError, refused, lookIn } from "../errors.ts";
 import type { WorkplaceRelease } from "../project/project.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import type { RuntimeShape } from "../runtime/runtime.ts";
@@ -55,7 +55,7 @@ export function refinement(d: RefinementDeps) {
         if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
       }
       const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
-      if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草"));
+      if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草", [lookIn.agent]));
       return chosen;
     });
 

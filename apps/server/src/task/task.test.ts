@@ -246,6 +246,13 @@ describe("task graphs", () => {
         const preview = yield* f.tasks.previewRemoveTask(id, "b");
         expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一步`, `「${taskOf(draft, "d")!.title}」不再等它`]);
         expect((yield* f.until(id, () => true)).tasks.map((n) => n.id)).toEqual(["a", "b", "c", "d"]);
+        // An act the draft does not allow is refused with the ones it does, as commands.
+        expect(yield* Effect.flip(f.tasks.act(id, "pause", "user"))).toMatchObject({
+          next: [
+            { say: "开工", run: ["graph", "act", id, "--json", '{"action":"start"}'] },
+            { say: "放弃", run: ["graph", "act", id, "--json", '{"action":"abandon"}'] },
+          ],
+        });
         yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "orchestrator");
         expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
         const ready = yield* f.until(id, (g) => g.state === "ready");
@@ -325,7 +332,10 @@ describe("task graphs", () => {
         expect(inbox(f.core.state()).map((c) => c.id)).toContain(id + ":failed:boom:2");
         const after = taskOf(stuck, "after")!;
         expect([after.state, blockedBy(stuck, after), stuck.state]).toEqual(["waiting", ["boom"], "running"]);
-        expect(yield* Effect.flip(f.tasks.taskAct(id, "nope", "skip", "user"))).toMatchObject({ reason: expect.stringContaining("没有「nope」") });
+        expect(yield* Effect.flip(f.tasks.taskAct(id, "nope", "skip", "user"))).toMatchObject({
+          _tag: "Missing",
+          what: expect.stringContaining("没有「nope」"),
+        });
         expect(yield* f.tasks.taskAct(id, "boom", "skip", "user")).toContain("跳过了");
         const ready = yield* f.until(id, (g) => g.state === "ready");
         expect(ready.tasks.map((n) => n.state)).toEqual(["skipped", "merged", "merged"]);

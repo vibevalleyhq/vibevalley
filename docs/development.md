@@ -67,7 +67,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 - **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
 - **请求体** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段。
 - **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `DELETE` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
-- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）。退出码分得出是哪一种：
+- **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单和计划的拒绝给出它们现在能做的动作。退出码分得出是哪一种：
 
   | 退出码 | 意思 |
   |---|---|
