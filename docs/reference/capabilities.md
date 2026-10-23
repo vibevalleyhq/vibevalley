@@ -55,6 +55,7 @@
 | `recurrence.list` | `GET /api/v1/recurrences` | ✓ | ✓ | ✓ |
 | `recurrence.update` | `PUT /api/v1/recurrences/{id}` | ✓ | ✓ |   |
 | `recurrence.delete` | `DELETE /api/v1/recurrences/{id}` | ✓ | ✓ | ✓ |
+| `recurrence.previewDelete` | `POST /api/v1/recurrences/{id}/delete/preview` | ✓ | ✓ | ✓ |
 
 ## issue
 
@@ -95,6 +96,7 @@
 | `graph.split` | `POST /api/v1/graphs` | ✓ | ✓ | ✓ |
 | `graph.updateTask` | `PUT /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |
 | `graph.deleteTask` | `DELETE /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |
+| `graph.previewDeleteTask` | `POST /api/v1/graphs/{id}/tasks/{task}/delete/preview` | ✓ | ✓ | ✓ |
 | `graph.act` | `POST /api/v1/graphs/{id}/act` | ✓ | ✓ | ✓ |
 | `graph.taskAct` | `POST /api/v1/graphs/{id}/tasks/{task}/act` | ✓ | ✓ | ✓ |
 | `graph.changes` | `GET /api/v1/graphs/{id}/changes` | ✓ | ✓ |   |
@@ -131,6 +133,7 @@
 | `agent.create` | `POST /api/v1/agents` | ✓ |   | ✓ |
 | `agent.save` | `PUT /api/v1/agents/{id}` | ✓ |   |   |
 | `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ |   |   |
+| `agent.previewDelete` | `POST /api/v1/agents/{id}/delete/preview` | ✓ |   |   |
 
 ## memory
 
@@ -140,6 +143,7 @@
 | `memory.recall` | `GET /api/v1/memories/{agent}/recall` | ✓ | ✓ |   |
 | `memory.create` | `POST /api/v1/memories/{agent}` | ✓ | ✓ | ✓ |
 | `memory.delete` | `DELETE /api/v1/memories/{agent}/{memory}` | ✓ | ✓ |   |
+| `memory.previewDelete` | `POST /api/v1/memories/{agent}/{memory}/delete/preview` | ✓ | ✓ |   |
 
 ## skill
 
@@ -149,6 +153,7 @@
 | `skill.create` | `POST /api/v1/skills` | ✓ |   | ✓ |
 | `skill.save` | `PUT /api/v1/skills/{id}` | ✓ |   |   |
 | `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ |   |   |
+| `skill.previewDelete` | `POST /api/v1/skills/{id}/delete/preview` | ✓ |   |   |
 
 ## project
 
@@ -191,8 +196,10 @@
 | `lan.update` | `PUT /api/v1/lan` | ✓ |   |   |
 | `lan.startPairing` | `POST /api/v1/lan/pairing` | ✓ |   |   |
 | `lan.stopPairing` | `DELETE /api/v1/lan/pairing` | ✓ |   |   |
+| `lan.previewStopPairing` | `POST /api/v1/lan/pairing/stop/preview` | ✓ |   |   |
 | `lan.answerPairing` | `POST /api/v1/lan/pairing/answer` | ✓ |   |   |
 | `lan.deleteDevice` | `DELETE /api/v1/lan/devices/{id}` | ✓ |   |   |
+| `lan.previewDeleteDevice` | `POST /api/v1/lan/devices/{id}/delete/preview` | ✓ |   |   |
 | `lan.pair` | `POST /api/v1/lan/pair` | ✓ | ✓ |   |
 | `lan.me` | `GET /api/v1/lan/me` | ✓ | ✓ |   |
 

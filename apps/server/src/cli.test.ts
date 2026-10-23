@@ -119,14 +119,8 @@ describe("the command line", () => {
         e.can,
       ]);
     }
-    // Every delete has one, but these, which are still to come.
-    const toCome = ["recurrence.delete", "graph.deleteTask", "agent.delete", "memory.delete", "skill.delete", "lan.deleteDevice", "lan.stopPairing"];
-    expect(
-      endpoints
-        .filter((e) => e.method === "DELETE" && !e.dryRun)
-        .map((e) => e.op)
-        .sort(),
-    ).toEqual(toCome.sort());
+    // Every delete has one.
+    expect(endpoints.filter((e) => e.method === "DELETE" && !e.dryRun).map((e) => e.op)).toEqual([]);
   });
 
   it.live("--dry-run says what a command would do and changes nothing; one with no dry run is refused, a read runs", () =>
@@ -151,6 +145,51 @@ describe("the command line", () => {
       const list = yield* cli(["issue", "list", "--server", server, "--dry-run"]);
       expect(list.code).toBe(0);
       expect((JSON.parse(list.out) as { title: string }[]).some((i) => i.title === "不该建")).toBe(false);
+    }),
+  );
+
+  it.live("each delete's dry run names what it would delete and leaves it there; one that is not there is missing", () =>
+    Effect.gen(function* () {
+      const server = yield* farm;
+      const run = (args: string[], body?: unknown) => cli([...args, "--server", server, ...(body === undefined ? [] : ["--json", JSON.stringify(body)])]);
+      const doc = (r: { out: string }) => JSON.parse(r.out) as { id: string; does: string[] } & Record<string, unknown>;
+      const list = (args: string[]) => Effect.map(run(args), (r) => JSON.parse(r.out) as unknown);
+
+      const recurrence = doc(yield* run(["recurrence", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
+      expect(doc(yield* run(["recurrence", "delete", recurrence.id, "--dry-run"])).does[0]).toContain("删掉定时「早上看看」");
+      expect(JSON.stringify(yield* list(["recurrence", "list"]))).toContain(recurrence.id);
+
+      const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
+      const agents = (yield* list(["agent", "list"])) as { id: string; name: string }[];
+      const docs = agents.find((a) => a.id === "docs")!;
+      yield* run(["agent", "save", "docs"], { ...docs, skills: [skill.id] });
+      expect(doc(yield* run(["skill", "delete", skill.id, "--dry-run"])).does).toEqual(["删掉技能「写测试」", `从 「${docs.name}」 的档案里摘掉它`]);
+      expect(JSON.stringify(yield* list(["skill", "list"]))).toContain(skill.id);
+
+      expect(doc(yield* run(["agent", "delete", "docs", "--dry-run"])).does[0]).toContain(`删掉档案「${docs.name}」`);
+      expect(JSON.stringify(yield* list(["agent", "list"]))).toContain('"id":"docs"');
+      const orchestrator = yield* run(["agent", "delete", "orchestrator", "--dry-run"]);
+      expect([orchestrator.code, orchestrator.failure?.message]).toEqual([3, "管家删不了：每个工作区都有一个"]);
+
+      const memory = doc(yield* run(["memory", "create", "docs"], { text: "主人喜欢短的提交说明" }));
+      expect(doc(yield* run(["memory", "delete", "docs", memory.id, "--dry-run"])).does).toEqual([`从 docs 的记性里忘掉：「主人喜欢短的提交说明」`]);
+      expect(JSON.stringify(yield* list(["memory", "list", "docs"]))).toContain(memory.id);
+
+      expect(doc(yield* run(["lan", "stop-pairing", "--dry-run"])).does).toEqual(["没有在配对的码：什么都不会动"]);
+
+      // Not there: the delete and its dry run are both missing, and say where to look.
+      for (const args of [
+        ["agent", "delete", "nobody"],
+        ["skill", "delete", "nothing"],
+        ["recurrence", "delete", "never"],
+        ["memory", "delete", "docs", "nothing"],
+        ["lan", "delete-device", "nowhere"],
+      ]) {
+        const dry = yield* run([...args, "--dry-run"]);
+        const real = yield* run(args);
+        expect([args.join(" "), dry.code, real.code, dry.failure?.message === real.failure?.message]).toEqual([args.join(" "), 4, 4, true]);
+        expect(dry.failure?.next?.[0]?.run).toBeDefined();
+      }
     }),
   );
 

@@ -11,12 +11,13 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
-import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, statePath } from "@vibevalley/protocol";
+import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
+import { missing } from "../errors.ts";
 import { callbackLog } from "../base/log.ts";
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
@@ -49,10 +50,14 @@ export interface LanShape {
   readonly setOpen: (open: boolean) => Effect.Effect<LanStatus, ApiError>;
   readonly startPairing: () => Effect.Effect<LanStatus, ApiError>;
   readonly stopPairing: () => LanStatus;
+  /** What stopPairing would do; nothing changes. */
+  readonly previewStopPairing: () => Preview;
   /** The code is used up either way. */
   readonly answer: (allow: boolean) => Effect.Effect<LanStatus, ApiError>;
   readonly pair: (code: string, name: string) => Effect.Effect<LanPaired, ApiError>;
   readonly forget: (id: string) => Effect.Effect<LanStatus, ApiError>;
+  /** What forget would do, refused as it would be; nothing changes. */
+  readonly previewForget: (id: string) => Effect.Effect<Preview, ApiError>;
   /** The device a request through the listener came from; undefined on this machine. */
   readonly me: (device: string | undefined) => Effect.Effect<LanDevice, ApiError>;
   /** Where the loopback server listens, once it does. */
@@ -150,6 +155,11 @@ export const make = (options: LanOptions = {}) =>
     /** Forgetting a device ends them. */
     const conns = new Map<string, Set<AbortController>>();
 
+    // forget and its dry run judge by this.
+    const known = (id: string) => {
+      const d = devices.get(id);
+      return d ? Effect.succeed(d) : Effect.fail(missing(`没有 ${id} 这台设备`, [{ say: "看连着的设备，找它的 id", run: ["lan", "status"] }]));
+    };
     const dropPairing = () => {
       pairing?.answer?.(false);
       pairing = undefined;
@@ -354,13 +364,24 @@ export const make = (options: LanOptions = {}) =>
           if (!allow) return yield* Effect.fail(refuse("主人没让这台设备进来"));
           return yield* addDevice(name);
         }),
+      previewStopPairing: () => {
+        const p = livePairing();
+        if (!p) return { does: ["没有在配对的码：什么都不会动"] };
+        return { does: [`收起配对码 ${p.code}`, ...(p.asking ? [`正在等你点头的「${p.asking}」连不进来`] : [])] };
+      },
       forget: (id) =>
         Effect.gen(function* () {
+          yield* known(id);
           yield* db(q.removeLanDevice({ id }));
           devices.delete(id);
           for (const c of conns.get(id) ?? []) c.abort();
           conns.delete(id);
           return status();
+        }),
+      previewForget: (id) =>
+        Effect.map(known(id), (d) => {
+          const open = conns.get(id)?.size ?? 0;
+          return { does: [`忘掉设备「${d.name}」：它的钥匙作废，要再连得重新配对`, ...(open > 0 ? [`断开它连着的 ${open} 条连接`] : [])] };
         }),
       me: (device) => {
         const d = device ? devices.get(device) : undefined;

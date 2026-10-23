@@ -127,7 +127,7 @@ describe("recurrences", () => {
         yield* drained;
         expect(due.map((d) => [d.recurrence.id, d.missed])).toEqual([[everyId, true]]);
         yield* s.remove(everyId);
-        expect((yield* Effect.flip(s.remove(everyId)))._tag).toBe("Refused");
+        expect((yield* Effect.flip(s.remove(everyId)))._tag).toBe("Missing");
         expect(core.state().recurrences).toHaveLength(1);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });

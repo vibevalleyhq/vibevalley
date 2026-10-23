@@ -11,6 +11,7 @@ import {
   GraphActorValues,
   type GraphEvent,
   type GraphEventKind,
+  type Preview,
   GraphEventKindValues,
   type Session,
   type SessionGraph,
@@ -76,6 +77,8 @@ export interface TaskShape {
   readonly taskAct: (id: string, task: string, action: TaskAction, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly editTask: (id: string, task: string, edit: TaskEdit, by: GraphActor) => Effect.Effect<string, ApiError>;
   readonly removeTask: (id: string, task: string, by: GraphActor) => Effect.Effect<string, ApiError>;
+  /** What removeTask would do, refused as it would be; nothing changes. */
+  readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<Preview, ApiError>;
   readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
   /** The task graphs now, as the board has them. */
   readonly graphs: () => TaskGraph[];
@@ -650,6 +653,17 @@ export const make = (options: TaskOptions = {}) =>
         ),
       editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
       removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),
+      previewRemoveTask: (id, task) =>
+        Effect.gen(function* () {
+          const graph = yield* need(id);
+          const result = removeTask(graph, task);
+          if (!result.ok) return yield* Effect.fail(refused(result.problem));
+          const gone = taskOf(graph, task)!;
+          const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => `「${n.title}」`);
+          return {
+            does: [`从计划「${graph.title}」删掉「${gone.title}」这一步`, ...(waiting.length > 0 ? [`${waiting.join("、")}不再等它`] : [])],
+          };
+        }),
       events: (id) =>
         Effect.gen(function* () {
           const rows = yield* db(q.graphEvents({ graph_id: id, n: readLimit }));
