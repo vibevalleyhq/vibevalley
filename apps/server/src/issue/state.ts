@@ -97,7 +97,7 @@ export function withIssueStatuses(state: WorkspaceState): WorkspaceState {
   return next ? { ...state, issues: next } : state;
 }
 
-/** The weeds a failed acceptance left attention. */
-export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.pulled).length;
+/** The findings still open: a failed acceptance's, until the next acceptance passes. */
+export const openFindings = (t: Issue) => (t.findings ?? []).filter((f) => !f.resolved).length;
 
 export const isForOrchestrator = (t: Issue) => t.assignee === orchestratorAgent;

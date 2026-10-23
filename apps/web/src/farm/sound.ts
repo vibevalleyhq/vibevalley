@@ -3,7 +3,7 @@
 // purpose: once voice is on, the microphone sits next to these.
 
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
-import type { GameEffect, Session } from "@vibevalley/protocol";
+import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 import type { BedFxKind } from "./tools";
 
 function grains(
@@ -309,6 +309,8 @@ export interface FarmSoundInput {
   effects?: readonly GameEffect[];
   /** Absent until the page has the core state; the first state is the farm as it already was. */
   sessions?: readonly Session[];
+  /** Where each issue stands (Issue.attention): its plot ripens or gets bugs as it does. */
+  issues?: readonly Pick<Issue, "id" | "attention">[];
   call?: { phase: CallPhase; problem?: string };
 }
 
@@ -346,12 +348,20 @@ export function farmCues(prev: FarmSoundInput, next: FarmSoundInput): Cue[] {
     }
   }
   if (prev.sessions && next.sessions && next.sessions !== prev.sessions) {
-    const before = new Map(prev.sessions.map((s) => [s.id, s]));
-    for (const s of next.sessions) {
-      const was = before.get(s.id);
-      if (!was) cues.push({ name: "arrive" });
-      else if (s.phase._tag === "done" && was.phase._tag !== "done") cues.push({ name: "ripe", hold: 220 });
-      else if (s.phase._tag === "failed" && was.phase._tag !== "failed") cues.push({ name: "bug" });
+    const before = new Set(prev.sessions.map((s) => s.id));
+    for (const s of next.sessions) if (!before.has(s.id)) cues.push({ name: "arrive" });
+  }
+  // Ripe and bug follow where the issue stands, as its plot does: a round handed back with a conflict or a question is
+  // neither.
+  if (prev.issues && next.issues && next.issues !== prev.issues) {
+    const before = new Map(prev.issues.map((t) => [t.id, t.attention]));
+    for (const t of next.issues) {
+      const was = before.get(t.id);
+      if (!was) continue;
+      const now = t.attention;
+      if (now.state === "reviewing" && was.state !== "reviewing") cues.push({ name: "ripe", hold: 220 });
+      else if (now.state === "stuck" && (now.stuck === "failed" || now.stuck === "conflict") && (was.state !== "stuck" || was.stuck !== now.stuck))
+        cues.push({ name: "bug" });
     }
   }
   if (prev.call && next.call) {

@@ -19,7 +19,7 @@ import type {
   Progress,
   Session,
 } from "@vibevalley/protocol";
-import { needOf, attentionLabel } from "@vibevalley/protocol/rules";
+import { needOf, attentionLabel, stuckLabel } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
 import { achievements } from "../agent/seed.ts";
 import { sessionOf } from "../session/state.ts";
@@ -66,37 +66,58 @@ function growth(h: Session): Crop {
 
 const badgeRipe: Badge = { text: "可收获", tone: "ripe" };
 const badgeBugs: Badge = { text: "有虫", tone: "bug" };
-const badgeConflict: Badge = { text: "有冲突", tone: "bug" };
-const badgeQuiet: Badge = { text: "没动静", tone: "stuck" };
+const badgeConflict: Badge = { text: stuckLabel.conflict, tone: "bug" };
+const badgeQuiet: Badge = { text: stuckLabel.quiet, tone: "stuck" };
+const badgeHalfway: Badge = { text: stuckLabel.interrupted, tone: "stuck" };
 const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
 const badgeReview: Badge = { text: attentionLabel.reviewing, tone: "wait" };
 const badgeQuestions: Badge = { text: attentionLabel.asking, tone: "wait" };
 
 /**
- * A plot is an issue: what the session on it is doing, then where the issue stands — waiting on the owner's answer
- * (等你回答), its acceptance (抽穗, or weeds after a failed one), or passed (ripe).
+ * A plot is a picture of its issue's attention, never a second reading of it: the crop and the badge say where the
+ * issue stands (attentionOf decides that, and in what order); the session only adds how far this round has grown.
  */
 export function plotOf(h: Session, issue: Issue | undefined): PlotView {
-  const plot = plotOfSession(h);
-  if (!issue) return plot;
-  if (needOf(h)?.kind === "conflict") return plot;
-  const weeds = openFindings(issue);
-  switch (h.phase._tag) {
-    case "working":
-      if (weeds > 0 && plot.badge === undefined) return { crop: "weeds", badge: { text: `除草中 ${weeds}`, tone: "bug" } };
+  if (!issue) return plotOfSession(h);
+  const a = issue.attention;
+  switch (a.state) {
+    case "draft":
+    case "queued":
+    case "working": {
+      if (h.phase._tag === "arriving") return { crop: "seeded" };
+      if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying };
+      // Another round after a failed acceptance: it works on what the review said.
+      const open = openFindings(issue);
+      return open > 0 ? { crop: "weeds", badge: { text: `除草中 ${open}`, tone: "bug" } } : { crop: growth(h) };
+    }
+    case "asking":
+      return { crop: "dry", badge: badgeQuestions };
+    case "reviewing":
+      if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
+      // One its task graph acts on asks nothing of the owner here.
+      return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview } : { crop: "flowering" };
+    case "stuck":
+      switch (a.stuck) {
+        case "conflict":
+          return { crop: "withered", badge: badgeConflict };
+        case "failed":
+        case undefined:
+          return { crop: "withered", badge: badgeBugs };
+        case "interrupted":
+          return { crop: growth(h), badge: badgeHalfway };
+        case "quiet":
+          return { crop: "dry", badge: badgeQuiet };
+      }
       break;
     case "done":
-    case "resting":
-      if ((issue.questions ?? []).length > 0) return { crop: "dry", badge: badgeQuestions };
-      if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
-      if (weeds > 0) return { crop: "weeds", badge: { text: `${weeds} 棵草`, tone: "bug" } };
-      if (h.phase._tag === "done") return { crop: "flowering", badge: badgeReview };
+    case "canceled":
       break;
   }
-  return plot;
+  return plotOfSession(h);
 }
 
+/** A session that works no issue (a draft, the one splitting a task graph): its own phase is all there is. */
 export function plotOfSession(h: Session): PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";

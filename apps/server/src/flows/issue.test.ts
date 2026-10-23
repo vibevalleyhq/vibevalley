@@ -531,7 +531,9 @@ describe("an issue", () => {
         (i) => i.status === "in_review",
         "the weed worked on and handed back",
       );
-      yield* until(() => crop() === "weeds", "the weed stands until a pass");
+      // Handed back again it waits on the owner's acceptance, as its page says; the findings stay open until a pass.
+      yield* until(() => crop() === "flowering", "waiting on the acceptance again");
+      expect(openFindings(yield* issues.get(issue.id))).toBe(1);
 
       issue = yield* issues.review(issue.id, { pass: true });
       expect([issue.reviewedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);

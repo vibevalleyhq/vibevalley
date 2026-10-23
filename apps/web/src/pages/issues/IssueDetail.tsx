@@ -217,10 +217,10 @@ export function IssueDetail(props: {
         >
           <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
-        <Show when={s().weeds.length > 0}>
+        <Show when={s().openFindings.length > 0}>
           <div class="mt-2">
             <div class="text-xs text-muted">上次打回的</div>
-            <For each={s().weeds}>{(f) => <div class="text-sm text-berry">· {f.text}</div>}</For>
+            <For each={s().openFindings}>{(f) => <div class="text-sm text-berry">· {f.text}</div>}</For>
           </div>
         </Show>
       </section>
@@ -375,9 +375,9 @@ export function IssueDetail(props: {
           )}
         </Show>
         <Property label="用时">{s().usedLine(steps(), now())}</Property>
-        <Show when={s().pulled.length > 0}>
+        <Show when={s().resolvedFindings.length > 0}>
           <Property label="已解决的验收意见">
-            <For each={s().pulled}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
+            <For each={s().resolvedFindings}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
           </Property>
         </Show>
       </More>

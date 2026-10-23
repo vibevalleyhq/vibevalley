@@ -266,9 +266,9 @@ function IssueBody(props: {
           >
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
-          <Show when={s().weeds.length > 0}>
+          <Show when={s().openFindings.length > 0}>
             <div class="mt-1.5">
-              <For each={s().weeds}>{(f) => <p class={[body, "text-berry"]}>上次打回 · {f.text}</p>}</For>
+              <For each={s().openFindings}>{(f) => <p class={[body, "text-berry"]}>上次打回 · {f.text}</p>}</For>
             </div>
           </Show>
         </FarmSection>
@@ -380,9 +380,9 @@ function IssueBody(props: {
                   </div>
                 </Row>
               </Show>
-              <Show when={s().pulled.length > 0}>
+              <Show when={s().resolvedFindings.length > 0}>
                 <Row label="拔了的草">
-                  <For each={s().pulled}>{(f) => <p class={[body, "text-bark-400 line-through"]}>已拔 · {f.text}</p>}</For>
+                  <For each={s().resolvedFindings}>{(f) => <p class={[body, "text-bark-400 line-through"]}>已拔 · {f.text}</p>}</For>
                 </Row>
               </Show>
               <Show when={agent()?.model}>

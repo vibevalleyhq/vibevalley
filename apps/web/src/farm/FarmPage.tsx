@@ -81,6 +81,7 @@ function FarmSounds() {
     open: { panel: has("panel"), selected: has("inspect"), sowing: has("sow"), watering: has("water"), friends: friends(), chat: chat() },
     effects: raw()?.effects,
     sessions: raw()?.state.sessions,
+    issues: raw()?.state.issues,
   }));
   return null;
 }
