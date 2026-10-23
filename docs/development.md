@@ -102,13 +102,14 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
    vibevalley issue get <id>
    ```
 
-4. 如果满意，收下改动。服务端把改动合进主分支。
+4. 如果满意，收下改动。先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
 
    ```bash
+   vibevalley issue status <id> --dry-run --json '{"status":"done"}'
    vibevalley issue status <id> --json '{"status":"done"}'
    ```
 
-状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。
+状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [verify-server](.agents/skills/verify-server/SKILL.md) 的 `--scripted-helper`。
 
 ## 素材、音效和官网
 

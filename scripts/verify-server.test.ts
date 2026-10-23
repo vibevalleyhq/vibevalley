@@ -60,3 +60,31 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     rmSync(result.evidence, { recursive: true, force: true });
   }
 }, 60_000);
+
+test("with the scripted helper, an issue goes out, comes back and is completed through the command line alone", async () => {
+  const result = await runVerification(
+    [
+      "sh",
+      "-c",
+      `set -e
+      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
+      vv issue create --json '{"title":"写打卡并提交","project":"clock","assignee":"docs"}' > /dev/null
+      vv issue run 1
+      vv issue status 1 --dry-run --json '{"status":"done"}'
+      vv issue status 1 --json '{"status":"done"}'
+      project=$(vv project list | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
+      git -C "$project" ls-tree --name-only main clock.ts`,
+    ],
+    { scriptedHelper: true },
+  );
+  try {
+    expect(result.code).toBe(0);
+    const [changes, preview, done, merged] = readFileSync(join(result.evidence, "command.stdout.log"), "utf8").trim().split("\n");
+    expect((JSON.parse(changes!) as { files: { path: string }[] }).files.map((f) => f.path)).toEqual(["clock.ts"]);
+    expect((JSON.parse(preview!) as { does: string[] }).does.at(-1)).toContain("合进 main");
+    expect(JSON.parse(done!)).toMatchObject({ status: "done", delivered: "merged" });
+    expect(merged).toBe("clock.ts");
+  } finally {
+    rmSync(result.evidence, { recursive: true, force: true });
+  }
+}, 120_000);
