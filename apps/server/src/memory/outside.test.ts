@@ -15,6 +15,7 @@ import { testConfig } from "../testing/layers.ts";
 import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
 import { nowledgeLabels } from "./nowledge.ts";
+import { until } from "../testing/until.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
 const everosProject = (project: string) => "project-" + createHash("sha256").update(project).digest("hex");
@@ -176,12 +177,6 @@ const world = (timeoutMs?: number) =>
   );
 
 const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] })).pipe(Effect.orDie);
-
-const until = (ok: () => boolean) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
-    expect(ok()).toBe(true);
-  });
 
 describe("Nowledge Mem", () => {
   it.live("a project search proves source scope even when reading everything was requested", () =>

@@ -11,6 +11,7 @@ import { Connectors, layer } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
 import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
+import { untilGot as until } from "../testing/until.ts";
 
 const owner = "o9cq80wkM5NnOwnerOfThisFarm@im.wechat";
 
@@ -144,16 +145,6 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
         chat.orchestratorSays(message.conversation, `k${++says}`, "收到：**" + text + "**", true, ""),
       ),
   }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
-
-const until = <A>(get: () => Promise<A | undefined | false>, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500; i++) {
-      const got = await get();
-      if (got) return got;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const statusOf = (id: ConnectorID) =>
   Effect.gen(function* () {

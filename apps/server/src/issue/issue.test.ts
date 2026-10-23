@@ -16,6 +16,7 @@ import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Issues } from "./issue.ts";
+import { until } from "../testing/until.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -31,15 +32,6 @@ const farm = (runtimes = [busy]) => {
   const c = config();
   return { config: c, layer: world({ config: c, runtimes, repos: ["demo"] }) };
 };
-
-const until = (ok: () => boolean | Promise<boolean>, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500; i++) {
-      if (await ok()) return;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const git = (dir: string, ...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
 

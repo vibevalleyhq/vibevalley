@@ -11,6 +11,7 @@ import { Issues } from "../issue/issue.ts";
 import { Memories } from "../memory/memory.ts";
 import { world } from "../testing/world.ts";
 import { Mcp } from "./mcp.ts";
+import { until } from "../testing/until.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -41,15 +42,6 @@ const client = (mcp: Mcp["Service"], token: string) => {
       ((await call("tools/call", { name, arguments: args })).result?.content ?? []).map((c) => c.text).join(""),
   };
 };
-
-const until = (ok: () => boolean, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500; i++) {
-      if (ok()) return;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const hired = (core: Core["Service"], s: Partial<Session> & { id: string }) =>
   core.apply({

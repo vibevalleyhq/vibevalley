@@ -15,6 +15,7 @@ import { agentSessionsStart, gamification, notificationsStart, taskGraphsStart }
 import { helper } from "../testing/helper.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world, type WorldOptions } from "../testing/world.ts";
+import { until as untilHeld, waitFor } from "../testing/until.ts";
 
 /** The seed profile on pi, with no effort: the scripted runtime has no models, so no effort levels. */
 export const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
@@ -61,27 +62,20 @@ export const watch = Effect.gen(function* () {
   return { facts, notes, nextReport };
 });
 
-/** Polls until ok, or fails the test after about ten seconds. */
-export const until = (ok: () => boolean | Promise<boolean>, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 1000; i++) {
-      if (await ok()) return;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
+/** Polls until ok, or fails the test after ten seconds. */
+export const until = (ok: () => boolean | Promise<boolean>, what: string) => untilHeld(ok, what, 10_000);
 
 /** The value got once ok says so. */
 export const await_ = <A>(get: () => Effect.Effect<A, unknown> | A, ok: (a: A) => boolean, what: string) =>
-  Effect.gen(function* () {
-    for (let i = 0; i < 1000; i++) {
+  waitFor(
+    Effect.suspend(() => {
       const got = get();
-      const a = Effect.isEffect(got) ? yield* Effect.orDie(got) : got;
-      if (ok(a)) return a;
-      yield* Effect.sleep(10);
-    }
-    return yield* Effect.die(new Error(`waited for ${what}`));
-  });
+      return Effect.isEffect(got) ? Effect.orDie(got) : Effect.succeed(got);
+    }),
+    ok,
+    what,
+    10_000,
+  );
 
 export const mustHire = (h: Hired): Session => {
   if (!h.session) throw new Error("refused: " + h.refused);
