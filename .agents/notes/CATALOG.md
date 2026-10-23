@@ -20,7 +20,6 @@
 
 ### architecture
 
-- 2026-10-23 [命令行是 agent 验证的入口：照 effect/cli 重写，能组合、能试跑、出 JSON、报错给下一步](.agents/notes/proposed/architecture/2026-10-23-the-cli-is-where-agents-verify.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)

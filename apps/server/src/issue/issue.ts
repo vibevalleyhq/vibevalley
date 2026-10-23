@@ -513,9 +513,10 @@ export const make = (options: IssueOptions = {}) =>
     const readyOf = (issue: Issue) =>
       Effect.gen(function* () {
         if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
-        if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案"));
+        const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
+        if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案", pick));
         const agent = store.agent(issue.assignee);
-        if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了"));
+        if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了", pick));
         return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
       });
 
@@ -752,7 +753,9 @@ export const make = (options: IssueOptions = {}) =>
             if (isForOrchestrator(t)) return [`${n} 交给管家答`];
             const [, agent, project] = yield* readyOf(p.taker ? { ...t, assignee: p.taker.id } : t);
             const full = sessions.noRoom(agent.runtime, project);
-            return full ? [`${n} 派给 ${agent.name}`, `现在没空位（${full}）：排进待办，有空位就自动开工`] : [`${n} 派 ${agent.name} 去 ${project} 开工`];
+            return full
+              ? [`${n} 派给 ${agent.name}`, `现在没空位（${full}）：排进待办，有空位就自动开工`]
+              : [project ? `${n} 派 ${agent.name} 去 ${project} 开工` : `${n} 派 ${agent.name} 开工`];
           }
           case "unqueue":
             return [`${n} 不排了，挪回备选`];
@@ -1001,7 +1004,7 @@ export const make = (options: IssueOptions = {}) =>
           const id = t.id;
           const name = actLabel[req.act];
           if (!t.attention.acts.includes(req.act))
-            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`, nextSteps(t)));
+            return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
           const said = (req.text ?? "").trim();
           const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
           switch (req.act) {
@@ -1127,7 +1130,7 @@ export const make = (options: IssueOptions = {}) =>
           const t = yield* get(ref);
           const name = actLabel[req.act];
           if (!t.attention.acts.includes(req.act))
-            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`, nextSteps(t)));
+            return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
           const said = (req.text ?? "").trim();
           const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
           const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
