@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome } from "@vibevalley/protocol";
+import { outcomeLabel } from "@vibevalley/protocol/rules";
 import {
   chatPath,
   feedOf,
@@ -29,9 +30,9 @@ import { TurnSteps } from "./WorkLog";
 import { useAgent } from "../../data/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
-  completed: { label: "做完了", fill: "#b4cb7c", icon: "icon-harvest" },
-  failed: { label: "没做成", fill: "#e9a092", icon: "icon-bug" },
-  interrupted: { label: "叫停了", fill: "#e2c995", icon: "icon-shovel" },
+  completed: { label: outcomeLabel.completed, fill: "#b4cb7c", icon: "icon-harvest" },
+  failed: { label: outcomeLabel.failed, fill: "#e9a092", icon: "icon-bug" },
+  interrupted: { label: outcomeLabel.interrupted, fill: "#e2c995", icon: "icon-shovel" },
 };
 
 /** A conversation's messages, newest at the bottom; filter keeps those containing it. */

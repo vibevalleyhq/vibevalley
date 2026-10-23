@@ -72,7 +72,7 @@ function ownerQuestion(attention: IssueAttention, issue: Issue, head: Session): 
         case "failed":
           return { head: "这一轮没做成", ...(said ? { line: said } : {}), tone: "berry" };
         case "interrupted":
-          return { head: "停在了半路", ...(said ? { line: said } : {}), tone: "wheat" };
+          return { head: "这一轮停在半路", ...(said ? { line: said } : {}), tone: "wheat" };
         case "quiet":
           return { head: `${who}很久没动静了`, line: "可能在跑很久的命令，也可能卡住了：看看它的每一步，不对就叫停。", tone: "berry" };
         case undefined:

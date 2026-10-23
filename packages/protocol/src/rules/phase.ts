@@ -1,6 +1,6 @@
 // What a session is doing and what it waits on.
 
-import type { Conflict, Retry, Session, SessionAction } from "../shapes";
+import type { Conflict, Outcome, Retry, Session, SessionAction } from "../shapes";
 
 /** What each action is, in words. */
 export const actionText: Readonly<Record<SessionAction, string>> = {
@@ -16,6 +16,9 @@ export const actionText: Readonly<Record<SessionAction, string>> = {
   speaking_text: "写汇报",
   none: "",
 };
+
+/** How a round ended. */
+export const outcomeLabel: Readonly<Record<Outcome, string>> = { completed: "做完了", failed: "没做成", interrupted: "停在半路" };
 
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
@@ -87,10 +90,10 @@ export function phaseWords(h: Session): string {
     case "done":
       return "这一轮做完了，等你看" + conflict;
     case "failed":
-      return "这一轮失败了";
+      return "这一轮没做成";
     case "resting": {
       const outcome = h.lastRun?.outcome;
-      const last = outcome === undefined ? "没做完" : outcome === "interrupted" ? "被叫停" : outcome === "completed" ? "做完了" : "失败了";
+      const last = outcome === undefined ? "没做完" : outcomeLabel[outcome];
       return "歇着（上一轮" + last + "）" + conflict;
     }
     default:

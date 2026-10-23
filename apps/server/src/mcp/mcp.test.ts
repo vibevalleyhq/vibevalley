@@ -128,7 +128,7 @@ describe("mcp", () => {
       yield* hired(core, { id: "resting", name: "歇着的", phase: { _tag: "resting" } as Session["phase"] });
       yield* hired(core, { id: "clash", name: "冲突的", phase: { _tag: "done" } as Session["phase"], conflict: { base: "main", files: ["a.go"] } });
       const text = yield* Effect.promise(() => client(mcp, "token").tool("session_list"));
-      for (const want of ["这一轮失败了", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"]) expect(text).toContain(want);
+      for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"]) expect(text).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(world({ who: () => "caller" }))),
   );
 

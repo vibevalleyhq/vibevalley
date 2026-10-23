@@ -1,9 +1,9 @@
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
-import { deliverableLabel } from "@vibevalley/protocol/rules";
+import { deliverableLabel, priorityLabel } from "@vibevalley/protocol/rules";
 import { api } from "../../data/api";
 import { rememberPick } from "./write";
-import { isRefined, newIssueTitle, priorityLabel } from "../../rules/issues";
+import { isRefined, newIssueTitle } from "../../rules/issues";
 import { ago, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { autofocus } from "../../app/util";

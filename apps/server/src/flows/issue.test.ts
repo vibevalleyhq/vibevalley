@@ -117,7 +117,7 @@ describe("an issue", () => {
       ]);
       const reopened = (yield* sessions.get(again))!;
       expect(reopened.brief).toMatch(new RegExp(`^打卡还要记下时区\\n\\n（这张工单重开了，上一次是 .+（${session.id}）做的。）`));
-      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：完成了/);
+      expect(reopened.brief).toMatch(/这张工单原来是：写打卡并提交\n它是怎么关的：已完成，合进了主分支/);
       refusedWith(yield* Effect.flip(issues.reopen(session.issue!, "", "")));
       expect((yield* Effect.flip(issues.reopen("w404", "", "")))._tag).toBe("Missing");
       yield* sessions.dismiss(again);

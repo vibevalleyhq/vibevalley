@@ -166,6 +166,13 @@ const RULES: readonly Rule[] = [
     except: /^apps\/(web\/src\/farm\/|web\/test\/farm-|server\/src\/game\/)/,
   },
   {
+    name: "a word list for an issue's or a session's state outside the protocol's rules",
+    pattern:
+      /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/,
+    says: "the word lists in packages/protocol/src/rules (statusLabel, attentionLabel, stuckLabel, actLabel, outcomeLabel, deliveredLabel, canceledLabel, deliverableLabel, priorityLabel): say a sentence with them, do not keep another list",
+    except: /^packages\/protocol\/src\/rules\//,
+  },
+  {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",

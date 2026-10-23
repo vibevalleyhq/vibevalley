@@ -39,7 +39,7 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { actLabel, attentionLabel } from "@vibevalley/protocol/rules";
+import { actLabel, attentionLabel, closedText, outcomeLabel } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
@@ -163,20 +163,11 @@ const json = <T>(text: string | null): T | undefined => {
 
 /** Empty is none. */
 
-const leftText: Readonly<Record<SessionClose, string>> = {
-  merged: "完成了，改动已经合进项目的主分支",
-  completed: "工单完成了，改动没有合进主分支",
-  dismissed: "取消了，改动没有合进主分支",
-  lost: "干活的目录丢了，改动可能不在了",
-};
-
 /** What a session's leaving says of its issue, when the issue is still open then: its work merged is done, the rest is
  * canceled. A completion the owner chose (kept, none) is written before its session leaves, and a task graph's step
  * closes with its graph, so neither is this. */
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
-
-const outcomeText = { completed: "做完了", failed: "没做成", interrupted: "被叫停了" } as const;
 
 const reopenDefault = "接着把这张工单做完";
 
@@ -186,8 +177,8 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   let out = (text.trim() || reopenDefault) + `\n\n（${how}。）`;
   out += "\n这张工单原来是：" + cut(issueJob(issue), askedMax);
   if (issue.answer) out += "\n上一次的结论：" + cut(issue.answer.conclusion, askedMax);
-  if (last.phase._tag === "closed") out += "\n它是怎么关的：" + leftText[last.phase.closed];
-  if (last.lastRun) out += `\n最后一轮${outcomeText[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
+  if (issue.closedAt !== undefined) out += "\n它是怎么关的：" + closedText(issue);
+  if (last.lastRun) out += `\n最后一轮${outcomeLabel[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
   if (previous) out += "\n这条分支上已经有上次的提交，接着做。";
   return out + "\n先看看项目现在的样子，再接着做。";
 }

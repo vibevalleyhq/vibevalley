@@ -19,7 +19,7 @@ import type {
   TemplateBlank,
   TemplateKind,
 } from "@vibevalley/protocol";
-import { closedText, shortTitle } from "@vibevalley/protocol/rules";
+import { closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
 
@@ -308,10 +308,10 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
         else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
         break;
       case "failed":
-        out.push({ at: r.endedAt, kind: "failed", ...by, text: "没做成" + said });
+        out.push({ at: r.endedAt, kind: "failed", ...by, text: outcomeLabel.failed + said });
         break;
       case "interrupted":
-        out.push({ at: r.endedAt, kind: "stopped", ...by, text: "停在了半路" + said });
+        out.push({ at: r.endedAt, kind: "stopped", ...by, text: outcomeLabel.interrupted + said });
         break;
     }
   });

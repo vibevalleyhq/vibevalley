@@ -2,8 +2,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/protocol";
 import type { BoardCard, Tone } from "../../rules/cards";
 import { cardAgent } from "../../rules/cards";
-import { statusLabel } from "@vibevalley/protocol/rules";
-import { priorityLabel } from "../../rules/issues";
+import { priorityLabel, statusLabel } from "@vibevalley/protocol/rules";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { useAgent } from "../../data/agents";
 

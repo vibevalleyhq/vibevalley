@@ -11,7 +11,7 @@ export { PxChipsInput } from "./forms";
 export { PxFrame } from "./frame";
 export { CrossMark, PixelMark, TickMark } from "./glyphs";
 export { ActionGlyph, Marked, PhaseGlyph, reducedMotion, SpriteIcon } from "./icons";
-export { ago, orchestratorLabel, numberText, outcomeLabel, phaseLabel, runtimeLabel } from "./labels";
+export { ago, numberText } from "./labels";
 export { mentionHref, plainText, withMentions } from "./markdown";
 export { EarnedMedal } from "./medals";
 export { badgeColors, CardColors, type GlyphCell, type Piece } from "./card";
