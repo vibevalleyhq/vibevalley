@@ -7,7 +7,7 @@ import { currentHost } from "@vibevalley/host";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { traySummary } from "../rules/notice";
 import { voiceCall } from "../voice/call";
-import { rawFrame } from "../farm/state";
+import { rawFrame } from "../data/frame";
 
 export function Follow() {
   // The frame as it came: what is news compares one inbox with the one before.

@@ -25,7 +25,7 @@ import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js
 import { castPrefix } from "../../rules/cast";
 import { playSound } from "../sound";
 import { clock, farmState, type BedFx } from "../store";
-import { orchestratorLooks, orchestratorSprite } from "../tools";
+import { orchestratorLooks, orchestratorSprite } from "../kit/looks";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
@@ -49,6 +49,7 @@ import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
+import { prefsNow } from "../../data/prefs";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;
@@ -379,7 +380,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
 
   const petDog = () => {
     const trick = pup.pet(t);
-    const cat = farmState().pet !== "dog";
+    const cat = prefsNow().pet !== "dog";
     life.heart(v.dog.x + 3, v.dog.y - 16);
     switch (trick) {
       case "wake":
@@ -592,7 +593,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
 
     // The orchestrator talks and listens; the pet wakes up for a call.
     const mood = state.orchestrator;
-    const chosen = store.orchestratorLook;
+    const chosen = prefsNow().orchestratorLook;
     const lookId = chosen !== "farmer" && orchestratorLooks.some((l) => l.id === chosen) && has(`manager-${chosen}`) ? chosen : "farmer";
     const base = lookId === "farmer" ? "manager" : `manager-${lookId}`;
     const orchestratorPose =
@@ -601,7 +602,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     rise(orchestrator, mood === "speaking" ? frameAt(t, 2, 4) : frameAt(t, 2, 0.6));
     const dogLook = pup.look(t, state.call === "live");
     const awake = dogLook.picture !== "dog-sleep";
-    const pet = store.pet;
+    const pet = prefsNow().pet;
     const petPicture = pet === "dog" ? dogLook.picture : dogLook.picture.replace("dog-", `${pet}-`);
     stand(dog, has(petPicture) ? petPicture : dogLook.picture);
     dog.y = v.dog.y - dogLook.lift;

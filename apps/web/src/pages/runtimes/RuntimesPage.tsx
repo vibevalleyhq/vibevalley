@@ -17,7 +17,7 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../data/api";
-import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "../../farm/hud/rules";
+import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "../../rules/quota";
 import { yuan } from "../../rules/chat";
 import { momentText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
@@ -25,7 +25,7 @@ import { A } from "../../app/A";
 import { Keyed } from "../../app/util";
 import { useWorkAgents } from "../../data/agents";
 import { ready, useRuntimes } from "../../data/query";
-import { RuntimeIcon } from "../../farm/hud/QuotaPill";
+import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { KeyValueEditor } from "../../ui/Chips";
 import { AgentFace } from "../../ui/Face";

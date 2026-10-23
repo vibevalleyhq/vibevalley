@@ -18,7 +18,7 @@ import { createExternal } from "../../data/external";
 import { useCore, useFrames } from "../../data/frame";
 import { ready, useQuery } from "../../data/query";
 import { toasts, ToastType } from "../kit";
-import { rawFrame } from "../state";
+import { rawFrame } from "../../data/frame";
 
 const keep = 2000;
 

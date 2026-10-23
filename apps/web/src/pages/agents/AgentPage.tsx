@@ -32,7 +32,7 @@ import { useRouter, useSearch } from "../../app/router";
 import { aria } from "../../app/util";
 import { useAgentIssues } from "../../data/agents";
 import { ready, useAgents, useRuntimes, useSprites } from "../../data/query";
-import { RuntimeIcon } from "../../farm/hud/QuotaPill";
+import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { ChipsInput, KeyValueEditor } from "../../ui/Chips";
 import { AgentFace } from "../../ui/Face";

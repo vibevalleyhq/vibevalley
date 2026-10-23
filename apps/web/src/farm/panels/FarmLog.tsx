@@ -9,8 +9,9 @@ import { useCore } from "../../data/frame";
 import { useAgent } from "../../data/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../kit";
-import { useFarm } from "../state";
+
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
+import { usePrefs } from "../../data/prefs";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [outcomeLabel.completed, "#efcf92", "#2f1f13"],
@@ -27,7 +28,7 @@ type Row = { kind: "said" | "report"; message: ChatMessage };
 
 export function FarmLog() {
   const core = useCore();
-  const look = useFarm((st) => st.orchestratorLook);
+  const look = usePrefs((p) => p.orchestratorLook);
   const rows = (): Row[] => {
     const s = core();
     const chat = s?.chat;

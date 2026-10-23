@@ -6,7 +6,7 @@ import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "s
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
-import { reasonOf } from "../../data/api";
+import { api, newSendKey, reasonOf } from "../../data/api";
 import { badgeColors, CardColors } from "../../farm/kit/card";
 import type { SpriteAtlas, SpriteInfo } from "../../farm/world/sprites";
 import { castOf, castSprite, cropSprite } from "../../rules/cast";
@@ -34,7 +34,6 @@ import { autofocus } from "../../app/util";
 import { useCore, useFrames } from "../../data/frame";
 import { ready, useAgents, useProjects } from "../../data/query";
 import { PixelCard } from "../../farm/kit";
-import { commands } from "../../farm/state";
 import { useVillage } from "../../farm/support";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
@@ -438,16 +437,16 @@ function NoProjects() {
   );
 }
 
-/** A seed for this project, no bed to choose: planted now (the orchestrator sends a helper), or kept as a todo to fill in. */
+/** A job for this project: sent now (the orchestrator sends a helper), or written down as a todo to fill in. */
 function SowHere(props: { project: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();
-  const plant = async () => {
+  const send = async () => {
     const project = props.project;
     setBusy(true);
     try {
-      await commands.plant(text().trim(), { project });
+      await api.channel.say({ body: { text: text().trim(), project, sendKey: newSendKey() } });
       props.onDone();
     } catch (e) {
       toast(reasonOf(e));
@@ -484,7 +483,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
         <Button disabled={busy() || !text().trim()} onClick={() => void write()}>
           先写成待办
         </Button>
-        <Button tone="primary" disabled={busy() || !text().trim()} onClick={() => void plant()}>
+        <Button tone="primary" disabled={busy() || !text().trim()} onClick={() => void send()}>
           种下
         </Button>
       </div>

@@ -3,7 +3,7 @@
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
 shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/data/frame.ts`); this folder
 only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `state.ts`
-(`useFarm`, `timeOfDay`, `rawFrame`, `commands`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
+(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `data/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
 the pad).
 
 ## Its parts

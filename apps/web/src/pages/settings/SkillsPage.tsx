@@ -11,7 +11,7 @@ import { A } from "../../app/A";
 import { useRouter } from "../../app/router";
 import { Keyed } from "../../app/util";
 import { ready, useAgents, useQuery, useRuntimes } from "../../data/query";
-import { RuntimeIcon } from "../../farm/hud/QuotaPill";
+import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";

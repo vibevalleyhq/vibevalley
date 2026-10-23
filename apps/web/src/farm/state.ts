@@ -23,12 +23,6 @@ export function useFarm<T>(select: (s: FarmUi) => T): Accessor<T> {
 /** The clock's time of day, 0..1, in steps of five minutes of the day (the HUD's clock text). */
 export const timeOfDay = () => createExternal(clock.subscribe, () => Math.floor(clock.day().tod * 288) / 288);
 
-/**
- * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after
- * (sounds, the canvas). UI reads the store (data/frames.ts), which keeps objects and updates only what changed.
- */
-export const rawFrame = (): Accessor<StateFrame | undefined> => createExternal(frames.subscribe, () => frames.get().frame);
-
 /** The project whose farm is on the page ("" for the sessions without one): the route sets it. */
 export const farmProject = () => farmState().project ?? "";
 

@@ -3,27 +3,16 @@
 
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { bottleSprite, machineOf, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "./rules";
+import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../rules/quota";
 import { yuan } from "../../rules/chat";
 import { aria, useClickAway } from "../../app/util";
 import { ready, useRuntimes } from "../../data/query";
 import { CardColors, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
 import { HudCard } from "./Hud";
-import { RuntimeBadge } from "../../ui/RuntimeBadge";
+import { RuntimeIcon } from "../kit/RuntimeIcon";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
-
-export function RuntimeIcon(props: { runtime: string; size: number }) {
-  return (
-    <span class="relative inline-block shrink-0" style={{ width: `${props.size}px`, height: `${props.size}px` }}>
-      <Show when={machineOf(props.runtime)} fallback={<span class="block h-full w-full bg-cream-200" />}>
-        {(machine) => <SpriteIcon name={machine()} size={props.size} />}
-      </Show>
-      <RuntimeBadge runtime={props.runtime} size={Math.max(10, Math.round(props.size * 0.46))} />
-    </span>
-  );
-}
 
 function UsageLines(props: { usage: AccountUsage | null }) {
   return (

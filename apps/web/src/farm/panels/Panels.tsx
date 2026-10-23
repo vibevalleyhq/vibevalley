@@ -5,7 +5,7 @@
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
-import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../tools";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../kit/looks";
 import { aria, Keyed } from "../../app/util";
 import { useCore } from "../../data/frame";
 import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../kit";
@@ -18,6 +18,7 @@ import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
 import { TaskBoard } from "./TaskBoard";
 import { tint } from "./bits";
+import { setOrchestratorLook, setPet, usePrefs } from "../../data/prefs";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: ["商店", "icon-shop", "sm"],
@@ -134,8 +135,8 @@ function Tile(props: { chosen: boolean; ready: boolean; onClick: () => void; chi
 
 function OrchestratorLooks() {
   const loaded = useVillage();
-  const current = useFarm((s) => s.orchestratorLook);
-  const pet = useFarm((s) => s.pet);
+  const current = usePrefs((p) => p.orchestratorLook);
+  const pet = usePrefs((p) => p.pet);
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
     <div class="flex flex-col">
@@ -143,7 +144,7 @@ function OrchestratorLooks() {
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
-            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => farm.setOrchestratorLook(look.id)}>
+            <Tile chosen={look.id === current()} ready={lookReady(look.id, has)} onClick={() => setOrchestratorLook(look.id)}>
               <span class="h-28">
                 <Show when={loaded().village}>
                   <SpriteIcon name={orchestratorSprite(look.id, "", has)} size={112} />
@@ -160,7 +161,7 @@ function OrchestratorLooks() {
         <For each={pets}>
           {(p) => (
             <div class="flex-1 bg-cream-100">
-              <Tile chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => farm.setPet(p)}>
+              <Tile chosen={p === pet()} ready={has(`${p}-awake`)} onClick={() => setPet(p)}>
                 <span class="h-16">
                   <Show when={has(`${p}-awake`)}>
                     <SpriteIcon name={`${p}-awake`} size={64} />

@@ -4,15 +4,15 @@
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
-import { orchestratorLooks } from "../../farm/tools";
+import { orchestratorLooks } from "../../farm/kit/looks";
 import { A } from "../../app/A";
 import { useRouter } from "../../app/router";
 import { aria } from "../../app/util";
-import { useFarm } from "../../farm/state";
 import { OrchestratorFace } from "../../ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "../Memory";
 import { VoiceForm } from "../settings/VoiceForm";
 import { TrajectoryLog } from "../Trajectory";
+import { usePrefs } from "../../data/prefs";
 
 const tabs = [
   { id: "memory", label: "记性" },
@@ -25,7 +25,7 @@ const tabs = [
 export function OrchestratorPage(props: { rest: string }) {
   const at = () => tabs.find((t) => t.id === props.rest)?.id ?? "memory";
   const router = useRouter();
-  const chosen = useFarm((s) => s.orchestratorLook);
+  const chosen = usePrefs((p) => p.orchestratorLook);
   const look = () => orchestratorLooks.find((l) => l.id === chosen());
   const head = () => (
     <div class="flex items-center gap-4 pt-4">
