@@ -31,7 +31,7 @@ const lastInput = (c: Request) =>
     .map(userText)
     .filter((t): t is string => t !== undefined)
     .at(-1) ?? "";
-const heads = ["【现在】", "【农场现状】", "【农场变了】", "【记性有更新】", "这期间田头上的汇报"];
+const heads = ["【现在】", "【现状】", "【现状变了】", "【记性有更新】", "这期间田头上的汇报"];
 /** An input without what the orchestrator puts before the words. */
 const words = (input: string) => {
   const blocks = input.split("\n\n");
@@ -132,8 +132,8 @@ describe("the orchestrator", () => {
       yield* orchestrator.say("帮我在 demo 里加个 README", {}, undefined, "");
       expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，记下了"]);
       const first = f.requests[0]!;
-      expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【农场现状】[\s\S]*可以派的帮工：\n- /);
-      expect(first.messages[0]!.role === "system" && messageText(first.messages[0]!)).not.toContain("【农场现状】");
+      expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /);
+      expect(first.messages[0]!.role === "system" && messageText(first.messages[0]!)).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
       const trail = yield* until(() => {
         const events = (sessions.events(orchestratorAgent) ?? []).filter((e) => e.type !== "llm/usage");
@@ -172,7 +172,7 @@ describe("the orchestrator", () => {
       expect((yield* Core).state().call).toBe("live");
       yield* until(() => words().length >= 1, "its words");
       const kept = readFileSync(join(config.home, "orchestrator", "orchestrator.jsonl"), "utf8");
-      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【农场现状】/);
+      expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*【现状】/);
       expect(kept).toMatch(/"customType":"orchestratorInput"[^\n]*"source":"owner","owner":true/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

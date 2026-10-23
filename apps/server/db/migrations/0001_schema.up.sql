@@ -49,7 +49,7 @@ CREATE TABLE channel_message (
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
   target_id   text not null,
-  resolved    text not null check (resolved in ('delivered', 'not_on_farm', 'unknown')),
+  resolved    text not null check (resolved in ('delivered', 'absent', 'unknown')),
   primary key (message_id, target_id)
 );
 CREATE TABLE channel_follow (

@@ -19,7 +19,7 @@ export interface McpShape {
 
 export class Mcp extends Context.Service<Mcp, McpShape>()("vibevalley/Mcp") {}
 
-export const unknownCaller = "没认出你是谁：这些工具只给农场里的帮工用";
+export const unknownCaller = "没认出你是谁：这些工具只给帮工用";
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 

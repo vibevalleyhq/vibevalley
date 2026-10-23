@@ -15,7 +15,7 @@ import { Card, Quiet } from "../kit";
 
 const notes = [
   "帮工能在这台电脑上跑命令，所以只让配对过的设备连进来；配对要你在这里点头。",
-  "配对过的设备和你一样用这个农场。开关和设备只能在这台电脑上管。",
+  "配对过的设备和你一样用这台电脑上的 VibeValley。开关和设备只能在这台电脑上管。",
   "连接走的是不加密的 HTTP：同一个网络里的人可能看到传的内容。只在信得过的网络里开，比如家里的 Wi-Fi、自己的热点。",
   "电脑换了地址（换了网络）以后，设备连不上了，在这里添加设备再扫一次就好，不用重新点头。",
 ];
@@ -44,7 +44,7 @@ export function LanPage() {
                 when={s().open}
                 fallback={
                   <>
-                    <p class="text-sm">打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的农场：看帮工、派活、在田头说话。</p>
+                    <p class="text-sm">打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在田头说话。</p>
                     <div>
                       <Button tone="primary" onClick={() => act(() => api.lan.update({ body: { open: true } }))}>
                         允许连接
@@ -150,7 +150,7 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
     >
       {(asking) => (
         <div class="flex flex-col gap-3">
-          <p class="text-sm">「{asking()}」想连接到这台电脑。让它进来以后，它能和你一样用这个农场。</p>
+          <p class="text-sm">「{asking()}」想连接到这台电脑。让它进来以后，它能和你一样用这台电脑上的 VibeValley。</p>
           <div class="flex gap-2">
             <Button tone="primary" onClick={() => props.act(() => api.lan.answerPairing({ body: { allow: true } }))}>
               让它进来

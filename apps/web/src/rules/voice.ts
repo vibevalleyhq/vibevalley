@@ -28,7 +28,7 @@ export const languageLabel: Record<Language, string> = {
 };
 
 export const asrLabel: Record<VoiceASR["vendor"], string> = { ares: "声网 ARES", deepgram: "Deepgram", microsoft: "微软" };
-export const answerLabel: Record<VoiceAnswer["vendor"], string> = { orchestrator: "农场的管家", agora: "声网托管", deepseek: "DeepSeek", openai: "自己的接口" };
+export const answerLabel: Record<VoiceAnswer["vendor"], string> = { orchestrator: "管家", agora: "声网托管", deepseek: "DeepSeek", openai: "自己的接口" };
 export const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: "微软" };
 
 /** What each starts with when picked: the one in use if it is the same vendor, else these. */

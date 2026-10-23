@@ -162,7 +162,7 @@ describe("mcp", () => {
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");
       expect(yield* tool("memory_search", { query: "部署" })).toContain("没有搜到「部署」");
-      expect(yield* Effect.promise(() => client(mcp, "w9").tool("memory_search", { query: "测试" }))).toContain("地里没有你");
+      expect(yield* Effect.promise(() => client(mcp, "w9").tool("memory_search", { query: "测试" }))).toContain("你不在场");
     }).pipe(Effect.scoped, Effect.provide(world({ who: (token) => token }))),
   );
 

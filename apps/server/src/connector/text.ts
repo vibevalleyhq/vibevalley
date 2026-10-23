@@ -51,7 +51,7 @@ export function flushText(lines: readonly string[]): string[] {
     const [head = "", body = ""] = l.split("\n", 2);
     return head + " " + slice(body, 0, 60) + (body.length > 60 ? "…" : "");
   });
-  return [`你不在的时候有 ${lines.length} 条消息：\n${firstLines.join("\n")}\n\n完整的在农场的田头里。`];
+  return [`你不在的时候有 ${lines.length} 条消息：\n${firstLines.join("\n")}\n\n完整的在田头里。`];
 }
 
 /** Spaces and a 配对 in front allowed. */

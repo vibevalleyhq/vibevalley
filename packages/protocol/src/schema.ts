@@ -1171,7 +1171,6 @@ export const IssueUpdate: Schema.Codec<T.IssueUpdate> = Schema.Struct({
 });
 
 export const IssueDispatchRequest: Schema.Codec<T.IssueDispatchRequest> = Schema.Struct({
-  station: Schema.optionalKey(Schema.Number),
   edit: Schema.optionalKey(IssueUpdate),
 });
 

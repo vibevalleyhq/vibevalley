@@ -196,7 +196,7 @@ function Detail(props: {
         {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
           <h1 class="text-lg font-semibold">找不到这张工单</h1>
-          <p class="mt-3 text-sm text-muted">农场里没有 {props.id}：可能已经删掉了，或者链接写错了。</p>
+          <p class="mt-3 text-sm text-muted">没有 {props.id} 这张工单：可能已经删掉了，或者链接写错了。</p>
         </div>
       </Match>
       <Match when={shows("todo")} keyed>

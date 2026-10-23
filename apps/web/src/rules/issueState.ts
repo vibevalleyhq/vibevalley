@@ -134,7 +134,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       crew.length <= 1 && !hand
         ? undefined
         : // One plot, one worktree: only the session on it now changes the code.
-          [crew.map((c) => c.name).join("、"), ...(hand ? [`锄头在${hand.name}手上`] : [])].join(" · "),
+          [crew.map((c) => c.name).join("、"), ...(hand ? [`${hand.name}在改代码`] : [])].join(" · "),
     whoLine: `${head.name}${head.runtime ? `（${head.runtime}）` : ""}`,
     historyLine: `${sessions.length} 次：${sessions.map((r) => `${r.name}（${r.id}）`).join(" → ")}`,
     /** 在等你 · 已经 3 分钟 · Claude 师傅 · 第 2 轮 · 用了 4 分钟 · ¥0.42; cny is all the issue's runs when known. */

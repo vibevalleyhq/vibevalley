@@ -40,7 +40,7 @@ export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & 
 // ── an answer issue ──
 
 export const answerOpening =
-  "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
+  "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 const answerExample = {
   conclusion: "看板拖卡还在调旧的 start 接口，所以挪到已完成时没反应。",
@@ -171,7 +171,7 @@ export function refinementDescription(d: IssueRefinement): string {
 }
 
 export const refinementOpening =
-  "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；农场规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
+  "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
 export function refinementBrief(

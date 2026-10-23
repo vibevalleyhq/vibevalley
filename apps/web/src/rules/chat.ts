@@ -279,7 +279,7 @@ export const menuMax = 6;
 export const nameables = (sessions: Session[], now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
   { token: mentionOf[orchestratorAgent]!, name: "管家", note: "派活、拆计划、问进度" },
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: "所有人", note: "叫醒地里每个帮工" }] : []),
+  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: "所有人", note: "叫醒在场的每个帮工" }] : []),
 ];
 
 const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;

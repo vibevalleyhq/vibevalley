@@ -287,7 +287,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
             <Show when={props.draft.kind === "nowledge"}>
               <Toggle
                 label="读全部"
-                hint="不只读农场替帮工记的，主人在里面的记忆每个帮工都读得到"
+                hint="不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到"
                 checked={props.draft.everything}
                 onChange={(everything) => props.set({ everything })}
               />

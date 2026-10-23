@@ -207,7 +207,7 @@ export const make = (options: LanOptions = {}) =>
       const done = new AbortController();
       res.on("close", () => done.abort());
       const go = async () => {
-        if (!upstream) return refuseHttp(res, 503, "农场还没起来");
+        if (!upstream) return refuseHttp(res, 503, "VibeValley 还没起来");
         if (req.method === "POST" && path === "/api/v1/lan/pair") return forward(req, res, "", done.signal);
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return forward(req, res, "", done.signal);
@@ -216,7 +216,7 @@ export const make = (options: LanOptions = {}) =>
         }
         const d = deviceOf(req);
         if (!d) return refuseHttp(res, 401, "这台设备没配对，或者已经被主人移除了：回那台电脑上扫码配对");
-        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, "连进来的设备不能做这个：只能在农场那台电脑上做");
+        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, "连进来的设备不能做这个：只能在跑着 VibeValley 的那台电脑上做");
         const mine = conns.get(d) ?? new Set();
         conns.set(d, mine);
         mine.add(done);
@@ -364,7 +364,7 @@ export const make = (options: LanOptions = {}) =>
         }),
       me: (device) => {
         const d = device ? devices.get(device) : undefined;
-        if (!d) return Effect.fail(refuse("这里就是农场本机，不是连进来的设备"));
+        if (!d) return Effect.fail(refuse("这里就是跑着 VibeValley 的本机，不是连进来的设备"));
         const { keyHash: _, written: __, ...shown } = d;
         return Effect.succeed(shown);
       },

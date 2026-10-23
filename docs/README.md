@@ -60,8 +60,9 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 叫法 | 代码里 | 意思 | 不用 |
 |---|---|---|---|
 | 管家 | orchestrator | 你直接说话的 agent，替你派活 | 工头、主 agent |
-| 帮工 | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 在一块地上干活的：一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，地不换 | 工人、子 agent、worker |
-| 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己；农场里是一季庄稼 | 一轮、turn |
+| 帮工 | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 一个档案为一张工单接的活，跨好几次干活；重开的工单换一个帮工，工单不换 | 工人、子 agent、worker |
+| 在场 | `presentSessions`（核心状态里的 `sessions`） | 现在还在的帮工：在干活或歇着，没走 | 地里 |
+| 一次干活 | run | 一次触发到一次汇报：派出去、带话、计划、定时、农机自己 | 一轮、turn |
 | 帮工档案 | agent（`Agent`） | 一份配置：农机、模型、人设、技能、哪种小动物 | 角色、profile |
 | 农机 | runtime | 机器上的一种编码 agent 程序（pi、claude、codex……） | harness、引擎 |
 | 工单 | issue（`Issue`） | 一件活，从写下到关上一个 id；每派一次是一个帮工 | job、ticket |
@@ -70,7 +71,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 空位 | `project.max_sessions`、农场的上限 | 一个项目（和整个农场）同时能在做的工单数；满了的待办排队，有空位自动开工 | 并发位、空地 |
 | 工单模板 | issue template（`IssueTemplate`、`project.templates`） | 写工单的现成模板：一个标题和一行完成线，按项目的栈填好命令；代码里的 seed 只指种子数据（`seeds.json`） | seed |
 | 阶段 | phase（`Session.phase`） | 帮工到哪了：刚派出去、在干活、交回来了、没做成、歇着、走了 | 状态 |
-| 核心状态 | `WorkspaceState` | 农场上的一切，只有服务端持有 | |
+| 核心状态 | `WorkspaceState` | 工作区里的一切，只有服务端持有 | |
+| VibeValley | 服务端、整个系统 | 说系统做了什么时的叫法（「VibeValley 会建好」「VibeValley 重启了」）；农场是它的一张皮，不是它的名字 | 农场（指系统时） |
 | 事实 | fact | 改核心状态的一件事 | patch |
 | 改动 | `Changes`（`issue.changes`） | 工单分支上的提交、改的文件和 diff，合进去会不会冲突 | 差异、PR 详情、收成清单 |
 | 完成 | 动作 `complete`；工单挪到 `done`（已完成） | 主人点头，工单关成已完成；交付了什么另记（`delivered`）：合进了主分支（`github.pr_projects` 里的项目是推分支、开 PR，PR 合了才关）、分支留着没合、没有改动要合 | 收获；合并只是交付的一种 |
@@ -94,7 +96,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 定时 | recurrence（`Recurrence`） | 一张工单的一种触发：到点开它的一次干活，派给帮工或管家 | cron |
 | 来电 | inbox | 要你处理的事 | 通知 |
 | 巡查 | patrol | 定时看 Inbox，放久了叫醒管家 | |
-| 连接到本机 | lan | 让局域网里的设备用这个农场的监听，默认关 | 远程模式 |
+| 连接到本机 | lan | 让局域网里的设备用这台电脑上的 VibeValley 的监听，默认关 | 远程模式 |
 
 ### 农场的皮
 
@@ -114,3 +116,5 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 仓库 | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
 | 种植计划、图纸桌 | 计划 | `TaskGraph` |
 | 一季庄稼 | 一次干活 | `Run` |
+| 地里 | 在场的帮工 | `presentSessions` |
+| 农场 | 这张皮本身（`/` 的像素农场）；说系统时是 VibeValley | |

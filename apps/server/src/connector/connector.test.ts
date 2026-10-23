@@ -457,7 +457,7 @@ describe("the chat apps", () => {
         yield* chat.orchestratorSays(thread, "old-thread-answer", "在旧串里继续答复", true, "");
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
-        expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在农场的田头上说的。"]);
+        expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在田头上说的。"]);
       }).pipe(Effect.scoped, Effect.provide(farm(second, config)));
     }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
   });

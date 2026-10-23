@@ -91,7 +91,7 @@ export function situationDelta(before: string, now: string): string {
   const changes = [...is.filter((l) => !has(was, l)).map((l) => ({ ...l, mark: "+ " })), ...was.filter((l) => !has(is, l)).map((l) => ({ ...l, mark: "− " }))];
   if (changes.length === 0) return "";
   if (changes.length * 2 > is.length) return now;
-  const out = ["【农场变了】"];
+  const out = ["【现状变了】"];
   let at = "";
   for (const c of changes) {
     if (c.head === "") at = c.line;

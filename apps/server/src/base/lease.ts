@@ -36,9 +36,9 @@ export function leaseHome(home: string): () => void {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
       const pid = Number(readFileSync(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken(`农场目录 ${home} 正被另一个服务端使用；请连接现有农场，或先停掉它`);
+      if (Number.isInteger(pid) && pid > 0 && alive(pid)) throw new HomeTaken(`家目录 ${home} 正被另一个服务端使用；请连接现有的服务端，或先停掉它`);
       unlinkSync(path);
     }
   }
-  throw new HomeTaken(`锁不住农场目录 ${home}`);
+  throw new HomeTaken(`锁不住家目录 ${home}`);
 }

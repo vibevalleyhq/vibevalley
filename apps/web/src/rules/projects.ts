@@ -354,7 +354,7 @@ export function spotText(spot: Spot, now: number) {
     case "open":
       return "空位：派一件活来，马上开工";
     case "shut":
-      return `农场的 ${maxRunning} 块地都有人在干活，等有人干完`;
+      return `已经有 ${maxRunning} 张工单在做，等有工单做完`;
   }
 }
 

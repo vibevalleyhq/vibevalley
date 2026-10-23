@@ -199,7 +199,7 @@ async function runtimeChat(raw: string[]) {
     ...(values.resume ? { resume: values.resume } : {}),
   });
   try {
-    console.log(dim(`${id} · ${session.id}${values.resume ? "（接着）" : ""}\n直接聊：不经过农场，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。`));
+    console.log(dim(`${id} · ${session.id}${values.resume ? "（接着）" : ""}\n直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。`));
     session.events(
       (e) => {
         const line = render(e);
@@ -405,12 +405,12 @@ function usage(only?: string) {
     console.log(`用法：
   vibevalley                                 和 VibeValley 自己的 agent 聊（runtime chat vibevalley）
   vibevalley runtime chat <runtime> [--model --effort --resume --cwd -p]
-                                             和一个农机直接聊，不经过农场
+                                             和一个农机直接聊，不经过 VibeValley
   vibevalley issue run <id>                  备选的挪到待办，等它交回来，打出改动
   vibevalley state [--watch]                 核心状态（GET ${statePath}）
   vibevalley events                          副作用（GET ${eventsPath}）
   vibevalley <group> <op> [参数…] [--json 请求体|-]
-                                             调农场的一个接口，答复是 JSON
+                                             调 VibeValley 的一个接口，答复是 JSON
 
   --server 地址，或 VIBEVALLEY_SERVER，默认 ${defaultServer}。能力表：docs/reference/capabilities.md
 `);

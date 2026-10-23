@@ -24,13 +24,13 @@ const connectorHow: Record<ConnectorID, string> = { weixin: "扫码登录，私�
 
 const connectorNotes: Record<ConnectorID, string[]> = {
   weixin: [
-    "只认扫码的那个微信：别人给这个机器人发的话进不了农场。",
+    "只认扫码的那个微信：别人给这个机器人发的话进不来。",
     "帮工干完活，汇报马上发到微信上，不用等你先说话。微信偶尔不收时，汇报先攒着，隔一会儿再试（越隔越久，最多半小时），你下次说一句也会一起发过来（多了合成一条）。",
     "用的是腾讯官方给机器人用的接口（和 OpenClaw 的微信插件一样）。",
   ],
   feishu: [
     "扫码后，飞书会替你建一个只属于你的机器人应用，不用去开放平台手动配。",
-    "建好后在飞书里找到这个机器人，私聊它发配对码：发了码的人就是主人，只有主人的话进农场。只收私聊，群里的不收。",
+    "建好后在飞书里找到这个机器人，私聊它发配对码：发了码的人就是主人，只有主人的话进得来。只收私聊，群里的不收。",
     "飞书的机器人可以随时给你发消息，汇报不用等你先说话。",
   ],
   qq: [
@@ -40,7 +40,7 @@ const connectorNotes: Record<ConnectorID, string[]> = {
   ],
 };
 
-const connectorsAlways = "帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。农场只往外连，不开端口。";
+const connectorsAlways = "帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。VibeValley 只往外连，不开端口。";
 
 export const stateLabel: Record<ConnectorState, string> = {
   off: "没连接",
@@ -81,7 +81,7 @@ export function ConnectorsPage(props: { id?: string }) {
     <Split
       list={
         <ListCard title="连接器" label="连接器列表">
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">在聊天软件里和农场说话：派活、问进度、收汇报。</li>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">在聊天软件里和管家说话：派活、问进度、收汇报。</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
@@ -193,7 +193,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
               {props.status.pairCode ?? ""}
             </span>
           </div>
-          <p class="text-xs text-muted">发了这个码的人就是主人：以后只有这个人的话进农场。码只能用一次。</p>
+          <p class="text-xs text-muted">发了这个码的人就是主人：以后只有这个人的话进得来。码只能用一次。</p>
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
@@ -269,7 +269,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
       <Field label="AppID">
         <TextInput aria-label="AppID" class="font-mono" placeholder="102xxxxxx" value={appId()} onInput={(e) => setAppId(e.currentTarget.value)} />
       </Field>
-      <Field label="AppSecret" hint="只存在这台电脑的农场数据库里，不会再显示。">
+      <Field label="AppSecret" hint="只存在这台电脑的数据库里，不会再显示。">
         <SecretInput aria-label="AppSecret" placeholder="机器人密钥" value={secret()} onInput={(e) => setSecret(e.currentTarget.value)} />
       </Field>
       <div>

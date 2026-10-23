@@ -20,7 +20,7 @@ test("the general shows with its empty words, the orchestrator resting", async (
   await expect(page.getByRole("heading", { name: generalName })).toBeVisible();
   const side = page.getByRole("complementary", { name: "频道和帮工" });
   await expect(side.getByRole("button", { name: generalName })).toHaveAttribute("aria-current", "page");
-  await expect(side.getByText("还没有帮工在地里")).toBeVisible();
+  await expect(side.getByText("还没有在场的帮工")).toBeVisible();
   await expect(side.getByText("在歇着")).toBeVisible();
   await expect(page.getByRole("tab", { name: "聊天" })).toHaveAttribute("aria-selected", "true");
 });
