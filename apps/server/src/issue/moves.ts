@@ -2,8 +2,9 @@
 // the server's refusals all go by. Worked out with the issue's status and attention in reduce (withIssueStatuses), so a
 // round that ends changes what the issue may do at once, wherever it is read.
 
-import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
-import { statusLabel } from "@vibevalley/protocol/rules";
+import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
+import type { Next } from "@vibevalley/protocol/api";
+import { actLabel, statusLabel } from "@vibevalley/protocol/rules";
 
 /** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -64,3 +65,25 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
 }
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
+
+/** The acts that need the owner's words (a question's answer, a word to the helper, what failed, what to do again). */
+const wordy: ReadonlySet<IssueAct> = new Set(["answer", "tell", "reject", "reopen"]);
+
+/** What the issue can be asked for now, as next steps after a refusal: each of its acts (attention.acts) and moves, as the
+ * command for it. One that needs the owner's words says which field takes them and has no command to run as it is. */
+export function nextSteps(t: Issue): Next[] {
+  const n = String(t.number);
+  const acts = t.attention.acts.map((act): Next => {
+    const label = actLabel[act];
+    return wordy.has(act)
+      ? { say: `${label}：issue act ${n}，--json 带 act「${act}」和要说的 text` }
+      : { say: label, run: ["issue", "act", n, "--json", JSON.stringify({ act })] };
+  });
+  const moves = statusMoves(t).map((to): Next => {
+    const say = "挪到" + statusLabel[to];
+    return statusMove(t, to)[0] === "round"
+      ? { say: `${say}：issue status ${n}，--json 带 status「${to}」和这一轮要它做什么的 text` }
+      : { say, run: ["issue", "status", n, "--json", JSON.stringify({ status: to })] };
+  });
+  return [...acts, ...moves];
+}

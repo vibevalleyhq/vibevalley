@@ -44,7 +44,7 @@ import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClos
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
 import { attentionIn } from "./attention.ts";
-import { statusMove, statusMoves } from "./moves.ts";
+import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { graphIssues } from "../task/rules.ts";
 import { dueText } from "../recurrence/rules.ts";
 import {
@@ -169,6 +169,9 @@ const json = <T>(text: string | null): T | undefined => {
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
+/** An issue not found: the list says which there are. */
+const issueListNext = [{ say: "列出工单，找它的编号", run: ["issue", "list"] }] as const;
+
 const reopenDefault = "接着把这张工单做完";
 
 /** handedOver: another profile takes it on from last. */
@@ -290,7 +293,7 @@ export const make = (options: IssueOptions = {}) =>
         const number = /^#?(\d+)$/.exec(r)?.[1];
         if (number !== undefined) {
           const row = yield* one(q.issueByNumber({ number: Number(number) }));
-          if (!row) return yield* Effect.fail(missing("工单 #" + number));
+          if (!row) return yield* Effect.fail(missing("工单 #" + number, issueListNext));
           return row.id;
         }
         return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
@@ -301,7 +304,7 @@ export const make = (options: IssueOptions = {}) =>
       Effect.gen(function* () {
         const issue = yield* idOf(ref);
         const row = yield* one(q.getIssue({ id: issue }));
-        if (!row) return yield* Effect.fail(missing("工单 " + ref));
+        if (!row) return yield* Effect.fail(missing("工单 " + ref, issueListNext));
         return issueOf(
           row,
           (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
@@ -907,7 +910,7 @@ export const make = (options: IssueOptions = {}) =>
           const id = t.id;
           const name = actLabel[req.act];
           if (!t.attention.acts.includes(req.act))
-            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`));
+            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`, nextSteps(t)));
           const said = (req.text ?? "").trim();
           const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
           switch (req.act) {
@@ -976,7 +979,7 @@ export const make = (options: IssueOptions = {}) =>
           const said = text.trim();
           switch (m) {
             case "none":
-              return yield* Effect.fail(refused(why));
+              return yield* Effect.fail(refused(why, nextSteps(t)));
             case "start":
               if (taker) yield* shape.edit(id, { assignee: taker.id });
               yield* start(id, channel);
@@ -1065,7 +1068,7 @@ export const make = (options: IssueOptions = {}) =>
               : t.status !== "in_review"
                 ? "还没交回来，没有东西可验收"
                 : "";
-          if (why) return yield* Effect.fail(refused(why));
+          if (why) return yield* Effect.fail(refused(why, nextSteps(t)));
           if (req.pass) {
             yield* judged(
               id,

@@ -75,6 +75,13 @@ describe("the command line", () => {
       const made = JSON.parse((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "派不出去" })])).out) as { id: string };
       const refused = yield* cli(["issue", "status", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
       expect([refused.code, refused.out, refused.failure?.tag]).toEqual([3, "", "Refused"]);
+      // The refusal says what can be done instead, as commands that run as they are.
+      const cancel = refused.failure?.next?.find((n) => n.run?.includes('{"status":"canceled"}'));
+      expect(cancel?.run).toBeDefined();
+      const canceled = yield* cli([...cancel!.run!, "--server", server]);
+      expect([canceled.code, (JSON.parse(canceled.out) as { status: string }).status]).toEqual([0, "canceled"]);
+      const nowhere = yield* cli(["issue", "get", "nope", "--server", server]);
+      expect(nowhere.failure?.next).toEqual([{ say: "列出工单，找它的编号", run: ["issue", "list"] }]);
       const unreachable = yield* cli(["issue", "list", "--server", "http://127.0.0.1:9"]);
       expect([unreachable.code, unreachable.failure?.tag]).toEqual([5, "Unreachable"]);
     }),
