@@ -89,34 +89,31 @@ export const make = (options: DocOptions = {}) =>
     const findDoc = (id: string) => db(Effect.option(qd.doc({ id })));
     const blocksOf = (doc: string) => db(Effect.map(qb.docBlocks({ doc_id: doc }), (rows) => rows.map(blockOf)));
 
-    const get = (id: string) =>
-      Effect.gen(function* () {
-        const d = yield* findDoc(id);
-        if (Option.isNone(d)) return yield* Effect.fail(missingDoc(id));
-        return { doc: document(d.value), blocks: ordered(yield* blocksOf(id)) };
-      });
+    const get = Effect.fn("Docs.get")(function* (id: string) {
+      const d = yield* findDoc(id);
+      if (Option.isNone(d)) return yield* Effect.fail(missingDoc(id));
+      return { doc: document(d.value), blocks: ordered(yield* blocksOf(id)) };
+    });
 
-    const create = (title: string) =>
-      Effect.gen(function* () {
-        const now = Date.now();
-        const id = newId();
-        yield* db(qd.addDoc({ id, title: titleOf(title), created_at: now, updated_at: now }));
-        return yield* get(id);
-      });
+    const create = Effect.fn("Docs.create")(function* (title: string) {
+      const now = Date.now();
+      const id = newId();
+      yield* db(qd.addDoc({ id, title: titleOf(title), created_at: now, updated_at: now }));
+      return yield* get(id);
+    });
 
     /** A batch already taken: its results then, its blocks now. */
-    const again = (doc: string, seen: qc.DocChangeByBatchResult) =>
-      Effect.gen(function* () {
-        if (seen.doc_id !== doc) return yield* Effect.fail(refused("这批改动（" + seen.batch_id + "）是另一篇文档的"));
-        const ids = JSON.parse(seen.block_ids) as string[];
-        const all = yield* blocksOf(doc);
-        return {
-          batchId: seen.batch_id,
-          seq: seen.seq,
-          results: JSON.parse(seen.results) as DocOpResult[],
-          blocks: ids.flatMap((id) => all.filter((b) => b.id === id)),
-        };
-      });
+    const again = Effect.fn("Docs.again")(function* (doc: string, seen: qc.DocChangeByBatchResult) {
+      if (seen.doc_id !== doc) return yield* Effect.fail(refused("这批改动（" + seen.batch_id + "）是另一篇文档的"));
+      const ids = JSON.parse(seen.block_ids) as string[];
+      const all = yield* blocksOf(doc);
+      return {
+        batchId: seen.batch_id,
+        seq: seen.seq,
+        results: JSON.parse(seen.results) as DocOpResult[],
+        blocks: ids.flatMap((id) => all.filter((b) => b.id === id)),
+      };
+    });
 
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<DocSubmit, "batchId" | "ops">): Effect.Effect<DocAck, ApiError> => {
@@ -198,47 +195,40 @@ export const make = (options: DocOptions = {}) =>
 
     const one = (ack: DocAck, id: string): [Block | undefined, DocOpResult | undefined] => [blockIn(ack, id), ack.results[0]];
 
-    const append = (doc: string, actor: string, type: string, attrs: BlockAttrs, text: string) =>
-      lock.withPermits(1)(
-        Effect.gen(function* () {
-          const last = new Page(doc, actor, 0, yield* blocksOf(doc)).children("").at(-1)?.orderKey ?? "";
-          const b: BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
-          return one(yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
-        }),
-      );
+    const append = Effect.fn("Docs.append")(function* (doc: string, actor: string, type: string, attrs: BlockAttrs, text: string) {
+      const last = new Page(doc, actor, 0, yield* blocksOf(doc)).children("").at(-1)?.orderKey ?? "";
+      const b: BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
+      return one(yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
+    }, lock.withPermits(1));
 
-    const updateText = (doc: string, actor: string, block: string, baseRev: number, text: string) =>
-      lock.withPermits(1)(
-        Effect.gen(function* () {
-          const type = (yield* blocksOf(doc)).find((b) => b.id === block)?.type ?? "paragraph";
-          return one(
-            yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }] }),
-            block,
-          );
-        }),
+    const updateText = Effect.fn("Docs.updateText")(function* (doc: string, actor: string, block: string, baseRev: number, text: string) {
+      const type = (yield* blocksOf(doc)).find((b) => b.id === block)?.type ?? "paragraph";
+      return one(
+        yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }] }),
+        block,
       );
+    }, lock.withPermits(1));
 
-    const importMarkdown = (title: string, markdown: string, actor: string) =>
-      Effect.gen(function* () {
-        const created = yield* create(title);
-        const parents: string[] = [];
-        const last = new Map<string, string>();
-        const ops = [];
-        for (const b of blocksOfMarkdown(markdown)) {
-          parents.length = b.depth;
-          const parent = b.depth > 0 ? parents[b.depth - 1]! : "";
-          const key = yield* keyOrRefuse(last.get(parent) ?? "", "");
-          last.set(parent, key);
-          const id = newId();
-          parents.push(id);
-          ops.push({
-            op: "insert_block" as const,
-            block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
-          });
-        }
-        if (ops.length > 0) yield* submit(created.doc.id, actor, { batchId: newId(), ops });
-        return yield* get(created.doc.id);
-      });
+    const importMarkdown = Effect.fn("Docs.importMarkdown")(function* (title: string, markdown: string, actor: string) {
+      const created = yield* create(title);
+      const parents: string[] = [];
+      const last = new Map<string, string>();
+      const ops = [];
+      for (const b of blocksOfMarkdown(markdown)) {
+        parents.length = b.depth;
+        const parent = b.depth > 0 ? parents[b.depth - 1]! : "";
+        const key = yield* keyOrRefuse(last.get(parent) ?? "", "");
+        last.set(parent, key);
+        const id = newId();
+        parents.push(id);
+        ops.push({
+          op: "insert_block" as const,
+          block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
+        });
+      }
+      if (ops.length > 0) yield* submit(created.doc.id, actor, { batchId: newId(), ops });
+      return yield* get(created.doc.id);
+    });
 
     // ── the demo ──
 
@@ -247,45 +237,46 @@ export const make = (options: DocOptions = {}) =>
     const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * tick);
 
     /** Inserts b at the end of the top level, or at the end of a section; the key is picked under the batch lock, so two writers cannot pick the same place. */
-    const demoInsert = (doc: string, writer: string, b: Omit<BlockInput, "orderKey">, at?: { headings: string[]; section: number }) =>
-      lock.withPermits(1)(
-        Effect.gen(function* () {
-          // Tombstones too: their keys still hold their places.
-          const top = new Page(doc, writer, 0, yield* blocksOf(doc)).children("");
-          let after = top.at(-1)?.orderKey ?? "";
-          let before = "";
-          if (at && at.section + 1 < at.headings.length) {
-            const i = top.findIndex((x) => x.id === at.headings[at.section + 1]);
-            if (i >= 0) {
-              before = top[i]!.orderKey;
-              after = i > 0 ? top[i - 1]!.orderKey : "";
-            }
-          }
-          const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
-          const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
-          const r = ack.results[0];
-          if (r?.status !== "applied") return yield* Effect.fail(refused("演示的块没插进去：" + r?.status));
-          return blockIn(ack, b.id)!.rev;
-        }),
-      );
+    const demoInsert = Effect.fn("Docs.demoInsert")(function* (
+      doc: string,
+      writer: string,
+      b: Omit<BlockInput, "orderKey">,
+      at?: { headings: string[]; section: number },
+    ) {
+      // Tombstones too: their keys still hold their places.
+      const top = new Page(doc, writer, 0, yield* blocksOf(doc)).children("");
+      let after = top.at(-1)?.orderKey ?? "";
+      let before = "";
+      if (at && at.section + 1 < at.headings.length) {
+        const i = top.findIndex((x) => x.id === at.headings[at.section + 1]);
+        if (i >= 0) {
+          before = top[i]!.orderKey;
+          after = i > 0 ? top[i - 1]!.orderKey : "";
+        }
+      }
+      const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
+      const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
+      const r = ack.results[0];
+      if (r?.status !== "applied") return yield* Effect.fail(refused("演示的块没插进去：" + r?.status));
+      return blockIn(ack, b.id)!.rev;
+    }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
-    const demoWrite = (doc: string, writer: string, headings: string[], section: number) =>
-      Effect.gen(function* () {
-        for (const text of demoScript[section]!.paragraphs) {
-          const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
-          let rev = yield* demoInsert(doc, writer, b, { headings, section });
-          const chars = Array.from(text);
-          for (let n = 1; n <= demoPieces; n++) {
-            yield* wait(1);
-            const [, r] = yield* updateText(doc, writer, b.id, rev, chars.slice(0, Math.floor((chars.length * n) / demoPieces)).join(""));
-            // The owner wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
-            if (r?.status !== "applied") break;
-            rev = r.rev ?? rev;
-          }
-          yield* wait(0.8);
+    const demoWrite = Effect.fn("Docs.demoWrite")(function* (doc: string, writer: string, headings: string[], section: number) {
+      for (const text of demoScript[section]!.paragraphs) {
+        const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
+        let rev = yield* demoInsert(doc, writer, b, { headings, section });
+        const chars = Array.from(text);
+        for (let n = 1; n <= demoPieces; n++) {
+          yield* wait(1);
+          const [, r] = yield* updateText(doc, writer, b.id, rev, chars.slice(0, Math.floor((chars.length * n) / demoPieces)).join(""));
+          // The owner wrote in it (or removed it): the block is theirs now, the writer goes on to its next paragraph.
+          if (r?.status !== "applied") break;
+          rev = r.rev ?? rev;
         }
-      });
+        yield* wait(0.8);
+      }
+    });
 
     const runDemo = (doc: string, writers: string[]) =>
       Effect.gen(function* () {
@@ -299,19 +290,18 @@ export const make = (options: DocOptions = {}) =>
         yield* Effect.forEach(writers, (w, i) => Effect.andThen(wait(i / 3), demoWrite(doc, w, headings, i)), { concurrency: "unbounded", discard: true });
       }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false))));
 
-    const demo = (id: string, helpers: readonly Agent[]) =>
-      Effect.gen(function* () {
-        if (Option.isNone(yield* findDoc(id))) return yield* Effect.fail(missingDoc(id));
-        const writers = helpers
-          .filter((a) => a.enabled)
-          .slice(0, demoScript.length)
-          .map((a) => a.id);
-        if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]));
-        if (demoOn) return yield* Effect.fail(refused("演示正在写，写完再点"));
-        demoOn = true;
-        // The demo lives as long as the service: stopping the farm stops it.
-        yield* Effect.forkIn(runDemo(id, writers), scope);
-      });
+    const demo = Effect.fn("Docs.demo")(function* (id: string, helpers: readonly Agent[]) {
+      if (Option.isNone(yield* findDoc(id))) return yield* Effect.fail(missingDoc(id));
+      const writers = helpers
+        .filter((a) => a.enabled)
+        .slice(0, demoScript.length)
+        .map((a) => a.id);
+      if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]));
+      if (demoOn) return yield* Effect.fail(refused("演示正在写，写完再点"));
+      demoOn = true;
+      // The demo lives as long as the service: stopping the farm stops it.
+      yield* Effect.forkIn(runDemo(id, writers), scope);
+    });
 
     const shape: DocShape & { readonly demoRunning: () => boolean } = {
       demoRunning: () => demoOn,

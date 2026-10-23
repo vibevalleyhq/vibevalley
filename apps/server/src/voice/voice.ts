@@ -546,116 +546,111 @@ export const make = (options: VoiceOptions = {}) =>
       ),
     );
 
-    const heard = (agentId: string, text: string, picked: string, sendKey: string) =>
-      Effect.gen(function* () {
-        const call = yield* callOf(agentId);
-        // Both transcript directions use the answer mode captured by this call, never the current settings.
-        if (!call.quick) return;
-        yield* orchestrator.heard(text, picked, sendKey);
-      });
+    const heard = Effect.fn("Voice.heard")(function* (agentId: string, text: string, picked: string, sendKey: string) {
+      const call = yield* callOf(agentId);
+      // Both transcript directions use the answer mode captured by this call, never the current settings.
+      if (!call.quick) return;
+      yield* orchestrator.heard(text, picked, sendKey);
+    });
 
     return Voice.of({
-      session: () =>
-        Effect.gen(function* () {
-          const c = yield* creds();
-          const channel = newChannel();
-          const uid = newUid();
-          const issued = yield* Effect.try({ try: () => sign(c, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
-          if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
-          prune();
-          grants.set(keyOf(channel, uid), { credentials: c, expires: now() + tokenSeconds * 1000, starting: false, agent: "" });
-          return issued;
-        }),
-      renew: (channel, uid) =>
-        Effect.gen(function* () {
-          prune();
-          const g = grants.get(keyOf(channel, uid));
-          if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
-          const issued = yield* Effect.try({ try: () => sign(g.credentials, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
-          g.expires = now() + tokenSeconds * 1000;
-          return issued;
-        }),
-      start: (channel, uid, about) =>
-        Effect.gen(function* () {
-          prune();
-          const key = keyOf(channel, uid);
-          const g = grants.get(key);
-          if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
-          if (g.starting || g.agent) return yield* Effect.fail(unavailable("这通电话已经在接通"));
-          g.starting = true;
-          let release = () => {};
-          const started = Effect.gen(function* () {
-            const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
-            let callLine: CallLine | undefined;
-            if (voice.answer.vendor === "orchestrator") {
-              callLine = yield* Effect.tryPromise({ try: openLine, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
-              const opened = callLine;
-              let once = false;
-              release = () => {
-                if (once) return;
-                once = true;
-                closeLine(opened.id);
-              };
-            }
-            // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
-            const forCall = about ? { ...voice, greeting: "" } : voice;
-            const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
-            if ("_tag" in vendors) return yield* Effect.fail(vendors);
-            const client = clientOf(g.credentials, voice.area, options.fetch);
-            const session = agentFor(client, forCall, vendors).createSession({
-              channel,
-              agentUid: voiceAgentUid,
-              remoteUids: [uid],
-              idleTimeout: voice.idleSeconds,
-              expiresIn: tokenSeconds,
-            });
-            const id = yield* Effect.tryPromise({ try: () => session.start(), catch: (e) => failed("请管家进频道失败：" + message(e)) });
-            if (stopped || grants.get(key) !== g) {
-              yield* Effect.promise(() => client.stopAgent(id).catch(() => undefined));
-              return yield* Effect.fail(unavailable("语音服务已经停下"));
-            }
-            g.agent = id;
-            g.starting = false;
-            calls.set(id, {
-              grant: key,
-              client,
-              session,
-              release,
-              quick: callLine === undefined,
-              greeting: forCall.greeting.trim(),
-              ending: false,
-            });
-            if (about) tell([], about);
-            return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
+      session: Effect.fn("Voice.session")(function* () {
+        const c = yield* creds();
+        const channel = newChannel();
+        const uid = newUid();
+        const issued = yield* Effect.try({ try: () => sign(c, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+        if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
+        prune();
+        grants.set(keyOf(channel, uid), { credentials: c, expires: now() + tokenSeconds * 1000, starting: false, agent: "" });
+        return issued;
+      }),
+      renew: Effect.fn("Voice.renew")(function* (channel, uid) {
+        prune();
+        const g = grants.get(keyOf(channel, uid));
+        if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
+        const issued = yield* Effect.try({ try: () => sign(g.credentials, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+        g.expires = now() + tokenSeconds * 1000;
+        return issued;
+      }),
+      start: Effect.fn("Voice.start")(function* (channel, uid, about) {
+        prune();
+        const key = keyOf(channel, uid);
+        const g = grants.get(key);
+        if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
+        if (g.starting || g.agent) return yield* Effect.fail(unavailable("这通电话已经在接通"));
+        g.starting = true;
+        let release = () => {};
+        const started = Effect.gen(function* () {
+          const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
+          let callLine: CallLine | undefined;
+          if (voice.answer.vendor === "orchestrator") {
+            callLine = yield* Effect.tryPromise({ try: openLine, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
+            const opened = callLine;
+            let once = false;
+            release = () => {
+              if (once) return;
+              once = true;
+              closeLine(opened.id);
+            };
+          }
+          // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
+          const forCall = about ? { ...voice, greeting: "" } : voice;
+          const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
+          if ("_tag" in vendors) return yield* Effect.fail(vendors);
+          const client = clientOf(g.credentials, voice.area, options.fetch);
+          const session = agentFor(client, forCall, vendors).createSession({
+            channel,
+            agentUid: voiceAgentUid,
+            remoteUids: [uid],
+            idleTimeout: voice.idleSeconds,
+            expiresIn: tokenSeconds,
           });
-          const agent = yield* Effect.tapError(started, () =>
-            Effect.sync(() => {
-              release();
-              if (grants.get(key) === g) grants.delete(key);
-            }),
-          );
-          yield* core.did({ kind: "talked" });
-          return agent;
-        }),
+          const id = yield* Effect.tryPromise({ try: () => session.start(), catch: (e) => failed("请管家进频道失败：" + message(e)) });
+          if (stopped || grants.get(key) !== g) {
+            yield* Effect.promise(() => client.stopAgent(id).catch(() => undefined));
+            return yield* Effect.fail(unavailable("语音服务已经停下"));
+          }
+          g.agent = id;
+          g.starting = false;
+          calls.set(id, {
+            grant: key,
+            client,
+            session,
+            release,
+            quick: callLine === undefined,
+            greeting: forCall.greeting.trim(),
+            ending: false,
+          });
+          if (about) tell([], about);
+          return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
+        });
+        const agent = yield* Effect.tapError(started, () =>
+          Effect.sync(() => {
+            release();
+            if (grants.get(key) === g) grants.delete(key);
+          }),
+        );
+        yield* core.did({ kind: "talked" });
+        return agent;
+      }),
       // A call keeps the client it started with, even when settings change before hangup.
-      stop: (agentId) =>
-        Effect.gen(function* () {
-          const call = calls.get(agentId);
-          let client: AgoraClient;
-          if (call) {
-            grants.delete(call.grant);
-            call.ending = true;
-            client = call.client;
-          } else client = clientOf(yield* creds(), settings.voice().area, options.fetch);
-          const stopping = Effect.tryPromise({ try: () => client.stopAgent(agentId), catch: (e) => e }).pipe(
-            Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))),
-          );
-          yield* Effect.ensuring(
-            stopping,
-            Effect.sync(() => call?.release()),
-          );
-          calls.delete(agentId);
-        }),
+      stop: Effect.fn("Voice.stop")(function* (agentId) {
+        const call = calls.get(agentId);
+        let client: AgoraClient;
+        if (call) {
+          grants.delete(call.grant);
+          call.ending = true;
+          client = call.client;
+        } else client = clientOf(yield* creds(), settings.voice().area, options.fetch);
+        const stopping = Effect.tryPromise({ try: () => client.stopAgent(agentId), catch: (e) => e }).pipe(
+          Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))),
+        );
+        yield* Effect.ensuring(
+          stopping,
+          Effect.sync(() => call?.release()),
+        );
+        calls.delete(agentId);
+      }),
       heard,
       heardCurrent: (text, picked, sendKey) =>
         Effect.suspend(() => {
@@ -665,52 +660,49 @@ export const make = (options: VoiceOptions = {}) =>
           return heard(live[0]![0], text, picked, sendKey);
         }),
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
-      said: (agentId, text) =>
-        Effect.gen(function* () {
-          const call = yield* callOf(agentId);
-          if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(orchestratorAgent, text, ""));
-        }),
-      dictate: (audio64, given) =>
-        Effect.gen(function* () {
-          const d = settings.dictation();
-          if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
-          const format = given.trim().replace(/^\./, "").toLowerCase();
-          const kind = dictateFormats[format];
-          if (!kind) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
-          const audio = Buffer.from(audio64, "base64");
-          if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
-            return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音是空的，或者不是 base64" });
-          if (audio.length > dictateMaxBytes) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音太长了：一段不超过 25 MB" });
-          const form = new FormData();
-          form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
-          form.append("model", d.model);
-          form.append("response_format", "json");
-          // A local model's first request loads it, which takes a while.
-          const res = yield* Effect.tryPromise({
-            try: () =>
-              fetch(d.url + "/audio/transcriptions", {
-                method: "POST",
-                body: form,
-                headers: d.key ? { authorization: "Bearer " + d.key } : {},
-                signal: AbortSignal.timeout(120_000),
-              }),
-            catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
-          });
-          const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
-            0,
-            1 << 20,
-          );
-          let got: { text?: string; error?: { message?: string } } | undefined;
-          try {
-            got = JSON.parse(raw) as typeof got;
-          } catch {
-            got = undefined;
-          }
-          if (!res.ok)
-            return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(got?.error?.message || raw.trim())].slice(0, 200).join("")}`));
-          if (!got) return yield* Effect.fail(unavailable("听写的地址回的不是 OpenAI 的转写格式"));
-          return { text: (got.text ?? "").trim() };
-        }),
+      said: Effect.fn("Voice.said")(function* (agentId, text) {
+        const call = yield* callOf(agentId);
+        if (call.quick && text.trim() !== call.greeting) yield* Effect.ignore(chat.spoken(orchestratorAgent, text, ""));
+      }),
+      dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
+        const d = settings.dictation();
+        if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
+        const format = given.trim().replace(/^\./, "").toLowerCase();
+        const kind = dictateFormats[format];
+        if (!kind) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
+        const audio = Buffer.from(audio64, "base64");
+        if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
+          return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音是空的，或者不是 base64" });
+        if (audio.length > dictateMaxBytes) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音太长了：一段不超过 25 MB" });
+        const form = new FormData();
+        form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
+        form.append("model", d.model);
+        form.append("response_format", "json");
+        // A local model's first request loads it, which takes a while.
+        const res = yield* Effect.tryPromise({
+          try: () =>
+            fetch(d.url + "/audio/transcriptions", {
+              method: "POST",
+              body: form,
+              headers: d.key ? { authorization: "Bearer " + d.key } : {},
+              signal: AbortSignal.timeout(120_000),
+            }),
+          catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
+        });
+        const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
+          0,
+          1 << 20,
+        );
+        let got: { text?: string; error?: { message?: string } } | undefined;
+        try {
+          got = JSON.parse(raw) as typeof got;
+        } catch {
+          got = undefined;
+        }
+        if (!res.ok) return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(got?.error?.message || raw.trim())].slice(0, 200).join("")}`));
+        if (!got) return yield* Effect.fail(unavailable("听写的地址回的不是 OpenAI 的转写格式"));
+        return { text: (got.text ?? "").trim() };
+      }),
       lines: () => keys.size,
       speak: (text) =>
         Effect.promise(async () => {

@@ -751,19 +751,18 @@ export const make = (options: SessionOptionsIn = {}) =>
         return { session: Object.assign(allocation, { agent: spawned.agent, detached: false }) };
       });
 
-    const leave = (h: Hand, closed: SessionClose, merged: number) =>
-      Effect.gen(function* () {
-        release(h);
-        trajectories.finish(h.id);
-        yield* ended(h.id, closed);
-        closedLaunch(h);
-        revokeToken(h.id);
-        hands.delete(h.id);
-        const session = core.session(h.id);
-        if (session) yield* memories.endSession({ agent: session.agent, session: h.id, project: h.place.project });
-        apply({ type: "left", id: h.id, closed, ...(merged > 0 ? { merged } : {}) });
-        save();
-      });
+    const leave = Effect.fn("Sessions.leave")(function* (h: Hand, closed: SessionClose, merged: number) {
+      release(h);
+      trajectories.finish(h.id);
+      yield* ended(h.id, closed);
+      closedLaunch(h);
+      revokeToken(h.id);
+      hands.delete(h.id);
+      const session = core.session(h.id);
+      if (session) yield* memories.endSession({ agent: session.agent, session: h.id, project: h.place.project });
+      apply({ type: "left", id: h.id, closed, ...(merged > 0 ? { merged } : {}) });
+      save();
+    });
 
     const closeOar = (h: Hand) => {
       const allocation = allocations.get(h.id);
@@ -771,17 +770,16 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
 
     /** Lets the oar session go, keeping its id to resume. */
-    const rest = (h: Hand) =>
-      Effect.gen(function* () {
-        const s = h.sess;
-        yield* closeOar(h);
-        if (!s) return;
-        if (s.agent.session.id) h.oarSessionId = s.agent.session.id;
-        release(h);
-        h.sess = undefined;
-        closedLaunch(h);
-        save();
-      });
+    const rest = Effect.fn("Sessions.rest")(function* (h: Hand) {
+      const s = h.sess;
+      yield* closeOar(h);
+      if (!s) return;
+      if (s.agent.session.id) h.oarSessionId = s.agent.session.id;
+      release(h);
+      h.sess = undefined;
+      closedLaunch(h);
+      save();
+    });
 
     const capacity = (): Session[] => {
       const visible = core.state().sessions;
@@ -807,148 +805,141 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const roomFor = (runtime: string, project: string) => noRoom(capacity(), runtime, project.trim(), limits(runtime));
 
-    const remind = (agent: string, session: string, project: string, input: string, recalled: Set<string>) =>
-      Effect.gen(function* () {
-        const found = yield* memories.recall({ agent, session, project, text: input, skip: new Set(recalled) });
-        for (const id of found.ids) recalled.add(id);
-        if (found.ids.length > 0) save();
-        return recallBlock(found.lines);
-      });
+    const remind = Effect.fn("Sessions.remind")(function* (agent: string, session: string, project: string, input: string, recalled: Set<string>) {
+      const found = yield* memories.recall({ agent, session, project, text: input, skip: new Set(recalled) });
+      for (const id of found.ids) recalled.add(id);
+      if (found.ids.length > 0) save();
+      return recallBlock(found.lines);
+    });
 
-    const wake = (h: Hand, session: Session, input: string, recall: string) =>
-      Effect.gen(function* () {
-        const agent = store.agent(session.agent);
-        if (!agent) return { kind: "refused", reason: session.name + " 的 agent 已经删掉了，叫不醒" } as Delivered;
-        const stopped = yield* Effect.result(rest(h));
-        if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) } as Delivered;
-        const resume = h.oarSessionId;
-        let opened = yield* open(agent, session, h.place, withRecall(recall, input), resume);
-        if (!opened.session && !opened.retained && resume) {
-          h.recalled.clear();
-          const again = yield* remind(session.agent, h.id, h.place.project, input, h.recalled);
-          opened = yield* open(
-            agent,
-            session,
-            h.place,
-            withRecall(again, "（VibeValley 重启过，之前的会话接不上了。你在这个分支上做过的事看 git log。）\n\n" + input),
-            "",
-          );
-        }
-        if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` } as Delivered;
-        attach(h, opened.session, session.runtime);
-        return { kind: "run", launch: h.launch || h.id, woke: true } as Delivered;
-      });
-
-    const deliver = (id: string, text: string, by: RunTrigger) =>
-      Effect.gen(function* () {
-        const h = hands.get(id);
-        if (!h) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
-        return yield* h.access.withPermits(1)(
-          admission.withPermits(1)(
-            Effect.gen(function* () {
-              const session = core.session(id);
-              if (hands.get(id) !== h || !session) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
-              if (h.sess?.closing) return { kind: "refused", reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮` } as Delivered;
-              const starts = !isBusy(session);
-              let recall = "";
-              if (starts) {
-                const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id);
-                if (full) return { kind: "refused", reason: `${session.name} 先不接着干：${full}` } as Delivered;
-                recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
-              }
-              const s = h.sess;
-              if (!s || !h.launch) {
-                expect(h, by);
-                const d = yield* wake(h, session, text, recall);
-                if (d.kind === "refused") unexpect(h);
-                return d;
-              }
-              const launch = h.launch;
-              if (starts) expect(h, by);
-              const sent = yield* Effect.promise(() =>
-                s.agent
-                  .send(withRecall(recall, text), "followup")
-                  .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
-              );
-              if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch } as Delivered;
-              if (starts) unexpect(h);
-              if (sent.kind !== "accepted") return { kind: "refused", reason: `${session.name} 没收到：${sent.reason}` } as Delivered;
-              if (sent.landed === "queued") {
-                expect(h, by);
-                return { kind: "queued", launch } as Delivered;
-              }
-              if (by.message) heardInRun(h, by.message);
-              return { kind: "steered", launch } as Delivered;
-            }),
-          ),
+    const wake = Effect.fn("Sessions.wake")(function* (h: Hand, session: Session, input: string, recall: string) {
+      const agent = store.agent(session.agent);
+      if (!agent) return { kind: "refused", reason: session.name + " 的 agent 已经删掉了，叫不醒" } as Delivered;
+      const stopped = yield* Effect.result(rest(h));
+      if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) } as Delivered;
+      const resume = h.oarSessionId;
+      let opened = yield* open(agent, session, h.place, withRecall(recall, input), resume);
+      if (!opened.session && !opened.retained && resume) {
+        h.recalled.clear();
+        const again = yield* remind(session.agent, h.id, h.place.project, input, h.recalled);
+        opened = yield* open(
+          agent,
+          session,
+          h.place,
+          withRecall(again, "（VibeValley 重启过，之前的会话接不上了。你在这个分支上做过的事看 git log。）\n\n" + input),
+          "",
         );
-      });
+      }
+      if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` } as Delivered;
+      attach(h, opened.session, session.runtime);
+      return { kind: "run", launch: h.launch || h.id, woke: true } as Delivered;
+    });
 
-    const handOver = (
+    const deliver = Effect.fn("Sessions.deliver")(function* (id: string, text: string, by: RunTrigger) {
+      const h = hands.get(id);
+      if (!h) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
+      return yield* h.access.withPermits(1)(
+        admission.withPermits(1)(
+          Effect.gen(function* () {
+            const session = core.session(id);
+            if (hands.get(id) !== h || !session) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
+            if (h.sess?.closing) return { kind: "refused", reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮` } as Delivered;
+            const starts = !isBusy(session);
+            let recall = "";
+            if (starts) {
+              const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id);
+              if (full) return { kind: "refused", reason: `${session.name} 先不接着干：${full}` } as Delivered;
+              recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
+            }
+            const s = h.sess;
+            if (!s || !h.launch) {
+              expect(h, by);
+              const d = yield* wake(h, session, text, recall);
+              if (d.kind === "refused") unexpect(h);
+              return d;
+            }
+            const launch = h.launch;
+            if (starts) expect(h, by);
+            const sent = yield* Effect.promise(() =>
+              s.agent
+                .send(withRecall(recall, text), "followup")
+                .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
+            );
+            if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch } as Delivered;
+            if (starts) unexpect(h);
+            if (sent.kind !== "accepted") return { kind: "refused", reason: `${session.name} 没收到：${sent.reason}` } as Delivered;
+            if (sent.landed === "queued") {
+              expect(h, by);
+              return { kind: "queued", launch } as Delivered;
+            }
+            if (by.message) heardInRun(h, by.message);
+            return { kind: "steered", launch } as Delivered;
+          }),
+        ),
+      );
+    });
+
+    const handOver = Effect.fn("Sessions.handOver")(function* (
       id: string,
       closed: SessionClose,
       use: (place: Workplace, lastText: string) => Effect.Effect<Merged, unknown>,
       settle: Settle = "owner",
-    ) =>
-      Effect.gen(function* () {
-        const h = hands.get(id);
-        if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
-        return yield* h.access.withPermits(1)(
-          Effect.gen(function* () {
-            const current = core.session(id);
-            if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
-            if (closed === "merged" && current.graph)
-              return yield* Effect.fail<ApiError | NotTakenIn>(
-                refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`),
-              );
-            if (isBusy(current) || h.triggers.length > 0)
-              return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
-            yield* rest(h);
-            const merged = yield* use(h.place, h.lastText).pipe(
-              Effect.mapError((e) => {
-                const f = e instanceof MergeFailure ? e : new MergeFailure("error", reasonText(e));
-                if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
-                const words = notTakenIn(f, current.name, settle);
-                return new NotTakenIn(f, words.fix, words.owner, words.notice, words.short);
-              }),
+    ) {
+      const h = hands.get(id);
+      if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
+      return yield* h.access.withPermits(1)(
+        Effect.gen(function* () {
+          const current = core.session(id);
+          if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
+          if (closed === "merged" && current.graph)
+            return yield* Effect.fail<ApiError | NotTakenIn>(
+              refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`),
             );
-            if (merged.pullRequest) return merged;
-            yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
-            if (merged.warning) notice("warn", merged.warning);
-            return merged;
-          }),
-        );
-      });
+          if (isBusy(current) || h.triggers.length > 0)
+            return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
+          yield* rest(h);
+          const merged = yield* use(h.place, h.lastText).pipe(
+            Effect.mapError((e) => {
+              const f = e instanceof MergeFailure ? e : new MergeFailure("error", reasonText(e));
+              if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+              const words = notTakenIn(f, current.name, settle);
+              return new NotTakenIn(f, words.fix, words.owner, words.notice, words.short);
+            }),
+          );
+          if (merged.pullRequest) return merged;
+          yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
+          if (merged.warning) notice("warn", merged.warning);
+          return merged;
+        }),
+      );
+    });
 
     /** The freshest word on conflicts is a preview of the branch; the session's state follows it. */
-    const changesOf = (id: string) =>
-      Effect.gen(function* () {
-        const place = hands.get(id)?.place;
-        if (!place) return undefined;
-        const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
-        const conflict = conflictOf(changes);
-        const session = core.session(id);
-        if (session && !sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
-        return changes;
-      });
+    const changesOf = Effect.fn("Sessions.changesOf")(function* (id: string) {
+      const place = hands.get(id)?.place;
+      if (!place) return undefined;
+      const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
+      const conflict = conflictOf(changes);
+      const session = core.session(id);
+      if (session && !sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+      return changes;
+    });
 
-    const recheck = (id: string) =>
-      Effect.gen(function* () {
-        const place = hands.get(id)?.place;
-        const session = core.session(id);
-        if (!place || !session) return;
-        const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
-        if (!sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
-      });
+    const recheck = Effect.fn("Sessions.recheck")(function* (id: string) {
+      const place = hands.get(id)?.place;
+      const session = core.session(id);
+      if (!place || !session) return;
+      const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
+      if (!sameConflict(session.conflict, conflict)) apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+    });
 
     // ── bringing the farm back ──
 
-    const expireLogs = (days: number) =>
-      Effect.gen(function* () {
-        if (days <= 0) return;
-        const ids = yield* db(qs.sessionsEndedBefore({ before: Date.now() - days * dayMs }));
-        for (const r of ids) trajectories.forget(r.id);
-      });
+    const expireLogs = Effect.fn("Sessions.expireLogs")(function* (days: number) {
+      if (days <= 0) return;
+      const ids = yield* db(qs.sessionsEndedBefore({ before: Date.now() - days * dayMs }));
+      for (const r of ids) trajectories.forget(r.id);
+    });
 
     const restore = Effect.gen(function* () {
       yield* expireLogs(config.session.trajectoryDays);
@@ -1035,87 +1026,83 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
     const shape: SessionShape = {
       noRoom: roomFor,
-      makeRoom: (runtime, project) =>
-        Effect.gen(function* () {
-          const full = roomFor(runtime, project);
-          if (full) return { refused: full };
-          const oldest = whoMakesRoom(core.state().sessions, maxRunning);
-          if (!oldest) return {};
-          const dismissed = yield* Effect.result(shape.dismiss(oldest.id));
-          if (dismissed._tag === "Failure") return { refused: reasonOf(dismissed.failure) };
-          return { evicted: oldest.name };
-        }),
-      send: (agent, task, where, opt) =>
-        admission.withPermits(1)(
+      makeRoom: Effect.fn("Sessions.makeRoom")(function* (runtime, project) {
+        const full = roomFor(runtime, project);
+        if (full) return { refused: full };
+        const oldest = whoMakesRoom(core.state().sessions, maxRunning);
+        if (!oldest) return {};
+        const dismissed = yield* Effect.result(shape.dismiss(oldest.id));
+        if (dismissed._tag === "Failure") return { refused: reasonOf(dismissed.failure) };
+        return { evicted: oldest.name };
+      }),
+      send: Effect.fn("Sessions.send")(function* (agent, task, where, opt) {
+        const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
+        if (unclosed) return { refused: unclosed.failure ?? "这张工单的农机还没交回工作区", retainedWork: true as const };
+        const full = roomFor(agent.runtime, where);
+        if (full) return { refused: full };
+        hired++;
+        const id = `w${hired}`;
+        const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
+        if (placed._tag === "Failure") return { refused: `${agent.name} 没地方干活：${placed.failure.message}` };
+        const place = placed.success;
+        const recalled = new Set<string>();
+        const recall = yield* remind(agent.id, id, place.project, task, recalled);
+        const session: Session = {
+          id,
+          name: sessionName(core.state().sessions, agent.id, agent.name),
+          agent: agent.id,
+          runtime: agent.runtime,
+          brief: task,
+          project: place.project,
+          hiredAt: Date.now(),
+          runs: 0,
+          phase: { _tag: "arriving" },
+          ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
+          ...(opt.channel ? { channel: opt.channel } : {}),
+          ...(opt.refining ? { refining: true } : {}),
+          issue: opt.issue.id,
+          ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
+        };
+        const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
           Effect.gen(function* () {
-            const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
-            if (unclosed) return { refused: unclosed.failure ?? "这张工单的农机还没交回工作区", retainedWork: true as const };
-            const full = roomFor(agent.runtime, where);
-            if (full) return { refused: full };
-            hired++;
-            const id = `w${hired}`;
-            const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
-            if (placed._tag === "Failure") return { refused: `${agent.name} 没地方干活：${placed.failure.message}` };
-            const place = placed.success;
-            const recalled = new Set<string>();
-            const recall = yield* remind(agent.id, id, place.project, task, recalled);
-            const session: Session = {
-              id,
-              name: sessionName(core.state().sessions, agent.id, agent.name),
-              agent: agent.id,
-              runtime: agent.runtime,
-              brief: task,
-              project: place.project,
-              hiredAt: Date.now(),
-              runs: 0,
-              phase: { _tag: "arriving" },
-              ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
-              ...(opt.channel ? { channel: opt.channel } : {}),
-              ...(opt.refining ? { refining: true } : {}),
-              issue: opt.issue.id,
-              ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
-            };
-            const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
-              Effect.gen(function* () {
-                if (retained) return { refused: why, retainedWork: true };
-                revokeToken(id);
-                const released = yield* projects.release(place);
-                if (released.kept) notice("warn", released.reason);
-                return { refused: why, ...(released.kept ? { retainedWork: true as const } : {}) };
-              });
-            const opened = yield* open(agent, session, place, withRecall(recall, task), "");
-            if (!opened.session) return yield* refuseStart(`${agent.name} 派不出去：${opened.refused}`, opened.retained);
-            const registered = yield* Effect.result(
-              Effect.gen(function* () {
-                if (opt.hiring) yield* opt.hiring(session);
-                return yield* logOf(session);
-              }).pipe(Effect.catchDefect((e) => Effect.fail(e))),
-            );
-            if (registered._tag === "Failure") {
-              const failed = yield* failedOpening(opened.session, `${agent.name} 的工单没记下来：${reasonText(registered.failure)}`);
-              return yield* refuseStart(failed.refused, failed.retained);
-            }
-            const h: Hand = {
-              id,
-              place,
-              access: Semaphore.makeUnsafe(1),
-              journal: registered.success,
-              oarSessionId: "",
-              lastText: "",
-              tracking: {},
-              launch: "",
-              spoke: false,
-              recalled,
-              triggers: [opt.trigger ?? { kind: "issue" }],
-              run: "",
-              heard: [],
-            };
-            hands.set(id, h);
-            apply({ type: "hired", session });
-            attach(h, opened.session, agent.runtime);
-            return { session };
-          }),
-        ),
+            if (retained) return { refused: why, retainedWork: true };
+            revokeToken(id);
+            const released = yield* projects.release(place);
+            if (released.kept) notice("warn", released.reason);
+            return { refused: why, ...(released.kept ? { retainedWork: true as const } : {}) };
+          });
+        const opened = yield* open(agent, session, place, withRecall(recall, task), "");
+        if (!opened.session) return yield* refuseStart(`${agent.name} 派不出去：${opened.refused}`, opened.retained);
+        const registered = yield* Effect.result(
+          Effect.gen(function* () {
+            if (opt.hiring) yield* opt.hiring(session);
+            return yield* logOf(session);
+          }).pipe(Effect.catchDefect((e) => Effect.fail(e))),
+        );
+        if (registered._tag === "Failure") {
+          const failed = yield* failedOpening(opened.session, `${agent.name} 的工单没记下来：${reasonText(registered.failure)}`);
+          return yield* refuseStart(failed.refused, failed.retained);
+        }
+        const h: Hand = {
+          id,
+          place,
+          access: Semaphore.makeUnsafe(1),
+          journal: registered.success,
+          oarSessionId: "",
+          lastText: "",
+          tracking: {},
+          launch: "",
+          spoke: false,
+          recalled,
+          triggers: [opt.trigger ?? { kind: "issue" }],
+          run: "",
+          heard: [],
+        };
+        hands.set(id, h);
+        apply({ type: "hired", session });
+        attach(h, opened.session, agent.runtime);
+        return { session };
+      }, admission.withPermits(1)),
       deliver,
       tell: (id, text, by) =>
         Effect.map(deliver(id, text, by), (d) => {
@@ -1130,59 +1117,53 @@ export const make = (options: SessionOptionsIn = {}) =>
           }
           return d.reason ?? "";
         }),
-      stop: (id) =>
-        Effect.gen(function* () {
-          const s = hands.get(id)?.sess;
-          if (!s || core.session(id)?.phase._tag !== "working") return false;
-          const outcome = yield* Effect.promise(() => s.agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
-          if (outcome.kind !== "accepted") {
-            yield* Effect.logWarning(`vibevalley: ${id} did not take the stop: ${"reason" in outcome ? outcome.reason : ""}`);
-            return false;
-          }
-          return true;
-        }),
-      dismiss: (id, work = "keep", closed = "dismissed") =>
-        Effect.gen(function* () {
-          const h = hands.get(id);
-          if (!h) return false;
-          return yield* h.access.withPermits(1)(
-            Effect.gen(function* () {
-              if (hands.get(id) !== h) return false;
-              const name = core.session(id)?.name ?? id;
-              yield* closeOar(h);
-              if (work === "discard" && h.place.branch) {
-                const reset = yield* Effect.result(projects.reset(h.place));
-                if (reset._tag === "Failure") notice("warn", `${name} 的工作目录没能重置：${reset.failure.message}`);
-              }
-              yield* leave(h, closed, 0);
-              const kept = yield* projects.release(h.place);
-              if (kept.kept) notice("info", `${name} 收工了：${kept.reason}`);
-              return true;
-            }),
-          );
-        }),
-      discardWork: (id) =>
-        Effect.gen(function* () {
-          const h = hands.get(id);
-          if (!h?.place.branch) return;
-          yield* h.access.withPermits(1)(
-            Effect.gen(function* () {
-              const s = core.session(id);
-              if (hands.get(id) !== h || !s || isBusy(s)) return;
-              const reset = yield* Effect.result(projects.reset(h.place));
-              if (reset._tag === "Failure") notice("warn", `${s.name} 的工作目录没能重置：${reset.failure.message}`);
-            }),
-          );
-        }),
-      clearWorkplace: (issue, project, number, work) =>
-        admission.withPermits(1)(
+      stop: Effect.fn("Sessions.stop")(function* (id) {
+        const s = hands.get(id)?.sess;
+        if (!s || core.session(id)?.phase._tag !== "working") return false;
+        const outcome = yield* Effect.promise(() => s.agent.interrupt().catch((e: unknown) => ({ kind: "failed" as const, reason: String(e) })));
+        if (outcome.kind !== "accepted") {
+          yield* Effect.logWarning(`vibevalley: ${id} did not take the stop: ${"reason" in outcome ? outcome.reason : ""}`);
+          return false;
+        }
+        return true;
+      }),
+      dismiss: Effect.fn("Sessions.dismiss")(function* (id, work = "keep", closed = "dismissed") {
+        const h = hands.get(id);
+        if (!h) return false;
+        return yield* h.access.withPermits(1)(
           Effect.gen(function* () {
-            const unclosed = [...allocations.values()].find((a) => a.owner.issue === issue);
-            if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? "这张工单的农机还没交回工作区"));
-            if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused("这张工单还有帮工，不能清掉工作目录"));
-            return yield* projects.clear(project, number, work);
+            if (hands.get(id) !== h) return false;
+            const name = core.session(id)?.name ?? id;
+            yield* closeOar(h);
+            if (work === "discard" && h.place.branch) {
+              const reset = yield* Effect.result(projects.reset(h.place));
+              if (reset._tag === "Failure") notice("warn", `${name} 的工作目录没能重置：${reset.failure.message}`);
+            }
+            yield* leave(h, closed, 0);
+            const kept = yield* projects.release(h.place);
+            if (kept.kept) notice("info", `${name} 收工了：${kept.reason}`);
+            return true;
           }),
-        ),
+        );
+      }),
+      discardWork: Effect.fn("Sessions.discardWork")(function* (id) {
+        const h = hands.get(id);
+        if (!h?.place.branch) return;
+        yield* h.access.withPermits(1)(
+          Effect.gen(function* () {
+            const s = core.session(id);
+            if (hands.get(id) !== h || !s || isBusy(s)) return;
+            const reset = yield* Effect.result(projects.reset(h.place));
+            if (reset._tag === "Failure") notice("warn", `${s.name} 的工作目录没能重置：${reset.failure.message}`);
+          }),
+        );
+      }),
+      clearWorkplace: Effect.fn("Sessions.clearWorkplace")(function* (issue, project, number, work) {
+        const unclosed = [...allocations.values()].find((a) => a.owner.issue === issue);
+        if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? "这张工单的农机还没交回工作区"));
+        if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused("这张工单还有帮工，不能清掉工作目录"));
+        return yield* projects.clear(project, number, work);
+      }, admission.withPermits(1)),
       roster: () =>
         [...hands.values()]
           .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -1196,23 +1177,21 @@ export const make = (options: SessionOptionsIn = {}) =>
       },
       handOver,
       changes: changesOf,
-      list: (agent) =>
-        Effect.gen(function* () {
-          const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
-          const rows = yield* db(qs.endedSessions({ agent }));
-          const runs = yield* db(qr.runsOfEndedSessions());
-          const bySession = Map.groupBy(runs, (r) => r.session);
-          for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
-          return out.sort((a, b) => b.hiredAt - a.hiredAt);
-        }),
-      get: (id) =>
-        Effect.gen(function* () {
-          const live = core.session(id);
-          if (live) return live;
-          const r = yield* db(Effect.option(qs.sessionByID({ id })));
-          if (Option.isNone(r) || r.value.ended_at === null) return undefined;
-          return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
-        }),
+      list: Effect.fn("Sessions.list")(function* (agent) {
+        const out = core.state().sessions.filter((s) => !agent || s.agent === agent);
+        const rows = yield* db(qs.endedSessions({ agent }));
+        const runs = yield* db(qr.runsOfEndedSessions());
+        const bySession = Map.groupBy(runs, (r) => r.session);
+        for (const r of rows) if (!out.some((s) => s.id === r.id)) out.push(endedSession(r, bySession.get(r.id) ?? []));
+        return out.sort((a, b) => b.hiredAt - a.hiredAt);
+      }),
+      get: Effect.fn("Sessions.get")(function* (id) {
+        const live = core.session(id);
+        if (live) return live;
+        const r = yield* db(Effect.option(qs.sessionByID({ id })));
+        if (Option.isNone(r) || r.value.ended_at === null) return undefined;
+        return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
+      }),
       runs: (issue) => Effect.map(db(qr.runsOfIssue({ issue_id: issue })), (rows) => rows.map(runOf)),
       events: (id, r) => trajectories.events(id, r),
       sessionOf: (id) => core.session(id),

@@ -1,0 +1,52 @@
+# Agent Note: 服务端照 Effect v4 的写法：方法有名字，状态在 Ref 里，定时和回调归作用域
+
+Status: proposed
+
+## Problem
+
+服务端是 Effect v4，但很多地方是包在 `Effect.gen` 里的 Node 写法（在 `apps/server/src` 里数的，不算测试）：
+
+- 服务的方法都是 `(id) => Effect.gen(function* () {...})`，`Effect.fn` 一处没用：出错的栈和追踪里看不出是哪个方法。
+- 服务的状态是 `make` 里的 `let` 和 `new Map`（116 个 `let`，`Ref` 一个没有），另用 `Semaphore` 管并发：读的地方加不加锁靠自觉。
+- 定时是 `setTimeout`（36 处）和 `new Promise`（30 处）：存盘的防抖、超时的 `Promise.race`；要手动 `clearTimeout`、`unref`，服务关的时候不跟着停。
+- 服务里面另起运行时：`Effect.runSync(core.apply(...))`（`session/session.ts`、`channel/chat.ts`），中断、上下文和追踪接不上。
+- 同步的 `fs`（100 处）、`JSON.parse` 配 try（49 处）、散着读的 `process.env`（17 处）、`console.*`。
+
+和 Promise 写的库交界的地方不算：oar、pi-agent-core（`agent/brain`）、MCP 的 SDK、连接器、`cli/chat.ts` 的终端界面。那里用 Promise 是被外面的接口定的。
+
+## Proposal
+
+分几批，每批一个 PR，行为不变，现有的测试就是回归：
+
+1. **方法有名字**：服务的方法改成 `Effect.fn("<服务>.<方法>")(function* (...) {...})`，只有一个 `yield*` 的短方法照旧。机械改动，先做。
+2. **服务里不另起运行时**：`Effect.runSync(core.apply(...))` 改成在纤程里调；给自己的回调用的 `FiberSet.makeRuntimePromise` 改成回调只往 `Queue` 放、一个 `forkScoped` 的纤程消费。给 oar、MCP 的回调保留。
+3. **定时归作用域**：防抖存盘用 `forkScoped` 的纤程加打断（或 `Stream.debounce`），超时用 `Effect.timeout`，重复用 `Schedule`；服务关的时候作用域收掉它们，不再手动 `clearTimeout`。先做 `session`、`runtime`。
+4. **状态在 Ref 里**：要跟锁一起改的状态换成 `SynchronizedRef`（`modifyEffect` 把读、判断、写放在一处），要往外推变化的换成 `SubscriptionRef`。先做 `agent`、`lan`。
+5. **读写和配置**：服务里的同步 `fs` 换成 `FileSystem`，JSON 用 `Schema.fromJsonString`，环境变量收进 `Config`，日志用 `Effect.log*`。
+
+做完再扫一遍，把还剩的、新看到的写回这篇或新开一篇。
+
+### 做到哪了
+
+1. 方法有名字：已经做了。服务的 `make` 里返回的方法和内部的帮手函数，整个函数就是一段 `Effect.gen`（或套一层 `x.withPermits(n)`）的，都改成了 `Effect.fn("<服务>.<名字>")`，锁作为第二个参数；共 135 处。模块顶层的 `make` 和自己写了返回类型的没动。
+
+## Alternatives considered
+
+**错误改成 `Schema.TaggedErrorClass`。** 地道，但 `ApiError` 是 protocol 的契约，页面和服务端都用，129 处 `Effect.fail(refused(...))` 都要动；收益是栈和 cause，接口的形状不变。放到这几批之后再看值不值。
+
+**子进程换成 `ChildProcess`。** `project/git.ts` 超时要杀整个进程组，换之前要先确认 `ChildProcess` 能做到；先不动。
+
+**一次全改。** 改动太大，出了问题分不清是哪一类引起的；按类分批，每批的测试都过了再走下一批。
+
+## Acceptance criteria
+
+- 服务的方法都有 `Effect.fn` 的名字（`Context.Service` 的 `make` 里返回的方法）。
+- 服务里没有 `Effect.runSync`、`Effect.runPromise`；`makeRuntimePromise` 只留在交给外面的库的地方。
+- `session`、`runtime` 里没有 `setTimeout`；服务关的时候它们起的纤程都停下（有测试）。
+- `bun run server:check`、`web:check` 过，行为不变。
+
+## Risks
+
+- **防抖改成纤程后时序变了**：存盘早一点、晚一点都可能让测试变红；照原来的间隔，测试红了先看是不是时序。
+- **`Effect.fn` 改变栈的形状**：只影响出错时打出来的东西，不影响行为。
+- **和别处同时改同一个文件**：每批小、合得快，减少冲突。

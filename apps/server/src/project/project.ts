@@ -401,22 +401,21 @@ export const make = (hooks: ProjectHooks = {}) =>
         return path;
       }).pipe(Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError(reason(e)))));
 
-    const list = () =>
-      Effect.gen(function* () {
-        if (!existsSync(root)) return [];
-        const out: Project[] = [];
-        for (const e of readdirSync(root, { withFileTypes: true })) {
-          if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
-          let path: string;
-          try {
-            path = realpathSync(join(root, e.name));
-          } catch {
-            continue;
-          }
-          out.push({ name: e.name, path, git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path });
+    const list = Effect.fn("Projects.list")(function* () {
+      if (!existsSync(root)) return [];
+      const out: Project[] = [];
+      for (const e of readdirSync(root, { withFileTypes: true })) {
+        if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
+        let path: string;
+        try {
+          path = realpathSync(join(root, e.name));
+        } catch {
+          continue;
         }
-        return out;
-      });
+        out.push({ name: e.name, path, git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path });
+      }
+      return out;
+    });
 
     const find = (name: string) => Effect.map(list(), (all) => all.find((p) => p.name === name));
 
@@ -426,43 +425,41 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const maxSessions = () => (perProject <= 0 || perProject > maxRunning ? maxRunning : perProject);
 
-    const summary = (p: Project) =>
-      Effect.gen(function* () {
-        const s: ProjectSummary = { name: p.name, path: p.path, git: p.git, maxSessions: maxSessions(), pullRequest: capability(p.name) };
-        if (p.git) {
-          const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
-          if (last > 0) s.last = last;
-        }
-        return s;
-      });
+    const summary = Effect.fn("Projects.summary")(function* (p: Project) {
+      const s: ProjectSummary = { name: p.name, path: p.path, git: p.git, maxSessions: maxSessions(), pullRequest: capability(p.name) };
+      if (p.git) {
+        const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
+        if (last > 0) s.last = last;
+      }
+      return s;
+    });
 
     const issueWorkplace = (name: string, n: number): Workplace => ({ project: name, cwd: join(trees, `${name}.${n}`), branch: issueBranch(n) });
 
     /** Called under the project's turn. Failing keeps the local main branch as the next issue's base. */
-    const syncMain = (name: string) =>
-      Effect.gen(function* () {
-        const path = join(root, name);
-        const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
-        const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
-        const kept = Effect.as(Effect.logWarning(`project ${name}: 无法从 origin 快进主分支，保留本地主分支`), main);
-        if (main === "") return yield* kept;
-        const fetched = hooks.fetch
-          ? yield* hooks.fetch(path, main)
-          : (yield* run("git", ["fetch", "origin", main], { cwd: path, timeoutMs: cloneTimeoutMs })).code === 0;
-        if (!fetched) return yield* kept;
-        const status = yield* gitRun(path, "status", "--porcelain");
-        if (status.code !== 0 || status.stdout.trim() !== "") return yield* kept;
-        const local = yield* gitRun(path, "rev-parse", "refs/heads/" + main);
-        const remote = yield* gitRun(path, "rev-parse", "FETCH_HEAD");
-        if (local.code !== 0 || remote.code !== 0 || !(yield* gitOk(path, "merge-base", "--is-ancestor", local.stdout.trim(), remote.stdout.trim())))
-          return yield* kept;
-        const current = yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
-        const moved =
-          current === main
-            ? yield* gitRun(path, "merge", "--ff-only", remote.stdout.trim())
-            : yield* gitRun(path, "update-ref", "refs/heads/" + main, remote.stdout.trim(), local.stdout.trim());
-        return moved.code === 0 ? main : yield* kept;
-      });
+    const syncMain = Effect.fn("Projects.syncMain")(function* (name: string) {
+      const path = join(root, name);
+      const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
+      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
+      const kept = Effect.as(Effect.logWarning(`project ${name}: 无法从 origin 快进主分支，保留本地主分支`), main);
+      if (main === "") return yield* kept;
+      const fetched = hooks.fetch
+        ? yield* hooks.fetch(path, main)
+        : (yield* run("git", ["fetch", "origin", main], { cwd: path, timeoutMs: cloneTimeoutMs })).code === 0;
+      if (!fetched) return yield* kept;
+      const status = yield* gitRun(path, "status", "--porcelain");
+      if (status.code !== 0 || status.stdout.trim() !== "") return yield* kept;
+      const local = yield* gitRun(path, "rev-parse", "refs/heads/" + main);
+      const remote = yield* gitRun(path, "rev-parse", "FETCH_HEAD");
+      if (local.code !== 0 || remote.code !== 0 || !(yield* gitOk(path, "merge-base", "--is-ancestor", local.stdout.trim(), remote.stdout.trim())))
+        return yield* kept;
+      const current = yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
+      const moved =
+        current === main
+          ? yield* gitRun(path, "merge", "--ff-only", remote.stdout.trim())
+          : yield* gitRun(path, "update-ref", "refs/heads/" + main, remote.stdout.trim(), local.stdout.trim());
+      return moved.code === 0 ? main : yield* kept;
+    });
 
     const usesPullRequests = (name: string) => prProjects.includes(name) && capability(name).available;
 
@@ -531,75 +528,71 @@ export const make = (hooks: ProjectHooks = {}) =>
       }).pipe(Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError(reason(e)))));
 
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
-    const projectCheck = (cwd: string) =>
-      Effect.gen(function* () {
-        const file = join(cwd, ".vibevalley", "check");
-        if (!lexists(file)) return;
-        const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
-        if (r.code === 0) return;
-        const why = r.timedOut
-          ? `项目检查 .vibevalley/check 超时（${checkTimeoutMs / 1000}s）`
-          : r.code < 0
-            ? `项目检查 .vibevalley/check 没通过：${reason(r.stderr)}`
-            : `项目检查 .vibevalley/check 没通过：exit status ${r.code}`;
-        const lines = (r.stdout + r.stderr)
-          .slice(-64 * 1024)
-          .trim()
-          .split("\n")
-          .slice(-40);
-        return yield* Effect.fail(new MergeFailure("check", why + "\n" + lines.join("\n")));
-      });
+    const projectCheck = Effect.fn("Projects.projectCheck")(function* (cwd: string) {
+      const file = join(cwd, ".vibevalley", "check");
+      if (!lexists(file)) return;
+      const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
+      if (r.code === 0) return;
+      const why = r.timedOut
+        ? `项目检查 .vibevalley/check 超时（${checkTimeoutMs / 1000}s）`
+        : r.code < 0
+          ? `项目检查 .vibevalley/check 没通过：${reason(r.stderr)}`
+          : `项目检查 .vibevalley/check 没通过：exit status ${r.code}`;
+      const lines = (r.stdout + r.stderr)
+        .slice(-64 * 1024)
+        .trim()
+        .split("\n")
+        .slice(-40);
+      return yield* Effect.fail(new MergeFailure("check", why + "\n" + lines.join("\n")));
+    });
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
-    const checkMerge = (place: Workplace, target: string) =>
-      Effect.gen(function* () {
-        yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
-        const path = join(root, place.project);
-        const into = target || (yield* git(path, "symbolic-ref", "--short", "HEAD"));
-        const checked = yield* git(path, "rev-parse", "refs/heads/" + place.branch);
-        const conflicts = yield* conflictsOf(path, into, checked);
-        if (conflicts.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", into, conflicts));
-        yield* projectCheck(place.cwd);
-        return checked;
-      });
+    const checkMerge = Effect.fn("Projects.checkMerge")(function* (place: Workplace, target: string) {
+      yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
+      const path = join(root, place.project);
+      const into = target || (yield* git(path, "symbolic-ref", "--short", "HEAD"));
+      const checked = yield* git(path, "rev-parse", "refs/heads/" + place.branch);
+      const conflicts = yield* conflictsOf(path, into, checked);
+      if (conflicts.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", into, conflicts));
+      yield* projectCheck(place.cwd);
+      return checked;
+    });
 
-    const checkLocalMerge = (place: Workplace) =>
-      Effect.gen(function* () {
-        yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
-        const path = join(root, place.project);
-        const main = yield* serially(
-          place.project,
-          Effect.gen(function* () {
-            const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
-            const files = yield* conflictsOf(path, main, place.branch!);
-            if (files.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, files));
-            yield* git(place.cwd, ...asFarm, "merge", "--no-edit", main);
-            return main;
-          }),
-        );
-        return yield* checkMerge(place, main);
-      });
+    const checkLocalMerge = Effect.fn("Projects.checkLocalMerge")(function* (place: Workplace) {
+      yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
+      const path = join(root, place.project);
+      const main = yield* serially(
+        place.project,
+        Effect.gen(function* () {
+          const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
+          const files = yield* conflictsOf(path, main, place.branch!);
+          if (files.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, files));
+          yield* git(place.cwd, ...asFarm, "merge", "--no-edit", main);
+          return main;
+        }),
+      );
+      return yield* checkMerge(place, main);
+    });
 
-    const mergeMain = (path: string, branch: string, kept: string) =>
-      Effect.gen(function* () {
-        const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
-        // A merge that would conflict is not tried: the session resolves it on its branch first.
-        const conflicts = yield* conflictsOf(path, main, branch);
-        if (conflicts.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, conflicts));
-        const ahead = Number(yield* git(path, "rev-list", "--count", `${main}..${branch}`)) || 0;
-        if (ahead > 0) {
-          const merged = yield* gitRun(path, "merge", "--no-edit", branch);
-          if (merged.code !== 0) {
-            const aborted = yield* gitRun(path, "merge", "--abort");
-            if (aborted.code !== 0)
-              return yield* fail(
-                `合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}；退出合并也没成功（${reason(aborted.stderr)}），${main} 停在合并到一半，要手动收拾`,
-              );
-            return yield* fail(`合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}`);
-          }
+    const mergeMain = Effect.fn("Projects.mergeMain")(function* (path: string, branch: string, kept: string) {
+      const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
+      // A merge that would conflict is not tried: the session resolves it on its branch first.
+      const conflicts = yield* conflictsOf(path, main, branch);
+      if (conflicts.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, conflicts));
+      const ahead = Number(yield* git(path, "rev-list", "--count", `${main}..${branch}`)) || 0;
+      if (ahead > 0) {
+        const merged = yield* gitRun(path, "merge", "--no-edit", branch);
+        if (merged.code !== 0) {
+          const aborted = yield* gitRun(path, "merge", "--abort");
+          if (aborted.code !== 0)
+            return yield* fail(
+              `合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}；退出合并也没成功（${reason(aborted.stderr)}），${main} 停在合并到一半，要手动收拾`,
+            );
+          return yield* fail(`合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}`);
         }
-        return { main, ahead };
-      });
+      }
+      return { main, ahead };
+    });
 
     const toMergeFailure = <A, R>(e: Effect.Effect<A, unknown, R>) => Effect.mapError(e, failed);
 
@@ -652,57 +645,54 @@ export const make = (hooks: ProjectHooks = {}) =>
       summary,
       summaries: () => Effect.flatMap(list(), (all) => Effect.forEach(all, summary)),
       stack: (name) => Effect.map(find(name), (p) => (p ? stackOf(p.path) : undefined)),
-      languages: (name) =>
-        Effect.gen(function* () {
-          const p = yield* find(name);
-          if (!p) return undefined;
-          const r = yield* run(tokei, tokeiArgs(p.path), { timeoutMs: 60_000 });
-          if (r.missing) return yield* fail(noTokei);
-          if (r.code !== 0) return yield* fail("tokei 没数完：" + reason(r.stderr));
-          const languages = countsOf(r.stdout);
-          if (!languages) return yield* fail("tokei 的输出读不懂：换个新一点的 tokei 试试");
-          return { project: name, at: Date.now(), languages };
-        }),
-      activity: (name) =>
-        Effect.gen(function* () {
-          const p = yield* find(name);
-          if (!p) return undefined;
-          const now = Date.now();
-          const out: ProjectActivity = { project: name, at: now, days: [], authors: [], total: 0 } as unknown as ProjectActivity;
-          if (!p.git) return out;
-          const since = new Date(now - yearDays * 86_400_000).toISOString();
-          const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");
-          const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
-          const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
-          const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
-          Object.assign(out, activityOf(log), { total: Number(total) || 0 });
-          const first = Math.min(
-            ...roots
-              .split("\n")
-              .map(secondsOf)
-              .filter((x) => x > 0),
-          );
-          if (Number.isFinite(first)) out.first = first;
-          if (last > 0) out.last = last;
-          return out;
-        }),
-      contributions: (extra) =>
-        Effect.gen(function* () {
-          const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
-          const seen = new Set<string>();
-          const out: Repo[] = [];
-          for (const dir of repoDirs(root, 3)) {
-            // Worktrees share their repository's history: one count per repository.
-            const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
-            if (common === "" || seen.has(common)) continue;
-            seen.add(common);
-            const mine = new Set([global, (yield* gitQuiet("", "-C", dir, "config", "user.email")).toLowerCase(), ...extra].filter((e) => e !== ""));
-            const emails = (yield* gitQuiet("", "-C", dir, "log", "--all", "--format=%ae")).split("\n");
-            const commits = emails.filter((e) => e !== "" && mine.has(e.toLowerCase())).length;
-            out.push({ path: (yield* gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir, commits });
-          }
-          return out;
-        }),
+      languages: Effect.fn("Projects.languages")(function* (name) {
+        const p = yield* find(name);
+        if (!p) return undefined;
+        const r = yield* run(tokei, tokeiArgs(p.path), { timeoutMs: 60_000 });
+        if (r.missing) return yield* fail(noTokei);
+        if (r.code !== 0) return yield* fail("tokei 没数完：" + reason(r.stderr));
+        const languages = countsOf(r.stdout);
+        if (!languages) return yield* fail("tokei 的输出读不懂：换个新一点的 tokei 试试");
+        return { project: name, at: Date.now(), languages };
+      }),
+      activity: Effect.fn("Projects.activity")(function* (name) {
+        const p = yield* find(name);
+        if (!p) return undefined;
+        const now = Date.now();
+        const out: ProjectActivity = { project: name, at: now, days: [], authors: [], total: 0 } as unknown as ProjectActivity;
+        if (!p.git) return out;
+        const since = new Date(now - yearDays * 86_400_000).toISOString();
+        const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");
+        const total = yield* gitQuiet(p.path, "rev-list", "--all", "--no-merges", "--count");
+        const roots = yield* gitQuiet(p.path, "log", "--all", "--max-parents=0", "--format=%at");
+        const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
+        Object.assign(out, activityOf(log), { total: Number(total) || 0 });
+        const first = Math.min(
+          ...roots
+            .split("\n")
+            .map(secondsOf)
+            .filter((x) => x > 0),
+        );
+        if (Number.isFinite(first)) out.first = first;
+        if (last > 0) out.last = last;
+        return out;
+      }),
+      contributions: Effect.fn("Projects.contributions")(function* (extra) {
+        const global = (yield* gitQuiet("", "config", "--global", "user.email")).toLowerCase();
+        const seen = new Set<string>();
+        const out: Repo[] = [];
+        for (const dir of repoDirs(root, 3)) {
+          // Worktrees share their repository's history: one count per repository.
+          const common = yield* gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");
+          if (common === "" || seen.has(common)) continue;
+          seen.add(common);
+          const mine = new Set([global, (yield* gitQuiet("", "-C", dir, "config", "user.email")).toLowerCase(), ...extra].filter((e) => e !== ""));
+          const emails = (yield* gitQuiet("", "-C", dir, "log", "--all", "--format=%ae")).split("\n");
+          const commits = emails.filter((e) => e !== "" && mine.has(e.toLowerCase())).length;
+          out.push({ path: (yield* gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir, commits });
+        }
+        return out;
+      }),
       workplace: (project, issueNumber, worktree, baseBranch) =>
         serially(
           project,
@@ -734,15 +724,14 @@ export const make = (hooks: ProjectHooks = {}) =>
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
           return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].sort();
         }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
-      conflict: (place, baseBranch = "") =>
-        Effect.gen(function* () {
-          if (!place.branch) return undefined;
-          const path = join(root, place.project);
-          const base = baseBranch || (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD"));
-          if (!base) return undefined;
-          const files = yield* conflictsOf(path, base, place.branch).pipe(Effect.orElseSucceed(() => [] as string[]));
-          return files.length > 0 ? { base, files } : undefined;
-        }),
+      conflict: Effect.fn("Projects.conflict")(function* (place, baseBranch = "") {
+        if (!place.branch) return undefined;
+        const path = join(root, place.project);
+        const base = baseBranch || (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD"));
+        if (!base) return undefined;
+        const files = yield* conflictsOf(path, base, place.branch).pipe(Effect.orElseSucceed(() => [] as string[]));
+        return files.length > 0 ? { base, files } : undefined;
+      }),
       merge: (place) =>
         toMergeFailure(
           Effect.gen(function* () {
@@ -829,18 +818,17 @@ export const make = (hooks: ProjectHooks = {}) =>
             return { kept: true, reason: `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了` };
           }),
         ),
-      reset: (place) =>
-        Effect.gen(function* () {
-          if (!place.branch) return yield* fail("不是 worktree，不能重置：" + place.cwd);
-          yield* serially(
-            place.project,
-            Effect.gen(function* () {
-              const main = yield* git(join(root, place.project), "symbolic-ref", "--short", "HEAD");
-              yield* git(place.cwd, "checkout", "-q", "-f", "-B", place.branch!, main);
-              yield* git(place.cwd, "clean", "-q", "-f", "-d");
-            }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
-          );
-        }),
+      reset: Effect.fn("Projects.reset")(function* (place) {
+        if (!place.branch) return yield* fail("不是 worktree，不能重置：" + place.cwd);
+        yield* serially(
+          place.project,
+          Effect.gen(function* () {
+            const main = yield* git(join(root, place.project), "symbolic-ref", "--short", "HEAD");
+            yield* git(place.cwd, "checkout", "-q", "-f", "-B", place.branch!, main);
+            yield* git(place.cwd, "clean", "-q", "-f", "-d");
+          }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
+        );
+      }),
       clear: (project, issueNumber, work = "discard") =>
         serially(
           project,
@@ -885,109 +873,106 @@ export const make = (hooks: ProjectHooks = {}) =>
         }
       },
       githubStatus: () => (status?.checkedAt ? status : ({ checkedAt: 0, installed: false, loggedIn: false, reason: "尚未检测 GitHub" } as GitHubStatus)),
-      refreshGitHub: () =>
-        Effect.gen(function* () {
-          const probed = yield* probeGitHub(gh);
-          const next = new Map<string, PullRequestCapability>();
-          for (const p of yield* list()) {
-            let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
-            if (probed.loggedIn) {
-              const origin = yield* gitRun(p.path, "remote", "get-url", "origin");
-              const repo = githubOrigin(origin.stdout);
-              if (!p.git || origin.code !== 0 || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
-              else {
-                const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-                let permission: string | undefined;
-                try {
-                  permission = view.ok ? (JSON.parse(view.out) as { viewerPermission?: string }).viewerPermission : undefined;
-                } catch {
-                  permission = undefined;
-                }
-                c =
-                  permission === undefined
-                    ? { available: false, reason: "无法检测 GitHub 仓库权限" }
-                    : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission)
-                      ? { available: true, reason: "" }
-                      : { available: false, reason: "没有写权限" };
-              }
-            }
-            next.set(p.name, c);
-          }
-          status = probed;
-          capabilities = next;
-          return probed;
-        }),
-      usesPullRequests,
-      submitPullRequest: (place, issue, conclusion) =>
-        Effect.gen(function* () {
-          if (place.branch !== issueBranch(issue.number)) return yield* fail("工单分支不匹配");
-          const checked = yield* toMergeFailure(checkMerge(place, ""));
-          return yield* serially(
-            place.project,
-            Effect.gen(function* () {
-              const path = join(root, place.project);
-              yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
-              const repo = githubOrigin((yield* gitRun(path, "remote", "get-url", "origin")).stdout);
-              if (repo === "") return yield* fail("不是 GitHub 仓库");
-              const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError(reason(e))));
-              const files = yield* conflictsOf(path, main, checked);
-              if (files.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, files));
-              const pushed = hooks.push
-                ? yield* hooks.push(place.cwd, place.branch!)
-                : (yield* run("git", ["push", "-u", "origin", place.branch!], { cwd: place.cwd, timeoutMs: cloneTimeoutMs })).code === 0;
-              if (!pushed) return yield* fail("推送工单分支失败，请检查 origin 和登录后重试");
-              if (issue.pullRequest?.state === "open") return issue.pullRequest;
-              // Recover a creation whose receipt was lost before it was saved.
-              const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
-              if (!listed.ok) return yield* fail("查询已有 PR 失败；分支已推送，可重试");
-              let existing: PullRequest[];
+      refreshGitHub: Effect.fn("Projects.refreshGitHub")(function* () {
+        const probed = yield* probeGitHub(gh);
+        const next = new Map<string, PullRequestCapability>();
+        for (const p of yield* list()) {
+          let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
+          if (probed.loggedIn) {
+            const origin = yield* gitRun(p.path, "remote", "get-url", "origin");
+            const repo = githubOrigin(origin.stdout);
+            if (!p.git || origin.code !== 0 || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
+            else {
+              const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
+              let permission: string | undefined;
               try {
-                existing = JSON.parse(listed.out) as PullRequest[];
+                permission = view.ok ? (JSON.parse(view.out) as { viewerPermission?: string }).viewerPermission : undefined;
               } catch {
-                return yield* fail("无法读取已有 PR");
+                permission = undefined;
               }
-              if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
-              const check = lexists(join(place.cwd, ".vibevalley/check")) ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。";
-              const created = yield* gh(
-                "pr",
-                "create",
-                "--repo",
-                repo,
-                "--head",
-                place.branch!,
-                "--base",
-                main,
-                "--title",
-                issue.title,
-                "--body",
-                `工单 #${issue.number}\n\n${conclusion}\n\n${check}`,
-              );
-              if (!created.ok) return yield* fail("创建 PR 失败；分支已推送，可重试");
-              const url = created.out.trim();
-              const prefix = `https://github.com/${repo}/pull/`;
-              const number = Number(url.slice(prefix.length));
-              if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail("无法读取新建 PR 的地址；可重试查询");
-              return { url, number, state: "open" as const };
-            }),
-          );
-        }),
-      pullRequestState: (name, n) =>
-        Effect.gen(function* () {
-          const repo = githubOrigin((yield* gitRun(join(root, name), "remote", "get-url", "origin")).stdout);
-          if (repo === "") return yield* fail("不是 GitHub 仓库");
-          const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
-          if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
-          let result: { state?: string; mergedAt?: string | null };
-          try {
-            result = JSON.parse(viewed.out) as typeof result;
-          } catch {
-            return yield* fail(`无法读取 PR #${n} 状态`);
+              c =
+                permission === undefined
+                  ? { available: false, reason: "无法检测 GitHub 仓库权限" }
+                  : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission)
+                    ? { available: true, reason: "" }
+                    : { available: false, reason: "没有写权限" };
+            }
           }
-          if (result.mergedAt || result.state === "MERGED") return "merged" as const;
-          if (result.state === "OPEN") return "open" as const;
-          if (result.state === "CLOSED") return "closed" as const;
-          return yield* fail(`无法识别 PR #${n} 状态`);
-        }),
+          next.set(p.name, c);
+        }
+        status = probed;
+        capabilities = next;
+        return probed;
+      }),
+      usesPullRequests,
+      submitPullRequest: Effect.fn("Projects.submitPullRequest")(function* (place, issue, conclusion) {
+        if (place.branch !== issueBranch(issue.number)) return yield* fail("工单分支不匹配");
+        const checked = yield* toMergeFailure(checkMerge(place, ""));
+        return yield* serially(
+          place.project,
+          Effect.gen(function* () {
+            const path = join(root, place.project);
+            yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
+            const repo = githubOrigin((yield* gitRun(path, "remote", "get-url", "origin")).stdout);
+            if (repo === "") return yield* fail("不是 GitHub 仓库");
+            const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError(reason(e))));
+            const files = yield* conflictsOf(path, main, checked);
+            if (files.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, files));
+            const pushed = hooks.push
+              ? yield* hooks.push(place.cwd, place.branch!)
+              : (yield* run("git", ["push", "-u", "origin", place.branch!], { cwd: place.cwd, timeoutMs: cloneTimeoutMs })).code === 0;
+            if (!pushed) return yield* fail("推送工单分支失败，请检查 origin 和登录后重试");
+            if (issue.pullRequest?.state === "open") return issue.pullRequest;
+            // Recover a creation whose receipt was lost before it was saved.
+            const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
+            if (!listed.ok) return yield* fail("查询已有 PR 失败；分支已推送，可重试");
+            let existing: PullRequest[];
+            try {
+              existing = JSON.parse(listed.out) as PullRequest[];
+            } catch {
+              return yield* fail("无法读取已有 PR");
+            }
+            if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
+            const check = lexists(join(place.cwd, ".vibevalley/check")) ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。";
+            const created = yield* gh(
+              "pr",
+              "create",
+              "--repo",
+              repo,
+              "--head",
+              place.branch!,
+              "--base",
+              main,
+              "--title",
+              issue.title,
+              "--body",
+              `工单 #${issue.number}\n\n${conclusion}\n\n${check}`,
+            );
+            if (!created.ok) return yield* fail("创建 PR 失败；分支已推送，可重试");
+            const url = created.out.trim();
+            const prefix = `https://github.com/${repo}/pull/`;
+            const number = Number(url.slice(prefix.length));
+            if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail("无法读取新建 PR 的地址；可重试查询");
+            return { url, number, state: "open" as const };
+          }),
+        );
+      }),
+      pullRequestState: Effect.fn("Projects.pullRequestState")(function* (name, n) {
+        const repo = githubOrigin((yield* gitRun(join(root, name), "remote", "get-url", "origin")).stdout);
+        if (repo === "") return yield* fail("不是 GitHub 仓库");
+        const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
+        if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
+        let result: { state?: string; mergedAt?: string | null };
+        try {
+          result = JSON.parse(viewed.out) as typeof result;
+        } catch {
+          return yield* fail(`无法读取 PR #${n} 状态`);
+        }
+        if (result.mergedAt || result.state === "MERGED") return "merged" as const;
+        if (result.state === "OPEN") return "open" as const;
+        if (result.state === "CLOSED") return "closed" as const;
+        return yield* fail(`无法识别 PR #${n} 状态`);
+      }),
       finishPullRequest: (name, n) =>
         serially(
           name,

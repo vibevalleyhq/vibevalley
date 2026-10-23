@@ -120,83 +120,74 @@ export const make = (options: RecurrenceOptions = {}) =>
 
     const shape: RecurrenceShape = {
       list: () => [...(core.state().recurrences ?? [])],
-      add: (req, by, ownerInRun) =>
-        lock.withPermits(1)(
-          Effect.gen(function* () {
-            const at = now();
-            const problem = recurrenceProblem(req, at);
-            if (problem) return yield* Effect.fail(refused(problem));
-            const want = req.channel ?? chat.general();
-            const channel = (yield* chat.channels()).find((c) => c.id === want);
-            if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`, [lookIn.channel]));
-            const named = (req.agent ?? "").trim();
-            const agents = store.agents();
-            const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-            if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]));
-            const project = (req.project ?? "").trim();
-            if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
-            const tz = req.tz ?? localZone();
-            const pending = needsOK(req, by, ownerInRun);
-            const s: Recurrence = {
-              id: newId(),
-              name: req.name.trim(),
-              text: req.text.trim(),
-              channel: channel.id,
-              ...(agent ? { agent: agent.id } : {}),
-              ...(project ? { project } : {}),
-              when: req.when,
-              tz,
-              // Counted from now, by the same clock that ticks.
-              enabled: !pending,
-              created: at,
-              by,
-              ...(pending ? { pending: true } : {}),
-            } as Recurrence;
-            yield* db(
-              q.addRecurrence({
-                id: s.id,
-                name: s.name,
-                body: s.text,
-                channel_id: s.channel,
-                agent: s.agent ?? null,
-                project: s.project ?? null,
-                spec: JSON.stringify(s.when),
-                tz,
-                set_by: by,
-                pending,
-                created_at: at,
-              }),
-            );
-            yield* core.apply({ type: "recurrence", recurrence: s });
-            return s;
+      add: Effect.fn("Recurrences.add")(function* (req, by, ownerInRun) {
+        const at = now();
+        const problem = recurrenceProblem(req, at);
+        if (problem) return yield* Effect.fail(refused(problem));
+        const want = req.channel ?? chat.general();
+        const channel = (yield* chat.channels()).find((c) => c.id === want);
+        if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`, [lookIn.channel]));
+        const named = (req.agent ?? "").trim();
+        const agents = store.agents();
+        const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
+        if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]));
+        const project = (req.project ?? "").trim();
+        if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
+        const tz = req.tz ?? localZone();
+        const pending = needsOK(req, by, ownerInRun);
+        const s: Recurrence = {
+          id: newId(),
+          name: req.name.trim(),
+          text: req.text.trim(),
+          channel: channel.id,
+          ...(agent ? { agent: agent.id } : {}),
+          ...(project ? { project } : {}),
+          when: req.when,
+          tz,
+          // Counted from now, by the same clock that ticks.
+          enabled: !pending,
+          created: at,
+          by,
+          ...(pending ? { pending: true } : {}),
+        } as Recurrence;
+        yield* db(
+          q.addRecurrence({
+            id: s.id,
+            name: s.name,
+            body: s.text,
+            channel_id: s.channel,
+            agent: s.agent ?? null,
+            project: s.project ?? null,
+            spec: JSON.stringify(s.when),
+            tz,
+            set_by: by,
+            pending,
+            created_at: at,
           }),
-        ),
-      setEnabled: (id, enabled) =>
-        lock.withPermits(1)(
-          Effect.gen(function* () {
-            const was = yield* find(id);
-            // Turned on is the owner's yes (only the owner may: recurrence.update); the queries clear pending the same way.
-            const { pending: _, ...rest } = was;
-            let s: Recurrence = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
-            // Switched back on: it counts from now, not from runs it skipped while off.
-            if (enabled && !was.enabled && was.when.kind !== "once") {
-              const at = now();
-              s = { ...s, lastRun: at };
-              yield* ran(id, at, enabled);
-            } else yield* db(q.enableRecurrence({ enabled, id }));
-            yield* core.apply({ type: "recurrence", recurrence: s });
-            return s;
-          }),
-        ),
-      remove: (id) =>
-        lock.withPermits(1)(
-          Effect.gen(function* () {
-            const was = yield* find(id);
-            yield* db(q.removeRecurrence({ id }));
-            yield* core.apply({ type: "recurrenceGone", id });
-            return was;
-          }),
-        ),
+        );
+        yield* core.apply({ type: "recurrence", recurrence: s });
+        return s;
+      }, lock.withPermits(1)),
+      setEnabled: Effect.fn("Recurrences.setEnabled")(function* (id, enabled) {
+        const was = yield* find(id);
+        // Turned on is the owner's yes (only the owner may: recurrence.update); the queries clear pending the same way.
+        const { pending: _, ...rest } = was;
+        let s: Recurrence = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
+        // Switched back on: it counts from now, not from runs it skipped while off.
+        if (enabled && !was.enabled && was.when.kind !== "once") {
+          const at = now();
+          s = { ...s, lastRun: at };
+          yield* ran(id, at, enabled);
+        } else yield* db(q.enableRecurrence({ enabled, id }));
+        yield* core.apply({ type: "recurrence", recurrence: s });
+        return s;
+      }, lock.withPermits(1)),
+      remove: Effect.fn("Recurrences.remove")(function* (id) {
+        const was = yield* find(id);
+        yield* db(q.removeRecurrence({ id }));
+        yield* core.apply({ type: "recurrenceGone", id });
+        return was;
+      }, lock.withPermits(1)),
       previewRemove: (id) =>
         Effect.map(find(id), (was) => ({
           does: [`删掉定时「${was.name}」${was.whenText ? `（${was.whenText}）` : ""}：以后不再到点开工，它开过的工单留着`],

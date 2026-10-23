@@ -350,28 +350,27 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = (req: IssueRequest, recurrence?: string) =>
-      Effect.gen(function* () {
-        const [title, description] = yield* issueWords(req);
-        const id = newId();
-        yield* db(
-          q.addIssue({
-            id,
-            title,
-            description,
-            project: nullText(req.project),
-            assignee: nullText(req.assignee),
-            priority: req.priority ?? "medium",
-            created_at: Date.now(),
-            recurrence: recurrence ?? null,
-            review: req.review || "glance",
-            // The orchestrator never changes code: what it is given is answered.
-            deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
-          }),
-        );
-        yield* publish(id);
-        return yield* get(id);
-      });
+    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, recurrence?: string) {
+      const [title, description] = yield* issueWords(req);
+      const id = newId();
+      yield* db(
+        q.addIssue({
+          id,
+          title,
+          description,
+          project: nullText(req.project),
+          assignee: nullText(req.assignee),
+          priority: req.priority ?? "medium",
+          created_at: Date.now(),
+          recurrence: recurrence ?? null,
+          review: req.review || "glance",
+          // The orchestrator never changes code: what it is given is answered.
+          deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
+        }),
+      );
+      yield* publish(id);
+      return yield* get(id);
+    });
 
     /** Done, with what it delivered. */
     const complete = (id: string, delivered: Delivery) => Effect.andThen(db(q.completeIssue({ closed_at: Date.now(), delivered, id })), publish(id));
@@ -379,19 +378,18 @@ export const make = (options: IssueOptions = {}) =>
     const cancelAs = (id: string, canceled: IssueCanceled) => Effect.andThen(db(q.cancelIssue({ closed_at: Date.now(), canceled, id })), publish(id));
 
     /** A run no session carries (an in-process agent's, the orchestrator's) ended on the issue: the issue keeps how. */
-    const endRun = (id: string, outcome: Outcome) =>
-      Effect.gen(function* () {
-        const t = yield* get(id);
-        // A run cut off by a restart closed its issue as lost; the run it goes on in ends on it all the same.
-        if (isClosed(t.status)) {
-          if (t.canceled !== "lost") return;
-          yield* db(q.reopenIssue({ id }));
-        }
-        const now = Date.now();
-        const run: IssueRun = { startedAt: t.lastRun?.startedAt ?? now, endedAt: now, outcome };
-        yield* db(q.setLastRun({ id, last_run: JSON.stringify(run) }));
-        yield* publish(id);
-      });
+    const endRun = Effect.fn("Issues.endRun")(function* (id: string, outcome: Outcome) {
+      const t = yield* get(id);
+      // A run cut off by a restart closed its issue as lost; the run it goes on in ends on it all the same.
+      if (isClosed(t.status)) {
+        if (t.canceled !== "lost") return;
+        yield* db(q.reopenIssue({ id }));
+      }
+      const now = Date.now();
+      const run: IssueRun = { startedAt: t.lastRun?.startedAt ?? now, endedAt: now, outcome };
+      yield* db(q.setLastRun({ id, last_run: JSON.stringify(run) }));
+      yield* publish(id);
+    });
 
     const reopenRow = (id: string) => Effect.andThen(db(q.reopenIssue({ id })), publish(id));
 
@@ -404,61 +402,57 @@ export const make = (options: IssueOptions = {}) =>
 
     /** An answer issue's round reported: a round that got through gives its conclusion (none when none can be read, and
      * the issue is stuck on it); whatever the round changed goes, so the issue never delivers a change. */
-    const answered = (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) =>
-      Effect.gen(function* () {
-        const t = yield* get(id);
-        if (t.deliver !== "answer" || t.sessions.at(-1) !== session) return;
-        if (outcome === "completed") yield* db(q.setIssueAnswer({ id, answer: jsonOrNull(answer, answer !== undefined) }));
-        yield* sessions.discardWork(session);
-        yield* publish(id);
-      });
+    const answered = Effect.fn("Issues.answered")(function* (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) {
+      const t = yield* get(id);
+      if (t.deliver !== "answer" || t.sessions.at(-1) !== session) return;
+      if (outcome === "completed") yield* db(q.setIssueAnswer({ id, answer: jsonOrNull(answer, answer !== undefined) }));
+      yield* sessions.discardWork(session);
+      yield* publish(id);
+    });
 
     /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
     const judged = (id: string, at: number, findings: readonly Finding[]) =>
       Effect.andThen(db(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
 
     /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
-    const ownerSaid = (id: string) =>
-      Effect.gen(function* () {
-        yield* asked(id, []);
-        const t = yield* get(id);
-        if (t.reviewedAt !== undefined) yield* judged(id, 0, t.findings);
-      });
+    const ownerSaid = Effect.fn("Issues.ownerSaid")(function* (id: string) {
+      yield* asked(id, []);
+      const t = yield* get(id);
+      if (t.reviewedAt !== undefined) yield* judged(id, 0, t.findings);
+    });
 
     /** The issue already owns its number and workplace before its session starts. */
-    const ran = (id: string, session: Session) =>
-      Effect.gen(function* () {
-        yield* sql
-          .withTransaction(
-            Effect.gen(function* () {
-              yield* q.reopenIssue({ id });
-              yield* q.assignIssue({ id, assignee: session.agent });
-              yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
-              yield* qq.dequeueIssue({ issue: id });
-            }),
-          )
-          .pipe(
-            Effect.provideService(SqlClient.SqlClient, sql),
-            Effect.mapError((e) => new Error(causeMessage(e))),
-          );
-        yield* publish(id);
-      });
+    const ran = Effect.fn("Issues.ran")(function* (id: string, session: Session) {
+      yield* sql
+        .withTransaction(
+          Effect.gen(function* () {
+            yield* q.reopenIssue({ id });
+            yield* q.assignIssue({ id, assignee: session.agent });
+            yield* qs.addSession({ session: session.id, issue: id, started_at: session.hiredAt });
+            yield* qq.dequeueIssue({ issue: id });
+          }),
+        )
+        .pipe(
+          Effect.provideService(SqlClient.SqlClient, sql),
+          Effect.mapError((e) => new Error(causeMessage(e))),
+        );
+      yield* publish(id);
+    });
 
     /** Queueing keeps the first dispatch context until the issue starts or leaves the queue. */
-    const queueRow = (id: string, queued: boolean, channel: string, by?: RunTrigger) =>
-      Effect.gen(function* () {
-        yield* unsent(id);
-        yield* inTx(
-          queued
-            ? Effect.andThen(
-                db(qq.enqueueIssue({ issue: id, channel, triggered_by: JSON.stringify(by ?? { kind: "issue" }) })),
-                db(q.queueIssue({ at: Date.now(), id })),
-              )
-            : Effect.andThen(db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id }))),
-        );
-        yield* publish(id);
-        return yield* get(id);
-      });
+    const queueRow = Effect.fn("Issues.queueRow")(function* (id: string, queued: boolean, channel: string, by?: RunTrigger) {
+      yield* unsent(id);
+      yield* inTx(
+        queued
+          ? Effect.andThen(
+              db(qq.enqueueIssue({ issue: id, channel, triggered_by: JSON.stringify(by ?? { kind: "issue" }) })),
+              db(q.queueIssue({ at: Date.now(), id })),
+            )
+          : Effect.andThen(db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id }))),
+      );
+      yield* publish(id);
+      return yield* get(id);
+    });
 
     const queuedDispatch = (id: string) =>
       Effect.flatMap(one(qq.queuedIssue({ issue: id })), (row) =>
@@ -466,59 +460,53 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     /** Canceled before it was ever sent: out of the queue and closed as dismissed, in one write. */
-    const drop = (id: string) =>
-      Effect.gen(function* () {
-        yield* unsent(id);
-        yield* inTx(
-          Effect.all(
-            [db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id })), db(q.cancelIssue({ closed_at: Date.now(), canceled: "dismissed", id }))],
-            {
-              discard: true,
-            },
-          ),
-        );
-        yield* publish(id);
-      });
+    const drop = Effect.fn("Issues.drop")(function* (id: string) {
+      yield* unsent(id);
+      yield* inTx(
+        Effect.all([db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id })), db(q.cancelIssue({ closed_at: Date.now(), canceled: "dismissed", id }))], {
+          discard: true,
+        }),
+      );
+      yield* publish(id);
+    });
 
     // ── sending ──
 
-    const hire = (agent: Agent, task: string, project: string, opt: HireOptions = {}) =>
-      Effect.gen(function* () {
-        if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" } as Hired;
-        if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
-        for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
-        const where = project.trim() || (agent.workdir ?? "").trim();
-        if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" } as Hired;
-        const room = yield* sessions.makeRoom(agent.runtime, where);
-        if ("refused" in room) return { refused: room.refused } as Hired;
-        const evicted = room.evicted ?? "";
-        const prepared = yield* Effect.result(
-          (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
-            Effect.catchDefect((d) => Effect.fail(refused(causeMessage(d)))),
-          ),
-        );
-        if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
-        const issue = prepared.success;
-        // A draft's session is not one of the issue's sessions: the issue stays unsent.
-        const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
-        if (!hired.session && !opt.issue && !hired.retainedWork) {
-          yield* db(q.removeIssue({ id: issue.id }));
-          yield* core.apply({ type: "issueGone", id: issue.id });
-        }
-        if (hired.retainedWork) return { ...hired, refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单` };
-        return hired.session && evicted ? { ...hired, evicted } : hired;
-      });
+    const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
+      if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" } as Hired;
+      if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
+      for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
+      const where = project.trim() || (agent.workdir ?? "").trim();
+      if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" } as Hired;
+      const room = yield* sessions.makeRoom(agent.runtime, where);
+      if ("refused" in room) return { refused: room.refused } as Hired;
+      const evicted = room.evicted ?? "";
+      const prepared = yield* Effect.result(
+        (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
+          Effect.catchDefect((d) => Effect.fail(refused(causeMessage(d)))),
+        ),
+      );
+      if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
+      const issue = prepared.success;
+      // A draft's session is not one of the issue's sessions: the issue stays unsent.
+      const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
+      if (!hired.session && !opt.issue && !hired.retainedWork) {
+        yield* db(q.removeIssue({ id: issue.id }));
+        yield* core.apply({ type: "issueGone", id: issue.id });
+      }
+      if (hired.retainedWork) return { ...hired, refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单` };
+      return hired.session && evicted ? { ...hired, evicted } : hired;
+    });
 
     /** Who an unsent issue goes to and where, or why it cannot go: starting it and its dry run ask the same. */
-    const readyOf = (issue: Issue) =>
-      Effect.gen(function* () {
-        if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
-        const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
-        if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案", pick));
-        const agent = store.agent(issue.assignee);
-        if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了", pick));
-        return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
-      });
+    const readyOf = Effect.fn("Issues.readyOf")(function* (issue: Issue) {
+      if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
+      const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
+      if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案", pick));
+      const agent = store.agent(issue.assignee);
+      if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了", pick));
+      return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
+    });
 
     const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
@@ -528,14 +516,13 @@ export const make = (options: IssueOptions = {}) =>
       );
 
     /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
-    const toOrchestrator = (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence, said?: string) =>
-      Effect.gen(function* () {
-        if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
-        const run: IssueRun = { startedAt: Date.now() };
-        yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
-        yield* publish(issue.id);
-        PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
-      });
+    const toOrchestrator = Effect.fn("Issues.toOrchestrator")(function* (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence, said?: string) {
+      if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
+      const run: IssueRun = { startedAt: Date.now() };
+      yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
+      yield* publish(issue.id);
+      PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
+    });
 
     /** by undefined: the issue sent out. said: the owner's words with it, when it is asked again. */
     const start = (id: string, channel: string, by?: RunTrigger, said?: string): Effect.Effect<Dispatched, ApiError> =>
@@ -587,69 +574,65 @@ export const make = (options: IssueOptions = {}) =>
     );
 
     /** to: another profile takes it on; else the one the last session worked as. */
-    const reopen = (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) =>
-      Effect.gen(function* () {
-        const issue = yield* get(id);
-        if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
-          return yield* Effect.fail(refused("这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
-        if (issue.sessions.length === 0) {
-          // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
-          if (!issue.lastRun) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
-          if (!isClosed(issue.status)) return yield* Effect.fail(refused("这张工单还开着：挪回待办就是再来一轮"));
-          yield* start(id, channel, by, text);
-          return "";
-        }
-        const last = yield* sessions.get(issue.sessions.at(-1)!);
-        if (!last) return yield* Effect.fail(missing("工单 " + id, [lookIn.issue]));
-        if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
-        const agent = to ?? store.agent(last.agent);
-        if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
-        const where = issue.project ?? "";
-        const changes = yield* Effect.option(projects.branchChanges(where, issueBranch(issue.number)));
-        const previous = Option.isSome(changes) && changes.value.commits.length > 0;
-        const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
-        const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
-        if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
-        return hired.session.id;
-      });
+    const reopen = Effect.fn("Issues.reopen")(function* (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) {
+      const issue = yield* get(id);
+      if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
+        return yield* Effect.fail(refused("这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
+      if (issue.sessions.length === 0) {
+        // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
+        if (!issue.lastRun) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
+        if (!isClosed(issue.status)) return yield* Effect.fail(refused("这张工单还开着：挪回待办就是再来一轮"));
+        yield* start(id, channel, by, text);
+        return "";
+      }
+      const last = yield* sessions.get(issue.sessions.at(-1)!);
+      if (!last) return yield* Effect.fail(missing("工单 " + id, [lookIn.issue]));
+      if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
+      const agent = to ?? store.agent(last.agent);
+      if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
+      const where = issue.project ?? "";
+      const changes = yield* Effect.option(projects.branchChanges(where, issueBranch(issue.number)));
+      const previous = Option.isSome(changes) && changes.value.commits.length > 0;
+      const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
+      const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
+      if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
+      return hired.session.id;
+    });
 
     /** A recurrence has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
-    const scheduled = (due: Due) =>
-      Effect.gen(function* () {
-        const s = due.recurrence;
-        const channel = yield* chat.channelOf(s.channel);
-        const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
-        const found = yield* ofRecurrence(s.id);
-        let issue = found;
-        if (!issue) {
-          const project = s.project ?? (channel.project || undefined);
-          const made = yield* Effect.result(
-            add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? orchestratorAgent }, s.id),
-          );
-          if (made._tag === "Failure")
-            return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
-          issue = made.success;
-        }
-        const text = dueText(s, due.missed);
-        const t = issue;
-        const result = yield* Effect.result(
-          Effect.gen(function* () {
-            if (isForOrchestrator(t)) return yield* toOrchestrator(t, channel.id, by, s);
-            if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
-            if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
-            const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
-            if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
-          }),
+    const scheduled = Effect.fn("Issues.scheduled")(function* (due: Due) {
+      const s = due.recurrence;
+      const channel = yield* chat.channelOf(s.channel);
+      const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
+      const found = yield* ofRecurrence(s.id);
+      let issue = found;
+      if (!issue) {
+        const project = s.project ?? (channel.project || undefined);
+        const made = yield* Effect.result(
+          add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? orchestratorAgent }, s.id),
         );
-        if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "recurrence_refused");
-      });
+        if (made._tag === "Failure") return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
+        issue = made.success;
+      }
+      const text = dueText(s, due.missed);
+      const t = issue;
+      const result = yield* Effect.result(
+        Effect.gen(function* () {
+          if (isForOrchestrator(t)) return yield* toOrchestrator(t, channel.id, by, s);
+          if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
+          if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
+          const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
+          if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
+        }),
+      );
+      if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "recurrence_refused");
+    });
 
-    const ofRecurrence = (id: string) =>
-      Effect.gen(function* () {
-        const row = yield* one(q.latestOfRecurrence({ recurrence: id }));
-        if (!row) return undefined;
-        return Option.getOrUndefined(yield* Effect.option(get(row.id)));
-      });
+    const ofRecurrence = Effect.fn("Issues.ofRecurrence")(function* (id: string) {
+      const row = yield* one(q.latestOfRecurrence({ recurrence: id }));
+      if (!row) return undefined;
+      return Option.getOrUndefined(yield* Effect.option(get(row.id)));
+    });
 
     // ── merging ──
 
@@ -667,15 +650,14 @@ export const make = (options: IssueOptions = {}) =>
       publish,
     });
 
-    const comment = (id: string, text: string, sendKey = "") =>
-      Effect.gen(function* () {
-        const issue = yield* get(id);
-        if (isClosed(issue.status)) return yield* Effect.fail(refused("这张工单关上了：带一句话重开它"));
-        const session = yield* liveSession(id);
-        const said = yield* chat.tellSession("user", session, text, sendKey);
-        // Said in its thread, the issue hears it from the message's fact (heard below); with no thread there is no fact.
-        if (!said) yield* ownerSaid(id);
-      });
+    const comment = Effect.fn("Issues.comment")(function* (id: string, text: string, sendKey = "") {
+      const issue = yield* get(id);
+      if (isClosed(issue.status)) return yield* Effect.fail(refused("这张工单关上了：带一句话重开它"));
+      const session = yield* liveSession(id);
+      const said = yield* chat.tellSession("user", session, text, sendKey);
+      // Said in its thread, the issue hears it from the message's fact (heard below); with no thread there is no fact.
+      if (!said) yield* ownerSaid(id);
+    });
 
     /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
     const commitsOf = (t: Issue) =>
@@ -685,58 +667,54 @@ export const make = (options: IssueOptions = {}) =>
 
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything
      * moves, so a handover never leaves its session gone and no one sent. */
-    const takerOf = (t: Issue, to: IssueStatus, key: string) =>
-      Effect.gen(function* () {
-        const a = store.named(key.trim());
-        if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案", [lookIn.agent]));
-        if (a.id === t.assignee) return undefined;
-        if (to !== "todo") return yield* Effect.fail(refused("换人是挪到待办时的事：挪到待办，填上谁来接手"));
-        if (t.status === "in_progress") return yield* Effect.fail(refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`));
-        if (!a.enabled) return yield* Effect.fail(refused(a.name + " 被停用了"));
-        for (const i of yield* runtimes.check(a)) if (i.level === "error") return yield* Effect.fail(refused(`${a.name} 派不出去：${i.text}`));
-        return a;
-      });
+    const takerOf = Effect.fn("Issues.takerOf")(function* (t: Issue, to: IssueStatus, key: string) {
+      const a = store.named(key.trim());
+      if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案", [lookIn.agent]));
+      if (a.id === t.assignee) return undefined;
+      if (to !== "todo") return yield* Effect.fail(refused("换人是挪到待办时的事：挪到待办，填上谁来接手"));
+      if (t.status === "in_progress") return yield* Effect.fail(refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`));
+      if (!a.enabled) return yield* Effect.fail(refused(a.name + " 被停用了"));
+      for (const i of yield* runtimes.check(a)) if (i.level === "error") return yield* Effect.fail(refused(`${a.name} 派不出去：${i.text}`));
+      return a;
+    });
 
     /** Its session, if one is on the farm, goes home; an issue no session works on has nobody to send. */
-    const cancel = (id: string) =>
-      Effect.gen(function* () {
-        const t = yield* get(id);
-        const last = t.sessions.at(-1);
-        if (last === undefined || !sessions.find(last)) return;
-        if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last, [lookIn.session]));
-      });
+    const cancel = Effect.fn("Issues.cancel")(function* (id: string) {
+      const t = yield* get(id);
+      const last = t.sessions.at(-1);
+      if (last === undefined || !sessions.find(last)) return;
+      if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last, [lookIn.session]));
+    });
 
     // ── a move worked out before it is made ──
 
     /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first);
      * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
-    const withEdit = (t: Issue, edit: IssueUpdate | undefined) =>
-      Effect.gen(function* () {
-        if (!edit) return t;
-        const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
-        if (words) yield* unsent(t.id);
-        return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) } as Issue;
-      });
+    const withEdit = Effect.fn("Issues.withEdit")(function* (t: Issue, edit: IssueUpdate | undefined) {
+      if (!edit) return t;
+      const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
+      if (words) yield* unsent(t.id);
+      return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) } as Issue;
+    });
 
     /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
      * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
-    const settledMove = (t: Issue, to: IssueStatus, text: string, opt: StatusOptions) =>
-      Effect.gen(function* () {
-        if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
-        const taker = opt.agent ? yield* takerOf(t, to, opt.agent) : undefined;
-        const [move, why] = statusMove(t, to);
-        const said = text.trim();
-        if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
-        if (move === "round" && !taker && !said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
-        // What a completion delivers follows the issue: nothing to take in, its branch kept, or merged (locally or by a PR).
-        let delivery: "kept" | "none" | "merge" | undefined;
-        let commits = 0;
-        if (move === "complete") {
-          commits = yield* commitsOf(t);
-          delivery = opt.keepBranch || commits === 0 ? (opt.keepBranch && commits > 0 ? "kept" : "none") : "merge";
-        }
-        return { t, to, move, said, taker, delivery, commits };
-      });
+    const settledMove = Effect.fn("Issues.settledMove")(function* (t: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
+      if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
+      const taker = opt.agent ? yield* takerOf(t, to, opt.agent) : undefined;
+      const [move, why] = statusMove(t, to);
+      const said = text.trim();
+      if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
+      if (move === "round" && !taker && !said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
+      // What a completion delivers follows the issue: nothing to take in, its branch kept, or merged (locally or by a PR).
+      let delivery: "kept" | "none" | "merge" | undefined;
+      let commits = 0;
+      if (move === "complete") {
+        commits = yield* commitsOf(t);
+        delivery = opt.keepBranch || commits === 0 ? (opt.keepBranch && commits > 0 ? "kept" : "none") : "merge";
+      }
+      return { t, to, move, said, taker, delivery, commits };
+    });
 
     const helperName = (t: Issue) => {
       const last = t.sessions.at(-1);
@@ -744,51 +722,50 @@ export const make = (options: IssueOptions = {}) =>
     };
 
     /** A settled move in words, one step a line; what it reads to say so (who would go, the room, a merge's conflicts) is read, not changed. */
-    const movesWords = (p: Effect.Success<ReturnType<typeof settledMove>>) =>
-      Effect.gen(function* () {
-        const t = p.t;
-        const n = `#${t.number}`;
-        switch (p.move) {
-          case "start": {
-            if (isForOrchestrator(t)) return [`${n} 交给管家答`];
-            const [, agent, project] = yield* readyOf(p.taker ? { ...t, assignee: p.taker.id } : t);
-            const full = sessions.noRoom(agent.runtime, project);
-            return full
-              ? [`${n} 派给 ${agent.name}`, `现在没空位（${full}）：排进待办，有空位就自动开工`]
-              : [project ? `${n} 派 ${agent.name} 去 ${project} 开工` : `${n} 派 ${agent.name} 开工`];
-          }
-          case "unqueue":
-            return [`${n} 不排了，挪回备选`];
-          case "round":
-            if (p.taker) return [`${helperName(t)} 收工，分支留着`, `${p.taker.name} 接手，在同一条分支上接着做`];
-            return t.sessions.length === 0 ? [`${n} 再交给管家答一轮：${p.said}`] : [`把这句话带给 ${helperName(t)}，再干一轮：${p.said}`];
-          case "reopen":
-            return [`${n} 重开：派${p.taker ? " " + p.taker.name : "同一个档案的新帮工"}接着做`, ...(p.said ? [`这一次要做的：${p.said}`] : [])];
-          case "revive":
-            return [`${n} 挪回备选`];
-          case "complete": {
-            if (p.delivery === "none") return [`${n} 关成已完成：没有改动要合`, `${helperName(t)} 收工`];
-            if (p.delivery === "kept") return [`${n} 关成已完成：分支留着没合（${p.commits} 个提交）`, `${helperName(t)} 收工`];
-            const changes = yield* sessions.changes(yield* liveSession(t.id));
-            const pr = t.project !== undefined && (t.pullRequest?.state === "open" || projects.usesPullRequests(t.project));
-            const out: string[] = [];
-            if (changes && changes.uncommitted.length > 0) out.push(`先替 ${helperName(t)} 提交 ${changes.uncommitted.length} 个没提交的文件`);
-            if (changes && changes.conflicts.length > 0)
-              return [...out, `合进 ${changes.base} 会冲突（${changes.conflicts.join("、")}）：不会合，标上冲突，工单留在等你看`];
-            out.push("合之前跑项目的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看");
-            out.push(
-              pr
-                ? `推分支、开 PR（${p.commits} 个提交）：PR 合了才关成已完成`
-                : `合进 ${changes?.base ?? "主分支"}（${p.commits} 个提交），关成已完成，${helperName(t)} 收工`,
-            );
-            return out;
-          }
-          case "cancel":
-            return [`${n} 关成已取消`, `${helperName(t)} 收工，分支上有提交就留着`];
-          case "drop":
-            return [`${n} 关成已取消：还没派过`, ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : [])];
+    const movesWords = Effect.fn("Issues.movesWords")(function* (p: Effect.Success<ReturnType<typeof settledMove>>) {
+      const t = p.t;
+      const n = `#${t.number}`;
+      switch (p.move) {
+        case "start": {
+          if (isForOrchestrator(t)) return [`${n} 交给管家答`];
+          const [, agent, project] = yield* readyOf(p.taker ? { ...t, assignee: p.taker.id } : t);
+          const full = sessions.noRoom(agent.runtime, project);
+          return full
+            ? [`${n} 派给 ${agent.name}`, `现在没空位（${full}）：排进待办，有空位就自动开工`]
+            : [project ? `${n} 派 ${agent.name} 去 ${project} 开工` : `${n} 派 ${agent.name} 开工`];
         }
-      });
+        case "unqueue":
+          return [`${n} 不排了，挪回备选`];
+        case "round":
+          if (p.taker) return [`${helperName(t)} 收工，分支留着`, `${p.taker.name} 接手，在同一条分支上接着做`];
+          return t.sessions.length === 0 ? [`${n} 再交给管家答一轮：${p.said}`] : [`把这句话带给 ${helperName(t)}，再干一轮：${p.said}`];
+        case "reopen":
+          return [`${n} 重开：派${p.taker ? " " + p.taker.name : "同一个档案的新帮工"}接着做`, ...(p.said ? [`这一次要做的：${p.said}`] : [])];
+        case "revive":
+          return [`${n} 挪回备选`];
+        case "complete": {
+          if (p.delivery === "none") return [`${n} 关成已完成：没有改动要合`, `${helperName(t)} 收工`];
+          if (p.delivery === "kept") return [`${n} 关成已完成：分支留着没合（${p.commits} 个提交）`, `${helperName(t)} 收工`];
+          const changes = yield* sessions.changes(yield* liveSession(t.id));
+          const pr = t.project !== undefined && (t.pullRequest?.state === "open" || projects.usesPullRequests(t.project));
+          const out: string[] = [];
+          if (changes && changes.uncommitted.length > 0) out.push(`先替 ${helperName(t)} 提交 ${changes.uncommitted.length} 个没提交的文件`);
+          if (changes && changes.conflicts.length > 0)
+            return [...out, `合进 ${changes.base} 会冲突（${changes.conflicts.join("、")}）：不会合，标上冲突，工单留在等你看`];
+          out.push("合之前跑项目的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看");
+          out.push(
+            pr
+              ? `推分支、开 PR（${p.commits} 个提交）：PR 合了才关成已完成`
+              : `合进 ${changes?.base ?? "主分支"}（${p.commits} 个提交），关成已完成，${helperName(t)} 收工`,
+          );
+          return out;
+        }
+        case "cancel":
+          return [`${n} 关成已取消`, `${helperName(t)} 收工，分支上有提交就留着`];
+        case "drop":
+          return [`${n} 关成已取消：还没派过`, ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : [])];
+      }
+    });
 
     // ── drafts ──
 
@@ -809,50 +786,48 @@ export const make = (options: IssueOptions = {}) =>
 
     // ── what happens to its sessions ──
 
-    const onSessionNews = (n: SessionNews) =>
-      Effect.gen(function* () {
-        switch (n._tag) {
-          case "left": {
-            const e = n.left;
-            const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
-            if (!issue) return;
-            const row = yield* one(q.getIssue({ id: issue }));
-            if (!row || row.graph !== null || row.task !== null) return;
-            const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
-            // Closed already (completed by the owner before its session went home): the verdict stands.
-            if (runs.at(-1) !== e.id || row.closed_at !== null) return;
-            const closing = closingOf(e.closed);
-            yield* db(
-              "delivered" in closing
-                ? q.completeOpenIssue({ closed_at: Date.now(), delivered: closing.delivered, id: issue })
-                : q.cancelOpenIssue({ closed_at: Date.now(), canceled: closing.canceled, id: issue }),
-            );
-            yield* publish(issue);
-            return;
-          }
-          case "reported": {
-            const e = n.report;
-            const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
-            // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
-            const checks = e.checks ?? [];
-            if (issue && checks.length > 0) yield* checked(issue, checks);
-            if (issue) yield* asked(issue, e.questions);
-            if (issue) yield* answered(issue, e.id, e.outcome, e.answer);
-            yield* handedBack(e);
-            return;
-          }
-          case "hired":
-            return;
+    const onSessionNews = Effect.fn("Issues.onSessionNews")(function* (n: SessionNews) {
+      switch (n._tag) {
+        case "left": {
+          const e = n.left;
+          const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+          if (!issue) return;
+          const row = yield* one(q.getIssue({ id: issue }));
+          if (!row || row.graph !== null || row.task !== null) return;
+          const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
+          // Closed already (completed by the owner before its session went home): the verdict stands.
+          if (runs.at(-1) !== e.id || row.closed_at !== null) return;
+          const closing = closingOf(e.closed);
+          yield* db(
+            "delivered" in closing
+              ? q.completeOpenIssue({ closed_at: Date.now(), delivered: closing.delivered, id: issue })
+              : q.cancelOpenIssue({ closed_at: Date.now(), canceled: closing.canceled, id: issue }),
+          );
+          yield* publish(issue);
+          return;
         }
-      });
+        case "reported": {
+          const e = n.report;
+          const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+          // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
+          const checks = e.checks ?? [];
+          if (issue && checks.length > 0) yield* checked(issue, checks);
+          if (issue) yield* asked(issue, e.questions);
+          if (issue) yield* answered(issue, e.id, e.outcome, e.answer);
+          yield* handedBack(e);
+          return;
+        }
+        case "hired":
+          return;
+      }
+    });
 
     // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
-    const onOwnerInThread = (thread: string) =>
-      Effect.gen(function* () {
-        const issue = yield* Effect.option(get(thread));
-        if (Option.isNone(issue) || isClosed(issue.value.status)) return;
-        yield* ownerSaid(issue.value.id);
-      });
+    const onOwnerInThread = Effect.fn("Issues.onOwnerInThread")(function* (thread: string) {
+      const issue = yield* Effect.option(get(thread));
+      if (Option.isNone(issue) || isClosed(issue.value.status)) return;
+      yield* ownerSaid(issue.value.id);
+    });
 
     // ── coming back ──
 
@@ -907,17 +882,16 @@ export const make = (options: IssueOptions = {}) =>
       );
     }
 
-    const timeline = (id: string) =>
-      Effect.gen(function* () {
-        const issue = yield* get(id);
-        const runs = yield* sessions.runs(issue.id);
-        const names = new Map<string, string>();
-        for (const s of new Set(runs.map((r) => r.session))) {
-          const found = yield* sessions.get(s);
-          if (found) names.set(s, found.name);
-        }
-        return milestonesOf(issue, runs, names);
-      });
+    const timeline = Effect.fn("Issues.timeline")(function* (id: string) {
+      const issue = yield* get(id);
+      const runs = yield* sessions.runs(issue.id);
+      const names = new Map<string, string>();
+      for (const s of new Set(runs.map((r) => r.session))) {
+        const found = yield* sessions.get(s);
+        if (found) names.set(s, found.name);
+      }
+      return milestonesOf(issue, runs, names);
+    });
 
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
@@ -927,380 +901,362 @@ export const make = (options: IssueOptions = {}) =>
       add: (req) => add(req),
       /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
        * next round goes by them. */
-      edit: (id, upd) =>
-        Effect.gen(function* () {
-          const whileOpen =
-            upd.title === undefined &&
-            upd.description === undefined &&
-            upd.project === undefined &&
-            upd.assignee === undefined &&
-            upd.priority === undefined &&
-            upd.criteria === undefined;
-          let was: Issue;
-          if (whileOpen) {
-            was = yield* get(id);
-            if (isClosed(was.status)) return yield* Effect.fail(refused("这张工单关上了"));
-          } else was = yield* unsent(id);
-          const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
-          if (upd.project !== undefined && upd.project !== was.project && was.project) {
-            const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
-            if (released.kept) return yield* Effect.fail(refused(`工单 #${was.number} 还不能换项目：${released.reason}`));
-          }
-          const criteria = upd.criteria !== undefined ? kept(upd.criteria) : (was.criteria ?? []);
-          yield* db(
-            q.editIssue({
-              title,
-              description,
-              project: nullText(upd.project ?? was.project),
-              assignee: nullText(upd.assignee ?? was.assignee),
-              priority: upd.priority ?? was.priority,
-              review: upd.review || was.review || "glance",
-              criteria: jsonOrNull(criteria, criteria.length > 0),
-              deliver: upd.deliver ?? was.deliver,
-              id,
-            }),
-          );
-          yield* publish(id);
-          return yield* get(id);
-        }),
-      remove: (id) =>
-        Effect.gen(function* () {
-          const t = yield* unsent(id);
-          const cleared = yield* clearRefinement(t);
-          if (cleared.kept) return yield* Effect.fail(refused(`工单 #${t.number} 还不能删：${cleared.reason}`));
-          yield* db(q.removeIssue({ id }));
-          yield* core.apply({ type: "issueGone", id } as never);
-        }),
-      move: (id, before) =>
-        Effect.gen(function* () {
-          yield* unsent(id);
-          const order = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
-          const at = order.indexOf(before);
-          order.splice(at < 0 ? order.length : at, 0, id);
-          yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
-          for (const each of order) yield* publish(each);
-          return yield* list;
-        }),
+      edit: Effect.fn("Issues.edit")(function* (id, upd) {
+        const whileOpen =
+          upd.title === undefined &&
+          upd.description === undefined &&
+          upd.project === undefined &&
+          upd.assignee === undefined &&
+          upd.priority === undefined &&
+          upd.criteria === undefined;
+        let was: Issue;
+        if (whileOpen) {
+          was = yield* get(id);
+          if (isClosed(was.status)) return yield* Effect.fail(refused("这张工单关上了"));
+        } else was = yield* unsent(id);
+        const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
+        if (upd.project !== undefined && upd.project !== was.project && was.project) {
+          const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
+          if (released.kept) return yield* Effect.fail(refused(`工单 #${was.number} 还不能换项目：${released.reason}`));
+        }
+        const criteria = upd.criteria !== undefined ? kept(upd.criteria) : (was.criteria ?? []);
+        yield* db(
+          q.editIssue({
+            title,
+            description,
+            project: nullText(upd.project ?? was.project),
+            assignee: nullText(upd.assignee ?? was.assignee),
+            priority: upd.priority ?? was.priority,
+            review: upd.review || was.review || "glance",
+            criteria: jsonOrNull(criteria, criteria.length > 0),
+            deliver: upd.deliver ?? was.deliver,
+            id,
+          }),
+        );
+        yield* publish(id);
+        return yield* get(id);
+      }),
+      remove: Effect.fn("Issues.remove")(function* (id) {
+        const t = yield* unsent(id);
+        const cleared = yield* clearRefinement(t);
+        if (cleared.kept) return yield* Effect.fail(refused(`工单 #${t.number} 还不能删：${cleared.reason}`));
+        yield* db(q.removeIssue({ id }));
+        yield* core.apply({ type: "issueGone", id } as never);
+      }),
+      move: Effect.fn("Issues.move")(function* (id, before) {
+        yield* unsent(id);
+        const order = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
+        const at = order.indexOf(before);
+        order.splice(at < 0 ? order.length : at, 0, id);
+        yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
+        for (const each of order) yield* publish(each);
+        return yield* list;
+      }),
       queue: (id, queued) => queueRow(id, queued, chat.general()),
       start: (id, channel) => start(id, channel),
       /** Only a queued todo starts here, under the queue's lock; without room it keeps its place. */
-      dispatchQueued: (id) =>
-        trying.withPermits(1)(
-          Effect.gen(function* () {
-            const issue = yield* get(id);
-            if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
-              return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
-            const [, agent, project] = yield* ready(id);
-            const full = sessions.noRoom(agent.runtime, project);
-            if (full) return { queued: full + "：还在排队，有空位就自动开工" };
-            return yield* start(id, "");
-          }),
-        ),
+      dispatchQueued: Effect.fn("Issues.dispatchQueued")(function* (id) {
+        const issue = yield* get(id);
+        if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
+          return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
+        const [, agent, project] = yield* ready(id);
+        const full = sessions.noRoom(agent.runtime, project);
+        if (full) return { queued: full + "：还在排队，有空位就自动开工" };
+        return yield* start(id, "");
+      }, trying.withPermits(1)),
       reopen: (id, text, channel) => reopen(id, text, channel),
       idOf,
-      act: (ref, req, channel) =>
-        Effect.gen(function* () {
-          const t = yield* get(ref);
-          const id = t.id;
-          const name = actLabel[req.act];
-          if (!t.attention.acts.includes(req.act))
-            return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
-          const said = (req.text ?? "").trim();
-          const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+      act: Effect.fn("Issues.act")(function* (ref, req, channel) {
+        const t = yield* get(ref);
+        const id = t.id;
+        const name = actLabel[req.act];
+        if (!t.attention.acts.includes(req.act))
+          return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+        const said = (req.text ?? "").trim();
+        const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+        switch (req.act) {
+          case "start":
+            yield* shape.setStatus(id, "todo", said, channel);
+            break;
+          case "answer":
+          case "tell":
+            yield* comment(id, yield* words, req.sendKey ?? "");
+            break;
+          case "accept":
+            yield* shape.review(id, { pass: true });
+            break;
+          case "reject": {
+            const findings = req.findings ?? findingsOf(said);
+            if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
+            yield* shape.review(id, { pass: false, findings });
+            break;
+          }
+          case "complete":
+          case "acknowledge":
+            yield* shape.setStatus(id, "done", said, channel);
+            break;
+          case "keep":
+            yield* shape.setStatus(id, "done", said, channel, { keepBranch: true });
+            break;
+          case "close":
+            yield* shape.setStatus(id, "canceled", said, channel);
+            break;
+          // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
+          case "reopen":
+            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel) : shape.setStatus(id, "backlog", "", channel);
+            break;
+          case "resolve":
+            yield* shape.resolve(id);
+            break;
+          case "resume":
+            yield* comment(id, resumeWords);
+            break;
+          case "cure": {
+            const last = t.sessions.at(-1);
+            // An answer that could not be read goes back with what was wrong with it; a failed round with the job again.
+            const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
+            const unread = t.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
+            yield* comment(
+              id,
+              unread
+                ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
+                : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title),
+            );
+            break;
+          }
+          case "stop":
+            yield* sessions.stop(yield* liveSession(id));
+            break;
+        }
+        return yield* get(id);
+      }),
+      setStatus: Effect.fn("Issues.setStatus")(function* (id, to, text, channel, opt = {}) {
+        const t = yield* get(id);
+        const { move, said, taker, delivery } = yield* settledMove(t, to, text, opt);
+        switch (move) {
+          case "start":
+            if (taker) yield* shape.edit(id, { assignee: taker.id });
+            yield* start(id, channel);
+            break;
+          case "unqueue":
+            yield* queueRow(id, false, chat.general());
+            break;
+          // Handed over: its session leaves first, so that one session at a time works the issue's branch.
+          case "round":
+            if (taker) {
+              yield* cancel(id);
+              yield* cancelAs(id, "dismissed");
+              yield* reopen(id, said, channel, { kind: "comment" }, taker);
+              break;
+            }
+            // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again.
+            if (t.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
+            else yield* comment(id, said);
+            break;
+          case "reopen":
+            yield* reopen(id, said, channel, { kind: "comment" }, taker);
+            break;
+          case "revive":
+            yield* reopenRow(id);
+            break;
+          // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
+          // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
+          case "complete": {
+            if (delivery === "kept" || delivery === "none") {
+              // Written down before its session goes home, so that leaving does not take it for canceled.
+              yield* complete(id, delivery);
+              const last = t.sessions.at(-1);
+              if (last !== undefined && sessions.find(last)) yield* sessions.dismiss(last, "keep", "completed");
+              break;
+            }
+            // The session's leaving closes the issue too, but later: closed here, the answer already says so.
+            yield* merge(id);
+            const updated = yield* get(id);
+            if (updated.pullRequest?.state !== "open") yield* complete(id, updated.pullRequest ? "pull_request" : "merged");
+            break;
+          }
+          case "cancel":
+            yield* cancel(id);
+            yield* cancelAs(id, "dismissed");
+            break;
+          case "drop":
+            yield* clearRefinement(t);
+            yield* drop(id);
+            break;
+        }
+        return yield* get(id);
+      }),
+      previewStatus: Effect.fn("Issues.previewStatus")(function* (id, to, text, opt = {}, edit) {
+        const t = yield* withEdit(yield* get(id), edit);
+        return { does: yield* movesWords(yield* settledMove(t, to, text, opt)) };
+      }),
+      previewAct: Effect.fn("Issues.previewAct")(function* (ref, req) {
+        const t = yield* get(ref);
+        const name = actLabel[req.act];
+        if (!t.attention.acts.includes(req.act))
+          return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+        const said = (req.text ?? "").trim();
+        const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+        const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
+        const helper = helperName(t);
+        const does: readonly string[] = yield* (() => {
           switch (req.act) {
             case "start":
-              yield* shape.setStatus(id, "todo", said, channel);
-              break;
+              return asStatus("todo", said);
             case "answer":
+              return Effect.map(words, (w) => [`回答 ${helper} 问的：${w}`, "它的问题清掉，接着做"]);
             case "tell":
-              yield* comment(id, yield* words, req.sendKey ?? "");
-              break;
+              return Effect.map(words, (w) => [`把这句话带给 ${helper}：${w}`]);
             case "accept":
-              yield* shape.review(id, { pass: true });
-              break;
+              return Effect.succeed([`#${t.number} 验收通过`]);
             case "reject": {
               const findings = req.findings ?? findingsOf(said);
-              if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
-              yield* shape.review(id, { pass: false, findings });
-              break;
+              return findings.length === 0
+                ? Effect.fail(refused("打回要写哪里要修，一行一条"))
+                : Effect.succeed([`#${t.number} 打回：${findings.length} 条意见交给 ${helper} 再修一轮`]);
             }
             case "complete":
             case "acknowledge":
-              yield* shape.setStatus(id, "done", said, channel);
-              break;
+              return asStatus("done", said);
             case "keep":
-              yield* shape.setStatus(id, "done", said, channel, { keepBranch: true });
-              break;
+              return asStatus("done", said, { keepBranch: true });
             case "close":
-              yield* shape.setStatus(id, "canceled", said, channel);
-              break;
-            // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
+              return asStatus("canceled", said);
             case "reopen":
-              yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel) : shape.setStatus(id, "backlog", "", channel);
-              break;
+              return t.sessions.length > 0 ? Effect.flatMap(words, (w) => asStatus("todo", w)) : asStatus("backlog", "");
             case "resolve":
-              yield* shape.resolve(id);
-              break;
+              return Effect.succeed([`让 ${helper} 把主分支合进它的分支、解决冲突，做完再交回来`]);
             case "resume":
-              yield* comment(id, resumeWords);
-              break;
-            case "cure": {
-              const last = t.sessions.at(-1);
-              // An answer that could not be read goes back with what was wrong with it; a failed round with the job again.
-              const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
-              const unread = t.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
-              yield* comment(
-                id,
-                unread
-                  ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
-                  : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title),
-              );
-              break;
-            }
+              return Effect.succeed([`让 ${helper} 接着做：${resumeWords}`]);
+            case "cure":
+              return Effect.succeed([`让 ${helper} 接着修，再交回来`]);
             case "stop":
-              yield* sessions.stop(yield* liveSession(id));
-              break;
+              return Effect.succeed([`叫停 ${helper} 这一轮：它停下，工单等你看`]);
           }
-          return yield* get(id);
-        }),
-      setStatus: (id, to, text, channel, opt = {}) =>
-        Effect.gen(function* () {
-          const t = yield* get(id);
-          const { move, said, taker, delivery } = yield* settledMove(t, to, text, opt);
-          switch (move) {
-            case "start":
-              if (taker) yield* shape.edit(id, { assignee: taker.id });
-              yield* start(id, channel);
-              break;
-            case "unqueue":
-              yield* queueRow(id, false, chat.general());
-              break;
-            // Handed over: its session leaves first, so that one session at a time works the issue's branch.
-            case "round":
-              if (taker) {
-                yield* cancel(id);
-                yield* cancelAs(id, "dismissed");
-                yield* reopen(id, said, channel, { kind: "comment" }, taker);
-                break;
-              }
-              // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again.
-              if (t.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
-              else yield* comment(id, said);
-              break;
-            case "reopen":
-              yield* reopen(id, said, channel, { kind: "comment" }, taker);
-              break;
-            case "revive":
-              yield* reopenRow(id);
-              break;
-            // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
-            // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
-            case "complete": {
-              if (delivery === "kept" || delivery === "none") {
-                // Written down before its session goes home, so that leaving does not take it for canceled.
-                yield* complete(id, delivery);
-                const last = t.sessions.at(-1);
-                if (last !== undefined && sessions.find(last)) yield* sessions.dismiss(last, "keep", "completed");
-                break;
-              }
-              // The session's leaving closes the issue too, but later: closed here, the answer already says so.
-              yield* merge(id);
-              const updated = yield* get(id);
-              if (updated.pullRequest?.state !== "open") yield* complete(id, updated.pullRequest ? "pull_request" : "merged");
-              break;
-            }
-            case "cancel":
-              yield* cancel(id);
-              yield* cancelAs(id, "dismissed");
-              break;
-            case "drop":
-              yield* clearRefinement(t);
-              yield* drop(id);
-              break;
-          }
-          return yield* get(id);
-        }),
-      previewStatus: (id, to, text, opt = {}, edit) =>
-        Effect.gen(function* () {
-          const t = yield* withEdit(yield* get(id), edit);
-          return { does: yield* movesWords(yield* settledMove(t, to, text, opt)) };
-        }),
-      previewAct: (ref, req) =>
-        Effect.gen(function* () {
-          const t = yield* get(ref);
-          const name = actLabel[req.act];
-          if (!t.attention.acts.includes(req.act))
-            return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
-          const said = (req.text ?? "").trim();
-          const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
-          const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
-          const helper = helperName(t);
-          const does: readonly string[] = yield* (() => {
-            switch (req.act) {
-              case "start":
-                return asStatus("todo", said);
-              case "answer":
-                return Effect.map(words, (w) => [`回答 ${helper} 问的：${w}`, "它的问题清掉，接着做"]);
-              case "tell":
-                return Effect.map(words, (w) => [`把这句话带给 ${helper}：${w}`]);
-              case "accept":
-                return Effect.succeed([`#${t.number} 验收通过`]);
-              case "reject": {
-                const findings = req.findings ?? findingsOf(said);
-                return findings.length === 0
-                  ? Effect.fail(refused("打回要写哪里要修，一行一条"))
-                  : Effect.succeed([`#${t.number} 打回：${findings.length} 条意见交给 ${helper} 再修一轮`]);
-              }
-              case "complete":
-              case "acknowledge":
-                return asStatus("done", said);
-              case "keep":
-                return asStatus("done", said, { keepBranch: true });
-              case "close":
-                return asStatus("canceled", said);
-              case "reopen":
-                return t.sessions.length > 0 ? Effect.flatMap(words, (w) => asStatus("todo", w)) : asStatus("backlog", "");
-              case "resolve":
-                return Effect.succeed([`让 ${helper} 把主分支合进它的分支、解决冲突，做完再交回来`]);
-              case "resume":
-                return Effect.succeed([`让 ${helper} 接着做：${resumeWords}`]);
-              case "cure":
-                return Effect.succeed([`让 ${helper} 接着修，再交回来`]);
-              case "stop":
-                return Effect.succeed([`叫停 ${helper} 这一轮：它停下，工单等你看`]);
-            }
-          })();
-          return { does: [...does] };
-        }),
-      previewRemove: (id) =>
-        Effect.gen(function* () {
-          const t = yield* unsent(id);
-          return {
-            does: [
-              `删掉工单 #${t.number}「${shortTitle(t.title)}」`,
-              ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : []),
-              ...(t.project ? ["清掉它的 worktree 和没有提交的分支；还有改动就不删"] : []),
-            ],
-          };
-        }),
+        })();
+        return { does: [...does] };
+      }),
+      previewRemove: Effect.fn("Issues.previewRemove")(function* (id) {
+        const t = yield* unsent(id);
+        return {
+          does: [
+            `删掉工单 #${t.number}「${shortTitle(t.title)}」`,
+            ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : []),
+            ...(t.project ? ["清掉它的 worktree 和没有提交的分支；还有改动就不删"] : []),
+          ],
+        };
+      }),
       comment,
-      changes: (id, by) =>
-        Effect.gen(function* () {
-          const session = yield* liveSession(id);
-          const changes = yield* sessions.changes(session);
-          if (!changes) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
-          if (by === "owner") yield* core.did({ kind: "reviewed", session });
-          return changes;
-        }),
+      changes: Effect.fn("Issues.changes")(function* (id, by) {
+        const session = yield* liveSession(id);
+        const changes = yield* sessions.changes(session);
+        if (!changes) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
+        if (by === "owner") yield* core.did({ kind: "reviewed", session });
+        return changes;
+      }),
       merge,
       /** The owner asks the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
-      resolve: (id) =>
-        Effect.gen(function* () {
-          const session = yield* liveSession(id);
-          const h = sessions.sessionOf(session);
-          if (!h) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
-          // A preview that fails (git broken) is said as it is, not taken for no conflict.
-          const changes = h.conflict ? undefined : yield* sessions.changes(session);
-          const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
-          if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
-          yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");
-        }),
+      resolve: Effect.fn("Issues.resolve")(function* (id) {
+        const session = yield* liveSession(id);
+        const h = sessions.sessionOf(session);
+        if (!h) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
+        // A preview that fails (git broken) is said as it is, not taken for no conflict.
+        const changes = h.conflict ? undefined : yield* sessions.changes(session);
+        const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
+        if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
+        yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");
+      }),
       cancel,
       /** Only an issue in review has something to judge. */
-      review: (id, req) =>
-        Effect.gen(function* () {
-          const t = yield* get(id);
-          const why = isForOrchestrator(t)
-            ? "这是派给管家的工单：管家答完就关"
-            : t.graph || t.task
-              ? "这是计划里的工单，跟着计划走：在计划里验收"
-              : t.status !== "in_review"
-                ? "还没交回来，没有东西可验收"
-                : "";
-          if (why) return yield* Effect.fail(refused(why, nextSteps(t)));
-          if (req.pass) {
-            yield* judged(
-              id,
-              Date.now(),
-              t.findings.map((f) => ({ ...f, resolved: true })),
-            );
-            return yield* get(id);
-          }
-          const fresh = kept(req.findings);
-          const text = (req.text ?? "").trim();
-          if (fresh.length === 0 && !text) return yield* Effect.fail(refused("没过验收要说哪里不行：至少写一条意见"));
-          const at = Date.now();
-          const findings = [...t.findings, ...fresh.map((text) => ({ id: newId(), text, at }))];
-          yield* judged(id, 0, findings);
-          // The findings go to whoever works it as the next round's words, like any comment.
-          yield* comment(id, failedText(findings, text));
+      review: Effect.fn("Issues.review")(function* (id, req) {
+        const t = yield* get(id);
+        const why = isForOrchestrator(t)
+          ? "这是派给管家的工单：管家答完就关"
+          : t.graph || t.task
+            ? "这是计划里的工单，跟着计划走：在计划里验收"
+            : t.status !== "in_review"
+              ? "还没交回来，没有东西可验收"
+              : "";
+        if (why) return yield* Effect.fail(refused(why, nextSteps(t)));
+        if (req.pass) {
+          yield* judged(
+            id,
+            Date.now(),
+            t.findings.map((f) => ({ ...f, resolved: true })),
+          );
           return yield* get(id);
-        }),
+        }
+        const fresh = kept(req.findings);
+        const text = (req.text ?? "").trim();
+        if (fresh.length === 0 && !text) return yield* Effect.fail(refused("没过验收要说哪里不行：至少写一条意见"));
+        const at = Date.now();
+        const findings = [...t.findings, ...fresh.map((text) => ({ id: newId(), text, at }))];
+        yield* judged(id, 0, findings);
+        // The findings go to whoever works it as the next round's words, like any comment.
+        yield* comment(id, failedText(findings, text));
+        return yield* get(id);
+      }),
       refine: draft,
       /** Every issue with its sessions, live and ended, once; a session with no record is named as missing, not given a phase. */
-      history: () =>
-        Effect.gen(function* () {
-          const all = yield* list;
-          const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
-          return all.map((issue) => ({
-            issue,
-            sessions: issue.sessions.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
-            missingSessions: issue.sessions.filter((id) => !byId.has(id)),
-          }));
-        }),
-      templates: (name) =>
-        Effect.gen(function* () {
-          const stack = yield* projects.stack(name);
-          if (!stack) return yield* Effect.fail(missing("项目 " + name, [lookIn.project]));
-          return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
-        }),
+      history: Effect.fn("Issues.history")(function* () {
+        const all = yield* list;
+        const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
+        return all.map((issue) => ({
+          issue,
+          sessions: issue.sessions.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+          missingSessions: issue.sessions.filter((id) => !byId.has(id)),
+        }));
+      }),
+      templates: Effect.fn("Issues.templates")(function* (name) {
+        const stack = yield* projects.stack(name);
+        if (!stack) return yield* Effect.fail(missing("项目 " + name, [lookIn.project]));
+        return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
+      }),
       hire,
       ran,
-      putTask: (graph) =>
-        Effect.gen(function* () {
-          const family = (id: string) =>
-            Effect.gen(function* () {
-              const rows = yield* db(q.family({ id }));
-              const runs = runsBy(yield* db(qs.sessionsOfFamily({ id })));
-              return rows.map((r) => issueOf(r, runs.get(r.id)));
-            });
-          const before = yield* family(graph.id);
-          const issues = graphIssues(graph, before, Date.now());
-          const gone = yield* inTx(
-            Effect.gen(function* () {
-              for (const t of issues)
-                yield* db(
-                  q.putIssue({
-                    id: t.id,
-                    title: t.title,
-                    description: t.description ?? "",
-                    project: nullText(t.project),
-                    assignee: nullText(t.assignee),
-                    priority: t.priority,
-                    rank: t.rank ?? 0,
-                    created_at: t.createdAt,
-                    closed_at: t.closedAt ?? null,
-                    delivered: t.delivered ?? null,
-                    canceled: t.canceled ?? null,
-                    parent: nullText(t.parent),
-                    blocked_by: jsonOrNull(t.blockedBy, (t.blockedBy ?? []).length > 0),
-                    graph: jsonOrNull(t.graph, !!t.graph),
-                    task: jsonOrNull(t.task, !!t.task),
-                  }),
-                );
-              const out: string[] = [];
-              for (const old of before)
-                if (!issues.some((t) => t.id === old.id)) {
-                  yield* db(q.removeIssue({ id: old.id }));
-                  out.push(old.id);
-                }
-              return out;
-            }),
-          );
-          // Published as one commit once the transaction has succeeded.
-          const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (t) => get(t.id).pipe(Effect.orDie));
-          yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
-        }),
+      putTask: Effect.fn("Issues.putTask")(function* (graph) {
+        const family = Effect.fn("Issues.family")(function* (id: string) {
+          const rows = yield* db(q.family({ id }));
+          const runs = runsBy(yield* db(qs.sessionsOfFamily({ id })));
+          return rows.map((r) => issueOf(r, runs.get(r.id)));
+        });
+        const before = yield* family(graph.id);
+        const issues = graphIssues(graph, before, Date.now());
+        const gone = yield* inTx(
+          Effect.gen(function* () {
+            for (const t of issues)
+              yield* db(
+                q.putIssue({
+                  id: t.id,
+                  title: t.title,
+                  description: t.description ?? "",
+                  project: nullText(t.project),
+                  assignee: nullText(t.assignee),
+                  priority: t.priority,
+                  rank: t.rank ?? 0,
+                  created_at: t.createdAt,
+                  closed_at: t.closedAt ?? null,
+                  delivered: t.delivered ?? null,
+                  canceled: t.canceled ?? null,
+                  parent: nullText(t.parent),
+                  blocked_by: jsonOrNull(t.blockedBy, (t.blockedBy ?? []).length > 0),
+                  graph: jsonOrNull(t.graph, !!t.graph),
+                  task: jsonOrNull(t.task, !!t.task),
+                }),
+              );
+            const out: string[] = [];
+            for (const old of before)
+              if (!issues.some((t) => t.id === old.id)) {
+                yield* db(q.removeIssue({ id: old.id }));
+                out.push(old.id);
+              }
+            return out;
+          }),
+        );
+        // Published as one commit once the transaction has succeeded.
+        const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (t) => get(t.id).pipe(Effect.orDie));
+        yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
+      }),
       nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
       forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),
       ofRecurrence,
