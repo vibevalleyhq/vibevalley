@@ -4,7 +4,7 @@
 
 ## 状态和用语
 
-工单的真实状态分下面几层，每层一个字段、一张词表。词表在 `packages/protocol/src/rules`（`issues.ts` 的 `statusLabel`、`deliveredLabel`、`canceledLabel`、`closedText`，`attention.ts` 的 `attentionLabel`、`actLabel`），服务端（工具、管家的提示、拒绝、提醒）和页面都从这里取，不各写一份。
+工单的真实状态分下面几层，每层一个字段、一张词表。词表在 `packages/protocol/src/rules`（`issues.ts` 的 `statusLabel`、`priorityLabel`、`deliverableLabel`、`deliveredLabel`、`canceledLabel`、`closedText`，`attention.ts` 的 `attentionLabel`、`stuckLabel`、`actLabel`，`phase.ts` 的 `outcomeLabel` 和帮工到哪了的 `phaseWords`），服务端（工具、管家的提示、拒绝、提醒、连接器）和页面都从这里取，拼句子用它们，不另写一份；`scripts/stale-names.ts` 查别处有没有 `Record<Outcome, string>` 这样的词表（皮自己的叫法用 `Partial<…>` 盖过，如农场的「收获」）。
 
 | 层 | 字段 | 取值和叫法 | 怎么来的 |
 |---|---|---|---|

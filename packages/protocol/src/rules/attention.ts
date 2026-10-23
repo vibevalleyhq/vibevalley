@@ -1,7 +1,7 @@
 // Where an issue stands for the owner: one state out of the issue's status, its session's phase, the questions, a
 // conflict and the acceptance, with the one thing the owner is asked to do. The board, the farm and the page all say it.
 
-import type { IssueAct, Attention } from "../shapes";
+import type { IssueAct, Attention, StuckReason } from "../shapes";
 
 export const attentionLabel: Record<Attention, string> = {
   draft: "草稿",
@@ -12,6 +12,14 @@ export const attentionLabel: Record<Attention, string> = {
   stuck: "卡住了",
   done: "已完成",
   canceled: "已取消",
+};
+
+/** Why an issue is stuck, in a word or two. */
+export const stuckLabel: Record<StuckReason, string> = {
+  conflict: "有冲突",
+  failed: "没做成",
+  interrupted: "停在半路",
+  quiet: "没动静",
 };
 
 /** What each act is called, on its button and in a refusal. */

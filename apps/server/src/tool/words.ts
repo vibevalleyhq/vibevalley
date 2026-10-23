@@ -13,7 +13,7 @@ import {
   type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { phaseText, shortTitle, statusLabel, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { outcomeLabel, phaseText, priorityLabel, shortTitle, statusLabel, stuckLabel, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
@@ -63,8 +63,7 @@ export function sessionLine(w: Roster, now = Date.now(), number?: number): strin
   const h = w.session;
   let last = "";
   if (h.lastRun) {
-    const how = h.lastRun.outcome === "completed" ? "做完了" : h.lastRun.outcome === "failed" ? "失败了" : "停下了";
-    last = "；上一轮" + how + "：" + head(h.lastRun.summary, 80);
+    last = "；上一轮" + outcomeLabel[h.lastRun.outcome] + "：" + head(h.lastRun.summary, 80);
   }
   const where = w.place.branch ? "在 " + w.place.project + " 的 " + w.place.branch : "在 " + w.place.project;
   const task = h.graph ? (h.graph.task ? "，做计划 " + h.graph.id + " 的步骤 " + h.graph.task : "，在拆计划 " + h.graph.id) : "";
@@ -75,18 +74,13 @@ export function sessionLine(w: Roster, now = Date.now(), number?: number): strin
 
 // ── issues, as the orchestrator reads them ──
 
-/** The words the owner and the orchestrator use for a status, and its own name. */
+/** The words for a status: its label (statusLabel), a few the owner says for it, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
-  备选: "backlog",
+  ...Object.fromEntries(IssueStatusValues.map((s) => [statusLabel[s], s])),
   草稿: "backlog",
-  待办: "todo",
-  处理中: "in_progress",
   在做: "in_progress",
-  等你看: "in_review",
   等验收: "in_review",
-  已完成: "done",
   完成: "done",
-  已取消: "canceled",
   取消: "canceled",
   ...Object.fromEntries(IssueStatusValues.map((s) => [s, s])),
 };
@@ -102,16 +96,12 @@ const priorityNames: Readonly<Record<string, Priority>> = {
 };
 export const priorityOf = (word: string): Priority | undefined => priorityNames[word.trim()];
 
-const priorityWords: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
-
 export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusLabel[s]).join("、");
-export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityWords[p]).join("、");
+export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityLabel[p]).join("、");
 
 /** A channel in one line: its name, what it is for, its default project. */
 export const channelLine = (c: { readonly name: string; readonly description?: string; readonly project?: string }) =>
   "#" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
-
-const stuckWords: Readonly<Record<StuckReason, string>> = { failed: "没做成", conflict: "有冲突", interrupted: "停在半路", quiet: "没动静" };
 
 /** How long, in round words. */
 export function spanWords(ms: number): string {
@@ -124,11 +114,11 @@ export function spanWords(ms: number): string {
 /** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
   const st = t.attention;
-  const stuck = st.stuck ? "（" + stuckWords[st.stuck] + "）" : "";
+  const stuck = st.stuck ? "（" + stuckLabel[st.stuck] + "）" : "";
   const parts = [`#${t.number}「${shortTitle(t.title)}」${attentionLabel[st.state]}${stuck}`];
   if (t.project) parts.push(t.project);
   if (who) parts.push(who);
-  if (t.priority !== "medium") parts.push(priorityWords[t.priority] + "优先级");
+  if (t.priority !== "medium") parts.push(priorityLabel[t.priority] + "优先级");
   if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
@@ -149,8 +139,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
   if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
   const weeds = t.findings.filter((f) => !f.pulled);
   if (weeds.length > 0) lines.push("验收没过要修的：" + weeds.map((f) => f.text).join("；"));
-  if (t.lastRun?.outcome)
-    lines.push("最后一轮" + (t.lastRun.outcome === "completed" ? "做完了" : t.lastRun.outcome === "failed" ? "没做成" : "停在半路") + "，在等主人点头");
+  if (t.lastRun?.outcome) lines.push("最后一轮" + outcomeLabel[t.lastRun.outcome] + "，在等主人点头");
   if (t.pullRequest) lines.push(`PR #${t.pullRequest.number}（${t.pullRequest.state}）${t.pullRequest.url}`);
   for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
   return lines.join("\n");

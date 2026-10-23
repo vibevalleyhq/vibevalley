@@ -15,9 +15,9 @@ import {
 import { api } from "../../data/api";
 import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
-import { issueTag, priorityLabel, runText, tagOpen, tagText } from "../../rules/issues";
+import { issueTag, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
-import { actLabel, closedText, deliverableLabel } from "@vibevalley/protocol/rules";
+import { actLabel, closedText, deliverableLabel, priorityLabel } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready } from "../../data/query";

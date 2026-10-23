@@ -4,6 +4,7 @@
 import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
+import { outcomeLabel } from "@vibevalley/protocol/rules";
 import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
@@ -122,9 +123,9 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
 }
 
 const outcomeTag: Record<Outcome, [label: string, fill: string, ink: string]> = {
-  completed: ["做完了", "#e5a93c66", "#2f1f13"],
-  failed: ["没做成", "#c84a3a26", "#c84a3a"],
-  interrupted: ["叫停了", "#e2c995", "#67482d"],
+  completed: [outcomeLabel.completed, "#e5a93c66", "#2f1f13"],
+  failed: [outcomeLabel.failed, "#c84a3a26", "#c84a3a"],
+  interrupted: [outcomeLabel.interrupted, "#e2c995", "#67482d"],
 };
 
 export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.Element; steps?: JSX.Element }) {

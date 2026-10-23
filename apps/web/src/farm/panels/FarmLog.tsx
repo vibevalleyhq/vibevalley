@@ -3,6 +3,7 @@
 
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
+import { outcomeLabel } from "@vibevalley/protocol/rules";
 import { generalOf, messagesIn, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
 import { useAgent } from "../../data/agents";
@@ -12,9 +13,9 @@ import { useFarm } from "../state";
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
-  completed: ["做完", "#efcf92", "#2f1f13"],
-  failed: ["没过", "#f0cda6", "#c84a3a"],
-  interrupted: ["叫停", "#e2c995", "#67482d"],
+  completed: [outcomeLabel.completed, "#efcf92", "#2f1f13"],
+  failed: [outcomeLabel.failed, "#f0cda6", "#c84a3a"],
+  interrupted: [outcomeLabel.interrupted, "#e2c995", "#67482d"],
 };
 
 /** The turn reports, newest first. */

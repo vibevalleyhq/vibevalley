@@ -5,7 +5,7 @@
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
 import { generalOf } from "../channel/state.ts";
-import { needOf } from "@vibevalley/protocol/rules";
+import { needOf, stuckLabel } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
 
@@ -228,7 +228,7 @@ const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWord
   review: (who, text) => ({ label: "等你看", title: `${who} 做完了`, body: text, tray: `${who} 做完了，等你看` }),
   ask: (who, text) => ({ label: "有问题问你", title: `${who} 有问题问你`, body: text }),
   fix: (who, text) => ({ label: "活没做成", title: `${who} 没做成`, body: text, tray: `${who} 没做成` }),
-  interrupted: (who, text) => ({ label: "停在了半路", title: `${who} 停在了半路`, body: text }),
+  interrupted: (who, text) => ({ label: stuckLabel.interrupted, title: `${who} 停在了半路`, body: text }),
   conflict: (who, text) => ({ label: "合不进去", title: `${who} 的活合进主分支会冲突`, body: text, tray: `${who} 的活会冲突` }),
   quiet: (who) => ({
     label: "好久没动静",
