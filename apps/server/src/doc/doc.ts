@@ -3,7 +3,7 @@
 // serial and its seq goes up in order.
 
 import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
-import { Context, Effect, Layer, Option, Semaphore } from "effect";
+import { Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { newId } from "../base/ids.ts";
 import { type ApiError, missing, lookIn, refused } from "../errors.ts";
@@ -16,6 +16,13 @@ import * as qb from "../../db/generated/doc_block.sql.ts";
 import * as qr from "../../db/generated/doc_block_revision.sql.ts";
 import * as qc from "../../db/generated/doc_change.sql.ts";
 import * as qd from "../../db/generated/doc.sql.ts";
+import { jsonOf } from "../base/json.ts";
+import * as S from "@vibevalley/protocol/schema";
+
+const attrsOf = jsonOf(S.BlockAttrs);
+const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.DocSpan))));
+const idsOf = jsonOf(Schema.mutable(Schema.Array(Schema.String)));
+const resultsOf = jsonOf(Schema.mutable(Schema.Array(S.DocOpResult)));
 
 export interface DocShape {
   readonly list: () => Effect.Effect<Document[]>;
@@ -61,8 +68,8 @@ const blockOf = (r: qb.DocBlocksResult): Block =>
     ...(r.parent_id !== null ? { parentId: r.parent_id } : {}),
     orderKey: r.order_key,
     type: r.type,
-    attrs: JSON.parse(r.attrs) as BlockAttrs,
-    text: (JSON.parse(r.spans) as DocSpan[] | null) ?? [],
+    attrs: attrsOf(r.attrs),
+    text: storedSpans(r.spans) ?? [],
     rev: r.rev,
     deleted: r.deleted,
     updatedBy: r.updated_by,
@@ -105,12 +112,12 @@ export const make = (options: DocOptions = {}) =>
     /** A batch already taken: its results then, its blocks now. */
     const again = Effect.fn("Docs.again")(function* (doc: string, seen: qc.DocChangeByBatchResult) {
       if (seen.doc_id !== doc) return yield* Effect.fail(refused("这批改动（" + seen.batch_id + "）是另一篇文档的"));
-      const ids = JSON.parse(seen.block_ids) as string[];
+      const ids = idsOf(seen.block_ids);
       const all = yield* blocksOf(doc);
       return {
         batchId: seen.batch_id,
         seq: seen.seq,
-        results: JSON.parse(seen.results) as DocOpResult[],
+        results: resultsOf(seen.results),
         blocks: ids.flatMap((id) => all.filter((b) => b.id === id)),
       };
     });
@@ -139,7 +146,7 @@ export const make = (options: DocOptions = {}) =>
                 continue;
               }
               const raw = yield* db(Effect.option(qr.docBlockRevision({ block_id: b.id, rev: op.baseRev })));
-              if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, JSON.parse(raw.value.spans) as DocSpan[]);
+              if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
             }
             const taken = new Set<string>();
             for (const op of body.ops ?? []) {

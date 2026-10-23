@@ -22,19 +22,16 @@ import {
   type Delivery,
   type IssueCanceled,
   type SessionClose,
-  type IssueGraph,
   type IssueHistory,
   type IssueRequest,
   type IssueStatus,
   IssueStatusValues,
-  type IssueTask,
   type IssueTimeline,
   type IssueUpdate,
   type Preview,
   orchestratorAgent,
   type Priority,
   type ProjectTemplates,
-  type PullRequest,
   type RunTrigger,
   type Recurrence,
   type Session,
@@ -63,7 +60,9 @@ import {
   sentTitles,
   splitJob,
 } from "./rules.ts";
-import { Context, Effect, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { jsonOf, jsonOrNone } from "../base/json.ts";
+import * as S from "@vibevalley/protocol/schema";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
@@ -160,14 +159,20 @@ export class Issues extends Context.Service<Issues, IssueShape>()("vibevalley/Is
 
 type Row = q.GetIssueResult;
 
-const json = <T>(text: string | null): T | undefined => {
-  if (text === null) return undefined;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return undefined;
-  }
+// The issue's JSON columns, read by their Schemas; one that does not read is none, as it was when it would not parse.
+const strings = Schema.mutable(Schema.Array(Schema.String));
+const column = {
+  graph: jsonOrNone(S.IssueGraph),
+  task: jsonOrNone(S.IssueTask),
+  strings: jsonOrNone(strings),
+  checks: jsonOrNone(Schema.mutable(Schema.Array(S.CriterionCheck))),
+  pullRequest: jsonOrNone(S.PullRequest),
+  run: jsonOrNone(S.IssueRun),
+  answer: jsonOrNone(S.IssueAnswer),
+  findings: jsonOrNone(Schema.mutable(Schema.Array(S.Finding))),
+  questions: jsonOrNone(Schema.mutable(Schema.Array(S.Question))),
 };
+const triggerOf = jsonOf(S.RunTrigger);
 
 /** Empty is none. */
 
@@ -231,14 +236,14 @@ export const make = (options: IssueOptions = {}) =>
 
     function issueOf(row: Row, runs: readonly string[] | undefined): Issue {
       const state = core.state();
-      const graph = json<IssueGraph>(row.graph);
-      const task = json<IssueTask>(row.task);
-      const blockedBy = json<string[]>(row.blocked_by);
-      const criteria = json<string[]>(row.criteria);
-      const checks = json<CriterionCheck[]>(row.checks);
-      const pullRequest = json<PullRequest>(row.pull_request);
-      const lastRun = json<IssueRun>(row.last_run);
-      const answer = json<IssueAnswer>(row.answer);
+      const graph = column.graph(row.graph);
+      const task = column.task(row.task);
+      const blockedBy = column.strings(row.blocked_by);
+      const criteria = column.strings(row.criteria);
+      const checks = column.checks(row.checks);
+      const pullRequest = column.pullRequest(row.pull_request);
+      const lastRun = column.run(row.last_run);
+      const answer = column.answer(row.answer);
       const out: Issue = {
         id: row.id,
         number: row.number,
@@ -264,8 +269,8 @@ export const make = (options: IssueOptions = {}) =>
         review: row.review as Issue["review"],
         deliver: row.deliver as Deliverable,
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
-        findings: json<Finding[]>(row.findings) ?? [],
-        questions: json<Question[]>(row.questions) ?? [],
+        findings: column.findings(row.findings) ?? [],
+        questions: column.questions(row.questions) ?? [],
         ...(criteria ? { criteria } : {}),
         ...(checks ? { checks } : {}),
         ...(lastRun ? { lastRun } : {}),
@@ -456,7 +461,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const queuedDispatch = (id: string) =>
       Effect.flatMap(one(qq.queuedIssue({ issue: id })), (row) =>
-        row ? Effect.succeed([row.channel, JSON.parse(row.triggered_by) as RunTrigger] as const) : Effect.fail(refused(`工单 ${id} 不在队里`)),
+        row ? Effect.succeed([row.channel, triggerOf(row.triggered_by)] as const) : Effect.fail(refused(`工单 ${id} 不在队里`)),
       );
 
     /** Canceled before it was ever sent: out of the queue and closed as dismissed, in one write. */
@@ -836,7 +841,7 @@ export const make = (options: IssueOptions = {}) =>
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
     // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
     for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) {
-      const run = json<IssueRun>(r.last_run);
+      const run = column.run(r.last_run);
       if (run && run.endedAt === undefined) yield* cancelAs(r.id, "lost");
     }
 

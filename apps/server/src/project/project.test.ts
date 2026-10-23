@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { NodeServices } from "@effect/platform-node";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
@@ -23,7 +24,13 @@ import {
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
 const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<Config> = {}, hooks: ProjectHooks = {}) =>
-  body.pipe(Effect.provide(layer({ gh: noGitHub, ...hooks }).pipe(Layer.provide(Layer.succeed(Settings, testConfig({ workRoot: dirname(root), ...change }))))));
+  body.pipe(
+    Effect.provide(
+      layer({ gh: noGitHub, ...hooks }).pipe(
+        Layer.provide(Layer.merge(Layer.succeed(Settings, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
+      ),
+    ),
+  );
 
 describe("projects", () => {
   it("names and addresses", () => {

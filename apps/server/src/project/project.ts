@@ -7,7 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
@@ -32,7 +32,7 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Context, Effect, Layer, Semaphore } from "effect";
+import { Context, Effect, FileSystem, Layer, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -360,7 +360,10 @@ export const make = (hooks: ProjectHooks = {}) =>
     const config = yield* Settings;
     const work = resolve(config.workRoot);
     const root = join(work, "projects");
-    mkdirSync(root, { recursive: true });
+    // A file call that fails where the sync one would have thrown: a defect, as before.
+    const fs = yield* FileSystem.FileSystem;
+    const exists = (path: string) => Effect.orDie(fs.exists(path));
+    yield* Effect.orDie(fs.makeDirectory(root, { recursive: true }));
     const trees = join(work, "worktrees");
     const perProject = config.project.maxSessions;
     const checkTimeoutMs = config.project.checkTimeoutSeconds * 1000;
@@ -384,15 +387,16 @@ export const make = (hooks: ProjectHooks = {}) =>
     const ensure = (name: string) =>
       Effect.gen(function* () {
         if (!projectName.test(name)) return yield* fail(`「${name}」不能当项目名：用一个简单的英文文件夹名，比如 clock-in`);
-        mkdirSync(join(root, name), { recursive: true });
+        yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
-        const path = realpathSync(join(root, name));
-        if (dirname(path) !== realpathSync(root)) return yield* fail("项目必须在工作目录里面，不能链接到外面");
+        const path = yield* Effect.orDie(fs.realPath(join(root, name)));
+        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail("项目必须在工作目录里面，不能链接到外面");
         const top = yield* gitQuiet(path, "rev-parse", "--show-toplevel");
         if (top !== path) {
           yield* git(path, "init", "-q", "-b", "main");
-          if (!existsSync(join(path, ".gitignore"))) writeFileSync(join(path, ".gitignore"), gitignore);
-          if (readdirSync(path).filter((e) => e !== ".git").length <= 1) writeFileSync(join(path, "README.md"), `# ${name}\n`);
+          if (!(yield* exists(join(path, ".gitignore")))) yield* Effect.orDie(fs.writeFileString(join(path, ".gitignore"), gitignore));
+          if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
+            yield* Effect.orDie(fs.writeFileString(join(path, "README.md"), `# ${name}\n`));
           yield* git(path, "add", "-A");
           yield* commit(path, "初始提交（VibeValley 建的项目）");
         } else if (!(yield* gitOk(path, "rev-parse", "--verify", "HEAD"))) {
@@ -402,16 +406,14 @@ export const make = (hooks: ProjectHooks = {}) =>
       }).pipe(Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError(reason(e)))));
 
     const list = Effect.fn("Projects.list")(function* () {
-      if (!existsSync(root)) return [];
+      if (!(yield* exists(root))) return [];
       const out: Project[] = [];
+      // readdirSync for the entries' kinds, which FileSystem does not give: a link to a folder is not a project.
       for (const e of readdirSync(root, { withFileTypes: true })) {
         if (!e.isDirectory() || e.name.startsWith(".") || pending.has(e.name)) continue;
-        let path: string;
-        try {
-          path = realpathSync(join(root, e.name));
-        } catch {
-          continue;
-        }
+        const real = yield* Effect.option(fs.realPath(join(root, e.name)));
+        if (real._tag === "None") continue;
+        const path = real.value;
         out.push({ name: e.name, path, git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path });
       }
       return out;
@@ -612,11 +614,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (problem) return yield* fail(problem);
             const path = join(root, req.name);
             // Exclusive creation also refuses existing empty folders and symlinks.
-            try {
-              mkdirSync(path);
-            } catch (e) {
-              return yield* fail((e as NodeJS.ErrnoException).code === "EEXIST" ? `「${req.name}」已经存在，请换个项目名` : reason(e));
-            }
+            const madeDir = yield* Effect.result(fs.makeDirectory(path));
+            if (madeDir._tag === "Failure")
+              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? `「${req.name}」已经存在，请换个项目名` : reason(madeDir.failure));
             pending.add(req.name);
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
@@ -702,8 +702,8 @@ export const make = (hooks: ProjectHooks = {}) =>
             const place = issueWorkplace(project, issueNumber);
             const branch = place.branch!;
             const cwd = place.cwd;
-            if (existsSync(cwd)) return place;
-            mkdirSync(trees, { recursive: true });
+            if (yield* exists(cwd)) return place;
+            yield* Effect.orDie(fs.makeDirectory(trees, { recursive: true }));
             const branchThere = yield* gitOk(path, "show-ref", "--verify", "refs/heads/" + branch);
             let from = baseBranch;
             if (!branchThere && usesPullRequests(project)) {
@@ -835,13 +835,13 @@ export const make = (hooks: ProjectHooks = {}) =>
           Effect.gen(function* () {
             const path = join(root, project);
             const place = issueWorkplace(project, issueNumber);
-            if (existsSync(place.cwd)) {
+            if (yield* exists(place.cwd)) {
               const removed = yield* gitRun(path, "worktree", "remove", ...(work === "discard" ? ["--force"] : []), place.cwd);
               if (removed.code !== 0) return { kept: true, reason: `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}` };
             }
             const branch = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + place.branch);
             if (branch.code !== 0) {
-              if (branch.code === 1 || !existsSync(path)) return { kept: false };
+              if (branch.code === 1 || !(yield* exists(path))) return { kept: false };
               return { kept: true, reason: `没能确认 ${place.branch} 已清掉：${reason(branch.stderr)}` };
             }
             const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
@@ -980,7 +980,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (usesPullRequests(name)) yield* syncMain(name);
             const place = issueWorkplace(name, n);
             const path = join(root, name);
-            if (existsSync(place.cwd)) {
+            if (yield* exists(place.cwd)) {
               const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
               if (removed.code !== 0) return yield* fail(`PR 已结束，清理 worktree 失败：${reason(removed.stderr)}`);
             }

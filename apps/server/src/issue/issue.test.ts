@@ -447,17 +447,19 @@ describe("issues", () => {
       const issues = yield* Issues;
       const sql = yield* SqlClient.SqlClient;
       const one = yield* issues.add({ title: "one" });
-      const graph = {
+      const graph: TaskGraph = {
         id: "p1",
         title: "task",
+        goal: "task",
         project: "demo",
         state: "draft",
+        parallel: 1,
         createdAt: 0,
         tasks: [
-          { id: "a", title: "first", state: "waiting" },
-          { id: "b", title: "second", state: "waiting" },
+          { id: "a", title: "first", brief: "first", needs: [], state: "waiting", tries: 0 },
+          { id: "b", title: "second", brief: "second", needs: ["a"], state: "waiting", tries: 0 },
         ],
-      } as unknown as TaskGraph;
+      };
       yield* issues.putTask(graph);
       const ranks = () => sql<{ id: string; rank: number }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
       const before = yield* ranks();
