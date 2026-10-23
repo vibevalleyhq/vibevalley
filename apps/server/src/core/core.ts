@@ -206,7 +206,7 @@ export const make = Effect.gen(function* () {
     sessionEvent: (id, activity) => side({ type: "event", at: Date.now(), id, activity }),
     notice: (level, text) => side({ type: "notice", at: Date.now(), level, text }),
     runtime: (info) => side({ type: "runtime", at: Date.now(), info }),
-    did: (d) => Effect.sync(() => PubSub.publishUnsafe(owner, d)),
+    did: (d) => Effect.asVoid(PubSub.publish(owner, d)),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
       return [state, Stream.fromSubscription(sub)] as const;

@@ -3,7 +3,7 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
@@ -40,7 +40,7 @@ export interface Note {
   readonly session?: string;
 }
 
-export class MemoryRefused extends Error {}
+export class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;
@@ -163,12 +163,12 @@ export const makeMemories = Effect.gen(function* () {
   const write = (n: Note) =>
     Effect.gen(function* () {
       const body = clip(n.text, noteMaxChars);
-      if (body === "") return yield* Effect.fail(new MemoryRefused("要记的话是空的"));
+      if (body === "") return yield* new MemoryRefused({ message: "要记的话是空的" });
       const project = n.project.trim() || undefined;
       const session = n.session || undefined;
       const { id, at } = yield* insertNote(n.agent, body, project, session, n.by).pipe(
         Effect.catchTag("SqlError", (e) =>
-          Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused("没记下来：数据库写不进去"))),
+          Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: "没记下来：数据库写不进去" }))),
         ),
       );
       return {
