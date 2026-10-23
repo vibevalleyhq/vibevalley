@@ -19,7 +19,7 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { Context, Effect, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
@@ -119,22 +119,27 @@ export const make = Effect.gen(function* () {
   let state = restore(restarted(kept));
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));
-  let pending: ReturnType<typeof setTimeout> | undefined;
   let closed = false;
-  // A crash loses half a second at most.
+  // A crash loses half a second at most: a write waits that long after the first change, and the changes after it join
+  // it rather than putting it off. The wait is a fiber of this service's, ended with it.
+  const saves = yield* FiberMap.make<"save">();
+  const later = yield* FiberMap.runtime(saves)<never>();
   const save = () => {
-    if (closed || pending) return;
-    pending = setTimeout(() => {
-      pending = undefined;
-      disk.write(body);
-    }, saveAfterMs);
+    if (!closed)
+      later(
+        "save",
+        Effect.delay(
+          Effect.sync(() => disk.write(body)),
+          saveAfterMs,
+        ),
+        { onlyIfMissing: true },
+      );
   };
   yield* Effect.addFinalizer(() =>
-    Effect.sync(() => {
+    Effect.suspend(() => {
       closed = true;
-      clearTimeout(pending);
-      disk.finish(body);
-    }),
+      return FiberMap.clear(saves);
+    }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
   );
 
   const events = yield* PubSub.unbounded<SideEvent>();

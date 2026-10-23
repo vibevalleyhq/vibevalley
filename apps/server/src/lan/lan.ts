@@ -345,15 +345,14 @@ export const make = (options: LanOptions = {}) =>
         p.asking = name;
         p.expires = now() + pairingForMs;
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
-        const allow = yield* Effect.callback<boolean | "late">((resume) => {
+        const allow = yield* Effect.callback<boolean>((resume) => {
           p.answer = (a) => resume(Effect.succeed(a));
-          const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);
+          // Cut short (the time ran out, or the request went away): unless the owner has answered or a new pairing
+          // replaced it.
           return Effect.sync(() => {
-            clearTimeout(timer);
-            // Unless the owner has answered or a new pairing replaced it.
             if (pairing === p) pairing = undefined;
           });
-        });
+        }).pipe(Effect.timeoutOption(pairingForMs), Effect.map(Option.getOrElse(() => "late" as const)));
         if (allow === "late") {
           if (pairing === p) pairing = undefined;
           return yield* Effect.fail(refuse("主人没来得及点头，配对码过期了：回那台电脑上换一个码"));

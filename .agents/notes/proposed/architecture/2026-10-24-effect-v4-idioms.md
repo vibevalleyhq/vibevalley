@@ -30,6 +30,7 @@ Status: proposed
 
 1. 方法有名字：已经做了。服务的 `make` 里返回的方法和内部的帮手函数，整个函数就是一段 `Effect.gen`（或套一层 `x.withPermits(n)`）的，都改成了 `Effect.fn("<服务>.<名字>")`，锁作为第二个参数；共 135 处。模块顶层的 `make` 和自己写了返回类型的没动。
 2. 服务里不另起运行时：已经做了。在 `Effect.gen` 里经 `Effect.runSync` 施加事实、发提醒的 19 处改成 `yield* core.apply`、`yield* core.notice`（`session`、`channel/chat`），`chat` 的那个帮手删了；`session` 的留给 oar 的回调（事件、汇报、太久没动静），它们不在纤程里、要照 oar 给的次序落下。服务的 `make` 里的锁 `Semaphore.makeUnsafe` 改成 `yield* Semaphore.make`（两个普通的工厂函数照旧）。其余的 `FiberSet.makeRuntime*` 都是给外面的库（oar、记性的来源、MCP、node 的 http）的回调用的，纤程归服务的作用域，是 v4 给这种交界的写法，留着。
+3. 定时归作用域：已经做了我们自己的服务。`session`（存盘的防抖、每个会话太久没动静）、`runtime`（花费的存盘、推一次新的花费、跑完一轮后查额度）、`core`（state.json 的合并写）、`channel/chat`（攒一下再提醒、叫醒失败后再试）的 `setTimeout` 都换成服务自己的 `FiberMap`：同一个键再来一次就换掉上一个（防抖），`onlyIfMissing` 是已经在等就不再排（合并写、一个窗口推一次）；服务关的时候作用域收掉它们，关前要写的照旧在终结器里写。`chat` 等完以后把活交给 `forkHere`，叫停只取消还在等的，不打断已经在锁里跑的。`session` 关时等农机收尾的 `Promise.race` 换成 `Effect.timeoutOption`，`lan` 等主人点头的超时也是。还剩的 `setTimeout` 在和外面打交道的地方（`voice`、连接器、`agent/brain`、`runtime/dsh.ts`、`project/git.ts` 的进程超时、`session/journal.ts` 这个类），最后一遍扫的时候再看。
 
 ## Alternatives considered
 
@@ -43,7 +44,7 @@ Status: proposed
 
 - 服务的方法都有 `Effect.fn` 的名字（`Context.Service` 的 `make` 里返回的方法）。
 - 服务的 Effect 代码里没有 `Effect.runSync`、`Effect.runPromise`；只留在外面的库的回调里，并写明为什么；`makeRuntime*` 只留在交给外面的库的地方。
-- `session`、`runtime` 里没有 `setTimeout`；服务关的时候它们起的纤程都停下（有测试）。
+- `session`、`runtime`、`core`、`channel/chat`、`lan` 里没有 `setTimeout`；它们等着的都是服务作用域里的纤程，服务关的时候停下。
 - `bun run server:check`、`web:check` 过，行为不变。
 
 ## Risks

@@ -33,7 +33,7 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -332,19 +332,24 @@ export interface SessionOptionsIn {
 
 /** Calls onStall once a turn has had no record for stallMs, folded from the session's first record as its events are:
  * oar's observeStalls hears only records from when it subscribes, and misses a turn that went quiet before that. */
-function watchStalls(session: RuntimeSession, stallMs: number, onStall: (silentForMs: number) => void) {
+function watchStalls(session: RuntimeSession, stallMs: number, onStall: (silentForMs: number) => void, timer: (wait: Effect.Effect<void>) => void) {
   let status = initialStatus;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const disarm = () => clearTimeout(timer);
+  // The timer is one keyed fiber of the service's: arming again replaces it, Effect.void disarms it.
+  const disarm = () => timer(Effect.void);
   const stop = session.rawEvents(
     (record) => {
       status = reduceStatus(status, record, session.id);
-      disarm();
-      if (status.kind !== "running") return;
-      timer = setTimeout(() => {
-        const stall = stallOf(status, Date.now(), stallMs);
-        if (stall !== null) onStall(stall.silentForMs);
-      }, stallMs);
+      if (status.kind !== "running") return disarm();
+      timer(
+        Effect.sleep(stallMs).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              const stall = stallOf(status, Date.now(), stallMs);
+              if (stall !== null) onStall(stall.silentForMs);
+            }),
+          ),
+        ),
+      );
     },
     { sessionId: session.id, afterSeq: -1 },
   );
@@ -378,6 +383,10 @@ export const make = (options: SessionOptionsIn = {}) =>
     const tried = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.mapError((err) => (err instanceof Error ? err : new Error(String(err)))));
     const fire = (e: Effect.Effect<unknown, unknown>) => void forkHere(e);
+    // Waits started from callbacks (the save, each session's stall): one fiber per key, a new one replacing the last,
+    // all ended with the service.
+    const timers = yield* FiberMap.make<string>();
+    const later = yield* FiberMap.runtime(timers)<never>();
     // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
     // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
     const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
@@ -413,7 +422,6 @@ export const make = (options: SessionOptionsIn = {}) =>
     let hired = 0;
     let launches = 0;
     let closing = false;
-    let pending: NodeJS.Timeout | undefined;
 
     // ── tokens: they tell sessions apart and guard nothing (sessions already run unsandboxed here), so memory only ──
 
@@ -445,8 +453,7 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const save = () => {
       if (closing) return;
-      clearTimeout(pending);
-      pending = setTimeout(() => fire(keepHands), saveAfterMs);
+      later("save", Effect.delay(keepHands, saveAfterMs));
     };
 
     const keep = (s: Session) =>
@@ -652,7 +659,12 @@ export const make = (options: SessionOptionsIn = {}) =>
       const stopReports = s.subagents.onReport((report) => {
         if (report.sessionId === session.id) queueMicrotask(() => !s.detached && applyReport(h, report));
       });
-      const stopStalls = watchStalls(session, stallMs, (silentForMs) => !s.detached && stalled(h, silentForMs));
+      const stopStalls = watchStalls(
+        session,
+        stallMs,
+        (silentForMs) => !s.detached && stalled(h, silentForMs),
+        (wait) => void later(`stall:${h.id}`, wait),
+      );
       s.stop = () => {
         stopEvents();
         stopReports();
@@ -996,21 +1008,21 @@ export const make = (options: SessionOptionsIn = {}) =>
       Effect.andThen(
         Effect.suspend(() => {
           closing = true;
-          clearTimeout(pending);
-          return keepHands;
+          return Effect.andThen(FiberMap.remove(timers, "save"), keepHands);
         }),
-        Effect.promise(async () => {
-          const all = [...hands.values()];
-          for (const h of all) {
+        Effect.sync(() => {
+          for (const h of [...hands.values()]) {
             h.journal.close();
             release(h);
           }
-          await Promise.race([
-            Promise.all([...allocations.values()].map((allocation) => closeAllocation(allocation).catch(() => {}))),
-            new Promise((r) => setTimeout(r, closeWaitMs).unref()),
-          ]);
-          trajectories.close();
-        }),
+        }).pipe(
+          Effect.andThen(
+            Effect.promise(() => Promise.all([...allocations.values()].map((allocation) => closeAllocation(allocation).catch(() => {})))).pipe(
+              Effect.timeoutOption(closeWaitMs),
+            ),
+          ),
+          Effect.andThen(Effect.sync(() => trajectories.close())),
+        ),
       ),
     );
 
