@@ -6,6 +6,7 @@
 // (testing/world.ts).
 
 import { Layer } from "effect";
+import { NodeServices } from "@effect/platform-node";
 import { layer as agent } from "./agent/agent.ts";
 import { type Config, Settings } from "./base/config.ts";
 import { Database } from "./base/db.ts";
@@ -53,9 +54,10 @@ export interface ServiceOptions {
   readonly connector?: ConnectorOptions;
 }
 
-/** Platform: the database, the settings and secrets, the core state (folded by the projection, which reads every
- * module's rules). */
-export const platform = (config: Config) => Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), on(projection), on(core), on(setting));
+/** Platform: Node's services (files, paths, processes), the database, the settings and secrets, the core state (folded by
+ * the projection, which reads every module's rules). */
+export const platform = (config: Config) =>
+  Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), Layer.provideMerge(NodeServices.layer), on(projection), on(core), on(setting));
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
 export const agents =

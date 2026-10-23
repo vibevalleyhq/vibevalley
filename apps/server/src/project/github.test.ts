@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { NodeServices } from "@effect/platform-node";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
@@ -16,7 +17,13 @@ const gh =
     Effect.sync(() => ({ ok: true, missing: false, ...answer(args) }));
 
 const projects = <A, E>(root: string, body: Effect.Effect<A, E, Projects>, change: Partial<Config> = {}, hooks: ProjectHooks = {}) =>
-  body.pipe(Effect.provide(layer({ gh: noGitHub, ...hooks }).pipe(Layer.provide(Layer.succeed(Settings, testConfig({ workRoot: dirname(root), ...change }))))));
+  body.pipe(
+    Effect.provide(
+      layer({ gh: noGitHub, ...hooks }).pipe(
+        Layer.provide(Layer.merge(Layer.succeed(Settings, testConfig({ workRoot: dirname(root), ...change })), NodeServices.layer)),
+      ),
+    ),
+  );
 
 const loggedIn = (permission: () => string) =>
   gh((args) => {
