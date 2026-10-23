@@ -733,17 +733,16 @@ export const make = (options: ConnectorOptions = {}) =>
       login: (id, input) => Effect.promise(async () => (bridge(id) ? bridge(id)!.login(input) : off(id))),
       verify: (id, code) => Effect.promise(async () => (bridge(id) ? bridge(id)!.verify(code) : off(id))),
       logout: (id) => Effect.promise(async () => (bridge(id) ? bridge(id)!.logout() : off(id))),
-      setChannel: (id, name) =>
-        Effect.gen(function* () {
-          const b = bridge(id);
-          if (!b) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有 ${id} 这个连接` });
-          const channel = yield* chat.channelByName(name);
-          if (!channel) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有叫 ${name} 的频道` });
-          return yield* Effect.tryPromise({
-            try: () => b.setChannel(channel.id !== general ? channel.id : undefined),
-            catch: (e): ApiError => ({ _tag: "ConnectorRefused", reason: message(e) }),
-          });
-        }),
+      setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
+        const b = bridge(id);
+        if (!b) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有 ${id} 这个连接` });
+        const channel = yield* chat.channelByName(name);
+        if (!channel) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有叫 ${name} 的频道` });
+        return yield* Effect.tryPromise({
+          try: () => b.setChannel(channel.id !== general ? channel.id : undefined),
+          catch: (e): ApiError => ({ _tag: "ConnectorRefused", reason: message(e) }),
+        });
+      }),
     });
   });
 

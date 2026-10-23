@@ -417,30 +417,28 @@ export const make = (options: OrchestratorOptions = {}) =>
     };
 
     return Orchestrator.of({
-      say: (text, pick, conversation, sendKey) =>
-        Effect.gen(function* () {
-          const a = pick.agent ? store.agent(pick.agent) : undefined;
-          const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
-          yield* core.open();
-          const { message, again } = yield* chat.say(text, conversation, sendKey);
-          if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
-        }),
-      heard: (text, agent, sendKey) =>
-        Effect.gen(function* () {
-          yield* core.open();
-          if (yield* chat.spoken("user", text, sendKey)) return;
-          const picked = agent ? store.agent(agent)?.id : undefined;
-          void take({
-            source: "owner",
-            line:
-              pickedNote(picked ? { agent: picked } : {}) +
-              "（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说：" +
-              text,
-            conversation: general,
-            ...(picked ? { agent: picked } : {}),
-            owner: true,
-          });
-        }),
+      say: Effect.fn("Orchestrator.say")(function* (text, pick, conversation, sendKey) {
+        const a = pick.agent ? store.agent(pick.agent) : undefined;
+        const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+        yield* core.open();
+        const { message, again } = yield* chat.say(text, conversation, sendKey);
+        if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
+      }),
+      heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
+        yield* core.open();
+        if (yield* chat.spoken("user", text, sendKey)) return;
+        const picked = agent ? store.agent(agent)?.id : undefined;
+        void take({
+          source: "owner",
+          line:
+            pickedNote(picked ? { agent: picked } : {}) +
+            "（这句话是主人用语音说的，语音那边已经回答了，问答都在田头。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n主人说：" +
+            text,
+          conversation: general,
+          ...(picked ? { agent: picked } : {}),
+          owner: true,
+        });
+      }),
       brief: async (line) => {
         const me = new Caller();
         void take({ source: "issue", line, conversation: general, caller: me });

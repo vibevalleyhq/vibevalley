@@ -122,32 +122,31 @@ export const make = Effect.gen(function* () {
     };
   };
 
-  const save = (u: SettingsUpdate) =>
-    Effect.gen(function* () {
-      const problem = settingsProblem(u);
-      if (problem) return yield* Effect.fail(new SettingRefused(problem));
-      const next: Record<string, unknown> = { ...stored };
-      for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
-        const given = u[key];
-        if (given !== undefined) next[key] = given.trim();
-      }
-      if (u.dictation) {
-        const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
-        next.dictation = d.url === "" && d.model === "" ? undefined : d;
-      }
-      if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
-      if (u.voice) next.voice = voiceOverrides(defaults, voiceSettingsOver(defaults, u.voice));
-      if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
-      if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
-      const kept = compact(next) as Stored;
-      try {
-        disk.write(() => JSON.stringify(kept, null, 2) + "\n");
-      } catch (e) {
-        return yield* Effect.fail(new SettingRefused(`存不进 ${file}：${(e as Error).message}`));
-      }
-      stored = kept;
-      return status();
-    });
+  const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
+    const problem = settingsProblem(u);
+    if (problem) return yield* Effect.fail(new SettingRefused(problem));
+    const next: Record<string, unknown> = { ...stored };
+    for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
+      const given = u[key];
+      if (given !== undefined) next[key] = given.trim();
+    }
+    if (u.dictation) {
+      const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
+      next.dictation = d.url === "" && d.model === "" ? undefined : d;
+    }
+    if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
+    if (u.voice) next.voice = voiceOverrides(defaults, voiceSettingsOver(defaults, u.voice));
+    if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
+    if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
+    const kept = compact(next) as Stored;
+    try {
+      disk.write(() => JSON.stringify(kept, null, 2) + "\n");
+    } catch (e) {
+      return yield* Effect.fail(new SettingRefused(`存不进 ${file}：${(e as Error).message}`));
+    }
+    stored = kept;
+    return status();
+  });
 
   const shape: SettingShape = {
     status,

@@ -149,23 +149,21 @@ export const make = Effect.gen(function* () {
     },
     skills: () => structuredClone([...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
-    saveAgent: (a) =>
-      Effect.gen(function* () {
-        if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
-          return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
-        const cast = withCast(a);
-        yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
-        return cast;
-      }),
-    createAgent: (draft) =>
-      Effect.gen(function* () {
-        if (draft.id) return yield* Effect.fail(refused("新档案的 id 要留空；指定 id 请用保存"));
-        let n = 1;
-        while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
-        const created = withCast({ ...draft, id: `agent-${n}` });
-        yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
-        return created;
-      }),
+    saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
+      if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
+        return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
+      const cast = withCast(a);
+      yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
+      return cast;
+    }),
+    createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
+      if (draft.id) return yield* Effect.fail(refused("新档案的 id 要留空；指定 id 请用保存"));
+      let n = 1;
+      while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
+      const created = withCast({ ...draft, id: `agent-${n}` });
+      yield* change((x) => ({ ...x, agents: [...x.agents, created] }));
+      return created;
+    }),
     deleteAgent: (id) =>
       Effect.andThen(
         deletableAgent(id),
@@ -178,20 +176,19 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
         skill,
       ),
-    createSkill: (draft) =>
-      Effect.gen(function* () {
-        if (draft.id) return yield* Effect.fail(refused("新技能的 id 要留空；指定 id 请用保存"));
-        const stem =
-          draft.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "") || "skill";
-        let id = stem;
-        for (let n = 2; s.skills.some((k) => k.id === id); n++) id = `${stem}-${n}`;
-        const created = { ...draft, id };
-        yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
-        return created;
-      }),
+    createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
+      if (draft.id) return yield* Effect.fail(refused("新技能的 id 要留空；指定 id 请用保存"));
+      const stem =
+        draft.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "skill";
+      let id = stem;
+      for (let n = 2; s.skills.some((k) => k.id === id); n++) id = `${stem}-${n}`;
+      const created = { ...draft, id };
+      yield* change((x) => ({ ...x, skills: [...x.skills, created] }));
+      return created;
+    }),
     deleteSkill: (id) =>
       Effect.andThen(
         deletableSkill(id),

@@ -118,23 +118,21 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const list = (agent: string) => Effect.promise(async () => (await sources.list(agent)).memories);
 
-    const write = (n: Note) =>
-      Effect.gen(function* () {
-        const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
-        sources.add(n);
-        return kept;
-      });
+    const write = Effect.fn("Memories.write")(function* (n: Note) {
+      const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
+      sources.add(n);
+      return kept;
+    });
 
     const forget = (agent: string, id: string) =>
       Effect.tryPromise({ try: () => sources.forget(agent, id), catch: (e) => refused(e instanceof Error ? e.message : String(e)) });
 
-    const writeOrchestrator = (text: string) =>
-      Effect.gen(function* () {
-        const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
-        if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
-        const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
-        return lineMemory(written, Date.now());
-      });
+    const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (text: string) {
+      const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
+      if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
+      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
+      return lineMemory(written, Date.now());
+    });
 
     const orchestrator = (): MemoryList => {
       const snapshot = readMemory(home);
@@ -148,15 +146,14 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
-    const forgettable = (agent: string, id: string) =>
-      Effect.gen(function* () {
-        const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
-        if (problem) return yield* Effect.fail(refused(problem));
-        const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
-        const m = listed.memories.find((x) => x.id === id);
-        if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
-        return m;
-      });
+    const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
+      const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
+      if (problem) return yield* Effect.fail(refused(problem));
+      const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
+      const m = listed.memories.find((x) => x.id === id);
+      if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
+      return m;
+    });
 
     const shape: MemoryShape = {
       memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.promise(() => sources.list(agent))),
@@ -169,13 +166,12 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         })),
       recallOf: (agent, project, text) =>
         agent === orchestratorAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text),
-      recall: (cue) =>
-        Effect.gen(function* () {
-          const told = mergeRecalled(yield* Effect.promise(() => sources.prefetch(cue)));
-          const ids = told.map((l) => l.id).filter((id) => id !== "");
-          yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
-          return { ids, lines: told.map((l) => l.line) };
-        }),
+      recall: Effect.fn("Memories.recall")(function* (cue) {
+        const told = mergeRecalled(yield* Effect.promise(() => sources.prefetch(cue)));
+        const ids = told.map((l) => l.id).filter((id) => id !== "");
+        yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
+        return { ids, lines: told.map((l) => l.line) };
+      }),
       search: (q) =>
         Effect.promise(async () => {
           const query = { ...q, limit: q.limit > 0 ? q.limit : searchLimit };
@@ -192,11 +188,10 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
           ).slice(0, query.limit);
           return { found, coverage };
         }),
-      keep: (r) =>
-        Effect.gen(function* () {
-          yield* local.keep(r);
-          sources.keep(r);
-        }),
+      keep: Effect.fn("Memories.keep")(function* (r) {
+        yield* local.keep(r);
+        sources.keep(r);
+      }),
       endSession: (s) => Effect.sync(() => sources.endSession(s)),
       write,
       list,

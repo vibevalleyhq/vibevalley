@@ -289,29 +289,27 @@ export const make = (options: LanOptions = {}) =>
     if (open) yield* Effect.promise(listen);
     yield* Effect.addFinalizer(() => Effect.sync(shut));
 
-    const addDevice = (name: string) =>
-      Effect.gen(function* () {
-        const key = randomBytes(32).toString("base64url");
-        const d: Device = { id: newId(), name, pairedAt: now(), keyHash: hash(key), written: 0 };
-        yield* db(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
-        devices.set(d.id, d);
-        logs.info(`vibevalley: lan access: "${name}" paired`);
-        return { device: d.id, key, hostName: hostName() };
-      });
+    const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
+      const key = randomBytes(32).toString("base64url");
+      const d: Device = { id: newId(), name, pairedAt: now(), keyHash: hash(key), written: 0 };
+      yield* db(q.addLanDevice({ id: d.id, name: d.name, key_hash: d.keyHash, paired_at: d.pairedAt }));
+      devices.set(d.id, d);
+      logs.info(`vibevalley: lan access: "${name}" paired`);
+      return { device: d.id, key, hostName: hostName() };
+    });
 
     return Lan.of({
       status,
-      setOpen: (want) =>
-        Effect.gen(function* () {
-          yield* db(lanQ.setLanOpen({ open: want }));
-          open = want;
-          if (want) yield* Effect.promise(listen);
-          else {
-            problem = "";
-            shut();
-          }
-          return status();
-        }),
+      setOpen: Effect.fn("Lan.setOpen")(function* (want) {
+        yield* db(lanQ.setLanOpen({ open: want }));
+        open = want;
+        if (want) yield* Effect.promise(listen);
+        else {
+          problem = "";
+          shut();
+        }
+        return status();
+      }),
       startPairing: () =>
         Effect.suspend(() => {
           if (!open || !server) return Effect.fail(refuse("还没允许连接：先打开它"));
@@ -333,51 +331,49 @@ export const make = (options: LanOptions = {}) =>
           answer?.(allow);
           return Effect.succeed(status());
         }),
-      pair: (code, given) =>
-        Effect.gen(function* () {
-          const name = deviceName(given);
-          const p = livePairing();
-          if (!open) return yield* Effect.fail(refuse("那台电脑没允许连接：回那台电脑的「连接到本机」打开它"));
-          if (!p) return yield* Effect.fail(refuse("配对码过期了：回那台电脑上换一个码"));
-          if (!same(code.trim().toUpperCase(), p.code)) {
-            p.wrong++;
-            if (p.wrong >= wrongTries) dropPairing();
-            return yield* Effect.fail(refuse("配对码不对"));
-          }
-          if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
-          p.asking = name;
-          p.expires = now() + pairingForMs;
-          logs.info(`vibevalley: lan access: "${name}" questions to pair`);
-          const allow = yield* Effect.callback<boolean | "late">((resume) => {
-            p.answer = (a) => resume(Effect.succeed(a));
-            const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);
-            return Effect.sync(() => {
-              clearTimeout(timer);
-              // Unless the owner has answered or a new pairing replaced it.
-              if (pairing === p) pairing = undefined;
-            });
-          });
-          if (allow === "late") {
+      pair: Effect.fn("Lan.pair")(function* (code, given) {
+        const name = deviceName(given);
+        const p = livePairing();
+        if (!open) return yield* Effect.fail(refuse("那台电脑没允许连接：回那台电脑的「连接到本机」打开它"));
+        if (!p) return yield* Effect.fail(refuse("配对码过期了：回那台电脑上换一个码"));
+        if (!same(code.trim().toUpperCase(), p.code)) {
+          p.wrong++;
+          if (p.wrong >= wrongTries) dropPairing();
+          return yield* Effect.fail(refuse("配对码不对"));
+        }
+        if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
+        p.asking = name;
+        p.expires = now() + pairingForMs;
+        logs.info(`vibevalley: lan access: "${name}" questions to pair`);
+        const allow = yield* Effect.callback<boolean | "late">((resume) => {
+          p.answer = (a) => resume(Effect.succeed(a));
+          const timer = setTimeout(() => resume(Effect.succeed("late")), pairingForMs);
+          return Effect.sync(() => {
+            clearTimeout(timer);
+            // Unless the owner has answered or a new pairing replaced it.
             if (pairing === p) pairing = undefined;
-            return yield* Effect.fail(refuse("主人没来得及点头，配对码过期了：回那台电脑上换一个码"));
-          }
-          if (!allow) return yield* Effect.fail(refuse("主人没让这台设备进来"));
-          return yield* addDevice(name);
-        }),
+          });
+        });
+        if (allow === "late") {
+          if (pairing === p) pairing = undefined;
+          return yield* Effect.fail(refuse("主人没来得及点头，配对码过期了：回那台电脑上换一个码"));
+        }
+        if (!allow) return yield* Effect.fail(refuse("主人没让这台设备进来"));
+        return yield* addDevice(name);
+      }),
       previewStopPairing: () => {
         const p = livePairing();
         if (!p) return { does: ["没有在配对的码：什么都不会动"] };
         return { does: [`收起配对码 ${p.code}`, ...(p.asking ? [`正在等你点头的「${p.asking}」连不进来`] : [])] };
       },
-      forget: (id) =>
-        Effect.gen(function* () {
-          yield* known(id);
-          yield* db(q.removeLanDevice({ id }));
-          devices.delete(id);
-          for (const c of conns.get(id) ?? []) c.abort();
-          conns.delete(id);
-          return status();
-        }),
+      forget: Effect.fn("Lan.forget")(function* (id) {
+        yield* known(id);
+        yield* db(q.removeLanDevice({ id }));
+        devices.delete(id);
+        for (const c of conns.get(id) ?? []) c.abort();
+        conns.delete(id);
+        return status();
+      }),
       previewForget: (id) =>
         Effect.map(known(id), (d) => {
           const open = conns.get(id)?.size ?? 0;
