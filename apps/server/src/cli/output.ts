@@ -1,18 +1,9 @@
 // What the command line writes and how it ends, for an agent as much as a person: stdout holds the result and nothing
 // else (one JSON document, or one JSON line per frame of a stream), stderr the progress, the help on a mistake and the
 // failure as JSON with what to do next; the exit code says which kind of failure it was without reading the words.
+// Everything goes through Effect's Stdio, so a test gives the command line its own.
 
-import { Data } from "effect";
-
-/** Where the command line reads and writes: the process's, or a test's. */
-export interface Io {
-  readonly out: (text: string) => void;
-  readonly err: (text: string) => void;
-  /** stdout is a terminal: a document is laid out for a person; otherwise it is one line. */
-  readonly tty: boolean;
-  readonly stdin: () => Promise<string>;
-  readonly env: Readonly<Record<string, string | undefined>>;
-}
+import { Data, Effect, Option, Schema, Stdio, Stream } from "effect";
 
 /** Exit codes a script can branch on. */
 export const exit = {
@@ -27,6 +18,8 @@ export const exit = {
   missing: 4,
   /** No server to talk to. */
   unreachable: 5,
+  /** Stopped by Ctrl+C (SIGINT), as a shell reports it. */
+  interrupted: 130,
 } as const;
 
 /** One thing to do next: what to do, and, when it is a command, the words to run (without the program's name). */
@@ -45,22 +38,27 @@ export class Failure extends Data.TaggedError("Failure")<{
   readonly next?: readonly Next[];
 }> {}
 
-/** A document as stdout takes it. */
-export const document = (value: unknown, tty: boolean) => (tty ? JSON.stringify(value, null, 2) : JSON.stringify(value));
+const line = (to: "stdout" | "stderr", text: string) =>
+  Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.orDie);
+
+export const out = (text: string) => line("stdout", text);
+export const err = (text: string) => line("stderr", text);
+
+/** What stdin holds, to its end. */
+export const stdinText = Effect.flatMap(Stdio.Stdio, (io) => io.stdin.pipe(Stream.decodeText, Stream.mkString));
+
+/** A document as stdout takes it: laid out for a person on a terminal, one line otherwise. */
+export const printDocument = (value: unknown) =>
+  Effect.flatMap(Stdio.Stdio, (io) => io.stdoutIsTerminal).pipe(Effect.flatMap((tty) => out(tty ? JSON.stringify(value, null, 2) : JSON.stringify(value))));
+
+const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** An answer's body as a document; one that is not JSON goes as it came. */
-export function printBody(io: Io, text: string) {
-  if (text.trim() === "") return;
-  try {
-    io.out(document(JSON.parse(text), io.tty));
-  } catch {
-    io.out(text);
-  }
-}
+export const printBody = (text: string) => (text.trim() === "" ? Effect.void : Option.match(json(text), { onNone: () => out(text), onSome: printDocument }));
 
 /** The failure on stderr, always one line, so a script can read the last line as JSON. */
-export const printFailure = (io: Io, f: Failure) =>
-  io.err(
+export const printFailure = (f: Failure) =>
+  err(
     JSON.stringify({
       error: { tag: f.tag, message: f.text, ...(f.status !== undefined ? { status: f.status } : {}), ...(f.next && f.next.length > 0 ? { next: f.next } : {}) },
     }),

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { ConfigProvider, Effect, Layer, Sink, Stdio, Stream } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { NodeServices } from "@effect/platform-node";
 import { endpoints } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
 import { kebab } from "./cli/api.ts";
@@ -14,17 +16,30 @@ const farm = Effect.gen(function* () {
   return "http://" + address;
 });
 
-/** One run: its exit code, what it put on stdout and on stderr, and the failure stderr ends with. */
-const cli = (args: string[], stdin = "") =>
+const text = (chunk: string | Uint8Array) => (typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+
+/** One run, with a Stdio of its own and no environment: its exit code, what it put on stdout and on stderr, and the
+ * failure stderr ends with. */
+const cli = (args: string[], stdin = "", env: Record<string, string> = {}) =>
   Effect.gen(function* () {
-    const out: string[] = [];
-    const err: string[] = [];
-    const code = yield* run(args, { out: (s) => void out.push(s), err: (s) => void err.push(s), tty: false, stdin: async () => stdin, env: {} });
-    const last = err.join("\n").split("\n").at(-1) ?? "";
+    let out = "";
+    let err = "";
+    const io = Stdio.layerTest({
+      stdout: () => Sink.forEach((c: string | Uint8Array) => Effect.sync(() => void (out += text(c)))),
+      stderr: () => Sink.forEach((c: string | Uint8Array) => Effect.sync(() => void (err += text(c)))),
+      stdin: Stream.make(new TextEncoder().encode(stdin)),
+      stdoutIsTerminal: Effect.succeed(false),
+    });
+    const code = yield* run(args).pipe(
+      Effect.provide(io),
+      Effect.provide([NodeServices.layer, FetchHttpClient.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord(env))]),
+    );
+    [out, err] = [out.replace(/\n$/, ""), err.replace(/\n$/, "")];
+    const last = err.split("\n").at(-1) ?? "";
     const failure = last.startsWith('{"error"')
       ? (JSON.parse(last) as { error: { tag: string; message: string; next?: { say: string; run?: string[] }[] } }).error
       : undefined;
-    return { code, out: out.join("\n"), err: err.join("\n"), failure };
+    return { code, out, err, failure };
   });
 
 describe("the command line", () => {
@@ -54,6 +69,9 @@ describe("the command line", () => {
       const list = JSON.parse((yield* cli(["issue", "list", "--server", server])).out) as { id: string }[];
       expect(list.map((i) => i.id)).toContain(issue.id);
       expect(JSON.parse((yield* cli(["state", "--server", server])).out)).toHaveProperty("state");
+      // With no --server, VIBEVALLEY_SERVER says where.
+      const fromEnv = yield* cli(["issue", "get", issue.id], "", { VIBEVALLEY_SERVER: server });
+      expect([fromEnv.code, (JSON.parse(fromEnv.out) as { title: string }).title]).toEqual([0, "改一下"]);
     }),
   );
 

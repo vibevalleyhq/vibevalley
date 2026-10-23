@@ -76,6 +76,8 @@ agent 改完代码，最贵的一步是证明改对了。现在证明的路有�
 3. 试跑（第三节）：已经做了工单的。接口表的一项带 `dryRun`，指向同参数、同请求体、答复 `Preview` 的另一个接口（不用查询参数 `dryRun`：答复的形状不一样，分开两个接口各自的 Schema 都准）；`issue.status`、`issue.act`、`issue.delete` 有了，`setStatus` 拆成算出挪法（`settledMove`）和动手两步。命令行的 `--dry-run` 调 `dryRun` 指的那个；只读的照跑；别的改东西的命令带它会被拒。还没有试跑的删除：定时、计划的一步、档案、记性、技能、连接到本机的设备（`cli.test.ts` 列着，新加的删除要么带试跑要么进这张单）。
 4. 验证 skill 改成只用命令行（第五节）：已经做了。`scripts/verify-server.ts --scripted-helper` 让沙箱里的 pi 是服务端测试里照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`），`verify-server` 的 skill 写着一遍只用命令行的：建工单、`issue run` 等它交回来、试跑完成、真完成、`git log` 看合进去的提交；`scripts/verify-server.test.ts` 跑着同样的一遍。
 
+5. 命令行自己也尽量用 Effect：已经做了。请求走 `HttpClient`（`FetchHttpClient.layer`），流用 `Sse.decode`，读写走 `Stdio`、`@文件` 走 `FileSystem`，`VIBEVALLEY_SERVER` 是 `--server` 的 `Flag.withFallbackConfig`，JSON 和服务端的错误照 Schema 解（protocol 的 `ApiError` 有了 Schema，服务端认错误也用它）；`issue run` 跟着 `/api/v1/state` 的帧走，不再轮询；进程由 `NodeRuntime.runMain` 起，Ctrl+C 中断，退出码 130。和农机、自己的 agent 聊（`cli/chat.ts`）仍是 Promise：底下的 Brain 和 oar 会话就是 Promise，它自己接 Ctrl+C，所以在不可中断的一段里跑。
+
 还没做的：别的服务的拒绝带 `next`；其余删除的试跑；命令行的黄金数据（`--help`、几条典型错误的 JSON）。
 
 ## Alternatives considered

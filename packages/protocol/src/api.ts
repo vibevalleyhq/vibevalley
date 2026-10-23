@@ -55,6 +55,19 @@ export interface LanRefused {
 /** What a route may refuse with: written as JSON with its _tag, at its status. */
 export type ApiError = Refused | Missing | VoiceUnavailable | VoiceAgentFailed | ConnectorRefused | LanRefused;
 
+const NextSchema: Schema.Codec<Next> = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
+const reasonOf = <Tag extends string>(tag: Tag) => Schema.Struct({ _tag: Schema.tag(tag), reason: Schema.String });
+
+/** The error as a route writes it, for a client to read back (the command line's failures). */
+export const ApiError: Schema.Codec<ApiError> = Schema.Union([
+  Schema.Struct({ _tag: Schema.tag("Refused"), reason: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
+  Schema.Struct({ _tag: Schema.tag("Missing"), what: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
+  Schema.Struct({ _tag: Schema.tag("VoiceUnavailable"), reason: Schema.String, settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])) }),
+  reasonOf("VoiceAgentFailed"),
+  reasonOf("ConnectorRefused"),
+  reasonOf("LanRefused"),
+]);
+
 export const errorStatus: Readonly<Record<ApiError["_tag"], number>> = {
   Refused: 409,
   Missing: 404,
