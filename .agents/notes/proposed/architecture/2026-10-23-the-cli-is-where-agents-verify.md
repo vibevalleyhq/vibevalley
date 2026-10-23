@@ -74,7 +74,9 @@ agent 改完代码，最贵的一步是证明改对了。现在证明的路有�
 1. 第一、二节和第四节里命令行自己的那一半：已经做了。`effect/cli` 搭的命令行（`apps/server/src/cli.ts`、`src/cli/`），每个接口一条命令、有帮助，`--json` 收文本、`-`、`@文件` 并照 Schema 先查；stdout 只放 JSON（终端里排开，不是终端时一行，流一行一帧），失败是 stderr 最后一行带 `next` 的 JSON，退出码照上表。没加 `--output`：是不是终端已经够分。
 2. 服务端的拒绝带 `next`（第四节的另一半）：已经做了工单的。`ApiError` 的 `Refused`、`Missing` 有可选的 `next`；工单的拒绝给出它现在能做的动作和挪法（`nextSteps`），找不到工单给 `issue list`。别的服务的拒绝还没带。
 3. 试跑（第三节）：已经做了工单的。接口表的一项带 `dryRun`，指向同参数、同请求体、答复 `Preview` 的另一个接口（不用查询参数 `dryRun`：答复的形状不一样，分开两个接口各自的 Schema 都准）；`issue.status`、`issue.act`、`issue.delete` 有了，`setStatus` 拆成算出挪法（`settledMove`）和动手两步。命令行的 `--dry-run` 调 `dryRun` 指的那个；只读的照跑；别的改东西的命令带它会被拒。还没有试跑的删除：定时、计划的一步、档案、记性、技能、连接到本机的设备（`cli.test.ts` 列着，新加的删除要么带试跑要么进这张单）。
-4. 验证 skill 改成只用命令行（第五节）。
+4. 验证 skill 改成只用命令行（第五节）：已经做了。`scripts/verify-server.ts --scripted-helper` 让沙箱里的 pi 是服务端测试里照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`），`verify-server` 的 skill 写着一遍只用命令行的：建工单、`issue run` 等它交回来、试跑完成、真完成、`git log` 看合进去的提交；`scripts/verify-server.test.ts` 跑着同样的一遍。
+
+还没做的：别的服务的拒绝带 `next`；其余删除的试跑；命令行的黄金数据（`--help`、几条典型错误的 JSON）。
 
 ## Alternatives considered
 

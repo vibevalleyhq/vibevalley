@@ -44,7 +44,13 @@ export function readyAddress(line: string, pid: number): string | undefined {
 }
 
 // The validation command owns assertions and fixtures; this owner isolates and releases its server and child process groups.
-export async function runVerification(command: string[] = []): Promise<VerificationResult> {
+export interface VerificationOptions {
+  /** pi is the scripted helper the server's tests hire (apps/server/src/testing/helper.ts), doing what the words of its
+   * job say, and no other runtime is installed: issues can be sent and handed back without a key or a real agent. */
+  readonly scriptedHelper?: boolean;
+}
+
+export async function runVerification(command: string[] = [], options: VerificationOptions = {}): Promise<VerificationResult> {
   if (process.platform === "win32") throw new Error("verification sandbox requires Unix process groups");
   const root = resolve(import.meta.dirname, "..");
   const evidence = mkdtempSync(join(tmpdir(), "vibevalley-verify-"));
@@ -52,7 +58,7 @@ export async function runVerification(command: string[] = []): Promise<Verificat
   const work = join(evidence, "work");
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
-  const env = isolatedEnvironment(home, work);
+  const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
   const serverDir = join(root, "apps", "server");
   // The command line from any folder: tsx is the server's own.
   const cli = join(binaries, "vv");
@@ -216,12 +222,14 @@ export async function runVerification(command: string[] = []): Promise<Verificat
 }
 
 if (import.meta.main) {
-  const args = process.argv.slice(2);
+  let args = process.argv.slice(2);
+  const scriptedHelper = args[0] === "--scripted-helper";
+  if (scriptedHelper) args = args.slice(1);
   if (args[0] === "--help") {
-    console.log("usage: pnpm exec tsx scripts/verify-server.ts [-- command args...]");
+    console.log("usage: bun scripts/verify-server.ts [--scripted-helper] [-- command args...]");
   } else {
     try {
-      process.exitCode = (await runVerification(args[0] === "--" ? args.slice(1) : args)).code;
+      process.exitCode = (await runVerification(args[0] === "--" ? args.slice(1) : args, { scriptedHelper })).code;
     } catch (error) {
       console.error(String(error));
       process.exitCode = 1;

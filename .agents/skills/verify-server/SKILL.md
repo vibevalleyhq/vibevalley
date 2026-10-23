@@ -16,7 +16,7 @@ description: 改了 VibeValley 服务端（apps/server/src/**、apps/server/db�
 
 不用它：只改了纯函数、黄金数据和单元测试已经覆盖的；只改了注释和文档。
 
-这个 skill 不派真的帮工：真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人。帮工的行为用 oar 的 `scriptedRuntime` 写测试（[地基](docs/subsystems/foundation.md)「测试」）。
+这个 skill 不派真的帮工：真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或 DeepSeek 的钥匙，会花钱，要先问主人。要把一张工单真的派出去、交回来、完成，用 `--scripted-helper`（步骤 3）：pi 换成服务端测试里照工单字眼干活的帮工（`apps/server/src/testing/helper.ts`），别的农机都当没装。帮工的更多行为照样写测试（[地基](docs/subsystems/foundation.md)「测试」）。
 
 ## 准备
 
@@ -41,12 +41,28 @@ description: 改了 VibeValley 服务端（apps/server/src/**、apps/server/db�
 
    子命令得到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`help` 列出全部接口）。需要造数据或断言时，把这些步骤写进同一个子命令；每次调用都是一个新农场。子命令失败仍会停止服务端，并保留它的退出码。
 
-3. 读证据目录的 `command.stdout.log`、`command.stderr.log` 和 `server.stdout.log`、`server.stderr.log`，核对接口结果、状态及错误。只有启动成功的 `health.json` 不能证明业务改动生效。
-4. 要看页面，先 `bun run --filter vibevalley-web build`，再在同一个子命令中造数据、跑 [verify-app](.agents/skills/verify-app/SKILL.md) 的截图命令。
+3. 改了工单怎么派、怎么走、怎么交付，只用命令行走一遍：
+
+   ```bash
+   bun scripts/verify-server.ts --scripted-helper -- sh -c '
+     vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
+     set -e
+     vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"assignee\":\"docs\"}"
+     vv issue run 1
+     vv issue status 1 --dry-run --json "{\"status\":\"done\"}"
+     vv issue status 1 --json "{\"status\":\"done\"}"
+     git -C "$(vv project list | jq -r ".[0].path")" log --oneline main
+   '
+   ```
+
+   每条命令的 stdout 是一个 JSON 文档：`issue run` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
+
+4. 读证据目录的 `command.stdout.log`、`command.stderr.log` 和 `server.stdout.log`、`server.stderr.log`，核对接口结果、状态及错误。只有启动成功的 `health.json` 不能证明业务改动生效。
+5. 要看页面，先 `bun run --filter vibevalley-web build`，再在同一个子命令中造数据、跑 [verify-app](.agents/skills/verify-app/SKILL.md) 的截图命令。
 
 ## 证据
 
-- 本轮执行的命令。
+- 本轮执行的命令；只用命令行走的，附上每条命令打出的 JSON（`command.stdout.log`）。
 - 证据目录的 `ready.json`、`health.json`、`result.json`，以及与改动有关的接口或状态片段。
 - `result.json` 的退出码应为 0，`stopped` 应为 true；业务断言应在子命令里完成。
 - 服务端日志中的错误和它们的结论。
