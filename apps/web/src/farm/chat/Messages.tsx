@@ -10,7 +10,8 @@ import { spentText } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../data/frame";
 import { PxMarkdown, SpriteIcon } from "../kit";
-import { useFarm } from "../state";
+
+import { usePrefs } from "../../data/prefs";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
@@ -56,7 +57,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
   const agentId = () => props.m.agent ?? session()?.agent ?? props.m.from;
   const agent = () => props.agents.get(agentId());
-  const look = useFarm((s) => s.orchestratorLook);
+  const look = usePrefs((p) => p.orchestratorLook);
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={agentId()} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={size()} />}>

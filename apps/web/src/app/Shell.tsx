@@ -6,12 +6,12 @@ import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../data/frame";
-import { useFarm } from "../farm/state";
 import { AgentFace, OrchestratorFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
 import { A } from "./A";
 import { useRouter } from "./router";
 import { titleBar } from "./TitleBar";
+import { usePrefs } from "../data/prefs";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -44,7 +44,7 @@ function Slot(props: { to: string; label: string; current?: boolean; fill?: stri
 
 function Rail(props: { here?: Place }) {
   const frames = useFrames();
-  const look = useFarm((s) => s.orchestratorLook);
+  const look = usePrefs((p) => p.orchestratorLook);
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav aria-label="工作台" class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">

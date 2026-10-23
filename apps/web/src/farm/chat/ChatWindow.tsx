@@ -25,6 +25,7 @@ import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
+import { usePrefs } from "../../data/prefs";
 
 const suggestions = ["让阿郑做字幕面板", "让小吴跑测试", "进度怎么样？", "大家收工"];
 
@@ -116,7 +117,7 @@ function Window() {
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const large = useFarm((s) => s.chatLarge);
   const shownId = useFarm((s) => s.chatShown);
-  const look = useFarm((s) => s.orchestratorLook);
+  const look = usePrefs((p) => p.orchestratorLook);
   const history = useHistory();
   const [problem, setProblem] = createSignal<string>();
   const shown = createMemo(() => (shownId() ? conversationOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));

@@ -4,7 +4,7 @@
 
 import { createSignal, For, Show } from "solid-js";
 import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
-import { bottleSprite, quotaOf } from "./rules";
+import { bottleSprite, quotaOf } from "../../rules/quota";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
 import { webRoutes } from "../world/places";
@@ -16,6 +16,7 @@ import { AgentFace } from "../../ui/Face";
 import { PxButton, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 import { HudCard } from "./Hud";
+import { setPick, usePrefs } from "../../data/prefs";
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
   bug: { dot: "#c84a3a", label: "地里有虫" },
@@ -39,7 +40,7 @@ function Stamina(props: { fill: number; segments?: number }) {
 }
 
 function Friend(props: { agent: Agent; st: FriendStatus }) {
-  const pick = useFarm((s) => s.pick);
+  const pick = usePrefs((p) => p.pick);
   const core = useCore();
   const runtimes = useRuntimes();
   const router = useRouter();
@@ -98,7 +99,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
           <div class="mt-3 flex items-center gap-2">
             <div class="flex-1">
               <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">停用了，派不出去</span>}>
-                <PxButton tone={picked() ? "plain" : "primary"} onClick={() => farm.setPick(picked() ? "auto" : props.agent.id)}>
+                <PxButton tone={picked() ? "plain" : "primary"} onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
                   {picked() ? "不再指定" : "下一单派它"}
                 </PxButton>
               </Show>

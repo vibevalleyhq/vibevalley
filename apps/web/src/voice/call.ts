@@ -7,9 +7,9 @@ import { currentHost, type RtcLine } from "@vibevalley/host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import { api, reasonOf } from "../data/api";
-import { farmState } from "../farm/store";
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";
+import { prefsNow } from "../data/prefs";
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";
 
@@ -213,6 +213,6 @@ export class VoiceCall {
 
 /** The farm's one call; what is said in it goes to the helper picked in the farm's chat, if one is. */
 export const voiceCall = new VoiceCall(() => {
-  const pick = farmState().pick;
+  const pick = prefsNow().pick;
   return pick && pick !== "auto" ? pick : undefined;
 });

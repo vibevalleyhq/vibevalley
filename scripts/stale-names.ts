@@ -173,6 +173,14 @@ const RULES: readonly Rule[] = [
     except: /^packages\/protocol\/src\/rules\//,
   },
   {
+    name: "the workbench leaning on the farm's state or rules",
+    pattern: /from "(\.\.?\/)+farm\/(state|store|commands|tools|scope|hud\/rules|world\/plots)"/,
+    says: "the rules and state both read live outside farm/: data/frame (rawFrame), data/prefs (the pick, the looks), rules/quota, data/issueActs; only the farm's pictures (farm/kit, farm/world/sprites, farm/sound) are for other pages to draw with",
+    dirs: ["apps/web/src"],
+    // The farm itself, and where the app mounts it.
+    except: /^apps\/web\/src\/(farm\/|app\/(App|Root)\.tsx$)/,
+  },
+  {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",

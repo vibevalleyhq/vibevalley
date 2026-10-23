@@ -7,19 +7,20 @@ import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../data/api";
 import { createComposer } from "../../data/composer";
-import { farm } from "../store";
+
 import { threadOwnerOf } from "../../rules/chat";
 import { aria } from "../../app/util";
 import { useCore } from "../../data/frame";
 import { AgentFace } from "../../ui/Face";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
-import { useFarm } from "../state";
+
 import { useAgent } from "../../data/agents";
+import { setPick, usePrefs } from "../../data/prefs";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {
-  const pick = useFarm((s) => s.pick);
+  const pick = usePrefs((p) => p.pick);
   const agent = useAgent(pick);
   return (
     <Show when={pick() !== "auto" && agent()?.enabled ? agent() : undefined}>
@@ -32,7 +33,7 @@ function PickChip(props: { named: boolean }) {
           <button
             type="button"
             aria-label="不指定帮工"
-            onClick={() => farm.setPick("auto")}
+            onClick={() => setPick("auto")}
             class="flex h-6 w-6 cursor-pointer items-center justify-center hover:bg-cream-300"
           >
             <SpriteIcon name="button-close" size={12} />
@@ -47,7 +48,7 @@ export type ChatPhase = "off" | "connecting" | "listening" | "thinking" | "speak
 
 export function FarmComposer(props: { conversation: Conversation | undefined; thread: boolean; onProblem: (p: string | undefined) => void }) {
   const core = useCore();
-  const pick = useFarm((s) => s.pick);
+  const pick = usePrefs((p) => p.pick);
   let input: HTMLTextAreaElement | undefined;
   const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
   const placeholder = () => (props.thread ? (owner() ? `在串里说，${owner()!.name}会看到…` : "在串里说…") : "对管家说，@ 叫帮工…");

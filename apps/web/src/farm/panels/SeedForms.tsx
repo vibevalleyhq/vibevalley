@@ -20,6 +20,7 @@ import { commands, useFarm } from "../state";
 import { useWorkAgents } from "../../data/agents";
 import { useCore } from "../../data/frame";
 import { issueOf } from "../world/plots";
+import { usePrefs } from "../../data/prefs";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */
@@ -67,7 +68,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   // Every plot here is sown in this farm's project.
   const farmProject = useFarm((s) => s.project);
   const project = () => farmProject() || undefined;
-  const pick = useFarm((s) => s.pick);
+  const pick = usePrefs((p) => p.pick);
   const agents = useWorkAgents(true);
   const router = useRouter();
   const [text, setText] = createSignal("");

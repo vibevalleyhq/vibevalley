@@ -1,6 +1,6 @@
 // The farm page's own state: what is open, what is held, what the canvas shows the overlays. The farm itself is the
 // server's (useFrames/useCore); nothing here copies it: the overlays, the tool held, the chat window (open, large,
-// shown), the phone, and the looks and picks kept on this machine.
+// shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are data/prefs.ts.
 
 import { dayClock } from "@vibevalley/engine/clock";
 import type { GameEffectReward } from "@vibevalley/protocol";
@@ -76,46 +76,11 @@ export interface FarmUi {
   /** Rewards shown in the FX layer for a few seconds each. */
   readonly rewards: readonly GameEffectReward[];
   readonly screen: VillageScreen | null;
-  /** The orchestrator's look (tools.ts orchestratorLooks ids; "farmer" is the plain one) and the pet by his door: this machine's. */
-  readonly orchestratorLook: string;
-  readonly pet: string;
-  /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose; this machine's. */
-  readonly pick: string;
   /** The project whose farm is on the page ("" for the sessions without one), and the one `/` opens next; this machine's. */
   readonly project: string | null;
 }
 
 const titleSeenKey = "vibevalley.title.seen";
-
-const looksKey = "vibevalley.farm.looks";
-
-/** The orchestrator's look and the pet, kept per machine. */
-const savedLooks = (): { orchestratorLook: string; pet: string } => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(looksKey) ?? "{}") as { orchestratorLook?: unknown; pet?: unknown };
-    return { orchestratorLook: typeof raw.orchestratorLook === "string" ? raw.orchestratorLook : "farmer", pet: typeof raw.pet === "string" ? raw.pet : "dog" };
-  } catch {
-    return { orchestratorLook: "farmer", pet: "dog" };
-  }
-};
-
-const saveLooks = (looks: { orchestratorLook: string; pet: string }) => {
-  try {
-    localStorage.setItem(looksKey, JSON.stringify(looks));
-  } catch {
-    // No storage: the choice lasts until the page closes.
-  }
-};
-
-const pickKey = "vibevalley.farm.pick";
-
-const savedPick = () => {
-  try {
-    return localStorage.getItem(pickKey) ?? "auto";
-  } catch {
-    return "auto";
-  }
-};
 
 const projectKey = "vibevalley.farm.project";
 
@@ -151,8 +116,6 @@ let state: FarmUi = {
   bedFx: [],
   rewards: [],
   screen: null,
-  ...savedLooks(),
-  pick: savedPick(),
   project: savedProject(),
 };
 
@@ -237,10 +200,6 @@ export const farm = {
     setTimeout(() => set((s) => ({ rewards: s.rewards.filter((x) => x !== r) })), rewardLinger);
   },
   setScreen: (screen: VillageScreen | null) => set({ screen }),
-  setOrchestratorLook: (orchestratorLook: string) => {
-    set({ orchestratorLook });
-    saveLooks({ orchestratorLook, pet: state.pet });
-  },
   setProject: (project: string) => {
     set({ project });
     try {
@@ -248,18 +207,6 @@ export const farm = {
     } catch {
       // No storage: remembered until the page closes.
     }
-  },
-  setPick: (pick: string) => {
-    set({ pick });
-    try {
-      localStorage.setItem(pickKey, pick);
-    } catch {
-      // No storage: the pick lasts until the page closes.
-    }
-  },
-  setPet: (pet: string) => {
-    set({ pet });
-    saveLooks({ orchestratorLook: state.orchestratorLook, pet });
   },
 };
 

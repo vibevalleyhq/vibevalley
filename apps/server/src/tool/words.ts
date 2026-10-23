@@ -10,7 +10,6 @@ import {
   PriorityValues,
   type Recurrence,
   type Spent,
-  type StuckReason,
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { outcomeLabel, phaseText, priorityLabel, shortTitle, statusLabel, stuckLabel, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";

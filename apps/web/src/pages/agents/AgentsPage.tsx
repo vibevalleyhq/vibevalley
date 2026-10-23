@@ -12,11 +12,11 @@ import { A } from "../../app/A";
 import { useAgentIssues, useWorkAgents } from "../../data/agents";
 import { useCore } from "../../data/frame";
 import { ready, useRuntimes } from "../../data/query";
-import { useFarm } from "../../farm/state";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useSkills } from "../settings/SkillsPage";
 import { AgentPage } from "./AgentPage";
+import { usePrefs } from "../../data/prefs";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {
@@ -99,7 +99,7 @@ function CardShell(props: { to: string; label: string; muted?: boolean; corner?:
 const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-xs text-muted";
 
 function OrchestratorCard() {
-  const look = useFarm((s) => s.orchestratorLook);
+  const look = usePrefs((p) => p.orchestratorLook);
   return (
     <CardShell to="/orchestrator" label="管家">
       <div class="flex items-start gap-3 pb-3">

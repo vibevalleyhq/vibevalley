@@ -24,7 +24,8 @@ import {
 } from "./layers";
 import { motesOf, type TitleScene, titleBackground } from "./scene";
 import { ready, useQuery } from "../../data/query";
-import { useFarm } from "../state";
+
+import { usePrefs } from "../../data/prefs";
 
 const pct = (n: number) => `${(n * 100).toFixed(3)}%`;
 
@@ -166,7 +167,7 @@ function Farmer(props: { scene: TitleScene; sizes: TitleSprites }) {
 }
 
 function PetOnHill(props: { scene: TitleScene; sizes: TitleSprites }) {
-  const chosen = useFarm((s) => s.pet);
+  const chosen = usePrefs((p) => p.pet);
   const pet = () => (chosen() in petScale ? chosen() : "dog");
   const frame = createPetFrame(() => props.scene === "night");
   const s = () => spriteOf(props.sizes, `${pet()}-${frame()}`, petScale[pet()]);

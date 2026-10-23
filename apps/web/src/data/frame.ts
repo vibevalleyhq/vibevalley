@@ -1,5 +1,6 @@
-import { createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
-import type { WorkspaceState } from "@vibevalley/protocol";
+import { type Accessor, createContext, createStore, onSettled, reconcile, useContext } from "solid-js";
+import type { StateFrame, WorkspaceState } from "@vibevalley/protocol";
+import { createExternal } from "./external";
 import { type Frames, frames } from "./frames";
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -37,3 +38,9 @@ export function useCore(): () => WorkspaceState | undefined {
   const f = useFrames();
   return () => f.frame?.state;
 }
+
+/**
+ * The frame as the stream sent it: a new object each time, for code that compares the one before with the one after
+ * (sounds, the canvas, the host's notices). UI reads the store above, which keeps objects and updates only what changed.
+ */
+export const rawFrame = (): Accessor<StateFrame | undefined> => createExternal(frames.subscribe, () => frames.get().frame);
