@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { Context, Effect, FiberSet, Layer, Schedule } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Schedule } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
@@ -180,8 +180,9 @@ export const make = (options: RuntimeOptions = {}) =>
      * read that started before it is dropped, so a slow probe never overwrites a newer one.
      */
     const reads = new Map<string, number>();
-    const pending = new Map<string, NodeJS.Timeout>();
-    const pushes = new Map<string, NodeJS.Timeout>();
+    // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
+    const timers = yield* FiberMap.make<string>();
+    const later = yield* FiberMap.runtime(timers)<never>();
     let closed = false;
 
     const spendFile = join(config.home, "spend.json");
@@ -195,7 +196,6 @@ export const make = (options: RuntimeOptions = {}) =>
         // An unreadable tally starts the day again.
       }
     }
-    let saving: NodeJS.Timeout | undefined;
     /** A new day starts from nothing. */
     const tally = () => {
       if (spent.day !== today()) spent = { day: today(), byRuntime: {} };
@@ -203,16 +203,19 @@ export const make = (options: RuntimeOptions = {}) =>
     };
 
     yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
-        closed = true;
-        clearTimeout(saving);
-        for (const t of [...pending.values(), ...pushes.values()]) clearTimeout(t);
-        try {
-          disk.finish(() => JSON.stringify(spent));
-        } catch (e) {
-          logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-        }
-      }),
+      Effect.andThen(
+        Effect.suspend(() => {
+          closed = true;
+          return FiberMap.clear(timers);
+        }),
+        Effect.sync(() => {
+          try {
+            disk.finish(() => JSON.stringify(spent));
+          } catch (e) {
+            logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
+          }
+        }),
+      ),
     );
 
     function withSpend(info: RuntimeInfo): RuntimeInfo {
@@ -442,32 +445,41 @@ export const make = (options: RuntimeOptions = {}) =>
       spend: (id, cny) => {
         if (!(cny > 0) || closed) return;
         tally()[id] = (tally()[id] ?? 0) + cny;
-        clearTimeout(saving);
-        saving = setTimeout(() => {
-          try {
-            disk.write(() => JSON.stringify(spent));
-          } catch (e) {
-            logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
-          }
-        }, 1000);
-        if (!pushes.has(id))
-          pushes.set(
-            id,
-            setTimeout(() => {
-              pushes.delete(id);
+        // The tally is written a second after the last spend; the runtime's new total is pushed once per window.
+        later(
+          "save",
+          Effect.delay(
+            Effect.sync(() => {
+              try {
+                disk.write(() => JSON.stringify(spent));
+              } catch (e) {
+                logs.warn(`vibevalley: could not save spend.json: ${String(e)}`);
+              }
+            }),
+            1000,
+          ),
+        );
+        later(
+          `push:${id}`,
+          Effect.delay(
+            Effect.sync(() => {
               const held = cache.get(id);
               if (held && !closed) remember(held, held.read);
-            }, spendPushAfterMs),
-          );
+            }),
+            spendPushAfterMs,
+          ),
+          { onlyIfMissing: true },
+        );
       },
       usageSoon: (id) => {
-        if (closed || pending.has(id)) return;
-        pending.set(
-          id,
-          setTimeout(() => {
-            pending.delete(id);
-            void refreshUsage(id);
-          }, usageAfterRunMs),
+        if (closed) return;
+        later(
+          `usage:${id}`,
+          Effect.delay(
+            Effect.promise(() => refreshUsage(id).catch(() => {})),
+            usageAfterRunMs,
+          ),
+          { onlyIfMissing: true },
         );
       },
     };

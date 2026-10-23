@@ -43,7 +43,7 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Context, Effect, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
@@ -349,7 +349,6 @@ export const make = Effect.gen(function* () {
   const breaker = new WakeBreaker();
   const lastRead = new Map<string, string>();
   const streaming = new Map<string, string>();
-  const notices = new Map<string, NodeJS.Timeout>();
   const names = new Map<string, string>();
   let closed = false;
   // Work set off by a timer belongs to this service: it ends with it and keeps its services.
@@ -361,11 +360,21 @@ export const make = Effect.gen(function* () {
     (what: string) =>
     <A, E>(e: Effect.Effect<A, E>) =>
       Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: ${what}: ${String(c)}`)));
-  // A timer, so a notice gathering can be called off (clearTimeout); what it runs is a fiber of this service's.
-  const later = (ms: number, fn: () => Effect.Effect<void>) =>
-    setTimeout(() => {
-      if (!closed) void forkHere(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(logged("later")));
-    }, ms);
+  // The waits are keyed fibers of this service's, so one can be called off (a notice gathering, when its session leaves);
+  // once a wait is over, what it runs is handed to forkHere, and calling the wait off no longer cuts it short.
+  const waits = yield* FiberMap.make<string>();
+  const wait = yield* FiberMap.runtime(waits)<never>();
+  const later = (key: string, ms: number, fn: () => Effect.Effect<void>) =>
+    void wait(
+      key,
+      Effect.delay(
+        Effect.sync(() => {
+          if (!closed) void forkHere(locked(Effect.suspend(() => (closed ? Effect.void : fn()))).pipe(logged("later")));
+        }),
+        ms,
+      ),
+      { onlyIfMissing: true },
+    );
 
   // ── the people and the channels ──
 
@@ -700,16 +709,7 @@ export const make = Effect.gen(function* () {
       if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
       if (isBusy(session)) {
         // Gathered for a moment: a burst of messages is one notice.
-        if (rows.some((r) => r.state === "pending" && r.held_by === null) && !notices.has(recipient))
-          notices.set(
-            recipient,
-            later(config.chat.noticeBatchMs, () =>
-              Effect.suspend(() => {
-                notices.delete(recipient);
-                return notify(recipient);
-              }),
-            ),
-          );
+        if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
         return;
       }
       if (waking.length === 0 || breaker.isOpen(recipient)) return;
@@ -761,7 +761,7 @@ export const make = Effect.gen(function* () {
                 });
               }
               // Not straight away: what failed may fail again.
-              later(config.chat.retryWakeMs, () => kick(a.id));
+              later(`wake:${a.id}`, config.chat.retryWakeMs, () => kick(a.id));
               return;
             }
           }
@@ -834,8 +834,7 @@ export const make = Effect.gen(function* () {
       if (p.kind !== "agent" || p.left_at !== null || on.has(p.id)) continue;
       yield* db(qp.participantLeft({ left_at: now, id: p.id }));
       yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: p.id }));
-      clearTimeout(notices.get(p.id));
-      notices.delete(p.id);
+      yield* FiberMap.remove(waits, `notice:${p.id}`);
       breaker.reset(p.id);
     }
   });
@@ -899,8 +898,6 @@ export const make = Effect.gen(function* () {
   yield* Effect.addFinalizer(() =>
     Effect.sync(() => {
       closed = true;
-      for (const t of notices.values()) clearTimeout(t);
-      notices.clear();
     }),
   );
 
