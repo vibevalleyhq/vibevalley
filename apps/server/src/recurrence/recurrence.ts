@@ -4,7 +4,7 @@
 
 import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
-import { Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
@@ -49,18 +49,12 @@ export function localZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export interface RecurrenceOptions {
-  /** The clock; tests turn it by hand. */
-  readonly now?: () => number;
-}
-
-export const make = Effect.fnUntraced(function* (options: RecurrenceOptions = {}) {
+export const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
   const chat = yield* Channels;
   const sql = yield* SqlClient.SqlClient;
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-  const now = options.now ?? Date.now;
   // The ticker, the tools and the pages all change the list.
   const lock = yield* Semaphore.make(1);
   const dueHub = yield* PubSub.unbounded<Due>();
@@ -101,7 +95,7 @@ export const make = Effect.fnUntraced(function* (options: RecurrenceOptions = {}
 
   const tick = lock.withPermits(1)(
     Effect.gen(function* () {
-      const at = now();
+      const at = yield* Clock.currentTimeMillis;
       for (const s of dueRecurrences(core.state().recurrences ?? [], at)) {
         const missed = isMissed(s, at);
         const after = afterRun(s, at);
@@ -120,7 +114,7 @@ export const make = Effect.fnUntraced(function* (options: RecurrenceOptions = {}
   const shape = Recurrences.of({
     list: () => [...(core.state().recurrences ?? [])],
     add: Effect.fn("Recurrences.add")(function* (req, by, ownerInRun) {
-      const at = now();
+      const at = yield* Clock.currentTimeMillis;
       const problem = recurrenceProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
       const want = req.channel ?? chat.general();
@@ -174,7 +168,7 @@ export const make = Effect.fnUntraced(function* (options: RecurrenceOptions = {}
       let s: Recurrence = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {
-        const at = now();
+        const at = yield* Clock.currentTimeMillis;
         s = { ...s, lastRun: at };
         yield* ran(id, at, enabled);
       } else yield* db(q.enableRecurrence({ enabled, id }));
@@ -197,7 +191,7 @@ export const make = Effect.fnUntraced(function* (options: RecurrenceOptions = {}
   return shape;
 });
 
-export const layer = (options?: RecurrenceOptions) => Layer.effect(Recurrences, make(options));
+export const layer = Layer.effect(Recurrences, make);
 
 /** Ticks once every service is built, so what the first tick finds due reaches the orchestrator (once ready). */
 export const start = Layer.effectDiscard(

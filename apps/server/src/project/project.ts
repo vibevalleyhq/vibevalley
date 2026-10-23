@@ -32,7 +32,7 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Context, Data, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
+import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -298,7 +298,7 @@ const runGitHub: GitHubRun = (...args) =>
   );
 
 export const probeGitHub = Effect.fnUntraced(function* (gh: GitHubRun) {
-  const s: GitHubStatus = { checkedAt: Date.now(), installed: false, loggedIn: false } as GitHubStatus;
+  const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false } as GitHubStatus;
   const version = yield* gh("--version");
   if (!version.ok) return { ...s, reason: version.missing ? "没装 gh" : "gh 检测失败" };
   const v = ghVersion.exec(version.out)?.[1];
@@ -654,12 +654,12 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       if (r.code !== 0) return yield* fail("tokei 没数完：" + reason(r.stderr));
       const languages = countsOf(r.stdout);
       if (!languages) return yield* fail("tokei 的输出读不懂：换个新一点的 tokei 试试");
-      return { project: name, at: Date.now(), languages };
+      return { project: name, at: yield* Clock.currentTimeMillis, languages };
     }),
     activity: Effect.fn("Projects.activity")(function* (name) {
       const p = yield* find(name);
       if (!p) return undefined;
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const out: ProjectActivity = { project: name, at: now, days: [], authors: [], total: 0 } as unknown as ProjectActivity;
       if (!p.git) return out;
       const since = new Date(now - yearDays * 86_400_000).toISOString();

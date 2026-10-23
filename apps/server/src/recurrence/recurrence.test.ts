@@ -59,7 +59,7 @@ test("what waits for the owner's yes", () => {
 });
 
 /** The farm with recurrences on a clock turned by hand. */
-const farm = (config: Config, clock: { now: number }) => world({ config, now: () => clock.now });
+const farm = (config: Config, clock: { now: number }) => world({ config, clock: () => clock.now });
 
 const collect = Effect.gen(function* () {
   const got: Due[] = [];

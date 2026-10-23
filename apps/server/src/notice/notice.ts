@@ -5,7 +5,7 @@
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
-import { Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -32,62 +32,56 @@ export interface NoticeShape {
 
 export class Notices extends Context.Service<Notices, NoticeShape>()("vibevalley/Notices") {}
 
-export interface NoticeOptions {
-  /** The patrol's clock. */
-  readonly now?: () => number;
-}
+export const make = Effect.gen(function* () {
+  const core = yield* Core;
+  const chat = yield* Channels;
 
-export const make = (options: NoticeOptions = {}) =>
-  Effect.gen(function* () {
-    const core = yield* Core;
-    const chat = yield* Channels;
-
-    // Until the startup primes it nothing is news: what comes back with the sessions was there before the stop.
-    let known: Set<string> | undefined;
-    let primed = false;
-    const newsHub = yield* PubSub.unbounded<readonly InboxItem[]>();
-    const facts = yield* core.subscribe;
-    yield* Effect.forkScoped(
-      Stream.runForEach(facts, () =>
-        Effect.gen(function* () {
-          if (!primed) return;
-          const news = freshOf(known, inbox(core.state()));
-          known = news.known;
-          if (news.fresh.length > 0) yield* PubSub.publish(newsHub, news.fresh);
-        }),
-      ),
-    );
-
-    const overdueHub = yield* PubSub.unbounded<Overdue>();
-    let memory: PatrolMemory = emptyPatrol();
-    const patrol = Effect.gen(function* () {
-      const [report, next] = patrolStep(core.state(), (options.now ?? Date.now)(), memory);
-      memory = next;
-      const byChannel = new Map<string, PatrolNote[]>();
-      for (const f of report) {
-        const c = f.channel ?? chat.general();
-        byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
-      }
-      for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
-    });
-
-    const shape = Notices.of({
-      news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-      overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
-      toOwner: Effect.map(
-        core.subscribe,
-        Stream.flatMap((e) => (e.type === "message" && forOwner(e.message) ? Stream.make(e.message) : Stream.empty)),
-      ),
-      patrol,
-      prime: Effect.sync(() => {
-        known = freshOf(undefined, inbox(core.state())).known;
-        primed = true;
+  // Until the startup primes it nothing is news: what comes back with the sessions was there before the stop.
+  let known: Set<string> | undefined;
+  let primed = false;
+  const newsHub = yield* PubSub.unbounded<readonly InboxItem[]>();
+  const facts = yield* core.subscribe;
+  yield* Effect.forkScoped(
+    Stream.runForEach(facts, () =>
+      Effect.gen(function* () {
+        if (!primed) return;
+        const news = freshOf(known, inbox(core.state()));
+        known = news.known;
+        if (news.fresh.length > 0) yield* PubSub.publish(newsHub, news.fresh);
       }),
-    });
-    return shape;
+    ),
+  );
+
+  const overdueHub = yield* PubSub.unbounded<Overdue>();
+  let memory: PatrolMemory = emptyPatrol();
+  const patrol = Effect.gen(function* () {
+    const [report, next] = patrolStep(core.state(), yield* Clock.currentTimeMillis, memory);
+    memory = next;
+    const byChannel = new Map<string, PatrolNote[]>();
+    for (const f of report) {
+      const c = f.channel ?? chat.general();
+      byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
+    }
+    for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
   });
 
-export const layer = (options?: NoticeOptions) => Layer.effect(Notices, make(options));
+  const shape = Notices.of({
+    news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
+    overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
+    toOwner: Effect.map(
+      core.subscribe,
+      Stream.flatMap((e) => (e.type === "message" && forOwner(e.message) ? Stream.make(e.message) : Stream.empty)),
+    ),
+    patrol,
+    prime: Effect.sync(() => {
+      known = freshOf(undefined, inbox(core.state())).known;
+      primed = true;
+    }),
+  });
+  return shape;
+});
+
+export const layer = Layer.effect(Notices, make);
 
 /** After the sessions and issues came back: the inbox as it stands is known, and the patrol starts its rounds. The first
  * round waits one interval: right after a start, what looks hanging is mostly the restart. */

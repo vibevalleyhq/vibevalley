@@ -5,7 +5,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Context, Effect, Layer } from "effect";
+import { Clock, Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
@@ -99,7 +99,7 @@ export const make = Effect.gen(function* () {
       s = JSON.parse(readFileSync(file, "utf8")) as Stored;
     } catch (e) {
       // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
-      const aside = `${file}.unreadable-${Date.now()}`;
+      const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
       try {
         renameSync(file, aside);
       } catch (moved) {

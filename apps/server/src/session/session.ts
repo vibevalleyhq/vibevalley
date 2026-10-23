@@ -33,7 +33,7 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Context, Data, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Data, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -944,7 +944,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
 
   const expireLogs = Effect.fnUntraced(function* (days: number) {
     if (days <= 0) return;
-    const ids = yield* db(qs.sessionsEndedBefore({ before: Date.now() - days * dayMs }));
+    const ids = yield* db(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
     for (const r of ids) trajectories.forget(r.id);
   });
 
@@ -1061,7 +1061,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         runtime: agent.runtime,
         brief: task,
         project: place.project,
-        hiredAt: Date.now(),
+        hiredAt: yield* Clock.currentTimeMillis,
         runs: 0,
         phase: { _tag: "arriving" },
         ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),

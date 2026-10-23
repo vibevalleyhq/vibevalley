@@ -60,7 +60,7 @@ import {
   sentTitles,
   splitJob,
 } from "./rules.ts";
-import { Context, Effect, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { SqlClient } from "effect/sql";
@@ -363,7 +363,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         project: nullText(req.project),
         assignee: nullText(req.assignee),
         priority: req.priority ?? "medium",
-        created_at: Date.now(),
+        created_at: yield* Clock.currentTimeMillis,
         recurrence: recurrence ?? null,
         review: req.review || "glance",
         // The orchestrator never changes code: what it is given is answered.
@@ -387,7 +387,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       if (t.canceled !== "lost") return;
       yield* db(q.reopenIssue({ id }));
     }
-    const now = Date.now();
+    const now = yield* Clock.currentTimeMillis;
     const run: IssueRun = { startedAt: t.lastRun?.startedAt ?? now, endedAt: now, outcome };
     yield* db(q.setLastRun({ id, last_run: JSON.stringify(run) }));
     yield* publish(id);
@@ -448,7 +448,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       queued
         ? Effect.andThen(
             db(qq.enqueueIssue({ issue: id, channel, triggered_by: JSON.stringify(by ?? { kind: "issue" }) })),
-            db(q.queueIssue({ at: Date.now(), id })),
+            db(q.queueIssue({ at: yield* Clock.currentTimeMillis, id })),
           )
         : Effect.andThen(db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id }))),
     );
@@ -465,9 +465,16 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   const drop = Effect.fnUntraced(function* (id: string) {
     yield* unsent(id);
     yield* inTx(
-      Effect.all([db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id })), db(q.cancelIssue({ closed_at: Date.now(), canceled: "dismissed", id }))], {
-        discard: true,
-      }),
+      Effect.all(
+        [
+          db(qq.dequeueIssue({ issue: id })),
+          db(q.unqueueIssue({ id })),
+          db(q.cancelIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: "dismissed", id })),
+        ],
+        {
+          discard: true,
+        },
+      ),
     );
     yield* publish(id);
   });
@@ -520,7 +527,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
   const toOrchestrator = Effect.fnUntraced(function* (issue: Issue, channel: string, by: RunTrigger, due?: Recurrence, said?: string) {
     if (isClosed(issue.status)) yield* db(q.reopenIssue({ id: issue.id }));
-    const run: IssueRun = { startedAt: Date.now() };
+    const run: IssueRun = { startedAt: yield* Clock.currentTimeMillis };
     yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
     yield* publish(issue.id);
     PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
@@ -801,8 +808,8 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         const closing = closingOf(e.closed);
         yield* db(
           "delivered" in closing
-            ? q.completeOpenIssue({ closed_at: Date.now(), delivered: closing.delivered, id: issue })
-            : q.cancelOpenIssue({ closed_at: Date.now(), canceled: closing.canceled, id: issue }),
+            ? q.completeOpenIssue({ closed_at: yield* Clock.currentTimeMillis, delivered: closing.delivered, id: issue })
+            : q.cancelOpenIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: closing.canceled, id: issue }),
         );
         yield* publish(issue);
         return;
@@ -1179,7 +1186,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       if (req.pass) {
         yield* judged(
           id,
-          Date.now(),
+          yield* Clock.currentTimeMillis,
           t.findings.map((f) => ({ ...f, resolved: true })),
         );
         return yield* get(id);
@@ -1187,7 +1194,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       const fresh = kept(req.findings);
       const text = (req.text ?? "").trim();
       if (fresh.length === 0 && !text) return yield* Effect.fail(refused("没过验收要说哪里不行：至少写一条意见"));
-      const at = Date.now();
+      const at = yield* Clock.currentTimeMillis;
       const findings = [...t.findings, ...fresh.map((text) => ({ id: newId(), text, at }))];
       yield* judged(id, 0, findings);
       // The findings go to whoever works it as the next round's words, like any comment.
@@ -1219,7 +1226,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         return rows.map((r) => issueOf(r, runs.get(r.id)));
       });
       const before = yield* family(graph.id);
-      const issues = graphIssues(graph, before, Date.now());
+      const issues = graphIssues(graph, before, yield* Clock.currentTimeMillis);
       const gone = yield* inTx(
         Effect.gen(function* () {
           for (const t of issues)

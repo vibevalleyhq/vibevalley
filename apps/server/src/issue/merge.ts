@@ -3,7 +3,7 @@
 // here, for the board, the command line and the orchestrator's tool alike.
 
 import type { Issue, PullRequest, PullRequestState } from "@vibevalley/protocol";
-import { Effect, Semaphore } from "effect";
+import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
 import type { ChannelShape } from "../channel/chat.ts";
@@ -103,8 +103,8 @@ export function merging(d: MergeDeps) {
       Effect.andThen(
         db(
           state === "closed"
-            ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: Date.now() })
-            : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: Date.now() }),
+            ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
+            : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
         ),
         db(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
       ),

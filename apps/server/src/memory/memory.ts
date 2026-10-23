@@ -12,7 +12,7 @@ import {
   type Preview,
   type RecallPreview,
 } from "@vibevalley/protocol";
-import { Context, Effect, FiberSet, Layer } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
@@ -130,7 +130,7 @@ export const make = Effect.fnUntraced(function* (build: BuildSource = defaultBui
     const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
     if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
     const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
-    return lineMemory(written, Date.now());
+    return lineMemory(written, yield* Clock.currentTimeMillis);
   });
 
   const orchestrator = (): MemoryList => {

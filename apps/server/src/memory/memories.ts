@@ -3,7 +3,7 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
-import { Data, Effect } from "effect";
+import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
@@ -73,7 +73,7 @@ export const makeMemories = Effect.gen(function* () {
     );
 
   const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: MemoryAuthor) {
-    const at = Date.now();
+    const at = yield* Clock.currentTimeMillis;
     const id = newId();
     yield* db(
       q.addNote({
@@ -111,7 +111,7 @@ export const makeMemories = Effect.gen(function* () {
         project: cue.project,
         text: cue.text,
         skip: cue.skip,
-        now: Date.now(),
+        now: yield* Clock.currentTimeMillis,
         matches: yield* matches(cue.agent, cue.text),
       };
       return pick(all, picked);
@@ -148,7 +148,7 @@ export const makeMemories = Effect.gen(function* () {
                   terms_of: termsVersion,
                   project: run.project,
                   session: run.session,
-                  created_at: Date.now(),
+                  created_at: yield* Clock.currentTimeMillis,
                 }),
               );
               for (const id of nextForgotten(yield* list(run.agent), 0)) yield* db(q.forget({ agent: run.agent, id }));
