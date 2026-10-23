@@ -7,6 +7,7 @@
 | skill | 什么时候用 | 证明什么 |
 |---|---|---|
 | [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) | 一类改动没有现成的验证办法 | 写出下一个 agent 照着就能做的验证步骤 |
+| [effect-ts](.agents/skills/effect-ts/SKILL.md) | 给一个用 Effect 的仓库做准备：装 `effect`、在 AGENTS.md 里指到它自带的 `AGENTS.md` 和源码（照抄自 [Effect-TS/skills](https://github.com/Effect-TS/skills/tree/main/skills/effect-ts)，不改） | 写 Effect 的 agent 先读 Effect 自己的指南，再查 `node_modules/effect/src` |
 | [verify-server](.agents/skills/verify-server/SKILL.md) | 改了 `apps/server` 的接口、服务、表结构、开机 | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动 |
 | [verify-app](.agents/skills/verify-app/SKILL.md) | 改了 `apps/web` 的页面、组件、贴图 | 对着真的服务端，页面画出来是对的（截图） |
 | [verify-mobile](.agents/skills/verify-mobile/SKILL.md) | 改了 `apps/mobile`、宿主的桥、「连接到本机」的配对 | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
