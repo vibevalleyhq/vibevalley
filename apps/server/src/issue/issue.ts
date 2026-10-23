@@ -187,7 +187,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
 function failedText(findings: readonly Finding[], text: string): string {
   let out = "验收没过，这几处要修：";
   let n = 0;
-  for (const f of findings) if (!f.pulled) out += `\n${++n}. ${f.text}`;
+  for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;
   if (text) out += "\n\n" + text;
   return out + "\n\n修好以后在结论里逐条说怎么修的。";
 }
@@ -1070,7 +1070,7 @@ export const make = (options: IssueOptions = {}) =>
             yield* judged(
               id,
               Date.now(),
-              t.findings.map((f) => ({ ...f, pulled: true })),
+              t.findings.map((f) => ({ ...f, resolved: true })),
             );
             return yield* get(id);
           }

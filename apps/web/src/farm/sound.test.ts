@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
-import type { Session } from "@vibevalley/protocol";
+import type { IssueAttention, Session } from "@vibevalley/protocol";
 import { farmCues, isMuted, playSound, SOUND_GROUPS, SOUND_LABEL, SOUNDS, type FarmSoundInput } from "./sound";
 
 const base: FarmSoundInput = { tool: "hand", bedFx: [], open: {} };
@@ -38,11 +38,21 @@ describe("farmCues", () => {
     expect(farmCues({ ...base, effects: same }, { ...base, effects: same })).toEqual([]);
   });
 
-  test("sessions arrive, ripen and fail, but not in the first state", () => {
+  test("sessions arrive and issues ripen or fail, but not in the first state", () => {
     const next = [session("a", "working"), session("b", "done"), session("c", "failed")];
     expect(farmCues(base, { ...base, sessions: next })).toEqual([]);
     const prev = [session("b", "working"), session("c", "working")];
-    expect(farmCues({ ...base, sessions: prev }, { ...base, sessions: next })).toEqual([{ name: "arrive" }, { name: "ripe", hold: 220 }, { name: "bug" }]);
+    expect(farmCues({ ...base, sessions: prev }, { ...base, sessions: next })).toEqual([{ name: "arrive" }]);
+    const issue = (id: string, attention: IssueAttention) => ({ id, attention });
+    const working: IssueAttention = { state: "working", acts: [] };
+    const before = [issue("b", working), issue("c", working), issue("d", working)];
+    const after = [
+      issue("b", { state: "reviewing", acts: ["complete"] }),
+      issue("c", { state: "stuck", stuck: "failed", acts: ["cure"] }),
+      // Handed back with a question: where it stands is asking, and its plot is neither ripe nor buggy.
+      issue("d", { state: "asking", acts: ["answer"] }),
+    ];
+    expect(farmCues({ ...base, issues: before }, { ...base, issues: after })).toEqual([{ name: "ripe", hold: 220 }, { name: "bug" }]);
   });
 
   test("the call", () => {

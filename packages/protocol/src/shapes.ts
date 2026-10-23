@@ -1255,7 +1255,8 @@ export interface Finding {
   id: string;
   text: string;
   at: number;
-  pulled?: boolean;
+  /** Settled: the next acceptance that passed after it was written. */
+  resolved?: boolean;
 }
 
 /** One of what the owner may do (Issue.attention.acts). text: what answer, tell and reopen say, and reject's findings

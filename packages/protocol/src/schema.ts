@@ -538,7 +538,7 @@ export const Finding: Schema.Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   at: Schema.Number,
-  pulled: Schema.optionalKey(Schema.Boolean),
+  resolved: Schema.optionalKey(Schema.Boolean),
 });
 
 export const IssueRefining: Schema.Codec<T.IssueRefining> = Schema.Struct({

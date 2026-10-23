@@ -128,8 +128,8 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     met: rows.filter((r) => r.result === "met").length,
     doing:
       attention.state === "working" && current.action !== "none" ? `正在${current.actionText ?? ""}${current.label ? "：" + current.label : ""}` : undefined,
-    weeds: issue.findings.filter((f) => !f.pulled),
-    pulled: issue.findings.filter((f) => f.pulled),
+    openFindings: issue.findings.filter((f) => !f.resolved),
+    resolvedFindings: issue.findings.filter((f) => f.resolved),
     crewLine:
       crew.length <= 1 && !hand
         ? undefined

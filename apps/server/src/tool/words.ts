@@ -137,8 +137,8 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
     });
   }
   if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
-  const weeds = t.findings.filter((f) => !f.pulled);
-  if (weeds.length > 0) lines.push("验收没过要修的：" + weeds.map((f) => f.text).join("；"));
+  const open = t.findings.filter((f) => !f.resolved);
+  if (open.length > 0) lines.push("验收没过要修的：" + open.map((f) => f.text).join("；"));
   if (t.lastRun?.outcome) lines.push("最后一轮" + outcomeLabel[t.lastRun.outcome] + "，在等主人点头");
   if (t.pullRequest) lines.push(`PR #${t.pullRequest.number}（${t.pullRequest.state}）${t.pullRequest.url}`);
   for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
