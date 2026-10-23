@@ -585,6 +585,8 @@ export const IssueTimeline: Schema.Codec<T.IssueTimeline> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
 });
 
+export const Preview: Schema.Codec<T.Preview> = Schema.Struct({ does: Schema.mutable(Schema.Array(Schema.String)) });
+
 export const IssueRun: Schema.Codec<T.IssueRun> = Schema.Struct({
   startedAt: Schema.Number,
   endedAt: Schema.optionalKey(Schema.Number),

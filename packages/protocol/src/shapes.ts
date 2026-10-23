@@ -1109,6 +1109,12 @@ export interface IssueAnswer {
   next: string[];
 }
 
+/** What a command that changes things would do, as its dry run answers it (an endpoint's `dryRun`): nothing was changed. */
+export interface Preview {
+  /** What it would do, in order, one step a line. */
+  does: string[];
+}
+
 export interface IssueRun {
   startedAt: number;
   endedAt?: number;

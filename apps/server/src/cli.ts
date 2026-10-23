@@ -10,7 +10,7 @@
 import { Console, Effect, Option } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { NodeServices } from "@effect/platform-node";
-import { eventsCommand, groupCommands, issueRunCommand, ServerFlag, stateCommand } from "./cli/api.ts";
+import { DryRunFlag, eventsCommand, groupCommands, issueRunCommand, ServerFlag, stateCommand } from "./cli/api.ts";
 import { ownChat, runtimeChat } from "./cli/chat.ts";
 import { exit, Failure, type Io, printFailure } from "./cli/output.ts";
 
@@ -70,7 +70,7 @@ const root = (io: Io) =>
       stateCommand(io),
       eventsCommand(io),
     ] as never),
-    Command.withGlobalFlags([ServerFlag]),
+    Command.withGlobalFlags([ServerFlag, DryRunFlag]),
   );
 
 /** What the parser said was wrong, as one failure: every mistake's words, and the help of the command it was in. */
