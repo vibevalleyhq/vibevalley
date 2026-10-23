@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { endpoints } from "@vibevalley/protocol/api";
+import { Preview } from "@vibevalley/protocol/schema";
 import { kebab } from "./cli/api.ts";
 import { run } from "./cli.ts";
 import { app } from "./http/app.ts";
@@ -84,6 +85,54 @@ describe("the command line", () => {
       expect(nowhere.failure?.next).toEqual([{ say: "列出工单，找它的编号", run: ["issue", "list"] }]);
       const unreachable = yield* cli(["issue", "list", "--server", "http://127.0.0.1:9"]);
       expect([unreachable.code, unreachable.failure?.tag]).toEqual([5, "Unreachable"]);
+    }),
+  );
+
+  // A dry run is an endpoint of its own that takes what the real one takes, so --dry-run can call it with the same words.
+  it("gives each command that changes what cannot be taken back a dry run of the same shape", () => {
+    for (const e of endpoints.filter((x) => x.dryRun)) {
+      const preview = endpoints.find((x) => x.op === e.dryRun);
+      expect({ op: e.op, preview: preview?.op }).toEqual({ op: e.op, preview: e.dryRun });
+      expect([preview!.pathParams, preview!.query, preview!.body === e.body, preview!.result === Preview, preview!.can]).toEqual([
+        e.pathParams,
+        e.query,
+        true,
+        true,
+        e.can,
+      ]);
+    }
+    // Every delete has one, but these, which are still to come.
+    const toCome = ["recurrence.delete", "graph.deleteTask", "agent.delete", "memory.delete", "skill.delete", "lan.deleteDevice", "lan.stopPairing"];
+    expect(
+      endpoints
+        .filter((e) => e.method === "DELETE" && !e.dryRun)
+        .map((e) => e.op)
+        .sort(),
+    ).toEqual(toCome.sort());
+  });
+
+  it.live("--dry-run says what a command would do and changes nothing; one with no dry run is refused, a read runs", () =>
+    Effect.gen(function* () {
+      const server = yield* farm;
+      const made = JSON.parse((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "先试跑" })])).out) as {
+        id: string;
+        number: number;
+      };
+      const preview = yield* cli(["issue", "delete", made.id, "--server", server, "--dry-run"]);
+      expect([preview.code, (JSON.parse(preview.out) as { does: string[] }).does[0]]).toEqual([0, `删掉工单 #${made.number}「先试跑」`]);
+      expect((yield* cli(["issue", "get", made.id, "--server", server])).code).toBe(0);
+      const cancel = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "canceled" })]);
+      expect((JSON.parse(cancel.out) as { does: string[] }).does).toEqual([`#${made.number} 关成已取消：还没派过`]);
+      expect((JSON.parse((yield* cli(["issue", "get", made.id, "--server", server])).out) as { status: string }).status).toBe("backlog");
+      // Refused as the real move would be, with the same words.
+      const real = yield* cli(["issue", "status", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
+      const dry = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "done" })]);
+      expect([dry.code, dry.failure?.message]).toEqual([3, real.failure?.message]);
+      const create = yield* cli(["issue", "create", "--server", server, "--dry-run", "--json", JSON.stringify({ title: "不该建" })]);
+      expect([create.code, create.failure?.tag]).toEqual([2, "NoDryRun"]);
+      const list = yield* cli(["issue", "list", "--server", server, "--dry-run"]);
+      expect(list.code).toBe(0);
+      expect((JSON.parse(list.out) as { title: string }[]).some((i) => i.title === "不该建")).toBe(false);
     }),
   );
 

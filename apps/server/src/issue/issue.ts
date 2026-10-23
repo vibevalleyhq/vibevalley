@@ -30,6 +30,7 @@ import {
   type IssueTask,
   type IssueTimeline,
   type IssueUpdate,
+  type Preview,
   orchestratorAgent,
   type Priority,
   type ProjectTemplates,
@@ -39,7 +40,7 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
-import { actLabel, attentionLabel, closedText, outcomeLabel } from "@vibevalley/protocol/rules";
+import { actLabel, attentionLabel, closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
@@ -117,6 +118,13 @@ export interface IssueShape {
   /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
    * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
   readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
+   * fields, as the move would see them once saved. */
+  readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
+  /** What act would do with the same request, refused as it would be; nothing changes. */
+  readonly previewAct: (id: string, req: IssueActRequest) => Effect.Effect<Preview, ApiError>;
+  /** What remove would do, refused as it would be; nothing changes. */
+  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
   /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
   readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
   readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
@@ -502,15 +510,17 @@ export const make = (options: IssueOptions = {}) =>
         return hired.session && evicted ? { ...hired, evicted } : hired;
       });
 
-    const ready = (id: string) =>
+    /** Who an unsent issue goes to and where, or why it cannot go: starting it and its dry run ask the same. */
+    const readyOf = (issue: Issue) =>
       Effect.gen(function* () {
-        const issue = yield* unsent(id);
         if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
         if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案"));
         const agent = store.agent(issue.assignee);
         if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了"));
         return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
       });
+
+    const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
     const send = (issue: Issue, agent: Agent, project: string, channel: string, by?: RunTrigger) =>
       Effect.flatMap(hire(agent, issueJob(issue), project, { channel, issue: issue.id, ...(by ? { trigger: by } : {}) }), (hired) =>
@@ -694,6 +704,88 @@ export const make = (options: IssueOptions = {}) =>
         const last = t.sessions.at(-1);
         if (last === undefined || !sessions.find(last)) return;
         if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last));
+      });
+
+    // ── a move worked out before it is made ──
+
+    /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first);
+     * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
+    const withEdit = (t: Issue, edit: IssueUpdate | undefined) =>
+      Effect.gen(function* () {
+        if (!edit) return t;
+        const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
+        if (words) yield* unsent(t.id);
+        return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) } as Issue;
+      });
+
+    /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
+     * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
+    const settledMove = (t: Issue, to: IssueStatus, text: string, opt: StatusOptions) =>
+      Effect.gen(function* () {
+        if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
+        const taker = opt.agent ? yield* takerOf(t, to, opt.agent) : undefined;
+        const [move, why] = statusMove(t, to);
+        const said = text.trim();
+        if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
+        if (move === "round" && !taker && !said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
+        // What a completion delivers follows the issue: nothing to take in, its branch kept, or merged (locally or by a PR).
+        let delivery: "kept" | "none" | "merge" | undefined;
+        let commits = 0;
+        if (move === "complete") {
+          commits = yield* commitsOf(t);
+          delivery = opt.keepBranch || commits === 0 ? (opt.keepBranch && commits > 0 ? "kept" : "none") : "merge";
+        }
+        return { t, to, move, said, taker, delivery, commits };
+      });
+
+    const helperName = (t: Issue) => {
+      const last = t.sessions.at(-1);
+      return (last !== undefined ? sessions.sessionOf(last)?.name : undefined) ?? "帮工";
+    };
+
+    /** A settled move in words, one step a line; what it reads to say so (who would go, the room, a merge's conflicts) is read, not changed. */
+    const movesWords = (p: Effect.Success<ReturnType<typeof settledMove>>) =>
+      Effect.gen(function* () {
+        const t = p.t;
+        const n = `#${t.number}`;
+        switch (p.move) {
+          case "start": {
+            if (isForOrchestrator(t)) return [`${n} 交给管家答`];
+            const [, agent, project] = yield* readyOf(p.taker ? { ...t, assignee: p.taker.id } : t);
+            const full = sessions.noRoom(agent.runtime, project);
+            return full ? [`${n} 派给 ${agent.name}`, `现在没空位（${full}）：排进待办，有空位就自动开工`] : [`${n} 派 ${agent.name} 去 ${project} 开工`];
+          }
+          case "unqueue":
+            return [`${n} 不排了，挪回备选`];
+          case "round":
+            if (p.taker) return [`${helperName(t)} 收工，分支留着`, `${p.taker.name} 接手，在同一条分支上接着做`];
+            return t.sessions.length === 0 ? [`${n} 再交给管家答一轮：${p.said}`] : [`把这句话带给 ${helperName(t)}，再干一轮：${p.said}`];
+          case "reopen":
+            return [`${n} 重开：派${p.taker ? " " + p.taker.name : "同一个档案的新帮工"}接着做`, ...(p.said ? [`这一次要做的：${p.said}`] : [])];
+          case "revive":
+            return [`${n} 挪回备选`];
+          case "complete": {
+            if (p.delivery === "none") return [`${n} 关成已完成：没有改动要合`, `${helperName(t)} 收工`];
+            if (p.delivery === "kept") return [`${n} 关成已完成：分支留着没合（${p.commits} 个提交）`, `${helperName(t)} 收工`];
+            const changes = yield* sessions.changes(yield* liveSession(t.id));
+            const pr = t.project !== undefined && (t.pullRequest?.state === "open" || projects.usesPullRequests(t.project));
+            const out: string[] = [];
+            if (changes && changes.uncommitted.length > 0) out.push(`先替 ${helperName(t)} 提交 ${changes.uncommitted.length} 个没提交的文件`);
+            if (changes && changes.conflicts.length > 0)
+              return [...out, `合进 ${changes.base} 会冲突（${changes.conflicts.join("、")}）：不会合，标上冲突，工单留在等你看`];
+            out.push("合之前跑项目的检查（.vibevalley/check，有的话）：没过就不合，工单留在等你看");
+            out.push(
+              pr
+                ? `推分支、开 PR（${p.commits} 个提交）：PR 合了才关成已完成`
+                : `合进 ${changes?.base ?? "主分支"}（${p.commits} 个提交），关成已完成，${helperName(t)} 收工`,
+            );
+            return out;
+          }
+          case "cancel":
+            return [`${n} 关成已取消`, `${helperName(t)} 收工，分支上有提交就留着`];
+          case "drop":
+            return [`${n} 关成已取消：还没派过`, ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : [])];
+        }
       });
 
     // ── drafts ──
@@ -971,15 +1063,9 @@ export const make = (options: IssueOptions = {}) =>
         }),
       setStatus: (id, to, text, channel, opt = {}) =>
         Effect.gen(function* () {
-          const agent = opt.agent;
-          if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
           const t = yield* get(id);
-          const taker = agent ? yield* takerOf(t, to, agent) : undefined;
-          const [m, why] = statusMove(t, to);
-          const said = text.trim();
-          switch (m) {
-            case "none":
-              return yield* Effect.fail(refused(why, nextSteps(t)));
+          const { move, said, taker, delivery } = yield* settledMove(t, to, text, opt);
+          switch (move) {
             case "start":
               if (taker) yield* shape.edit(id, { assignee: taker.id });
               yield* start(id, channel);
@@ -995,7 +1081,6 @@ export const make = (options: IssueOptions = {}) =>
                 yield* reopen(id, said, channel, { kind: "comment" }, taker);
                 break;
               }
-              if (!said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
               // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again.
               if (t.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
               else yield* comment(id, said);
@@ -1009,10 +1094,9 @@ export const make = (options: IssueOptions = {}) =>
             // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
             // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
             case "complete": {
-              const commits = yield* commitsOf(t);
-              if (opt.keepBranch || commits === 0) {
+              if (delivery === "kept" || delivery === "none") {
                 // Written down before its session goes home, so that leaving does not take it for canceled.
-                yield* complete(id, opt.keepBranch && commits > 0 ? "kept" : "none");
+                yield* complete(id, delivery);
                 const last = t.sessions.at(-1);
                 if (last !== undefined && sessions.find(last)) yield* sessions.dismiss(last, "keep", "completed");
                 break;
@@ -1033,6 +1117,69 @@ export const make = (options: IssueOptions = {}) =>
               break;
           }
           return yield* get(id);
+        }),
+      previewStatus: (id, to, text, opt = {}, edit) =>
+        Effect.gen(function* () {
+          const t = yield* withEdit(yield* get(id), edit);
+          return { does: yield* movesWords(yield* settledMove(t, to, text, opt)) };
+        }),
+      previewAct: (ref, req) =>
+        Effect.gen(function* () {
+          const t = yield* get(ref);
+          const name = actLabel[req.act];
+          if (!t.attention.acts.includes(req.act))
+            return yield* Effect.fail(refused(`#${t.number} 现在不能「${name}」：它${attentionLabel[t.attention.state]}`, nextSteps(t)));
+          const said = (req.text ?? "").trim();
+          const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+          const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
+          const helper = helperName(t);
+          const does: readonly string[] = yield* (() => {
+            switch (req.act) {
+              case "start":
+                return asStatus("todo", said);
+              case "answer":
+                return Effect.map(words, (w) => [`回答 ${helper} 问的：${w}`, "它的问题清掉，接着做"]);
+              case "tell":
+                return Effect.map(words, (w) => [`把这句话带给 ${helper}：${w}`]);
+              case "accept":
+                return Effect.succeed([`#${t.number} 验收通过`]);
+              case "reject": {
+                const findings = req.findings ?? findingsOf(said);
+                return findings.length === 0
+                  ? Effect.fail(refused("打回要写哪里要修，一行一条"))
+                  : Effect.succeed([`#${t.number} 打回：${findings.length} 条意见交给 ${helper} 再修一轮`]);
+              }
+              case "complete":
+              case "acknowledge":
+                return asStatus("done", said);
+              case "keep":
+                return asStatus("done", said, { keepBranch: true });
+              case "close":
+                return asStatus("canceled", said);
+              case "reopen":
+                return t.sessions.length > 0 ? Effect.flatMap(words, (w) => asStatus("todo", w)) : asStatus("backlog", "");
+              case "resolve":
+                return Effect.succeed([`让 ${helper} 把主分支合进它的分支、解决冲突，做完再交回来`]);
+              case "resume":
+                return Effect.succeed([`让 ${helper} 接着做：${resumeWords}`]);
+              case "cure":
+                return Effect.succeed([`让 ${helper} 接着修，再交回来`]);
+              case "stop":
+                return Effect.succeed([`叫停 ${helper} 这一轮：它停下，工单等你看`]);
+            }
+          })();
+          return { does: [...does] };
+        }),
+      previewRemove: (id) =>
+        Effect.gen(function* () {
+          const t = yield* unsent(id);
+          return {
+            does: [
+              `删掉工单 #${t.number}「${shortTitle(t.title)}」`,
+              ...(t.refining ? [`在起草的 ${t.refining.name} 收工`] : []),
+              ...(t.project ? ["清掉它的 worktree 和没有提交的分支；还有改动就不删"] : []),
+            ],
+          };
         }),
       comment,
       changes: (id, by) =>

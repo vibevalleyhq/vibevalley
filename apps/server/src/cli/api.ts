@@ -16,6 +16,12 @@ export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(Flag.optional, Flag.withDescription(`服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是 ${defaultServer}`)),
 });
 
+/** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes
+ * nothing; one that only reads runs as it is; any other is refused rather than done. */
+export const DryRunFlag = GlobalFlag.Setting("dry-run")({
+  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription("只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）")),
+});
+
 const serverOf = (io: Io) => Effect.map(ServerFlag, (given) => Option.getOrUndefined(given) || io.env.VIBEVALLEY_SERVER || defaultServer);
 
 const unreachable = (base: string, why: string) =>
@@ -117,7 +123,25 @@ function endpointCommand(e: Endpoint, io: Io) {
       }
       const json = e.body ? Option.getOrElse(given.json as Option.Option<string>, () => "") : undefined;
       const body = e.body ? yield* checkedBody(e, io, json!, path) : undefined;
-      printBody(io, yield* request(base, e.method, url + (q.size > 0 ? "?" + q.toString() : ""), body));
+      const query = q.size > 0 ? "?" + q.toString() : "";
+      if (yield* DryRunFlag) {
+        const preview = e.dryRun ? endpoints.find((x) => x.op === e.dryRun) : undefined;
+        if (preview)
+          return printBody(
+            io,
+            yield* request(base, preview.method, preview.path.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(String(given[k]))) + query, body),
+          );
+        if (e.method !== "GET")
+          return yield* Effect.fail(
+            new Failure({
+              code: exit.usage,
+              tag: "NoDryRun",
+              text: `${e.op} 会改东西，但没有试跑：去掉 --dry-run 才会做`,
+              next: [{ say: "看这条命令做什么", run: [...path, "--help"] }],
+            }),
+          );
+      }
+      printBody(io, yield* request(base, e.method, url + query, body));
     }),
   ).pipe(Command.withDescription(`${e.method} ${e.path}`));
 }

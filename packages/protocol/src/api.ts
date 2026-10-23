@@ -103,10 +103,14 @@ export interface Handlers<R = never> {
   readonly "issue.create": (a: { readonly body: T.IssueRequest }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.update": (a: { readonly id: string; readonly body: T.IssueUpdate }) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What issue.delete would do, refused as it would be; nothing changes. */
+  readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "issue.move": (a: { readonly id: string; readonly body: T.MoveIssueRequest }) => Effect.Effect<T.Issue[], ApiError, R>;
   /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
    * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
   readonly "issue.status": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  /** What issue.status would do with the same body, refused as it would be; nothing changes. */
+  readonly "issue.previewStatus": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Preview, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
    * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
   readonly "issue.refine": (a: { readonly id: string; readonly body: T.IssueRefineRequest }) => Effect.Effect<T.Issue, ApiError, R>;
@@ -114,6 +118,8 @@ export interface Handlers<R = never> {
   readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;
   /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
   readonly "issue.act": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  /** What issue.act would do with the same body, refused as it would be; nothing changes. */
+  readonly "issue.previewAct": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.updateTask": (a: { readonly id: string; readonly task: string; readonly body: T.TaskEdit }) => Effect.Effect<string, ApiError, R>;
   readonly "graph.deleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
@@ -211,6 +217,10 @@ export interface Endpoint {
   readonly body: Schema.Codec<unknown> | undefined;
   readonly result: Schema.Codec<unknown> | undefined;
   readonly can: readonly Caller[];
+  /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home): its dry run is this endpoint,
+   * which takes the same parameters and body and answers a Preview without changing anything (the command line's
+   * --dry-run). */
+  readonly dryRun?: keyof Handlers;
 }
 
 export const endpoints: readonly Endpoint[] = [
@@ -457,6 +467,17 @@ export const endpoints: readonly Endpoint[] = [
     body: undefined,
     result: undefined,
     can: ["owner", "remote"],
+    dryRun: "issue.previewDelete",
+  },
+  {
+    op: "issue.previewDelete",
+    method: "POST",
+    path: "/api/v1/issues/{id}/delete/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: undefined,
+    result: S.Preview,
+    can: ["owner", "remote"],
   },
   {
     op: "issue.move",
@@ -476,6 +497,17 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.IssueStatusRequest,
     result: S.Issue,
+    can: ["owner", "remote"],
+    dryRun: "issue.previewStatus",
+  },
+  {
+    op: "issue.previewStatus",
+    method: "POST",
+    path: "/api/v1/issues/{id}/status/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: S.IssueStatusRequest,
+    result: S.Preview,
     can: ["owner", "remote"],
   },
   {
@@ -506,6 +538,17 @@ export const endpoints: readonly Endpoint[] = [
     query: [],
     body: S.IssueActRequest,
     result: S.Issue,
+    can: ["owner", "remote"],
+    dryRun: "issue.previewAct",
+  },
+  {
+    op: "issue.previewAct",
+    method: "POST",
+    path: "/api/v1/issues/{id}/act/preview",
+    pathParams: [{ name: "id", number: false }],
+    query: [],
+    body: S.IssueActRequest,
+    result: S.Preview,
     can: ["owner", "remote"],
   },
   {

@@ -95,12 +95,18 @@ export class VibeValleyApi {
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Issue>,
     delete: (a: { id: string }): Promise<void> =>
       this.call("DELETE", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    /** What issue.delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
     move: (a: { id: string; body: T.MoveIssueRequest }): Promise<T.Issue[]> =>
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/move", undefined, a.body) as Promise<T.Issue[]>,
     /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
      * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
     status: (a: { id: string; body: T.IssueStatusRequest }): Promise<T.Issue> =>
       this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status", undefined, a.body) as Promise<T.Issue>,
+    /** What issue.status would do with the same body, refused as it would be; nothing changes. */
+    previewStatus: (a: { id: string; body: T.IssueStatusRequest }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status/preview", undefined, a.body) as Promise<T.Preview>,
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
      * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
     refine: (a: { id: string; body: T.IssueRefineRequest }): Promise<T.Issue> =>
@@ -111,6 +117,9 @@ export class VibeValleyApi {
     /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
     act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
       this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,
+    /** What issue.act would do with the same body, refused as it would be; nothing changes. */
+    previewAct: (a: { id: string; body: T.IssueActRequest }): Promise<T.Preview> =>
+      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act/preview", undefined, a.body) as Promise<T.Preview>,
   };
 
   readonly session = {

@@ -401,6 +401,38 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  // A dry run of a move says what it would do, from the same judgment as the move, and changes nothing: no git, no status.
+  it.live("says what completing would deliver before it is done, and then does that", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const w = yield* watch;
+      const issues = yield* Issues;
+      yield* (yield* Agents).saveAgent(lab());
+      const project = join(f.config.workRoot, "projects", "clock");
+      const committed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
+      yield* w.nextReport;
+      const before = git(project, "log", "--format=%s", "main");
+      const merging = yield* issues.previewStatus(committed.issue!, "done", "");
+      expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/);
+      const keeping = yield* issues.previewStatus(committed.issue!, "done", "", { keepBranch: true });
+      expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/);
+      expect([git(project, "log", "--format=%s", "main"), (yield* issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
+      yield* issues.setStatus(committed.issue!, "done", "", "");
+      const done = yield* await_(
+        () => issues.get(committed.issue!),
+        (i) => i.closedAt !== undefined,
+        "done",
+      );
+      expect(done.delivered).toBe("merged");
+
+      const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
+      yield* w.nextReport;
+      expect((yield* issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/);
+      expect((yield* issues.previewAct(looked.issue!, { act: "close" })).does[0]).toMatch(/关成已取消$/);
+      refusedWith(yield* Effect.flip(issues.previewAct(looked.issue!, { act: "tell" })), "要说一句");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   // An answer issue is read only: its conclusion is read into the issue, whatever the round changed goes, and completing it
   // delivers nothing. An answer that cannot be read is a round not done: 接着修 says what was wrong with it.
   it.live("answers with a conclusion and leaves nothing on its branch", () => {

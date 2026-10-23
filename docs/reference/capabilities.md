@@ -70,11 +70,14 @@
 | `issue.create` | `POST /api/v1/issues` | ✓ | ✓ |   |
 | `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |   |
 | `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |
+| `issue.previewDelete` | `POST /api/v1/issues/{id}/delete/preview` | ✓ | ✓ |   |
 | `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |   |
 | `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
+| `issue.previewStatus` | `POST /api/v1/issues/{id}/status/preview` | ✓ | ✓ |   |
 | `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
 | `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
 | `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
+| `issue.previewAct` | `POST /api/v1/issues/{id}/act/preview` | ✓ | ✓ |   |
 
 ## session
 
