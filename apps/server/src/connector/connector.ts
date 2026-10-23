@@ -12,7 +12,7 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Context, Effect, FiberSet, Layer, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Option, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -277,7 +277,7 @@ export const make = (options: ConnectorOptions = {}) =>
 
       const reload = async () => {
         const row = await run(Effect.option(accountQ.connectorAccount({ connector: id })));
-        if (row._tag === "None") {
+        if (Option.isNone(row)) {
           account = undefined;
           return;
         }
@@ -503,7 +503,7 @@ export const make = (options: ConnectorOptions = {}) =>
       // An SDK handler may outlive receive: acceptance is sealed and in-flight writes joined before it returns.
       const receive = async (signal: AbortSignal, secrets: Record<string, string>) => {
         const cursor = (await run(Effect.option(accountQ.connectorAccount({ connector: id }))).catch(() => undefined))?.pipe((o) =>
-          o._tag === "Some" ? o.value.cursor : "",
+          Option.match(o, { onNone: () => "", onSome: (a) => a.cursor }),
         );
         let closed = false;
         const pending = new Set<Promise<void>>();

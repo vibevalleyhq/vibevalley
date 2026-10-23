@@ -7,6 +7,7 @@ import { Context, Effect, Layer } from "effect";
 import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Lan } from "./lan.ts";
+import { until } from "../testing/until.ts";
 
 const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
@@ -29,15 +30,6 @@ const request = async (method: string, url: string, key: string, body?: unknown)
 
 const ask = (addr: string, code: string, name: string) =>
   fetch(addr + "/api/v1/lan/pair", { method: "POST", body: JSON.stringify({ code, name }) }).then((r) => r.text());
-
-const until = (ok: () => boolean, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500; i++) {
-      if (ok()) return;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const open = (lan: Lan["Service"]) =>
   Effect.map(lan.setOpen(true), (s) => {

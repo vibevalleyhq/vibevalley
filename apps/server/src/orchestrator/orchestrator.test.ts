@@ -21,6 +21,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { layer, Orchestrator, type OrchestratorShape } from "./orchestrator.ts";
 import { deepseekModel, intake, orchestratorModel } from "./rules.ts";
+import { untilGot as until } from "../testing/until.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
 const onPhone = (o: OrchestratorShape, text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
@@ -84,17 +85,7 @@ const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = te
   return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
 
-const until = <A>(get: () => A | undefined | false, what: string, ms = 5_000) =>
-  Effect.promise(async () => {
-    const deadline = Date.now() + ms;
-    for (;;) {
-      const got = get();
-      if (got) return got;
-      if (Date.now() > deadline) throw new Error(`waited for ${what}`);
-      await new Promise((r) => setTimeout(r, 10));
-    }
-  });
-const settle = Effect.promise(() => new Promise((r) => setTimeout(r, 100)));
+const settle = Effect.sleep(100);
 
 const enableLab = Effect.gen(function* () {
   const agents = yield* Agents;

@@ -33,7 +33,7 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Data, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -244,20 +244,16 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
 }
 
 /** Work that did not go in (see handOver); the session stays. */
-export class NotTakenIn extends Error {
-  readonly _tag = "NotTakenIn";
-  constructor(
-    readonly failure: MergeFailure,
-    /** What the helper is sent back with; "" when the owner settles it. */
-    readonly fix: string,
-    /** What the owner is told. */
-    readonly owner: string,
-    readonly notice: string,
-    readonly short: string,
-  ) {
-    super(owner);
-  }
-}
+export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
+  readonly failure: MergeFailure;
+  /** What the helper is sent back with; "" when the owner settles it. */
+  readonly fix: string;
+  /** What the owner is told; also the message. */
+  readonly owner: string;
+  readonly notice: string;
+  readonly short: string;
+  readonly message: string;
+}> {}
 
 /** A failure's words, whatever it is. */
 const reasonText = (e: unknown): string =>
@@ -914,10 +910,10 @@ export const make = (options: SessionOptionsIn = {}) =>
           yield* rest(h);
           const merged = yield* use(h.place, h.lastText).pipe(
             Effect.mapError((e) => {
-              const f = e instanceof MergeFailure ? e : new MergeFailure("error", reasonText(e));
+              const f = e instanceof MergeFailure ? e : MergeFailure.error(reasonText(e));
               if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
               const words = notTakenIn(f, current.name, settle);
-              return new NotTakenIn(f, words.fix, words.owner, words.notice, words.short);
+              return new NotTakenIn({ failure: f, ...words, message: words.owner });
             }),
           );
           if (merged.pullRequest) return merged;

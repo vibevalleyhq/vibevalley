@@ -49,7 +49,7 @@
 - **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
-- **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`SettingRefused`、`MemoryRefused`），能 `catchTag`、能直接 `yield*`；只在同步或 Promise 的代码里抛的照旧是 `Error`。
+- **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`MergeFailure`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`），按 `catchTag` 接、能直接 `yield*`，不用 `instanceof` 分；`MergeFailure` 由 `MergeFailure.conflict(base, files)`、`.check(why)`、`.error(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。
 
 **形状和规则**
 
@@ -71,7 +71,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演：同样的记录、折叠和控制，没有程序、登录和模型；项目用临时目录里真的 git 仓库；模型用 pi-ai 的假模型；声网和三家聊天软件是本地假服务；测试里不探测本机的农机，`gh` 回答它不在（`noGitHub`）。
-- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用轮询到期限的 `until`，不用 `sleep` 赌时间。
+- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用 `testing/until.ts`（`until`、`untilGot`、`waitFor`：每 10 毫秒再问一次，到期限就带着在等什么失败），不用 `sleep` 赌时间。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
 
 ## 怎么走
@@ -115,7 +115,7 @@
 - **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
-- **照 Effect v4 的写法，但不在交界处硬改。** 服务的方法用 `Effect.fn`、定时进作用域、Effect 代码里不另起运行时，是因为名字、中断和收尾由 Effect 管才不会漏（关不干净的定时器、跑在纤程外的事实）。和 Promise 写的库交界的地方（oar、pi-agent-core、MCP 的 SDK、连接器、语音的隧道、终端里的对话）照旧是 Promise 和回调：改了只是换写法。放弃了把服务的状态都换成 `Ref`：大多是同步的读改写，换了要处处 `getUnsafe`，不消掉竞争。放弃了把 `ApiError` 换成 `Schema.TaggedErrorClass`：它是页面和服务端共用的契约，129 处拒绝都要动，收益只是栈和 cause。放弃了把 `project/git.ts` 的子进程换成 `ChildProcess`：超时要杀整个进程组，没确认它做得到。
+- **照 Effect v4 的写法，但不在交界处硬改。** 服务的方法用 `Effect.fn`、定时进作用域、Effect 代码里不另起运行时，是因为名字、中断和收尾由 Effect 管才不会漏（关不干净的定时器、跑在纤程外的事实）。和 Promise 写的库交界的地方（oar、pi-agent-core、MCP 的 SDK、连接器、语音的隧道、终端里的对话）照旧是 Promise 和回调：改了只是换写法。放弃了把服务的状态都换成 `Ref`：大多是同步的读改写，换了要处处 `getUnsafe`，不消掉竞争。放弃了把 `ApiError` 换成 `Schema.TaggedErrorClass`：它是页面和服务端共用的契约，129 处拒绝都要动，收益只是栈和 cause。放弃了把 `project/git.ts` 的子进程换成 `ChildProcess`：它也会杀整个进程组，但超时被打断时会丢掉已经读到的输出（检查超时要说出最后几行），每个 git 的帮手还要多带一个 `ChildProcessSpawner`；现在的 `Effect.callback` 加打断时杀进程组，就是 v4 给这种交界的写法。
 - **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
 - **PGlite，不是 SQLite。** effect-sqlc 读 Postgres 的表结构和查询，类型推得出来；PGlite 在进程里，不要单独装数据库，桌面版带得走。代价是库比 SQLite 大、开机多花一点时间。
 - **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Schema.Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。

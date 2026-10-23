@@ -13,14 +13,9 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
 import { Sessions, type SessionsInside } from "./session.ts";
+import { until } from "../testing/until.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
-
-const until = (ok: () => boolean, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
-    if (!ok()) throw new Error(`waited for ${what}`);
-  });
 
 /** A helper that writes a file, commits it and reports, as the farm's rules ask. */
 const worker = (turns: ScriptedTurn[]) =>
@@ -66,7 +61,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
       expect((yield* sessions.deliver(id, "resume the work", { kind: "comment" })).kind).toBe("run");
       yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "做完了第 3 轮", "the fallback report");
       expect(opens).toBe(3);
@@ -131,7 +126,7 @@ describe("sessions", () => {
       const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
-      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(new MergeFailure("check", "fix next time"))));
+      yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
       const resumed = yield* sessions.deliver(id, "resume the work", { kind: "comment" });
       expect(resumed.kind).toBe("refused");
       expect(JSON.stringify(resumed)).toContain("did not stop");

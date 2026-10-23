@@ -11,14 +11,9 @@ import { Sessions } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Tasks } from "./task.ts";
+import { until } from "../testing/until.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-
-const until = (ready: () => boolean, what: string) =>
-  Effect.promise(async () => {
-    for (let n = 0; n < 500 && !ready(); n++) await new Promise((resolve) => setTimeout(resolve, 10));
-    if (!ready()) throw new Error("waited for " + what);
-  });
 
 describe("a task's workplace", () => {
   it.live("a rejected check releases the handover before asking the same session to fix it", () => {

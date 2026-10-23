@@ -52,7 +52,7 @@ export function merging(d: MergeDeps) {
     });
   /** The session's work taken in by use; what did not go in is said as above. */
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, unknown>) =>
-    sessions.handOver(id, "merged", use).pipe(Effect.catch((e) => (e instanceof NotTakenIn ? Effect.flatMap(notTaken(id, e), Effect.fail) : Effect.fail(e))));
+    sessions.handOver(id, "merged", use).pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
 
   const mergeSession = (id: string) =>
     Effect.gen(function* () {
@@ -70,8 +70,8 @@ export function merging(d: MergeDeps) {
     Effect.gen(function* () {
       const pr = yield* projects
         .submitPullRequest(place, issue, pullRequestConclusion(said))
-        .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : new MergeFailure("error", e.message))));
-      yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => new MergeFailure("error", reasonOf(e))));
+        .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : MergeFailure.error(e.message))));
+      yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
       return { pullRequest: pr, text: "PR：" + pr.url, commits: 0 } as Merged;
     });
 
@@ -101,7 +101,7 @@ export function merging(d: MergeDeps) {
       if (sessions.find(id))
         yield* sessions
           .handOver(id, closed, (place) => projects.finishPullRequest(place.project, issue.number))
-          .pipe(Effect.mapError((e) => (e instanceof NotTakenIn ? refused(e.failure.reasonText) : e)));
+          .pipe(Effect.catchTag("NotTakenIn", (e) => Effect.fail(refused(e.failure.reasonText))));
       else yield* projects.finishPullRequest(issue.project!, issue.number).pipe(Effect.mapError((e) => refused(e.message)));
       yield* inTx(
         Effect.andThen(

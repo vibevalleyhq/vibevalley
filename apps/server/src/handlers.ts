@@ -5,7 +5,7 @@ import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
 import { Projects } from "./project/project.ts";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Settings } from "./base/config.ts";
 import { Core } from "./core/core.ts";
 import { Channels } from "./channel/chat.ts";
@@ -75,7 +75,7 @@ export const handlers = Effect.gen(function* () {
     // Only the lan listener says a device, by a header it never takes from the device.
     "lan.me": () =>
       Effect.flatMap(Effect.serviceOption(HttpServerRequest.HttpServerRequest), (request) =>
-        lan.me(request._tag === "Some" ? (request.value.headers[deviceHeader] as string | undefined) : undefined),
+        lan.me(Option.getOrUndefined(Option.map(request, (r) => r.headers[deviceHeader] as string | undefined))),
       ),
     "game.chooseTitle": ({ body }) => game.chooseTitle(body.achievement, body.tier),
     "github.refresh": () => Effect.flatMap(projects.refreshGitHub(), (status) => Effect.as(issues.refreshPullRequests, status)),

@@ -17,6 +17,7 @@ import { notTakenIn } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
+import { untilGot } from "../testing/until.ts";
 
 const step = (id: string, ...needs: string[]) => ({
   id,
@@ -154,9 +155,9 @@ class FakeWork implements TaskWork {
   handOver: SessionShape["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
-        const failure = e instanceof MergeFailure ? e : new MergeFailure("error", String(e));
+        const failure = e instanceof MergeFailure ? e : MergeFailure.error(String(e));
         const words = notTakenIn(failure, id, settle);
-        return new NotTakenIn(failure, words.fix, words.owner, words.notice, words.short);
+        return new NotTakenIn({ failure, ...words, message: words.owner });
       }),
     );
 }
@@ -210,14 +211,14 @@ const farm = Effect.gen(function* () {
   const news: string[] = [];
   yield* Effect.forkScoped(Stream.runForEach(yield* tasks.news, (n) => Effect.sync(() => news.push(n))));
   const until = (id: string, ready: (g: TaskGraph) => boolean) =>
-    Effect.promise(async () => {
-      for (let i = 0; i < 800; i++) {
+    untilGot(
+      () => {
         const g = graphOf(core.state(), id);
-        if (g && ready(g)) return g;
-        await new Promise((r) => setTimeout(r, 10));
-      }
-      throw new Error(`task ${id} never got there: ${JSON.stringify(graphOf(core.state(), id))}`);
-    });
+        return g && ready(g) ? g : undefined;
+      },
+      () => `task ${id} to get there: ${JSON.stringify(graphOf(core.state(), id))}`,
+      8_000,
+    );
   const split = (goal: string, project: string) => Effect.map(tasks.split(goal, project, "", "user"), (said) => /（(p\d+)）/.exec(said)![1]!);
   return { core, issues, tasks, work, git, states, news, until, split };
 });

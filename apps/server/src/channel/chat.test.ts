@@ -15,6 +15,7 @@ import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
+import { until } from "../testing/until.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -112,15 +113,6 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
     Layer.provideMerge(Layer.succeed(Settings, c)),
   );
 };
-
-const until = (ok: () => boolean | Promise<boolean>, what: string) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 500; i++) {
-      if (await ok()) return;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const settle = Effect.sleep(100);
 

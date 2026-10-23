@@ -10,6 +10,7 @@ import { gitSync, repo } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Game, layer } from "./game.ts";
+import { waitFor as until } from "../testing/until.ts";
 
 const farm = (config = testConfig()) => layer.pipe(Layer.provideMerge(world({ config })));
 
@@ -18,16 +19,6 @@ const kinds = Effect.gen(function* () {
   const rows = yield* Effect.orDie(sql<{ kind: string }>`select kind from game_ledger order by id`);
   return rows.map((r) => r.kind);
 });
-
-const until = <A, R>(get: Effect.Effect<A, never, R>, ok: (a: A) => boolean, what: string) =>
-  Effect.gen(function* () {
-    for (let i = 0; i < 500; i++) {
-      const got = yield* get;
-      if (ok(got)) return got;
-      yield* Effect.sleep(10);
-    }
-    throw new Error(`waited for ${what}`);
-  });
 
 const helper = (id: string, phase = { _tag: "working", since: 0, doing: { action: "thinking", label: "" } } as Session["phase"]) =>
   ({ id, name: id, agent: "lab", runtime: "pi", brief: "试试", hiredAt: 0, runs: 0, phase }) as Session;
