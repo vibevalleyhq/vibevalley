@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
-import { Context, Effect, Layer } from "effect";
+import { Context, Data, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
@@ -47,7 +47,7 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Error {}
+export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;
@@ -124,7 +124,7 @@ export const make = Effect.gen(function* () {
 
   const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
-    if (problem) return yield* Effect.fail(new SettingRefused(problem));
+    if (problem) return yield* new SettingRefused({ message: problem });
     const next: Record<string, unknown> = { ...stored };
     for (const key of ["deepseekApiKey", "agoraAppId", "agoraAppCertificate", "asrKey", "llmKey", "ttsKey", "dictationKey"] as const) {
       const given = u[key];
@@ -142,7 +142,7 @@ export const make = Effect.gen(function* () {
     try {
       disk.write(() => JSON.stringify(kept, null, 2) + "\n");
     } catch (e) {
-      return yield* Effect.fail(new SettingRefused(`存不进 ${file}：${(e as Error).message}`));
+      return yield* new SettingRefused({ message: `存不进 ${file}：${(e as Error).message}` });
     }
     stored = kept;
     return status();

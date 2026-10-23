@@ -285,8 +285,8 @@ export const make = (options: DocOptions = {}) =>
       }
     });
 
-    const runDemo = (doc: string, writers: string[]) =>
-      Effect.gen(function* () {
+    const runDemo = Effect.fn("Docs.runDemo")(
+      function* (doc: string, writers: string[]) {
         const headings: string[] = [];
         for (const [i, w] of writers.entries()) {
           const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", demoScript[i]!.heading) };
@@ -295,7 +295,9 @@ export const make = (options: DocOptions = {}) =>
           yield* wait(0.5);
         }
         yield* Effect.forEach(writers, (w, i) => Effect.andThen(wait(i / 3), demoWrite(doc, w, headings, i)), { concurrency: "unbounded", discard: true });
-      }).pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false))));
+      },
+      (e) => e.pipe(Effect.ignore, Effect.ensuring(Effect.sync(() => (demoOn = false)))),
+    );
 
     const demo = Effect.fn("Docs.demo")(function* (id: string, helpers: readonly Agent[]) {
       if (Option.isNone(yield* findDoc(id))) return yield* Effect.fail(missingDoc(id));

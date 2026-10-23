@@ -32,7 +32,7 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Context, Effect, FileSystem, Layer, Semaphore } from "effect";
+import { Context, Data, Effect, FileSystem, Layer, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -76,11 +76,9 @@ export class MergeFailure extends Error {
   }
 }
 
-export class ProjectError extends Error {
-  readonly _tag = "ProjectError";
-}
+export class ProjectError extends Data.TaggedError("ProjectError")<{ readonly message: string }> {}
 
-const fail = (message: string) => Effect.fail(new ProjectError(message));
+const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 
 // The end of a check's output is kept: a test run's verdict is there.
 const runTimeoutMs = 10 * 60_000;
@@ -384,8 +382,8 @@ export const make = (hooks: ProjectHooks = {}) =>
     let status: GitHubStatus | undefined;
     let capabilities = new Map<string, PullRequestCapability>();
 
-    const ensure = (name: string) =>
-      Effect.gen(function* () {
+    const ensure = Effect.fn("Projects.ensure")(
+      function* (name: string) {
         if (!projectName.test(name)) return yield* fail(`「${name}」不能当项目名：用一个简单的英文文件夹名，比如 clock-in`);
         yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
@@ -403,7 +401,9 @@ export const make = (hooks: ProjectHooks = {}) =>
           yield* git(path, "commit", "-q", "--allow-empty", "-m", "初始提交").pipe(Effect.catch(() => commit(path, "初始提交")));
         }
         return path;
-      }).pipe(Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError(reason(e)))));
+      },
+      Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError({ message: reason(e) }))),
+    );
 
     const list = Effect.fn("Projects.list")(function* () {
       if (!(yield* exists(root))) return [];
@@ -465,8 +465,8 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const usesPullRequests = (name: string) => prProjects.includes(name) && capability(name).available;
 
-    const describe = (project: string, cwd: string, branch: string | undefined) =>
-      Effect.gen(function* () {
+    const describe = Effect.fn("Projects.describe")(
+      function* (project: string, cwd: string, branch: string | undefined) {
         const path = join(root, project);
         const base = yield* git(path, "symbolic-ref", "--short", "HEAD");
         const uncommitted: UncommittedItem[] = [];
@@ -527,7 +527,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         changes.conflicts.push(...conflicts);
         changes.behind = Number(behind) || 0;
         return changes;
-      }).pipe(Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError(reason(e)))));
+      },
+      Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError({ message: reason(e) }))),
+    );
 
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
     const projectCheck = Effect.fn("Projects.projectCheck")(function* (cwd: string) {
@@ -711,19 +713,21 @@ export const make = (hooks: ProjectHooks = {}) =>
               from ||= main;
             }
             const args = branchThere ? ["worktree", "add", "-q", cwd, branch] : ["worktree", "add", "-q", "-b", branch, cwd, from || "HEAD"];
-            yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError(reason(e))));
+            yield* git(path, ...args).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
             return { project, cwd, branch };
           }),
         ),
       changes: (place) => describe(place.project, place.cwd, place.branch),
       branchChanges: (project, branch) => describe(project, "", branch),
-      changedFiles: (cwd, baseBranch) =>
-        Effect.gen(function* () {
+      changedFiles: Effect.fn("Projects.changedFiles")(
+        function* (cwd, baseBranch) {
           const fork = yield* git(cwd, "merge-base", baseBranch, "HEAD");
           const changed = yield* git(cwd, "diff", "--name-only", "--no-renames", fork);
           const added = yield* git(cwd, "ls-files", "--others", "--exclude-standard");
           return [...new Set(`${changed}\n${added}`.split("\n").filter((f) => f !== ""))].sort();
-        }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
+        },
+        Effect.mapError((e) => new ProjectError({ message: reason(e) })),
+      ),
       conflict: Effect.fn("Projects.conflict")(function* (place, baseBranch = "") {
         if (!place.branch) return undefined;
         const path = join(root, place.project);
@@ -826,7 +830,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const main = yield* git(join(root, place.project), "symbolic-ref", "--short", "HEAD");
             yield* git(place.cwd, "checkout", "-q", "-f", "-B", place.branch!, main);
             yield* git(place.cwd, "clean", "-q", "-f", "-d");
-          }).pipe(Effect.mapError((e) => new ProjectError(reason(e)))),
+          }).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) }))),
         );
       }),
       clear: (project, issueNumber, work = "discard") =>
@@ -856,7 +860,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           project,
           Effect.gen(function* () {
             const path = yield* ensure(project);
-            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => new ProjectError(reason(e))));
+            yield* git(path, "branch", branch, from || "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
           }),
         ),
       run: (cwd, command) =>
@@ -915,7 +919,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
             const repo = githubOrigin((yield* gitRun(path, "remote", "get-url", "origin")).stdout);
             if (repo === "") return yield* fail("不是 GitHub 仓库");
-            const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError(reason(e))));
+            const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
             const files = yield* conflictsOf(path, main, checked);
             if (files.length > 0) return yield* Effect.fail(new MergeFailure("conflict", "", main, files));
             const pushed = hooks.push

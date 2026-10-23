@@ -170,7 +170,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellOrchestrator = (text: string) => Effect.sync(() => PubSub.publishUnsafe(newsHub, "【计划】" + text));
+    const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, "【计划】" + text));
 
     const usableAs = options.usable;
     const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;

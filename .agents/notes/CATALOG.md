@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `pnpm run notes:catalog`，过期了 `pnpm run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（22 篇）
 
 ### feature
 
@@ -20,7 +20,6 @@
 
 ### architecture
 
-- 2026-10-24 [服务端照 Effect v4 的写法：方法有名字，状态在 Ref 里，定时和回调归作用域](.agents/notes/proposed/architecture/2026-10-24-effect-v4-idioms.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)
