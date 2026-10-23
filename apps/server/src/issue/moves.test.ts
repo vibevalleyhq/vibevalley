@@ -4,7 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { type Fact, type Issue, type IssueStatus, type Session } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { attentionOf } from "./attention.ts";
-import { statusMove, statusMoves } from "./moves.ts";
+import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { reduce } from "../projection/reduce.ts";
 
 describe("status moves", () => {
@@ -128,5 +128,29 @@ describe("moves and the attention", () => {
     expect(state.issues![0]!.moves).toContain("done");
     state = reduce(state, { type: "report", at: 3, id: "w1", outcome: "failed", summary: "没做成", runs: 2 } as Fact)[0];
     expect(state.issues![0]!.moves).toEqual(["todo", "canceled"]);
+  });
+});
+
+describe("next steps after a refusal", () => {
+  it("are the issue's acts and moves as commands; one that needs words says so and runs nothing", () => {
+    const t = {
+      number: 41,
+      status: "in_review",
+      sessions: ["w1"],
+      review: "glance",
+      attention: { state: "reviewing", lead: "complete", acts: ["complete", "tell", "close"] },
+    } as unknown as Issue;
+    const next = nextSteps(t);
+    expect(next.filter((n) => n.run).map((n) => n.run)).toEqual([
+      ["issue", "act", "41", "--json", '{"act":"complete"}'],
+      ["issue", "act", "41", "--json", '{"act":"close"}'],
+      ["issue", "status", "41", "--json", '{"status":"done"}'],
+      ["issue", "status", "41", "--json", '{"status":"canceled"}'],
+    ]);
+    // A word to the helper, and another round, need the owner's words: named, not run.
+    expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
+      "带话：issue act 41，--json 带 act「tell」和要说的 text",
+      "挪到待办：issue status 41，--json 带 status「todo」和这一轮要它做什么的 text",
+    ]);
   });
 });

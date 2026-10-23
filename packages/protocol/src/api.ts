@@ -7,14 +7,24 @@ import * as S from "./schema";
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
 
+/** One thing to do next after a refusal: what to do, and, when it is a command, the command line's words for it (without
+ * the program's name), runnable as they are. */
+export interface Next {
+  readonly say: string;
+  readonly run?: readonly string[];
+}
+
 export interface Refused {
   readonly _tag: "Refused";
   readonly reason: string;
+  /** What can be done instead, as the refusing service knows it (an issue's acts and moves now). */
+  readonly next?: readonly Next[];
 }
 
 export interface Missing {
   readonly _tag: "Missing";
   readonly what: string;
+  readonly next?: readonly Next[];
 }
 
 /** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
