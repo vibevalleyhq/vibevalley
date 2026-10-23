@@ -29,6 +29,7 @@ Status: proposed
 ### 做到哪了
 
 1. 方法有名字：已经做了。服务的 `make` 里返回的方法和内部的帮手函数，整个函数就是一段 `Effect.gen`（或套一层 `x.withPermits(n)`）的，都改成了 `Effect.fn("<服务>.<名字>")`，锁作为第二个参数；共 135 处。模块顶层的 `make` 和自己写了返回类型的没动。
+2. 服务里不另起运行时：已经做了。在 `Effect.gen` 里经 `Effect.runSync` 施加事实、发提醒的 19 处改成 `yield* core.apply`、`yield* core.notice`（`session`、`channel/chat`），`chat` 的那个帮手删了；`session` 的留给 oar 的回调（事件、汇报、太久没动静），它们不在纤程里、要照 oar 给的次序落下。服务的 `make` 里的锁 `Semaphore.makeUnsafe` 改成 `yield* Semaphore.make`（两个普通的工厂函数照旧）。其余的 `FiberSet.makeRuntime*` 都是给外面的库（oar、记性的来源、MCP、node 的 http）的回调用的，纤程归服务的作用域，是 v4 给这种交界的写法，留着。
 
 ## Alternatives considered
 
@@ -41,7 +42,7 @@ Status: proposed
 ## Acceptance criteria
 
 - 服务的方法都有 `Effect.fn` 的名字（`Context.Service` 的 `make` 里返回的方法）。
-- 服务里没有 `Effect.runSync`、`Effect.runPromise`；`makeRuntimePromise` 只留在交给外面的库的地方。
+- 服务的 Effect 代码里没有 `Effect.runSync`、`Effect.runPromise`；只留在外面的库的回调里，并写明为什么；`makeRuntime*` 只留在交给外面的库的地方。
 - `session`、`runtime` 里没有 `setTimeout`；服务关的时候它们起的纤程都停下（有测试）。
 - `bun run server:check`、`web:check` 过，行为不变。
 
