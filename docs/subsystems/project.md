@@ -89,7 +89,7 @@
 - **工单（`issue`）**：决定什么时候合、走本地合还是 PR（`usesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的改动。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。
-- **管家（`orchestrator`、`tool`）**：农场现状和 `look` 工具列出 `list` 和 `root`。
+- **管家（`orchestrator`、`tool`）**：现状和 `look` 工具列出 `list` 和 `root`。
 - **HTTP（`handler`）**：只转发；`github.refresh` 先刷新检测，再调工单的 `refreshPullRequests`。
 
 ## 为什么这样

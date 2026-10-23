@@ -223,7 +223,7 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
         </Section>
         <Section title="帮工" count={sessions().length}>
           <Show when={sessions().length === 0}>
-            <p class="px-3 text-xs text-muted">还没有帮工在地里：在频道里跟管家说一件活。</p>
+            <p class="px-3 text-xs text-muted">还没有在场的帮工：在频道里跟管家说一件活。</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>

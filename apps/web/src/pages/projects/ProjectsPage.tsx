@@ -569,7 +569,7 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
           取消
         </Button>
         <Button type="submit" tone="primary" disabled={!canSubmit()}>
-          {busy() ? "进行中…" : importing() === "github" ? "下载到农场" : "创建项目"}
+          {busy() ? "进行中…" : importing() === "github" ? "下载到工作目录" : "创建项目"}
         </Button>
       </div>
     </form>

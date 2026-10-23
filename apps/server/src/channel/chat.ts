@@ -373,7 +373,7 @@ export const make = Effect.gen(function* () {
   for (const [id, kind, name] of [
     ["user", "user", "主人"],
     [orchestratorAgent, "orchestrator", "管家"],
-    ["system", "system", "农场"],
+    ["system", "system", "VibeValley"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: Date.now() }));
   let general = (yield* one(qc.generalID()))?.id ?? "";
@@ -528,9 +528,9 @@ export const make = Effect.gen(function* () {
       const sessionsNow = presentSessions();
       const present = sessionsNow.map((h) => h.id);
       const known = new Set((yield* db(qp.participants())).map((p) => p.id));
-      const named: { id: string; how: "delivered" | "not_on_farm" | "unknown" }[] = [];
+      const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
       for (const m of mentions) {
-        const how = m === orchestratorAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "not_on_farm" : "unknown";
+        const how = m === orchestratorAgent || m === "user" || m === everyone || present.includes(m) ? "delivered" : known.has(m) ? "absent" : "unknown";
         named.push({ id: m, how });
         yield* db(qmn.insertMention({ message_id: row.id, target_id: m, resolved: how }));
       }
@@ -961,7 +961,7 @@ export const make = Effect.gen(function* () {
           if (written.again) return { message: toMessage(yield* messageOrFail(written.id)), again: true };
           yield* readThrough("user", where, written.number);
           yield* publishConversation(where);
-          if (written.absent.length > 0) yield* core.notice("warn", written.absent.map((m) => mentionOf[m] ?? "@" + m).join("、") + " 不在地里，没送到");
+          if (written.absent.length > 0) yield* core.notice("warn", written.absent.map((m) => mentionOf[m] ?? "@" + m).join("、") + " 不在场，没送到");
           return { message: toMessage(yield* messageOrFail(written.id)), again: false };
         }),
       ),

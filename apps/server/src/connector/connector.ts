@@ -442,7 +442,7 @@ export const make = (options: ConnectorOptions = {}) =>
             }),
           );
           await reload();
-          await adapter.send(signal, a.secrets, m.from, "配对好了：以后在这里说的话，就是你在农场的田头上说的。", m.reply ?? "");
+          await adapter.send(signal, a.secrets, m.from, "配对好了：以后在这里说的话，就是你在田头上说的。", m.reply ?? "");
           return;
         }
         if (m.from !== a.owner) return;

@@ -229,7 +229,7 @@ export const make = Effect.gen(function* () {
     if (!a) throw new Error("没有叫 " + k + " 的帮工档案");
     return a.id;
   };
-  const notWorking = "地里没有你：记性只给在干活的帮工用";
+  const notWorking = "你不在场：记性只给在干活的帮工用";
 
   const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", project: "", text: "", kind: "", limit: 0, ...q });
 
@@ -243,9 +243,9 @@ export const make = Effect.gen(function* () {
     (await go(chat.channels())).map((c) => "- " + channelLine(c)).join("\n"),
   );
 
-  const roster = tool<object>("roster", "列出地里所有帮工：在做什么、上一轮的结果。", () => {
+  const roster = tool<object>("roster", "列出在场的所有帮工：在做什么、上一轮的结果。", () => {
     const all = run.roster();
-    return all.length === 0 ? "地里现在没有帮工。" : all.map((w) => sessionLine(w, Date.now(), numberOf(w))).join("\n");
+    return all.length === 0 ? "现在没有在场的帮工。" : all.map((w) => sessionLine(w, Date.now(), numberOf(w))).join("\n");
   });
 
   const check = issueTool("check", "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。", async (t) => {
@@ -273,9 +273,9 @@ export const make = Effect.gen(function* () {
     },
   );
 
-  const sessionList = sessionSchemaTool<object>("session_list", "地里现在有谁：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
+  const sessionList = sessionSchemaTool<object>("session_list", "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
     // Listed without @: an @ wakes someone, and models copy what they read.
-    const lines = ["地里有主人、管家，和这些帮工："];
+    const lines = ["在场的有主人、管家，和这些帮工："];
     for (const h of run.presentSessions())
       lines.push(`- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, Date.now())}）工单：${head(h.brief.replace(spaces, " "), 60)}`);
     lines.push("要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。");
@@ -297,7 +297,7 @@ export const make = Effect.gen(function* () {
       case "confirm":
         return `先没发：你刚读的是 ${s.lastRead}，这条却要发到 ${s.target} 顶层。要回在那个串里，就把 target 写成 ${s.lastRead}；确实要发到田头，就加 confirm: true。`;
       default: {
-        const absent = s.absent && s.absent.length > 0 ? "。" + s.absent.map((m) => "@" + m).join("、") + " 不在地里，没送到" : "";
+        const absent = s.absent && s.absent.length > 0 ? "。" + s.absent.map((m) => "@" + m).join("、") + " 不在场，没送到" : "";
         return `发出去了：${s.target} msg=${s.message?.number ?? 0}${absent}`;
       }
     }
@@ -306,7 +306,7 @@ export const make = Effect.gen(function* () {
   const channelSay = (who: Who) =>
     sessionSchemaTool<{ text: string; target?: string; anyway?: boolean; confirm?: boolean }>(
       "channel_say",
-      "在农场的群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" +
+      "在群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" +
         generalName +
         " 是默认的频道田头）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
       async (p) => {
@@ -404,7 +404,7 @@ export const make = Effect.gen(function* () {
       return toError(e).message;
     }
   });
-  const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开农场，不收它的改动（分支留着）。", async (t) => {
+  const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开，不收它的改动（分支留着）。", async (t) => {
     const w = workerOf(t);
     if (!w) return nobodyOn(t);
     await go(run.dismiss(w.session.id));

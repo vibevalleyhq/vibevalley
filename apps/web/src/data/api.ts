@@ -5,7 +5,7 @@ export const api = new VibeValleyApi("", async (url, init) => {
   try {
     return await fetch(url, init);
   } catch (error) {
-    if (error instanceof TypeError) throw new Error("暂时连不上农场，请等它恢复后重试。", { cause: error });
+    if (error instanceof TypeError) throw new Error("暂时连不上服务端，请等它恢复后重试。", { cause: error });
     throw error;
   }
 });

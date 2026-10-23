@@ -152,7 +152,9 @@ export const make = Effect.gen(function* () {
         return created;
       }),
     deleteAgent: (id) =>
-      id === orchestratorAgent ? Effect.fail(refused("管家是每个农场都有的，删不了")) : change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
+      id === orchestratorAgent
+        ? Effect.fail(refused("管家删不了：每个工作区都有一个"))
+        : change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),

@@ -33,7 +33,7 @@ test("the seed bag can retry after the server is reachable again without losing 
   expect(attempts).toBe(2);
   const draft = bag.getByRole("textbox", { name: "工单" });
   await draft.fill("保留我刚写下的想法");
-  await expect(bag.getByText(/^种子袋没拿到/)).toContainText("暂时连不上农场");
+  await expect(bag.getByText(/^种子袋没拿到/)).toContainText("暂时连不上服务端");
   await expect(bag).not.toContainText("Failed to fetch");
   await page.screenshot({ path: test.info().outputPath("seed-disconnected.png") });
   await page.setViewportSize({ width: 390, height: 844 });

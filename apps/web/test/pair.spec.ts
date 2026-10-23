@@ -4,7 +4,7 @@ import { expect, test } from "./fixtures";
 
 test("a device names itself, questions, and is told why not", async ({ page }) => {
   await page.goto("/pair?c=ABCDE12345");
-  await expect(page.getByRole("heading", { name: "连进农场" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "连进那台电脑" })).toBeVisible();
   await expect(page.getByLabel("配对码")).toHaveCount(0);
   await page.getByLabel("这台设备叫").fill("测试的手机");
   await page.getByRole("button", { name: "请主人放行" }).click();

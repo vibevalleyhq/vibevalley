@@ -206,13 +206,13 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
   const credentialsReady = () => base().agoraAppId.source !== undefined && base().agoraAppCertificate.source !== undefined;
   const answerHint = () =>
     answer().vendor === "orchestrator"
-      ? "田头上那个管家本人接电话：看得到地里，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。"
+      ? "田头上那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。"
       : answer().vendor === "agora"
         ? "声网托管的模型，不用别的 key。"
         : answer().vendor === "deepseek"
           ? base().deepseekApiKey.source
-            ? `用农场的 DeepSeek key（${keyFrom[base().deepseekApiKey.source!]}）。`
-            : "用农场的 DeepSeek key，现在还没有：去首页「设置」填。"
+            ? `用设置里的 DeepSeek key（${keyFrom[base().deepseekApiKey.source!]}）。`
+            : "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。"
           : "任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……";
 
   return (
@@ -427,9 +427,9 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
           {/* The persona is the quick model's only: the orchestrator answering is itself, with its own prompt. */}
           <Show
             when={answer().vendor !== "orchestrator"}
-            fallback={<p class="text-sm text-muted">电话由农场的管家自己接：它就是田头里那个管家，用它自己的提示词，不另设人设。</p>}
+            fallback={<p class="text-sm text-muted">电话由管家自己接：它就是田头里那个管家，用它自己的提示词，不另设人设。</p>}
           >
-            <Labeled label="人设" hint="电话里先答话的模型是谁、怎么说话。它看不到地里，派活由本机的管家做；写明别编进度。">
+            <Labeled label="人设" hint="电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。">
               <TextArea aria-label="人设" rows={8} value={draft().persona} onInput={(e) => set({ ...draft(), persona: e.currentTarget.value })} />
             </Labeled>
           </Show>

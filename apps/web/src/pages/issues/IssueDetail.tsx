@@ -518,7 +518,7 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
   "tool/call": "用工具",
   "llm/retry": "重试",
   "run/error": "出错",
-  "run/end": "收工",
+  "run/end": "这一轮结束",
 };
 
 /** The session's steps, newest last; tool results and usage are left to the farm's fuller log. */

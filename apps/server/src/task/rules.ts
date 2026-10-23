@@ -231,7 +231,7 @@ export function taskBrief(graph: TaskGraph, task: Task): string {
   if (frozen.length > 0) lines.push("", "前面的验收留下的这些文件是冻结的，不能改：" + frozen.join("、") + "。验收不过就改代码，不改验收。");
   const checks = acceptanceChecks(graph, task);
   if (checks.length > 0) lines.push("", "你是收尾的一步：做完以后还会跑前面的验收，要能通过：" + checks.map((c) => "`" + c + "`").join("、") + "。");
-  lines.push("", "做完提交。农场会把你的分支合回计划分支，给后面的步骤用；结论里写清楚你留下了什么（接口、文件位置），后面的步骤要接着用。");
+  lines.push("", "做完提交。VibeValley 会把你的分支合回计划分支，给后面的步骤用；结论里写清楚你留下了什么（接口、文件位置），后面的步骤要接着用。");
   return lines.join("\n");
 }
 
@@ -258,7 +258,7 @@ export const changeOf = (e: GraphEvent) => ({
 
 /** Only the helper an issue was last sent to splits it, and only while it is a plain open issue. */
 export function issueSplitRefusal(session: Session | undefined, issue: Issue | undefined): string {
-  if (!session) return "你已经不在地里了";
+  if (!session) return "你已经不在场了";
   if (session.graph) return "你在做计划里的一步：这一步不能再拆，太大就在结论里说，让主人改计划";
   if (!issue) return "你手上没有工单：只有工单能拆";
   if (session.refining) return "你在起草这张工单，还没开工：把要拆的想法写进草稿";

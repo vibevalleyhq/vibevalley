@@ -835,7 +835,6 @@ export interface TemplateBlank {
 }
 
 export interface IssueDispatchRequest {
-  station?: number;
   /** Fields the owner changed and has not saved: saved first, so the act sees them. */
   edit?: IssueUpdate;
 }

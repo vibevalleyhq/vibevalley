@@ -88,7 +88,7 @@ export function ProjectMap() {
           {[
             `${islands().length} 座岛`,
             `${tally().peopled} 座有人`,
-            `在干 ${tally().working}/${maxRunning} 块地`,
+            `在做 ${tally().working}/${maxRunning} 张`,
             ...(tally().queued > 0 ? [`排队 ${tally().queued}`] : []),
           ].join(" · ")}
         </span>
@@ -97,7 +97,7 @@ export function ProjectMap() {
             each={
               [
                 ["map-stake", "空位，点了派活"],
-                ["plot-locked", "农场的地都占着"],
+                ["plot-locked", "空位都占着"],
                 ["map-sack", "排队的活"],
               ] as const
             }
@@ -143,7 +143,7 @@ export function ProjectMap() {
           </Show>
         </div>
       </div>
-      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={`播种 · ${sowing() ?? ""}`}>
+      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={`派一件活 · ${sowing() ?? ""}`}>
         <Show when={sowing()}>{(p) => <SowHere project={p()} onDone={() => setSowing(undefined)} />}</Show>
       </Dialog>
     </div>
@@ -546,7 +546,7 @@ export function IslandDetail(props: { island: Island }) {
             : open() > 0
               ? `还能再派 ${open()} 件活，马上开工（这个项目最多同时 ${props.island.maxSessions} 个帮工）。`
               : shut() > 0
-                ? `农场的 ${maxRunning} 块地都有人在干活，派来的活先排队。`
+                ? `已经有 ${maxRunning} 张工单在做，派来的活先排队。`
                 : `满了：${props.island.maxSessions} 个帮工都在干活，派来的活先排队。`}
         </p>
       </div>

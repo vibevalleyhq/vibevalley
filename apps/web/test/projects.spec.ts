@@ -22,7 +22,7 @@ test("a new plot is opened, shows on the map and opens its deed", async ({ page 
     .getByRole("link", { name: /^全部/ })
     .click();
   await expect(page).toHaveURL(/\/projects$/);
-  await expect(page.getByText(/\d+ 座岛 · \d+ 座有人 · 在干 \d+\/\d+ 块地/)).toBeVisible();
+  await expect(page.getByText(/\d+ 座岛 · \d+ 座有人 · 在做 \d+\/\d+ 张/)).toBeVisible();
   await expect(page.getByRole("button", { name: `${name}：在干 0/3` })).toBeVisible();
   // 进岛: into the project's own farm, its sign saying whose.
   await page.getByRole("button", { name: `进${name}的农场` }).click();

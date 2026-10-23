@@ -181,6 +181,26 @@ const RULES: readonly Rule[] = [
     except: /^apps\/web\/src\/(farm\/|app\/(App|Root)\.tsx$)/,
   },
   {
+    name: "presence or the system in farm words, where agents and the workbench read them",
+    pattern: /地里|【农场|农场现状|not_on_farm/,
+    says: "在场 (present sessions: presentSessions, session_list), 现状 (the orchestrator's situation), VibeValley for the system; 地里 and 农场 are the farm's own words",
+    dirs: [
+      "apps/server/src/issue",
+      "apps/server/src/session",
+      "apps/server/src/task",
+      "apps/server/src/tool",
+      "apps/server/src/orchestrator",
+      "apps/server/src/channel",
+      "apps/server/src/mcp",
+      "apps/server/src/notice",
+      "apps/web/src/pages",
+      "apps/web/src/rules",
+      "apps/web/src/data",
+    ],
+    // What the owner types in a test is the owner's words.
+    except: /\.test\.ts$/,
+  },
+  {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",

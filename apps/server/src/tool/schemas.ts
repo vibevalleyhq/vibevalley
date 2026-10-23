@@ -144,7 +144,7 @@ export const schemas: Record<string, Schema> = {
     additionalProperties: true,
     properties: {
       agent: {
-        description: "谁来做：帮工的名字、id 或 runtime；不填，开工时按农场的规则挑",
+        description: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
         type: "string",
       },
       channel: {
