@@ -59,6 +59,8 @@ class Script {
   readonly weixinIn = new Inbox<WeixinMessage>();
   readonly feishuIn = new Inbox<FeishuMessage>();
   readonly qqIn = new Inbox<QQMessage>();
+  readonly weixinBuf: string[] = [];
+  pollError?: Error;
   private record(s: Sent) {
     this.sent.push(s);
     return this.sent.length;
@@ -74,6 +76,12 @@ class Script {
       return { account: { baseUrl, token: "tok" }, botId: "bot1@im.bot", owner };
     },
     getUpdates: async (signal, _account, buf) => {
+      this.weixinBuf.push(buf);
+      if (this.pollError) {
+        const error = this.pollError;
+        this.pollError = undefined;
+        throw error;
+      }
       const m = await this.weixinIn.take(signal, 100);
       return m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf };
     },
@@ -451,6 +459,32 @@ describe("the chat apps", () => {
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在田头上说的。"]);
       }).pipe(Effect.scoped, Effect.provide(farm(second, config)));
     }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
+  });
+
+  it.live("does not turn an account read failure into an empty cursor", () => {
+    const script = new Script();
+    return Effect.gen(function* () {
+      const c = yield* Connectors;
+      const sql = yield* SqlClient.SqlClient;
+      yield* c.login("weixin", {});
+      yield* reaches("weixin", "connected");
+      yield* until(async () => (script.weixinBuf.length > 0 ? true : undefined), "the first poll");
+      script.pollError = new Error("reconnect after poll");
+      yield* until(async () => {
+        const all = await Effect.runPromise(c.list());
+        return all.find((s) => s.id === "weixin")?.error?.includes("reconnect after poll") ? true : undefined;
+      }, "the forced poll failure");
+      const polls = script.weixinBuf.length;
+      yield* Effect.orDie(sql.unsafe(`drop table connector_account`));
+      const failure = yield* until(async () => {
+        const all = await Effect.runPromise(c.list());
+        const error = all.find((s) => s.id === "weixin")?.error;
+        return error?.includes("connector_account") ? error : undefined;
+      }, "the account read failure");
+      expect(failure).toContain("connector_account");
+      // The next receive reads the account before polling; a missing table must not become an empty cursor and another poll.
+      expect(script.weixinBuf).toHaveLength(polls);
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
   it.live("keep the account when retiring what waited fails", () => {

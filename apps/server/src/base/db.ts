@@ -5,12 +5,18 @@
 
 import { PGlite } from "@electric-sql/pglite";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
-import { Effect, Layer } from "effect";
+import { Cause, Effect, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dbDir, Settings } from "./config.ts";
+
+export const optional = <A, E, R>(effect: Effect.Effect<A, E | Cause.NoSuchElementError, R>): Effect.Effect<Option.Option<A>, E, R> =>
+  effect.pipe(
+    Effect.map(Option.some),
+    Effect.catchTag("NoSuchElementError", () => Effect.succeed(Option.none())),
+  );
 
 const baseline = resolve(import.meta.dirname, "../../db/migrations/0001_schema.up.sql");
 const baselineSql = () => readFileSync(baseline, "utf8");

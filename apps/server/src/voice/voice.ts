@@ -10,7 +10,7 @@ import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type Voic
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Context, Effect, Layer, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { chatCompletions } from "../agent/brain/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
@@ -186,6 +186,18 @@ interface Grant {
 /** A call's agent session: what it says goes through it, with the session's own ConvoAI token. */
 type CallSession = ReturnType<ReturnType<typeof agentFor>["createSession"]>;
 
+interface StartingCall {
+  readonly grant: Grant;
+  readonly key: string;
+  line?: Promise<CallLine>;
+  release: () => void;
+  client?: AgoraClient;
+  session?: CallSession;
+  start?: Promise<string>;
+  transferred: boolean;
+  readonly cleanup: () => Promise<void>;
+}
+
 interface Call {
   readonly grant: string;
   readonly client: AgoraClient;
@@ -273,6 +285,8 @@ export interface VoiceOptions {
   readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
+  /** How long an idle shared tunnel stays ready for another call; ten minutes when absent. */
+  readonly lineLingerMs?: number;
 }
 
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
@@ -339,9 +353,14 @@ export const make = (options: VoiceOptions = {}) =>
     const chat = yield* Channels;
     const orchestrator = yield* Orchestrator;
     const now = options.now ?? Date.now;
+    const lingerMs = options.lineLingerMs ?? lineLingerMs;
 
     const grants = new Map<string, Grant>();
+    const startingCalls = new Map<string, StartingCall>();
     const calls = new Map<string, Call>();
+    // Keep the set with its runtime so shutdown can explicitly interrupt every drain.
+    const drainFibers = yield* FiberSet.make<void, never>();
+    const forkDrain = yield* FiberSet.runtime(drainFibers)<never>();
     let stopped = false;
     const keyOf = (channel: string, uid: string) => channel + "\u0000" + uid;
 
@@ -420,7 +439,8 @@ export const make = (options: VoiceOptions = {}) =>
         if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
         return t;
       });
-    // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
+    // Opening a tunnel waits for it to answer, through this very line: one opening at a time. A caller's interruption never
+    // cancels this shared opening; its own signal is checked only after the shared base is ready.
     let opening: Promise<string> | undefined;
     const base = async () => {
       if (config.voice.line.url) return config.voice.line.url.replace(/\/+$/, "");
@@ -429,6 +449,10 @@ export const make = (options: VoiceOptions = {}) =>
       if (!tunnel) {
         opening ??= openTunnel(linePort)
           .then((t) => {
+            if (stopped) {
+              t.close();
+              throw new Error("语音线路已经关闭");
+            }
             tunnel = t;
             return t.url;
           })
@@ -439,15 +463,23 @@ export const make = (options: VoiceOptions = {}) =>
       }
       return tunnel.url;
     };
-    const openLine = async (): Promise<CallLine> => {
+    const openLine = async (signal: AbortSignal): Promise<CallLine> => {
       if (stopped) throw new Error("语音线路已经关闭");
       if (lineProblem) throw new Error(lineProblem);
       if (!line) throw new Error("语音线路还没开");
-      const url = await base();
       const id = randomBytes(8).toString("hex");
       const key = randomBytes(24).toString("base64url");
       keys.set(id, key);
-      return { id, key, url: url + "/llm/" + id + "/chat/completions" };
+      try {
+        const url = await base();
+        if (signal.aborted) throw signal.reason ?? new Error("语音线路的接通已经取消");
+        if (stopped) throw new Error("语音线路已经关闭");
+        return { id, key, url: url + "/llm/" + id + "/chat/completions" };
+      } catch (e) {
+        // The first caller owns the shared tunnel even when cancellation precedes its key's release handler.
+        closeLine(id);
+        throw e;
+      }
     };
     const closeLine = (id: string) => {
       keys.delete(id);
@@ -458,17 +490,45 @@ export const make = (options: VoiceOptions = {}) =>
         if (keys.size > 0 || !tunnel) return;
         tunnel.close();
         tunnel = undefined;
-      }, lineLingerMs);
+      }, lingerMs);
       closing.unref();
     };
 
     yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
         stopped = true;
+        yield* FiberSet.clear(drainFibers);
+        for (const starting of [...startingCalls.values()]) {
+          yield* Effect.tryPromise({ try: () => starting.cleanup(), catch: (e) => e }).pipe(
+            Effect.catch((e) => Effect.sync(() => logs.warn(`vibevalley: voice: cleaning up an opening call: ${message(e)}`))),
+          );
+        }
+        for (const [id, call] of [...calls]) {
+          call.ending = true;
+          grants.delete(call.grant);
+          yield* Effect.tryPromise({ try: () => call.client.stopAgent(id), catch: (e) => e }).pipe(
+            Effect.catch((e) =>
+              alreadyStopping(e) ? Effect.void : Effect.sync(() => logs.warn(`vibevalley: voice: stopping ${id} while closing: ${message(e)}`)),
+            ),
+            Effect.ensuring(
+              Effect.sync(() => {
+                call.release();
+                calls.delete(id);
+              }),
+            ),
+          );
+        }
         grants.clear();
+        startingCalls.clear();
+        calls.clear();
         keys.clear();
         if (closing) clearTimeout(closing);
-        tunnel?.close();
+        closing = undefined;
+        try {
+          tunnel?.close();
+        } catch (e) {
+          logs.warn("vibevalley: voice: closing the tunnel: " + message(e));
+        }
         tunnel = undefined;
         line?.closeAllConnections();
         line?.close();
@@ -505,23 +565,33 @@ export const make = (options: VoiceOptions = {}) =>
     let rang: string | undefined;
     let telling = false;
     const tell = (texts: readonly string[], ring?: string) => {
+      if (stopped) return;
       waiting.push(...texts);
       if (ring) rang = ring;
-      if (!telling) void drain();
+      if (!telling) {
+        telling = true;
+        void forkDrain(
+          Effect.tryPromise({ try: (signal) => drain(signal), catch: (e) => e }).pipe(
+            Effect.catch((e) => Effect.sync(() => logs.warn("vibevalley: voice: telling the owner failed: " + message(e)))),
+          ),
+        );
+      }
     };
-    const drain = async () => {
-      telling = true;
+    const drain = async (signal: AbortSignal) => {
       try {
         for (let tries = 0; (waiting.length > 0 || rang) && tries < 3;) {
           await new Promise((r) => setTimeout(r, gatherMs));
+          if (stopped || signal.aborted) break;
           const on = liveCall();
-          if (!on || stopped) break;
+          if (!on) break;
           const texts = waiting.splice(0);
           const ring = rang;
           rang = undefined;
           const said = await orchestrator.brief(onCallLine(texts, ring));
+          if (stopped || signal.aborted) break;
           if (said) {
             tries = 0;
+            if (stopped || signal.aborted) break;
             await speakOn(on, said);
           } else {
             tries++;
@@ -573,31 +643,83 @@ export const make = (options: VoiceOptions = {}) =>
         return issued;
       }),
       start: Effect.fn("Voice.start")(function* (channel, uid, about) {
+        if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
         prune();
         const key = keyOf(channel, uid);
         const g = grants.get(key);
         if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
         if (g.starting || g.agent) return yield* Effect.fail(unavailable("这通电话已经在接通"));
         g.starting = true;
-        let release = () => {};
+        let cleaning: Promise<void> | undefined;
+        const opening: StartingCall = {
+          grant: g,
+          key,
+          release: () => {},
+          transferred: false,
+          cleanup: () => {
+            // Both the start's exit and service close may arrive here; all of them wait for the same late resources.
+            cleaning ??= (async () => {
+              if (grants.get(key) === g) grants.delete(key);
+              g.starting = false;
+              try {
+                const pending: Promise<unknown>[] = [];
+                if (opening.line) {
+                  pending.push(
+                    opening.line
+                      .then(
+                        () => opening.release(),
+                        () => undefined,
+                      )
+                      .catch((e) => logs.warn(`vibevalley: voice: releasing an opening line: ${message(e)}`)),
+                  );
+                }
+                if (opening.start && opening.client) {
+                  const client = opening.client;
+                  pending.push(
+                    opening.start
+                      .then(
+                        (id) => client.stopAgent(id),
+                        () => undefined,
+                      )
+                      .catch((e) => logs.warn(`vibevalley: voice: stopping an opening agent: ${message(e)}`)),
+                  );
+                }
+                await Promise.all(pending);
+              } finally {
+                if (startingCalls.get(key) === opening) startingCalls.delete(key);
+              }
+            })();
+            return cleaning;
+          },
+        };
+        startingCalls.set(key, opening);
         const started = Effect.gen(function* () {
           const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
           let callLine: CallLine | undefined;
           if (voice.answer.vendor === "orchestrator") {
-            callLine = yield* Effect.tryPromise({ try: openLine, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
-            const opened = callLine;
-            let once = false;
-            release = () => {
-              if (once) return;
-              once = true;
-              closeLine(opened.id);
-            };
+            callLine = yield* Effect.tryPromise({
+              try: (signal) => {
+                opening.line = openLine(signal).then((opened) => {
+                  let once = false;
+                  opening.release = () => {
+                    if (once) return;
+                    once = true;
+                    closeLine(opened.id);
+                  };
+                  return opened;
+                });
+                return opening.line;
+              },
+              catch: (e) => unavailable("管家的语音线路接不通：" + message(e)),
+            });
           }
+          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable("语音服务已经停下"));
           // Answering a ring, the orchestrator's first words are what rang: no greeting before them.
           const forCall = about ? { ...voice, greeting: "" } : voice;
           const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
           const client = clientOf(g.credentials, voice.area, options.fetch);
+          opening.client = client;
           const session = agentFor(client, forCall, vendors).createSession({
             channel,
             agentUid: voiceAgentUid,
@@ -605,31 +727,33 @@ export const make = (options: VoiceOptions = {}) =>
             idleTimeout: voice.idleSeconds,
             expiresIn: tokenSeconds,
           });
-          const id = yield* Effect.tryPromise({ try: () => session.start(), catch: (e) => failed("请管家进频道失败：" + message(e)) });
-          if (stopped || grants.get(key) !== g) {
-            yield* Effect.promise(() => client.stopAgent(id).catch(() => undefined));
-            return yield* Effect.fail(unavailable("语音服务已经停下"));
-          }
+          opening.session = session;
+          const id = yield* Effect.tryPromise({
+            try: () => {
+              opening.start = session.start();
+              return opening.start;
+            },
+            catch: (e) => failed("请管家进频道失败：" + message(e)),
+          });
+          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable("语音服务已经停下"));
+          // No asynchronous step may separate this ownership transfer from its last ownership check.
           g.agent = id;
           g.starting = false;
           calls.set(id, {
             grant: key,
             client,
             session,
-            release,
+            release: opening.release,
             quick: callLine === undefined,
             greeting: forCall.greeting.trim(),
             ending: false,
           });
+          startingCalls.delete(key);
+          opening.transferred = true;
           if (about) tell([], about);
           return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
         });
-        const agent = yield* Effect.tapError(started, () =>
-          Effect.sync(() => {
-            release();
-            if (grants.get(key) === g) grants.delete(key);
-          }),
-        );
+        const agent = yield* Effect.onExit(started, () => (opening.transferred ? Effect.void : Effect.promise(() => opening.cleanup())));
         yield* core.did({ kind: "talked" });
         return agent;
       }),
@@ -680,12 +804,12 @@ export const make = (options: VoiceOptions = {}) =>
         form.append("response_format", "json");
         // A local model's first request loads it, which takes a while.
         const res = yield* Effect.tryPromise({
-          try: () =>
+          try: (signal) =>
             fetch(d.url + "/audio/transcriptions", {
               method: "POST",
               body: form,
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
-              signal: AbortSignal.timeout(120_000),
+              signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
           catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
         });

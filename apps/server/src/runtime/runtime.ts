@@ -90,6 +90,8 @@ export interface RuntimeOptions {
   usageOf?: UsageOf;
   /** The background reads (the first probe of every runtime, the quota every five minutes); off in tests. */
   background?: boolean;
+  /** The clock; tests turn it by hand. */
+  readonly now?: () => number;
 }
 
 /** The farm's runtimes: oar's and those the farm adds (VibeValley's own agent, DeepSeek Harness); one added with oar's id takes its place. */
@@ -110,8 +112,8 @@ interface Spent {
   byRuntime: Record<string, number>;
 }
 
-const today = () => {
-  const d = new Date();
+const today = (at: number) => {
+  const d = new Date(at);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
@@ -187,18 +189,20 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const spendFile = join(config.home, "spend.json");
     const disk = new FileWriter(spendFile);
-    let spent: Spent = { day: today(), byRuntime: {} };
+    const now = options.now ?? Date.now;
+    let spent: Spent = { day: today(now()), byRuntime: {} };
     if (existsSync(spendFile)) {
       try {
         const kept = JSON.parse(readFileSync(spendFile, "utf8")) as Spent;
-        if (kept.day === today() && kept.byRuntime) spent = kept;
+        if (kept.day === today(now()) && kept.byRuntime) spent = kept;
       } catch {
         // An unreadable tally starts the day again.
       }
     }
     /** A new day starts from nothing. */
     const tally = () => {
-      if (spent.day !== today()) spent = { day: today(), byRuntime: {} };
+      const day = today(now());
+      if (spent.day !== day) spent = { day, byRuntime: {} };
       return spent.byRuntime;
     };
 
@@ -240,6 +244,7 @@ export const make = (options: RuntimeOptions = {}) =>
 
     function remember(next: Observation, read: number): RuntimeInfo {
       const id = next.info.id;
+      if (closed) return next.info;
       const held = cache.get(id);
       if (held && read < held.read) return held.info;
       const info = withSpend({ ...next.info, preset: presetOf(id), facts: facts(id) });
@@ -327,11 +332,16 @@ export const make = (options: RuntimeOptions = {}) =>
     const known = (id: string) => runtimeIds().includes(id);
 
     async function refresh(id: string): Promise<RuntimeInfo | undefined> {
-      if (!known(id)) return undefined;
+      if (!known(id) || closed) return undefined;
       const read = begin(id);
-      // The settings are the farm's own, whatever stands in for the machine.
-      const next: Observation = options.probe ? { info: { ...(await options.probe(id)), settings: store.settings(id) }, read: 0 } : await probe(id);
-      return remember(next, read);
+      try {
+        // The settings are the farm's own, whatever stands in for the machine.
+        const next: Observation = options.probe ? { info: { ...(await options.probe(id)), settings: store.settings(id) }, read: 0 } : await probe(id);
+        if (closed) return undefined;
+        return remember(next, read);
+      } finally {
+        if (!cache.has(id) && reads.get(id) === read) reads.delete(id);
+      }
     }
 
     async function info(id: string): Promise<RuntimeInfo | undefined> {
@@ -342,10 +352,11 @@ export const make = (options: RuntimeOptions = {}) =>
     async function refreshUsage(id: string) {
       const runtime = registry.get(id);
       const before = cache.get(id);
-      const read = begin(id);
       // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
+      const read = begin(id);
       const usage = await usageOf(id, runtime, before.found, before.info.settings).catch(() => null);
+      if (closed || cache.get(id) !== before) return;
       if (JSON.stringify(usage) === JSON.stringify(before.info.usage)) return;
       remember({ ...before, info: { ...before.info, usage, checkedAt: Date.now() } }, read);
     }
@@ -390,7 +401,8 @@ export const make = (options: RuntimeOptions = {}) =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
           if (hit) return withSpend(hit.info);
-          if (!reads.has(id)) void refresh(id);
+          if (!closed && !reads.has(id))
+            void forkHere(Effect.tryPromise({ try: () => refresh(id), catch: () => undefined }).pipe(Effect.catch(() => Effect.void)));
           return {
             id,
             preset: presetOf(id),

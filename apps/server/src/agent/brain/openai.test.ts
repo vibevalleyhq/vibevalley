@@ -70,6 +70,76 @@ describe("chat/completions", () => {
     expect(lines.slice(0, 2).map((l) => JSON.parse(l.slice(6)).choices[0].delta.content)).toEqual(["好，", "这就去。"]);
   });
 
+  it.each([false, true])("accepts content parts and additional fields when stream is %s", async (stream) => {
+    let heard = "";
+    const handle = chatCompletions({
+      answerer: only("m", (text) => {
+        heard = text;
+        return said("收到");
+      }),
+    });
+    const res = await ask(handle, {
+      model: "m",
+      stream,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "user",
+          name: "owner",
+          content: [
+            { type: "text", text: "看看", provider: "extra" },
+            { type: "image_url", image_url: { url: "https://example.test/image.png" } },
+            { type: "text", text: "进度" },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(heard).toBe("看看进度");
+  });
+
+  it.each([
+    ["a null message without streaming", { model: "m", stream: false, messages: [null] }],
+    ["a null message with streaming", { model: "m", stream: true, messages: [null] }],
+    ["a null content part without streaming", { model: "m", stream: false, messages: [{ role: "user", content: [null] }] }],
+    ["a null content part with streaming", { model: "m", stream: true, messages: [{ role: "user", content: [null] }] }],
+    ["a non-string model without streaming", { model: 42, stream: false, messages: [{ role: "user", content: "在吗" }] }],
+    ["a non-string model with streaming", { model: 42, stream: true, messages: [{ role: "user", content: "在吗" }] }],
+  ] as [string, unknown][])("returns an OpenAI 400 before answering %s", async (_name, body) => {
+    let lookups = 0;
+    let answers = 0;
+    const handle = chatCompletions({
+      answerer: () => {
+        lookups++;
+        return () => {
+          answers++;
+          return said("不应回答");
+        };
+      },
+    });
+    const res = await ask(handle, body);
+    const got = (await res.json()) as { error: { message: string; type: string } };
+    expect(res.status).toBe(400);
+    expect(got.error.type).toBe("invalid_request_error");
+    expect(typeof got.error.message).toBe("string");
+    expect([lookups, answers]).toEqual([0, 0]);
+  });
+
+  it("returns an OpenAI 400 for a non-boolean stream without answering", async () => {
+    let lookups = 0;
+    const handle = chatCompletions({
+      answerer: () => {
+        lookups++;
+        return () => said("不应回答");
+      },
+    });
+    const res = await ask(handle, { model: "m", stream: "yes", messages: [{ role: "user", content: "在吗" }] });
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { error: { type: string } }).toMatchObject({ error: { type: "invalid_request_error" } });
+    expect(lookups).toBe(0);
+  });
+
   it("refuses in OpenAI's shape", async () => {
     const answer: Answer = () => said("在");
     const strict = chatCompletions({ answerer: only("m", answer) });

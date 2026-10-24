@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "@effect/vitest";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
-import { Effect, Layer } from "effect";
-import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
+import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { Orchestrator, layer as orchestrator } from "../orchestrator/orchestrator.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
@@ -12,8 +12,47 @@ import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
 import { agentFor, type CallLine, clientOf, layer, onCallLine, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+const pendingDictation = () => {
+  const timeout = new AbortController();
+  let seen: AbortSignal | undefined;
+  let entered!: () => void;
+  const started = new Promise<void>((done) => (entered = done));
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    expect(ms).toBe(120_000);
+    return timeout.signal;
+  });
+  vi.stubGlobal("fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+    const signal = init?.signal ?? undefined;
+    seen = signal;
+    entered();
+    return new Promise<Response>((_, reject) => {
+      if (signal?.aborted) reject(signal.reason);
+      else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  });
+  return { timeout, started, signal: () => seen };
+};
+
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const agentResponse = (agentId: string) =>
+  new Response(JSON.stringify({ agent_id: agentId }), { status: 200, headers: { "content-type": "application/json" } });
 
 /** Agora's REST calls, kept; each answered as given (an agent by default). */
 class Capture {
@@ -21,13 +60,27 @@ class Capture {
   readonly requests: Record<string, unknown>[] = [];
   /** Each request's Authorization header, as Agora would read it. */
   readonly auths: string[] = [];
+  private heldStart?: { readonly response: Promise<Response>; readonly entered: () => void };
   status = 200;
   body = `{"agent_id":"parity-agent"}`;
+  holdStart() {
+    const response = deferred<Response>();
+    const entered = deferred<void>();
+    this.heldStart = { response: response.promise, entered: () => entered.resolve() };
+    return { ...response, entered: entered.promise };
+  }
   readonly fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
-    this.urls.push((init?.method ?? "GET") + " " + url);
+    const method = init?.method ?? "GET";
+    this.urls.push(method + " " + url);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
     this.requests.push(init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {});
+    if (method === "POST" && url.endsWith("/join") && this.heldStart) {
+      const held = this.heldStart;
+      this.heldStart = undefined;
+      held.entered();
+      return held.response;
+    }
     return new Response(this.body, { status: this.status, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
 }
@@ -105,13 +158,34 @@ describe("a call's agent", () => {
   });
 });
 
+interface FarmOptions {
+  readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
+  readonly brief?: (line: string) => Promise<string>;
+  readonly lineLingerMs?: number;
+}
+
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture) => {
-  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
-  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
-    Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
-  );
+const farm = (capture: Capture, options: FarmOptions = {}) => {
+  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: options.tunnel ? "" : "https://line.example.com" } } };
+  const built = layer({
+    fetch: capture.fetch,
+    gatherMs: 30,
+    ...(options.tunnel ? { tunnel: options.tunnel } : {}),
+    ...(options.lineLingerMs !== undefined ? { lineLingerMs: options.lineLingerMs } : {}),
+  }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))));
+  const brief = options.brief;
+  return brief
+    ? built.pipe(
+        Layer.tap((context) =>
+          Effect.sync(() => {
+            Object.assign(Context.get(context, Orchestrator), { brief });
+          }),
+        ),
+      )
+    : built;
 };
+
+const buildFarm = (scope: Scope.Closeable, capture: Capture, options: FarmOptions = {}) => Scope.provide(scope)(Layer.build(farm(capture, options)));
 
 /** A helper at work on an issue, and the issue, as the core has them. */
 const helperOn = (id: string, issue: string) =>
@@ -191,6 +265,187 @@ describe("voice", () => {
       capture.body = `{"detail":"boom"}`;
       expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceAgentFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  it.live("an interrupted line opening releases its late tunnel and does not block a retry", () => {
+    const capture = new Capture();
+    const opened = deferred<{ readonly url: string; readonly close: () => void }>();
+    const entered = deferred<void>();
+    let closes = 0;
+    const resource = {
+      url: "https://tunnel.example.com",
+      close: () => {
+        closes++;
+      },
+    };
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const services = yield* buildFarm(scope, capture, {
+        tunnel: () => {
+          entered.resolve();
+          return opened.promise;
+        },
+        lineLingerMs: 30,
+      });
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        const old = yield* voice.session();
+        const starting = yield* Effect.forkChild(voice.start(old.channel, old.uid));
+        yield* Effect.promise(() => entered.promise);
+        const interrupting = yield* Effect.forkChild(Fiber.interrupt(starting));
+        yield* Effect.sleep(10);
+        opened.resolve(resource);
+        yield* Fiber.join(interrupting);
+        expect(voice.lines()).toBe(0);
+        yield* Effect.promise(() => vi.waitFor(() => expect(closes).toBe(1)));
+        expect(yield* Effect.flip(voice.start(old.channel, old.uid))).toMatchObject({ reason: expect.stringContaining("失效") });
+        const retry = yield* voice.session();
+        expect((yield* voice.start(retry.channel, retry.uid)).agentId).toBe("parity-agent");
+        expect(voice.lines()).toBe(1);
+        yield* Scope.close(scope, Exit.void);
+        expect(voice.lines()).toBe(0);
+        expect(closes).toBe(2);
+      }).pipe(
+        Effect.provide(services),
+        Effect.ensuring(
+          Effect.suspend(() => {
+            opened.resolve(resource);
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    });
+  });
+
+  it.live("an interrupted agent start stops its late agent once and frees the line for a retry", () => {
+    const capture = new Capture();
+    const late = capture.holdStart();
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const services = yield* buildFarm(scope, capture);
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        const old = yield* voice.session();
+        const starting = yield* Effect.forkChild(voice.start(old.channel, old.uid));
+        yield* Effect.promise(() => late.entered);
+        const interrupting = yield* Effect.forkChild(Fiber.interrupt(starting));
+        yield* Effect.sleep(10);
+        late.resolve(agentResponse("late-agent"));
+        yield* Fiber.join(interrupting);
+        expect(voice.lines()).toBe(0);
+        expect(capture.urls.filter((url) => url.includes("late-agent"))).toHaveLength(1);
+        const retry = yield* voice.session();
+        expect((yield* voice.start(retry.channel, retry.uid)).agentId).toBe("parity-agent");
+        expect(voice.lines()).toBe(1);
+        yield* Scope.close(scope, Exit.void);
+        expect(capture.urls.filter((url) => url.includes("late-agent"))).toHaveLength(1);
+      }).pipe(
+        Effect.provide(services),
+        Effect.ensuring(
+          Effect.suspend(() => {
+            late.resolve(agentResponse("late-agent"));
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    });
+  });
+
+  it.live("closing a scope waits for an opening agent's late response and cleanup", () => {
+    const capture = new Capture();
+    const late = capture.holdStart();
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const services = yield* buildFarm(scope, capture);
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        const grant = yield* voice.session();
+        const starting = yield* Effect.forkChild(Effect.flip(voice.start(grant.channel, grant.uid)));
+        yield* Effect.promise(() => late.entered);
+        let closed = false;
+        const closing = yield* Effect.forkChild(Scope.close(scope, Exit.void).pipe(Effect.ensuring(Effect.sync(() => (closed = true)))));
+        yield* Effect.sleep(20);
+        expect(closed).toBe(false);
+        late.resolve(agentResponse("late-agent"));
+        yield* Fiber.join(closing);
+        expect(closed).toBe(true);
+        expect(yield* Fiber.join(starting)).toMatchObject({ _tag: "VoiceUnavailable" });
+        expect(voice.lines()).toBe(0);
+        expect(capture.urls.filter((url) => url.includes("late-agent"))).toHaveLength(1);
+      }).pipe(
+        Effect.provide(services),
+        Effect.ensuring(
+          Effect.suspend(() => {
+            late.resolve(agentResponse("late-agent"));
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    });
+  });
+
+  it.live("closing a scope stops an active agent and releases its line and tunnel", () => {
+    const capture = new Capture();
+    let closes = 0;
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const services = yield* buildFarm(scope, capture, {
+        tunnel: async () => ({
+          url: "https://tunnel.example.com",
+          close: () => {
+            closes++;
+          },
+        }),
+      });
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        const grant = yield* voice.session();
+        expect((yield* voice.start(grant.channel, grant.uid)).agentId).toBe("parity-agent");
+        expect(voice.lines()).toBe(1);
+        yield* Scope.close(scope, Exit.void);
+        expect(capture.urls.filter((url) => url.includes("parity-agent"))).toHaveLength(1);
+        expect(voice.lines()).toBe(0);
+        expect(closes).toBe(1);
+      }).pipe(Effect.provide(services), Effect.ensuring(Scope.close(scope, Exit.void)));
+    });
+  });
+
+  it.live("a brief that arrives after scope close is never spoken", () => {
+    const capture = new Capture();
+    const brief = deferred<string>();
+    const briefStarted = deferred<void>();
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      const services = yield* buildFarm(scope, capture, {
+        brief: () => {
+          briefStarted.resolve();
+          return brief.promise;
+        },
+      });
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        const grant = yield* voice.session();
+        yield* voice.start(grant.channel, grant.uid, "交回来了");
+        yield* Effect.promise(() => briefStarted.promise);
+        yield* Scope.close(scope, Exit.void);
+        brief.resolve("晚到的话");
+        yield* Effect.sleep(50);
+        expect(capture.urls.some((url) => url.endsWith("/speak"))).toBe(false);
+      }).pipe(
+        Effect.provide(services),
+        Effect.ensuring(
+          Effect.suspend(() => {
+            brief.resolve("晚到的话");
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    });
   });
 
   it.live("keeps a call's credentials and line whatever the settings say later", () => {
@@ -346,6 +601,36 @@ describe("voice", () => {
       expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({ _tag: "VoiceAgentFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
+
+  it.live("interrupting dictation aborts its fetch", () => {
+    const pending = pendingDictation();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const setting = yield* Setting;
+      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      const dictating = yield* Effect.forkChild(voice.dictate("AAAA", "wav"));
+      yield* Effect.promise(() => pending.started);
+      yield* Fiber.interrupt(dictating);
+      expect(pending.signal()?.aborted).toBe(true);
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+  });
+
+  it.live("dictation's timeout still aborts its fetch", () => {
+    const pending = pendingDictation();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const setting = yield* Setting;
+      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      const dictating = yield* Effect.forkChild(Effect.flip(voice.dictate("AAAA", "wav")));
+      yield* Effect.promise(() => pending.started);
+      const reason = new DOMException("test timeout", "TimeoutError");
+      pending.timeout.abort(reason);
+      const failure = yield* Fiber.join(dictating);
+      expect(pending.signal()?.aborted).toBe(true);
+      expect(pending.signal()?.reason).toBe(reason);
+      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("test timeout") });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+  });
 
   it.live("says dictation is not set up", () =>
     Effect.gen(function* () {

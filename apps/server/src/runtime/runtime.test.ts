@@ -7,7 +7,7 @@ import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@boti
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { Agent, LiveEvent, RuntimeInfo } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Exit, Layer, Scope, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
 import { type Config, Settings } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
@@ -45,6 +45,16 @@ const agent = (a: Partial<Agent>): Agent => ({ id: "a", name: "小禾", runtime:
 const until = async (ok: () => boolean) => {
   for (let i = 0; i < 500 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
   expect(ok()).toBe(true);
+};
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 };
 
 const servers: Server[] = [];
@@ -319,6 +329,246 @@ describe("runtime", () => {
       expect([a.installation, b.installation]).toMatchObject([{ command: "first-bin" }, { command: "second-bin" }]);
       expect(process.env.OAR_PI_BIN).toBe("external-default");
     }).pipe(Effect.ensuring(Effect.sync(() => env("OAR_PI_BIN", before))));
+  });
+
+  it.live("a failed list probe is retried without changing the synchronous checking answer", () => {
+    const first = deferred<RuntimeInfo>();
+    let probes = 0;
+    return Effect.gen(function* () {
+      const r = yield* runtimes({
+        probe: (id) => {
+          if (id !== "pi") return notFound(id);
+          probes++;
+          return probes === 1 ? first.promise : notFound(id);
+        },
+      });
+      const pi = () => r.list().find((info) => info.id === "pi")!;
+      expect(pi().installation.status).toBe("checking");
+      yield* Effect.promise(() => until(() => probes === 1));
+      first.reject(new Error("first probe failed"));
+      yield* Effect.sleep(20);
+      expect(pi().installation.status).toBe("checking");
+      yield* Effect.promise(() => until(() => probes === 2 && pi().installation.status === "not_found"));
+      expect(probes).toBe(2);
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("an old read's failure does not clear the newer read's checking marker", () => {
+    const old = deferred<RuntimeInfo>();
+    const latest = deferred<RuntimeInfo>();
+    let probes = 0;
+    return Effect.gen(function* () {
+      const r = yield* runtimes({
+        probe: (id) => {
+          if (id !== "pi") return notFound(id);
+          probes++;
+          return probes === 1 ? old.promise : latest.promise;
+        },
+      });
+      const oldResult = Effect.runPromise(r.refresh("pi")).then(
+        () => ({ status: "resolved" as const }),
+        (error: unknown) => ({ status: "rejected" as const, error }),
+      );
+      yield* Effect.promise(() => until(() => probes === 1));
+      const latestResult = Effect.runPromise(r.refresh("pi"));
+      yield* Effect.promise(() => until(() => probes === 2));
+      old.reject(new Error("old probe failed"));
+      expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
+      expect(r.list().find((info) => info.id === "pi")!.installation.status).toBe("checking");
+      yield* Effect.sleep(20);
+      expect(probes).toBe(2);
+      latest.resolve(yield* Effect.promise(() => notFound("pi")));
+      expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("an older usage read cannot overwrite a newer full probe", () => {
+    const fullProbe = deferred<void>();
+    const usageGate = deferred<void>();
+    const entered = deferred<void>();
+    let probes = 0;
+    let firstUsage = true;
+    const registry = new RuntimeRegistry([
+      fake("pi", {
+        installation: async (): Promise<InstallationSnapshot> => {
+          probes++;
+          if (probes === 2) await fullProbe.promise;
+          return { kind: "available", via: "executable", command: probes === 1 ? "old" : "new" };
+        },
+      }),
+    ]);
+    return Effect.gen(function* () {
+      const r = yield* make({
+        registry,
+        background: false,
+        usageOf: async (_id, _runtime, found) => {
+          if (firstUsage) {
+            firstUsage = false;
+            return null;
+          }
+          if (found.via === "executable" && found.command === "new") return null;
+          entered.resolve();
+          await usageGate.promise;
+          return { status: "ok" as const, subscription: "old", windows: [] };
+        },
+      });
+      yield* r.refresh("pi");
+      const core = yield* Core;
+      const commands: string[] = [];
+      yield* Effect.forkScoped(
+        Stream.runForEach(core.live, (event) =>
+          Effect.sync(() => {
+            if (event.type !== "runtime") return;
+            const installation = event.info.installation;
+            if (installation.status === "available") commands.push(installation.command);
+          }),
+        ),
+      );
+      yield* Effect.sleep(10);
+      const full = Effect.runPromise(r.refresh("pi"));
+      yield* Effect.promise(() => until(() => probes === 2));
+      const pending = r.refreshUsage("pi");
+      yield* Effect.promise(() => entered.promise);
+      fullProbe.resolve();
+      yield* Effect.promise(() => full);
+      const command = () => {
+        const installation = r.cached.get("pi")!.info.installation;
+        return installation.status === "available" ? installation.command : "";
+      };
+      expect(command()).toBe("new");
+      usageGate.resolve();
+      yield* Effect.promise(() => pending);
+      expect(command()).toBe("new");
+      expect(r.cached.get("pi")!.info.usage).toBeNull();
+      expect(commands).toEqual(["new"]);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          fullProbe.resolve();
+          usageGate.resolve();
+        }),
+      ),
+      Effect.scoped,
+      Effect.provide(world()),
+    );
+  });
+
+  it.live("a deferred probe cannot begin, write cache or emit after its service closes", () => {
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    let probes = 0;
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      return yield* Effect.gen(function* () {
+        const r = yield* Scope.provide(scope)(
+          runtimes({
+            probe: async (id) => {
+              probes++;
+              entered.resolve();
+              await held.promise;
+              return notFound(id);
+            },
+          }),
+        );
+        const core = yield* Core;
+        const events: LiveEvent[] = [];
+        yield* Effect.forkScoped(Stream.runForEach(core.live, (event) => Effect.sync(() => events.push(event))));
+        yield* Effect.sleep(10);
+        const pending = Effect.runPromise(r.refresh("pi"));
+        yield* Effect.promise(() => entered.promise);
+        yield* Scope.close(scope, Exit.void);
+        held.resolve();
+        yield* Effect.promise(() => pending);
+        yield* Effect.sleep(20);
+        expect(r.cached.has("pi")).toBe(false);
+        expect(events.filter((event) => event.type === "runtime")).toEqual([]);
+        expect(yield* r.refresh("pi")).toBeUndefined();
+        expect(probes).toBe(1);
+        expect(r.cached.has("pi")).toBe(false);
+        expect(events.filter((event) => event.type === "runtime")).toEqual([]);
+      }).pipe(
+        Effect.ensuring(
+          Effect.suspend(() => {
+            held.resolve();
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("a deferred usage read cannot overwrite cache or emit after its service closes", () => {
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    const registry = new RuntimeRegistry([
+      fake("pi", { installation: async (): Promise<InstallationSnapshot> => ({ kind: "available", via: "executable", command: "pi" }) }),
+    ]);
+    let late = false;
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      return yield* Effect.gen(function* () {
+        const r = yield* Scope.provide(scope)(
+          make({
+            registry,
+            background: false,
+            usageOf: async () => {
+              if (!late) return null;
+              entered.resolve();
+              await held.promise;
+              return { status: "ok" as const, subscription: "late", windows: [] };
+            },
+          }),
+        );
+        yield* r.refresh("pi");
+        const checkedAt = r.cached.get("pi")!.info.checkedAt;
+        const core = yield* Core;
+        const events: LiveEvent[] = [];
+        yield* Effect.forkScoped(Stream.runForEach(core.live, (event) => Effect.sync(() => events.push(event))));
+        yield* Effect.sleep(10);
+        late = true;
+        const pending = r.refreshUsage("pi");
+        yield* Effect.promise(() => entered.promise);
+        yield* Scope.close(scope, Exit.void);
+        held.resolve();
+        yield* Effect.promise(() => pending);
+        yield* Effect.sleep(20);
+        expect(r.cached.get("pi")!.info.checkedAt).toBe(checkedAt);
+        expect(r.cached.get("pi")!.info.usage).toBeNull();
+        expect(events.filter((event) => event.type === "runtime")).toEqual([]);
+      }).pipe(
+        Effect.ensuring(
+          Effect.suspend(() => {
+            held.resolve();
+            return Scope.close(scope, Exit.void);
+          }),
+        ),
+      );
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("crossing midnight clears spending and opens the daily budget gate with the injected clock", () => {
+    let now = new Date(2026, 0, 1, 23, 59).getTime();
+    return Effect.gen(function* () {
+      const r = yield* runtimes({
+        now: () => now,
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          installation: { status: "available", via: "bundled", command: id, version: null },
+        }),
+      });
+      const agents = yield* Agents;
+      yield* agents.saveSettings("pi", { ...agents.settings("pi"), dailyBudget: 10 });
+      yield* r.refresh("pi");
+      r.spend("pi", 12);
+      const blocked = yield* r.assess(agent({}));
+      expect(usable(blocked)).toBe(false);
+      expect(blocked.blocking.some((issue) => issue.text.includes("每日预算 ¥10.00"))).toBe(true);
+      now += 2 * 60_000;
+      const got = yield* r.info("pi");
+      expect([got!.spentToday, got!.stop]).toEqual([undefined, undefined]);
+      expect(r.spent()).toEqual({ day: "2026-01-02", byRuntime: {} });
+      expect(usable(yield* r.assess(agent({})))).toBe(true);
+    }).pipe(Effect.scoped, Effect.provide(world()));
   });
 
   it.live("yesterday's spending does not stop today's work", () =>

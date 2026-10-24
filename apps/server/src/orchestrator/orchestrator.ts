@@ -386,6 +386,8 @@ export const make = (options: OrchestratorOptions = {}) =>
       (a: A) =>
         Effect.promise(() => f(a).catch((err) => logs.error(`vibevalley: the orchestrator could not take ${what}:`, err)));
 
+    yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
+
     // A test that gave the orchestrator no model hears nothing: the other services run as without it, and nothing reaches a model.
     if (options.listen ?? true) {
       yield* Effect.forkScoped(Stream.runForEach(yield* chat.forOrchestrator, handled("a line", heardInChat)));
@@ -405,8 +407,6 @@ export const make = (options: OrchestratorOptions = {}) =>
       );
       if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
     }
-
-    yield* Effect.addFinalizer(() => Effect.promise(() => host.close()));
 
     const modelId = () => {
       try {

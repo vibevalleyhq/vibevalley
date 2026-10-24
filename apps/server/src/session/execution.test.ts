@@ -1,9 +1,11 @@
+import { getEventListeners } from "node:events";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
+import { Caller } from "./host.ts";
 import { type RunFinished, type RunStore, Sessions, type SessionsInside } from "./session.ts";
 
 const user = (text: string) => ({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } }) as AgentEvent;
@@ -79,6 +81,24 @@ describe("the orchestrator's runs", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
+  it.live("close takes effect only when run and stops later inputs", () =>
+    Effect.gen(function* () {
+      const sessions = (yield* Sessions) as SessionsInside;
+      const journal = sessions.trajectories.openLog("orchestrator");
+      const x = new AgentExecution("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
+      const closing = x.close();
+      yield* x.observe(user("还收"), { by: { kind: "comment" } });
+      expect(sessions.currentRun("orchestrator")).not.toBe("");
+      yield* closing;
+      expect(sessions.currentRun("orchestrator")).toBe("");
+      yield* x.observe(user("不再收"), { by: { kind: "comment" } });
+      expect(sessions.currentRun("orchestrator")).toBe("");
+      const sql = yield* SqlClient.SqlClient;
+      const rows = yield* sql<{ outcome: string; summary: string }>`select outcome, summary from session_run`;
+      expect(rows).toEqual([{ outcome: "interrupted", summary: "VibeValley 停下了，这一轮中断了" }]);
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
   it.live("a run whose end could not be written ends before the next starts", () =>
     Effect.gen(function* () {
       const sessions = (yield* Sessions) as SessionsInside;
@@ -99,4 +119,56 @@ describe("the orchestrator's runs", () => {
       expect(rows.map((r) => r.outcome)).toEqual(["completed", "completed"]);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
+});
+
+describe("a caller's words", () => {
+  const listeners = (signal: AbortSignal) => getEventListeners(signal, "abort").length;
+  const pending = async (words: AsyncGenerator<string>, signal: AbortSignal) => {
+    const next = words.next();
+    await Promise.resolve();
+    expect(listeners(signal)).toBeGreaterThan(0);
+    return { next };
+  };
+
+  it("does not accumulate abort listeners over 20 empty waits and pushes", async () => {
+    const controller = new AbortController();
+    const caller = new Caller();
+    const words = caller.words(controller.signal);
+    for (let i = 0; i < 20; i++) {
+      const { next } = await pending(words, controller.signal);
+      caller.push(`w${i}`);
+      expect(await next).toEqual({ done: false, value: `w${i}` });
+    }
+    expect(listeners(controller.signal)).toBe(0);
+    await words.return(undefined);
+  });
+
+  it("cleans the abort listener after end and an early return", async () => {
+    const ending = new AbortController();
+    const ended = new Caller();
+    const endedWords = ended.words(ending.signal);
+    const { next: end } = await pending(endedWords, ending.signal);
+    ended.end();
+    expect(await end).toEqual({ done: true, value: undefined });
+    expect(listeners(ending.signal)).toBe(0);
+
+    const returning = new AbortController();
+    const caller = new Caller();
+    const words = caller.words(returning.signal);
+    const { next } = await pending(words, returning.signal);
+    const returned = words.return(undefined);
+    expect(await next).toEqual({ done: true, value: undefined });
+    expect(await returned).toEqual({ done: true, value: undefined });
+    expect(listeners(returning.signal)).toBe(0);
+  });
+
+  it("abort wakes an empty wait and cleans its listener", async () => {
+    const controller = new AbortController();
+    const caller = new Caller();
+    const words = caller.words(controller.signal);
+    const { next } = await pending(words, controller.signal);
+    controller.abort();
+    expect(await next).toEqual({ done: true, value: undefined });
+    expect(listeners(controller.signal)).toBe(0);
+  });
 });

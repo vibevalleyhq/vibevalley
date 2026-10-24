@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { WorkspaceState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
-import { Effect, Fiber, Layer, Queue, Stream } from "effect";
+import { Deferred, Effect, Exit, Fiber, Layer, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { emptyProgress } from "../game/progress.ts";
 import { Settings } from "../base/config.ts";
@@ -76,6 +76,113 @@ describe("core", () => {
       expect([next.state.orchestrator, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
+  );
+
+  it.effect("an interrupted publish still commits every channel in order", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      const reading = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const drained = yield* Deferred.make<void>();
+      const updated = yield* Deferred.make<void>();
+      const moved = yield* Deferred.make<void>();
+      const totals: number[] = [];
+      const updates: number[] = [];
+      const transitions: number[] = [];
+      yield* core.events.pipe(
+        Stream.runForEach((e) => {
+          if (e.type === "snapshot") return Deferred.succeed(reading, undefined).pipe(Effect.andThen(Deferred.await(release)));
+          if (e.type !== "commits") return Effect.void;
+          return Effect.gen(function* () {
+            totals.push(e.commits.total);
+            if (e.commits.total === 64) yield* Deferred.succeed(drained, undefined);
+          });
+        }),
+        Effect.forkScoped,
+      );
+      const subscribed = yield* core.subscribe;
+      yield* subscribed.pipe(
+        Stream.runForEach((e) =>
+          Effect.gen(function* () {
+            if (e.type !== "commits") return;
+            updates.push(e.commits.total);
+            if (e.commits.total === 64) yield* Deferred.succeed(updated, undefined);
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      const [, moves] = yield* core.transitions;
+      yield* moves.pipe(
+        Stream.runForEach((t) =>
+          Effect.gen(function* () {
+            if (t.fact.type !== "commits") return;
+            transitions.push(t.fact.commits.total);
+            if (t.fact.commits.total === 64) yield* Deferred.succeed(moved, undefined);
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      yield* Deferred.await(reading);
+      for (let total = 0; total < 64; total++) yield* core.setCommits({ total } as never);
+      let finished = false;
+      const pending = yield* Effect.forkChild(core.setCommits({ total: 64 } as never).pipe(Effect.tap(() => Effect.sync(() => void (finished = true)))), {
+        startImmediately: true,
+      });
+      const interrupting = yield* Effect.forkChild(Fiber.interrupt(pending), { startImmediately: true });
+      yield* Effect.yieldNow;
+      expect(finished).toBe(false);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(interrupting);
+      expect(Exit.hasInterrupts(yield* Fiber.await(pending))).toBe(true);
+      yield* Deferred.await(drained);
+      yield* Deferred.await(updated);
+      yield* Deferred.await(moved);
+      const expected = Array.from({ length: 65 }, (_, total) => total);
+      expect(totals).toEqual(expected);
+      expect(updates).toEqual(expected);
+      expect(transitions).toEqual(expected);
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
+  );
+
+  it.effect("a slow frame reader bounds each burst and catches up with the latest state", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      const reading = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const latest = yield* Deferred.make<void>();
+      const totals: Array<number | undefined> = [];
+      let first = true;
+      yield* core.states.pipe(
+        Stream.runForEach((frame) =>
+          Effect.gen(function* () {
+            if (first) {
+              first = false;
+              yield* Deferred.succeed(reading, undefined);
+              yield* Deferred.await(release);
+            }
+            const total = frame.state.commits?.total;
+            totals.push(total);
+            if (total === 31) yield* Deferred.succeed(latest, undefined);
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      yield* Deferred.await(reading);
+      // One change is already in the frame window; the next publish waits for the bounded subscription.
+      for (let total = 0; total < 31; total++) yield* core.setCommits({ total } as never);
+      let finished = false;
+      const pending = yield* Effect.forkChild(core.setCommits({ total: 31 } as never).pipe(Effect.tap(() => Effect.sync(() => void (finished = true)))), {
+        startImmediately: true,
+      });
+      yield* Effect.yieldNow;
+      expect(finished).toBe(false);
+      yield* Deferred.succeed(release, undefined);
+      yield* TestClock.adjust(stateEveryMs);
+      yield* Fiber.join(pending);
+      yield* Deferred.await(latest);
+      expect(finished).toBe(true);
+      expect(totals).toEqual([undefined, 31]);
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
   );
 });

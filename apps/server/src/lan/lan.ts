@@ -16,6 +16,7 @@ import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
+import { optional } from "../base/db.ts";
 import { code as newCode, newId } from "../base/ids.ts";
 import { missing, lookIn } from "../errors.ts";
 import { callbackLog } from "../base/log.ts";
@@ -143,7 +144,7 @@ export const make = (options: LanOptions = {}) =>
       });
     }
     // No row yet is shut.
-    let open = Option.match(yield* Effect.option(Effect.provideService(lanQ.lanOpen(), SqlClient.SqlClient, sql)), {
+    let open = Option.match(yield* db(optional(lanQ.lanOpen())), {
       onNone: () => false,
       onSome: (r) => r.open,
     });

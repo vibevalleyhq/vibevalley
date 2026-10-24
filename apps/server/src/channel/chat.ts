@@ -46,6 +46,7 @@ import {
 import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
+import { optional as optionalRow } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
@@ -337,7 +338,7 @@ export const make = Effect.gen(function* () {
   let helpers: Helpers | undefined;
   const sql = yield* SqlClient.SqlClient;
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
+  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(optionalRow(e)), Option.getOrUndefined);
   const inTx = <A, E>(e: Effect.Effect<A, E>) =>
     sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
   const lock = yield* Semaphore.make(1);

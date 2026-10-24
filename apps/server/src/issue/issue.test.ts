@@ -5,7 +5,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
 import { seedAgents } from "../agent/seed.ts";
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels } from "../channel/chat.ts";
@@ -399,7 +399,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  it.live("an issue that cannot be written publishes no session and keeps none", () => {
+  it.live("an issue write defect publishes no session, while a known failure is an ordinary refusal", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = yield* Issues;
@@ -410,10 +410,13 @@ describe("issues", () => {
         .unsafe(`create function reject_issue() returns trigger language plpgsql as $$ begin raise exception 'test write failure'; end $$`)
         .pipe(Effect.orDie);
       yield* sql.unsafe(`create trigger reject_issue before insert on issue for each row execute function reject_issue()`).pipe(Effect.orDie);
-      const got = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo");
-      expect(got.refused).toContain("test write failure");
-      expect(got.session).toBeUndefined();
+      const exit = yield* Effect.exit(issues.hire({ ...lab(), worktree: true }, "test", "demo"));
+      expect(Exit.hasDies(exit)).toBe(true);
+      expect(Exit.hasFails(exit)).toBe(false);
       expect([core.state().sessions.length, sessions.roster().length]).toEqual([0, 0]);
+      const known = yield* issues.hire({ ...lab(), worktree: true }, "test", "demo", { issue: "missing" });
+      expect(known.refused).toContain("工单 missing");
+      expect(known.session).toBeUndefined();
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
