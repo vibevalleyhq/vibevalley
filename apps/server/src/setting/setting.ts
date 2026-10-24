@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
-import { Context, Data, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
@@ -47,7 +47,7 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
+export class SettingRefused extends Schema.TaggedError<SettingRefused>()("SettingRefused", { message: Schema.String }) {}
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;
@@ -122,7 +122,7 @@ export const make = Effect.gen(function* () {
     };
   };
 
-  const save = Effect.fn("Setting.save")(function* (u: SettingsUpdate) {
+  const save = Effect.fnUntraced(function* (u: SettingsUpdate) {
     const problem = settingsProblem(u);
     if (problem) return yield* new SettingRefused({ message: problem });
     const next: Record<string, unknown> = { ...stored };
@@ -148,7 +148,7 @@ export const make = Effect.gen(function* () {
     return status();
   });
 
-  const shape: SettingShape = {
+  const shape = Setting.of({
     status,
     check: (u) => {
       const problem = settingsProblem(u);
@@ -169,7 +169,7 @@ export const make = Effect.gen(function* () {
       keys: { asrKey: stored.asrKey ?? "", llmKey: stored.llmKey ?? "", ttsKey: stored.ttsKey ?? "" },
       deepseekApiKey: pick(stored.deepseekApiKey, fromConfig.deepseek)?.[0] ?? "",
     }),
-  };
+  });
   return shape;
 });
 

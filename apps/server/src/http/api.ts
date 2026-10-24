@@ -39,13 +39,8 @@ function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, A
     }
     if (endpoint.body) {
       const text = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
-      let json: unknown;
-      try {
-        json = JSON.parse(text);
-      } catch (e) {
-        return badRequest((e as Error).message);
-      }
-      const decoded = Schema.decodeUnknownExit(endpoint.body)(json);
+      // Not JSON and not the endpoint's shape are both the Schema's to say.
+      const decoded = Schema.decodeUnknownExit(Schema.fromJsonString(endpoint.body))(text);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
       args.body = decoded.value;
     }

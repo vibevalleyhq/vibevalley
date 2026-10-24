@@ -1,13 +1,13 @@
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
-import type { ApiError, Next } from "@vibevalley/protocol/api";
+import { type ApiError, Missing, type Next, Refused } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };
 
-export const refused = (reason: string, next?: readonly Next[]): ApiError => ({ _tag: "Refused", reason, ...(next && next.length > 0 ? { next } : {}) });
+export const refused = (reason: string, next?: readonly Next[]): ApiError => new Refused({ reason, ...(next && next.length > 0 ? { next } : {}) });
 
 /** Something asked for by id or name is not there. next is required: where to look for the ones that are (lookIn). */
-export const missing = (what: string, next: readonly Next[]): ApiError => ({ _tag: "Missing", what, ...(next.length > 0 ? { next } : {}) });
+export const missing = (what: string, next: readonly Next[]): ApiError => new Missing({ what, ...(next.length > 0 ? { next } : {}) });
 
 /** Where to find the ones that are there, as the command that lists them; cli.test.ts runs each one's help, so a command
  * renamed away breaks the test, not the hint. */

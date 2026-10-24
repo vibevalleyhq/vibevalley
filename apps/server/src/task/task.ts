@@ -52,10 +52,10 @@ import {
   withTask,
 } from "./rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
@@ -160,7 +160,7 @@ export const make = (options: TaskOptions = {}) =>
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+    const { run: db } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
     const newsHub = yield* PubSub.unbounded<string>();
@@ -210,7 +210,7 @@ export const make = (options: TaskOptions = {}) =>
         { discard: true },
       );
 
-    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: GraphActor, why = "") {
+    const put = Effect.fnUntraced(function* (graph: TaskGraph, by: GraphActor, why = "") {
       const before = get(graph.id);
       yield* issues.putTask(graph).pipe(Effect.catchDefect((d) => Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`))));
       yield* record(before, graph, by, why);
@@ -218,7 +218,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const putSystem = (graph: TaskGraph) => put(graph, "system");
 
-    const giveUp = Effect.fn("Tasks.giveUp")(function* (graph: TaskGraph, why: string) {
+    const giveUp = Effect.fnUntraced(function* (graph: TaskGraph, why: string) {
       const splitter = splitters.get(graph.id);
       yield* putSystem(withNote({ ...graph, state: "abandoned" }, why));
       splitters.delete(graph.id);
@@ -227,7 +227,7 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
     });
 
-    const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
+    const split = Effect.fnUntraced(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
       if (outcome === "interrupted") return yield* giveUp(graph, "规划被叫停了");
@@ -253,43 +253,42 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
     });
 
-    const recurrence = (id: string): Effect.Effect<void, ApiError> =>
-      Effect.gen(function* () {
-        let graph = get(id);
-        if (!graph || graph.state !== "running") return;
-        for (const task of startable(graph)) {
-          const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
-          let refusal = "没有能派的帮工";
-          let hired: Session | undefined;
-          if (agent) {
-            const tag: SessionGraph = { id: graph.id, task: task.id };
-            const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
-              worktree: true,
-              taskGraph: tag,
-              base: graph.branch ?? "",
-              trigger: { kind: "task" },
-              issue: taskIssueID(graph.id, task.id),
-            });
-            hired = got.session;
-            refusal = got.refused ?? refusal;
-          }
-          if (!hired) {
-            // Not now: it waits, and is tried again when a session finishes or leaves.
-            const note = "「" + task.title + "」先等着：" + refusal;
-            if (graph.note !== note) yield* putSystem(withNote(graph, note));
-            return;
-          }
-          const session = hired.id;
-          graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
-          const saved = yield* Effect.result(putSystem(graph));
-          if (saved._tag === "Failure") {
-            yield* dismiss(session);
-            return yield* Effect.fail(saved.failure);
-          }
+    const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
+      let graph = get(id);
+      if (!graph || graph.state !== "running") return;
+      for (const task of startable(graph)) {
+        const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
+        let refusal = "没有能派的帮工";
+        let hired: Session | undefined;
+        if (agent) {
+          const tag: SessionGraph = { id: graph.id, task: task.id };
+          const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
+            worktree: true,
+            taskGraph: tag,
+            base: graph.branch ?? "",
+            trigger: { kind: "task" },
+            issue: taskIssueID(graph.id, task.id),
+          });
+          hired = got.session;
+          refusal = got.refused ?? refusal;
         }
-      });
+        if (!hired) {
+          // Not now: it waits, and is tried again when a session finishes or leaves.
+          const note = "「" + task.title + "」先等着：" + refusal;
+          if (graph.note !== note) yield* putSystem(withNote(graph, note));
+          return;
+        }
+        const session = hired.id;
+        graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
+        const saved = yield* Effect.result(putSystem(graph));
+        if (saved._tag === "Failure") {
+          yield* dismiss(session);
+          return yield* Effect.fail(saved.failure);
+        }
+      }
+    });
 
-    const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
+    const taskFailed = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
       yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
       yield* tellOrchestrator(
@@ -304,7 +303,7 @@ export const make = (options: TaskOptions = {}) =>
       );
     });
 
-    const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
+    const sendBack = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
       if (task.tries >= autoRetries) return yield* taskFailed(graph, task, why);
       yield* put(
         withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 })),
@@ -315,29 +314,28 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
-    const verified = (graph: TaskGraph, task: Task, cwd: string): Effect.Effect<Verification> =>
-      Effect.gen(function* () {
-        const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
-        let changed: string[] = [];
-        if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
-          const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-          if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
-          changed = files.success;
-        }
-        if (isAcceptance(task) && task.check) {
-          if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
-          return { frozen: changed };
-        }
-        const touched = frozenTouched(graph, task, changed);
-        if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
-        for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
-          const ran = yield* projects.run(cwd, check);
-          if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
-        }
-        return { frozen: [] };
-      });
+    const verified = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, cwd: string): Effect.fn.Return<Verification> {
+      const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
+      let changed: string[] = [];
+      if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
+        const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
+        if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
+        changed = files.success;
+      }
+      if (isAcceptance(task) && task.check) {
+        if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
+        return { frozen: changed };
+      }
+      const touched = frozenTouched(graph, task, changed);
+      if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
+      for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
+        const ran = yield* projects.run(cwd, check);
+        if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
+      }
+      return { frozen: [] };
+    });
 
-    const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
+    const taskDone = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
       if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
       const target = graph.branch;
@@ -350,7 +348,7 @@ export const make = (options: TaskOptions = {}) =>
           (place) =>
             Effect.gen(function* () {
               verification = yield* verified(graph, task, place.cwd);
-              if (verification.rejected) return yield* Effect.fail(MergeFailure.check(verification.rejected.why));
+              if (verification.rejected) return yield* Effect.fail(MergeFailure.ofCheck(verification.rejected.why));
               return yield* projects.mergeInto(place, target);
             }),
           "helper",
@@ -385,7 +383,7 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const taskEnded = Effect.fn("Tasks.taskEnded")(function* (graph: TaskGraph, task: Task, session: Session, outcome: string, summary: string) {
+    const taskEnded = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, session: Session, outcome: string, summary: string) {
       if (outcome === "completed") return yield* taskDone(graph, task, session.id, summary);
       if (outcome === "failed") return yield* sendBack(graph, task, session.id, retryText(task), summary);
       if (graph.state !== "running") return;
@@ -426,7 +424,7 @@ export const make = (options: TaskOptions = {}) =>
         }).pipe(Effect.catch((e) => notice("warn", reasonOf(e)))),
       );
 
-    const resumeWorking = Effect.fn("Tasks.resumeWorking")(function* (id: string) {
+    const resumeWorking = Effect.fnUntraced(function* (id: string) {
       for (const task of get(id)?.tasks ?? []) {
         if (task.state !== "working") continue;
         const graph = get(id);
@@ -442,15 +440,15 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from = "") {
-      const branch = "vibevalley/task-" + graph.id + "-" + Date.now().toString(36);
+    const openBranch = Effect.fnUntraced(function* (graph: TaskGraph, from = "") {
+      const branch = "vibevalley/task-" + graph.id + "-" + (yield* Clock.currentTimeMillis).toString(36);
       yield* projects.openBranch(graph.project, branch, from).pipe(Effect.mapError((e) => refused(e.message)));
       return branch;
     });
 
-    const edited = Effect.fn("Tasks.edited")(function* (id: string, change: (g: TaskGraph) => EditResult, by: GraphActor) {
+    const edited = Effect.fnUntraced(function* (id: string, change: (g: TaskGraph) => EditResult, by: GraphActor) {
       const result = change(yield* need(id));
-      if (!result.ok) return yield* Effect.fail(refused(result.problem));
+      if (!result.ok) return yield* refused(result.problem);
       yield* put(result.graph, by);
       return "改好了";
     }, lock.withPermits(1));
@@ -472,16 +470,16 @@ export const make = (options: TaskOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(yield* live.news, (n) => (n._tag === "hired" ? Effect.void : follow(n))));
 
-    const shape: TaskShape = {
+    const shape = Tasks.of({
       graphs: () => graphsOf(core.state()),
       comeBack,
       split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
         const where = project.trim();
-        if (!goal.trim()) return yield* Effect.fail(refused("没说要做什么"));
-        if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：项目是工作目录下的一个文件夹"));
+        if (!goal.trim()) return yield* refused("没说要做什么");
+        if (!where) return yield* refused("没说在哪个项目里做：项目是工作目录下的一个文件夹");
         const all = yield* candidates;
         const chosen = chooseAgent(all, "规划 计划 拆分 " + goal, agent, "");
-        if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来拆计划", [lookIn.agent]));
+        if (!chosen) return yield* refused("没有能派的帮工来拆计划", [lookIn.agent]);
         const id = yield* issues.nextTaskId();
         const graph: TaskGraph = {
           id,
@@ -491,7 +489,7 @@ export const make = (options: TaskOptions = {}) =>
           state: "splitting",
           tasks: [],
           parallel: defaultParallel,
-          createdAt: Date.now(),
+          createdAt: yield* Clock.currentTimeMillis,
         };
         yield* put(graph, by);
         const hired = yield* work.hire(
@@ -507,7 +505,7 @@ export const make = (options: TaskOptions = {}) =>
         if (!hired.session) {
           const reason = hired.refused || "没派出去";
           yield* put(withNote({ ...graph, state: "abandoned" }, "规划的帮工派不出去：" + reason), by);
-          return yield* Effect.fail(refused(reason));
+          return yield* refused(reason);
         }
         splitters.set(graph.id, hired.session.id);
         return `${hired.session.name} 去看代码、拆计划了（${graph.id}）。拆好了会放在「计划」里，你看过再开工。`;
@@ -517,10 +515,10 @@ export const make = (options: TaskOptions = {}) =>
         const session = sessionOf(state, sessionId);
         const issue = session?.issue ? (state.issues ?? []).find((t) => t.id === session.issue) : undefined;
         const why = issueSplitRefusal(session, issue);
-        if (why) return yield* Effect.fail(refused(why));
+        if (why) return yield* refused(why);
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);
-        if (problems.length > 0) return yield* Effect.fail(refused("步骤有问题，改好再拆：\n- " + problems.join("\n- ")));
+        if (problems.length > 0) return yield* refused("步骤有问题，改好再拆：\n- " + problems.join("\n- "));
         let graph: TaskGraph = {
           id: issue!.id,
           title: title.trim() || issue!.title,
@@ -548,7 +546,7 @@ export const make = (options: TaskOptions = {}) =>
           case "start": {
             if (graph.state !== "draft") return yield* not();
             const problems = graphProblems(graph.tasks);
-            if (problems.length > 0) return yield* Effect.fail(refused(problems[0]!));
+            if (problems.length > 0) return yield* refused(problems[0]!);
             const branch = yield* openBranch(graph);
             yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
               Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但开工状态没能保存：${reasonOf(e)}`)),
@@ -589,7 +587,7 @@ export const make = (options: TaskOptions = {}) =>
               const why =
                 f.kind === "conflict" ? "合进 " + f.base + " 会冲突（" + f.files.join("、") + "）：" + f.base + " 在这期间变了" : f.reasonText || f.message;
               yield* put(withNote(graph, "没合进去：" + why), by);
-              return yield* Effect.fail(refused("没合进去：" + why + "。计划分支 " + graph.branch + " 留着"));
+              return yield* refused("没合进去：" + why + "。计划分支 " + graph.branch + " 留着");
             }
             yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(
               Effect.mapError((e) => refused(`计划分支已合进主分支，但完成状态没能保存：${reasonOf(e)}`)),
@@ -598,16 +596,16 @@ export const make = (options: TaskOptions = {}) =>
             return "计划「" + graph.title + "」合进去了：" + merged.success;
           }
         }
-        return yield* Effect.fail(refused(`不认识 ${String(action satisfies never)} 这个动作`));
+        return yield* refused(`不认识 ${String(action satisfies never)} 这个动作`);
       }, lock.withPermits(1)),
       taskAct: Effect.fn("Tasks.taskAct")(function* (id, taskId, action, by) {
         const graph = yield* need(id);
         const task = taskOf(graph, taskId);
-        if (!task) return yield* Effect.fail(missing(`计划里没有「${taskId}」这一步`, [lookIn.graph]));
-        if (graph.state !== "running" && graph.state !== "paused") return yield* Effect.fail(refused("计划" + graphStateText[graph.state], graphNext(graph)));
+        if (!task) return yield* missing(`计划里没有「${taskId}」这一步`, [lookIn.graph]);
+        if (graph.state !== "running" && graph.state !== "paused") return yield* refused("计划" + graphStateText[graph.state], graphNext(graph));
         switch (action) {
           case "retry": {
-            if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试", stepNext(graph, task)));
+            if (task.state !== "failed") return yield* refused("「" + task.title + "」没有失败，不用重试", stepNext(graph, task));
             const session = task.session ? live.sessionOf(task.session) : undefined;
             if (session && !isBusy(session)) {
               // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
@@ -627,8 +625,9 @@ export const make = (options: TaskOptions = {}) =>
           }
           case "skip": {
             if (task.state !== "waiting" && task.state !== "failed")
-              return yield* Effect.fail(
-                refused(task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了", stepNext(graph, task)),
+              return yield* refused(
+                task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了",
+                stepNext(graph, task),
               );
             let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));
             if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
@@ -638,14 +637,14 @@ export const make = (options: TaskOptions = {}) =>
             return "跳过了「" + task.title + "」，后面的步骤照常开工";
           }
         }
-        return yield* Effect.fail(refused(`不认识 ${String(action satisfies never)} 这个动作`));
+        return yield* refused(`不认识 ${String(action satisfies never)} 这个动作`);
       }, lock.withPermits(1)),
       editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
       removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),
       previewRemoveTask: Effect.fn("Tasks.previewRemoveTask")(function* (id, task) {
         const graph = yield* need(id);
         const result = removeTask(graph, task);
-        if (!result.ok) return yield* Effect.fail(refused(result.problem));
+        if (!result.ok) return yield* refused(result.problem);
         const gone = taskOf(graph, task)!;
         const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => `「${n.title}」`);
         return {
@@ -682,11 +681,11 @@ export const make = (options: TaskOptions = {}) =>
       }),
       changes: Effect.fn("Tasks.changes")(function* (id) {
         const graph = yield* need(id);
-        if (!graph.branch) return yield* Effect.fail(refused("计划「" + graph.title + "」还没开工，没有分支"));
+        if (!graph.branch) return yield* refused("计划「" + graph.title + "」还没开工，没有分支");
         return yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
-    };
+    });
     return shape;
   });
 

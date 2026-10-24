@@ -80,7 +80,7 @@ const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = te
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],
     repos: ["demo", "notes"],
-    ...(patrolNow ? { patrolNow } : {}),
+    ...(patrolNow ? { clock: patrolNow } : {}),
   });
   return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };

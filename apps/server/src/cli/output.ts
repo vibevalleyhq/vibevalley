@@ -3,7 +3,7 @@
 // failure as JSON with what to do next; the exit code says which kind of failure it was without reading the words.
 // Everything goes through Effect's Stdio, so a test gives the command line its own.
 
-import { Data, Effect, Option, Schema, Stdio, Stream } from "effect";
+import { Effect, Option, Schema, Stdio, Stream } from "effect";
 
 /** Exit codes a script can branch on. */
 export const exit = {
@@ -29,14 +29,14 @@ export interface Next {
 }
 
 /** A command that did not go through, as it is printed: `{"error": {...}}` on stderr. */
-export class Failure extends Data.TaggedError("Failure")<{
-  readonly code: number;
+export class Failure extends Schema.TaggedError<Failure>()("Failure", {
+  code: Schema.Number,
   /** ApiError's tag (Refused, Missing…), the parser's (MissingArgument…), or Unreachable, InvalidJson, Server. */
-  readonly tag: string;
-  readonly text: string;
-  readonly status?: number;
-  readonly next?: readonly Next[];
-}> {}
+  tag: Schema.String,
+  text: Schema.String,
+  status: Schema.optionalKey(Schema.Number),
+  next: Schema.optionalKey(Schema.Array(Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) }))),
+}) {}
 
 const line = (to: "stdout" | "stderr", text: string) =>
   Effect.flatMap(Stdio.Stdio, (io) => Stream.run(Stream.make(text + "\n"), io[to]({ endOnDone: false }))).pipe(Effect.orDie);

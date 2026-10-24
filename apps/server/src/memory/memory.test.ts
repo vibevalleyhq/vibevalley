@@ -3,12 +3,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { remember, rewriteMemory } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { orchestratorHome, Memories, make } from "./memory.ts";
@@ -18,6 +19,7 @@ const world = (config = testConfig()) =>
   Layer.effect(Memories, make()).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),
+    Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, config)),
   );
@@ -210,6 +212,8 @@ describe("memory", () => {
   it.effect("what is shown fading is what goes", () =>
     Effect.gen(function* () {
       const m = yield* Memories;
+      // The test clock starts at 0: what is kept now is newer than the old rows only once the clock is past them.
+      yield* TestClock.setTime(Date.UTC(2026, 9, 24));
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
         if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "agent", created_at: 1 });

@@ -21,6 +21,8 @@ import type {
 } from "@vibevalley/protocol";
 import { closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
+import { Result, Schema } from "effect";
+import { lines, linesOf, text as textField } from "../base/json.ts";
 import { clip } from "../base/text.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
@@ -109,18 +111,9 @@ export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map(
 /** The questions with words in them. */
 export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
-function linesOf(v: unknown, field: string): string[] {
-  if (v === undefined || v === null) return [];
-  if (typeof v === "string") return [v];
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v as string[];
-  throw new Error(`${field}：要是字符串或字符串的数组`);
-}
-
-function textOf(v: unknown, field: string): string {
-  if (v === undefined || v === null) return "";
-  if (typeof v === "string") return v;
-  throw new Error(`${field}：要是字符串`);
-}
+/** A draft as a helper writes it in its json block. */
+const RefinementBlock = Schema.fromJsonString(Schema.Struct({ title: textField, why: textField, todo: lines, criteria: lines, notDoing: lines, files: lines }));
+const readRefinement = Schema.decodeUnknownResult(RefinementBlock);
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
@@ -130,22 +123,20 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
   if (blocks.length === 0) return { problem: "没找到草稿：要用一个 json 代码块给出" };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
-    let d: IssueRefinement;
-    try {
-      const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
-      d = {
-        title: textOf(raw.title, "title"),
-        why: textOf(raw.why, "why"),
-        todo: linesOf(raw.todo, "todo"),
-        criteria: linesOf(raw.criteria, "criteria"),
-        notDoing: linesOf(raw.notDoing, "notDoing"),
-        files: linesOf(raw.files, "files"),
-      };
-    } catch (e) {
-      problem = "json 读不了：" + (e instanceof Error ? e.message : String(e));
+    const read = readRefinement(blocks[i]!);
+    if (Result.isFailure(read)) {
+      problem = "json 读不了：" + read.failure.message;
       continue;
     }
+    const raw = read.success;
+    const d: IssueRefinement = {
+      title: raw.title ?? "",
+      why: raw.why ?? "",
+      todo: linesOf(raw.todo),
+      criteria: linesOf(raw.criteria),
+      notDoing: linesOf(raw.notDoing),
+      files: linesOf(raw.files),
+    };
     const title = clip(d.title, 80);
     if (!title) {
       problem = "草稿没有标题";

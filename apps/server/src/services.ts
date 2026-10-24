@@ -9,18 +9,18 @@ import { Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { layer as agent } from "./agent/agent.ts";
 import { type Config, Settings } from "./base/config.ts";
-import { Database } from "./base/db.ts";
+import { Database, DbLayer } from "./base/db.ts";
 import { layer as core } from "./core/core.ts";
 import { layer as channel } from "./channel/chat.ts";
 import { type DocOptions, layer as doc } from "./doc/doc.ts";
 import { type IssueOptions, layer as issue } from "./issue/issue.ts";
 import { layer as memory } from "./memory/memory.ts";
 import { layer as projection } from "./projection/projection.ts";
-import { layer as notice, type NoticeOptions, start as noticeStart } from "./notice/notice.ts";
+import { layer as notice, start as noticeStart } from "./notice/notice.ts";
 import { layer as project, type ProjectHooks, start as projectStart } from "./project/project.ts";
 import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
 import { layer as session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
-import { layer as recurrence, type RecurrenceOptions, start as recurrenceStart } from "./recurrence/recurrence.ts";
+import { layer as recurrence, start as recurrenceStart } from "./recurrence/recurrence.ts";
 import { layer as setting } from "./setting/setting.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
@@ -43,10 +43,8 @@ export interface ServiceOptions {
   readonly project?: ProjectHooks;
   readonly doc?: DocOptions;
   readonly session?: SessionOptionsIn;
-  readonly recurrence?: RecurrenceOptions;
   readonly issue?: IssueOptions;
   readonly task?: TaskOptions;
-  readonly notice?: NoticeOptions;
   readonly orchestrator?: OrchestratorOptions;
   readonly mcp?: McpOptions;
   readonly lan?: LanOptions;
@@ -57,7 +55,14 @@ export interface ServiceOptions {
 /** Platform: Node's services (files, paths, processes), the database, the settings and secrets, the core state (folded by
  * the projection, which reads every module's rules). */
 export const platform = (config: Config) =>
-  Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), Layer.provideMerge(NodeServices.layer), on(projection), on(core), on(setting));
+  Database.pipe(
+    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(NodeServices.layer),
+    on(DbLayer),
+    on(projection),
+    on(core),
+    on(setting),
+  );
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
 export const agents =
@@ -87,7 +92,7 @@ export const collaboration =
 export const issuesBelowTaskGraphs =
   (o: ServiceOptions = {}) =>
   <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(recurrence(o.recurrence)), on(issue(o.issue)));
+    below.pipe(on(recurrence), on(issue(o.issue)));
 
 /** Issues: the issues, their task graphs and recurrences. */
 export const issues =
@@ -96,10 +101,7 @@ export const issues =
     issuesBelowTaskGraphs(o)(below).pipe(on(task(o.task)));
 
 /** Notifications: what in the inbox is news to the owner, and the patrol. */
-export const notifications =
-  (o: ServiceOptions = {}) =>
-  <B, E, R>(below: Layer.Layer<B, E, R>) =>
-    below.pipe(on(notice(o.notice)));
+export const notifications = <B, E, R>(below: Layer.Layer<B, E, R>) => below.pipe(on(notice));
 
 /** Orchestrator: the agent that hands the owner's work to helpers, and its tools. */
 export const orchestrator =
@@ -138,7 +140,7 @@ export const services = (config: Config, options: ServiceOptions = {}) =>
     collaboration(options),
     agentSessions(options),
     issues(options),
-    notifications(options),
+    notifications,
     orchestrator(options),
     gamification,
     gateway(options),

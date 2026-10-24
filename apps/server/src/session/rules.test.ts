@@ -43,7 +43,9 @@ describe("an answer handed back", () => {
     expect(parseAnswer("说不清").problem).toBe("没找到结论：要用一个 json 代码块给出");
     expect(parseAnswer(block({ conclusion: "", evidence: ["a.ts"] })).problem).toBe("结论是空的");
     expect(parseAnswer(block({ conclusion: "猜的", evidence: [] })).problem).toBe("结论没有依据：evidence 至少一条");
-    expect(parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem).toBe("json 读不了：evidence：要是字符串或字符串的数组");
+    // The Schema says which field did not read, and that is what the helper is told to fix.
+    const wrong = parseAnswer(block({ conclusion: "猜的", evidence: [1] })).problem;
+    expect([wrong.startsWith("json 读不了："), wrong.includes('["evidence"]')]).toEqual([true, true]);
   });
   it("a completed report carries it; a failed one does not", () => {
     const said = block({ conclusion: "慢在读配置", evidence: ["clock.ts:1"] });
@@ -299,13 +301,13 @@ describe("shell", () => {
 
 describe("work that does not go in", () => {
   it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
-    const check = notTakenIn(MergeFailure.check("测试没过"), "阿狐", "owner");
+    const check = notTakenIn(MergeFailure.ofCheck("测试没过"), "阿狐", "owner");
     expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
-    const conflict = MergeFailure.conflict("main", ["a.ts", "b.ts"]);
+    const conflict = MergeFailure.ofConflict("main", ["a.ts", "b.ts"]);
     expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
     expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
     expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
-    expect(notTakenIn(MergeFailure.error("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
+    expect(notTakenIn(MergeFailure.ofError("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
   });
 
   it("reads a conflict off a preview", () => {

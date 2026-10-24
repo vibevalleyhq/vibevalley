@@ -5,7 +5,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Context, Effect, Layer } from "effect";
+import { Clock, Context, Effect, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
@@ -99,7 +99,7 @@ export const make = Effect.gen(function* () {
       s = JSON.parse(readFileSync(file, "utf8")) as Stored;
     } catch (e) {
       // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
-      const aside = `${file}.unreadable-${Date.now()}`;
+      const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
       try {
         renameSync(file, aside);
       } catch (moved) {
@@ -139,7 +139,7 @@ export const make = Effect.gen(function* () {
     return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [lookIn.skill]));
   };
 
-  const shape: AgentShape = {
+  const shape = Agents.of({
     agents: () => sendable(),
     all,
     agent: (id) => all().find((a) => a.id === id),
@@ -151,13 +151,13 @@ export const make = Effect.gen(function* () {
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
       if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
-        return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
+        return yield* refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime);
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新档案的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* refused("新档案的 id 要留空；指定 id 请用保存");
       let n = 1;
       while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
       const created = withCast({ ...draft, id: `agent-${n}` });
@@ -177,7 +177,7 @@ export const make = Effect.gen(function* () {
         skill,
       ),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新技能的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* refused("新技能的 id 要留空；指定 id 请用保存");
       const stem =
         draft.name
           .toLowerCase()
@@ -208,7 +208,7 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } })),
         settings,
       ),
-  };
+  });
   return shape;
 });
 

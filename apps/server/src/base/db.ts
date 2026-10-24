@@ -5,7 +5,7 @@
 
 import { PGlite } from "@electric-sql/pglite";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
-import { Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -74,3 +74,36 @@ export function causeMessage(e: unknown): string {
   }
   return said;
 }
+
+/**
+ * The farm's database as the services use it: a generated query (db/generated) run against it. The database is in this
+ * process, so a query that fails is a bug or a full disk, not something a caller handles: run makes it a defect; attempt
+ * keeps the failure for the few callers that log it and go on.
+ */
+export class Db extends Context.Service<
+  Db,
+  {
+    readonly run: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
+    readonly attempt: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A, E>;
+    /** The one row, or undefined: a query that finds none (or fails) is none. */
+    readonly one: <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
+    /** work in one transaction; the database's own failure is a defect, work's other failures stay. */
+    readonly inTx: <A, E>(work: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  }
+>()("vibevalley/Db") {}
+
+export const DbLayer = Layer.effect(
+  Db,
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const attempt = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(query, SqlClient.SqlClient, sql);
+    const run = <A, E>(query: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(attempt(query));
+    return Db.of({
+      run,
+      attempt,
+      one: (query) => Effect.map(run(Effect.option(query)), Option.getOrUndefined),
+      inTx: <A, E>(work: Effect.Effect<A, E>) =>
+        sql.withTransaction(work).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>,
+    });
+  }),
+);

@@ -82,28 +82,27 @@ function usageOf(e: CliError.CliError): Failure {
 
 /** Runs the command line on args and gives back its exit code. Whatever effect/cli prints (help, version, completions)
  * is held and goes to stdout when asked for, to stderr when it came with a mistake: stdout stays the result. */
-export const run = (args: readonly string[]) =>
-  Effect.gen(function* () {
-    const held: string[] = [];
-    const hold = (...a: unknown[]) => void held.push(a.map(String).join(" "));
-    const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
-    const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
-      Effect.suspend(() => {
-        const text = held.join("\n").replace(/\n+$/, "");
-        held.length = 0;
-        return text ? to(text) : Effect.void;
-      });
-    return yield* Command.runWith(root, { version, renderErrors: false })(args).pipe(
-      Effect.provideService(Console.Console, console_),
-      Effect.andThen(flush(out)),
-      Effect.as(exit.ok as number),
-      Effect.catch((e: unknown) => {
-        if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.as(flush(out), exit.ok as number);
-        const f = e instanceof Failure ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
-        return flush(err).pipe(Effect.andThen(printFailure(f)), Effect.as(f.code));
-      }),
-    );
-  });
+export const run = Effect.fnUntraced(function* (args: readonly string[]) {
+  const held: string[] = [];
+  const hold = (...a: unknown[]) => void held.push(a.map(String).join(" "));
+  const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
+  const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
+    Effect.suspend(() => {
+      const text = held.join("\n").replace(/\n+$/, "");
+      held.length = 0;
+      return text ? to(text) : Effect.void;
+    });
+  return yield* Command.runWith(root, { version, renderErrors: false })(args).pipe(
+    Effect.provideService(Console.Console, console_),
+    Effect.andThen(flush(out)),
+    Effect.as(exit.ok as number),
+    Effect.catch((e: unknown) => {
+      if (CliError.isCliError(e) && e._tag === "ShowHelp" && e.errors.length === 0) return Effect.as(flush(out), exit.ok as number);
+      const f = e instanceof Failure ? e : CliError.isCliError(e) ? usageOf(e) : new Failure({ code: exit.other, tag: "Error", text: String(e) });
+      return flush(err).pipe(Effect.andThen(printFailure(f)), Effect.as(f.code));
+    }),
+  );
+});
 
 /** The process ends with the command's code; Ctrl+C interrupts it, and its streams and requests are let go of first. */
 const codeOf = (end: Exit.Exit<unknown, unknown>) =>

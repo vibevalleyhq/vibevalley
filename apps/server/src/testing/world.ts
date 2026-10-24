@@ -18,6 +18,7 @@ import { layer as mcp } from "../mcp/mcp.ts";
 import { testConfig } from "./layers.ts";
 import { repo } from "./git.ts";
 import { installedOnly } from "./helper.ts";
+import { clockLayer } from "./clock.ts";
 
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
@@ -29,12 +30,10 @@ export interface WorldOptions {
   /** Projects made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
   readonly stallMs?: number;
-  /** The recurrences' clock. */
-  readonly now?: () => number;
+  /** What now is for the whole farm (Effect's Clock); the real time when absent. */
+  readonly clock?: () => number;
   /** What a runtime's account says of its quota or balance; none when absent. */
   readonly usage?: () => AccountUsage | null;
-  /** The patrol's clock. */
-  readonly patrolNow?: () => number;
   /** Who an MCP token names; the sessions' tokens when absent. */
   readonly who?: (token: string) => string;
 }
@@ -52,21 +51,16 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
     project: { gh: noGitHub, ...options.projects },
     ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
-    ...(options.now ? { recurrence: { now: options.now } } : {}),
     issue: { background: false },
   };
-  return platform(config).pipe(agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
+  const below = options.clock ? platform(config).pipe(Layer.provideMerge(clockLayer(options.clock))) : platform(config);
+  return below.pipe(agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
 }
 
 /** The farm up to its notifications, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds
  * it). */
 export function world(options: WorldOptions = {}) {
-  return worldBelowTasks(options).pipe(
-    on(task()),
-    on(notice(options.patrolNow ? { now: options.patrolNow } : {})),
-    on(tool),
-    on(mcp(options.who ? { who: options.who } : {})),
-  );
+  return worldBelowTasks(options).pipe(on(task()), on(notice), on(tool), on(mcp(options.who ? { who: options.who } : {})));
 }
 
 const on =
