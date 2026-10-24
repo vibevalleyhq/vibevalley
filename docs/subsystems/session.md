@@ -87,9 +87,11 @@
 2. 想起这个档案的记性（「【你记得的】」一段，和活之间隔 `jobBreak`）。
 3. `Runtimes.resolve` 定农机、模型、安装；`spawn` 开 oar 会话。开不成就放回 worktree、作废令牌，报「派不出去」。
 4. 调 `SendOptions.hiring`（工单服务记下既有工单和 Session 的关联）；失败就关闭会话，按项目的释放回执交代现场是否保留，不上地。关闭也失败时，执行模块保留这次未发布的启动分配，继续占位置，拒绝再派同一张工单和清理它的工作区；关机时再尽力关闭。工单已经在开 worktree 以前写好，这里不补建。
-5. 写 `session` 表一行，施加 `hired`，接上事件（`Subagent` 的 follow）和没动静的计时，第一次 run 的触发默认是 `issue`。
+5. 写 `session` 表一行，接上事件（`Subagent` 的 follow）和没动静的计时，由监听接管分配后施加 `hired`，第一次 run 的触发默认是 `issue`。`attach` 等接管时已有的初始事件折完才返回，调用方不会读到接管前的核心状态。
 
 从取得 `Subagents` 到发布帮工、叫醒和离场，执行只用一份资源分配（`Allocation`）。每个真正返回的 oar 会话立即登记，`dispose` 的成功或失败只认同一次调用；启动、第一句话、工单关联或日志登记失败都经同一处关闭。只有 `Subagents` 和取得的全部会话都确认释放，才交回现场。接回旧会话失败时也先完成这次释放，才能换新会话；不能停止的不会再尝试另开一个。未发布分配与已发布帮工按同一个 Session id 算位置，不重复占位。
+
+首次派出的启动由 `Opening` 拥有：从 worktree、想起记性、开会话到工单关联、日志和接监听，普通拒绝、defect 和中断都走同一个不可中断、幂等的 `cleanupOpening`。晚到的 oar 会话也要等回来再释放；清理失败保留分配、工作区和原退出分类，不另开一个写入方。`hands` 和事件监听先接好，再发布 `hired`；只有这条事实成功提交才转移启动清理。尚未提交就中断时，监听、分配、令牌、工作区都释放；已经提交后，资源归正常 Session 生命周期。
 
 **一次 run**：农机开一轮时施加 `run`、写 `session_run` 一行、日志写 `run/start`；之后每个 oar 事件经 `facts.ts` 变成事实（`doing` 是头顶的气泡，只在变了时施加；`retry`；`spent`）和日志。汇报（`SubagentReport`）经 `readReport` 读成 `report` 事实，带上 run 的 id、这一轮的花费和问主人的问题，`session_run` 记上结果、摘要和花费，日志写 `run/end`，交给记性记下这一轮，20 秒后读一次额度。oar 的 follow 在一个消费者上按顺序交来事件和汇报，汇报不越过它那条记录里的事件：claude 在 `turn_ended` 那一帧里才报用量，汇报照样带得上这一轮的花费。农机进程在干活时退出，记成一次失败的汇报并提醒。
 
@@ -131,6 +133,10 @@
 
 **管家的 run**（`execution.ts`）：管家跑在进程内的 agent 上，不占地。一个实际的 agent loop 是一次 run：第一次真正消费输入时开始，agent 结束时终结（成功 `completed`、模型失败 `failed`、停下 `interrupted`）。同一个 loop 消费了几张工单，`session_run.issue` 是第一张，`session_run_issue` 记全部；还在队列里的输入不归进 run。终结写库失败时这次 run 待终结：重试保持原结果，新输入等它终结成功才开新 run；`currentRun` 不把待终结的当成在干。工单只在收到成功终结（`finishedRuns`）后关上。输入带的摘要消息在真正消费时记进 `Run.heard`，再经 `inputsConsumed` 交给频道提交回执。启动失败另记一次 failed 的 run。
 
+`AgentExecution` 的可复用操作用 `Effect.fn({ self: this })` 绑定，状态变化在 Effect 真正运行时发生；只构造 `close()` 不运行不会提前关闭执行或改写结局。
+
+**进程内 agent 的输入生命周期**（`host.ts`）：每条输入带一个 `generation` 和只结束一次的记录。`stop` 进入下一代、结束旧 caller 并停 Brain，停止前尚未交付的 Build 不能再 `send` / `later`；`close` 拒绝新的 `submit` / `resume`，等正在启动的 Brain 和输入串行链落定，再关 Brain、事件队列和 `AgentExecution`。Brain 起不来的 failed run 也进入这条串行链：关闭前开始的登记先写完，关闭后的旧输入不再登记。`Caller.words` 每轮等待都在 `finally` 里移除 abort listener；提前 `return()` 先结束并唤醒当前等待，正常结束和 abort 也不累积监听。
+
 ## 和谁打交道
 
 - **工单（`issue`）**：经 `send` 派活、经 `deliver` 带话、经 `handOver` 合并（合并方式由工单给：`projects.merge`、提 PR 并存下回执、结束 PR）、经 `dismiss` 收工；订阅 `news`（`SessionNews`：`hired`、`reported` 带着那一刻的 Session、`left`，按施加的顺序）：交回带来结果和问题，走了让工单判断要不要关上；订阅 `finishedRuns` 关上管家答完的工单。别的模块要看地里的帮工经 `sessionOf`、`presentSessions`，不直接读核心状态里的 `sessions`。`issue.history` 一次返回工单、它真实的 Session（在地里的从核心状态，走了的从 `session` 表）和缺失记录的号（`missingSessions`），查库失败报错，页面对缺失的显示「记录缺失」，不补造歇着的帮工。
@@ -169,8 +175,9 @@
 
 - `session/rules.test.ts`（纯函数，不开会话）：一轮从活开始、花费从上一次的累计算、没动静以一句话结束而不是用量、重试和模型失败和进程退出说人话、子 agent 的步骤说是谁的、摘要是结论、做完和失败的一轮怎么读、给主人的问题、工作区的上限、Session 的编号、挑档案。
 - `session/journal.test.ts`：日志存下、放开以后从盘上读回、接着原来的写；子 agent 的步骤挂在它的调用下面；长出来的一步只推一次、写下；同一步的内容版本递增、落盘后保留；只追加。
-- `session/session.test.ts`（oar 的 `scriptedRuntime` 扮演帮工、真的 git 仓库）：派出去、干一轮、汇报、带一句话、合并；要了的一轮在开始干之前占着位置。
+- `session/session.test.ts`（oar 的 `scriptedRuntime` 扮演帮工、真的 git 仓库）：派出去、干一轮、汇报、带一句话、合并；要了的一轮在开始干之前占着位置；spawn 和工单关联中断时释放晚到的会话、工作区和令牌，发布锁尚未取得时中断也清理全部启动资源，defect 不改成拒绝；慢 SSE 读者恢复后仍能收到真实 oar 汇报。
 - `src/flows/work.test.ts`（照字眼干活的帮工、真的 git 仓库）：派出去、干活、汇报、回家；被拒的原因；合并后清掉 worktree、记进账本；重启后歇着回来、叫得醒；每一步都在轨迹里；失败说原因；没动静被标出来（开工就不出声也算）；合并前看改动；冲突的分支留到解决；项目和农机的上限；两个同时派到新项目；开口、结束、令牌随它走；每次 run 记着为什么开、重启打断的记成 `interrupted`；到场时工单已经在；走了的是一行。`flows/reach.test.ts`：帮工的 `/mcp` 跟着服务端实际的地址。
-- `session/execution.test.ts`：管家的一个 loop 是一次 run、关联它消费的全部工单，失败和叫停怎么说；终结没写成的 run 在下一次开始前先终结。
+- `session/execution.test.ts`：管家的一个 loop 是一次 run、关联它消费的全部工单，失败和叫停怎么说；终结没写成的 run 在下一次开始前先终结；只构造而不运行 `close()` 不改状态；`Caller.words` 的 abort listener 不随空等累积，空等待中的提前 `return()` 也会醒来并清掉监听。
+- `session/host.test.ts`：stop / close 后旧 Build 不交付，新代际仍能工作，关闭后不接受输入；多个 pending caller 只结束一次；关闭会等已经开始的失败 run 登记完。
 - `runtime/runtime.test.ts`：接受的探测拥有它读用量的那个安装、慢的不覆盖新的；适配器的拒绝挡住档案；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；昨天的花费不挡今天；存不上的设置被拒；`resolve` 管默认、覆盖和模型的退回；价目分开算缓存、按人民币；dsh 和 pi 的价格和余额。`runtime/rules.test.ts`：黄金数据和额度的说法。`runtime/dsh.test.ts`：DeepSeek Harness 的模型和思考强度。
 - 页面：`apps/web/src/rules/rounds.test.ts`（日志怎么按 run 分段、瀑布图）。

@@ -62,7 +62,7 @@
 
 - 交给管家的话里，不是主人说的超过 800 字（UTF-16，`orchestratorLineMax`）只给前 800 字，后面写明这条有多少字、用 `read_chat` 读哪里（`#频道` 或 `#频道:消息号`）；主人的话照原样给。`read_chat` 给全文，`check` 给帮工上一轮汇报的结尾 2000 字。
 - 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`answerer("phone")`）带一句口语、一两句、先说结论的提示，回答边长边念。
-- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。
+- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放。请求体先经嵌套 Schema 解码 `model`、`stream`、`messages` 和 content parts；`null` 消息、错误的字段类型等坏输入在调用回答器以前回 OpenAI 形状的 400 `invalid_request_error`。`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。
 
 **说话**：管家说的字边长边进它回话的那个频道（至多每 120 毫秒推一次），一句说完写成定稿；空的不发。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
 
@@ -76,7 +76,7 @@
 4. 切点在用户的话开头，最近 12 条（`keepRecent`）原样留下，再往前挪到留下至少 3 条带字的 `orchestrator` 消息（`keepSaid`）；挪到头或留下的超过预算一半，就不管这一条。
 5. 压缩之后重拼开头，下一条输入的现状带全文。生成失败只留下「摘要没生成出来，原文见归档」。
 
-**叫停**（`orchestrator.stop`，`vibevalley orchestrator stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。
+**叫停**（`orchestrator.stop`，`vibevalley orchestrator stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。宿主进入下一代，旧 Build 不得晚到再交付；关闭后不再接受新输入，具体终态见[帮工](docs/subsystems/session.md#怎么走)。监听 fiber 先于宿主 finalizer 停止。
 
 **重启后接着做**：服务端停下（`close`）时还在跑的一轮，取消造出的消息不写进对话文件，文件停在被打断的地方，和崩溃一样。开机时 `brain.SessionUnfinished(orchestrator.jsonl)` 看按 `replay` 读出的最后一条：是用户的话、`custom`、没被叫停的工具结果，或带工具调用的回答，就是没做完。没做完、有钥匙，就在后台起大脑、`Resume(30 分钟)`：
 
@@ -137,6 +137,6 @@
 - `orchestrator/rules.test.ts`：现状的差异（大半变了就给全文）；截别人的长话、不截主人的；用量那一行字；每个来源的开头；巡查的说法和黄金数据。
 - 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`npm run evals`，照 [verify-orchestrator-evals](.agents/skills/verify-orchestrator-evals/SKILL.md)）。
 - `tool/tool.test.ts`：管家每个工具的参数对照 `testdata/tool_schemas.json`；钱的说法；轨迹里工具的名字和说法。
-- `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束、照 OpenAI 的样子拒绝）、`tools.test.ts`。
+- `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束；`null` 消息和 part、错误的 model / stream 类型都在调用回答器前回 400，合法的 string / parts 仍可回答）、`tools.test.ts`。
 - `agent/agent.test.ts`：管家是内置的档案。
 - 页面：`apps/web/test/orchestrator.spec.ts`（记性、轨迹、「这一轮做错了」、旧账、声音）；`farm-chat.spec.ts`（管家回答田头的话）。

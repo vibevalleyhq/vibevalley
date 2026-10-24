@@ -8,6 +8,7 @@ import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Lan } from "./lan.ts";
 import { until } from "../testing/until.ts";
+import { noGitHub } from "../testing/world.ts";
 
 const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
@@ -50,6 +51,30 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
     expect(paired.key).not.toBe("");
     return paired;
   });
+
+describe("test configuration", () => {
+  it("uses free ports by default and keeps explicit overrides", () => {
+    const config = testConfig();
+    expect([config.port, config.lan.port, config.voice.line.port]).toEqual([0, 0, 0]);
+    const changed = testConfig({ port: 9000, lan: { port: 9001 }, voice: { id: "voice", line: { port: 9002, url: "https://line.example.com" } } });
+    expect([changed.port, changed.lan.port, changed.voice.line.port]).toEqual([9000, 9001, 9002]);
+    expect([changed.voice.id, changed.voice.line.url]).toEqual(["voice", "https://line.example.com"]);
+  });
+
+  it.live("builds two whole apps at once without a port conflict", () =>
+    Effect.gen(function* () {
+      const addresses: string[] = [];
+      const listening = (address: string) => Effect.sync(() => void addresses.push(address));
+      const first = testConfig();
+      const second = testConfig();
+      const isolated = { runtime: { background: false }, project: { gh: noGitHub }, orchestrator: { listen: false }, issue: { background: false } } as const;
+      yield* Layer.build(app(first, first.port, listening, isolated));
+      yield* Layer.build(app(second, second.port, listening, isolated));
+      expect(addresses).toHaveLength(2);
+      expect(addresses[0]).not.toBe(addresses[1]);
+    }).pipe(Effect.scoped),
+  );
+});
 
 describe("lan access", () => {
   it.live("is shut until opened", () =>

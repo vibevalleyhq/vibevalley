@@ -4,7 +4,7 @@ import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { inbox } from "../notice/inbox.ts";
 import { clip } from "../base/text.ts";
 import { graphOf, parseSplit, taskBrief, taskIssueID } from "./rules.ts";
-import { Effect, Stream } from "effect";
+import { Effect, Exit, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
@@ -496,6 +496,41 @@ describe("task graphs", () => {
     ),
   );
 
+  it.live("a scheduled state that cannot be saved dismisses its hired session and preserves the defect", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const graph = {
+          id: "p901",
+          title: "调度保存失败",
+          goal: "",
+          project: "test",
+          state: "paused",
+          parallel: 1,
+          createdAt: 0,
+          tasks: [{ id: "a", title: "步骤", brief: "做事", needs: [], state: "waiting", tries: 0 }],
+        } as TaskGraph;
+        yield* f.issues.putTask(graph);
+        yield* sql
+          .unsafe(
+            `create function fail_scheduled_save() returns trigger language plpgsql as $$ begin if new.task is not null and (new.task::jsonb)->>'state' = 'working' then raise exception 'injected scheduled save failure'; end if; return new; end $$`,
+          )
+          .pipe(Effect.orDie);
+        yield* sql
+          .unsafe(`create trigger fail_scheduled_save before insert or update on issue for each row execute function fail_scheduled_save()`)
+          .pipe(Effect.orDie);
+        const exit = yield* Effect.exit(f.tasks.act(graph.id, "resume", "user"));
+        expect(Exit.hasDies(exit)).toBe(true);
+        expect(Exit.hasFails(exit)).toBe(false);
+        expect(f.work.n).toBe(1);
+        expect(f.core.session("w1")).toBeUndefined();
+        const after = graphOf(f.core.state(), graph.id)!;
+        expect([after.state, after.tasks[0]!.state]).toEqual(["running", "waiting"]);
+        yield* sql.unsafe(`drop trigger fail_scheduled_save on issue`).pipe(Effect.orDie);
+      }),
+    ),
+  );
+
   for (const action of ["pause", "resume", "abandon", "retry", "skip", "edit"] as const)
     it.live(`a graph that cannot be saved does nothing more: ${action}`, () =>
       run((f) =>
@@ -527,7 +562,9 @@ describe("task graphs", () => {
               : action === "edit"
                 ? f.tasks.editTask(graph.id, "a", { title: "changed" }, "user")
                 : f.tasks.act(graph.id, action, "user");
-          expect(yield* Effect.flip(done)).toMatchObject({ reason: expect.stringContaining("injected write failure") });
+          const exit = yield* Effect.exit(done);
+          expect(Exit.hasDies(exit)).toBe(true);
+          expect(Exit.hasFails(exit)).toBe(false);
           expect({ told: f.work.told.size, hired: f.work.n, left: f.core.session("w900") !== undefined }).toEqual(before);
           const after = graphOf(f.core.state(), graph.id)!;
           expect([after.state, after.title, after.tasks[0]!.state]).toEqual([graph.state, graph.title, "failed"]);

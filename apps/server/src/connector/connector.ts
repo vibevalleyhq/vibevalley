@@ -18,7 +18,7 @@ import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
 import { newId } from "../base/ids.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, optional } from "../base/db.ts";
 import { Channels } from "../channel/chat.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
@@ -276,7 +276,7 @@ export const make = (options: ConnectorOptions = {}) =>
       };
 
       const reload = async () => {
-        const row = await run(Effect.option(accountQ.connectorAccount({ connector: id })));
+        const row = await run(optional(accountQ.connectorAccount({ connector: id })));
         if (Option.isNone(row)) {
           account = undefined;
           return;
@@ -502,9 +502,7 @@ export const make = (options: ConnectorOptions = {}) =>
       };
       // An SDK handler may outlive receive: acceptance is sealed and in-flight writes joined before it returns.
       const receive = async (signal: AbortSignal, secrets: Record<string, string>) => {
-        const cursor = (await run(Effect.option(accountQ.connectorAccount({ connector: id }))).catch(() => undefined))?.pipe((o) =>
-          Option.match(o, { onNone: () => "", onSome: (a) => a.cursor }),
-        );
+        const cursor = (await run(optional(accountQ.connectorAccount({ connector: id })))).pipe(Option.match({ onNone: () => "", onSome: (a) => a.cursor }));
         let closed = false;
         const pending = new Set<Promise<void>>();
         const result = await adapter.receive(signal, secrets, {
@@ -531,7 +529,10 @@ export const make = (options: ConnectorOptions = {}) =>
             await kept(reload());
             continue;
           }
-          const stopped = (await receive(signal, a.secrets)) ?? { kind: "failed", reason: "收消息停了" };
+          const stopped = (await receive(signal, a.secrets).catch((e) => ({ kind: "failed" as const, reason: message(e) }))) ?? {
+            kind: "failed",
+            reason: "收消息停了",
+          };
           if (signal.aborted) return;
           if (stopped.kind === "stale") {
             await pause();

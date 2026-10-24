@@ -66,7 +66,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, optional } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -225,7 +225,7 @@ export const make = (options: IssueOptions = {}) =>
     const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-    const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
+    const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(optional(e)), Option.getOrUndefined);
     const inTx = <A, E>(e: Effect.Effect<A, E>) =>
       sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
     const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
@@ -486,11 +486,7 @@ export const make = (options: IssueOptions = {}) =>
       const room = yield* sessions.makeRoom(agent.runtime, where);
       if ("refused" in room) return { refused: room.refused } as Hired;
       const evicted = room.evicted ?? "";
-      const prepared = yield* Effect.result(
-        (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
-          Effect.catchDefect((d) => Effect.fail(refused(causeMessage(d)))),
-        ),
-      );
+      const prepared = yield* Effect.result(opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id }));
       if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
       const issue = prepared.success;
       // A draft's session is not one of the issue's sessions: the issue stays unsent.

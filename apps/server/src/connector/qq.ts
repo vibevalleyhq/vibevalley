@@ -1,9 +1,29 @@
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
+import { Schema } from "effect";
+
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
 const intents = 1 << 25;
+
+const Envelope = Schema.Struct({
+  op: Schema.optional(Schema.Int),
+  s: Schema.optional(Schema.Int),
+  t: Schema.optional(Schema.String),
+  d: Schema.optional(Schema.Unknown),
+});
+const heartbeatInterval = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 2_147_483_647 }));
+const Heartbeat = Schema.Struct({ heartbeat_interval: Schema.optional(heartbeatInterval) });
+const MessageData = Schema.Struct({
+  id: Schema.optional(Schema.String),
+  content: Schema.optional(Schema.String),
+  author: Schema.optional(Schema.Struct({ user_openid: Schema.optional(Schema.String) })),
+  attachments: Schema.optional(Schema.Array(Schema.Unknown)),
+});
+const decodeEnvelope = Schema.decodeUnknownSync(Envelope);
+const decodeHeartbeat = Schema.decodeUnknownSync(Heartbeat);
+const decodeMessageData = Schema.decodeUnknownSync(MessageData);
 
 export interface App {
   readonly appId: string;
@@ -110,39 +130,41 @@ export class QQClient implements QQApi {
       // One message at a time: each is handed over before the next is read.
       let chain = Promise.resolve();
       ws.addEventListener("message", (event) => {
-        chain = chain.then(async () => {
-          if (done) return;
-          let msg: { op?: number; s?: number; t?: string; d?: unknown };
-          try {
-            msg = JSON.parse(String(event.data)) as typeof msg;
-          } catch {
-            return end(new Error("QQ 网关：连接出错"));
-          }
-          if (typeof msg.s === "number") seq = msg.s;
-          switch (msg.op) {
-            case 10: {
-              send({ op: 2, d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} } });
-              const every = (msg.d as { heartbeat_interval?: number } | undefined)?.heartbeat_interval ?? 0;
-              beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
-              return;
-            }
-            case 0: {
-              if (msg.t !== "C2C_MESSAGE_CREATE") return;
-              const d = msg.d as { id?: string; content?: string; author?: { user_openid?: string }; attachments?: unknown[] } | undefined;
-              if (!d?.id || !d.author?.user_openid) return;
-              try {
-                await got({ id: d.id, from: d.author.user_openid, content: d.content ?? "", attachments: d.attachments?.length ?? 0 });
-              } catch (e) {
-                end(e instanceof Error ? e : new Error(String(e)));
+        chain = chain
+          .then(async () => {
+            if (done) return;
+            try {
+              const msg = decodeEnvelope(JSON.parse(String(event.data)));
+              if (msg.s !== undefined) seq = msg.s;
+              switch (msg.op) {
+                case 10: {
+                  send({ op: 2, d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} } });
+                  const d = msg.d === undefined ? {} : decodeHeartbeat(msg.d);
+                  const every = d.heartbeat_interval ?? 0;
+                  beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
+                  return;
+                }
+                case 0: {
+                  if (msg.t !== "C2C_MESSAGE_CREATE" || msg.d === undefined) return;
+                  const d = decodeMessageData(msg.d);
+                  if (!d.id || !d.author?.user_openid) return;
+                  try {
+                    await got({ id: d.id, from: d.author.user_openid, content: d.content ?? "", attachments: d.attachments?.length ?? 0 });
+                  } catch (e) {
+                    end(e instanceof Error ? e : new Error(String(e)));
+                  }
+                  return;
+                }
+                case 7:
+                  return end(new Error("QQ 网关：QQ 让重新连接"));
+                case 9:
+                  return end(new Error("QQ 网关：QQ 说会话无效"));
               }
-              return;
+            } catch {
+              end(new Error("QQ 网关：连接出错"));
             }
-            case 7:
-              return end(new Error("QQ 网关：QQ 让重新连接"));
-            case 9:
-              return end(new Error("QQ 网关：QQ 说会话无效"));
-          }
-        });
+          })
+          .catch(end);
       });
       ws.addEventListener("close", (event) => end(new Error(`QQ 网关：连接关了（${event.code}）`)));
       ws.addEventListener("error", () => end(new Error("QQ 网关：连接出错")));

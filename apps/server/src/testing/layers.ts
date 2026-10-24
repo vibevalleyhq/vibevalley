@@ -9,7 +9,17 @@ import { Database } from "../base/db.ts";
 
 export function testConfig(change: Partial<Config> = {}): Config {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-test-"));
-  return { ...defaults(home), home, workRoot: join(home, "work"), db: "memory", ...change };
+  const config = defaults(home);
+  return {
+    ...config,
+    home,
+    workRoot: join(home, "work"),
+    db: "memory",
+    port: 0,
+    voice: { ...config.voice, line: { ...config.voice.line, port: 0 } },
+    lan: { ...config.lan, port: 0 },
+    ...change,
+  };
 }
 
 export const testSettings = (change: Partial<Config> = {}) => Layer.succeed(Settings, testConfig(change));

@@ -19,7 +19,7 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Semaphore, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
@@ -142,58 +142,73 @@ export const make = Effect.gen(function* () {
     }).pipe(Effect.andThen(Effect.sync(() => disk.finish(body)))),
   );
 
-  const events = yield* PubSub.unbounded<SideEvent>();
+  // SSE readers apply backpressure here. Internal subscriptions are separate: a consumer may apply a derived fact while
+  // handling one, and bounded input on both sides of that cycle would deadlock the publisher and its consumer.
+  const events = yield* PubSub.bounded<SideEvent>(64);
+  const updates = yield* PubSub.unbounded<SideEvent>();
   const transitions = yield* PubSub.unbounded<Transition>();
   const owner = yield* PubSub.unbounded<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
-  const changes = yield* PubSub.unbounded<GameEffect | undefined>();
+  const changes = yield* PubSub.bounded<GameEffect | undefined>(32);
+  // A closing scope must not strand a publisher behind a reader that is going away.
+  yield* Effect.addFinalizer(() => PubSub.shutdown(events).pipe(Effect.andThen(PubSub.shutdown(changes))));
+  const publishing = yield* Semaphore.make(1);
 
-  const publish = (e: SideEvent) => {
-    PubSub.publishUnsafe(events, e);
-    if (isFact(e)) PubSub.publishUnsafe(changes, undefined);
-  };
-
-  const apply = (...facts: FactIn[]) =>
-    Effect.sync(() => {
-      let next = state;
-      const done: Transition[] = [];
-      const made: GameEffect[] = [];
-      for (const fact of facts) {
-        const f = { ...fact, at: Date.now() } as Fact;
-        const [after, changed] = reduce(next, f);
-        if (!changed) continue;
-        done.push({ before: next, fact: f, after });
-        made.push(...effectsOf(next, f));
-        next = after;
-      }
-      if (done.length === 0) return;
-      state = next;
-      save();
-      for (const t of done) {
-        publish(t.fact);
-        PubSub.publishUnsafe(transitions, t);
-      }
-      for (const e of made) {
-        PubSub.publishUnsafe(changes, e);
-      }
+  const publish = (e: SideEvent) =>
+    Effect.gen(function* () {
+      yield* PubSub.publish(events, e);
+      yield* PubSub.publish(updates, e);
+      if (isFact(e)) yield* PubSub.publish(changes, undefined);
     });
 
-  const side = (e: SideEvent) => Effect.sync(() => publish(e));
-
-  const states = Stream.callback<StateFrame>((queue) =>
-    Effect.gen(function* () {
-      const sub = yield* PubSub.subscribe(changes);
-      Queue.offerUnsafe(queue, frameOf(state));
-      yield* Effect.forever(
+  const apply = (...facts: FactIn[]) =>
+    publishing.withPermits(1)(
+      // Acquiring the permit is interruptible; a fold that has begun must publish all of it or none of it.
+      Effect.uninterruptible(
         Effect.gen(function* () {
-          const first = yield* PubSub.take(sub);
-          yield* Effect.sleep(stateEveryMs);
-          const rest = yield* PubSub.takeUpTo(sub, Number.MAX_SAFE_INTEGER);
-          const gathered = [first, ...rest].filter((e): e is GameEffect => e !== undefined);
-          Queue.offerUnsafe(queue, frameOf(state, gathered));
+          let next = state;
+          const done: Transition[] = [];
+          const made: GameEffect[] = [];
+          for (const fact of facts) {
+            const f = { ...fact, at: Date.now() } as Fact;
+            const [after, changed] = reduce(next, f);
+            if (!changed) continue;
+            done.push({ before: next, fact: f, after });
+            made.push(...effectsOf(next, f));
+            next = after;
+          }
+          if (done.length === 0) return;
+          state = next;
+          save();
+          for (const t of done) {
+            yield* publish(t.fact);
+            yield* PubSub.publish(transitions, t);
+          }
+          for (const e of made) {
+            yield* PubSub.publish(changes, e);
+          }
         }),
-      );
-    }),
+      ),
+    );
+
+  const side = (e: SideEvent) => publishing.withPermits(1)(Effect.uninterruptible(publish(e)));
+
+  const states = Stream.callback<StateFrame>(
+    (queue) =>
+      Effect.gen(function* () {
+        const sub = yield* PubSub.subscribe(changes);
+        yield* Queue.offer(queue, frameOf(state));
+        yield* Effect.forever(
+          Effect.gen(function* () {
+            const first = yield* PubSub.take(sub);
+            yield* Effect.sleep(stateEveryMs);
+            const rest = yield* PubSub.takeUpTo(sub, 32);
+            const gathered = [first, ...rest].filter((e): e is GameEffect => e !== undefined);
+            yield* Queue.offer(queue, frameOf(state, gathered));
+          }),
+        );
+      }),
+    { bufferSize: 1, strategy: "suspend" },
   );
 
   const shape: CoreShape = {
@@ -206,7 +221,7 @@ export const make = Effect.gen(function* () {
     sessionEvent: (id, activity) => side({ type: "event", at: Date.now(), id, activity }),
     notice: (level, text) => side({ type: "notice", at: Date.now(), level, text }),
     runtime: (info) => side({ type: "runtime", at: Date.now(), info }),
-    did: (d) => Effect.asVoid(PubSub.publish(owner, d)),
+    did: (d) => publishing.withPermits(1)(PubSub.publish(owner, d)),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
       return [state, Stream.fromSubscription(sub)] as const;
@@ -217,8 +232,8 @@ export const make = Effect.gen(function* () {
         return Stream.concat(Stream.succeed<SideEvent>({ type: "snapshot", at: Date.now(), state }), Stream.fromSubscription(sub));
       }),
     ),
-    subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),
-    facts: Stream.fromPubSub(events).pipe(Stream.filter(isFact)),
+    subscribe: Effect.map(PubSub.subscribe(updates), Stream.fromSubscription),
+    facts: Stream.fromPubSub(updates).pipe(Stream.filter(isFact)),
     live: Stream.fromPubSub(events).pipe(
       Stream.map(liveOf),
       Stream.filter((e): e is LiveEvent => e !== undefined),

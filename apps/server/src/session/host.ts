@@ -39,11 +39,35 @@ export class Caller {
   }
 
   end() {
+    if (this.ended) return;
     this.ended = true;
     this.wake?.();
   }
 
-  async *words(signal?: AbortSignal): AsyncGenerator<string> {
+  words(signal?: AbortSignal): AsyncGenerator<string> {
+    const inner = this.iterate(signal);
+    return {
+      next: (value) => inner.next(value),
+      return: (value) => {
+        // AsyncGenerator.return waits for the current await; wake it first so an empty caller can actually return.
+        this.end();
+        return inner.return(value);
+      },
+      throw: (error) => {
+        this.end();
+        return inner.throw(error);
+      },
+      [Symbol.asyncDispose]: async () => {
+        this.end();
+        await inner[Symbol.asyncDispose]?.();
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
+  }
+
+  private async *iterate(signal?: AbortSignal): AsyncGenerator<string> {
     while (!signal?.aborted) {
       const next = this.queue.shift();
       if (next !== undefined) {
@@ -51,11 +75,16 @@ export class Caller {
         continue;
       }
       if (this.ended) return;
-      await new Promise<void>((resolve) => {
-        this.wake = resolve;
-        signal?.addEventListener("abort", () => resolve(), { once: true });
-      });
-      this.wake = undefined;
+      const onAbort = () => this.wake?.();
+      try {
+        await new Promise<void>((resolve) => {
+          this.wake = resolve;
+          signal?.addEventListener("abort", onAbort, { once: true });
+        });
+      } finally {
+        signal?.removeEventListener("abort", onAbort);
+        this.wake = undefined;
+      }
     }
   }
 }
@@ -66,6 +95,12 @@ export interface Hosted<R> {
   readonly route: R;
   readonly run: RunInput;
   readonly caller?: Caller;
+}
+
+interface InputRecord<R> {
+  hosted: Hosted<R>;
+  readonly generation: number;
+  ended: boolean;
 }
 
 export interface HostOptions<R> {
@@ -108,15 +143,18 @@ export type Build = (busy: boolean, memoryNews: string) => Promise<{ readonly te
 
 export class AgentHost<R> {
   private readonly execution: AgentExecution;
-  private readonly local = new WeakMap<AgentMessage, Hosted<R>>();
+  private readonly local = new WeakMap<AgentMessage, InputRecord<R>>();
+  private readonly pending = new Set<InputRecord<R>>();
   private readonly transcript: string;
-  private input: Hosted<R>;
+  private input: InputRecord<R>;
   private toCaller = 0;
   private said = 0;
   private open = false;
   private lastPush = 0;
   private prefixChanged: string[] = [];
+  private generation = 0;
   private closing = false;
+  private closeTask: Promise<void> | undefined;
   private brain: Brain | undefined;
   private starting: Promise<Brain> | undefined;
   private events = Promise.resolve();
@@ -134,7 +172,7 @@ export class AgentHost<R> {
     this.journal = journal;
     this.execution = new AgentExecution(o.name, journal, o.toolStart, runs);
     this.transcript = join(o.home, o.name + ".jsonl");
-    this.input = { route: o.first, run: { by: { kind: "" } } };
+    this.input = { hosted: { route: o.first, run: { by: { kind: "" } } }, generation: 0, ended: false };
   }
 
   /** The input taken last: its route is where words go now. */
@@ -142,9 +180,9 @@ export class AgentHost<R> {
     const messages = this.brain?.core.state.messages ?? [];
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i]!;
-      if (isHosted(m, this.o.inputType)) return this.local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
+      if (isHosted(m, this.o.inputType)) return this.local.get(m)?.hosted ?? { route: m.details as R, run: { by: { kind: "" } } };
     }
-    return this.input;
+    return this.input.hosted;
   }
 
   /** The run a restart cut off is in the transcript. */
@@ -152,40 +190,78 @@ export class AgentHost<R> {
     return sessionUnfinished(this.transcript);
   }
 
-  /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the agent
-   * cannot start: that input is recorded as a failed run of its own. */
+  /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the host is
+   * closed or the agent cannot start: a start failure is recorded as a failed run of its own. */
   async submit(
     build: Build,
     input: Hosted<R>,
     now: boolean,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string }> {
+    const generation = this.generation;
+    if (this.closing) {
+      this.finish({ hosted: input, generation, ended: false });
+      return { ok: false, why: this.o.label + "已关闭", run: "" };
+    }
     const run: RunInput = { ...input.run, by: input.run.by.kind ? input.run.by : { kind: "comment" } };
+    const pending: InputRecord<R> = { hosted: { ...input, run }, generation, ended: false };
+    this.pending.add(pending);
+    if (!this.live(generation)) {
+      this.finish(pending);
+      return { ok: true };
+    }
     let b: Brain;
     try {
       b = await this.start();
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
-      const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", "起不来：" + why)).catch((e: Error) => {
-        this.o.notice("error", this.o.label + "的执行没能记下：" + e.message);
-        return "";
+      const id = await this.serially(async () => {
+        if (!this.live(generation)) {
+          this.finish(pending);
+          return "";
+        }
+        const failed = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", "起不来：" + why)).catch((e: Error) => {
+          this.o.notice("error", this.o.label + "的执行没能记下：" + e.message);
+          return "";
+        });
+        this.o.notice("error", this.o.label + "起不来：" + why);
+        input.caller?.push("我这边起不来：" + why);
+        this.finish(pending);
+        return failed;
       });
-      this.o.notice("error", this.o.label + "起不来：" + why);
-      input.caller?.push("我这边起不来：" + why);
-      input.caller?.end();
       return { ok: false, why, run: id };
     }
-    await this.serially(async () => {
-      const { text, heard } = await build(b.busy() || b.core.hasQueuedMessages(), b.memoryNews());
-      const message = customMessage(this.o.inputType, text, { details: input.route });
-      this.local.set(message, { ...input, run: { ...run, ...(heard ? { heard } : {}) } });
-      if (now) b.send(message);
-      else b.later(message);
-    });
+    if (!this.live(generation)) {
+      this.finish(pending);
+      return { ok: true };
+    }
+    try {
+      await this.serially(async () => {
+        if (!this.live(generation)) {
+          this.finish(pending);
+          return;
+        }
+        const { text, heard } = await build(b.busy() || b.core.hasQueuedMessages(), b.memoryNews());
+        if (!this.live(generation)) {
+          this.finish(pending);
+          return;
+        }
+        const message = customMessage(this.o.inputType, text, { details: input.route });
+        pending.hosted = { ...pending.hosted, run: { ...run, ...(heard ? { heard } : {}) } };
+        this.local.set(message, pending);
+        if (now) b.send(message);
+        else b.later(message);
+      });
+    } catch (err) {
+      this.finish(pending);
+      throw err;
+    }
     return { ok: true };
   }
 
   /** The run the last start was cut off in goes on, with the input it was taking, within maxAgeMs. */
   async resume(maxAgeMs: number): Promise<void> {
+    const generation = this.generation;
+    if (this.closing || !this.live(generation)) return;
     let b: Brain;
     try {
       b = await this.start();
@@ -193,8 +269,9 @@ export class AgentHost<R> {
       this.o.log("error", `vibevalley: ${this.o.name} could not go on with its last run: ${String(err)}`);
       return;
     }
+    if (!this.live(generation)) return;
     const at = this.current();
-    this.input = at;
+    this.input = { hosted: at, generation, ended: false };
     this.toCaller = 0;
     this.execution.resume(this.o.restored(at.route));
     if (b.resume(maxAgeMs)) return;
@@ -204,13 +281,27 @@ export class AgentHost<R> {
 
   /** The inputs waiting are dropped with the run. */
   async stop(): Promise<void> {
+    this.generation++;
+    this.finishAll();
+    const starting = this.starting;
+    if (starting) await starting.catch(() => undefined);
     await this.brain?.stop();
   }
 
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    if (this.closeTask) return this.closeTask;
     this.closing = true;
-    const b = this.brain ?? (await this.starting?.catch(() => undefined));
-    await b?.close();
+    this.generation++;
+    this.finishAll();
+    this.closeTask = this.closeBrain();
+    return this.closeTask;
+  }
+
+  private async closeBrain(): Promise<void> {
+    const starting = this.starting;
+    if (starting) await starting.catch(() => undefined);
+    await this.inputs;
+    await this.brain?.close();
     await this.events;
     await this.o.go(this.execution.close()).catch((err: Error) => this.o.log("error", `${this.o.name} execution: ${err.message}`));
   }
@@ -294,6 +385,25 @@ export class AgentHost<R> {
     return next;
   }
 
+  private live(generation: number): boolean {
+    return !this.closing && generation === this.generation;
+  }
+
+  private finish(input: InputRecord<R>, endCaller = true) {
+    if (input.ended) return;
+    input.ended = true;
+    this.pending.delete(input);
+    if (endCaller) input.hosted.caller?.end();
+    if (this.input !== input) return;
+    this.input = { hosted: { route: input.hosted.route, run: input.hosted.run }, generation: this.generation, ended: false };
+    this.toCaller = 0;
+  }
+
+  private finishAll() {
+    for (const input of [...this.pending]) this.finish(input);
+    this.finish(this.input);
+  }
+
   private keyNow() {
     if (!this.open) {
       this.open = true;
@@ -303,7 +413,7 @@ export class AgentHost<R> {
   }
 
   private async grow(text: string) {
-    const input = this.input;
+    const input = this.input.hosted;
     if (input.caller && text.length > this.toCaller) {
       input.caller.push(text.slice(this.toCaller));
       this.toCaller = text.length;
@@ -316,7 +426,7 @@ export class AgentHost<R> {
   }
 
   private async done(text: string) {
-    const input = this.input;
+    const input = this.input.hosted;
     if (input.caller && text.length > this.toCaller) input.caller.push(text.slice(this.toCaller));
     if (input.caller && text) input.caller.push("\n");
     this.toCaller = 0;
@@ -328,8 +438,7 @@ export class AgentHost<R> {
   // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
   private async settled(aborted: boolean) {
     if (aborted && !this.closing) this.journal.note("run/error", "主人叫停了");
-    this.input.caller?.end();
-    this.input = { route: this.input.route, run: this.input.run };
+    this.finish(this.input);
     this.open = false;
     await this.o.state("listening");
   }
@@ -352,16 +461,22 @@ export class AgentHost<R> {
 
   private async event(e: BrainEvent) {
     let run: RunInput | undefined;
-    if (e.type === "message_start" && isHosted(e.message, this.o.inputType)) run = this.local.get(e.message)?.run ?? { by: { kind: "" } };
+    if (e.type === "message_start" && isHosted(e.message, this.o.inputType)) run = this.local.get(e.message)?.hosted.run ?? { by: { kind: "" } };
     if (e.type !== "agent_settled" && e.type !== "compaction_start" && e.type !== "compaction_end" && e.type !== "prefix_changed" && e.type !== "tasks_changed")
       await this.o.go(this.execution.observe(e, run)).catch((err: Error) => this.o.notice("error", this.o.label + "的执行没能记下：" + err.message));
     switch (e.type) {
       case "message_start":
         if (isHosted(e.message, this.o.inputType)) {
-          const next = this.local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
+          const next: InputRecord<R> = this.local.get(e.message) ?? {
+            hosted: { route: e.message.details as R, run: { by: { kind: "" } } },
+            generation: this.generation,
+            ended: false,
+          };
+          if (next.ended || next.generation !== this.generation || this.closing) return;
           // An input that joins the run takes the words from here on: the one before has what it got, and ends now, or a
           // caller waiting on it (a brief, a call's line) would wait for the run's end with no words.
-          if (this.input.caller && this.input.caller !== next.caller) this.input.caller.end();
+          if (this.input !== next) this.finish(this.input, this.input.hosted.caller !== next.hosted.caller);
+          this.pending.delete(next);
           this.input = next;
           this.toCaller = 0;
         }

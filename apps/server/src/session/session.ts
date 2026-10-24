@@ -40,8 +40,9 @@ import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type
 
 export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
+import { optional } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
-import { Core, type FactIn } from "../core/core.ts";
+import { Core } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { Memories } from "../memory/memory.ts";
 import { type Merged, MergeFailure, Projects, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/project.ts";
@@ -154,6 +155,15 @@ interface Hand {
   /** The open turn's run and what it heard. */
   run: string;
   heard: string[];
+}
+
+interface Opening {
+  readonly id: string;
+  owner?: Session;
+  place?: Workplace;
+  hand?: Hand;
+  committed: boolean;
+  cleaned?: Hired;
 }
 
 export interface SessionShape {
@@ -383,16 +393,22 @@ export const make = (options: SessionOptionsIn = {}) =>
     // all ended with the service.
     const timers = yield* FiberMap.make<string>();
     const later = yield* FiberMap.runtime(timers)<never>();
-    // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
-    // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
-    const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
-    const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
+    // oar calls outside fibers. A full SSE reader can suspend a publish, so callbacks enter this runtime in oar's order
+    // instead of using runSync, which cannot wait. The chain keeps failures out of the next event's way.
+    let callbacks = Promise.resolve();
+    const follow = (effect: Effect.Effect<void, unknown>) => {
+      callbacks = callbacks.then(() =>
+        run(effect.pipe(Effect.catchCause((cause) => Effect.logWarning("vibevalley: a session callback failed", cause)))).catch((error: unknown) => {
+          if (!closing) throw error;
+        }),
+      );
+    };
 
     const root = resolve(projects.root);
     const logDir = join(config.home, "logs");
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
-    const trajectories = new Trajectories(config.home, (id, e) => Effect.runSync(core.sessionEvent(id, e)));
+    const trajectories = new Trajectories(config.home, (id, e) => fire(core.sessionEvent(id, e)));
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
 
@@ -546,92 +562,97 @@ export const make = (options: SessionOptionsIn = {}) =>
       }
     };
 
-    const watch = (h: Hand, s: OarSession, runtime: string) => (event: Event) => {
-      if (s.detached) return;
-      let opened = false;
-      const signals: LaunchActivity[] = [];
-      if (h.launch && h.sess === s && event.agentPath.length === 0) {
-        if (event.kind === "turn_started") {
-          h.spoke = false;
-          opened = true;
-        } else if (event.kind === "reasoning" || event.kind === "text_delta" || event.kind === "tool_call_started") {
-          if (!h.spoke) {
-            h.spoke = true;
-            signals.push({ kind: "spoke", id: h.id, launch: h.launch });
+    const watch = (h: Hand, s: OarSession, runtime: string) => (event: Event) =>
+      follow(
+        Effect.gen(function* () {
+          if (s.detached) return;
+          let opened = false;
+          const signals: LaunchActivity[] = [];
+          if (h.launch && h.sess === s && event.agentPath.length === 0) {
+            if (event.kind === "turn_started") {
+              h.spoke = false;
+              opened = true;
+            } else if (event.kind === "reasoning" || event.kind === "text_delta" || event.kind === "tool_call_started") {
+              if (!h.spoke) {
+                h.spoke = true;
+                signals.push({ kind: "spoke", id: h.id, launch: h.launch });
+              }
+            } else if (event.kind === "compaction_started") signals.push({ kind: "compacting", id: h.id, on: true });
+            else if (event.kind === "compaction_ended") signals.push({ kind: "compacting", id: h.id, on: false });
           }
-        } else if (event.kind === "compaction_started") signals.push({ kind: "compacting", id: h.id, on: true });
-        else if (event.kind === "compaction_ended") signals.push({ kind: "compacting", id: h.id, on: false });
-      }
-      const reaction = eventFacts(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
-      h.tracking = reaction.tracking;
-      if (reaction.model) h.tracking = { ...h.tracking, rate: runtimes.quote(runtime, reaction.model) };
-      if (opened) {
-        for (const fact of reaction.facts) if (fact.type === "run") apply(fact);
-        startRun(h);
-      }
-      for (const a of signals) signal(a);
-      for (const op of reaction.journal) record(h.journal, op);
-      for (const fact of reaction.facts) {
-        if (opened && fact.type === "run") continue;
-        if (fact.type === "report") {
-          const report = h.run ? { ...fact, run: h.run } : fact;
-          apply(report);
-          endRun(h, report.outcome, report.summary, report.spent);
-        } else apply(fact);
-      }
-      if (reaction.spentCny) runtimes.spend(runtime, reaction.spentCny);
-      if (reaction.warn) notice("warn", reaction.warn);
-      if (event.kind === "exited") closedLaunch(h);
-    };
-
-    const applyReport = (h: Hand, report: SubagentReport) => {
-      const session = core.session(h.id);
-      if (!session) return;
-      const read = readReport(report.outcome, report.text);
-      const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;
-      h.lastText = read.text;
-      h.tracking = { ...h.tracking, runFrom: undefined };
-      const { launch, spoke } = h;
-      apply({
-        type: "report",
-        id: h.id,
-        outcome: read.outcome,
-        summary: read.summary,
-        runs: report.turn,
-        ...(spent ? { spent } : {}),
-        ...(h.run ? { run: h.run } : {}),
-        ...(read.questions.length > 0 ? { questions: read.questions } : {}),
-        ...(read.checks.length > 0 ? { checks: read.checks } : {}),
-        ...(read.answer ? { answer: read.answer } : {}),
-      });
-      endRun(h, read.outcome, read.summary, spent);
-      fire(
-        memories.keep({
-          agent: session.agent,
-          session: h.id,
-          project: h.place.project,
-          job: session.brief,
-          outcome: read.outcome,
-          said: read.text,
-          summary: read.summary,
+          const reaction = eventFacts(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
+          h.tracking = reaction.tracking;
+          if (reaction.model) h.tracking = { ...h.tracking, rate: runtimes.quote(runtime, reaction.model) };
+          if (opened) {
+            for (const fact of reaction.facts) if (fact.type === "run") yield* core.apply(fact);
+            startRun(h);
+          }
+          for (const a of signals) signal(a);
+          for (const op of reaction.journal) record(h.journal, op);
+          for (const fact of reaction.facts) {
+            if (opened && fact.type === "run") continue;
+            if (fact.type === "report") {
+              const report = h.run ? { ...fact, run: h.run } : fact;
+              yield* core.apply(report);
+              endRun(h, report.outcome, report.summary, report.spent);
+            } else yield* core.apply(fact);
+          }
+          if (reaction.spentCny) runtimes.spend(runtime, reaction.spentCny);
+          if (reaction.warn) yield* core.notice("warn", reaction.warn);
+          if (event.kind === "exited") closedLaunch(h);
         }),
       );
-      if (read.needsYou) notice("error", `${session.name} 停下了：${read.failure}`);
-      if (launch) signal({ kind: "ended", id: h.id, launch, outcome: read.outcome, spoke });
-      runtimes.usageSoon(session.runtime);
-      save();
-    };
 
-    const stalled = (h: Hand, silentForMs: number) => {
-      const session = core.session(h.id);
-      if (session?.phase._tag !== "working") return;
-      h.tracking = { ...h.tracking, quiet: true };
-      apply({ type: "quiet", id: h.id, since: Date.now() - silentForMs });
-      const quiet = silentForMs < 60_000 ? `${Math.round(silentForMs / 1000)} 秒` : `${Math.round(silentForMs / 60_000)} 分钟`;
-      const last = session.phase.doing.label ? "（最后在：" + session.phase.doing.label + "）" : "";
-      h.journal.note("run/error", `已经 ${quiet}没动静了${last}。可能在跑很久的命令，也可能卡住了`);
-      notice("warn", `${session.name} 已经 ${quiet}没动静了${last}：点它的地看看过程，不对就叫停`);
-    };
+    const applyReport = (h: Hand, report: SubagentReport) =>
+      Effect.gen(function* () {
+        const session = core.session(h.id);
+        if (!session) return;
+        const read = readReport(report.outcome, report.text);
+        const spent = session.spent ? since(session.spent, h.tracking.runFrom) : undefined;
+        h.lastText = read.text;
+        h.tracking = { ...h.tracking, runFrom: undefined };
+        const { launch, spoke } = h;
+        yield* core.apply({
+          type: "report",
+          id: h.id,
+          outcome: read.outcome,
+          summary: read.summary,
+          runs: report.turn,
+          ...(spent ? { spent } : {}),
+          ...(h.run ? { run: h.run } : {}),
+          ...(read.questions.length > 0 ? { questions: read.questions } : {}),
+          ...(read.checks.length > 0 ? { checks: read.checks } : {}),
+          ...(read.answer ? { answer: read.answer } : {}),
+        });
+        endRun(h, read.outcome, read.summary, spent);
+        fire(
+          memories.keep({
+            agent: session.agent,
+            session: h.id,
+            project: h.place.project,
+            job: session.brief,
+            outcome: read.outcome,
+            said: read.text,
+            summary: read.summary,
+          }),
+        );
+        if (read.needsYou) yield* core.notice("error", `${session.name} 停下了：${read.failure}`);
+        if (launch) signal({ kind: "ended", id: h.id, launch, outcome: read.outcome, spoke });
+        runtimes.usageSoon(session.runtime);
+        save();
+      });
+
+    const stalled = (h: Hand, silentForMs: number) =>
+      Effect.gen(function* () {
+        const session = core.session(h.id);
+        if (session?.phase._tag !== "working") return;
+        h.tracking = { ...h.tracking, quiet: true };
+        yield* core.apply({ type: "quiet", id: h.id, since: Date.now() - silentForMs });
+        const quiet = silentForMs < 60_000 ? `${Math.round(silentForMs / 1000)} 秒` : `${Math.round(silentForMs / 60_000)} 分钟`;
+        const last = session.phase.doing.label ? "（最后在：" + session.phase.doing.label + "）" : "";
+        h.journal.note("run/error", `已经 ${quiet}没动静了${last}。可能在跑很久的命令，也可能卡住了`);
+        yield* core.notice("warn", `${session.name} 已经 ${quiet}没动静了${last}：点它的地看看过程，不对就叫停`);
+      });
 
     const release = (h: Hand) => {
       const s = h.sess;
@@ -653,12 +674,17 @@ export const make = (options: SessionOptionsIn = {}) =>
       const stopEvents = session.events(watch(h, s, runtime), { cursor: { sessionId: session.id, afterSeq: -1 } });
       // The report comes from oar's subagent, which hears the turn's end first: it is taken once the end's other readers have.
       const stopReports = s.subagents.onReport((report) => {
-        if (report.sessionId === session.id) queueMicrotask(() => !s.detached && applyReport(h, report));
+        if (report.sessionId === session.id)
+          queueMicrotask(() => {
+            if (!s.detached) follow(applyReport(h, report));
+          });
       });
       const stopStalls = watchStalls(
         session,
         stallMs,
-        (silentForMs) => !s.detached && stalled(h, silentForMs),
+        (silentForMs) => {
+          if (!s.detached) follow(stalled(h, silentForMs));
+        },
         (wait) => void later(`stall:${h.id}`, wait),
       );
       s.stop = () => {
@@ -667,6 +693,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         stopStalls();
       };
       save();
+      // As the synchronous replay used to be: a caller sees the initial events folded before it continues.
+      return callbacks;
     };
 
     const closeAllocation = (allocation: Allocation) =>
@@ -701,8 +729,43 @@ export const make = (options: SessionOptionsIn = {}) =>
         return { refused: allocation.failure, retained: true };
       });
 
+    const cleanupOpening = (opening: Opening, why = "", retained = false): Effect.Effect<Hired> =>
+      Effect.suspend(() => {
+        const remember = (retainedWork = false, refusal = why) => {
+          const cleaned: Hired = {
+            ...(refusal ? { refused: refusal } : {}),
+            ...(retainedWork ? { retainedWork: true as const } : {}),
+          };
+          opening.cleaned = cleaned;
+          return cleaned;
+        };
+        if (opening.cleaned) return Effect.succeed(opening.cleaned);
+        if (opening.committed || core.session(opening.id)) return Effect.succeed(remember(true));
+        return Effect.gen(function* () {
+          const allocation = allocations.get(opening.id);
+          if ((allocation && allocation.owner !== opening.owner) || retained) return remember(true);
+          if (opening.hand) release(opening.hand);
+          if (allocation) {
+            const stopped = yield* Effect.result(stopOar(allocation));
+            if (stopped._tag === "Failure") {
+              const failure = why ? `${why}；${reasonOf(stopped.failure)}` : reasonOf(stopped.failure);
+              allocation.failure = failure;
+              yield* core.notice("error", failure);
+              return remember(true, failure);
+            }
+          }
+          trajectories.finish(opening.id);
+          if (opening.hand && hands.get(opening.id) === opening.hand) hands.delete(opening.id);
+          revokeToken(opening.id);
+          if (!opening.place) return remember();
+          const released = yield* projects.release(opening.place);
+          if (released.kept) yield* core.notice("warn", released.reason);
+          return remember(released.kept);
+        });
+      }).pipe(Effect.uninterruptible);
+
     /** Opens an oar session for the profile in place: its prompt, the farm's MCP server and its own, as a subagent. */
-    const open = (agent: Agent, owner: Session, place: Workplace, input: string, resume: string): Effect.Effect<Opened> =>
+    const open = (agent: Agent, owner: Session, place: Workplace, input: string, resume: string, opening?: Opening): Effect.Effect<Opened> =>
       Effect.gen(function* () {
         const id = owner.id;
         const prior = allocations.get(id);
@@ -753,7 +816,10 @@ export const make = (options: SessionOptionsIn = {}) =>
             })
             .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: e instanceof Error ? e.message : String(e) })),
         );
-        if (spawned.kind !== "spawned") return yield* failedOpening(allocation, `${spawned.reason}（${spawned.code}）`);
+        if (spawned.kind !== "spawned") {
+          const why = `${spawned.reason}（${spawned.code}）`;
+          return opening ? { refused: why, retained: false } : yield* failedOpening(allocation, why);
+        }
         const verb = resume ? "叫醒" : "派";
         const how = r.model ? "，模型 " + r.model : "，runtime 默认模型";
         const where = place.project + (place.branch ? " 的 " + place.branch : "");
@@ -841,7 +907,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         );
       }
       if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` } as Delivered;
-      attach(h, opened.session, session.runtime);
+      const attached = attach(h, opened.session, session.runtime);
+      yield* Effect.promise(() => attached);
       return { kind: "run", launch: h.launch || h.id, woke: true } as Delivered;
     });
 
@@ -908,14 +975,14 @@ export const make = (options: SessionOptionsIn = {}) =>
           if (isBusy(current) || h.triggers.length > 0)
             return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
           yield* rest(h);
-          const merged = yield* use(h.place, h.lastText).pipe(
-            Effect.mapError((e) => {
-              const f = e instanceof MergeFailure ? e : MergeFailure.error(reasonText(e));
-              if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
-              const words = notTakenIn(f, current.name, settle);
-              return new NotTakenIn({ failure: f, ...words, message: words.owner });
-            }),
-          );
+          const attempted = yield* Effect.result(use(h.place, h.lastText));
+          if (attempted._tag === "Failure") {
+            const f = attempted.failure instanceof MergeFailure ? attempted.failure : MergeFailure.error(reasonText(attempted.failure));
+            if (f.kind === "conflict") yield* core.apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+            const words = notTakenIn(f, current.name, settle);
+            return yield* Effect.fail(new NotTakenIn({ failure: f, ...words, message: words.owner }));
+          }
+          const merged = attempted.success;
           if (merged.pullRequest) return merged;
           yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
           if (merged.warning) yield* core.notice("warn", merged.warning);
@@ -1052,66 +1119,71 @@ export const make = (options: SessionOptionsIn = {}) =>
         if (full) return { refused: full };
         hired++;
         const id = `w${hired}`;
-        const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
-        if (placed._tag === "Failure") return { refused: `${agent.name} 没地方干活：${placed.failure.message}` };
-        const place = placed.success;
-        const recalled = new Set<string>();
-        const recall = yield* remind(agent.id, id, place.project, task, recalled);
-        const session: Session = {
-          id,
-          name: sessionName(core.state().sessions, agent.id, agent.name),
-          agent: agent.id,
-          runtime: agent.runtime,
-          brief: task,
-          project: place.project,
-          hiredAt: Date.now(),
-          runs: 0,
-          phase: { _tag: "arriving" },
-          ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
-          ...(opt.channel ? { channel: opt.channel } : {}),
-          ...(opt.refining ? { refining: true } : {}),
-          issue: opt.issue.id,
-          ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
-        };
-        const refuseStart = (why: string, retained: boolean): Effect.Effect<Hired> =>
-          Effect.gen(function* () {
-            if (retained) return { refused: why, retainedWork: true };
-            revokeToken(id);
-            const released = yield* projects.release(place);
-            if (released.kept) yield* core.notice("warn", released.reason);
-            return { refused: why, ...(released.kept ? { retainedWork: true as const } : {}) };
-          });
-        const opened = yield* open(agent, session, place, withRecall(recall, task), "");
-        if (!opened.session) return yield* refuseStart(`${agent.name} 派不出去：${opened.refused}`, opened.retained);
-        const registered = yield* Effect.result(
-          Effect.gen(function* () {
-            if (opt.hiring) yield* opt.hiring(session);
-            return yield* logOf(session);
-          }).pipe(Effect.catchDefect((e) => Effect.fail(e))),
-        );
-        if (registered._tag === "Failure") {
-          const failed = yield* failedOpening(opened.session, `${agent.name} 的工单没记下来：${reasonText(registered.failure)}`);
-          return yield* refuseStart(failed.refused, failed.retained);
-        }
-        const h: Hand = {
-          id,
-          place,
-          access: Semaphore.makeUnsafe(1),
-          journal: registered.success,
-          oarSessionId: "",
-          lastText: "",
-          tracking: {},
-          launch: "",
-          spoke: false,
-          recalled,
-          triggers: [opt.trigger ?? { kind: "issue" }],
-          run: "",
-          heard: [],
-        };
-        hands.set(id, h);
-        yield* core.apply({ type: "hired", session });
-        attach(h, opened.session, agent.runtime);
-        return { session };
+        const opening: Opening = { id, committed: false };
+        const starting = Effect.gen(function* () {
+          const placed = yield* Effect.uninterruptible(
+            Effect.map(Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? "")), (placed) => {
+              if (placed._tag === "Success") opening.place = placed.success;
+              return placed;
+            }),
+          );
+          if (placed._tag === "Failure") return { refused: `${agent.name} 没地方干活：${placed.failure.message}` };
+          const place = placed.success;
+          const recalled = new Set<string>();
+          const recall = yield* remind(agent.id, id, place.project, task, recalled);
+          const session: Session = {
+            id,
+            name: sessionName(core.state().sessions, agent.id, agent.name),
+            agent: agent.id,
+            runtime: agent.runtime,
+            brief: task,
+            project: place.project,
+            hiredAt: Date.now(),
+            runs: 0,
+            phase: { _tag: "arriving" },
+            ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),
+            ...(opt.channel ? { channel: opt.channel } : {}),
+            ...(opt.refining ? { refining: true } : {}),
+            issue: opt.issue.id,
+            ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
+          };
+          opening.owner = session;
+          const opened = yield* open(agent, session, place, withRecall(recall, task), "", opening);
+          if (!opened.session) return yield* cleanupOpening(opening, `${agent.name} 派不出去：${opened.refused}`, opened.retained);
+          const registered = yield* Effect.result(
+            Effect.gen(function* () {
+              if (opt.hiring) yield* opt.hiring(session);
+              return yield* logOf(session);
+            }),
+          );
+          if (registered._tag === "Failure") {
+            return yield* cleanupOpening(opening, `${agent.name} 的工单没记下来：${reasonText(registered.failure)}`);
+          }
+          const h: Hand = {
+            id,
+            place,
+            access: Semaphore.makeUnsafe(1),
+            journal: registered.success,
+            oarSessionId: "",
+            lastText: "",
+            tracking: {},
+            launch: "",
+            spoke: false,
+            recalled,
+            triggers: [opt.trigger ?? { kind: "issue" }],
+            run: "",
+            heard: [],
+          };
+          opening.hand = h;
+          // Listeners are ready before publication; only a committed hired fact transfers cleanup to the session lifecycle.
+          hands.set(id, h);
+          const attached = attach(h, opened.session, agent.runtime);
+          yield* core.apply({ type: "hired", session });
+          opening.committed = true;
+          yield* Effect.promise(() => attached);
+          return { session };
+        });
+        return yield* starting.pipe(Effect.onExit((exit) => (exit._tag === "Failure" ? Effect.asVoid(cleanupOpening(opening)) : Effect.void)));
       }, admission.withPermits(1)),
       deliver,
       tell: (id, text, by) =>
@@ -1198,7 +1270,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       get: Effect.fn("Sessions.get")(function* (id) {
         const live = core.session(id);
         if (live) return live;
-        const r = yield* db(Effect.option(qs.sessionByID({ id })));
+        const r = yield* db(optional(qs.sessionByID({ id })));
         if (Option.isNone(r) || r.value.ended_at === null) return undefined;
         return endedSession(r.value, yield* db(qr.runsOfSession({ session: id })));
       }),

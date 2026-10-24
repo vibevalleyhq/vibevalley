@@ -6,7 +6,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
 import { seedAgents } from "../agent/seed.ts";
 import { Agents } from "../agent/agent.ts";
-import { Effect, Fiber, Semaphore, Stream } from "effect";
+import { Effect, Exit, Fiber, Semaphore, Stream } from "effect";
 import { Core } from "../core/core.ts";
 import { MergeFailure, Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -35,7 +35,291 @@ const worker = (turns: ScriptedTurn[]) =>
 
 const phase = (core: Core["Service"], id: string) => core.session(id)?.phase._tag;
 
+const idleWorker = () =>
+  scriptedRuntime({
+    id: "pi",
+    turn: async (turn) => {
+      if (turn.signal.aborted) return;
+      await new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve(), { once: true }));
+    },
+  });
+
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
+
 describe("sessions", () => {
+  it.live("a slow events reader holds oar callbacks without losing the final report", () => {
+    const reading = deferred();
+    const release = deferred();
+    const worked = deferred();
+    const runtime = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        for (let n = 0; n < 40; n++) await turn.tool("bash", JSON.stringify({ command: `echo ${n}` }), () => String(n));
+        worked.resolve();
+        turn.say("结论：慢读者恢复以后交回");
+      },
+    });
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const reports: string[] = [];
+      yield* core.events.pipe(
+        Stream.runForEach((e) => {
+          if (e.type === "snapshot") {
+            reading.resolve();
+            return Effect.promise(() => release.promise);
+          }
+          if (e.type === "report" && e.summary === "慢读者恢复以后交回") reports.push(e.summary);
+          return Effect.void;
+        }),
+        Effect.forkScoped,
+      );
+      yield* Effect.promise(() => reading.promise);
+      const hired = yield* sessions.send(lab(), "flood the slow reader", "demo", { issue: { id: "slow-reader", number: 1 }, worktree: true });
+      const id = hired.session!.id;
+      yield* Effect.promise(() => worked.promise);
+      yield* Effect.yieldNow;
+      expect(phase(core, id)).not.toBe("done");
+      release.resolve();
+      yield* until(() => phase(core, id) === "done" && core.session(id)?.lastRun?.summary === "慢读者恢复以后交回", "the report after the reader resumes");
+      expect(reports).toEqual(["慢读者恢复以后交回"]);
+    }).pipe(Effect.ensuring(Effect.sync(() => release.resolve())), Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
+  it.live("interrupting a send before its core commit releases every startup resource", () => {
+    const base = idleWorker();
+    const reading = deferred();
+    const release = deferred();
+    let disposals = 0;
+    let capturedCwd = "";
+    let capturedToken = "";
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        capturedCwd = args[1].cwd;
+        capturedToken = ((args[1].mcpServers![0] as { headers: Record<string, string> }).headers.authorization ?? "").replace("Bearer ", "");
+        const session = await base.session(...args);
+        return {
+          ...session,
+          dispose: async () => {
+            disposals++;
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const s = sessions as SessionsInside;
+      yield* core.events.pipe(
+        Stream.runForEach((e) => {
+          if (e.type === "snapshot") {
+            reading.resolve();
+            return Effect.promise(() => release.promise);
+          }
+          return Effect.void;
+        }),
+        Effect.forkScoped,
+      );
+      yield* Effect.promise(() => reading.promise);
+      for (let total = 0; total < 64; total++) yield* core.setCommits({ total } as never);
+      const blocked = yield* Effect.forkChild(core.setCommits({ total: 64 } as never), { startImmediately: true });
+      yield* Effect.yieldNow;
+      expect(core.state().commits?.total).toBe(64);
+      const sending = yield* Effect.forkChild(sessions.send(lab(), "cancel before hired", "demo", { issue: { id: "i1", number: 1 }, worktree: true }), {
+        startImmediately: true,
+      });
+      yield* until(() => s.hands.has("w1"), "the attached but uncommitted session");
+      yield* Fiber.interrupt(sending);
+      expect(Exit.hasInterrupts(yield* Fiber.await(sending))).toBe(true);
+      expect(disposals).toBe(1);
+      expect(core.session("w1")).toBeUndefined();
+      expect(s.hands.has("w1")).toBe(false);
+      expect(sessions.who(capturedToken)).toBe("");
+      expect(capturedToken).not.toBe("");
+      expect(existsSync(capturedCwd)).toBe(false);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+      release.resolve();
+      yield* Fiber.join(blocked);
+    }).pipe(Effect.ensuring(Effect.sync(() => release.resolve())), Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
+  it.live("interrupting a pending spawn disposes the late session and lets the issue retry", () => {
+    const base = worker([]);
+    const sessionStarted = deferred();
+    const sessionGate = deferred();
+    let opens = 0;
+    let disposals = 0;
+    let capturedCwd = "";
+    let capturedToken = "";
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        const first = ++opens === 1;
+        if (first) {
+          capturedCwd = args[1].cwd;
+          capturedToken = ((args[1].mcpServers![0] as { headers: Record<string, string> }).headers.authorization ?? "").replace("Bearer ", "");
+          sessionStarted.resolve();
+          await sessionGate.promise;
+        }
+        const session = await base.session(...args);
+        if (!first) return session;
+        return {
+          ...session,
+          dispose: async () => {
+            disposals++;
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted spawn", "demo", { issue: { id: "i1", number: 1 }, worktree: true }), {
+        startImmediately: true,
+      });
+      yield* Effect.promise(() => sessionStarted.promise);
+      // Interruption waits for cleanup, and cleanup waits for the late runtime session.
+      const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending), { startImmediately: true });
+      yield* Effect.yieldNow;
+      sessionGate.resolve();
+      const exit = yield* Fiber.await(sending);
+      yield* Fiber.join(interrupting);
+      expect(Exit.hasInterrupts(exit)).toBe(true);
+      expect(disposals).toBe(1);
+      expect(capturedCwd).not.toBe("");
+      expect(capturedToken).not.toBe("");
+      expect(existsSync(capturedCwd)).toBe(false);
+      expect(sessions.who(capturedToken)).toBe("");
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+
+      const retried = yield* sessions.send(lab(), "retry after interruption", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      expect(retried.refused).toBeUndefined();
+      expect(retried.session).toBeDefined();
+      expect(opens).toBe(2);
+      yield* until(() => phase(core, retried.session!.id) === "done", "the retried report");
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
+  it.live("interrupting hiring closes the allocation, journal, token and workplace", () => {
+    const base = idleWorker();
+    const hiringStarted = deferred();
+    const hiringGate = deferred();
+    let disposals = 0;
+    let capturedCwd = "";
+    let capturedToken = "";
+    let openingId = "";
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        capturedCwd = args[1].cwd;
+        capturedToken = ((args[1].mcpServers![0] as { headers: Record<string, string> }).headers.authorization ?? "").replace("Bearer ", "");
+        const session = await base.session(...args);
+        return {
+          ...session,
+          dispose: async () => {
+            disposals++;
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const core = yield* Core;
+      const s = sessions as SessionsInside;
+      const finished: string[] = [];
+      const finish = s.trajectories.finish.bind(s.trajectories);
+      s.trajectories.finish = (id) => {
+        finished.push(id);
+        finish(id);
+      };
+      const sending = yield* Effect.forkChild(
+        sessions.send(lab(), "interrupted hiring", "demo", {
+          issue: { id: "i1", number: 1 },
+          worktree: true,
+          hiring: (session) => {
+            openingId = session.id;
+            hiringStarted.resolve();
+            return Effect.promise(() => hiringGate.promise);
+          },
+        }),
+        { startImmediately: true },
+      );
+      yield* Effect.promise(() => hiringStarted.promise);
+      yield* Fiber.interrupt(sending);
+      const exit = yield* Fiber.await(sending);
+      expect(Exit.hasInterrupts(exit)).toBe(true);
+      expect(openingId).toBe("w1");
+      expect(disposals).toBe(1);
+      expect(finished).toEqual([openingId]);
+      expect(s.hands.has(openingId)).toBe(false);
+      expect(core.session(openingId)).toBeUndefined();
+      expect(sessions.who(capturedToken)).toBe("");
+      expect(existsSync(capturedCwd)).toBe(false);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
+  it.live("hiring preserves defects and treats typed failures as ordinary refusals", () => {
+    const base = idleWorker();
+    const boom = new Error("boom");
+    const cwds: string[] = [];
+    const tokens: string[] = [];
+    let disposals = 0;
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        cwds.push(args[1].cwd);
+        tokens.push(((args[1].mcpServers![0] as { headers: Record<string, string> }).headers.authorization ?? "").replace("Bearer ", ""));
+        const session = await base.session(...args);
+        return {
+          ...session,
+          dispose: async () => {
+            disposals++;
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const known = yield* sessions.send(lab(), "known failure", "demo", {
+        issue: { id: "known", number: 1 },
+        worktree: true,
+        hiring: () => Effect.fail(new Error("known hiring failure")),
+      });
+      expect(known.refused).toContain("known hiring failure");
+      expect(known.session).toBeUndefined();
+      expect(disposals).toBe(1);
+      expect(sessions.who(tokens[0]!)).toBe("");
+      expect(existsSync(cwds[0]!)).toBe(false);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+
+      const exit = yield* Effect.exit(
+        sessions.send(lab(), "defect", "demo", {
+          issue: { id: "defect", number: 2 },
+          worktree: true,
+          hiring: () => Effect.die(boom),
+        }),
+      );
+      expect(Exit.hasDies(exit)).toBe(true);
+      expect(Exit.hasFails(exit)).toBe(false);
+      expect(disposals).toBe(2);
+      expect(sessions.who(tokens[1]!)).toBe("");
+      expect(existsSync(cwds[1]!)).toBe(false);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+    }).pipe(Effect.scoped, Effect.provide(world({ runtimes: [runtime], repos: ["demo"] })));
+  });
+
   it.live("a released failed resume can fall back without reserving its old allocation", () => {
     let opens = 0;
     const base = worker([]);

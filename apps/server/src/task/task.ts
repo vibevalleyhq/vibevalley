@@ -55,7 +55,6 @@ import { actorText, graphChanges, graphEventText } from "./changes.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { causeMessage } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
@@ -212,7 +211,7 @@ export const make = (options: TaskOptions = {}) =>
 
     const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: GraphActor, why = "") {
       const before = get(graph.id);
-      yield* issues.putTask(graph).pipe(Effect.catchDefect((d) => Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`))));
+      yield* issues.putTask(graph);
       yield* record(before, graph, by, why);
     });
 
@@ -281,10 +280,14 @@ export const make = (options: TaskOptions = {}) =>
           }
           const session = hired.id;
           graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
-          const saved = yield* Effect.result(putSystem(graph));
+          const saved = yield* Effect.exit(putSystem(graph));
           if (saved._tag === "Failure") {
-            yield* dismiss(session);
-            return yield* Effect.fail(saved.failure);
+            yield* Effect.uninterruptible(
+              dismiss(session).pipe(
+                Effect.catchCause((cause) => Effect.logWarning(`vibevalley: could not dismiss ${session} after the graph was not saved`, cause)),
+              ),
+            );
+            return yield* saved;
           }
         }
       });

@@ -45,7 +45,7 @@
 **Effect 的写法**
 
 - **服务的方法有名字**：`make` 返回的方法和内部的帮手写成 `Effect.fn("<服务>.<名字>")(function* (...) {...})`，出错的栈和追踪里看得出是哪个；要锁的把 `lock.withPermits(1)` 作为第二个参数。参数的类型由服务的 Shape 定。
-- **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域。
+- **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域；oar 的事件、汇报按次序进入这个运行时。不能用 `Effect.runSync` 执行会等待背压的发布。
 - **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
@@ -64,6 +64,7 @@
 
 - **一个 PGlite 库**：`base/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `bigint`。
 - **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `npm run db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
+- **可空的单行查询只把没有行当空**：`base/db.ts` 的 `optional` 只把 `NoSuchElementError` 变成 `Option.none`，SQL 执行和 Schema 解码的失败留在原错误通道。不能用 `Effect.option` 把这些失败都变成「不存在」。
 - **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
 - **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起，省掉大半的准备时间。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里的 id 都是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
@@ -71,6 +72,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演：同样的记录、折叠和控制，没有程序、登录和模型；项目用临时目录里真的 git 仓库；模型用 pi-ai 的假模型；声网和三家聊天软件是本地假服务；测试里不探测本机的农机，`gh` 回答它不在（`noGitHub`）。
+- **测试监听都选空闲端口**：`testConfig` 默认把主 HTTP、「连接到本机」和语音线路的端口设为 0，调用方给的 `change` 最后覆盖。完整农场 fixture 可同时启动，并显式关掉本机农机探测、真实 GitHub 和模型监听；确需固定端口的测试自己显式指定，生产默认值不变。
 - **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用 `testing/until.ts`（`until`、`untilGot`、`waitFor`：每 10 毫秒再问一次，到期限就带着在等什么失败），不用 `sleep` 赌时间。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
 
@@ -120,7 +122,7 @@
 - **PGlite，不是 SQLite。** effect-sqlc 读 Postgres 的表结构和查询，类型推得出来；PGlite 在进程里，不要单独装数据库，桌面版带得走。代价是库比 SQLite 大、开机多花一点时间。
 - **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Schema.Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。
 - **一个模块一个服务，名字单数、用我们的词。** 按「谁调谁」切层切口最少，但那是按代码现状分；按概念分，模块就是产品里的东西（[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。一块业务一个入口，调用处读得出是谁的事。
-- **反方向走流，不丢消息。** 下层要告诉上层的事（事实、执行的动静、给管家的消息）如果直接调，就有环；发布的人不该被慢的订阅者挡住，也不该悄悄丢掉，所以用无界的 `PubSub`，慢的只排队。
+- **反方向走流，不在发布处静默丢消息。** 下层要告诉上层的事（事实、执行的动静、给管家的消息）如果直接调，就有环；内部订阅用无界 `PubSub`，因为消费者可能再施加派生事实。对外 SSE 改为有界发布，慢读者把背压传回发布者，容量、合并和循环等待的取舍见[核心状态](docs/subsystems/core.md#模型和不变量)。
 - **规则跟着主人，黄金数据跟着规则。** 规则都堆在一处时，没有哪个名字说得清是谁的。黄金数据跟着规则走，删一条规则就删它的用例；共用的规则在 `packages/protocol`，页面拿到的就是服务端用的那份。
 - **查询由 effect-sqlc 生成，一张表一个文件。** 手写在服务里的 SQL 字符串，列和字段靠手对，表改了编译器不知道。按表分文件，改表结构时要看的查询就在同名文件里。没用 ORM：查询不多，SQL 写得更直接。
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
@@ -136,7 +138,7 @@
 
 ## 怎么验证
 
-- `src/base/schema.test.ts`：一份基线，表名、索引名，每个查询文件只写它自己的表。
+- `src/base/schema.test.ts`：一份基线，表名、索引名，每个查询文件只写它自己的表；`base/db.test.ts`：可空单行查询只把 `NoSuchElementError` 当空，SQL 和 Schema 失败保留；`lan/lan.test.ts`：两个完整 app fixture 同时启动。
 - `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
 - `bun run check`：`vp check`，格式、lint 和类型。
 - `bun run server:check`：protocol 的测试、服务端的类型、`db:check`、vitest。
