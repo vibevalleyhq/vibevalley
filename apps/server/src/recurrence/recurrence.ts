@@ -5,7 +5,6 @@
 import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
@@ -15,6 +14,7 @@ import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 import * as q from "../../db/generated/recurrence.sql.ts";
 import { jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
+import { Db } from "../base/db.ts";
 
 export interface Due {
   readonly recurrence: Recurrence;
@@ -57,8 +57,7 @@ export const make = Effect.gen(function* () {
   const core = yield* Core;
   const store = yield* Agents;
   const chat = yield* Channels;
-  const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+  const { run: db } = yield* Db;
   // The ticker, the tools and the pages all change the list.
   const lock = yield* Semaphore.make(1);
   const dueHub = yield* PubSub.unbounded<Due>();

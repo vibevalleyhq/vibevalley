@@ -21,6 +21,7 @@ import { missing, lookIn } from "../errors.ts";
 import { callbackLog } from "../base/log.ts";
 import * as lanQ from "../../db/generated/lan.sql.ts";
 import * as q from "../../db/generated/lan_device.sql.ts";
+import { Db } from "../base/db.ts";
 
 /** A device's asking gets as long again for the owner to answer. */
 const pairingForMs = 2 * 60_000;
@@ -126,7 +127,7 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
   const runHere = yield* FiberSet.makeRuntimePromise<never>();
   const config = yield* Settings;
   const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(Effect.provideService(e, SqlClient.SqlClient, sql));
+  const { run: db } = yield* Db;
   const address = options.address ?? lanAddress;
   const now = options.now ?? Date.now;
 

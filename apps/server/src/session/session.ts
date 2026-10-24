@@ -71,6 +71,7 @@ import { sessionOnIssue } from "./state.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
+import { Db } from "../base/db.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -364,7 +365,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
   const projects = yield* Projects;
   const runtimes = yield* Runtimes;
   const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+  const { run: db } = yield* Db;
   /** A write that must not stop a run: logged, and the run goes on. */
   const logged = <A, E>(what: string, e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
     Effect.provideService(e, SqlClient.SqlClient, sql).pipe(

@@ -43,8 +43,7 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
@@ -60,6 +59,7 @@ import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 import { jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
+import { Db } from "../base/db.ts";
 
 const reportMax = 1500;
 const readLimit = 30;
@@ -341,11 +341,7 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
   let helpers: Helpers | undefined;
-  const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
-  const inTx = <A, E>(e: Effect.Effect<A, E>) =>
-    sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  const { run: db, one, inTx } = yield* Db;
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();

@@ -7,7 +7,7 @@ import { wakeBreaker } from "./rules.ts";
 import { Effect, Layer, PubSub, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { newsOf } from "../session/session.ts";
 import { sessionOnIssue } from "../session/state.ts";
@@ -109,6 +109,7 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
   return fakeHelpers(x).pipe(
     Layer.provideMerge(channelLayer),
     Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
+    Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, c)),
   );

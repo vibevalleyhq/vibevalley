@@ -18,6 +18,7 @@ import * as qc from "../../db/generated/doc_change.sql.ts";
 import * as qd from "../../db/generated/doc.sql.ts";
 import { jsonOf } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
+import { Db } from "../base/db.ts";
 
 const attrsOf = jsonOf(S.BlockAttrs);
 const storedSpans = jsonOf(Schema.NullOr(Schema.mutable(Schema.Array(S.DocSpan))));
@@ -87,7 +88,7 @@ export interface DocOptions {
 
 export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
   const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+  const { run: db } = yield* Db;
   const lock = yield* Semaphore.make(1);
   const scope = yield* Effect.scope;
   const tick = options.tickMs ?? 1000;

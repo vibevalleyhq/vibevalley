@@ -6,12 +6,12 @@
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 import { Clock, Context, Effect, Layer, Schedule, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
 import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
+import { Db } from "../base/db.ts";
 
 /** The person plants on an empty plot and then says what to do; the orchestrator hires a session for it some seconds later. */
 const wantStationForMs = 10_000;
@@ -38,8 +38,7 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
   const projects = yield* Projects;
-  const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql);
+  const { attempt: db } = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
   const rows = yield* Effect.orDie(db(q.ledgerEntries()));

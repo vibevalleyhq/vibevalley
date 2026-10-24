@@ -9,6 +9,7 @@ import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
 import { termsList, termsText, termsVersion } from "./terms.ts";
+import { Db } from "../base/db.ts";
 
 /** One finished run, everything about it; each provider keeps what it uses. */
 export interface FinishedRun {
@@ -49,7 +50,7 @@ const recutBatch = 100;
 
 export const makeMemories = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql);
+  const { attempt: db } = yield* Db;
 
   const list = (agent: string) =>
     db(
