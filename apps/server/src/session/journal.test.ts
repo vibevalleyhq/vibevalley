@@ -10,8 +10,11 @@ afterEach(() => {
   for (const t of open.splice(0)) t.close();
 });
 
+/** What the journals said they could not save. */
+const warnings: string[] = [];
+
 const trajectories = (home = mkdtempSync(join(tmpdir(), "journal-")), push: (id: string, e: SessionEvent) => void = () => {}) => {
-  const t = new Trajectories(home, push);
+  const t = new Trajectories(home, push, (message) => warnings.push(message));
   open.push(t);
   return t;
 };

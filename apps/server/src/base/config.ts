@@ -39,6 +39,8 @@ export interface Config {
   readonly project: { readonly maxSessions: number; readonly checkTimeoutSeconds: number };
   readonly github: { readonly prProjects: readonly string[]; readonly prPollSeconds: number };
   readonly chat: { readonly noticeBatchMs: number; readonly retryWakeMs: number };
+  /** An OTLP collector (http://127.0.0.1:4318): the spans, logs and metrics go there; none when empty. */
+  readonly otlp: { readonly url: string };
 }
 
 export const noticeBatchMs = 3_000;
@@ -65,6 +67,7 @@ export function defaults(home = homedir()): Config {
     project: { maxSessions: 3, checkTimeoutSeconds: 1200 },
     github: { prProjects: [], prPollSeconds: 180 },
     chat: { noticeBatchMs, retryWakeMs: 3_000 },
+    otlp: { url: "" },
   };
 }
 
