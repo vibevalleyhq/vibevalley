@@ -401,7 +401,11 @@ export const make = (options: SessionOptionsIn = {}) =>
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     const clock = yield* Clock.Clock;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
-    const trajectories = new Trajectories(config.home, (id, e) => Effect.runSync(core.sessionEvent(id, e)));
+    const trajectories = new Trajectories(
+      config.home,
+      (id, e) => Effect.runSync(core.sessionEvent(id, e)),
+      (message) => fire(Effect.logWarning(message)),
+    );
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
 

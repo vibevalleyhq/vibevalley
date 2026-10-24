@@ -11,6 +11,8 @@ import { mkdirSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { Otlp, OtlpSerialization } from "effect/observability";
 import { loadConfig, projectsDir } from "./base/config.ts";
 import { leaseHome } from "./base/lease.ts";
 import { redactOutput } from "./base/redact.ts";
@@ -55,4 +57,14 @@ mkdirSync(config.home, { recursive: true });
 mkdirSync(projectsDir(config), { recursive: true });
 const release = leaseHome(config.home);
 process.on("exit", release);
-NodeRuntime.runMain(Layer.launch(farm));
+// With otlp.url the services' spans (Effect.fn), logs and metrics go to that collector; without it nothing is sent.
+const observed = config.otlp.url
+  ? farm.pipe(
+      Layer.provide(
+        Otlp.layer({ baseUrl: config.otlp.url, resource: { serviceName: "vibevalley", serviceVersion: config.version } }).pipe(
+          Layer.provide([FetchHttpClient.layer, OtlpSerialization.layerJson]),
+        ),
+      ),
+    )
+  : farm;
+NodeRuntime.runMain(Layer.launch(observed));
