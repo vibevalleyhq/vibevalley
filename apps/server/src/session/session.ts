@@ -893,17 +893,14 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     settle: Settle = "owner",
   ) {
     const h = hands.get(id);
-    if (!h) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
+    if (!h) return yield* missing("帮工 " + id, [lookIn.session]);
     return yield* h.access.withPermits(1)(
       Effect.gen(function* () {
         const current = core.session(id);
-        if (hands.get(id) !== h || !current) return yield* Effect.fail<ApiError | NotTakenIn>(missing("帮工 " + id, [lookIn.session]));
+        if (hands.get(id) !== h || !current) return yield* missing("帮工 " + id, [lookIn.session]);
         if (closed === "merged" && current.graph)
-          return yield* Effect.fail<ApiError | NotTakenIn>(
-            refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`),
-          );
-        if (isBusy(current) || h.triggers.length > 0)
-          return yield* Effect.fail<ApiError | NotTakenIn>(refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收"));
+          return yield* refused(`${current.name} 在做计划 ${current.graph.id} 里的活：做完会自动合进计划的分支，整个计划合进主分支时再进主分支`);
+        if (isBusy(current) || h.triggers.length > 0) return yield* refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收");
         yield* rest(h);
         const merged = yield* use(h.place, h.lastText).pipe(
           Effect.mapError((e) => {
@@ -1166,8 +1163,8 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     }),
     clearWorkplace: Effect.fn("Sessions.clearWorkplace")(function* (issue, project, number, work) {
       const unclosed = [...allocations.values()].find((a) => a.owner.issue === issue);
-      if (unclosed) return yield* Effect.fail(refused(unclosed.failure ?? "这张工单的农机还没交回工作区"));
-      if (core.state().sessions.some((s) => s.issue === issue)) return yield* Effect.fail(refused("这张工单还有帮工，不能清掉工作目录"));
+      if (unclosed) return yield* refused(unclosed.failure ?? "这张工单的农机还没交回工作区");
+      if (core.state().sessions.some((s) => s.issue === issue)) return yield* refused("这张工单还有帮工，不能清掉工作目录");
       return yield* projects.clear(project, number, work);
     }, admission.withPermits(1)),
     roster: () =>

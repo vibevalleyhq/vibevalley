@@ -115,16 +115,16 @@ export const make = Effect.gen(function* () {
     add: Effect.fn("Recurrences.add")(function* (req, by, ownerInRun) {
       const at = yield* Clock.currentTimeMillis;
       const problem = recurrenceProblem(req, at);
-      if (problem) return yield* Effect.fail(refused(problem));
+      if (problem) return yield* refused(problem);
       const want = req.channel ?? chat.general();
       const channel = (yield* chat.channels()).find((c) => c.id === want);
-      if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`, [lookIn.channel]));
+      if (!channel) return yield* refused(`没有 ${want} 这个频道`, [lookIn.channel]);
       const named = (req.agent ?? "").trim();
       const agents = store.agents();
       const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-      if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]));
+      if (named && !agent) return yield* refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]);
       const project = (req.project ?? "").trim();
-      if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
+      if (agent && !project && !channel.project) return yield* refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`);
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by, ownerInRun);
       const s: Recurrence = {

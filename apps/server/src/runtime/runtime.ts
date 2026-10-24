@@ -419,11 +419,11 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
     choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
     resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
       const runtime = registry.get(agent.runtime);
-      if (!runtime) return yield* Effect.fail(refused(`oar 驱动不了 ${agent.runtime}`));
+      if (!runtime) return yield* refused(`oar 驱动不了 ${agent.runtime}`);
       const { info: i, settings } = yield* Effect.promise(() => configuration(agent.runtime));
       const { model, effort, env, missingModel, issues } = sessionOptions(agent, settings, i);
       const problem = issues.find((i) => i.level === "error");
-      if (problem) return yield* Effect.fail(refused(`${agent.name} 派不出去：${problem.text}`));
+      if (problem) return yield* refused(`${agent.name} 派不出去：${problem.text}`);
       if (missingModel) yield* core.notice("warn", `${runtimeLabel(agent.runtime)} 没有 ${missingModel} 这个模型，${agent.name} 先用默认模型`);
       const observed = cache.get(agent.runtime);
       const installation = observed?.found && observed.info.settings.binPath === settings.binPath ? structuredClone(observed.found) : undefined;

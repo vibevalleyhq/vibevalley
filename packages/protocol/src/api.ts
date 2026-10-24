@@ -14,59 +14,42 @@ export interface Next {
   readonly run?: readonly string[];
 }
 
-export interface Refused {
-  readonly _tag: "Refused";
-  readonly reason: string;
-  /** What can be done instead, as the refusing service knows it (an issue's acts and moves now). */
-  readonly next?: readonly Next[];
-}
+const NextSchema: Schema.Codec<Next> = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
 
-export interface Missing {
-  readonly _tag: "Missing";
-  readonly what: string;
-  readonly next?: readonly Next[];
-}
+// Each refusal is a Schema.TaggedError: its type, its Schema and an error a service fails with (`return yield* new Refused(...)`)
+// in one. On the wire it is its _tag and fields, as the page and the command line read it.
+
+export class Refused extends Schema.TaggedError<Refused>()("Refused", {
+  reason: Schema.String,
+  /** What can be done instead, as the refusing service knows it (an issue's acts and moves now). */
+  next: Schema.optionalKey(Schema.Array(NextSchema)),
+}) {}
+
+export class Missing extends Schema.TaggedError<Missing>()("Missing", {
+  what: Schema.String,
+  next: Schema.optionalKey(Schema.Array(NextSchema)),
+}) {}
 
 /** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
 export type VoiceFix = "agora" | "deepseek" | "voice";
 
-export interface VoiceUnavailable {
-  readonly _tag: "VoiceUnavailable";
-  readonly reason: string;
+export class VoiceUnavailable extends Schema.TaggedError<VoiceUnavailable>()("VoiceUnavailable", {
+  reason: Schema.String,
   /** Where in 设置 the owner fixes it, when a setting does. */
-  readonly settings?: VoiceFix;
-}
+  settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])),
+}) {}
 
-export interface VoiceAgentFailed {
-  readonly _tag: "VoiceAgentFailed";
-  readonly reason: string;
-}
+export class VoiceAgentFailed extends Schema.TaggedError<VoiceAgentFailed>()("VoiceAgentFailed", { reason: Schema.String }) {}
 
-export interface ConnectorRefused {
-  readonly _tag: "ConnectorRefused";
-  readonly reason: string;
-}
+export class ConnectorRefused extends Schema.TaggedError<ConnectorRefused>()("ConnectorRefused", { reason: Schema.String }) {}
 
-export interface LanRefused {
-  readonly _tag: "LanRefused";
-  readonly reason: string;
-}
+export class LanRefused extends Schema.TaggedError<LanRefused>()("LanRefused", { reason: Schema.String }) {}
 
 /** What a route may refuse with: written as JSON with its _tag, at its status. */
 export type ApiError = Refused | Missing | VoiceUnavailable | VoiceAgentFailed | ConnectorRefused | LanRefused;
 
-const NextSchema: Schema.Codec<Next> = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
-const reasonOf = <Tag extends string>(tag: Tag) => Schema.Struct({ _tag: Schema.tag(tag), reason: Schema.String });
-
-/** The error as a route writes it, for a client to read back (the command line's failures). */
-export const ApiError: Schema.Codec<ApiError> = Schema.Union([
-  Schema.Struct({ _tag: Schema.tag("Refused"), reason: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
-  Schema.Struct({ _tag: Schema.tag("Missing"), what: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
-  Schema.Struct({ _tag: Schema.tag("VoiceUnavailable"), reason: Schema.String, settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])) }),
-  reasonOf("VoiceAgentFailed"),
-  reasonOf("ConnectorRefused"),
-  reasonOf("LanRefused"),
-]);
+/** The refusals' Schema: the server tells a refusal by it, and a client reads one back with it (the command line's failures). */
+export const ApiError = Schema.Union([Refused, Missing, VoiceUnavailable, VoiceAgentFailed, ConnectorRefused, LanRefused]);
 
 export const errorStatus: Readonly<Record<ApiError["_tag"], number>> = {
   Refused: 409,

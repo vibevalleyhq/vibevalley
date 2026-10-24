@@ -128,7 +128,7 @@ export const make = Effect.fnUntraced(function* (build: BuildSource = defaultBui
 
   const writeOrchestrator = Effect.fnUntraced(function* (text: string) {
     const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
-    if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
+    if (body === "") return yield* refused("要记的话是空的");
     const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
     return lineMemory(written, yield* Clock.currentTimeMillis);
   });
@@ -147,10 +147,10 @@ export const make = Effect.fnUntraced(function* (build: BuildSource = defaultBui
   // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
   const forgettable = Effect.fnUntraced(function* (agent: string, id: string) {
     const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
-    if (problem) return yield* Effect.fail(refused(problem));
+    if (problem) return yield* refused(problem);
     const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
     const m = listed.memories.find((x) => x.id === id);
-    if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
+    if (!m) return yield* missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]);
     return m;
   });
 

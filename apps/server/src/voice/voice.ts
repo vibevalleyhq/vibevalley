@@ -7,7 +7,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
-import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
+import { type ApiError, Refused, VoiceAgentFailed, type VoiceFix, VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
 import { Context, Effect, Layer, Stream } from "effect";
@@ -44,8 +44,8 @@ const dictateFormats: Record<string, string> = {
 };
 
 /** settings: the 设置 section the owner fixes it in, when a setting does; the page offers to go there. */
-const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({ _tag: "VoiceUnavailable", reason, ...(settings ? { settings } : {}) });
-const failed = (reason: string): ApiError => ({ _tag: "VoiceAgentFailed", reason });
+const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => new VoiceUnavailable({ reason, ...(settings ? { settings } : {}) });
+const failed = (reason: string): ApiError => new VoiceAgentFailed({ reason });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CallLine {
@@ -668,11 +668,11 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
       if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
       const format = given.trim().replace(/^\./, "").toLowerCase();
       const kind = dictateFormats[format];
-      if (!kind) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
+      if (!kind) return yield* new Refused({ reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
       const audio = Buffer.from(audio64, "base64");
       if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
-        return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音是空的，或者不是 base64" });
-      if (audio.length > dictateMaxBytes) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音太长了：一段不超过 25 MB" });
+        return yield* new Refused({ reason: "录音是空的，或者不是 base64" });
+      if (audio.length > dictateMaxBytes) return yield* new Refused({ reason: "录音太长了：一段不超过 25 MB" });
       const form = new FormData();
       form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
       form.append("model", d.model);

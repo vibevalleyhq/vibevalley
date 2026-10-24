@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
-import { type ApiError, endpoints } from "@vibevalley/protocol/api";
+import { type ApiError, endpoints, LanRefused } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
@@ -30,7 +30,7 @@ const seenEveryMs = 60_000;
 /** The header the listener says a device by, to the loopback server; never taken from the device. */
 export const deviceHeader = "x-vibevalley-lan-device";
 
-const refuse = (reason: string): ApiError => ({ _tag: "LanRefused", reason });
+const refuse = (reason: string): ApiError => new LanRefused({ reason });
 
 interface Device extends LanDevice {
   readonly keyHash: string;

@@ -151,13 +151,13 @@ export const make = Effect.gen(function* () {
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
       if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
-        return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
+        return yield* refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime);
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新档案的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* refused("新档案的 id 要留空；指定 id 请用保存");
       let n = 1;
       while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
       const created = withCast({ ...draft, id: `agent-${n}` });
@@ -177,7 +177,7 @@ export const make = Effect.gen(function* () {
         skill,
       ),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新技能的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* refused("新技能的 id 要留空；指定 id 请用保存");
       const stem =
         draft.name
           .toLowerCase()

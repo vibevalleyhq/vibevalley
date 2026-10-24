@@ -243,7 +243,7 @@ describe("runtime", () => {
         const resolved = yield* Effect.result(r.resolve(a));
         expect(resolved._tag).toBe("Failure");
         if (resolved._tag === "Failure")
-          expect(resolved.failure).toEqual({
+          expect(resolved.failure).toMatchObject({
             _tag: "Refused",
             reason: "小禾 派不出去：" + (option === "env" ? "no env" : "pi 默认用的 Known 没有 high 这一档，可选：low"),
           });

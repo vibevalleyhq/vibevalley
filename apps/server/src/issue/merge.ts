@@ -55,7 +55,7 @@ export function merging(d: MergeDeps) {
 
   const mergeSession = Effect.fnUntraced(function* (id: string) {
     const session = sessions.sessionOf(id);
-    if (!session) return yield* Effect.fail(missing("帮工 " + id, [lookIn.session]));
+    if (!session) return yield* missing("帮工 " + id, [lookIn.session]);
     const merged = yield* handedOver(id, (place) => projects.merge(place));
     yield* core.notice("info", `${session.name} 的活合进去了：${merged.text}`);
     return merged.text;
@@ -80,7 +80,7 @@ export function merging(d: MergeDeps) {
         // failed, or a required acceptance not passed, is not merged.
         if (!issue.graph && !issue.task) {
           const [m, why] = statusMove(issue, "done");
-          if (m === "none") return yield* Effect.fail(refused(why));
+          if (m === "none") return yield* refused(why);
         }
         const session = yield* liveSession(id);
         if (issue.project && !issue.graph && !issue.task && (issue.pullRequest?.state === "open" || projects.usesPullRequests(issue.project))) {

@@ -907,17 +907,17 @@ export const make = Effect.gen(function* () {
       return general;
     }
     const parsed = parseChatTarget(target);
-    if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
+    if (!parsed) return yield* refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`);
     let channel = general;
     const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
     if (name) {
       const found = yield* one(qc.channelByName({ name }));
-      if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
+      if (!found) return yield* missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]);
       channel = found.id;
     }
     if (parsed.kind === "channel") return channel;
     const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
-    if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
+    if (!parent) return yield* refused(`频道里没有 ${parsed.parent} 这条消息`);
     const thread = yield* inTx(threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }));
     yield* publishConversation(thread);
     return thread;
@@ -938,10 +938,10 @@ export const make = Effect.gen(function* () {
     say: (text, conversation, sendKey) =>
       locked(
         Effect.gen(function* () {
-          if (!text.trim()) return yield* Effect.fail(refused("没说什么"));
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused("sendKey 太长"));
+          if (!text.trim()) return yield* refused("没说什么");
+          if (sendKey.length > sendKeyMax) return yield* refused("sendKey 太长");
           const where = conversation ?? general;
-          if (!(yield* one(qc.conversationByID({ id: where })))) return yield* Effect.fail(missing(`没有 ${where} 这个对话`, [lookIn.channel]));
+          if (!(yield* one(qc.conversationByID({ id: where })))) return yield* missing(`没有 ${where} 这个对话`, [lookIn.channel]);
           const written = yield* write({ conversation: where, from: "user", kind: "chat", text: text.trim(), final: true, sendKey });
           if (written.again) return { message: toMessage(yield* messageOrFail(written.id)), again: true };
           yield* readThrough("user", where, written.number);
@@ -956,7 +956,7 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!helpers?.present(session)) return yield* Effect.fail(missing(`没有 ${session} 这个帮工`, [lookIn.session]));
+            if (!helpers?.present(session)) return yield* missing(`没有 ${session} 这个帮工`, [lookIn.session]);
             yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
@@ -970,10 +970,10 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const words = text.trim();
-          if (!words) return yield* Effect.fail(refused("没说什么"));
+          if (!words) return yield* refused("没说什么");
           const conversation = yield* resolveTarget(from, opt.target ?? "");
           const row = yield* one(qc.conversationByID({ id: conversation }));
-          if (!row) return yield* Effect.fail(refused("找不到这个对话"));
+          if (!row) return yield* refused("找不到这个对话");
           const target = targetOfConv(row);
           // A retry of the same words is the same message.
           const again = yield* one(
@@ -1022,7 +1022,7 @@ export const make = Effect.gen(function* () {
     spoken: (from, text, sendKey) =>
       locked(
         Effect.gen(function* () {
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused("sendKey 太长"));
+          if (sendKey.length > sendKeyMax) return yield* refused("sendKey 太长");
           if (!text.trim()) return false;
           const written = yield* write({ conversation: general, from, kind: "chat", text: text.trim(), final: true, meta: { spoken: true }, sendKey });
           if (written.again) return true;
@@ -1048,7 +1048,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const conversation = yield* resolveTarget(who, opt.target ?? "");
           const row = yield* one(qc.conversationByID({ id: conversation }));
-          if (!row) return yield* Effect.fail(refused("找不到这个对话"));
+          if (!row) return yield* refused("找不到这个对话");
           const target = targetOfConv(row);
           const limit = opt.limit ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
           const cursor = (yield* one(qr.readCursor({ participant_id: who, conversation_id: conversation })))?.read_number ?? 0;
@@ -1070,7 +1070,7 @@ export const make = Effect.gen(function* () {
     markRead: (conversation, seq) =>
       locked(
         Effect.gen(function* () {
-          if (!(yield* one(qc.conversationByID({ id: conversation })))) return yield* Effect.fail(missing(`没有 ${conversation} 这个对话`, [lookIn.channel]));
+          if (!(yield* one(qc.conversationByID({ id: conversation })))) return yield* missing(`没有 ${conversation} 这个对话`, [lookIn.channel]);
           yield* readThrough("user", conversation, seq);
           yield* publishConversation(conversation);
         }),
@@ -1099,7 +1099,7 @@ export const make = Effect.gen(function* () {
             clean,
             rows.flatMap((r) => (r.name !== null ? [r.name] : [])),
           );
-          if (problem) return yield* Effect.fail(refused(problem));
+          if (problem) return yield* refused(problem);
           const desc = optional(description);
           const proj = optional(project);
           const id = newId();
@@ -1113,7 +1113,7 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = yield* one(qc.conversationByID({ id }));
-          if (!row || row.kind === "thread") return yield* Effect.fail(missing(`没有 ${id} 这个频道`, [lookIn.channel]));
+          if (!row || row.kind === "thread") return yield* missing(`没有 ${id} 这个频道`, [lookIn.channel]);
           const desc = (description !== undefined ? optional(description) : null) ?? row.description;
           const proj = project !== undefined ? optional(project) : row.project;
           yield* db(qc.updateChannel({ description: desc, project: proj, id }));

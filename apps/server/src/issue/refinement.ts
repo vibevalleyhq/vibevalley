@@ -47,14 +47,14 @@ export function refinement(d: RefinementDeps) {
     const candidates = yield* runtimes.candidates;
     let named = "";
     if (t.assignee) {
-      if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
+      if (!store.agent(t.assignee)) return yield* refused("帮工档案 " + t.assignee + " 不在了");
       named = t.assignee;
     } else if (t.project) {
       const last = (yield* one(qs.lastAssigneeIn({ project: t.project })))?.assignee;
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
-    if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草", [lookIn.agent]));
+    if (!chosen) return yield* refused("没有能派的帮工来起草", [lookIn.agent]);
     return chosen;
   });
 
@@ -102,12 +102,12 @@ export function refinement(d: RefinementDeps) {
     drafting.withPermits(1)(
       Effect.gen(function* () {
         const t = yield* unsent(id);
-        if (isForOrchestrator(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
-        if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
-        if (t.refining) return yield* Effect.fail(refused(t.refining.name + " 正在起草：等它交回来"));
+        if (isForOrchestrator(t)) return yield* refused("这是派给管家的工单：管家自己会看");
+        if (t.status !== "backlog") return yield* refused("只有备选里的工单能起草：先挪回备选");
+        if (t.refining) return yield* refused(t.refining.name + " 正在起草：等它交回来");
         const chosen = yield* refiner(t);
         const where = t.project ?? (chosen.workdir ?? "").trim();
-        if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：先选一个项目"));
+        if (!where) return yield* refused("没说在哪个项目里做：先选一个项目");
         const said = word.trim();
         const brief = refinementBrief(t, said, where);
         yield* beforeRefinement(t, said, chosen.id, where);
@@ -116,7 +116,7 @@ export function refinement(d: RefinementDeps) {
         if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${t.id}: before its draft: ${kept.reason}`);
         // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
         const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
-        if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
+        if (!hired.session) return yield* refused(hired.refused ?? "派不出去");
         // Its moves no longer hold todo while it drafts.
         yield* publish(id);
         return yield* get(id);

@@ -110,7 +110,7 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
 
   /** A batch already taken: its results then, its blocks now. */
   const again = Effect.fnUntraced(function* (doc: string, seen: qc.DocChangeByBatchResult) {
-    if (seen.doc_id !== doc) return yield* Effect.fail(refused("这批改动（" + seen.batch_id + "）是另一篇文档的"));
+    if (seen.doc_id !== doc) return yield* refused("这批改动（" + seen.batch_id + "）是另一篇文档的");
     const ids = idsOf(seen.block_ids);
     const all = yield* blocksOf(doc);
     return {
@@ -255,7 +255,7 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
     const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
     const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
     const r = ack.results[0];
-    if (r?.status !== "applied") return yield* Effect.fail(refused("演示的块没插进去：" + r?.status));
+    if (r?.status !== "applied") return yield* refused("演示的块没插进去：" + r?.status);
     return blockIn(ack, b.id)!.rev;
   }, lock.withPermits(1));
 
@@ -296,8 +296,8 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
       .filter((a) => a.enabled)
       .slice(0, demoScript.length)
       .map((a) => a.id);
-    if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]));
-    if (demoOn) return yield* Effect.fail(refused("演示正在写，写完再点"));
+    if (writers.length === 0) return yield* refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]);
+    if (demoOn) return yield* refused("演示正在写，写完再点");
     demoOn = true;
     // The demo lives as long as the service: stopping the farm stops it.
     yield* Effect.forkIn(runDemo(id, writers), scope);

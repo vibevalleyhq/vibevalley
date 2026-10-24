@@ -303,7 +303,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     const number = /^#?(\d+)$/.exec(r)?.[1];
     if (number !== undefined) {
       const row = yield* one(q.issueByNumber({ number: Number(number) }));
-      if (!row) return yield* Effect.fail(missing("工单 #" + number, [lookIn.issue]));
+      if (!row) return yield* missing("工单 #" + number, [lookIn.issue]);
       return row.id;
     }
     return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
@@ -313,7 +313,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   const get = Effect.fnUntraced(function* (ref: string): Effect.fn.Return<Issue, ApiError> {
     const issue = yield* idOf(ref);
     const row = yield* one(q.getIssue({ id: issue }));
-    if (!row) return yield* Effect.fail(missing("工单 " + ref, [lookIn.issue]));
+    if (!row) return yield* missing("工单 " + ref, [lookIn.issue]);
     return issueOf(
       row,
       (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
@@ -509,11 +509,11 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
 
   /** Who an unsent issue goes to and where, or why it cannot go: starting it and its dry run ask the same. */
   const readyOf = Effect.fnUntraced(function* (issue: Issue) {
-    if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
+    if (issue.refining) return yield* refused(issue.refining.name + " 正在起草：等它交回来再开工");
     const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
-    if (!issue.assignee) return yield* Effect.fail(refused("还没选派哪个帮工档案", pick));
+    if (!issue.assignee) return yield* refused("还没选派哪个帮工档案", pick);
     const agent = store.agent(issue.assignee);
-    if (!agent) return yield* Effect.fail(refused("帮工档案 " + issue.assignee + " 不在了", pick));
+    if (!agent) return yield* refused("帮工档案 " + issue.assignee + " 不在了", pick);
     return [issue, agent, issue.project ?? agent.workdir ?? ""] as const;
   });
 
@@ -585,25 +585,25 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   const reopen = Effect.fnUntraced(function* (id: string, text: string, channel: string, by: RunTrigger = { kind: "comment" }, to?: Agent) {
     const issue = yield* get(id);
     if (issue.graph || issue.task || issue.delivered === "merged_into_parent")
-      return yield* Effect.fail(refused("这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划"));
+      return yield* refused("这是计划里的工单，跟着计划走：在计划里重试这一步，或者重开整个计划");
     if (issue.sessions.length === 0) {
       // Run before by no session (the orchestrator): its doer takes it up again, with the owner's words.
-      if (!issue.lastRun) return yield* Effect.fail(refused("这张工单还没开过工：直接开工"));
-      if (!isClosed(issue.status)) return yield* Effect.fail(refused("这张工单还开着：挪回待办就是再来一轮"));
+      if (!issue.lastRun) return yield* refused("这张工单还没开过工：直接开工");
+      if (!isClosed(issue.status)) return yield* refused("这张工单还开着：挪回待办就是再来一轮");
       yield* start(id, channel, by, text);
       return "";
     }
     const last = yield* sessions.get(issue.sessions.at(-1)!);
-    if (!last) return yield* Effect.fail(missing("工单 " + id, [lookIn.issue]));
-    if (!isClosed(issue.status)) return yield* Effect.fail(refused(last.name + " 还在做这张工单：直接给它带话"));
+    if (!last) return yield* missing("工单 " + id, [lookIn.issue]);
+    if (!isClosed(issue.status)) return yield* refused(last.name + " 还在做这张工单：直接给它带话");
     const agent = to ?? store.agent(last.agent);
-    if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
+    if (!agent) return yield* refused("派它的帮工档案 " + last.agent + " 不在了");
     const where = issue.project ?? "";
     const changes = yield* Effect.option(projects.branchChanges(where, issueBranch(issue.number)));
     const previous = Option.isSome(changes) && changes.value.commits.length > 0;
     const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
     const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
-    if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
+    if (!hired.session) return yield* refused(hired.refused ?? "派不出去");
     return hired.session.id;
   });
 
@@ -630,7 +630,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         if (!found || t.status === "backlog" || t.status === "todo") return yield* Effect.asVoid(start(t.id, channel.id, by));
         if (isClosed(t.status)) return yield* Effect.asVoid(reopen(t.id, text, channel.id, by));
         const d = yield* sessions.deliver(t.sessions.at(-1)!, text, by);
-        if (d.kind === "refused") return yield* Effect.fail(refused(d.reason ?? ""));
+        if (d.kind === "refused") return yield* refused(d.reason ?? "");
       }),
     );
     if (result._tag === "Failure") yield* chat.notice(channel.id, "定时「" + s.name + "」开不了工：" + reasonOf(result.failure), "recurrence_refused");
@@ -660,7 +660,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
 
   const comment = Effect.fnUntraced(function* (id: string, text: string, sendKey = "") {
     const issue = yield* get(id);
-    if (isClosed(issue.status)) return yield* Effect.fail(refused("这张工单关上了：带一句话重开它"));
+    if (isClosed(issue.status)) return yield* refused("这张工单关上了：带一句话重开它");
     const session = yield* liveSession(id);
     const said = yield* chat.tellSession("user", session, text, sendKey);
     // Said in its thread, the issue hears it from the message's fact (heard below); with no thread there is no fact.
@@ -677,12 +677,12 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
    * moves, so a handover never leaves its session gone and no one sent. */
   const takerOf = Effect.fnUntraced(function* (t: Issue, to: IssueStatus, key: string) {
     const a = store.named(key.trim());
-    if (!a) return yield* Effect.fail(refused("没有叫 " + key + " 的帮工档案", [lookIn.agent]));
+    if (!a) return yield* refused("没有叫 " + key + " 的帮工档案", [lookIn.agent]);
     if (a.id === t.assignee) return undefined;
-    if (to !== "todo") return yield* Effect.fail(refused("换人是挪到待办时的事：挪到待办，填上谁来接手"));
-    if (t.status === "in_progress") return yield* Effect.fail(refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`));
-    if (!a.enabled) return yield* Effect.fail(refused(a.name + " 被停用了"));
-    for (const i of yield* runtimes.check(a)) if (i.level === "error") return yield* Effect.fail(refused(`${a.name} 派不出去：${i.text}`));
+    if (to !== "todo") return yield* refused("换人是挪到待办时的事：挪到待办，填上谁来接手");
+    if (t.status === "in_progress") return yield* refused(`#${t.number} 还在干这一轮：先叫停，等它停下再换人`);
+    if (!a.enabled) return yield* refused(a.name + " 被停用了");
+    for (const i of yield* runtimes.check(a)) if (i.level === "error") return yield* refused(`${a.name} 派不出去：${i.text}`);
     return a;
   });
 
@@ -691,7 +691,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     const t = yield* get(id);
     const last = t.sessions.at(-1);
     if (last === undefined || !sessions.find(last)) return;
-    if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last, [lookIn.session]));
+    if (!(yield* sessions.dismiss(last))) return yield* missing("帮工 " + last, [lookIn.session]);
   });
 
   // ── a move worked out before it is made ──
@@ -708,12 +708,12 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
    * previewStatus says it in words: one judgment, so a dry run never promises what the move would refuse. */
   const settledMove = Effect.fnUntraced(function* (t: Issue, to: IssueStatus, text: string, opt: StatusOptions) {
-    if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* Effect.fail(refused("没有这个状态：" + to));
+    if (!(IssueStatusValues as readonly string[]).includes(to)) return yield* refused("没有这个状态：" + to);
     const taker = opt.agent ? yield* takerOf(t, to, opt.agent) : undefined;
     const [move, why] = statusMove(t, to);
     const said = text.trim();
-    if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
-    if (move === "round" && !taker && !said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
+    if (move === "none") return yield* refused(why, nextSteps(t));
+    if (move === "round" && !taker && !said) return yield* refused("再干一轮要说一句：这一轮要它做什么");
     // What a completion delivers follows the issue: nothing to take in, its branch kept, or merged (locally or by a PR).
     let delivery: "kept" | "none" | "merge" | undefined;
     let commits = 0;
@@ -917,12 +917,12 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       let was: Issue;
       if (whileOpen) {
         was = yield* get(id);
-        if (isClosed(was.status)) return yield* Effect.fail(refused("这张工单关上了"));
+        if (isClosed(was.status)) return yield* refused("这张工单关上了");
       } else was = yield* unsent(id);
       const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
       if (upd.project !== undefined && upd.project !== was.project && was.project) {
         const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
-        if (released.kept) return yield* Effect.fail(refused(`工单 #${was.number} 还不能换项目：${released.reason}`));
+        if (released.kept) return yield* refused(`工单 #${was.number} 还不能换项目：${released.reason}`);
       }
       const criteria = upd.criteria !== undefined ? kept(upd.criteria) : (was.criteria ?? []);
       yield* db(
@@ -944,7 +944,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     remove: Effect.fn("Issues.remove")(function* (id) {
       const t = yield* unsent(id);
       const cleared = yield* clearRefinement(t);
-      if (cleared.kept) return yield* Effect.fail(refused(`工单 #${t.number} 还不能删：${cleared.reason}`));
+      if (cleared.kept) return yield* refused(`工单 #${t.number} 还不能删：${cleared.reason}`);
       yield* db(q.removeIssue({ id }));
       yield* core.apply({ type: "issueGone", id } as never);
     }),
@@ -963,7 +963,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     dispatchQueued: Effect.fn("Issues.dispatchQueued")(function* (id) {
       const issue = yield* get(id);
       if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
-        return yield* Effect.fail(refused("只有排着队的待办能从这里开工"));
+        return yield* refused("只有排着队的待办能从这里开工");
       const [, agent, project] = yield* ready(id);
       const full = sessions.noRoom(agent.runtime, project);
       if (full) return { queued: full + "：还在排队，有空位就自动开工" };
@@ -976,7 +976,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       const id = t.id;
       const name = actLabel[req.act];
       if (!t.attention.acts.includes(req.act))
-        return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+        return yield* refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t));
       const said = (req.text ?? "").trim();
       const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
       switch (req.act) {
@@ -992,7 +992,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
           break;
         case "reject": {
           const findings = req.findings ?? findingsOf(said);
-          if (findings.length === 0) return yield* Effect.fail(refused("打回要写哪里要修，一行一条"));
+          if (findings.length === 0) return yield* refused("打回要写哪里要修，一行一条");
           yield* shape.review(id, { pass: false, findings });
           break;
         }
@@ -1099,7 +1099,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       const t = yield* get(ref);
       const name = actLabel[req.act];
       if (!t.attention.acts.includes(req.act))
-        return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+        return yield* refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t));
       const said = (req.text ?? "").trim();
       const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
       const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
@@ -1155,7 +1155,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     changes: Effect.fn("Issues.changes")(function* (id, by) {
       const session = yield* liveSession(id);
       const changes = yield* sessions.changes(session);
-      if (!changes) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
+      if (!changes) return yield* missing("帮工 " + session, [lookIn.session]);
       if (by === "owner") yield* core.did({ kind: "reviewed", session });
       return changes;
     }),
@@ -1164,11 +1164,11 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     resolve: Effect.fn("Issues.resolve")(function* (id) {
       const session = yield* liveSession(id);
       const h = sessions.sessionOf(session);
-      if (!h) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
+      if (!h) return yield* missing("帮工 " + session, [lookIn.session]);
       // A preview that fails (git broken) is said as it is, not taken for no conflict.
       const changes = h.conflict ? undefined : yield* sessions.changes(session);
       const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
-      if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
+      if (!conflict) return yield* refused(h.name + " 和主分支没有冲突");
       yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");
     }),
     cancel,
@@ -1182,7 +1182,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
           : t.status !== "in_review"
             ? "还没交回来，没有东西可验收"
             : "";
-      if (why) return yield* Effect.fail(refused(why, nextSteps(t)));
+      if (why) return yield* refused(why, nextSteps(t));
       if (req.pass) {
         yield* judged(
           id,
@@ -1193,7 +1193,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       }
       const fresh = kept(req.findings);
       const text = (req.text ?? "").trim();
-      if (fresh.length === 0 && !text) return yield* Effect.fail(refused("没过验收要说哪里不行：至少写一条意见"));
+      if (fresh.length === 0 && !text) return yield* refused("没过验收要说哪里不行：至少写一条意见");
       const at = yield* Clock.currentTimeMillis;
       const findings = [...t.findings, ...fresh.map((text) => ({ id: newId(), text, at }))];
       yield* judged(id, 0, findings);
@@ -1214,7 +1214,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     }),
     templates: Effect.fn("Issues.templates")(function* (name) {
       const stack = yield* projects.stack(name);
-      if (!stack) return yield* Effect.fail(missing("项目 " + name, [lookIn.project]));
+      if (!stack) return yield* missing("项目 " + name, [lookIn.project]);
       return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
     }),
     hire,

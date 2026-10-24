@@ -10,7 +10,7 @@
 
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
-import { type ApiError } from "@vibevalley/protocol/api";
+import { type ApiError, ConnectorRefused } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -737,12 +737,12 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
     logout: (id) => Effect.promise(async () => (bridge(id) ? bridge(id)!.logout() : off(id))),
     setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
       const b = bridge(id);
-      if (!b) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有 ${id} 这个连接` });
+      if (!b) return yield* new ConnectorRefused({ reason: `没有 ${id} 这个连接` });
       const channel = yield* chat.channelByName(name);
-      if (!channel) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有叫 ${name} 的频道` });
+      if (!channel) return yield* new ConnectorRefused({ reason: `没有叫 ${name} 的频道` });
       return yield* Effect.tryPromise({
         try: () => b.setChannel(channel.id !== general ? channel.id : undefined),
-        catch: (e): ApiError => ({ _tag: "ConnectorRefused", reason: message(e) }),
+        catch: (e): ApiError => new ConnectorRefused({ reason: message(e) }),
       });
     }),
   });
