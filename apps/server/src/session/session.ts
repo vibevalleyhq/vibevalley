@@ -33,7 +33,7 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Clock, Context, Data, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -244,16 +244,16 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
 }
 
 /** Work that did not go in (see handOver); the session stays. */
-export class NotTakenIn extends Data.TaggedError("NotTakenIn")<{
-  readonly failure: MergeFailure;
+export class NotTakenIn extends Schema.TaggedError<NotTakenIn>()("NotTakenIn", {
+  failure: MergeFailure,
   /** What the helper is sent back with; "" when the owner settles it. */
-  readonly fix: string;
+  fix: Schema.String,
   /** What the owner is told; also the message. */
-  readonly owner: string;
-  readonly notice: string;
-  readonly short: string;
-  readonly message: string;
-}> {}
+  owner: Schema.String,
+  notice: Schema.String,
+  short: Schema.String,
+  message: Schema.String,
+}) {}
 
 /** A failure's words, whatever it is. */
 const reasonText = (e: unknown): string =>
@@ -904,7 +904,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         yield* rest(h);
         const merged = yield* use(h.place, h.lastText).pipe(
           Effect.mapError((e) => {
-            const f = e instanceof MergeFailure ? e : MergeFailure.error(reasonText(e));
+            const f = e instanceof MergeFailure ? e : MergeFailure.ofError(reasonText(e));
             if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
             const words = notTakenIn(f, current.name, settle);
             return new NotTakenIn({ failure: f, ...words, message: words.owner });

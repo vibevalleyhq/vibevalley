@@ -348,7 +348,7 @@ export const make = (options: TaskOptions = {}) =>
           (place) =>
             Effect.gen(function* () {
               verification = yield* verified(graph, task, place.cwd);
-              if (verification.rejected) return yield* Effect.fail(MergeFailure.check(verification.rejected.why));
+              if (verification.rejected) return yield* Effect.fail(MergeFailure.ofCheck(verification.rejected.why));
               return yield* projects.mergeInto(place, target);
             }),
           "helper",

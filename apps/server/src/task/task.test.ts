@@ -155,7 +155,7 @@ class FakeWork implements TaskWork {
   handOver: SessionShape["handOver"] = (id, _closed, use, settle = "owner") =>
     use({ project: "", cwd: "/wt/" + id }, this.last.get(id) ?? "").pipe(
       Effect.mapError((e) => {
-        const failure = e instanceof MergeFailure ? e : MergeFailure.error(String(e));
+        const failure = e instanceof MergeFailure ? e : MergeFailure.ofError(String(e));
         const words = notTakenIn(failure, id, settle);
         return new NotTakenIn({ failure, ...words, message: words.owner });
       }),

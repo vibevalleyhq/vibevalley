@@ -67,8 +67,8 @@ export function merging(d: MergeDeps) {
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: Issue, said: string) {
     const pr = yield* projects
       .submitPullRequest(place, issue, pullRequestConclusion(said))
-      .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : MergeFailure.error(e.message))));
-    yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.error(reasonOf(e))));
+      .pipe(Effect.mapError((e) => (e instanceof MergeFailure ? e : MergeFailure.ofError(e.message))));
+    yield* savePullRequest(issue.id, pr).pipe(Effect.mapError((e) => MergeFailure.ofError(reasonOf(e))));
     return { pullRequest: pr, text: "PR：" + pr.url, commits: 0 } as Merged;
   });
 

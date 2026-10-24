@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
-import { Context, Data, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
@@ -47,7 +47,7 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonly message: string }> {}
+export class SettingRefused extends Schema.TaggedError<SettingRefused>()("SettingRefused", { message: Schema.String }) {}
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;

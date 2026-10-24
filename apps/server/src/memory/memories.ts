@@ -3,7 +3,7 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
-import { Clock, Data, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
@@ -40,7 +40,7 @@ export interface Note {
   readonly session?: string;
 }
 
-export class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
+export class MemoryRefused extends Schema.TaggedError<MemoryRefused>()("MemoryRefused", { message: Schema.String }) {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;

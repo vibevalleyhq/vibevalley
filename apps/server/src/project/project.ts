@@ -32,7 +32,7 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
+import { Clock, Context, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -63,27 +63,26 @@ export interface Merged {
   readonly warning?: string;
 }
 
-/** Why a merge did not go in: a conflict (and with what), the check, or git. */
 /** Work that did not merge: a conflict (with the base and its files), a failed check, or anything else. */
-export class MergeFailure extends Data.TaggedError("MergeFailure")<{
-  readonly kind: "conflict" | "check" | "error";
-  readonly reasonText: string;
-  readonly base: string;
-  readonly files: readonly string[];
-  readonly message: string;
-}> {
-  static conflict(base: string, files: readonly string[]) {
+export class MergeFailure extends Schema.TaggedError<MergeFailure>()("MergeFailure", {
+  kind: Schema.Literals(["conflict", "check", "error"]),
+  reasonText: Schema.String,
+  base: Schema.String,
+  files: Schema.Array(Schema.String),
+  message: Schema.String,
+}) {
+  static ofConflict(base: string, files: readonly string[]) {
     return new MergeFailure({ kind: "conflict", reasonText: "", base, files, message: `合进 ${base} 有冲突` });
   }
-  static check(why: string) {
+  static ofCheck(why: string) {
     return new MergeFailure({ kind: "check", reasonText: why, base: "", files: [], message: why });
   }
-  static error(why: string) {
+  static ofError(why: string) {
     return new MergeFailure({ kind: "error", reasonText: why, base: "", files: [], message: why });
   }
 }
 
-export class ProjectError extends Data.TaggedError("ProjectError")<{ readonly message: string }> {}
+export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", { message: Schema.String }) {}
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 
@@ -160,11 +159,11 @@ const commitLeft = Effect.fnUntraced(function* (cwd: string, message: string) {
   yield* commit(cwd, message);
 });
 
-const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
+const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.ofError(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
   if ((yield* git(path, "rev-parse", "refs/heads/" + branch)) !== checked)
-    return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
+    return yield* Effect.fail(MergeFailure.ofCheck("分支在检查以后又变了，请重新检查再合"));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
@@ -551,7 +550,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       .trim()
       .split("\n")
       .slice(-40);
-    return yield* Effect.fail(MergeFailure.check(why + "\n" + lines.join("\n")));
+    return yield* Effect.fail(MergeFailure.ofCheck(why + "\n" + lines.join("\n")));
   });
 
   /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
@@ -561,7 +560,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
     const into = target || (yield* git(path, "symbolic-ref", "--short", "HEAD"));
     const checked = yield* git(path, "rev-parse", "refs/heads/" + place.branch);
     const conflicts = yield* conflictsOf(path, into, checked);
-    if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(into, conflicts));
+    if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(into, conflicts));
     yield* projectCheck(place.cwd);
     return checked;
   });
@@ -574,7 +573,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       Effect.gen(function* () {
         const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
         const files = yield* conflictsOf(path, main, place.branch!);
-        if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
+        if (files.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(main, files));
         yield* git(place.cwd, ...asFarm, "merge", "--no-edit", main);
         return main;
       }),
@@ -586,7 +585,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
     const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
     // A merge that would conflict is not tried: the session resolves it on its branch first.
     const conflicts = yield* conflictsOf(path, main, branch);
-    if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, conflicts));
+    if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(main, conflicts));
     const ahead = Number(yield* git(path, "rev-list", "--count", `${main}..${branch}`)) || 0;
     if (ahead > 0) {
       const merged = yield* gitRun(path, "merge", "--no-edit", branch);
@@ -752,7 +751,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
               yield* unchangedBranch(path, place.branch!, checked);
               const head = yield* git(path, "symbolic-ref", "--short", "HEAD");
               if (!(yield* gitOk(path, "merge-base", "--is-ancestor", head, checked)))
-                return yield* Effect.fail(MergeFailure.check("主分支在检查期间又变了，请重新检查再合"));
+                return yield* Effect.fail(MergeFailure.ofCheck("主分支在检查期间又变了，请重新检查再合"));
               const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`);
               const warning = yield* cleanupMerged(place, path);
               return {
@@ -768,14 +767,14 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       toMergeFailure(
         Effect.gen(function* () {
           const path = join(root, place.project);
-          if (!place.branch) return yield* Effect.fail(MergeFailure.error("它直接在项目里干活，没有分支可合"));
+          if (!place.branch) return yield* Effect.fail(MergeFailure.ofError("它直接在项目里干活，没有分支可合"));
           const checked = yield* checkMerge(place, target);
           return yield* serially(
             place.project,
             Effect.gen(function* () {
               yield* unchangedBranch(path, place.branch!, checked);
               const conflicts = yield* conflictsOf(path, target, place.branch!);
-              if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(target, conflicts));
+              if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(target, conflicts));
               const brought = (yield* git(path, "log", "--reverse", "--format=%h", `${target}..${place.branch}`)).split("\n").filter((s) => s !== "");
               if (brought.length > 0) {
                 const ours = yield* git(path, "rev-parse", "refs/heads/" + target);
@@ -920,7 +919,7 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           if (repo === "") return yield* fail("不是 GitHub 仓库");
           const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
           const files = yield* conflictsOf(path, main, checked);
-          if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
+          if (files.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(main, files));
           const pushed = hooks.push
             ? yield* hooks.push(place.cwd, place.branch!)
             : (yield* run("git", ["push", "-u", "origin", place.branch!], { cwd: place.cwd, timeoutMs: cloneTimeoutMs })).code === 0;

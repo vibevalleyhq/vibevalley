@@ -301,13 +301,13 @@ describe("shell", () => {
 
 describe("work that does not go in", () => {
   it("sends the helper back with what to fix; a conflict only when the helper settles it", () => {
-    const check = notTakenIn(MergeFailure.check("测试没过"), "阿狐", "owner");
+    const check = notTakenIn(MergeFailure.ofCheck("测试没过"), "阿狐", "owner");
     expect([check.fix, check.short]).toEqual(["测试没过\n请修好检查，再交回来。", "项目检查没通过"]);
-    const conflict = MergeFailure.conflict("main", ["a.ts", "b.ts"]);
+    const conflict = MergeFailure.ofConflict("main", ["a.ts", "b.ts"]);
     expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
     expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
     expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
-    expect(notTakenIn(MergeFailure.error("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
+    expect(notTakenIn(MergeFailure.ofError("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
   });
 
   it("reads a conflict off a preview", () => {
