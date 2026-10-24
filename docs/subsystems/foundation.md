@@ -44,12 +44,19 @@
 
 **Effect 的写法**
 
-- **服务的方法有名字**：`make` 返回的方法和内部的帮手写成 `Effect.fn("<服务>.<名字>")(function* (...) {...})`，出错的栈和追踪里看得出是哪个；要锁的把 `lock.withPermits(1)` 作为第二个参数。参数的类型由服务的 Shape 定。
-- **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域。
-- **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。
-- **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
-- **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
-- **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`MergeFailure`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`），按 `catchTag` 接、能直接 `yield*`，不用 `instanceof` 分；`MergeFailure` 由 `MergeFailure.conflict(base, files)`、`.check(why)`、`.error(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。
+照 effect 自带的指南（`node_modules/effect/AGENTS.md`，AGENTS.md 的「Learning more about Effect」）写，下面是这个仓库里的落法。
+
+- **函数**：服务 Shape 上的方法写成 `Effect.fn("<服务>.<方法>")(function* (...) {...})`，是追踪的边界；不对外的帮手和模块的 `make` 写成 `Effect.fnUntraced(...)`。不写整个就是一段 `Effect.gen` 的函数；要标返回类型的写在生成器上（`Effect.fn.Return<A, E>`）。要锁的把 `lock.withPermits(1)` 作为第二个参数，不 `.pipe`。服务用 `X.of({...})` 返回。
+- **时间**：Effect 代码里读时间是 `yield* Clock.currentTimeMillis`，不读 `Date.now()`；测试要拨钟就给 `world` 的 `clock`（`testing/clock.ts`：整座农场读的「现在」由测试给，睡照真的睡），`it.effect` 的测试用 `TestClock`。
+- **定期**：后台隔一段做一次的是 `x.pipe(Effect.repeat(Schedule.spaced(n)))`（先等再做的再加 `Effect.delay(n)`），不写 `Effect.forever` 加 `sleep`。
+- **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域；回调里写日志用 `base/log.ts` 的 `callbackLog`，也是 Effect 的日志。
+- **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。
+- **资源**：长寿的资源用 `Effect.acquireRelease` 把建和关写在一处；按开关开合的（连接到本机的监听）每开一次一个 `Scope`，关就是关这个 `Scope`。
+- **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`。
+- **库**：服务经 `Db`（`base/db.ts`）用库：`run`（失败是缺陷）、`attempt`（失败留着）、`one`、`inTx`；不各写一份 `provideService(SqlClient)`。
+- **数据照 Schema 读**：外面来的（请求体、`gh` 和 `tokei` 的输出、帮工交回的 json 块）、自己写进表的 JSON 列，都经 Schema 解（`Schema.fromJsonString`，`base/json.ts` 的 `jsonOf`、`jsonOrNone`，模型写的「一行或一串」用 `lines`），不 `JSON.parse(...) as T`、不一个字段一个字段地 `typeof`。文件走 `FileSystem`（`platform` 提供 `NodeServices.layer`），失败照旧是缺陷。
+- **错误**：都是 `Schema.TaggedError`：接口的拒绝（protocol 的 `Refused`、`Missing`……，`ApiError` 的 Schema 是它们的 `Union`）和服务自己的（`ProjectError`、`MergeFailure`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`）。抛的时候 `return yield* refused(...)`、`return yield* new X({...})`，接的时候 `catchTag`；`MergeFailure` 由 `ofConflict(base, files)`、`ofCheck(why)`、`ofError(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。
+- **观测**：配置填了 `otlp.url`（[设置](docs/subsystems/setting.md)），`Effect.fn` 的 span、日志和指标经 `Otlp.layer` 送到那个收集器；空着不送。
 
 **形状和规则**
 
@@ -115,7 +122,7 @@
 - **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
-- **照 Effect v4 的写法，但不在交界处硬改。** 服务的方法用 `Effect.fn`、定时进作用域、Effect 代码里不另起运行时，是因为名字、中断和收尾由 Effect 管才不会漏（关不干净的定时器、跑在纤程外的事实）。和 Promise 写的库交界的地方（oar、pi-agent-core、MCP 的 SDK、连接器、语音的隧道、终端里的对话）照旧是 Promise 和回调：改了只是换写法。放弃了把服务的状态都换成 `Ref`：大多是同步的读改写，换了要处处 `getUnsafe`，不消掉竞争。放弃了把 `ApiError` 换成 `Schema.TaggedErrorClass`：它是页面和服务端共用的契约，129 处拒绝都要动，收益只是栈和 cause。放弃了把 `project/git.ts` 的子进程换成 `ChildProcess`：它也会杀整个进程组，但超时被打断时会丢掉已经读到的输出（检查超时要说出最后几行），每个 git 的帮手还要多带一个 `ChildProcessSpawner`；现在的 `Effect.callback` 加打断时杀进程组，就是 v4 给这种交界的写法。
+- **照 Effect v4 的写法，但不在交界处硬改。** 服务的方法用 `Effect.fn`、定时进作用域、Effect 代码里不另起运行时，是因为名字、中断和收尾由 Effect 管才不会漏（关不干净的定时器、跑在纤程外的事实）。和 Promise 写的库交界的地方（oar、pi-agent-core、MCP 的 SDK、连接器、语音的隧道、终端里的对话）照旧是 Promise 和回调：改了只是换写法。放弃了把服务的状态都换成 `Ref`：大多是同步的读改写，换了要处处 `getUnsafe`，不消掉竞争。`ApiError` 换成了 `Schema.TaggedError` 的类：原来是 interface 加工厂函数，命令行读回来又手写了一份 Schema，两份靠 `Schema.Codec` 绑住；类本身就是类型、Schema 和能 `yield*` 的错误，线上的 JSON 不变。放弃了把 `project/git.ts` 的子进程换成 `ChildProcess`：它也会杀整个进程组，但超时被打断时会丢掉已经读到的输出（检查超时要说出最后几行），每个 git 的帮手还要多带一个 `ChildProcessSpawner`；现在的 `Effect.callback` 加打断时杀进程组，就是 v4 给这种交界的写法。
 - **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
 - **PGlite，不是 SQLite。** effect-sqlc 读 Postgres 的表结构和查询，类型推得出来；PGlite 在进程里，不要单独装数据库，桌面版带得走。代价是库比 SQLite 大、开机多花一点时间。
 - **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Schema.Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。

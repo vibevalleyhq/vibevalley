@@ -23,7 +23,7 @@ Status: proposed
 | 和非 Effect 代码交界：`ManagedRuntime`，回调用 `Stream.callback` | `FiberSet.makeRuntime*` 12 处，`Effect.runSync` 3 处（oar 的回调），`Stream.callback` 1 | `Effect.promise` 39 处、`tryPromise` 9 处：前者把拒绝当缺陷 |
 | HTTP 出站用 `HttpClient`；服务端用 `HttpApi` | `HttpClient` 只在命令行；`fetch` 12 处；服务端是自己的接口表 `endpoints` 加 `HttpRouter` | 出站请求没有 Schema、没有统一的超时和重试 |
 | 子进程用 `effect/process` | `node:child_process` 5 个文件，`ChildProcess` 0 | `git.ts` 已经说明为什么不换（[地基](docs/subsystems/foundation.md)），其余三处没评估过 |
-| 观测：`Effect.log*`、span、Otlp | `Effect.log*` 35，`callbackLog` 的 `logs.*` 32，`console.*` 24；没有 tracer | `Effect.fn` 的 span 没有去处，三套日志 |
+| 观测：`Effect.log*`、span、Otlp | `Effect.log*` 35，`callbackLog`（回调里的 `Effect.log*`）32，`console.*` 24；没有 tracer | `Effect.fn` 的 span 没有去处；`session/journal.ts` 还在 `console.warn` |
 | 测试：`it.effect`、共享的测试 layer | `it.effect` 56，`it.live` 200，`Effect.runPromise` 25 处，`as unknown as` 24 处 | 时间相关的测试只能跑真钟 |
 
 已经和指南一致、不再提的：入口是 `NodeRuntime.runMain(Layer.launch(farm))`（`main.ts:58`）；每个模块一个 `Context.Service`，按 `services.ts` 的次序叠 layer；protocol 的 329 个形状都是 `Schema.Codec<T.X>`；服务的方法有 `Effect.fn` 的名字，没有 `Effect.fn(...).pipe`；接错误用 `catchTag`（7 处）；命令行是 `effect/cli`、`HttpClient`、`Sse`、`Stdio`；服务里的定时是 `FiberMap`。
@@ -138,7 +138,7 @@ Status: proposed
 
 ## 观测
 
-- 三套日志并存：`Effect.log*` 35 处，`base/log.ts` 的 `callbackLog`（`logs.info`、`logs.warn`）32 处，`console.*` 24 处（`cli/chat.ts` 12 处是终端界面，对；`session/journal.ts`、`agent/brain` 的不是）。`callbackLog` 是给回调里用的；回调都有 `FiberSet` 的运行时，可以在那里 `Effect.log`，`callbackLog` 就能删。
+- 日志其实只有一套：`base/log.ts` 的 `callbackLog`（32 处）是在服务自己的纤程上 `Effect.log*`，给回调里用，和 `Effect.log*`（35 处）走的是同一个日志器（起初数的时候当成了第三套，看了实现更正）。`console.*` 24 处里 `cli/chat.ts` 12 处是终端界面，对；`agent/brain` 的在 pi-agent-core 的类里；该改的只有 `session/journal.ts` 的 2 处。
 - **没有 tracer。** `Effect.fn` 的 139 个名字现在只让出错的栈好读，span 没有去处。指南的「Setting up tracing with Otlp modules」是一个 layer；本机用的工具不必常开，`VIBEVALLEY_OTLP` 这样的开关打开时才挂上，调慢的派活、合并时就能看到每一步花在哪。`Effect.annotateLogs`、`withSpan` 0 处，挂 tracer 时再加在派活、合并、开会话这几条主线上。
 
 ## 测试
@@ -165,8 +165,22 @@ Status: proposed
 5. **`ApiError` 换成 `Schema.TaggedError` 的类**，服务端 `return yield* new Refused(...)`，手写的 Union 删掉；服务自己的 `Data.TaggedError` 一起换。
 6. **一个 `Db` 服务**替掉 10 份 `db` 帮手；`now` 以外的默认值做成 `Context.Reference`。
 7. **资源归 `acquireRelease`**：`lan` 的监听、`voice` 的线路和隧道、`dsh` 和 cloudflared 的子进程（`ChildProcess`）。
-8. **日志合成 `Effect.log`**，删 `callbackLog`；加一个按开关挂上的 Otlp tracer。
+8. **会话日志存不下时经服务的日志说**（`session/journal.ts` 的 `console.warn`）；加一个按开关挂上的 Otlp tracer。
 9. 之后再评估：`core` 换 `SubscriptionRef`、oar 的事件换 `Stream.callback`、出站请求换 `HttpClient`、id 加品牌、服务端换 `HttpApi`。
+
+### 做到哪了
+
+都在分支 `v4-o55` 上，一批一个提交，每批 `bun run check`、`server:check` 过（552 个；`project.test.ts` 的两条和连接器、群聊提及几条在全量跑时偶发失败，单跑都过，这几批以前就有）。
+
+1. **时间走 `Clock`**：做了。生成器里的 50 处 `Date.now()` 换成 `yield* Clock.currentTimeMillis`（codemod，`agent/brain` 不动）；`recurrence`、`notice` 的 `now` 选项删掉，`world` 换成一个 `clock` 选项（`testing/clock.ts`：整座农场读的「现在」由测试给，睡照真的睡），定时的测试、管家巡查的测试、工单的两个测试改用它；`memory.test.ts` 的一个 `it.effect` 测试在 `TestClock` 下从 0 开始，先 `TestClock.setTime`。没换成 `it.effect` 加 `TestClock`：定时的测试搭了整座农场，里面的等待（`Effect.sleep`、`FiberMap` 的定时）在 `TestClock` 下都要手拨；`lan`、`voice` 的 `now` 是在 node 的回调和 Promise 代码里读的，留着。
+2. **函数的写法**：做了。整个就是 `Effect.gen` 的函数改成 `Effect.fn`（Shape 的方法）或 `Effect.fnUntraced`（帮手、`make`），自己写的 `Effect.Effect<...>` 返回类型改成 `Effect.fn.Return<...>`；不对外的帮手上的 `Effect.fn` 换成 `fnUntraced`，共 126 处；12 个服务改成 `const shape = X.of({...})`（`doc` 的 shape 比 Shape 宽，没改）。还剩 9 个匿名的小包装（命令和 layer 的回调）和 `task` 的 `make`。
+3. **定期用 `Schedule`**：做了 5 个（定时的 tick、数 commit、巡查、排队、PR 的状态）；`core` 的那个不是定时，是等第一条变化再攒一阵，留 `Effect.forever`。
+4. **外来数据照 Schema 解**：做了请求体（`http/api.ts`，`Schema.fromJsonString(endpoint.body)`）、`gh` 的 3 处和 `tokei` 的输出、帮工交回的结论和草稿（`parseAnswer`、`parseRefinement`，错话改成 Schema 说的、带字段的路径）、定时的 `when`、花费、连接器存着的密钥、消息的附注。没做的：`task/rules.ts` 拆计划的解码有 600 条黄金数据记着 Go 的错话，不动；`config.json`、`settings.json`、`state.json` 是主人的文件，形状对不上就会把主人的档案换回种子，先不收紧；`Effect.promise` 里会不会拒绝要逐个读被包的库，没做。
+5. **错误**：做了。protocol 的 `Refused`、`Missing`、`VoiceUnavailable`、`VoiceAgentFailed`、`ConnectorRefused`、`LanRefused` 是 `Schema.TaggedError` 的类，`ApiError` 的 Schema 是它们的 `Union`，手写的那份删了；线上的 JSON 不变（测过：自己的键就是 `_tag` 和字段）。98 处 `return yield* Effect.fail(refused(...))` 改成 `return yield* refused(...)`，余下 36 处不是直接 `yield*` 的（三元、`mapError`），照旧 `Effect.fail`。服务自己的 6 个 `Data.TaggedError` 也换成 `Schema.TaggedError`；`MergeFailure` 的具名构造改叫 `ofConflict`、`ofCheck`、`ofError`（Schema 的类自带静态的 `check`）。
+6. **`Db` 服务**：做了。`base/db.ts` 的 `Db`（`run`、`attempt`、`one`、`inTx`）在 `platform` 里提供，9 个模块不再各写一份；`agent/brain/taskStore.ts` 在普通函数里，留着。`now` 以外的默认值做成 `Context.Reference`：没做，改动面大、收益小。
+7. **资源归 `acquireRelease`**：做了 `lan` 的监听：绑上和关掉在一个 `acquireRelease` 里，每开一次一个 `Scope`，关就是关它。`voice` 的隧道和线路、`dsh` 的子进程在 Promise 写的适配器里（`dsh` 是 oar 的 `Runtime` 的实现），改它们要重写适配器，没做。
+8. **观测**：做了。配置加了 `otlp.url`（`VIBEVALLEY_OTLP_URL`），填了就经 `Otlp.layer` 把 span、日志和指标送出去（本机起一个假的收集器看过：收到 `/v1/traces` 和 `/v1/logs`，里面有 `Issues.edit`、`Issues.setStatus` 这些 `Effect.fn` 的 span）；`session/journal.ts` 存不下时经服务的 `Effect.logWarning` 说，`vite.config.ts` 不再为它放开 `no-console`。
+9. 之后再评估的没动：`core` 换 `SubscriptionRef`、oar 的事件换 `Stream.callback`、出站请求换 `HttpClient`、id 加品牌、服务端换 `HttpApi`；测试里的 `Effect.runPromise`（25 处）和 `as unknown as`（24 处）也没动。
 
 每批做完，在这一篇的「做到哪了」记一行；全部做完，把仍然成立的写法并进 [地基](docs/subsystems/foundation.md) 的「Effect 的写法」，删掉这一篇。
 
