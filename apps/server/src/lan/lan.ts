@@ -13,7 +13,7 @@ import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints, LanRefused } from "@vibevalley/protocol/api";
-import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { Context, Effect, Exit, FiberSet, Layer, Option, Scope, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { code as newCode, newId } from "../base/ids.ts";
@@ -245,15 +245,15 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
     });
   };
 
-  // A port taken is said in the status; the farm runs on.
-  const listen = () =>
-    new Promise<void>((resolve) => {
-      if (server) return resolve();
+  // The listener is bound and closed in one place: bound in the scope of this opening, closed with its connections when
+  // that scope closes (a shut, or the service ending). A port taken is said in the status; the farm runs on.
+  const listener = Effect.acquireRelease(
+    Effect.callback<Server | undefined>((resume) => {
       const s = createServer(guard);
       s.once("error", (e) => {
         problem = "连接开不起来：" + e.message;
         logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
-        resolve();
+        resume(Effect.succeed(undefined));
       });
       s.listen(config.lan.port, options.host, () => {
         problem = "";
@@ -261,19 +261,31 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
         const a = s.address();
         port = a && typeof a === "object" ? a.port : config.lan.port;
         logs.info(`vibevalley: lan access is open on port ${port}`);
-        resolve();
+        resume(Effect.succeed(s));
       });
-    });
-
-  const shut = () => {
+    }),
+    (s) =>
+      Effect.sync(() => {
+        if (!s) return;
+        s.closeAllConnections();
+        s.close();
+        server = undefined;
+        logs.info("vibevalley: lan access is shut");
+      }),
+  );
+  let opened: Scope.Closeable | undefined;
+  const listen = Effect.gen(function* () {
+    if (opened) return;
+    const scope = yield* Scope.make();
+    yield* Scope.provide(listener, scope);
+    opened = scope;
+  });
+  const shut = Effect.suspend(() => {
     dropPairing();
-    if (server) {
-      server.closeAllConnections();
-      server.close();
-      logs.info("vibevalley: lan access is shut");
-    }
-    server = undefined;
-  };
+    const scope = opened;
+    opened = undefined;
+    return scope ? Scope.close(scope, Exit.void) : Effect.void;
+  });
 
   const status = (): LanStatus => {
     const s: LanStatus = { open, hostName: hostName(), devices: [] };
@@ -289,8 +301,8 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
     return s;
   };
 
-  if (open) yield* Effect.promise(listen);
-  yield* Effect.addFinalizer(() => Effect.sync(shut));
+  if (open) yield* listen;
+  yield* Effect.addFinalizer(() => shut);
 
   const addDevice = Effect.fnUntraced(function* (name: string) {
     const key = randomBytes(32).toString("base64url");
@@ -306,10 +318,10 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
     setOpen: Effect.fn("Lan.setOpen")(function* (want) {
       yield* db(lanQ.setLanOpen({ open: want }));
       open = want;
-      if (want) yield* Effect.promise(listen);
+      if (want) yield* listen;
       else {
         problem = "";
-        shut();
+        yield* shut;
       }
       return status();
     }, opening.withPermits(1)),
