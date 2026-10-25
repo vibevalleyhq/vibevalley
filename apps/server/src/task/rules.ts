@@ -74,7 +74,7 @@ export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly
 
 const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
-/** A plan as the splitter writes it: optional fields may be missing but never null; other keys are ignored. */
+/** A split as the splitter writes it: optional fields may be missing but never null; other keys are ignored. */
 const SplitDraft = Schema.Struct({
   title: Schema.optionalKey(Schema.String),
   tasks: Schema.Array(
@@ -90,7 +90,7 @@ const SplitDraft = Schema.Struct({
     }),
   ),
 });
-// Two steps, so the words tell JSON that does not read from a plan that is not one.
+// Two steps, so the words tell JSON that does not read from a split that is not one.
 const readJson = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown));
 const readSplit = Schema.decodeUnknownResult(SplitDraft);
 
@@ -271,7 +271,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
     return t;
   };
   const project = graph.project;
-  // A plan is an issue of its own, under the same id.
+  // The task is an issue of its own, under the same id.
   const id = issueId(graph.id);
   const out = [
     keep(
