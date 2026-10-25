@@ -20,8 +20,22 @@ export function stackOf(dir: string): ProjectStack {
   };
   const has = (name: string) => read(name) !== undefined;
   const stack = (s: Partial<ProjectStack>) => withCommands({ ...empty, ...s });
-  if (has("go.mod")) return stack({ name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." });
-  if (has("Cargo.toml")) return stack({ name: "rust", label: "Rust", test: "cargo test", lint: "cargo clippy", build: "cargo build" });
+  if (has("go.mod"))
+    return stack({
+      name: "go",
+      label: "Go",
+      test: "go test ./...",
+      lint: "go vet ./...",
+      build: "go build ./...",
+    });
+  if (has("Cargo.toml"))
+    return stack({
+      name: "rust",
+      label: "Rust",
+      test: "cargo test",
+      lint: "cargo clippy",
+      build: "cargo build",
+    });
   const pubspec = read("pubspec.yaml");
   if (pubspec !== undefined)
     return pubspec.includes("flutter")
@@ -31,7 +45,12 @@ export function stackOf(dir: string): ProjectStack {
   if (pkg !== undefined) return nodeStack(pkg, has);
   const pyproject = read("pyproject.toml");
   if (pyproject !== undefined || has("requirements.txt") || has("setup.py"))
-    return stack({ name: "python", label: "Python", test: "pytest", lint: pyproject?.includes("ruff") ? "ruff check ." : "" });
+    return stack({
+      name: "python",
+      label: "Python",
+      test: "pytest",
+      lint: pyproject?.includes("ruff") ? "ruff check ." : "",
+    });
   return empty;
 }
 
@@ -45,5 +64,11 @@ function nodeStack(pkg: string, has: (name: string) => boolean): ProjectStack {
     // An unreadable package.json has no scripts.
   }
   const runScript = (s: string) => (scripts[s]?.trim() ? `${pm} run ${s}` : "");
-  return withCommands({ name: "node", label: `Node（${pm}）`, test: runScript("test"), lint: runScript("lint"), build: runScript("build") });
+  return withCommands({
+    name: "node",
+    label: `Node（${pm}）`,
+    test: runScript("test"),
+    lint: runScript("lint"),
+    build: runScript("build"),
+  });
 }

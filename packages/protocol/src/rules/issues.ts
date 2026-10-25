@@ -29,7 +29,12 @@ export const statusLabel: Readonly<Record<IssueStatus, string>> = {
   canceled: "已取消",
 };
 
-export const priorityLabel: Readonly<Record<Priority, string>> = { urgent: "紧急", high: "高", medium: "普通", low: "低" };
+export const priorityLabel: Readonly<Record<Priority, string>> = {
+  urgent: "紧急",
+  high: "高",
+  medium: "普通",
+  low: "低",
+};
 
 /** What an issue is to deliver, as the owner picks it. */
 export const deliverableLabel: Readonly<Record<Deliverable, string>> = {

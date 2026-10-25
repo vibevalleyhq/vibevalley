@@ -11,10 +11,10 @@ export const ServerReady: Schema.Codec<T.ServerReady> = Schema.Struct({
 
 export const GitHubStatus: Schema.Codec<T.GitHubStatus> = Schema.Struct({
   installed: Schema.Boolean,
-  version: Schema.String,
+  version: Schema.optionalKey(Schema.String),
   loggedIn: Schema.Boolean,
-  account: Schema.String,
-  reason: Schema.String,
+  account: Schema.optionalKey(Schema.String),
+  reason: Schema.optionalKey(Schema.String),
   checkedAt: Schema.Number,
 });
 
@@ -585,7 +585,9 @@ export const IssueTimeline: Schema.Codec<T.IssueTimeline> = Schema.Struct({
   spent: Schema.optionalKey(Spent),
 });
 
-export const Preview: Schema.Codec<T.Preview> = Schema.Struct({ does: Schema.mutable(Schema.Array(Schema.String)) });
+export const Preview: Schema.Codec<T.Preview> = Schema.Struct({
+  does: Schema.mutable(Schema.Array(Schema.String)),
+});
 
 export const IssueRun: Schema.Codec<T.IssueRun> = Schema.Struct({
   startedAt: Schema.Number,

@@ -5,7 +5,13 @@ import { expect, test } from "vite-plus/test";
 import { stackOf } from "./stack.ts";
 
 const scripts = `{"scripts":{"test":"vitest run","build":"vite build"}}`;
-const go = { name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." };
+const go = {
+  name: "go",
+  label: "Go",
+  test: "go test ./...",
+  lint: "go vet ./...",
+  build: "go build ./...",
+};
 
 test.each([
   ["nothing", { "README.md": "hi" }, { name: "", label: "" }],

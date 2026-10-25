@@ -115,7 +115,10 @@ describe("projects", () => {
         expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/);
         expect(yield* p.branchChanges("task", "vibevalley/missing")).toBeUndefined();
         expect(yield* p.mergeBranch("task", "vibevalley/task-1")).toMatch(/1 个提交合进了 task 的 main/);
-        expect(yield* p.run(join(root, "task"), "cat a.txt && exit 3")).toEqual({ ok: false, output: "a" });
+        expect(yield* p.run(join(root, "task"), "cat a.txt && exit 3")).toEqual({
+          ok: false,
+          output: "a",
+        });
       }),
     );
   });
@@ -159,7 +162,10 @@ describe("projects", () => {
   });
 
   it("tokei's output", () => {
-    const report = (name: string) => ({ name, stats: { blanks: 0, code: 1, comments: 0, blobs: {} } });
+    const report = (name: string) => ({
+      name,
+      stats: { blanks: 0, code: 1, comments: 0, blobs: {} },
+    });
     const lang = (blanks: number, code: number, comments: number, ...reports: object[]) => ({
       blanks,
       code,
@@ -484,7 +490,10 @@ describe("projects", () => {
         writeFileSync(join(kept.cwd, "work.txt"), "z");
         gitSync(kept.cwd, "add", ".");
         gitSync(kept.cwd, "commit", "-qm", "work");
-        expect(yield* p.clear("demo", 8)).toMatchObject({ kept: true, reason: expect.stringMatching(/分支留着/) });
+        expect(yield* p.clear("demo", 8)).toMatchObject({
+          kept: true,
+          reason: expect.stringMatching(/分支留着/),
+        });
         expect(yield* p.clear("missing", 9)).toEqual({ kept: false });
       }),
     );
