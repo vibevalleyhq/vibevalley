@@ -48,6 +48,7 @@
 - **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域。
 - **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。同一段逻辑的 `Effect.sleep` 和静默时长用同一个 Clock；同步回调要读时间时用它的 `currentTimeMillisUnsafe`，不另读墙钟。
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
+- **定期的后台任务用 `Schedule`**：`x.pipe(Effect.repeat(Schedule.spaced(n)))`，先等一个周期再做的加 `Effect.delay(n)`；不写 `Effect.forever` 加 `Effect.sleep`。等到有事才攒一阵的（核心状态出帧）不是定期，照旧用 `Effect.forever`。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
 - **单行查询只把无行折成空**：用 `Effect.catchNoSuchElement` 接 `NoSuchElementError`，不用 `Effect.option` 把 `SqlError`、`SchemaError` 也当成「没有这一行」。
 - **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`MergeFailure`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`），按 `catchTag` 接、能直接 `yield*`，不用 `instanceof` 分；`MergeFailure` 由 `MergeFailure.conflict(base, files)`、`.check(why)`、`.error(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。

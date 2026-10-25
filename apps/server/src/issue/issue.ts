@@ -60,7 +60,7 @@ import {
   sentTitles,
   splitJob,
 } from "./rules.ts";
-import { Context, Effect, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
@@ -874,15 +874,11 @@ export const make = (options: IssueOptions = {}) =>
     );
     yield* Effect.forkScoped(Stream.runForEach(due, (d) => scheduled(d).pipe(logged(`recurrence ${d.recurrence.id}`))));
     if (options.background ?? true) {
-      yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.sleep(options.tryEveryMs ?? 5000), tryQueued.pipe(logged("the queue")))));
-      yield* Effect.forkScoped(
-        Effect.forever(
-          Effect.andThen(
-            Effect.sleep(config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000),
-            refreshPullRequests.pipe(logged("refresh pull requests")),
-          ),
-        ),
-      );
+      // Each waits a period before its first run, then runs every period.
+      const tryEvery = options.tryEveryMs ?? 5000;
+      yield* Effect.forkScoped(tryQueued.pipe(logged("the queue"), Effect.repeat(Schedule.spaced(tryEvery)), Effect.delay(tryEvery)));
+      const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
+      yield* Effect.forkScoped(refreshPullRequests.pipe(logged("refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)));
     }
 
     const timeline = Effect.fn("Issues.timeline")(function* (id: string) {
