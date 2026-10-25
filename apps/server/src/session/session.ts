@@ -33,7 +33,7 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Queue, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -41,7 +41,7 @@ import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type
 export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
-import { Core, type FactIn } from "../core/core.ts";
+import { Core } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { Memories } from "../memory/memory.ts";
 import { type Merged, MergeFailure, Projects, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "../project/project.ts";
@@ -322,6 +322,12 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
   return s;
 }
 
+/** What oar's callbacks hand a session's fiber, in the order they came. */
+type Arrived =
+  | { readonly _tag: "event"; readonly event: Event }
+  | { readonly _tag: "report"; readonly report: SubagentReport }
+  | { readonly _tag: "stall"; readonly silentForMs: number };
+
 export interface SessionOptionsIn {
   /** The time a session may be quiet before it is said to be; tests make it short. */
   readonly stallMs?: number;
@@ -383,10 +389,6 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
   // all ended with the service.
   const timers = yield* FiberMap.make<string>();
   const later = yield* FiberMap.runtime(timers)<never>();
-  // For oar's callbacks (a session's events, its report, a stall), which run outside any fiber and must land in the
-  // order oar gives them: core.apply and core.notice are synchronous and need no services. Effect code yields them.
-  const apply = (...facts: FactIn[]) => Effect.runSync(core.apply(...facts));
-  const notice = (level: "info" | "warn" | "error", text: string) => Effect.runSync(core.notice(level, text));
 
   const root = resolve(projects.root);
   const logDir = join(config.home, "logs");
@@ -550,7 +552,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     }
   };
 
-  const watch = (h: Hand, s: OarSession, runtime: string) => (event: Event) => {
+  const watch = Effect.fnUntraced(function* (h: Hand, s: OarSession, runtime: string, event: Event) {
     if (s.detached) return;
     let opened = false;
     const signals: LaunchActivity[] = [];
@@ -570,7 +572,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     h.tracking = reaction.tracking;
     if (reaction.model) h.tracking = { ...h.tracking, rate: runtimes.quote(runtime, reaction.model) };
     if (opened) {
-      for (const fact of reaction.facts) if (fact.type === "run") apply(fact);
+      for (const fact of reaction.facts) if (fact.type === "run") yield* core.apply(fact);
       startRun(h);
     }
     for (const a of signals) signal(a);
@@ -579,16 +581,16 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       if (opened && fact.type === "run") continue;
       if (fact.type === "report") {
         const report = h.run ? { ...fact, run: h.run } : fact;
-        apply(report);
+        yield* core.apply(report);
         endRun(h, report.outcome, report.summary, report.spent);
-      } else apply(fact);
+      } else yield* core.apply(fact);
     }
     if (reaction.spentCny) runtimes.spend(runtime, reaction.spentCny);
-    if (reaction.warn) notice("warn", reaction.warn);
+    if (reaction.warn) yield* core.notice("warn", reaction.warn);
     if (event.kind === "exited") closedLaunch(h);
-  };
+  });
 
-  const applyReport = (h: Hand, report: SubagentReport) => {
+  const applyReport = Effect.fnUntraced(function* (h: Hand, report: SubagentReport) {
     const session = core.session(h.id);
     if (!session) return;
     const read = readReport(report.outcome, report.text);
@@ -596,7 +598,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     h.lastText = read.text;
     h.tracking = { ...h.tracking, runFrom: undefined };
     const { launch, spoke } = h;
-    apply({
+    yield* core.apply({
       type: "report",
       id: h.id,
       outcome: read.outcome,
@@ -620,22 +622,22 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         summary: read.summary,
       }),
     );
-    if (read.needsYou) notice("error", `${session.name} 停下了：${read.failure}`);
+    if (read.needsYou) yield* core.notice("error", `${session.name} 停下了：${read.failure}`);
     if (launch) signal({ kind: "ended", id: h.id, launch, outcome: read.outcome, spoke });
     runtimes.usageSoon(session.runtime);
     save();
-  };
+  });
 
-  const stalled = (h: Hand, silentForMs: number) => {
+  const stalled = Effect.fnUntraced(function* (h: Hand, silentForMs: number) {
     const session = core.session(h.id);
     if (session?.phase._tag !== "working") return;
     h.tracking = { ...h.tracking, quiet: true };
-    apply({ type: "quiet", id: h.id, since: Date.now() - silentForMs });
+    yield* core.apply({ type: "quiet", id: h.id, since: (yield* Clock.currentTimeMillis) - silentForMs });
     const quiet = silentForMs < 60_000 ? `${Math.round(silentForMs / 1000)} 秒` : `${Math.round(silentForMs / 60_000)} 分钟`;
     const last = session.phase.doing.label ? "（最后在：" + session.phase.doing.label + "）" : "";
     h.journal.note("run/error", `已经 ${quiet}没动静了${last}。可能在跑很久的命令，也可能卡住了`);
-    notice("warn", `${session.name} 已经 ${quiet}没动静了${last}：点它的地看看过程，不对就叫停`);
-  };
+    yield* core.notice("warn", `${session.name} 已经 ${quiet}没动静了${last}：点它的地看看过程，不对就叫停`);
+  });
 
   const release = (h: Hand) => {
     const s = h.sess;
@@ -644,7 +646,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     s.stop?.();
   };
 
-  const attach = (h: Hand, s: OarSession, runtime: string) => {
+  const attach = Effect.fnUntraced(function* (h: Hand, s: OarSession, runtime: string) {
     launches++;
     h.sess = s;
     s.attached = true;
@@ -653,25 +655,40 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     if (s.agent.session.id) h.oarSessionId = s.agent.session.id;
     h.tracking = { ...h.tracking, oarTokens: undefined };
     const session = s.agent.session;
+    // oar's callbacks only queue what arrived, registered here and now (a report is not replayed, so none is missed); one
+    // fiber of this service's takes the queue in order and handles each in Effect.
+    const arrived = yield* Queue.unbounded<Arrived>();
     // From the session's first record: its turn may have started (or ended) before this line runs.
-    const stopEvents = session.events(watch(h, s, runtime), { cursor: { sessionId: session.id, afterSeq: -1 } });
-    // The report comes from oar's subagent, which hears the turn's end first: it is taken once the end's other readers have.
+    const stopEvents = session.events((event) => void Queue.offerUnsafe(arrived, { _tag: "event", event }), {
+      cursor: { sessionId: session.id, afterSeq: -1 },
+    });
+    // The report comes from oar's subagent, which hears the turn's end first: it is queued a microtask later, after the end's
+    // event.
     const stopReports = s.subagents.onReport((report) => {
-      if (report.sessionId === session.id) queueMicrotask(() => !s.detached && applyReport(h, report));
+      if (report.sessionId === session.id) queueMicrotask(() => void Queue.offerUnsafe(arrived, { _tag: "report", report }));
     });
     const stopStalls = watchStalls(
       session,
       stallMs,
-      (silentForMs) => !s.detached && stalled(h, silentForMs),
+      (silentForMs) => void Queue.offerUnsafe(arrived, { _tag: "stall", silentForMs }),
       (wait) => void later(`stall:${h.id}`, wait),
     );
+    const handle = (a: Arrived): Effect.Effect<void> =>
+      s.detached
+        ? Effect.void
+        : (a._tag === "event" ? watch(h, s, runtime, a.event) : a._tag === "report" ? applyReport(h, a.report) : stalled(h, a.silentForMs)).pipe(
+            // One that fails is said, and the next is still taken.
+            Effect.catchCause((cause) => Effect.logWarning(`vibevalley: session ${h.id}: ${Cause.pretty(cause)}`)),
+          );
+    void later(`arrivals:${h.id}`, Stream.runForEach(Stream.fromQueue(arrived), handle));
     s.stop = () => {
       stopEvents();
       stopReports();
       stopStalls();
+      void later(`arrivals:${h.id}`, Effect.void);
     };
     save();
-  };
+  });
 
   const closeAllocation = (allocation: Allocation) =>
     (allocation.closing ??= (async () => {
@@ -843,7 +860,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       );
     }
     if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` } as Delivered;
-    attach(h, opened.session, session.runtime);
+    yield* attach(h, opened.session, session.runtime);
     return { kind: "run", launch: h.launch || h.id, woke: true } as Delivered;
   });
 
@@ -908,12 +925,14 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         if (isBusy(current) || h.triggers.length > 0) return yield* refused(current.name + " 还在干活：等这一轮做完，或者先叫停，再收");
         yield* rest(h);
         const merged = yield* use(h.place, h.lastText).pipe(
-          Effect.mapError((e) => {
-            const f = e instanceof MergeFailure ? e : MergeFailure.ofError(reasonText(e));
-            if (f.kind === "conflict") apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
-            const words = notTakenIn(f, current.name, settle);
-            return new NotTakenIn({ failure: f, ...words, message: words.owner });
-          }),
+          Effect.catch((e) =>
+            Effect.gen(function* () {
+              const f = e instanceof MergeFailure ? e : MergeFailure.ofError(reasonText(e));
+              if (f.kind === "conflict") yield* core.apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+              const words = notTakenIn(f, current.name, settle);
+              return yield* new NotTakenIn({ failure: f, ...words, message: words.owner });
+            }),
+          ),
         );
         if (merged.pullRequest) return merged;
         yield* leave(h, closed, closed === "merged" ? merged.commits : 0);
@@ -1108,7 +1127,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       };
       hands.set(id, h);
       yield* core.apply({ type: "hired", session });
-      attach(h, opened.session, agent.runtime);
+      yield* attach(h, opened.session, agent.runtime);
       return { session };
     }, admission.withPermits(1)),
     deliver,
