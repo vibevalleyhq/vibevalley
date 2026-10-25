@@ -5,7 +5,7 @@
 import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { inbox } from "./inbox.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Stream } from "effect";
+import { Context, Effect, Layer, PubSub, Schedule, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -97,6 +97,6 @@ export const start = Layer.effectDiscard(
     const notices = yield* Notices;
     yield* notices.prime;
     const every = config.patrol.heartbeatMinutes * 60_000;
-    if (every > 0) yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.sleep(every), notices.patrol)));
+    if (every > 0) yield* Effect.forkScoped(notices.patrol.pipe(Effect.repeat(Schedule.spaced(every)), Effect.delay(every)));
   }),
 );
