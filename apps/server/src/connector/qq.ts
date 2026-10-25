@@ -7,16 +7,18 @@ const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
 const intents = 1 << 25;
 
+// A refused AppID or secret answers without a token, with QQ's reason in message: that reason is what the owner sees.
 const TokenResponse = Schema.Struct({
-  access_token: Schema.String,
+  access_token: Schema.optionalKey(Schema.String),
   expires_in: Schema.optionalKey(Schema.Union([Schema.Number, Schema.String])),
   message: Schema.optionalKey(Schema.String),
 });
 const GatewayResponse = Schema.Struct({ url: Schema.String });
 const GatewayEvent = Schema.Struct({
   op: Schema.Number,
-  s: Schema.optionalKey(Schema.Number),
-  t: Schema.optionalKey(Schema.String),
+  // Frames that are not dispatches may carry s and t as null.
+  s: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  t: Schema.optionalKey(Schema.NullOr(Schema.String)),
   d: Schema.optionalKey(Schema.Unknown),
 });
 export const decodeGatewayEvent = Schema.decodeUnknownSync(Schema.fromJsonString(GatewayEvent));
@@ -87,7 +89,11 @@ export class QQClient implements QQApi {
   }
 
   private headers(app: App, token: string) {
-    return { Authorization: "QQBot " + token, "X-Union-Appid": app.appId, "Content-Type": "application/json" };
+    return {
+      Authorization: "QQBot " + token,
+      "X-Union-Appid": app.appId,
+      "Content-Type": "application/json",
+    };
   }
 
   async check(signal: AbortSignal, app: App) {
@@ -144,17 +150,32 @@ export class QQClient implements QQApi {
             if (typeof msg.s === "number") seq = msg.s;
             switch (msg.op) {
               case 10: {
-                send({ op: 2, d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} } });
+                send({
+                  op: 2,
+                  d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} },
+                });
                 const every = (msg.d as { heartbeat_interval?: number } | undefined)?.heartbeat_interval ?? 0;
                 beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
                 return;
               }
               case 0: {
                 if (msg.t !== "C2C_MESSAGE_CREATE") return;
-                const d = msg.d as { id?: string; content?: string; author?: { user_openid?: string }; attachments?: unknown[] } | undefined;
+                const d = msg.d as
+                  | {
+                      id?: string;
+                      content?: string;
+                      author?: { user_openid?: string };
+                      attachments?: unknown[];
+                    }
+                  | undefined;
                 if (!d?.id || !d.author?.user_openid) return;
                 try {
-                  await got({ id: d.id, from: d.author.user_openid, content: d.content ?? "", attachments: d.attachments?.length ?? 0 });
+                  await got({
+                    id: d.id,
+                    from: d.author.user_openid,
+                    content: d.content ?? "",
+                    attachments: d.attachments?.length ?? 0,
+                  });
                 } catch (e) {
                   end(e instanceof Error ? e : new Error(String(e)));
                 }

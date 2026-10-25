@@ -30,7 +30,11 @@ describe("WeChat updates", () => {
       msgs: [
         {
           message_id: "m1",
-          item_list: [{ ref_msg: { svr_id: "old", message_item: { type: 1, text_item: { text: "nested" } } } }],
+          item_list: [
+            {
+              ref_msg: { svr_id: "old", message_item: { type: 1, text_item: { text: "nested" } } },
+            },
+          ],
         },
       ],
     };

@@ -30,7 +30,11 @@ export interface Item {
   readonly text_item?: { readonly text?: string };
   readonly voice_item?: { readonly text?: string };
   readonly file_item?: { readonly file_name?: string };
-  readonly ref_msg?: { readonly svr_id?: string; readonly title?: string; readonly message_item?: Item };
+  readonly ref_msg?: {
+    readonly svr_id?: string;
+    readonly title?: string;
+    readonly message_item?: Item;
+  };
 }
 
 const ItemSchema: Schema.Codec<Item> = Schema.Struct({
@@ -130,7 +134,10 @@ const clientVersion = (v: string) => {
 const baseInfo = { channel_version: version, bot_agent: "vibevalley/0.1.0" };
 
 function headers(token: string, auth: boolean): Record<string, string> {
-  const h: Record<string, string> = { "iLink-App-Id": "bot", "iLink-App-ClientVersion": String(clientVersion(version)) };
+  const h: Record<string, string> = {
+    "iLink-App-Id": "bot",
+    "iLink-App-ClientVersion": String(clientVersion(version)),
+  };
   if (!auth) return h;
   h["Content-Type"] = "application/json";
   h.AuthorizationType = "ilink_bot_token";
@@ -160,7 +167,12 @@ export class WeixinClient implements WeixinApi {
   ): Promise<T> {
     let res: Response;
     try {
-      res = await fetch(url, { method, headers: headers(token, auth), ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal });
+      res = await fetch(url, {
+        method,
+        headers: headers(token, auth),
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        signal,
+      });
     } catch (e) {
       throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
     }
@@ -259,7 +271,11 @@ export class WeixinClient implements WeixinApi {
         case "confirmed": {
           const s = status;
           if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error("微信确认了，但没给齐登录信息，请重试。");
-          return { account: { baseUrl: s.baseurl || base, token: s.bot_token }, botId: s.ilink_bot_id, owner: s.ilink_user_id };
+          return {
+            account: { baseUrl: s.baseurl || base, token: s.bot_token },
+            botId: s.ilink_bot_id,
+            owner: s.ilink_user_id,
+          };
         }
       }
     }
