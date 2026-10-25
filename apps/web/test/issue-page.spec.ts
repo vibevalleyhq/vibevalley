@@ -6,6 +6,7 @@ import type { Page, Route } from "@playwright/test";
 import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 async function firstFrame(url: string): Promise<StateFrame> {
   const abort = new AbortController();
@@ -34,7 +35,7 @@ async function openIssue(
   const now = Date.now();
   const frame = await firstFrame(server.url);
   const session: Session = {
-    id: "w1",
+    id: sessionId("w1"),
     name: "阿狐",
     agent: "fox",
     runtime: "nobody",
@@ -47,7 +48,7 @@ async function openIssue(
     ...helper,
   };
   const closed = attention.state === "done" || attention.state === "canceled";
-  const issue: Issue = { ...made, sessions: ["w1"], project: "farm-site", attention, ...more };
+  const issue: Issue = { ...made, sessions: [sessionId("w1")], project: "farm-site", attention, ...more };
   const fixture: StateFrame = { ...frame, state: { ...frame.state, sessions: closed ? [] : [session], issues: [issue] } };
   const history: IssueHistory[] = [
     { issue, sessions: [closed ? { ...session, phase: { _tag: "closed", at: now, closed: "merged" } } : session], missingSessions: [] },

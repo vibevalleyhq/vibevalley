@@ -36,6 +36,7 @@ import {
   type Recurrence,
   type Session,
   type TaskGraph,
+  type IssueId,
 } from "@vibevalley/protocol";
 import { actLabel, attentionLabel, closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
@@ -63,6 +64,7 @@ import {
 import { Clock, Context, Effect, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
@@ -241,7 +243,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     const lastRun = column.run(row.last_run);
     const answer = column.answer(row.answer);
     const out: Issue = {
-      id: row.id,
+      id: issueId(row.id),
       number: row.number,
       title: row.title,
       ...(row.description ? { description: row.description } : {}),
@@ -250,11 +252,11 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       priority: row.priority as Priority,
       createdAt: row.created_at,
       ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
-      sessions: [...(runs ?? [])],
+      sessions: (runs ?? []).map((s) => sessionId(s)),
       ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
       ...(row.delivered !== null ? { delivered: row.delivered as Delivery } : {}),
       ...(row.canceled !== null ? { canceled: row.canceled as IssueCanceled } : {}),
-      ...(row.parent !== null ? { parent: row.parent } : {}),
+      ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
       ...(blockedBy ? { blockedBy } : {}),
       ...(graph ? { graph } : {}),
       ...(task ? { task } : {}),
@@ -1016,11 +1018,11 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       const cleared = yield* clearRefinement(t);
       if (cleared.kept) return yield* refused(`工单 #${t.number} 还不能删：${cleared.reason}`);
       yield* db(q.removeIssue({ id }));
-      yield* core.apply({ type: "issueGone", id } as never);
+      yield* core.apply({ type: "issueGone", id: t.id });
     }),
     move: Effect.fn("Issues.move")(function* (id, before) {
       yield* unsent(id);
-      const order = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
+      const order: string[] = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
       const at = order.indexOf(before);
       order.splice(at < 0 ? order.length : at, 0, id);
       yield* inTx(
@@ -1328,7 +1330,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
                 task: jsonOrNull(t.task, !!t.task),
               }),
             );
-          const out: string[] = [];
+          const out: IssueId[] = [];
           for (const old of before)
             if (!issues.some((t) => t.id === old.id)) {
               yield* db(q.removeIssue({ id: old.id }));
@@ -1339,7 +1341,7 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       );
       // Published as one commit once the transaction has succeeded.
       const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (t) => get(t.id).pipe(Effect.orDie));
-      yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
+      yield* core.apply(...gone.map((id) => ({ type: "issueGone" as const, id })), ...updated.map((issue) => ({ type: "issue" as const, issue })));
     }),
     nextTaskId: () => Effect.map(db(q.graphIDs()), (rows) => nextTaskId(rows.map((r) => r.id))),
     forOrchestrator: Effect.map(PubSub.subscribe(orchestratorHub), Stream.fromSubscription),

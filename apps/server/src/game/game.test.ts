@@ -11,6 +11,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Game, layer } from "./game.ts";
 import { waitFor as until } from "../testing/until.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const farm = (config = testConfig()) => layer.pipe(Layer.provideMerge(world({ config })));
 
@@ -48,7 +49,7 @@ describe("the game", () => {
         const core = yield* Core;
         yield* game.record({
           kind: "harvested",
-          session: "w1",
+          session: sessionId("w1"),
           agent: "lab",
           project: "demo",
           runtime: "pi",
@@ -61,7 +62,7 @@ describe("the game", () => {
         yield* core.apply({ type: "hired", session: helper("w2") });
         yield* core.apply({
           type: "report",
-          id: "w2",
+          id: sessionId("w2"),
           outcome: "failed",
           summary: "坏了",
           runs: 1,
@@ -84,7 +85,7 @@ describe("the game", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       yield* Effect.sleep(10);
-      yield* core.did({ kind: "reviewed", session: "w1" });
+      yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
       yield* until(kinds, (k) => [...k].sort().join() === "reviewed,voice", "both");
     }).pipe(Effect.scoped, Effect.provide(farm())),

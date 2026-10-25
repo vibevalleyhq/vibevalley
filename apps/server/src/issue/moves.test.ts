@@ -6,6 +6,7 @@ import { emptyWorkspaceState } from "../core/core.ts";
 import { attentionOf } from "./attention.ts";
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";
 import { reduce } from "../projection/reduce.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
@@ -35,7 +36,7 @@ describe("status moves", () => {
     const required = issue("in_review", true, { review: "required" });
     expect(statusMoves(required)).toEqual(["todo", "canceled"]);
     expect(statusMoves({ ...required, reviewedAt: 1 })).toEqual(["todo", "done", "canceled"]);
-    expect(statusMoves(issue("backlog", false, { refining: { session: "w2", name: "试验田" } }))).toEqual(["canceled"]);
+    expect(statusMoves(issue("backlog", false, { refining: { session: sessionId("w2"), name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { lastRun: { startedAt: 1 } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
   });

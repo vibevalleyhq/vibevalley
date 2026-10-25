@@ -1,6 +1,13 @@
 // The shapes the server and the page share: every type on the wire and on disk, and the closed sets' members. schema.ts
 // holds a Schema for each, typed by it (Schema.Codec<T.X>), so the two cannot drift apart; api.ts the endpoints.
 
+import type { Brand } from "effect";
+
+/** An issue's id (not its number). */
+export type IssueId = string & Brand.Brand<"IssueId">;
+/** A session's id: w1, w2…, for the whole life of the farm. */
+export type SessionId = string & Brand.Brand<"SessionId">;
+
 /** The orchestrator's participant id, and the agent of an issue for it. No agent profile has this id. */
 export const orchestratorAgent = "orchestrator";
 
@@ -218,7 +225,7 @@ export interface ChatMessage {
   text: string;
   final: boolean;
   mentions?: string[];
-  session?: string;
+  session?: SessionId;
   run?: string;
   outcome?: Outcome;
   spent?: Spent;
@@ -310,7 +317,7 @@ export interface SessionPlay {
 }
 
 export interface Session {
-  id: string;
+  id: SessionId;
   name: string;
   agent: string;
   runtime: string;
@@ -327,7 +334,7 @@ export interface Session {
   graph?: SessionGraph;
   channel?: string;
   play?: SessionPlay;
-  issue?: string;
+  issue?: IssueId;
   refining?: boolean;
   phaseText?: string;
 }
@@ -354,7 +361,7 @@ export interface Task {
   acceptance?: boolean;
   frozen?: string[];
   state: TaskState;
-  session?: string;
+  session?: SessionId;
   conclusion?: string;
   commits?: string[];
   spent?: Spent;
@@ -413,7 +420,7 @@ export interface Progress {
 
 export interface ProgressNews {
   coins?: number;
-  session?: string;
+  session?: SessionId;
   unlocked?: Unlock[];
 }
 
@@ -698,7 +705,7 @@ export interface GraphEvent {
   task?: string;
   kind: GraphEventKind;
   actor: GraphActor;
-  session?: string;
+  session?: SessionId;
   detail?: string;
   changes?: TaskFieldChange[];
   commits?: string[];
@@ -916,7 +923,7 @@ export interface Memory {
   text: string;
   author?: MemoryAuthor;
   project?: string;
-  session?: string;
+  session?: SessionId;
   at: number;
   recalled: number;
   recalledAt?: number;
@@ -1039,14 +1046,14 @@ export interface GraphSplitRequest {
 }
 
 export interface Dispatched {
-  session?: string;
+  session?: SessionId;
   queued?: string;
 }
 
 export interface IssueHistory {
   issue: Issue;
   sessions: Session[];
-  missingSessions: string[];
+  missingSessions: SessionId[];
 }
 
 export const PullRequestStateValues = ["open", "merged", "closed"] as const;
@@ -1059,7 +1066,7 @@ export interface PullRequest {
 }
 
 export interface Issue {
-  id: string;
+  id: IssueId;
   number: number;
   title: string;
   description?: string;
@@ -1069,13 +1076,13 @@ export interface Issue {
   rank?: number;
   createdAt: number;
   queuedAt?: number;
-  sessions: string[];
+  sessions: SessionId[];
   closedAt?: number;
   /** Done: what it delivered. Its verdict is the status; how its work went in is this. */
   delivered?: Delivery;
   /** Canceled: why. */
   canceled?: IssueCanceled;
-  parent?: string;
+  parent?: IssueId;
   blockedBy?: string[];
   graph?: IssueGraph;
   task?: IssueTask;
@@ -1204,7 +1211,7 @@ export interface IssueTimeline {
 }
 
 export interface IssueRefining {
-  session: string;
+  session: SessionId;
   name: string;
 }
 
@@ -1228,7 +1235,7 @@ export interface IssueTask {
   scope?: string[];
   acceptance?: boolean;
   frozen?: string[];
-  session?: string;
+  session?: SessionId;
   conclusion?: string;
   commits?: string[];
   spent?: Spent;
@@ -1319,8 +1326,8 @@ export interface RunTrigger {
 
 export interface Run {
   id: string;
-  session: string;
-  issue?: string;
+  session: SessionId;
+  issue?: IssueId;
   triggeredBy: RunTrigger;
   heard: string[];
   startedAt: number;
@@ -1599,14 +1606,15 @@ export interface Badge {
 
 export interface GameEffectReward {
   kind: "reward";
-  sessionId: string;
+  /** The session whose work paid; none for a reward of the farm as a whole. */
+  sessionId?: SessionId;
   coins: number;
   streak: number;
 }
 
 export interface GameEffectPenalty {
   kind: "penalty";
-  sessionId: string;
+  sessionId: SessionId;
 }
 
 export interface GameEffectLevelUp {
@@ -1628,7 +1636,7 @@ export interface GameEffectAchievement {
 export interface LedgerEntryHarvested {
   kind: "harvested";
   at: number;
-  session: string;
+  session: SessionId;
   agent?: string;
   project: string;
   runtime: string;
@@ -1640,26 +1648,26 @@ export interface LedgerEntryHarvested {
 export interface LedgerEntryFailed {
   kind: "failed";
   at: number;
-  session: string;
+  session: SessionId;
   agent?: string;
 }
 
 export interface LedgerEntryConflicted {
   kind: "conflicted";
   at: number;
-  session: string;
+  session: SessionId;
 }
 
 export interface LedgerEntryTold {
   kind: "told";
   at: number;
-  session: string;
+  session: SessionId;
 }
 
 export interface LedgerEntryReviewed {
   kind: "reviewed";
   at: number;
-  session: string;
+  session: SessionId;
 }
 
 export interface LedgerEntryGraph {
@@ -1673,20 +1681,20 @@ export interface LedgerEntryGraph {
 export interface LedgerEntryHandoff {
   kind: "handoff";
   at: number;
-  session: string;
+  session: SessionId;
   to: string;
 }
 
 export interface LedgerEntryCalled {
   kind: "called";
   at: number;
-  session: string;
+  session: SessionId;
 }
 
 export interface LedgerEntryHired {
   kind: "hired";
   at: number;
-  session: string;
+  session: SessionId;
   agent?: string;
 }
 
@@ -1895,7 +1903,8 @@ export interface FactMessage {
   at: number;
   message: ChatMessage;
   thread?: string;
-  answers?: string;
+  /** The session the message answers, when an agent speaks back to the one that called it. */
+  answers?: SessionId;
 }
 
 export interface FactConversation {
@@ -1919,21 +1928,21 @@ export interface FactHired {
 export interface FactStation {
   type: "station";
   at: number;
-  id: string;
+  id: SessionId;
   station: number;
 }
 
 export interface FactRun {
   type: "run";
   at: number;
-  id: string;
+  id: SessionId;
   brief?: string;
 }
 
 export interface FactDoing {
   type: "doing";
   at: number;
-  id: string;
+  id: SessionId;
   action: SessionAction;
   label: string;
 }
@@ -1941,14 +1950,14 @@ export interface FactDoing {
 export interface FactQuiet {
   type: "quiet";
   at: number;
-  id: string;
+  id: SessionId;
   since: number;
 }
 
 export interface FactRetry {
   type: "retry";
   at: number;
-  id: string;
+  id: SessionId;
   attempt: number;
   of?: number;
 }
@@ -1956,14 +1965,14 @@ export interface FactRetry {
 export interface FactSpent {
   type: "spent";
   at: number;
-  id: string;
+  id: SessionId;
   spent: Spent;
 }
 
 export interface FactReport {
   type: "report";
   at: number;
-  id: string;
+  id: SessionId;
   run?: string;
   outcome: Outcome;
   summary: string;
@@ -1977,14 +1986,14 @@ export interface FactReport {
 export interface FactConflict {
   type: "conflict";
   at: number;
-  id: string;
+  id: SessionId;
   conflict?: Conflict;
 }
 
 export interface FactLeft {
   type: "left";
   at: number;
-  id: string;
+  id: SessionId;
   closed?: SessionClose;
   merged?: number;
 }
@@ -2004,7 +2013,7 @@ export interface FactIssue {
 export interface FactIssueGone {
   type: "issueGone";
   at: number;
-  id: string;
+  id: IssueId;
 }
 
 export interface FactProgress {
@@ -2218,7 +2227,7 @@ export interface BlockAttrs {
   width?: number;
   height?: number;
   alt?: string;
-  issueId?: string;
+  issueId?: IssueId;
   memoryId?: string;
 }
 

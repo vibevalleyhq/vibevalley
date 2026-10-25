@@ -1,17 +1,18 @@
 // What a tap lands on: the order is the rule. Helpers first (the last drawn on top), then
 // the dog, the yard's places, the plots (a little taller than their box).
 
+import type { SessionId } from "@vibevalley/protocol";
 import { type Box, inBox, type Point } from "./level";
 
 export type VillageHit =
-  | { readonly kind: "session"; readonly id: string }
+  | { readonly kind: "session"; readonly id: SessionId }
   | { readonly kind: "dog" }
   | { readonly kind: "spot"; readonly spot: string }
   | { readonly kind: "plot"; readonly bed: number };
 
 export interface VillageHitData {
   /** In drawing order. */
-  readonly sessions: ReadonlyMap<string, Box>;
+  readonly sessions: ReadonlyMap<SessionId, Box>;
   readonly dog?: Box;
   readonly spots: ReadonlyMap<string, Box>;
   readonly plots: ReadonlyMap<number, Box>;

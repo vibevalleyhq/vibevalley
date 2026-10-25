@@ -4,6 +4,7 @@
 // reads back to the same blocks.
 
 import type { Block, BlockAttrs, DocMarks, DocSpan } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 import { ordered, textFor } from "./ops.ts";
 import { normal, plain, unmarked } from "./text.ts";
 
@@ -141,7 +142,7 @@ function classify(line: string): LineKind {
     }
     return { type: "image", attrs, rest: "" };
   }
-  if ((m = issueLine.exec(line))) return { type: "issue_ref", attrs: { issueId: m[1]! }, rest: "" };
+  if ((m = issueLine.exec(line))) return { type: "issue_ref", attrs: { issueId: issueId(m[1]!) }, rest: "" };
   if ((m = memoryLine.exec(line))) return { type: "memory_item", attrs: { memoryId: m[1]! }, rest: m[2] ?? "" };
   return { type: "paragraph", attrs: {}, rest: line };
 }

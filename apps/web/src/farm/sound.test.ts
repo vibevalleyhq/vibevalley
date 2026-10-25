@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { IssueAttention, Session } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { farmCues, isMuted, playSound, SOUND_GROUPS, SOUND_LABEL, SOUNDS, type FarmSoundInput } from "./sound";
 
 const base: FarmSoundInput = { tool: "hand", bedFx: [], open: {} };
@@ -26,8 +27,8 @@ describe("farmCues", () => {
 
   test("a new effects array plays each good effect in turn", () => {
     const effects = [
-      { kind: "reward", sessionId: "a", coins: 3, streak: 1 },
-      { kind: "penalty", sessionId: "b" },
+      { kind: "reward", sessionId: sessionId("a"), coins: 3, streak: 1 },
+      { kind: "penalty", sessionId: sessionId("b") },
       { kind: "levelUp", level: 2 },
     ] as const;
     expect(farmCues(base, { ...base, effects: [...effects] })).toEqual([
@@ -43,7 +44,7 @@ describe("farmCues", () => {
     expect(farmCues(base, { ...base, sessions: next })).toEqual([]);
     const prev = [session("b", "working"), session("c", "working")];
     expect(farmCues({ ...base, sessions: prev }, { ...base, sessions: next })).toEqual([{ name: "arrive" }]);
-    const issue = (id: string, attention: IssueAttention) => ({ id, attention });
+    const issue = (id: string, attention: IssueAttention) => ({ id: issueId(id), attention });
     const working: IssueAttention = { state: "working", acts: [] };
     const before = [issue("b", working), issue("c", working), issue("d", working)];
     const after = [

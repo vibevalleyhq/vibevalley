@@ -3,6 +3,7 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 import { Clock, Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
@@ -69,7 +70,7 @@ export const makeMemories = Effect.gen(function* () {
             at: r.created_at,
             recalled: r.recalled,
             ...(r.project !== null ? { project: r.project } : {}),
-            ...(r.session !== null ? { session: r.session } : {}),
+            ...(r.session !== null ? { session: sessionId(r.session) } : {}),
             ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
           })),
       ),

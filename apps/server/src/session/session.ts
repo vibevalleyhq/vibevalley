@@ -22,16 +22,19 @@ import {
   type Fact,
   type SessionClose,
   type Issue,
+  type IssueId,
   maxRunning,
   type Outcome,
   type Run,
   type RunTrigger,
   type Session,
   type SessionEvent,
+  type SessionId,
   type SessionGraph,
   type Spent,
   type WorkspaceState,
 } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { Cause, Clock, Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, Queue, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
@@ -114,7 +117,7 @@ export interface SendOptions extends Omit<HireOptions, "issue"> {
 
 export interface RunFinished {
   readonly id: string;
-  readonly issues: string[];
+  readonly issues: IssueId[];
   readonly outcome: Outcome;
 }
 
@@ -142,7 +145,7 @@ type OpenFailure = {
 type Opened = { readonly session: OarSession; readonly refused?: never; readonly retained?: never } | OpenFailure;
 
 interface Hand {
-  readonly id: string;
+  readonly id: SessionId;
   readonly place: Workplace;
   readonly access: Semaphore.Semaphore;
   readonly journal: Journal;
@@ -225,7 +228,7 @@ export interface RunStore {
   readonly start: (id: string, session: string, issue: string, trigger: RunTrigger) => Effect.Effect<void, Error>;
   readonly link: (run: string, issue: string) => Effect.Effect<void, Error>;
   readonly heard: (run: string, heard: readonly string[]) => Effect.Effect<void, Error>;
-  readonly issues: (run: string) => Effect.Effect<string[], Error>;
+  readonly issues: (run: string) => Effect.Effect<IssueId[], Error>;
   readonly finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) => Effect.Effect<void, Error>;
   readonly finished: (r: RunFinished) => void;
   readonly consumed: (c: InputConsumed) => void;
@@ -282,12 +285,12 @@ const json = <T>(text: string | null | undefined): T | undefined => {
 function runOf(r: qr.RunsOfSessionResult): Run {
   const run: Run = {
     id: r.id,
-    session: r.session,
+    session: sessionId(r.session),
     triggeredBy: json<RunTrigger>(r.triggered_by) ?? { kind: "runtime" },
     heard: json<string[]>(r.heard) ?? [],
     startedAt: r.started_at,
   };
-  if (r.issue !== null) run.issue = r.issue;
+  if (r.issue !== null) run.issue = issueId(r.issue);
   if (r.ended_at !== null) run.endedAt = r.ended_at;
   if (r.outcome !== null) run.outcome = r.outcome as Outcome;
   if (r.summary !== null) run.summary = r.summary;
@@ -299,7 +302,7 @@ function runOf(r: qr.RunsOfSessionResult): Run {
 /** An ended session as the core state would have had it: its runs counted, its last one's word, what it spent in all. */
 function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): Session {
   const s: Session = {
-    id: r.id,
+    id: sessionId(r.id),
     name: r.name,
     agent: r.agent,
     runtime: r.runtime,
@@ -312,7 +315,7 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
       closed: (r.closed ?? "dismissed") as SessionClose,
     },
     ...(r.project !== null ? { project: r.project } : {}),
-    ...(r.issue !== null ? { issue: r.issue } : {}),
+    ...(r.issue !== null ? { issue: issueId(r.issue) } : {}),
   };
   const graph = json<SessionGraph>(r.graph);
   if (graph) s.graph = graph;
@@ -512,7 +515,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
     link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
     heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
-    issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
+    issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => issueId(x.issue))),
     finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
       tried(
         qr.endRun({
@@ -1016,7 +1019,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
               if (f.kind === "conflict")
                 yield* core.apply({
                   type: "conflict",
-                  id,
+                  id: current.id,
                   conflict: { base: f.base, files: [...f.files] },
                 });
               const words = notTakenIn(f, current.name, settle);
@@ -1039,7 +1042,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     const changes = yield* projects.changes(place).pipe(Effect.mapError((e) => refused(e.message)));
     const conflict = conflictOf(changes);
     const session = core.session(id);
-    if (session && !sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+    if (session && !sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id: session.id, ...(conflict ? { conflict } : {}) });
     return changes;
   });
 
@@ -1048,7 +1051,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     const session = core.session(id);
     if (!place || !session) return;
     const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
-    if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id, ...(conflict ? { conflict } : {}) });
+    if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id: session.id, ...(conflict ? { conflict } : {}) });
   });
 
   // ── bringing the farm back ──
@@ -1174,7 +1177,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       const full = roomFor(agent.runtime, where);
       if (full) return { refused: full };
       hired++;
-      const id = `w${hired}`;
+      const id = sessionId(`w${hired}`);
       const placed = yield* Effect.result(projects.workplace(where, opt.issue.number, opt.worktree ?? agent.worktree ?? false, opt.base ?? ""));
       if (placed._tag === "Failure") return { refused: `${agent.name} 没地方干活：${placed.failure.message}` };
       const place = placed.success;

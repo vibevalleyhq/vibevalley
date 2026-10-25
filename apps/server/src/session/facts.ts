@@ -5,7 +5,7 @@ import { relative } from "node:path";
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
 import type { FactIn } from "../core/core.ts";
-import type { Session, SessionAction, SessionEventType, Spent, ToolAction } from "@vibevalley/protocol";
+import type { Session, SessionAction, SessionId, SessionEventType, Spent, ToolAction } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { doingOf, failureText, jobBreak, recalledIn } from "./rules.ts";
 import { clip } from "../base/text.ts";
@@ -38,7 +38,7 @@ export interface Tracking {
 }
 
 export interface FactContext {
-  readonly id: string;
+  readonly id: SessionId;
   readonly runtime: string;
   readonly cwd: string;
 }

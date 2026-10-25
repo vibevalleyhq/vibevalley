@@ -14,6 +14,7 @@ import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
 import { Sessions, type SessionsInside } from "./session.ts";
 import { until } from "../testing/until.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -61,7 +62,7 @@ describe("sessions", () => {
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", {
-        issue: { id: "i1", number: 1 },
+        issue: { id: issueId("i1"), number: 1 },
         worktree: true,
       });
       const id = sent.session!.id;
@@ -135,7 +136,7 @@ describe("sessions", () => {
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
       const sent = yield* sessions.send(lab(), "first run", "demo", {
-        issue: { id: "i1", number: 1 },
+        issue: { id: issueId("i1"), number: 1 },
         worktree: true,
       });
       const id = sent.session!.id;
@@ -186,7 +187,7 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       const sent = yield* sessions.send(lab(), "work", "demo", {
-        issue: { id: "i1", number: 1 },
+        issue: { id: issueId("i1"), number: 1 },
         worktree: true,
       });
       const id = sent.session!.id;
@@ -221,7 +222,7 @@ describe("sessions", () => {
       yield* Effect.sleep(5);
 
       const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", {
-        issue: { id: "i1", number: 1 },
+        issue: { id: issueId("i1"), number: 1 },
         worktree: true,
       });
       const id = hired.session!.id;
@@ -287,7 +288,7 @@ describe("sessions", () => {
         } as Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
-        id: "w1",
+        id: sessionId("w1"),
         place: { project: "demo", cwd: "/nowhere" },
         access: Semaphore.makeUnsafe(1),
         journal: s.trajectories.openLog("w1"),
@@ -310,15 +311,15 @@ describe("sessions", () => {
       });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
-          yield* core.apply({ type: "run", id: "w1" });
+          yield* core.apply({ type: "run", id: sessionId("w1") });
           s.unexpect(h);
         }
         const got = yield* sessions.send(lab(), "another", "demo", {
-          issue: { id: "i2", number: 2 },
+          issue: { id: issueId("i2"), number: 2 },
         });
         expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
       }
-      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "", runs: 1 });
+      yield* core.apply({ type: "report", id: sessionId("w1"), outcome: "completed", summary: "", runs: 1 });
       expect(sessions.noRoom("pi", "demo")).toBe("");
     }).pipe(
       Effect.scoped,

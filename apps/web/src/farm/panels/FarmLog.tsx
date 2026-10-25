@@ -22,7 +22,8 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
 /** The turn reports, newest first. */
 const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
 
-const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined => (s?.issues ?? []).find((i) => i.sessions.includes(session));
+const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>
+  (s?.issues ?? []).find((i) => i.sessions.some((s) => s === session));
 
 type Row = { kind: "said" | "report"; message: ChatMessage };
 

@@ -3,7 +3,7 @@
 // shown), the phone, and which project's farm `/` shows. The looks and who the next job goes to are data/prefs.ts.
 
 import { dayClock } from "@vibevalley/engine/clock";
-import type { GameEffectReward } from "@vibevalley/protocol";
+import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
 import type { BedFxKind, Tool } from "./tools";
 import type { Point } from "./world/level";
 import type { FarmPanel } from "./world/places";
@@ -49,7 +49,7 @@ export interface VillageScreen {
   /** A bed's box on the page. */
   readonly plotRect: (bed: number) => Rect;
   /** Where a helper stands now (its feet), on the page; undefined when it is not drawn. Changes every frame. */
-  readonly helperAt: (sessionId: string) => Point | undefined;
+  readonly helperAt: (sessionId: SessionId) => Point | undefined;
   /** Calls `fn` after every drawn frame, for DOM that follows walkers; returns how to stop. */
   readonly onFrame: (fn: () => void) => () => void;
 }

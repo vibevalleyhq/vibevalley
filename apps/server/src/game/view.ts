@@ -159,7 +159,7 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
       if (news.coins)
         out.push({
           kind: "reward",
-          sessionId: news.session ?? "",
+          ...(news.session ? { sessionId: news.session } : {}),
           coins: news.coins,
           streak: fact.progress.streak,
         });

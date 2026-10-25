@@ -3,9 +3,10 @@ import type { Session } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { playOf, withStations } from "./play.ts";
 import { reduce } from "../projection/reduce.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const session = (id: string, project?: string): Session => ({
-  id,
+  id: sessionId(id),
   name: id,
   agent: "a",
   runtime: "nobody",
@@ -30,13 +31,13 @@ test("each project's farm has its own beds: the first of each is on bed 0", () =
 test("a bed taken on another project's farm is free on this one, and taken on its own is not", () => {
   let s = hire(undefined, session("a1", "alpha"));
   s = hire(s, session("b1", "beta"));
-  const [moved, changed] = reduce(s, { type: "station", at: 0, id: "b1", station: 3 });
+  const [moved, changed] = reduce(s, { type: "station", at: 0, id: sessionId("b1"), station: 3 });
   expect(changed).toBe(true);
   // b1 holds bed 3 on beta's farm: b2 cannot take it, and stays on beta's first free bed.
   const [again, took] = reduce(hire(moved, session("b2", "beta")), {
     type: "station",
     at: 0,
-    id: "b2",
+    id: sessionId("b2"),
     station: 3,
   });
   expect(took).toBe(false);

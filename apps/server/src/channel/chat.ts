@@ -19,6 +19,7 @@ import {
   type RunTrigger,
   type SenderKind,
   type Session,
+  type SessionId,
   type Spent,
   type SubjectKind,
 } from "@vibevalley/protocol";
@@ -59,6 +60,8 @@ import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 import { jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
+import { sessionId } from "@vibevalley/protocol/schema";
+import type { Wire } from "@vibevalley/protocol/schema";
 import { Db } from "../base/db.ts";
 
 const reportMax = 1500;
@@ -114,7 +117,7 @@ export interface OrchestratorNews {
 interface Meta {
   run?: string;
   mentions?: string[];
-  session?: string;
+  session?: SessionId;
   outcome?: Outcome;
   spent?: Spent;
   forTask?: boolean;
@@ -123,11 +126,11 @@ interface Meta {
   spoken?: boolean;
 }
 
-const readMeta = jsonOrNone<Meta>(
+const readMeta = jsonOrNone<Meta, Wire<Meta>>(
   Schema.Struct({
     run: Schema.optionalKey(Schema.String),
     mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-    session: Schema.optionalKey(Schema.String),
+    session: Schema.optionalKey(S.SessionId),
     outcome: Schema.optionalKey(S.Outcome),
     spent: Schema.optionalKey(S.Spent),
     forTask: Schema.optionalKey(Schema.Boolean),
@@ -218,7 +221,7 @@ interface Write {
   readonly text: string;
   readonly final: boolean;
   readonly meta?: Meta;
-  readonly answers?: string;
+  readonly answers?: SessionId;
   readonly thread?: ThreadSubject;
   /** A participant who follows the conversation from this message on, in the same transaction. */
   readonly follow?: string;
@@ -480,7 +483,7 @@ export const make = Effect.gen(function* () {
     });
   });
 
-  const publishMessage = Effect.fnUntraced(function* (id: string, answers: string | undefined) {
+  const publishMessage = Effect.fnUntraced(function* (id: string, answers: SessionId | undefined) {
     const row = yield* one(qm.messageByID({ id }));
     if (!row) return;
     const conv = yield* one(qc.conversationByID({ id: row.conversation_id }));
@@ -576,7 +579,8 @@ export const make = Effect.gen(function* () {
     const meta = metaOf(row.meta);
     const mentions = mentionsIn(row.body);
     const sessionsNow = presentSessions();
-    const present = sessionsNow.map((h) => h.id);
+    // Participants are sessions, agents and the owner alike: a mention is any of them.
+    const present: readonly string[] = sessionsNow.map((h) => h.id);
     const known = new Set((yield* db(qp.participants())).map((p) => p.id));
     const named: { id: string; how: "delivered" | "absent" | "unknown" }[] = [];
     for (const m of mentions) {
@@ -743,7 +747,7 @@ export const make = Effect.gen(function* () {
     return written;
   });
 
-  const after = Effect.fnUntraced(function* (conversation: string, written: Written, answers: string | undefined): Effect.fn.Return<void> {
+  const after = Effect.fnUntraced(function* (conversation: string, written: Written, answers: SessionId | undefined): Effect.fn.Return<void> {
     for (const r of written.resetWake) breaker.reset(r);
     yield* publishMessage(written.id, answers);
     yield* publishConversation(conversation);
@@ -994,7 +998,7 @@ export const make = Effect.gen(function* () {
   });
 
   const sessionsLeft = Effect.gen(function* () {
-    const on = new Set(presentSessions().map((h) => h.id));
+    const on = new Set<string>(presentSessions().map((h) => h.id));
     const now = yield* Clock.currentTimeMillis;
     for (const p of yield* db(qp.participants())) {
       if (p.kind !== "agent" || p.left_at !== null || on.has(p.id)) continue;
@@ -1210,7 +1214,8 @@ export const make = Effect.gen(function* () {
               more: unseen.length - shown.length,
             } as Spoken;
           }
-          const answers = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
+          const caller = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
+          const answers = caller === undefined ? undefined : sessionId(caller);
           const run = helpers?.currentRun(from);
           const written = yield* write({
             conversation,

@@ -6,6 +6,7 @@ import type { Page } from "@playwright/test";
 import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 test.use({ farm: "farm-chat" });
 
@@ -132,7 +133,7 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   const made = await api.issue.create({ body: { title: "把登录页的记住我做完" } });
   const frame = await firstFrame(server.url);
   const session: Session = {
-    id: "w1",
+    id: sessionId("w1"),
     name: "阿狐",
     agent: "fox",
     runtime: "nobody",
@@ -147,7 +148,7 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   // What the server would say of an issue handed back: it may be completed (done) or canceled.
   const issue: Issue = {
     ...made,
-    sessions: ["w1"],
+    sessions: [sessionId("w1")],
     status: "in_review",
     moves: ["done", "canceled"],
     criteria: ["勾上后重开浏览器还登着"],

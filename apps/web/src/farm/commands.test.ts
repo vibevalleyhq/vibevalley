@@ -4,11 +4,12 @@ import { farmCommands } from "./commands";
 import { farm, resetFarm } from "./store";
 import { beds } from "./world/plots";
 import type { Tool } from "./tools";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 afterEach(resetFarm);
 
 const helper: Session = {
-  id: "helper",
+  id: sessionId("helper"),
   name: "阿狐",
   agent: "fox",
   runtime: "pi",
@@ -16,13 +17,13 @@ const helper: Session = {
   hiredAt: 0,
   runs: 1,
   phase: { _tag: "done" },
-  issue: "clock",
+  issue: issueId("clock"),
   play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
 };
 
 function frame(attention: IssueAttention, session: Session = helper): StateFrame {
   const issue: Issue = {
-    id: "clock",
+    id: issueId("clock"),
     number: 1,
     title: "提交打卡页",
     priority: "medium",

@@ -13,6 +13,7 @@ import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
 import { agentFor, type CallLine, clientOf, layer, onCallLine, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
@@ -161,13 +162,13 @@ const helperOn = (id: string, issue: string) =>
   }) as unknown as Session;
 const issueOf = (id: string, number: number, session: string) =>
   ({
-    id,
+    id: issueId(id),
     number,
     title: "写打卡",
     priority: "medium",
     deliver: "change",
     createdAt: Date.now(),
-    sessions: [session],
+    sessions: [sessionId(session)],
     status: "in_progress",
     moves: [],
     review: "glance",
@@ -310,7 +311,7 @@ describe("voice", () => {
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
       yield* core.apply({
         type: "report",
-        id: "w1",
+        id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
         runs: 1,
@@ -369,14 +370,14 @@ describe("voice", () => {
       }
       yield* core.apply({
         type: "report",
-        id: "w1",
+        id: sessionId("w1"),
         outcome: "completed",
         summary: "做完了",
         runs: 1,
       });
       yield* core.apply({
         type: "report",
-        id: "w2",
+        id: sessionId("w2"),
         outcome: "failed",
         summary: "没做成",
         runs: 1,

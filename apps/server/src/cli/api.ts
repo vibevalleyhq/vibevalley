@@ -108,7 +108,7 @@ const call = (base: string, op: keyof Handlers, given: Readonly<Record<string, u
 
 /** An answer read by its Schema; one that is not is the server's fault, not the command's. */
 const answer =
-  <T>(schema: Schema.Codec<T>) =>
+  <T, E>(schema: Schema.Codec<T, E>) =>
   (text: string) =>
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
       Effect.mapError(

@@ -3,6 +3,7 @@ import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { lineOf, memoryNotesOf, nextForgotten, pick, type PickCue, relevance } from "./recall.ts";
 import { termsOf } from "./terms.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 // Go's math.Exp on arm64 (where the cases were recorded) is its own assembly, with fused multiply-adds; V8's is fdlibm's.
 // They can differ in the last bit, so a relevance within 1e-12 of the Go's is the same one; the picks must agree exactly.
@@ -61,12 +62,12 @@ test("jobs: this project's only, three at most, not its own session's", () => {
       memory(`job${i}`, `第 ${i} 件活 → 做好了`, {
         kind: "issue",
         project: "clock",
-        session: `w${i}`,
+        session: sessionId(`w${i}`),
         at: now - i * dayMs,
       }),
     ),
     memory("note", "迁移文件在 db/migrations", { project: "clock" }),
-    memory("job-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: "w8" }),
+    memory("job-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: sessionId("w8") }),
   ];
   expect(ids(pick(memories, cue("随便做点什么")))).toEqual(["note", "job0", "job1", "job2"]);
   expect(ids(pick(memories, cue("随便做点什么", { session: "w0", skip: new Set(["note"]) })))).toEqual(["job1", "job2", "job3"]);

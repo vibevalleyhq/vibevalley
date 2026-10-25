@@ -20,7 +20,7 @@ import {
   type PointLight,
   type Sky,
 } from "@vibevalley/engine/pixi";
-import type { Agent, Crop, Session, StateFrame } from "@vibevalley/protocol";
+import type { Agent, Crop, Session, SessionId, StateFrame } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { castPrefix } from "../../rules/cast";
 import { playSound } from "../sound";
@@ -103,7 +103,7 @@ export interface SceneEvents {
 export interface Scene {
   readonly stage: PixelStage;
   /** Where a helper's feet are now, art pixels. */
-  readonly helperAt: (sessionId: string) => Point | undefined;
+  readonly helperAt: (sessionId: SessionId) => Point | undefined;
   readonly destroy: () => void;
 }
 
@@ -273,7 +273,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
   plant("fg-grass", v.width * 0.34, v.height + 16, 0.5, 1);
   plant("fg-fern", v.width * 0.6, v.height + 24, 0.5, 1);
 
-  const actors = new Map<string, Actor>();
+  const actors = new Map<SessionId, Actor>();
   const fx = plotFx(world, texture, (bed) => v.plotAt(bed));
   let t = 0;
   let whereAt = 0;
@@ -284,7 +284,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
   let downOn: VillageHit | undefined;
   let pointerAt: Point | undefined;
   const hitAt = (p: Point): VillageHit | undefined => {
-    const sessions = new Map<string, Box>();
+    const sessions = new Map<SessionId, Box>();
     for (const [id, a] of actors) {
       if (a.leftAt !== undefined) continue;
       const b = a.body.getBounds();
@@ -583,7 +583,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     }
     for (const a of actors.values()) a.node.alpha = Math.max(0, 1 - a.goneFor / fadeS);
 
-    const bedOfSession = (id: string) => {
+    const bedOfSession = (id: SessionId) => {
       const a = actors.get(id);
       if (a?.bed) return a.bed.index;
       const s = present.get(id);

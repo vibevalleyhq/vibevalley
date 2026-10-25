@@ -4,9 +4,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { Issue, IssueAttention, Session } from "@vibevalley/protocol";
 import { plotOf } from "./view.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const session = (phase: Session["phase"]): Session => ({
-  id: "w1",
+  id: sessionId("w1"),
   name: "阿狐",
   agent: "lab",
   runtime: "pi",
@@ -14,7 +15,7 @@ const session = (phase: Session["phase"]): Session => ({
   hiredAt: 0,
   runs: 1,
   phase,
-  issue: "t1",
+  issue: issueId("t1"),
 });
 const issue = (attention: IssueAttention, more: Partial<Issue> = {}): Issue =>
   ({

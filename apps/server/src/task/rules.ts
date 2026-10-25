@@ -11,7 +11,9 @@ import {
   type Task,
   type TaskEdit,
   type TaskGraph,
+  type IssueId,
 } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 import { isForOrchestrator } from "../issue/state.ts";
 import { Result, Schema } from "effect";
 import { slice } from "../base/text.ts";
@@ -239,7 +241,7 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
   return "";
 }
 
-export const taskIssueID = (graph: string, key: string) => graph + "." + key;
+export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
 
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
@@ -269,15 +271,17 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
     return t;
   };
   const project = graph.project;
+  // A plan is an issue of its own, under the same id.
+  const id = issueId(graph.id);
   const out = [
     keep(
       {
-        id: graph.id,
+        id,
         title: graph.title,
         description: graph.goal,
         project,
         // A helper's issue split under it keeps who it was given to.
-        assignee: was.get(graph.id)?.assignee,
+        assignee: was.get(id)?.assignee,
         deliver: "change",
         graph: {
           state: graph.state,
@@ -301,7 +305,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
           deliver: "change",
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
-          parent: graph.id,
+          parent: id,
           blockedBy: blocked.length > 0 ? blocked : undefined,
           task: {
             key: n.id,
