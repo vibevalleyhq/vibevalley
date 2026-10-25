@@ -18,7 +18,11 @@ import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
-  defineRuntime({ id, session: () => Promise.reject(new Error("no sessions here")), ...more } as Parameters<typeof defineRuntime>[0]);
+  defineRuntime({
+    id,
+    session: () => Promise.reject(new Error("no sessions here")),
+    ...more,
+  } as Parameters<typeof defineRuntime>[0]);
 
 const notFound = async (id: string): Promise<RuntimeInfo> => ({
   id,
@@ -156,6 +160,49 @@ describe("runtime", () => {
       );
     });
 
+  it.live("a usage read keeps its answer when a spend rebuilds what is shown meanwhile, and a late older one does not undo a newer", () => {
+    const out: ((u: AccountUsage) => void)[] = [];
+    const used = (usedPercent: number) =>
+      ({
+        status: "ok",
+        subscription: "pro",
+        windows: [{ label: "5 hours", usedPercent, resetsAt: null }],
+      }) as AccountUsage;
+    return Effect.gen(function* () {
+      let calls = 0;
+      const r = yield* make({
+        registry: new RuntimeRegistry([
+          fake("pi", {
+            installation: async () => ({ kind: "available", via: "executable", command: "pi" }),
+          }),
+        ]),
+        background: false,
+        usageOf: (async () => (++calls === 1 ? null : new Promise<AccountUsage>((answer) => out.push(answer)))) as RuntimeOptions["usageOf"],
+      });
+      yield* r.refresh("pi");
+      // A spend while the read is out pushes a new total, rebuilding the cached observation.
+      const read = r.refreshUsage("pi");
+      yield* Effect.promise(() => until(() => out.length === 1));
+      const shown = r.cached.get("pi");
+      r.spend("pi", 1);
+      yield* Effect.promise(() => until(() => r.cached.get("pi") !== shown));
+      out[0]!(used(40));
+      yield* Effect.promise(() => read);
+      expect((yield* r.info("pi"))!.usage).toEqual(used(40));
+      expect((yield* r.info("pi"))!.spentToday).toBe(1);
+      // Two reads out at once: the one asked later answers first, and the older one's late answer is dropped.
+      const older = r.refreshUsage("pi");
+      yield* Effect.promise(() => until(() => out.length === 2));
+      const newer = r.refreshUsage("pi");
+      yield* Effect.promise(() => until(() => out.length === 3));
+      out[2]!(used(100));
+      yield* Effect.promise(() => newer);
+      out[1]!(used(70));
+      yield* Effect.promise(() => older);
+      expect((yield* r.info("pi"))!.usage).toEqual(used(100));
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
   it.live("an adapter's refusals stop a profile, under the farm's", () =>
     Effect.gen(function* () {
       const registry = new RuntimeRegistry([
@@ -164,7 +211,10 @@ describe("runtime", () => {
       ]);
       const r = yield* runtimes({
         registry,
-        probe: async (id) => ({ ...(await notFound(id)), installation: { status: "available", via: "executable", command: id, version: null } }),
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          installation: { status: "available", via: "executable", command: id, version: null },
+        }),
       });
       const a = agent({ env: { TEST: "value" } });
       const assessed = yield* r.assess(a);
@@ -173,7 +223,10 @@ describe("runtime", () => {
       expect(usable(yield* r.assess(agent({})))).toBe(true);
       expect(usable(yield* r.assess(agent({ enabled: false })))).toBe(false);
       const opencode = (yield* r.info("opencode"))!.facts.refused;
-      expect(opencode).toEqual({ env: "test env", disallowedTools: factsOf("opencode").refused.disallowedTools });
+      expect(opencode).toEqual({
+        env: "test env",
+        disallowedTools: factsOf("opencode").refused.disallowedTools,
+      });
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
@@ -187,7 +240,10 @@ describe("runtime", () => {
       });
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("antigravity", { refusedSessionOptions: { env: "no env" } })]),
-        probe: async (id) => ({ ...(await notFound(id)), installation: { status: "available", via: "bundled", command: id, version: null } }),
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          installation: { status: "available", via: "bundled", command: id, version: null },
+        }),
       });
       const a = agent({ runtime: "antigravity" });
       const assessed = yield* r.assess(a);
@@ -227,7 +283,11 @@ describe("runtime", () => {
     it.live(`an unknown ${source} model warns and checks effort against the actual fallback`, () =>
       Effect.gen(function* () {
         const store = yield* Agents;
-        yield* store.saveSettings("pi", { ...store.settings("pi"), defaultModel: source === "runtime" ? "missing" : "configured", defaultEffort: "high" });
+        yield* store.saveSettings("pi", {
+          ...store.settings("pi"),
+          defaultModel: source === "runtime" ? "missing" : "configured",
+          defaultEffort: "high",
+        });
         const r = yield* runtimes({
           registry: new RuntimeRegistry([fake("pi")]),
           probe: async (id) => ({
@@ -243,7 +303,11 @@ describe("runtime", () => {
         const issues = yield* r.check(a);
         expect(issues).toEqual([
           { field: "model", level: "warn", text: "pi 的模型列表里没有 missing" },
-          { field: "effort", level: "error", text: "pi 默认用的 Fallback 没有 high 这一档，可选：low" },
+          {
+            field: "effort",
+            level: "error",
+            text: "pi 默认用的 Fallback 没有 high 这一档，可选：low",
+          },
         ]);
         expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
         const sent = yield* r.resolve({ ...a, effort: "low" });
@@ -315,7 +379,10 @@ describe("runtime", () => {
     Effect.gen(function* () {
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),
-        probe: async (id) => ({ ...(await notFound(id)), installation: { status: "available", via: "bundled", command: id, version: null } }),
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          installation: { status: "available", via: "bundled", command: id, version: null },
+        }),
       });
       const store = yield* Agents;
       yield* r.update("pi", { ...store.settings("pi"), enabled: false, dailyBudget: 1 });
@@ -329,7 +396,10 @@ describe("runtime", () => {
   it.live("the list carries every runtime's preset and facts", () =>
     Effect.gen(function* () {
       const registry = new RuntimeRegistry([
-        fake("opencode", { refusedSessionOptions: { env: "test env" }, installation: async () => ({ kind: "not_found" }) as const }),
+        fake("opencode", {
+          refusedSessionOptions: { env: "test env" },
+          installation: async () => ({ kind: "not_found" }) as const,
+        }),
       ]);
       const r = yield* runtimes({ registry, probe: undefined });
       // The first answer does not wait for a probe: every runtime is checking, already with its name, look and facts.
@@ -347,7 +417,10 @@ describe("runtime", () => {
       expect(list.map((i) => i.id)).toEqual(runtimeIds());
       const byId = Object.fromEntries(list.map((i) => [i.id, i]));
       expect(byId.opencode!.installation.status).toBe("not_found");
-      expect(byId.opencode!.facts.refused).toEqual({ env: "test env", disallowedTools: factsOf("opencode").refused.disallowedTools });
+      expect(byId.opencode!.facts.refused).toEqual({
+        env: "test env",
+        disallowedTools: factsOf("opencode").refused.disallowedTools,
+      });
       expect(byId.claude!.installation.status).toBe("unsupported");
       expect(byId.claude!.preset.label).toBe("Claude Code");
       expect(byId.claude!.facts.capabilities).toEqual(factsOf("claude").capabilities);
@@ -370,13 +443,23 @@ describe("runtime", () => {
     ]);
     const farm = (bin: string) =>
       Effect.gen(function* () {
-        yield* Effect.flatMap(Agents, (a) => a.saveSettings("pi", { enabled: true, binPath: bin, defaultModel: "", defaultEffort: "", env: {} }));
+        yield* Effect.flatMap(Agents, (a) =>
+          a.saveSettings("pi", {
+            enabled: true,
+            binPath: bin,
+            defaultModel: "",
+            defaultEffort: "",
+            env: {},
+          }),
+        );
         const r = yield* runtimes({ registry, probe: undefined });
         yield* r.refresh("pi");
         return yield* r.resolve(agent({}));
       }).pipe(Effect.scoped, Effect.provide(world()));
     return Effect.gen(function* () {
-      const [a, b] = yield* Effect.all([farm("first-bin"), farm("second-bin")], { concurrency: "unbounded" });
+      const [a, b] = yield* Effect.all([farm("first-bin"), farm("second-bin")], {
+        concurrency: "unbounded",
+      });
       expect([a.installation, b.installation]).toMatchObject([{ command: "first-bin" }, { command: "second-bin" }]);
       expect(process.env.OAR_PI_BIN).toBe("external-default");
     }).pipe(Effect.ensuring(Effect.sync(() => env("OAR_PI_BIN", before))));
@@ -425,7 +508,17 @@ describe("runtime", () => {
       const file = join(config.home, "config.json");
       rmSync(file);
       mkdirSync(file);
-      expect((yield* Effect.flip(r.update("pi", { enabled: true, binPath: "", defaultModel: "unsaved", defaultEffort: "", env: {} })))._tag).toBe("Refused");
+      expect(
+        (yield* Effect.flip(
+          r.update("pi", {
+            enabled: true,
+            binPath: "",
+            defaultModel: "unsaved",
+            defaultEffort: "",
+            env: {},
+          }),
+        ))._tag,
+      ).toBe("Refused");
       expect(probed).toBe(false);
       expect((yield* Agents).settings("pi").defaultModel).not.toBe("unsaved");
     }).pipe(Effect.scoped, Effect.provide(world(config)));
@@ -434,11 +527,20 @@ describe("runtime", () => {
   it.live("resolve owns the defaults, the overrides and the model's fallback", () =>
     Effect.gen(function* () {
       yield* Effect.flatMap(Agents, (a) =>
-        a.saveSettings("pi", { enabled: true, binPath: "", defaultModel: "known", defaultEffort: "default-effort", env: { base: "kept", override: "base" } }),
+        a.saveSettings("pi", {
+          enabled: true,
+          binPath: "",
+          defaultModel: "known",
+          defaultEffort: "default-effort",
+          env: { base: "kept", override: "base" },
+        }),
       );
       const r = yield* runtimes({
         registry: new RuntimeRegistry([fake("pi")]),
-        probe: async (id) => ({ ...(await notFound(id)), models: [{ id: "known", name: "known", effortLevels: [], isDefault: false }] }),
+        probe: async (id) => ({
+          ...(await notFound(id)),
+          models: [{ id: "known", name: "known", effortLevels: [], isDefault: false }],
+        }),
       });
       const a = agent({ env: { override: "profile" } });
       const got = yield* r.resolve(a);
@@ -468,8 +570,18 @@ describe("runtime", () => {
   });
 
   it("pi's balance, as pi configures DeepSeek", async () => {
-    const saved = { dir: process.env.OAR_PI_AGENT_DIR, key: process.env.DEEPSEEK_API_KEY, mine: process.env.MY_DEEPSEEK };
-    const balance = async (key: string, answer: unknown = { is_available: true, balance_infos: [{ currency: "CNY", total_balance: "12.50" }] }) => {
+    const saved = {
+      dir: process.env.OAR_PI_AGENT_DIR,
+      key: process.env.DEEPSEEK_API_KEY,
+      mine: process.env.MY_DEEPSEEK,
+    };
+    const balance = async (
+      key: string,
+      answer: unknown = {
+        is_available: true,
+        balance_infos: [{ currency: "CNY", total_balance: "12.50" }],
+      },
+    ) => {
       const s = createServer((req, res) => {
         if (req.url !== "/user/balance" || req.headers.authorization !== "Bearer " + key) return void res.writeHead(401).end();
         res.end(JSON.stringify(answer));
@@ -486,7 +598,12 @@ describe("runtime", () => {
       if (models) writeFileSync(join(dir, "models.json"), models);
       if (auth) writeFileSync(join(dir, "auth.json"), auth);
     };
-    const want = { status: "balance", provider: "DeepSeek", available: true, balances: [{ currency: "CNY", amount: 12.5 }] };
+    const want = {
+      status: "balance",
+      provider: "DeepSeek",
+      available: true,
+      balances: [{ currency: "CNY", amount: 12.5 }],
+    };
     try {
       let url = await balance("sk-from-env");
       delete process.env.DEEPSEEK_API_KEY;
@@ -503,13 +620,22 @@ describe("runtime", () => {
       delete process.env.DEEPSEEK_API_KEY;
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
       expect(await piBalance({ defaultModel: "" })).toEqual({ status: "login_required" });
-      expect(await piBalance({ defaultModel: "anthropic/claude" })).toEqual({ status: "unavailable", reason: "anthropic 不报余额" });
+      expect(await piBalance({ defaultModel: "anthropic/claude" })).toEqual({
+        status: "unavailable",
+        reason: "anthropic 不报余额",
+      });
       url = await balance("sk-bad", { is_available: true, balance_infos: {} });
       process.env.DEEPSEEK_API_KEY = "sk-bad";
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
-      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "unavailable", reason: "没读到 DeepSeek 余额" });
+      expect(await piBalance({ defaultModel: "" })).toEqual({
+        status: "unavailable",
+        reason: "没读到 DeepSeek 余额",
+      });
       piHome("", "", `{"defaultProvider":{}}`);
-      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "unavailable", reason: "pi 没有设默认模型" });
+      expect(await piBalance({ defaultModel: "" })).toEqual({
+        status: "unavailable",
+        reason: "pi 没有设默认模型",
+      });
     } finally {
       env("OAR_PI_AGENT_DIR", saved.dir);
       env("DEEPSEEK_API_KEY", saved.key);

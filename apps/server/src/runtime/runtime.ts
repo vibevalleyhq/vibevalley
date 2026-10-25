@@ -149,7 +149,11 @@ function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>
     subscription: usage.plan || null,
     windows: usage.windows.map((w) => {
       const at = w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN;
-      return { label: w.label, usedPercent: Math.round(w.usedRatio * 100), resetsAt: Number.isNaN(at) ? null : at };
+      return {
+        label: w.label,
+        usedPercent: Math.round(w.usedRatio * 100),
+        resetsAt: Number.isNaN(at) ? null : at,
+      };
     }),
   };
 }
@@ -183,10 +187,13 @@ export const make = (options: RuntimeOptions = {}) =>
     const cache = new Map<string, Observation>();
     /**
      * Each full probe takes the next number as it starts; the cache keeps the number of the probe it holds, and a probe
-     * that started before it is dropped, so a slow full refresh never overwrites a newer one. Usage reads merge by the
-     * identity of the observation they started from instead of taking a full-refresh number.
+     * that started before it is dropped, so a slow full refresh never overwrites a newer one. Usage reads merge into the
+     * observation of the full probe they started from (its number), and only while it is still the one held.
      */
     const reads = new Map<string, number>();
+    /** Usage reads asked and the latest one taken, per runtime: an older answer arriving late does not undo a newer. */
+    const usageAsked = new Map<string, number>();
+    const usageTaken = new Map<string, number>();
     // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
     const timers = yield* FiberMap.make<string>();
     const later = yield* FiberMap.runtime(timers)<never>();
@@ -236,7 +243,10 @@ export const make = (options: RuntimeOptions = {}) =>
     /** What the runtime takes: seeds.json's facts, with what it refuses taken from the adapter and the farm's policy laid over it. */
     function facts(id: string) {
       const f = factsOf(id);
-      return { ...f, refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string> };
+      return {
+        ...f,
+        refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string>,
+      };
     }
 
     const begin = (id: string) => {
@@ -275,17 +285,27 @@ export const make = (options: RuntimeOptions = {}) =>
         const reason = id === "cursor" ? "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接" : "oar 不认识这个 runtime";
         return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
       }
-      const snapshot = await within(probeInstallation(runtime, settings.binPath), probeTimeoutMs, { kind: "not_found" } as InstallationSnapshot);
+      const snapshot = await within(probeInstallation(runtime, settings.binPath), probeTimeoutMs, {
+        kind: "not_found",
+      } as InstallationSnapshot);
       if (snapshot.kind !== "available") {
         return {
-          info: { ...info, installation: snapshot.kind === "unsupported" ? { status: "unsupported", reason: snapshot.reason } : { status: "not_found" } },
+          info: {
+            ...info,
+            installation: snapshot.kind === "unsupported" ? { status: "unsupported", reason: snapshot.reason } : { status: "not_found" },
+          },
           read: 0,
         };
       }
       const found = snapshot;
       info.installation =
         found.via === "executable"
-          ? { status: "available", via: "executable", command: found.command, version: found.version || null }
+          ? {
+              status: "available",
+              via: "executable",
+              command: found.command,
+              version: found.version || null,
+            }
           : { status: "available", via: "bundled", command: id, version: null };
       const cwd = projectsDir(config);
       const [models, usage, skills, mcpServers, tools] = await Promise.all([
@@ -294,7 +314,12 @@ export const make = (options: RuntimeOptions = {}) =>
               m?.kind === "ok"
                 ? m.models
                     .filter((x) => !x.disabled)
-                    .map((x) => ({ id: x.id, name: x.displayName || x.id, effortLevels: [...(x.effortLevels ?? [])], isDefault: !!x.default }))
+                    .map((x) => ({
+                      id: x.id,
+                      name: x.displayName || x.id,
+                      effortLevels: [...(x.effortLevels ?? [])],
+                      isDefault: !!x.default,
+                    }))
                 : null,
             )
           : Promise.resolve(null),
@@ -351,10 +376,16 @@ export const make = (options: RuntimeOptions = {}) =>
       const before = cache.get(id);
       // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
+      const asked = (usageAsked.get(id) ?? 0) + 1;
+      usageAsked.set(id, asked);
       const usage = await usageOf(id, runtime, before.found, before.info.settings).catch(() => null);
-      if (closed || cache.get(id) !== before) return;
-      if (JSON.stringify(usage) === JSON.stringify(before.info.usage)) return;
-      remember({ ...before, info: { ...before.info, usage, checkedAt: Date.now() } }, before.read);
+      // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed. The
+      // cached observation itself may have been rebuilt meanwhile (a spend pushes a new total): that is no reason to drop it.
+      const now = cache.get(id);
+      if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
+      usageTaken.set(id, asked);
+      if (JSON.stringify(usage) === JSON.stringify(now.info.usage)) return;
+      remember({ ...now, info: { ...now.info, usage, checkedAt: Date.now() } }, now.read);
     }
 
     /** At most four runtimes asked at once. */
@@ -490,7 +521,12 @@ export const make = (options: RuntimeOptions = {}) =>
         );
       },
     };
-    return Object.assign(shape, { refreshUsage, cached: cache, spent: () => spent, setSpent: (s: Spent) => (spent = s) });
+    return Object.assign(shape, {
+      refreshUsage,
+      cached: cache,
+      spent: () => spent,
+      setSpent: (s: Spent) => (spent = s),
+    });
   });
 
 /** The farm's: VibeValley's own agent among them, unless options name the runtimes. */

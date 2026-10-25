@@ -14,11 +14,23 @@ const readTimeoutMs = 10_000;
 /** pi's agent folder, as oar's pi runtime finds it. */
 export const piAgentDir = () => process.env.OAR_PI_AGENT_DIR || process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
 
-const SettingsFile = Schema.Struct({ defaultProvider: Schema.optionalKey(Schema.String), defaultModel: Schema.optionalKey(Schema.String) });
-const AuthFile = Schema.Struct({ deepseek: Schema.optionalKey(Schema.Struct({ key: Schema.optionalKey(Schema.String) })) });
+const SettingsFile = Schema.Struct({
+  defaultProvider: Schema.optionalKey(Schema.String),
+  defaultModel: Schema.optionalKey(Schema.String),
+});
+const AuthFile = Schema.Struct({
+  deepseek: Schema.optionalKey(Schema.Struct({ key: Schema.optionalKey(Schema.String) })),
+});
 const ModelsFile = Schema.Struct({
   providers: Schema.optionalKey(
-    Schema.Struct({ deepseek: Schema.optionalKey(Schema.Struct({ apiKey: Schema.optionalKey(Schema.String), baseUrl: Schema.optionalKey(Schema.String) })) }),
+    Schema.Struct({
+      deepseek: Schema.optionalKey(
+        Schema.Struct({
+          apiKey: Schema.optionalKey(Schema.String),
+          baseUrl: Schema.optionalKey(Schema.String),
+        }),
+      ),
+    }),
   ),
 });
 const BalanceResponse = Schema.Struct({
@@ -84,7 +96,10 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
   if (!key) return { status: "login_required" };
   let res: Response;
   try {
-    res = await fetch(base + "/user/balance", { headers: { authorization: "Bearer " + key }, signal: AbortSignal.timeout(readTimeoutMs) });
+    res = await fetch(base + "/user/balance", {
+      headers: { authorization: "Bearer " + key },
+      signal: AbortSignal.timeout(readTimeoutMs),
+    });
   } catch (e) {
     return unavailable(e instanceof Error ? e.message : String(e));
   }
@@ -99,6 +114,9 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
     status: "balance",
     provider: "DeepSeek",
     available: b.is_available ?? true,
-    balances: (b.balance_infos ?? []).map((x) => ({ currency: x.currency, amount: Number.parseFloat(x.total_balance) || 0 })),
+    balances: (b.balance_infos ?? []).map((x) => ({
+      currency: x.currency,
+      amount: Number.parseFloat(x.total_balance) || 0,
+    })),
   };
 }

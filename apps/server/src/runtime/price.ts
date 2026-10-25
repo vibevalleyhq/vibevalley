@@ -39,7 +39,14 @@ export const vibevalleyRuntime = "vibevalley";
 export const defaultModel = "deepseek-flash";
 
 const priceOf = (cost: Price | undefined): Price | undefined =>
-  cost ? { input: cost.input, output: cost.output, cacheRead: cost.cacheRead, cacheWrite: cost.cacheWrite } : undefined;
+  cost
+    ? {
+        input: cost.input,
+        output: cost.output,
+        cacheRead: cost.cacheRead,
+        cacheWrite: cost.cacheWrite,
+      }
+    : undefined;
 
 function piPrice(model: string): Price | undefined {
   const slash = model.indexOf("/");
