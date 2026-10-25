@@ -24,7 +24,12 @@ it("forwards a disconnect to the Web handler", async () => {
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Mcp, handler),
-        Layer.succeed(Orchestrator, Orchestrator.of({ answerer: () => () => undefined } as unknown as Orchestrator["Service"])),
+        Layer.succeed(
+          Orchestrator,
+          Orchestrator.of({
+            answerer: () => () => undefined,
+          } as unknown as Orchestrator["Service"]),
+        ),
       ),
     ),
   );

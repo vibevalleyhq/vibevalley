@@ -331,7 +331,7 @@ export const Session: Schema.Codec<T.Session> = Schema.Struct({
   channel: Schema.optionalKey(Schema.String),
   play: Schema.optionalKey(SessionPlay),
   issue: Schema.optionalKey(Schema.String),
-  draft: Schema.optionalKey(Schema.Boolean),
+  refining: Schema.optionalKey(Schema.Boolean),
   phaseText: Schema.optionalKey(Schema.String),
 });
 
@@ -625,7 +625,7 @@ export const Issue: Schema.Codec<T.Issue> = Schema.Struct({
   questions: Schema.mutable(Schema.Array(Question)),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   checks: Schema.optionalKey(Schema.mutable(Schema.Array(CriterionCheck))),
-  drafting: Schema.optionalKey(IssueRefining),
+  refining: Schema.optionalKey(IssueRefining),
   lastRun: Schema.optionalKey(IssueRun),
   answer: Schema.optionalKey(IssueAnswer),
   attention: IssueAttention,

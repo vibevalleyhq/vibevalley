@@ -5,6 +5,7 @@
 import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers } from "@vibevalley/protocol/api";
 import { Cause, Effect, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { wireOf } from "../base/wire.ts";
 
 // The same Schema the clients read it back with: a refusal that does not fit it is the server's bug, a 500.
 const isApiError = Schema.is(ApiError);
@@ -59,12 +60,15 @@ function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, A
       return yield* HttpServerResponse.schemaJson(ApiError)(e, { status: errorStatus[e._tag] });
     }
     if (!endpoint.result) return HttpServerResponse.empty({ status: 204 });
-    return yield* HttpServerResponse.schemaJson(endpoint.result)(out.success);
+    return yield* HttpServerResponse.schemaJson(endpoint.result)(wireOf(out.success));
   }).pipe(
     Effect.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Effect.failCause(cause);
       const failure = Cause.squash(cause);
-      if (isApiError(failure)) return HttpServerResponse.schemaJson(ApiError)(failure, { status: errorStatus[failure._tag] });
+      if (isApiError(failure))
+        return HttpServerResponse.schemaJson(ApiError)(failure, {
+          status: errorStatus[failure._tag],
+        });
       return Effect.as(
         Effect.logError(`${endpoint.op}: ${Cause.pretty(cause)}`),
         HttpServerResponse.text(String(failure instanceof Error ? failure.message : failure) + "\n", { status: 500 }),

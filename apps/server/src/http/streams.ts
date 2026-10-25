@@ -6,6 +6,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { Effect, Schedule, Schema, Stream } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { bounded } from "../core/bounded.ts";
+import { wireJson } from "../base/wire.ts";
 import { Core } from "../core/core.ts";
 
 const heartbeatMs = 20_000;
@@ -13,7 +14,7 @@ const heartbeatMs = 20_000;
 const encoder = new TextEncoder();
 
 function sse<A>(name: string, events: Stream.Stream<A>, schema: Schema.Codec<A>) {
-  const encode = Schema.encodeEffect(Schema.fromJsonString(schema));
+  const encode = wireJson(schema);
   // These clients reconnect from a snapshot. Internal fact subscribers cannot do that and must not end on a full buffer.
   const data = bounded(events, "http." + name).pipe(
     Stream.mapEffect((event) =>
@@ -25,7 +26,11 @@ function sse<A>(name: string, events: Stream.Stream<A>, schema: Schema.Codec<A>)
   );
   const pings = Stream.fromSchedule(Schedule.spaced(heartbeatMs)).pipe(Stream.map(() => encoder.encode(": ping\n\n")));
   return HttpServerResponse.stream(Stream.merge(data, pings, { haltStrategy: "left" }), {
-    headers: { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" },
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      "x-accel-buffering": "no",
+    },
   });
 }
 
