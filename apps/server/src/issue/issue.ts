@@ -63,7 +63,7 @@ import {
 import { Context, Effect, Layer, Option, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
-import { SqlClient } from "effect/sql";
+import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { causeMessage } from "../base/db.ts";
@@ -486,7 +486,8 @@ export const make = (options: IssueOptions = {}) =>
       const evicted = room.evicted ?? "";
       const prepared = yield* Effect.result(
         (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
-          Effect.catchDefect((d) => Effect.fail(refused(causeMessage(d)))),
+          // The database failing (a full disk) is told as a refusal; any other defect is a bug and stays one.
+          Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(causeMessage(d))) : Effect.die(d))),
         ),
       );
       if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
