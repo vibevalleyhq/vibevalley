@@ -50,7 +50,11 @@ const DictationResponse = Schema.fromJsonString(
 );
 
 /** settings: the 设置 section the owner fixes it in, when a setting does; the page offers to go there. */
-const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({ _tag: "VoiceUnavailable", reason, ...(settings ? { settings } : {}) });
+const unavailable = (reason: string, settings?: VoiceFix): VoiceUnavailable => ({
+  _tag: "VoiceUnavailable",
+  reason,
+  ...(settings ? { settings } : {}),
+});
 const failed = (reason: string): ApiError => ({ _tag: "VoiceAgentFailed", reason });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -63,7 +67,11 @@ export interface CallLine {
 /** For a member added to the union and not to vendorsFor. */
 export const voiceUnknown = "服务端还不会用";
 
-type Vendors = { stt: AresSTT | DeepgramSTT | MicrosoftSTT; llm: OpenAI; tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS };
+type Vendors = {
+  stt: AresSTT | DeepgramSTT | MicrosoftSTT;
+  llm: OpenAI;
+  tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS;
+};
 
 /** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need
  * no key of their own. line undefined: the orchestrator does not answer the call itself. */
@@ -105,7 +113,12 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         break;
       case "deepseek":
         if (!deepseekKey) return unavailable("用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填", "deepseek");
-        llm = new OpenAI({ apiKey: deepseekKey, url: deepseekChat, model: answer.model, ...speech });
+        llm = new OpenAI({
+          apiKey: deepseekKey,
+          url: deepseekChat,
+          model: answer.model,
+          ...speech,
+        });
         break;
       case "openai":
         if (!keys.llmKey) return unavailable("自己的大模型还没有 key：在声音页的「想」里填", "voice");
@@ -144,7 +157,12 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area] ?? AgoraArea.US;
 
 export const clientOf = (c: AgoraCredentials, area: Area, fetcher?: typeof fetch) =>
-  new AgoraClient({ area: areaOf(area) as never, appId: c.appId, appCertificate: c.appCertificate, ...(fetcher ? { fetch: fetcher } : {}) });
+  new AgoraClient({
+    area: areaOf(area) as never,
+    appId: c.appId,
+    appCertificate: c.appCertificate,
+    ...(fetcher ? { fetch: fetcher } : {}),
+  });
 
 /** Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: the client has no RTM. */
 export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Vendors) {
@@ -156,14 +174,22 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
       language: voice.language,
       config: {
         speech_threshold: 0.5,
-        start_of_speech: { mode: "vad", vad_config: { interrupt_duration_ms: voice.interruptMs, prefix_padding_ms: 300 } },
+        start_of_speech: {
+          mode: "vad",
+          vad_config: { interrupt_duration_ms: voice.interruptMs, prefix_padding_ms: 300 },
+        },
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
     } as never,
     // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
     // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
     advancedFeatures: { enable_rtm: false, enable_tools: true },
-    parameters: { audio_scenario: "chorus", data_channel: "datastream", enable_error_message: true, enable_metrics: true } as never,
+    parameters: {
+      audio_scenario: "chorus",
+      data_channel: "datastream",
+      enable_error_message: true,
+      enable_metrics: true,
+    } as never,
   })
     .withStt(vendors.stt)
     .withLlm(vendors.llm)
@@ -172,7 +198,11 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
 
 /** Already left or leaving counts as success, as the quickstart treats it. */
 function alreadyStopping(e: unknown): boolean {
-  const err = e as { statusCode?: number; body?: { detail?: string; reason?: string }; message?: string } | null;
+  const err = e as {
+    statusCode?: number;
+    body?: { detail?: string; reason?: string };
+    message?: string;
+  } | null;
   if (err?.statusCode === 404) return true;
   return [err?.body?.detail, err?.body?.reason, err?.message].join(" ").toLowerCase().includes("already in the process of shutting down");
 }
@@ -332,7 +362,10 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
 async function tunnelAnswers(url: string): Promise<boolean> {
   for (const deadline = Date.now() + lineReadyMs; Date.now() < deadline;) {
     try {
-      const res = await fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.timeout(5_000) });
+      const res = await fetch(url + "/llm/ready/chat/completions", {
+        method: "POST",
+        signal: AbortSignal.timeout(5_000),
+      });
       if (res.status === 401) return true;
     } catch {
       // Not yet.
@@ -515,7 +548,10 @@ export const make = (options: VoiceOptions = {}) =>
         // Through the session: a bare agents.speak carries no token, and Agora answers 401.
         for (const piece of speakPieces(text)) {
           if (stopped || call.ending || calls.get(agentId) !== call) return false;
-          yield* Effect.tryPromise({ try: () => call.session.say(piece, { priority: "APPEND", interruptable: true }), catch: (e) => e });
+          yield* Effect.tryPromise({
+            try: () => call.session.say(piece, { priority: "APPEND", interruptable: true }),
+            catch: (e) => e,
+          });
         }
         return true;
       },
@@ -604,17 +640,28 @@ export const make = (options: VoiceOptions = {}) =>
         const c = yield* creds();
         const channel = newChannel();
         const uid = newUid();
-        const issued = yield* Effect.try({ try: () => sign(c, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+        const issued = yield* Effect.try({
+          try: () => sign(c, channel, uid),
+          catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+        });
         if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
         prune();
-        grants.set(keyOf(channel, uid), { credentials: c, expires: now() + tokenSeconds * 1000, starting: false, agent: "" });
+        grants.set(keyOf(channel, uid), {
+          credentials: c,
+          expires: now() + tokenSeconds * 1000,
+          starting: false,
+          agent: "",
+        });
         return issued;
       }),
       renew: Effect.fn("Voice.renew")(function* (channel, uid) {
         prune();
         const g = grants.get(keyOf(channel, uid));
         if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
-        const issued = yield* Effect.try({ try: () => sign(g.credentials, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+        const issued = yield* Effect.try({
+          try: () => sign(g.credentials, channel, uid),
+          catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+        });
         g.expires = now() + tokenSeconds * 1000;
         return issued;
       }),
@@ -635,7 +682,10 @@ export const make = (options: VoiceOptions = {}) =>
           const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
           if (voice.answer.vendor === "orchestrator") {
             openingLine = openLine();
-            callLine = yield* Effect.tryPromise({ try: () => openingLine!, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
+            callLine = yield* Effect.tryPromise({
+              try: () => openingLine!,
+              catch: (e) => unavailable("管家的语音线路接不通：" + message(e)),
+            });
             const opened = callLine;
             let once = false;
             release = () => {
@@ -659,7 +709,10 @@ export const make = (options: VoiceOptions = {}) =>
           });
           const pending = session.start();
           starting = pending;
-          const id = yield* Effect.tryPromise({ try: () => pending, catch: (e) => failed("请管家进频道失败：" + message(e)) });
+          const id = yield* Effect.tryPromise({
+            try: () => pending,
+            catch: (e) => failed("请管家进频道失败：" + message(e)),
+          });
           if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable("语音服务已经停下"));
           g.agent = id;
           g.starting = false;
@@ -675,7 +728,10 @@ export const make = (options: VoiceOptions = {}) =>
           });
           committed = true;
           if (about) tell([], about);
-          return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
+          return {
+            agentId: id,
+            answeredBy: callLine === undefined ? "agora" : "orchestrator",
+          } as const;
         });
         const agent = yield* started.pipe(
           Effect.onError(() =>
@@ -717,9 +773,10 @@ export const make = (options: VoiceOptions = {}) =>
           call.life.abort();
           client = call.client;
         } else client = clientOf(yield* creds(), settings.voice().area, options.fetch);
-        const stopping = Effect.tryPromise({ try: () => client.stopAgent(agentId), catch: (e) => e }).pipe(
-          Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))),
-        );
+        const stopping = Effect.tryPromise({
+          try: () => client.stopAgent(agentId),
+          catch: (e) => e,
+        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))));
         yield* Effect.ensuring(
           stopping,
           Effect.sync(() => call?.release()),
@@ -744,11 +801,22 @@ export const make = (options: VoiceOptions = {}) =>
         if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
-        if (!kind) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: `听写认不得 ${JSON.stringify(format)} 这种录音` });
+        if (!kind)
+          return yield* Effect.fail<ApiError>({
+            _tag: "Refused",
+            reason: `听写认不得 ${JSON.stringify(format)} 这种录音`,
+          });
         const audio = Buffer.from(audio64, "base64");
         if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
-          return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音是空的，或者不是 base64" });
-        if (audio.length > dictateMaxBytes) return yield* Effect.fail<ApiError>({ _tag: "Refused", reason: "录音太长了：一段不超过 25 MB" });
+          return yield* Effect.fail<ApiError>({
+            _tag: "Refused",
+            reason: "录音是空的，或者不是 base64",
+          });
+        if (audio.length > dictateMaxBytes)
+          return yield* Effect.fail<ApiError>({
+            _tag: "Refused",
+            reason: "录音太长了：一段不超过 25 MB",
+          });
         const form = new FormData();
         form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
         form.append("model", d.model);
@@ -764,10 +832,10 @@ export const make = (options: VoiceOptions = {}) =>
             }),
           catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
         });
-        const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
-          0,
-          1 << 20,
-        );
+        const raw = (yield* Effect.tryPromise({
+          try: () => res.text(),
+          catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice"),
+        })).slice(0, 1 << 20);
         const got = Schema.decodeUnknownOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
         if (!res.ok) return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(detail || raw.trim())].slice(0, 200).join("")}`));
