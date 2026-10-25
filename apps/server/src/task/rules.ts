@@ -13,6 +13,7 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { isForOrchestrator } from "../issue/state.ts";
+import { Result, Schema } from "effect";
 import { slice } from "../base/text.ts";
 import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, maxTasks, taskOf, taskStateText } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
@@ -71,82 +72,42 @@ export type ParsedSplit = { readonly ok: true; readonly title?: string; readonly
 
 const taskBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 
-/** JSON as Go's decoder reads it; the words for one that does not read say what Go's would where they are the same failure. */
-function parseJson(body: string): unknown {
-  try {
-    return JSON.parse(body);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message);
-  }
-}
-
-/** Optional fields may be missing but never null; other keys are ignored. */
-function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } | string {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return "要一个对象";
-  const obj = raw as Record<string, unknown>;
-  let title: string | undefined;
-  if ("title" in obj) {
-    if (typeof obj.title !== "string") return `["title"] 要是字符串`;
-    title = obj.title;
-  }
-  if (!Array.isArray(obj.tasks)) return `["tasks"] 要是数组`;
-  const tasks: StepDraft[] = [];
-  for (const [i, item] of obj.tasks.entries()) {
-    const at = `["tasks"][${i}]`;
-    if (typeof item !== "object" || item === null || Array.isArray(item)) return at + " 要是对象";
-    const o = item as Record<string, unknown>;
-    const text = (key: string, required: boolean): string | undefined | { problem: string } => {
-      if (!(key in o)) return required ? { problem: `${at}["${key}"] 缺了` } : undefined;
-      return typeof o[key] === "string" ? o[key] : { problem: `${at}["${key}"] 要是字符串` };
-    };
-    const texts = (key: string): string[] | undefined | { problem: string } => {
-      if (!(key in o)) return undefined;
-      const a = o[key];
-      if (!Array.isArray(a)) return { problem: `${at}["${key}"] 要是数组` };
-      const bad = a.findIndex((x) => typeof x !== "string");
-      return bad >= 0 ? { problem: `${at}["${key}"][${bad}] 要是字符串` } : (a as string[]);
-    };
-    const step: Record<string, unknown> = {};
-    for (const [key, read] of [
-      ["id", () => text("id", true)],
-      ["title", () => text("title", false)],
-      ["brief", () => text("brief", true)],
-      ["needs", () => texts("needs")],
-      ["agent", () => text("agent", false)],
-      ["check", () => text("check", false)],
-      ["scope", () => texts("scope")],
-    ] as const) {
-      const v = read();
-      if (v !== undefined && typeof v === "object" && !Array.isArray(v)) return v.problem;
-      if (v !== undefined) step[key] = v;
-    }
-    if ("acceptance" in o) {
-      if (typeof o.acceptance !== "boolean") return at + `["acceptance"] 要是布尔值`;
-      step.acceptance = o.acceptance;
-    }
-    tasks.push(step as unknown as StepDraft);
-  }
-  return { ...(title !== undefined ? { title } : {}), tasks };
-}
+/** A plan as the splitter writes it: optional fields may be missing but never null; other keys are ignored. */
+const SplitDraft = Schema.Struct({
+  title: Schema.optionalKey(Schema.String),
+  tasks: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      title: Schema.optionalKey(Schema.String),
+      brief: Schema.String,
+      needs: Schema.optionalKey(Schema.Array(Schema.String)),
+      agent: Schema.optionalKey(Schema.String),
+      check: Schema.optionalKey(Schema.String),
+      scope: Schema.optionalKey(Schema.Array(Schema.String)),
+      acceptance: Schema.optionalKey(Schema.Boolean),
+    }),
+  ),
+});
+// Two steps, so the words tell JSON that does not read from a plan that is not one.
+const readJson = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown));
+const readSplit = Schema.decodeUnknownResult(SplitDraft);
 
 export function parseSplit(text: string): ParsedSplit {
   const blocks = [...text.matchAll(taskBlock)].map((m) => m[1]!);
   if (blocks.length === 0) return { ok: false, problems: ["没找到计划：要用一个 json 代码块给出"] };
   let last = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
-    let raw: unknown;
-    try {
-      raw = parseJson(blocks[i]!);
-    } catch (e) {
-      last = "json 读不了：" + (e as Error).message;
+    const json = readJson(blocks[i]!);
+    if (Result.isFailure(json)) {
+      last = "json 读不了：" + json.failure.message;
       continue;
     }
-    const draft = decodeSplitDraft(raw);
-    if (typeof draft === "string") {
-      last = "计划的格式不对：" + draft;
+    const read = readSplit(json.success);
+    if (Result.isFailure(read)) {
+      last = "计划的格式不对：" + read.failure.message;
       continue;
     }
+    const draft = read.success;
     const tasks = draft.tasks.map(freshTask);
     const problems = graphProblems(tasks);
     if (problems.length > 0) return { ok: false, problems };
