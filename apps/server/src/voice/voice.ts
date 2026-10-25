@@ -3,14 +3,14 @@
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
-import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type VoiceAgent, type VoiceSettings } from "@vibevalley/protocol";
 import { type ApiError, Refused, VoiceAgentFailed, type VoiceFix, VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Context, Effect, Layer, Stream } from "effect";
+import { Context, Deferred, Effect, Exit, FiberMap, Layer, Scope, Semaphore, Stream } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { chatCompletions } from "../agent/brain/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
@@ -269,51 +269,39 @@ export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
   readonly now?: () => number;
-  /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
-  readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
+  /** A tunnel to the line's port, open while its scope is: its public address. cloudflared's quick tunnel when absent. */
+  readonly tunnel?: (port: number) => Effect.Effect<string, Error, Scope.Scope>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
   readonly gatherMs?: number;
 }
 
 const quickTunnel = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 
-function cloudflared(port: number): Promise<{ url: string; close: () => void }> {
-  return new Promise((resolve, reject) => {
-    let child: ChildProcess;
-    try {
-      child = spawn("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`], { stdio: ["ignore", "pipe", "pipe"] });
-    } catch (e) {
-      return reject(e);
-    }
-    const close = () => child.kill();
-    const timer = setTimeout(() => {
-      close();
-      reject(new Error("cloudflared 30 秒没给出地址"));
-    }, 30_000);
-    // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
-    const read = (b: Buffer) => {
-      const url = quickTunnel.exec(b.toString())?.[0];
-      if (url) {
-        clearTimeout(timer);
-        resolve({ url, close });
-      }
-    };
-    child.stdout?.on("data", read);
-    child.stderr?.on("data", read);
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      reject(
-        (e as NodeJS.ErrnoException).code === "ENOENT"
-          ? new Error("没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道")
-          : e,
+/** cloudflared's quick tunnel to port, open while the scope is: its address once it says it. */
+const cloudflared = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], port: number) =>
+  Effect.gen(function* () {
+    const handle = yield* spawner
+      .spawn(ChildProcess.make("cloudflared", ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`]))
+      .pipe(
+        Effect.mapError((e) =>
+          e.reason._tag === "NotFound"
+            ? new Error("没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道")
+            : new Error(e.message),
+        ),
       );
-    });
-    child.on("exit", () => {
-      clearTimeout(timer);
-      reject(new Error("cloudflared 退出了，没给出地址"));
-    });
+    const said = yield* Deferred.make<string, Error>();
+    // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
+    yield* handle.all.pipe(
+      Stream.decodeText,
+      Stream.runForEach((text) => {
+        const url = quickTunnel.exec(text)?.[0];
+        return url ? Effect.asVoid(Deferred.succeed(said, url)) : Effect.void;
+      }),
+      Effect.andThen(Deferred.fail(said, new Error("cloudflared 退出了，没给出地址"))),
+      Effect.forkScoped,
+    );
+    return yield* Deferred.await(said).pipe(Effect.timeoutOrElse({ duration: 30_000, orElse: () => Effect.fail(new Error("cloudflared 30 秒没给出地址")) }));
   });
-}
 
 /** The line refusing a keyless request counts as an answer. */
 async function tunnelAnswers(url: string): Promise<boolean> {
@@ -360,8 +348,12 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
   let line: Server | undefined;
   let linePort = config.voice.line.port;
   let lineProblem = "";
-  let tunnel: { url: string; close: () => void } | undefined;
-  let closing: NodeJS.Timeout | undefined;
+  // The tunnel, while calls use it: opened in a scope of its own, closed a while after the last call let go of the line.
+  let tunnel: { readonly url: string; readonly scope: Scope.Closeable } | undefined;
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const tunnelLock = yield* Semaphore.make(1);
+  const timers = yield* FiberMap.make<"close">();
+  const later = yield* FiberMap.runtime(timers)<never>();
   const answer = chatCompletions({
     answerer: orchestrator.answerer("phone"),
     misheard: lineMisheard,
@@ -414,51 +406,54 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
 
   const openTunnel =
     options.tunnel ??
-    (async (port: number) => {
-      const t = await cloudflared(port);
-      if (!(await tunnelAnswers(t.url))) logs.info(`vibevalley: the voice line's tunnel ${t.url} does not answer yet; the call goes on`);
-      return t;
-    });
+    ((port: number) =>
+      Effect.tap(cloudflared(spawner, port), (url) =>
+        Effect.promise(() => tunnelAnswers(url)).pipe(
+          Effect.flatMap((answers) =>
+            answers ? Effect.void : Effect.sync(() => logs.info(`vibevalley: the voice line's tunnel ${url} does not answer yet; the call goes on`)),
+          ),
+        ),
+      ));
   // Opening a tunnel waits for it to answer, through this very line: one opening at a time.
-  let opening: Promise<string> | undefined;
-  const base = async () => {
+  const base = Effect.gen(function* () {
     if (config.voice.line.url) return config.voice.line.url.replace(/\/+$/, "");
-    if (closing) clearTimeout(closing);
-    closing = undefined;
-    if (!tunnel) {
-      opening ??= openTunnel(linePort)
-        .then((t) => {
-          tunnel = t;
-          return t.url;
-        })
-        .finally(() => {
-          opening = undefined;
-        });
-      return opening;
-    }
-    return tunnel.url;
-  };
-  const openLine = async (): Promise<CallLine> => {
-    if (stopped) throw new Error("语音线路已经关闭");
-    if (lineProblem) throw new Error(lineProblem);
-    if (!line) throw new Error("语音线路还没开");
-    const url = await base();
+    // A call came: the tunnel stays.
+    yield* FiberMap.remove(timers, "close");
+    return yield* tunnelLock.withPermits(1)(
+      Effect.gen(function* () {
+        if (tunnel) return tunnel.url;
+        const scope = yield* Scope.make();
+        const url = yield* Scope.provide(openTunnel(linePort), scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)));
+        tunnel = { url, scope };
+        return url;
+      }),
+    );
+  });
+  const closeTunnel = Effect.suspend(() => {
+    const t = tunnel;
+    tunnel = undefined;
+    return t ? Scope.close(t.scope, Exit.void) : Effect.void;
+  });
+  const openLine = Effect.gen(function* () {
+    if (stopped) return yield* Effect.fail(new Error("语音线路已经关闭"));
+    if (lineProblem) return yield* Effect.fail(new Error(lineProblem));
+    if (!line) return yield* Effect.fail(new Error("语音线路还没开"));
+    const url = yield* base;
     const id = randomBytes(8).toString("hex");
     const key = randomBytes(24).toString("base64url");
     keys.set(id, key);
-    return { id, key, url: url + "/llm/" + id + "/chat/completions" };
-  };
+    return { id, key, url: url + "/llm/" + id + "/chat/completions" } satisfies CallLine;
+  });
   const closeLine = (id: string) => {
     keys.delete(id);
     if (keys.size > 0 || !tunnel) return;
-    if (closing) clearTimeout(closing);
-    closing = setTimeout(() => {
-      closing = undefined;
-      if (keys.size > 0 || !tunnel) return;
-      tunnel.close();
-      tunnel = undefined;
-    }, lineLingerMs);
-    closing.unref();
+    void later(
+      "close",
+      Effect.delay(
+        Effect.suspend(() => (keys.size > 0 ? Effect.void : closeTunnel)),
+        lineLingerMs,
+      ),
+    );
   };
 
   yield* Effect.addFinalizer(() =>
@@ -466,12 +461,9 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
       stopped = true;
       grants.clear();
       keys.clear();
-      if (closing) clearTimeout(closing);
-      tunnel?.close();
-      tunnel = undefined;
       line?.closeAllConnections();
       line?.close();
-    }),
+    }).pipe(Effect.andThen(closeTunnel)),
   );
 
   const callOf = (agentId: string) => {
@@ -583,7 +575,7 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
         const { voice, keys: vendorKeys, deepseekApiKey } = settings.voiceConfig();
         let callLine: CallLine | undefined;
         if (voice.answer.vendor === "orchestrator") {
-          callLine = yield* Effect.tryPromise({ try: openLine, catch: (e) => unavailable("管家的语音线路接不通：" + message(e)) });
+          callLine = yield* openLine.pipe(Effect.mapError((e) => unavailable("管家的语音线路接不通：" + e.message)));
           const opened = callLine;
           let once = false;
           release = () => {

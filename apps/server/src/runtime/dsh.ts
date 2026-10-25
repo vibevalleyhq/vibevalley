@@ -7,8 +7,9 @@
 // and session/close, one prompt at a time, session/cancel, and session/set_config_option with a `model` select grouped
 // by provider and a `reasoning_effort` select in the thought_level category (off, low, high, max).
 
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
+import { NodeServices } from "@effect/platform-node";
+import { Cause, Deferred, Effect, Exit, Queue, Stream } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import {
   defineRuntime,
   type InstallationProbe,
@@ -148,45 +149,71 @@ export function projectModels(response: unknown): ModelEntry[] | undefined {
   return entries;
 }
 
-/** A throwaway session in the listing's cwd, for its model option: initialize, session/new, session/close. */
-async function readNewSession(command: string, cwd: string, timeoutMs: number): Promise<Rec> {
-  const child = spawn(command, ["--profile", "acp"], { cwd, stdio: ["pipe", "pipe", "ignore"] });
-  const lines = createInterface({ input: child.stdout });
-  let next = 0;
-  const waiting = new Map<number, { resolve: (v: Rec) => void; reject: (e: Error) => void }>();
-  lines.on("line", (line) => {
-    try {
-      const m = JSON.parse(line) as { id?: number; result?: Rec; error?: { code?: number; message?: string } };
-      const w = m.id !== undefined ? waiting.get(m.id) : undefined;
-      if (!w) return;
-      waiting.delete(m.id!);
-      if (m.error) w.reject(Object.assign(new Error(m.error.message ?? "ACP error"), { code: m.error.code }));
-      else w.resolve(m.result ?? {});
-    } catch {
-      // Not JSON-RPC: logs.
-    }
-  });
-  const request = (method: string, params: Rec) =>
-    new Promise<Rec>((resolve, reject) => {
-      const id = ++next;
-      const timer = setTimeout(() => reject(new Error(`${method} timed out`)), timeoutMs);
-      waiting.set(id, { resolve: (v) => (clearTimeout(timer), resolve(v)), reject: (e) => (clearTimeout(timer), reject(e)) });
-      child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
-    });
-  try {
-    await new Promise<void>((resolve, reject) => {
-      child.once("spawn", resolve);
-      child.once("error", reject);
-    });
-    await request("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } });
-    const response = await request("session/new", { cwd, mcpServers: [] });
-    // Best effort: the list is in hand, and the process is killed next.
-    if (typeof response.sessionId === "string") await request("session/close", { sessionId: response.sessionId }).catch(() => undefined);
-    return response;
-  } finally {
-    child.kill();
+/** A JSON-RPC error from the process, with its code (-32601: no such method). */
+class RpcError extends Error {
+  constructor(
+    message: string,
+    readonly code: number | undefined,
+  ) {
+    super(message);
   }
 }
+
+/**
+ * A throwaway session in the listing's cwd, for its model option: initialize, session/new, session/close. The process lives
+ * in this effect's scope: closing it kills the process (and its group).
+ */
+const readNewSession = (command: string, cwd: string, timeoutMs: number) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const outgoing = yield* Queue.unbounded<Uint8Array>();
+      const handle = yield* spawner.spawn(ChildProcess.make(command, ["--profile", "acp"], { cwd, stdin: Stream.fromQueue(outgoing), stderr: "ignore" }));
+      const waiting = new Map<number, Deferred.Deferred<Rec, Error>>();
+      // Lines that are not JSON-RPC answers are its logs.
+      yield* handle.stdout.pipe(
+        Stream.decodeText,
+        Stream.splitLines,
+        Stream.runForEach((line) =>
+          Effect.suspend(() => {
+            let m: { id?: number; result?: Rec; error?: { code?: number; message?: string } };
+            try {
+              m = JSON.parse(line) as typeof m;
+            } catch {
+              return Effect.void;
+            }
+            const w = m.id !== undefined ? waiting.get(m.id) : undefined;
+            if (!w) return Effect.void;
+            waiting.delete(m.id!);
+            return m.error ? Deferred.fail(w, new RpcError(m.error.message ?? "ACP error", m.error.code)) : Deferred.succeed(w, m.result ?? {});
+          }),
+        ),
+        Effect.forkScoped,
+      );
+      let next = 0;
+      const encoder = new TextEncoder();
+      const request = (method: string, params: Rec) =>
+        Effect.gen(function* () {
+          const id = ++next;
+          const answer = yield* Deferred.make<Rec, Error>();
+          waiting.set(id, answer);
+          yield* Queue.offer(outgoing, encoder.encode(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"));
+          return yield* Deferred.await(answer).pipe(Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.fail(new Error(`${method} timed out`)) }));
+        });
+      yield* request("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } });
+      const response = yield* request("session/new", { cwd, mcpServers: [] });
+      // Best effort: the list is in hand, and the process is killed next.
+      if (typeof response.sessionId === "string") yield* Effect.ignore(request("session/close", { sessionId: response.sessionId }));
+      return response;
+    }),
+  );
+
+/** readNewSession for oar's Promise interface: its failure as it was raised (an RpcError keeps its code). */
+const readNewSessionPromise = async (command: string, cwd: string, timeoutMs: number): Promise<Rec> => {
+  const exit = await Effect.runPromiseExit(readNewSession(command, cwd, timeoutMs).pipe(Effect.provide(NodeServices.layer)));
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw Cause.squash(exit.cause);
+};
 
 const startSession = acpSession({
   args: ["--profile", "acp"],
@@ -213,7 +240,7 @@ export const dshRuntime = defineRuntime({
       return { kind: "unsupported", reason: "dsh model listing requires the dsh executable" };
     let response: Rec;
     try {
-      response = await readNewSession(installation.command as string, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
+      response = await readNewSessionPromise(installation.command as string, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {
       if ((e as { code?: number }).code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
       throw e;

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, type Scope } from "effect";
 import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -105,10 +105,10 @@ describe("a call's agent", () => {
   });
 });
 
-/** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture) => {
-  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
-  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
+/** The farm with a voice service, its line on a free port behind a line of its own; or, given tunnel, behind that tunnel. */
+const farm = (capture: Capture, tunnel?: (port: number) => Effect.Effect<string, Error, Scope.Scope>) => {
+  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: tunnel ? "" : "https://line.example.com" } } };
+  return layer({ fetch: capture.fetch, gatherMs: 30, ...(tunnel ? { tunnel } : {}) }).pipe(
     Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
   );
 };
@@ -191,6 +191,36 @@ describe("voice", () => {
       capture.body = `{"detail":"boom"}`;
       expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceAgentFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  it.live("opens one tunnel for the line's calls, and closes it with the service", () => {
+    const capture = new Capture();
+    const opened: number[] = [];
+    let closed = 0;
+    const tunnel = (port: number) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          opened.push(port);
+          return "https://tunnel.example.com";
+        }),
+        () => Effect.sync(() => void closed++),
+      );
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        const voice = yield* Voice;
+        yield* credentials({ answer: { vendor: "orchestrator" } });
+        for (const _ of [1, 2]) {
+          const grant = yield* voice.session();
+          const agent = yield* voice.start(grant.channel, grant.uid);
+          const props = capture.requests.at(-1)!.properties as Record<string, Record<string, unknown>>;
+          expect(String(props.llm!.url).startsWith("https://tunnel.example.com/llm/")).toBe(true);
+          yield* voice.stop(agent.agentId);
+        }
+        // The second call came while the first one's tunnel lingered: the same tunnel.
+        expect([opened.length, opened[0]! > 0, closed]).toEqual([1, true, 0]);
+      }).pipe(Effect.scoped, Effect.provide(farm(capture, tunnel)));
+      expect(closed).toBe(1);
+    });
   });
 
   it.live("keeps a call's credentials and line whatever the settings say later", () => {

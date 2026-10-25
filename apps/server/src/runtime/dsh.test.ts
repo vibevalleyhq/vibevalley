@@ -7,8 +7,9 @@ import { dshRuntime, modelId, optionValue, projectModels } from "./dsh.ts";
 const answersFile = resolve(import.meta.dirname, "testdata/dsh-acp-0.2.1-rc.2.json");
 const answers = JSON.parse(readFileSync(answersFile, "utf8")) as Record<string, unknown>;
 
-/** `dsh --profile acp` played: it answers with what dsh 0.2.1-rc.2 answered (testdata), and logs every request. */
-function fakeDsh() {
+/** `dsh --profile acp` played: it answers with what dsh 0.2.1-rc.2 answered (testdata), and logs every request; an older
+ * one (noSessionNew) has no session/new. */
+function fakeDsh(noSessionNew = false) {
   const dir = mkdtempSync(join(tmpdir(), "vibevalley-dsh-"));
   const log = join(dir, "log.jsonl");
   const script = join(dir, "dsh");
@@ -30,6 +31,10 @@ rl.on("line", (line) => {
     answer = { sessionId: "dsh-session", configOptions: opened.configOptions };
   }
   if (m.method === "session/prompt") answer = { stopReason: "end_turn" };
+  if (${noSessionNew} && m.method === "session/new") {
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Method not found" } }) + "\\n");
+    return;
+  }
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: answer }) + "\\n");
 });
 `,
@@ -78,6 +83,12 @@ describe("DeepSeek Harness", () => {
     const fake = fakeDsh();
     const listed = await dshRuntime.listModels!({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
     expect(listed.kind === "ok" && listed.models.map((m) => m.id)).toEqual(["deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"]);
+  });
+
+  it("says a dsh with no session/new cannot list its models", async () => {
+    const fake = fakeDsh(true);
+    const listed = await dshRuntime.listModels!({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
+    expect(listed).toEqual({ kind: "unsupported", reason: "this dsh build has no session/new method" });
   });
 
   it("refuses a system prompt", async () => {
