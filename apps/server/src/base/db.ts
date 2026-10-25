@@ -53,7 +53,8 @@ export const Database = PgliteClient.layerFrom(
     const base = memory ? memoryBase : undefined;
     const pglite = yield* Effect.acquireRelease(
       Effect.promise(async () => (memory ? PGlite.create(base ? { loadDataDir: await base } : undefined) : PGlite.create(where))),
-      (db) => Effect.promise(() => db.close()),
+      // Closing at shutdown that fails (closed twice, the disk) is said, not a defect on the way out.
+      (db) => Effect.tryPromise(() => db.close()).pipe(Effect.catch((e) => Effect.logWarning(`vibevalley: the database did not close: ${String(e)}`))),
     );
     const client = yield* PgliteClient.fromClient({ liveClient: pglite });
     yield* migrate(pglite, client);

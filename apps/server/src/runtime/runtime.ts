@@ -118,8 +118,15 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const within = <A>(p: Promise<A>, ms: number, fallback: A): Promise<A> =>
-  Promise.race([p.catch(() => fallback), new Promise<A>((resolve) => setTimeout(() => resolve(fallback), ms).unref())]);
+/** start's answer, or fallback when it fails or takes longer than ms. start is called inside a promise, so a runtime that
+ * throws while starting its probe (instead of rejecting) is caught as well. */
+const within = <A>(start: () => Promise<A>, ms: number, fallback: A): Promise<A> =>
+  Promise.race([
+    Promise.resolve()
+      .then(start)
+      .catch(() => fallback),
+    new Promise<A>((resolve) => setTimeout(() => resolve(fallback), ms).unref()),
+  ]);
 
 /**
  * oar's installation probes read the binary from OAR_<ID>_BIN as they start: it is set for that moment only, so two
@@ -158,7 +165,7 @@ async function inventory<T>(
   entry: (t: T) => InventoryEntry,
 ): Promise<InventoryEntry[] | null> {
   if (!read) return null;
-  const result = await within(read(found, { cwd, timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
+  const result = await within(() => read(found, { cwd, timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
   return result?.kind === "ok" ? result.items.map(entry) : null;
 }
 
@@ -267,7 +274,7 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
       const reason = id === "cursor" ? "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接" : "oar 不认识这个 runtime";
       return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
     }
-    const snapshot = await within(probeInstallation(runtime, settings.binPath), probeTimeoutMs, { kind: "not_found" } as InstallationSnapshot);
+    const snapshot = await within(() => probeInstallation(runtime, settings.binPath), probeTimeoutMs, { kind: "not_found" } as InstallationSnapshot);
     if (snapshot.kind !== "available") {
       return {
         info: { ...info, installation: snapshot.kind === "unsupported" ? { status: "unsupported", reason: snapshot.reason } : { status: "not_found" } },
@@ -282,7 +289,7 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
     const cwd = projectsDir(config);
     const [models, usage, skills, mcpServers, tools] = await Promise.all([
       runtime.listModels
-        ? within(runtime.listModels(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined).then((m) =>
+        ? within(() => runtime.listModels?.(found, { timeoutMs: probeTimeoutMs }) ?? Promise.resolve(undefined), probeTimeoutMs, undefined).then((m) =>
             m?.kind === "ok"
               ? m.models
                   .filter((x) => !x.disabled)
@@ -318,8 +325,9 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
 
   async function defaultUsageOf(id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings): Promise<AccountUsage | null> {
     if (id === "pi") return piBalance(settings);
-    if (!runtime.accountUsage) return null;
-    const usage = await within(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
+    const accountUsage = runtime.accountUsage;
+    if (!accountUsage) return null;
+    const usage = await within(() => accountUsage.call(runtime, found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
     return usage ? fromOar(usage) : null;
   }
 
