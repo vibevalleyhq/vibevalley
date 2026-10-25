@@ -64,7 +64,13 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
     Layer.provideMerge(Layer.succeed(Settings, testConfig())),
   );
 
-const nowledgeOn: MemorySourceUpdate = { kind: "nowledge", url: "http://up/", enabled: true, read: true, write: true };
+const nowledgeOn: MemorySourceUpdate = {
+  kind: "nowledge",
+  url: "http://up/",
+  enabled: true,
+  read: true,
+  write: true,
+};
 
 const save = (s: MemorySourceUpdate) => Effect.flatMap(Setting, (setting) => setting.save({ memorySources: [s] }));
 
@@ -75,7 +81,12 @@ const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Eff
     return yield* body(yield* Memories);
   }).pipe(Effect.provide(world(() => fake)));
 
-const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: "owner" });
+const owner = (agent: string, text: string, project = ""): Note => ({
+  agent,
+  text,
+  project,
+  by: "owner",
+});
 
 const until = async (ok: () => boolean) => {
   for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
@@ -115,7 +126,12 @@ describe("memory sources", () => {
     return withFake(fake, (m) =>
       Effect.gen(function* () {
         const local = yield* m.write(owner("lab", "这个项目测试用 pnpm test", "demo"));
-        const got = yield* m.recall({ agent: "lab", project: "demo", text: "测试 提交", skip: new Set(["nowledge:m1", "other:m2", local.id + "x"]) });
+        const got = yield* m.recall({
+          agent: "lab",
+          project: "demo",
+          text: "测试 提交",
+          skip: new Set(["nowledge:m1", "other:m2", local.id + "x"]),
+        });
         expect(got.ids).toEqual([local.id, "nowledge:m9"]);
         expect(got.lines[1]).toBe("主人要中文的提交信息");
         expect([...fake.cues[0]!.skip!]).toEqual(["m1"]);
@@ -319,7 +335,13 @@ describe("memory sources", () => {
       ])
         yield* m.write(owner(agent!, text!, project));
       const texts = (found: Found[]) => found.map((f) => f.text);
-      const q = (agent: string, project: string, text: string): SearchQuery => ({ agent, project, text, kind: "", limit: 0 });
+      const q = (agent: string, project: string, text: string): SearchQuery => ({
+        agent,
+        project,
+        text,
+        kind: "",
+        limit: 0,
+      });
       expect(texts((yield* m.search(q("lab", "demo", "测试"))).found)).toEqual(["这个项目测试用 pnpm test"]);
       const pnpm = texts((yield* m.search(q("lab", "", "pnpm test"))).found);
       expect([pnpm.length, pnpm[0]]).toEqual([2, "这个项目测试用 pnpm test"]);
@@ -334,13 +356,33 @@ describe("memory sources", () => {
   it.live("search questions every source and takes them in turns", () => {
     const fake = new Fake("nowledge");
     fake.found = [
-      { id: "m1", agent: "lab", kind: "note", text: "这个项目测试用 pnpm test", score: 0.9, scope: { kind: "project", project: "demo" } } as Found,
-      { id: "m2", agent: "lab", kind: "note", text: "测试要先起数据库", score: 0.5, scope: { kind: "global" } } as Found,
+      {
+        id: "m1",
+        agent: "lab",
+        kind: "note",
+        text: "这个项目测试用 pnpm test",
+        score: 0.9,
+        scope: { kind: "project", project: "demo" },
+      } as Found,
+      {
+        id: "m2",
+        agent: "lab",
+        kind: "note",
+        text: "测试要先起数据库",
+        score: 0.5,
+        scope: { kind: "global" },
+      } as Found,
     ];
     return withFake(fake, (m) =>
       Effect.gen(function* () {
         yield* m.write(owner("lab", "这个项目测试用 pnpm test", "demo"));
-        const got = (yield* m.search({ agent: "lab", project: "demo", text: "测试", kind: "", limit: 0 })).found;
+        const got = (yield* m.search({
+          agent: "lab",
+          project: "demo",
+          text: "测试",
+          kind: "",
+          limit: 0,
+        })).found;
         expect([got.length, got[0]!.source, got[1]!.id, got[1]!.source]).toEqual([2, localName, "nowledge:m2", "nowledge"]);
         const asked = fake.searched[0]!;
         expect([asked.agent, asked.text, asked.limit]).toEqual(["lab", "测试", searchLimit]);

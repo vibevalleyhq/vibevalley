@@ -18,7 +18,12 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
     await held;
   });
   const call = vi.spyOn(Client.prototype, "callTool");
-  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
+  const source = nowledge({
+    kind: "nowledge",
+    url: "http://unused/mcp",
+    enabled: true,
+    read: true,
+  });
   const query = { agent: "lab", project: "", text: "query", kind: "" as const, limit: 1 };
   const pending = source.search(query, new AbortController().signal).then(
     () => "completed",
@@ -39,17 +44,27 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   let entered!: () => void;
   const held = new Promise<Response>((done) => (release = done));
   const started = new Promise<void>((done) => (entered = done));
-  vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body)) as { session_id: string };
-    requests.push({ path: new URL(url).pathname, session: body.session_id });
-    if (body.session_id === "vibevalley-late" && url.endsWith("/add")) {
+  vi.stubGlobal("fetch", async (input: string | URL, init: RequestInit) => {
+    const request = new Request(input, init);
+    const body = (await request.json()) as { session_id: string };
+    const path = new URL(request.url).pathname;
+    requests.push({ path, session: body.session_id });
+    if (body.session_id === "vibevalley-late" && path.endsWith("/add")) {
       entered();
       return held;
     }
     return new Response("{}", { status: 200 });
   });
   const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true });
-  const run = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };
+  const run = {
+    agent: "lab",
+    session: "done",
+    project: "demo",
+    job: "job",
+    outcome: "completed" as const,
+    said: "done",
+    summary: "done",
+  };
   await source.syncTurn(run, new AbortController().signal);
   const pending = source.syncTurn({ ...run, session: "late" }, new AbortController().signal).then(
     () => "completed",

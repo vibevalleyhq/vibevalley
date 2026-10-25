@@ -64,11 +64,16 @@ class FakeNowledge {
     const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
     const object = { type: "object" as const };
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: ["memory_search", "memory_add", "get_memory_by_id", "memory_delete"].map((name) => ({ name, inputSchema: object })),
+      tools: ["memory_search", "memory_add", "get_memory_by_id", "memory_delete"].map((name) => ({
+        name,
+        inputSchema: object,
+      })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const a = (req.params.arguments ?? {}) as Record<string, unknown>;
-      const text = (v: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(v) }] });
+      const text = (v: unknown) => ({
+        content: [{ type: "text" as const, text: JSON.stringify(v) }],
+      });
       switch (req.params.name) {
         case "get_memory_by_id": {
           const id = String(a.memory_id);
@@ -85,12 +90,24 @@ class FakeNowledge {
             .filter(
               (m) => (label === "" || m.labels.includes(label)) && query !== "" && (query === "*" || m.content.includes(query) || m.title.includes(query)),
             )
-            .map((m) => ({ id: m.id, memory_id: m.id, title: m.title, content: m.content, content_preview: m.content, relevance_score: 0.9 }));
+            .map((m) => ({
+              id: m.id,
+              memory_id: m.id,
+              title: m.title,
+              content: m.content,
+              content_preview: m.content,
+              relevance_score: 0.9,
+            }));
           return text({ results, total: results.length, query });
         }
         case "memory_add": {
           this.adds.push(a);
-          const m = { id: `nm-${this.memories.length + 1}`, title: a.title as string, content: a.content as string, labels: (a.labels as string).split(",") };
+          const m = {
+            id: `nm-${this.memories.length + 1}`,
+            title: a.title as string,
+            content: a.content as string,
+            labels: (a.labels as string).split(","),
+          };
           this.memories.push(m);
           return text({ id: m.id, title: m.title });
         }
@@ -105,7 +122,10 @@ class FakeNowledge {
   async serve() {
     const url = await listen(
       createServer(async (req, res) => {
-        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
         await this.server().connect(transport);
         await transport.handleRequest(req, res, req.method === "POST" ? await bodyOf(req) : undefined);
       }),
@@ -184,12 +204,34 @@ describe("Nowledge Mem", () => {
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       fake.memories = [
-        { id: "a", title: "", content: "测试 project-a", labels: nowledgeLabels("lab", "demo").split(",") },
-        { id: "b", title: "", content: "测试 project-b", labels: nowledgeLabels("lab", "other").split(",") },
-        { id: "g", title: "", content: "测试 global", labels: nowledgeLabels("lab", "").split(",") },
+        {
+          id: "a",
+          title: "",
+          content: "测试 project-a",
+          labels: nowledgeLabels("lab", "demo").split(","),
+        },
+        {
+          id: "b",
+          title: "",
+          content: "测试 project-b",
+          labels: nowledgeLabels("lab", "other").split(","),
+        },
+        {
+          id: "g",
+          title: "",
+          content: "测试 global",
+          labels: nowledgeLabels("lab", "").split(","),
+        },
         { id: "u", title: "", content: "测试 unknown", labels: [] },
       ];
-      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false, everything: true });
+      yield* save({
+        kind: "nowledge",
+        url: yield* Effect.promise(() => fake.serve()),
+        enabled: true,
+        read: true,
+        write: false,
+        everything: true,
+      });
       const m = yield* Memories;
       const q = { agent: "lab", project: "demo", text: "测试", kind: "" as const, limit: 10 };
       const text = foundText(yield* m.search(q), q);
@@ -207,7 +249,13 @@ describe("Nowledge Mem", () => {
   it.live("a run's notes reach Nowledge and come back", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
+      yield* save({
+        kind: "nowledge",
+        url: yield* Effect.promise(() => fake.serve()),
+        enabled: true,
+        read: true,
+        write: true,
+      });
       const m = yield* Memories;
       yield* m.keep({
         agent: "lab",
@@ -232,9 +280,20 @@ describe("Nowledge Mem", () => {
       const last = fake.searches.at(-1)!;
       expect([last.filter_labels, last.query]).toEqual(["vibevalley-agent-lab", "测试"]);
 
-      const both = (yield* m.search({ agent: "lab", project: "", text: "提交", kind: "", limit: 0 })).found;
+      const both = (yield* m.search({
+        agent: "lab",
+        project: "",
+        text: "提交",
+        kind: "",
+        limit: 0,
+      })).found;
       expect(both.map((f) => f.source)).toEqual([localName]);
-      fake.memories.push({ id: "nm-9", title: "部署", content: "部署用 make deploy", labels: ["vibevalley-agent-lab"] });
+      fake.memories.push({
+        id: "nm-9",
+        title: "部署",
+        content: "部署用 make deploy",
+        labels: ["vibevalley-agent-lab"],
+      });
       const q = { agent: "lab", project: "", text: "部署", kind: "" as const, limit: 0 };
       const found = yield* m.search(q);
       expect(found.found.map((f) => [f.source, f.id])).toEqual([["nowledge", "nowledge:nm-9"]]);
@@ -258,7 +317,14 @@ describe("Nowledge Mem", () => {
       const m = yield* Memories;
       const q = { agent: "lab", project: "", text: "测试", kind: "" as const, limit: 0 };
       expect((yield* m.search(q)).found).toEqual([]);
-      yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
+      yield* save({
+        kind: "nowledge",
+        url,
+        enabled: true,
+        read: true,
+        write: false,
+        everything: true,
+      });
       expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
       yield* m.write({ agent: "lab", text: "不写进去", project: "", by: "owner" });
       yield* Effect.sleep(50);
@@ -271,7 +337,12 @@ describe("Nowledge Mem", () => {
       const url = yield* Effect.promise(() => listen(createServer(() => {})));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memories;
-      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", project: "demo", by: "owner" });
+      yield* m.write({
+        agent: "lab",
+        text: "迁移文件放 db/migrations",
+        project: "demo",
+        by: "owner",
+      });
       const start = Date.now();
       expect((yield* m.recall({ agent: "lab", project: "demo", text: "迁移" })).lines).toHaveLength(1);
       expect(Date.now() - start).toBeLessThan(1000);
@@ -283,7 +354,13 @@ describe("EverOS", () => {
   it.live("a project query asks the farm's project and global scopes and does not claim cross-project coverage", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      yield* save({
+        kind: "everos",
+        url: yield* Effect.promise(() => fake.serve()),
+        enabled: true,
+        read: true,
+        write: false,
+      });
       const m = yield* Memories;
       const q = { agent: "lab", project: "demo", text: "分页", kind: "" as const, limit: 10 };
       expect(foundText(yield* m.search(q), q)).toContain("给打卡接口加分页");
@@ -326,14 +403,38 @@ describe("EverOS", () => {
         said: "改好了。\n记住：登录态统一走 refreshSession()",
         summary: "改好了",
       });
-      yield* m.keep({ agent: "lab", session: "w1", project: "demo", job: "修登录页", outcome: "failed", said: "测试没过", summary: "测试没过" });
-      yield* m.keep({ agent: "lab", session: "w1", project: "demo", job: "修登录页", outcome: "interrupted", said: "停下了", summary: "" });
+      yield* m.keep({
+        agent: "lab",
+        session: "w1",
+        project: "demo",
+        job: "修登录页",
+        outcome: "failed",
+        said: "测试没过",
+        summary: "测试没过",
+      });
+      yield* m.keep({
+        agent: "lab",
+        session: "w1",
+        project: "demo",
+        job: "修登录页",
+        outcome: "interrupted",
+        said: "停下了",
+        summary: "",
+      });
       yield* until(() => fake.seen("add").length === 2);
       const adds = fake.seen("add");
-      expect(adds[0]!.body).toMatchObject({ session_id: "vibevalley-w1", app_id: "vibevalley", project_id: everosProject("demo") });
+      expect(adds[0]!.body).toMatchObject({
+        session_id: "vibevalley-w1",
+        app_id: "vibevalley",
+        project_id: everosProject("demo"),
+      });
       expect(adds[0]!.body.messages).toMatchObject([
         { role: "user", sender_id: "lucas", content: "修登录页，token 是 [redacted]" },
-        { role: "assistant", sender_id: "vibevalley-lab", content: "改好了。\n记住：登录态统一走 refreshSession()" },
+        {
+          role: "assistant",
+          sender_id: "vibevalley-lab",
+          content: "改好了。\n记住：登录态统一走 refreshSession()",
+        },
       ]);
       expect(adds[0]!.auth).toBe("Bearer ev-key-1234");
       const second = adds[1]!.body.messages as { role: string; content: string }[];
@@ -354,7 +455,13 @@ describe("EverOS", () => {
       expect(got.lines).toContain("- （EverOS）给打卡接口加分页；先跑 pnpm test；分页参数从 1 开始");
       const asked = fake.seen("search")[0]!.body;
       expect([asked.agent_id, asked.query, asked.user_id]).toEqual(["vibevalley-lab", "分页", undefined]);
-      const found = (yield* m.search({ agent: "lab", project: "demo", text: "登录", kind: "issue", limit: 0 })).found;
+      const found = (yield* m.search({
+        agent: "lab",
+        project: "demo",
+        text: "登录",
+        kind: "issue",
+        limit: 0,
+      })).found;
       expect(found.some((f) => f.id === `everos:${everosProject("demo")}:ep-1` && f.text === "登录页：主人让修登录页，改完了")).toBe(true);
       expect((yield* m.search({ agent: "", project: "", text: "登录", kind: "", limit: 0 })).found.some((f) => f.source === "everos")).toBe(false);
       const sources = m.sources();
@@ -371,7 +478,13 @@ describe("EverOS", () => {
   it.live("a note outside a run is extracted at once", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
-      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
+      yield* save({
+        kind: "everos",
+        url: yield* Effect.promise(() => fake.serve()),
+        enabled: true,
+        read: true,
+        write: true,
+      });
       const m = yield* Memories;
       yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: "owner" });
       yield* until(() => fake.seen("flush").length === 1);
@@ -388,7 +501,15 @@ describe("EverOS", () => {
       yield* Effect.gen(function* () {
         yield* save({ kind: "everos", url, enabled: true, read: false, write: true });
         const m = yield* Memories;
-        yield* m.keep({ agent: "lab", session: "w7", project: "demo", job: "写文档", outcome: "completed", said: "写好了", summary: "" });
+        yield* m.keep({
+          agent: "lab",
+          session: "w7",
+          project: "demo",
+          job: "写文档",
+          outcome: "completed",
+          said: "写好了",
+          summary: "",
+        });
         yield* until(() => fake.seen("add").length === 1);
       }).pipe(Effect.provide(world()));
       const flushes = fake.seen("flush");

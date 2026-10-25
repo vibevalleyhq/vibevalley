@@ -114,7 +114,10 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
     let best: { freq: number; index: number } | undefined;
     for (const i of dag[idx]!) {
       const f = find(runes.slice(idx, i + 1).join(""));
-      const r = { freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + routes[i + 1]!.freq, index: i };
+      const r = {
+        freq: (f === undefined ? Math.log(1) : Math.log(f)) - logT + routes[i + 1]!.freq,
+        index: i,
+      };
       if (!best || best.freq < r.freq || (best.freq === r.freq && best.index < r.index)) best = r;
     }
     routes[idx] = best!;
@@ -131,8 +134,18 @@ const emit = () =>
   (emitTable ??= JSON.parse(gunzipSync(readFileSync(join(dataDir, "hmm_emit.json.gz"))).toString("utf8")) as Record<State, Record<string, number>>);
 
 const minFloat = -3.14e100;
-const prevStatus: Record<State, readonly State[]> = { B: ["E", "S"], M: ["M", "B"], S: ["S", "E"], E: ["B", "M"] };
-const probStart: Record<State, number> = { B: -0.26268660809250016, E: -3.14e100, M: -3.14e100, S: -1.4652633398537678 };
+const prevStatus: Record<State, readonly State[]> = {
+  B: ["E", "S"],
+  M: ["M", "B"],
+  S: ["S", "E"],
+  E: ["B", "M"],
+};
+const probStart: Record<State, number> = {
+  B: -0.26268660809250016,
+  E: -3.14e100,
+  M: -3.14e100,
+  S: -1.4652633398537678,
+};
 const probTrans: Record<State, Partial<Record<State, number>>> = {
   B: { E: -0.51082562376599, M: -0.916290731874155 },
   E: { B: -0.5897149736854513, S: -0.8085250474669937 },

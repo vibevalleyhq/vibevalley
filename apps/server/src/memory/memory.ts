@@ -124,24 +124,39 @@ export const make = Effect.fnUntraced(function* (build: BuildSource = defaultBui
   });
 
   const forget = (agent: string, id: string) =>
-    Effect.tryPromise({ try: () => sources.forget(agent, id), catch: (e) => refused(e instanceof Error ? e.message : String(e)) });
+    Effect.tryPromise({
+      try: () => sources.forget(agent, id),
+      catch: (e) => refused(e instanceof Error ? e.message : String(e)),
+    });
 
   const writeOrchestrator = Effect.fnUntraced(function* (text: string) {
     const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
     if (body === "") return yield* refused("要记的话是空的");
-    const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
+    const written = yield* Effect.try({
+      try: () => remember(home, fromOwner + body),
+      catch: () => refused("没记下来：MEMORY.md 写不进去"),
+    });
     return lineMemory(written, yield* Clock.currentTimeMillis);
   });
 
   const orchestrator = (): MemoryList => {
     const snapshot = readMemory(home);
-    return { file: snapshot.file, memories: snapshot.lines.map((l) => lineMemory(l, snapshot.updatedAt)).reverse(), carried: snapshot.carried, sources: [] };
+    return {
+      file: snapshot.file,
+      memories: snapshot.lines.map((l) => lineMemory(l, snapshot.updatedAt)).reverse(),
+      carried: snapshot.carried,
+      sources: [],
+    };
   };
 
   const preview = (agent: string, project: string, text: string) =>
     Effect.promise(async (): Promise<RecallPreview> => {
       const lines = mergeRecalled(await sources.prefetch({ agent, project, text, peek: true }));
-      return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
+      return {
+        lines: lines.map((l) => l.line),
+        chars: lines.reduce((n, l) => n + l.line.length + 1, 0),
+        limit: recallChars,
+      };
     });
 
   // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.

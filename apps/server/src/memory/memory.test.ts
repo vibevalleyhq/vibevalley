@@ -47,7 +47,17 @@ describe("memory", () => {
     expect(memoryNotesOf("结论：做完了。")).toEqual([]);
     expect(memoryJobText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
     expect(memoryJobText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
-    const known = [{ id: "1", agent: "lab", kind: "note", text: "这个项目用 pnpm test 跑测试", project: "clock", at: 0, recalled: 0 }] as never;
+    const known = [
+      {
+        id: "1",
+        agent: "lab",
+        kind: "note",
+        text: "这个项目用 pnpm test 跑测试",
+        project: "clock",
+        at: 0,
+        recalled: 0,
+      },
+    ] as never;
     expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "clock")).toBe(false);
     expect(memoryIsNewNote(known, "这个项目用 pnpm test 跑测试", "blog")).toBe(true);
     expect(memoryIsNewNote(known, "数据库迁移放在 db/migrations", "clock")).toBe(true);
@@ -74,7 +84,15 @@ describe("memory", () => {
         said: "记住：这个项目用 pnpm test 跑测试",
         summary: "测试没过",
       });
-      yield* m.keep({ agent: "lab", session: "w2", project: "clock", job: "不算", outcome: "interrupted", said: "记住：停下的不算", summary: "" });
+      yield* m.keep({
+        agent: "lab",
+        session: "w2",
+        project: "clock",
+        job: "不算",
+        outcome: "interrupted",
+        said: "记住：停下的不算",
+        summary: "",
+      });
       const all = yield* m.list("lab");
       expect(all.map((x) => `${x.kind}:${x.text}`).sort()).toEqual([
         "issue:加分页 → 没做成：测试没过",
@@ -82,11 +100,21 @@ describe("memory", () => {
         "note:这个项目用 pnpm test 跑测试",
       ]);
       expect(all.find((x) => x.text === "提交信息写中文")?.project).toBeUndefined();
-      const picked = yield* m.recall({ agent: "lab", session: "w9", project: "clock", text: "跑测试" });
+      const picked = yield* m.recall({
+        agent: "lab",
+        session: "w9",
+        project: "clock",
+        text: "跑测试",
+      });
       expect(picked.ids).toHaveLength(3);
       expect(picked.lines[0]).toBe("- （这个项目）这个项目用 pnpm test 跑测试");
       for (const x of yield* m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
-      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", project: " clock ", by: "owner" });
+      const note = yield* m.write({
+        agent: "lab",
+        text: "  周末别派夜班  ",
+        project: " clock ",
+        by: "owner",
+      });
       expect([note.text, note.project, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
       expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: "owner" }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forgetOf("lab", note.id);
@@ -104,7 +132,12 @@ describe("memory", () => {
       const m = yield* Memories;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
       remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
-      const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: "owner" });
+      const written = yield* m.remember({
+        agent: "orchestrator",
+        text: "  周末别派夜班\n真的  ",
+        project: "",
+        by: "owner",
+      });
       expect([written.text, written.session]).toEqual(["周末别派夜班 真的", undefined]);
       expect(readFileSync(join(folder, "MEMORY.md"), "utf8")).toContain("主人交代：周末别派夜班 真的");
       const view = yield* m.memoriesOf("orchestrator");
@@ -125,7 +158,10 @@ describe("memory", () => {
       expect(carried > 0 && carried < 100).toBe(true);
       rewriteMemory(folder, "# header\n- first\n* second\nplain third\n");
       expect((yield* m.memoriesOf("orchestrator")).carried).toBe(3);
-      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({ _tag: "Refused", reason: expect.stringMatching(/整份记性/) });
+      expect(yield* Effect.flip(m.recallOf("orchestrator", "", ""))).toMatchObject({
+        _tag: "Refused",
+        reason: expect.stringMatching(/整份记性/),
+      });
     }).pipe(Effect.provide(world(config)));
   });
 
@@ -148,14 +184,25 @@ describe("memory", () => {
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
       const m = yield* Memories;
-      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: "owner" });
+      yield* m.write({
+        agent: "lab",
+        text: "clock 的测试用 pnpm test",
+        project: "clock",
+        by: "owner",
+      });
       yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: "owner" });
       const preview = yield* m.recallOf("lab", "clock", "");
       expect(preview.lines).toEqual(["- （这个项目）clock 的测试用 pnpm test", "- （所有项目）提交前跑 lint"]);
       expect(preview.limit).toBe(recallChars);
       for (const x of yield* m.list("lab")) expect([x.recalled, x.fading ?? false]).toEqual([0, false]);
       expect((yield* m.recallOf("lab", "", "")).lines).toEqual([]);
-      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, project: "", by: "owner" });
+      for (let i = 0; i < 300 - 10; i++)
+        yield* m.write({
+          agent: "lab",
+          text: `第 ${i} 条，各不相同 ${i * 7919}`,
+          project: "",
+          by: "owner",
+        });
       expect((yield* m.list("lab")).filter((x) => x.fading)).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -163,9 +210,20 @@ describe("memory", () => {
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
       const m = yield* Memories;
-      const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: "owner" });
+      const note = yield* m.write({
+        agent: "lab",
+        text: "这个项目测试用 pnpm test",
+        project: "demo",
+        by: "owner",
+      });
       yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: "owner" });
-      const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
+      const found = (yield* m.search({
+        agent: "lab",
+        project: "",
+        text: "跑一遍测试",
+        kind: "",
+        limit: 0,
+      })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
       yield* m.forgetOf("lab", note.id);
@@ -185,7 +243,15 @@ describe("memory", () => {
     }
   });
 
-  const run = (session: string, said: string) => ({ agent: "lab", session, project: "demo", job: "work", said, summary: "", outcome: "completed" as const });
+  const run = (session: string, said: string) => ({
+    agent: "lab",
+    session,
+    project: "demo",
+    job: "work",
+    said,
+    summary: "",
+    outcome: "completed" as const,
+  });
 
   it.effect("a run's notes go back when its job cannot be written", () =>
     Effect.gen(function* () {
@@ -216,8 +282,29 @@ describe("memory", () => {
       yield* TestClock.setTime(Date.UTC(2026, 9, 24));
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
-        if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "agent", created_at: 1 });
-        else yield* q.keepJob({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: id, created_at: 1 });
+        if (i % 2 === 0)
+          yield* q.addNote({
+            id,
+            agent: "lab",
+            body: id,
+            terms: "",
+            terms_of: 0,
+            project: null,
+            session: null,
+            author: "agent",
+            created_at: 1,
+          });
+        else
+          yield* q.keepJob({
+            id,
+            agent: "lab",
+            body: id,
+            terms: "",
+            terms_of: 0,
+            project: null,
+            session: id,
+            created_at: 1,
+          });
       }
       const before = yield* m.list("lab");
       const predicted = before.filter((x) => x.fading).map((x) => x.id);

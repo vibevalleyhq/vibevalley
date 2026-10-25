@@ -5,6 +5,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
+import { Effect, Schema } from "effect";
+import { HttpClient, HttpClientRequest } from "effect/http";
+import { outside } from "../base/http.ts";
+import { jsonOrNone } from "../base/json.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
 const readTimeoutMs = 10_000;
@@ -62,29 +66,37 @@ export function piDeepseek(): { key: string; base: string } {
 
 export const unavailable = (reason: string): AccountUsage => ({ status: "unavailable", reason });
 
+const readBalance = jsonOrNone(
+  Schema.Struct({
+    is_available: Schema.optionalKey(Schema.Boolean),
+    balance_infos: Schema.optionalKey(Schema.Array(Schema.Struct({ currency: Schema.String, total_balance: Schema.String }))),
+  }),
+);
+
 /** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. */
 export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">): Promise<AccountUsage> {
   const provider = piProvider(settings);
   if (provider !== "deepseek") return unavailable(provider ? provider + " 不报余额" : "pi 没有设默认模型");
   const { key, base } = piDeepseek();
   if (!key) return { status: "login_required" };
-  let res: Response;
-  try {
-    res = await fetch(base + "/user/balance", { headers: { authorization: "Bearer " + key }, signal: AbortSignal.timeout(readTimeoutMs) });
-  } catch (e) {
-    return unavailable(e instanceof Error ? e.message : String(e));
-  }
-  if (!res.ok) return unavailable(`HTTP ${res.status}`);
-  let b: { is_available?: boolean; balance_infos?: { currency: string; total_balance: string }[] };
-  try {
-    b = (await res.json()) as typeof b;
-  } catch {
-    return unavailable("没读到 DeepSeek 余额");
-  }
-  return {
-    status: "balance",
-    provider: "DeepSeek",
-    available: b.is_available ?? true,
-    balances: (b.balance_infos ?? []).map((x) => ({ currency: x.currency, amount: Number.parseFloat(x.total_balance) || 0 })),
-  };
+  return outside(
+    Effect.gen(function* () {
+      const res = yield* HttpClient.execute(HttpClientRequest.get(base + "/user/balance").pipe(HttpClientRequest.bearerToken(key)));
+      if (res.status < 200 || res.status > 299) return unavailable(`HTTP ${res.status}`);
+      const b = readBalance(yield* res.text);
+      if (!b) return unavailable("没读到 DeepSeek 余额");
+      return {
+        status: "balance",
+        provider: "DeepSeek",
+        available: b.is_available ?? true,
+        balances: (b.balance_infos ?? []).map((x) => ({
+          currency: x.currency,
+          amount: Number.parseFloat(x.total_balance) || 0,
+        })),
+      } satisfies AccountUsage;
+    }).pipe(
+      Effect.timeout(readTimeoutMs),
+      Effect.catch((e) => Effect.succeed(unavailable(e.message))),
+    ),
+  );
 }

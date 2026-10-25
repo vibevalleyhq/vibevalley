@@ -73,7 +73,9 @@ export function nowledge(c: MemorySourceConfig): Source {
   const open = () => {
     if (closed) return Promise.reject(new Error("Nowledge source has stopped"));
     return (client ??= (async () => {
-      const wire = new StreamableHTTPClientTransport(new URL(c.url), { requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined });
+      const wire = new StreamableHTTPClientTransport(new URL(c.url), {
+        requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined,
+      });
       transport = wire;
       const one = new Client({ name: app, version: "1" });
       try {
@@ -115,7 +117,10 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   /** agent "" reads what the farm wrote for any profile; everything reads all that is in it. */
   const find = async (agent: string, query: string, limit: number, everything: boolean, signal: AbortSignal): Promise<Hit[]> => {
-    const args: Record<string, unknown> = { limit: Math.max(1, Math.min(limit, most)), source_app: app };
+    const args: Record<string, unknown> = {
+      limit: Math.max(1, Math.min(limit, most)),
+      source_app: app,
+    };
     // Its search without a query lists nothing; filtered by labels, any query finds all they hold.
     const q = head(redact(query).trim(), queryMost) || (everything ? "" : "*");
     if (q !== "") args.query = q;
@@ -130,7 +135,16 @@ export function nowledge(c: MemorySourceConfig): Source {
 
   const add = async (agent: string, text: string, project: string, signal: AbortSignal) => {
     const body = redact(text);
-    const answer = await call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app }, signal);
+    const answer = await call(
+      "memory_add",
+      {
+        content: body,
+        title: head(body, 60),
+        labels: nowledgeLabels(agent, project),
+        source_app: app,
+      },
+      signal,
+    );
     // The new memory's id, at the top or under memory; none when it found the same memory there already.
     let added: { id?: string; memory_id?: string; memory?: { id?: string } } = {};
     try {
@@ -160,7 +174,11 @@ export function nowledge(c: MemorySourceConfig): Source {
       const hits = await find(cue.agent, cue.text, recallCount, !!c.everything, signal);
       return hits
         .filter((h) => !cue.skip?.has(hitID(h)))
-        .map((h) => ({ id: hitID(h), line: "- （Nowledge）" + clip(hitText(h), lineMost), score: h.relevance_score ?? 0 }));
+        .map((h) => ({
+          id: hitID(h),
+          line: "- （Nowledge）" + clip(hitText(h), lineMost),
+          score: h.relevance_score ?? 0,
+        }));
     },
     // Its memories are notes; it has no jobs done.
     search: async (q, signal) => {
@@ -215,7 +233,15 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (!c.write) return undefined;
       const project = n.project.trim();
       const id = await add(n.agent, n.text, project, signal);
-      return { id, agent: n.agent, kind: "note", text: n.text, at: Date.now(), recalled: 0, ...(project ? { project } : {}) } as Memory;
+      return {
+        id,
+        agent: n.agent,
+        kind: "note",
+        text: n.text,
+        at: Date.now(),
+        recalled: 0,
+        ...(project ? { project } : {}),
+      } as Memory;
     },
     forget: async () => {
       throw new Error("Nowledge Mem 里的记忆到 Nowledge Mem 里删");

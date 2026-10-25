@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
@@ -28,7 +30,10 @@ class Capture {
     this.urls.push((init?.method ?? "GET") + " " + url);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
     this.requests.push(init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {});
-    return new Response(this.body, { status: this.status, headers: { "content-type": "application/json" } });
+    return new Response(this.body, {
+      status: this.status,
+      headers: { "content-type": "application/json" },
+    });
   }) as typeof fetch;
 }
 
@@ -77,8 +82,13 @@ describe("a call's agent", () => {
 
   it("says which key is missing", () => {
     // The quick model, so the rest needs no line; the default (the orchestrator) needs the line and nothing else.
-    expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({ reason: "管家的语音线路没接通" });
-    const d: VoiceSettings = { ...defaultVoice(), answer: { vendor: "agora", model: "gpt-4.1-mini" } };
+    expect(vendorsFor(defaultVoice(), { asrKey: "", llmKey: "", ttsKey: "" }, "")).toMatchObject({
+      reason: "管家的语音线路没接通",
+    });
+    const d: VoiceSettings = {
+      ...defaultVoice(),
+      answer: { vendor: "agora", model: "gpt-4.1-mini" },
+    };
     const none = { asrKey: "", llmKey: "", ttsKey: "" };
     const problem = (v: VoiceSettings, deepseek = "", line?: CallLine) => {
       const got = vendorsFor(v, none, deepseek, line);
@@ -90,13 +100,32 @@ describe("a call's agent", () => {
       return "_tag" in got ? got.settings : undefined;
     };
     expect(problem(d)).toBe("");
-    const deepseek: VoiceSettings = { ...d, answer: { vendor: "deepseek", model: "deepseek-chat" } };
+    const deepseek: VoiceSettings = {
+      ...d,
+      answer: { vendor: "deepseek", model: "deepseek-chat" },
+    };
     expect(problem(deepseek)).toContain("DeepSeek");
     expect(problem(deepseek, "sk-x")).toBe("");
     expect(problem({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toContain("识别");
-    expect(problem({ ...d, answer: { vendor: "openai", url: "https://x/v1/chat/completions", model: "m" } })).toContain("大模型");
-    expect(problem({ ...d, tts: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } })).toContain("合成");
-    expect(problem({ ...d, asr: { vendor: "deepgram", model: "nova-3" }, tts: { vendor: "openai", voice: "nova" } })).toBe("");
+    expect(
+      problem({
+        ...d,
+        answer: { vendor: "openai", url: "https://x/v1/chat/completions", model: "m" },
+      }),
+    ).toContain("大模型");
+    expect(
+      problem({
+        ...d,
+        tts: { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" },
+      }),
+    ).toContain("合成");
+    expect(
+      problem({
+        ...d,
+        asr: { vendor: "deepgram", model: "nova-3" },
+        tts: { vendor: "openai", voice: "nova" },
+      }),
+    ).toBe("");
     expect(problem({ ...d, answer: { vendor: "orchestrator" } })).toContain("语音线路");
     expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown);
     expect(fixedIn(deepseek)).toBe("deepseek");
@@ -107,7 +136,10 @@ describe("a call's agent", () => {
 
 /** The farm with a voice service, its line on a free port behind a line of its own; or, given tunnel, behind that tunnel. */
 const farm = (capture: Capture, tunnel?: (port: number) => Effect.Effect<string, Error, Scope.Scope>) => {
-  const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: tunnel ? "" : "https://line.example.com" } } };
+  const config = {
+    ...testConfig(),
+    voice: { id: "", line: { port: 0, url: tunnel ? "" : "https://line.example.com" } },
+  };
   return layer({ fetch: capture.fetch, gatherMs: 30, ...(tunnel ? { tunnel } : {}) }).pipe(
     Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
   );
@@ -147,14 +179,23 @@ const issueOf = (id: string, number: number, session: string) =>
 const credentials = (voice?: Partial<VoiceSettings>) =>
   Effect.gen(function* () {
     const setting = yield* Setting;
-    yield* Effect.orDie(setting.save({ agoraAppId: appId, agoraAppCertificate: cert, ...(voice ? { voice: voice as never } : {}) }));
+    yield* Effect.orDie(
+      setting.save({
+        agoraAppId: appId,
+        agoraAppCertificate: cert,
+        ...(voice ? { voice: voice as never } : {}),
+      }),
+    );
   });
 
 describe("voice", () => {
   it.live("signs a grant only with credentials, and renews it", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect(yield* Effect.flip(voice.session())).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("App ID") });
+      expect(yield* Effect.flip(voice.session())).toMatchObject({
+        _tag: "VoiceUnavailable",
+        reason: expect.stringContaining("App ID"),
+      });
       yield* credentials();
       const s = yield* voice.session();
       expect(s.appId).toBe(appId);
@@ -232,7 +273,12 @@ describe("voice", () => {
       const grant = yield* voice.session();
       const agent = yield* voice.start(grant.channel, grant.uid);
       const started = capture.urls[0]!;
-      yield* Effect.orDie(setting.save({ agoraAppId: "33333333333333333333333333333333", voice: { area: "US" } as never }));
+      yield* Effect.orDie(
+        setting.save({
+          agoraAppId: "33333333333333333333333333333333",
+          voice: { area: "US" } as never,
+        }),
+      );
       capture.status = 500;
       capture.body = `{"detail":"temporary failure"}`;
       yield* Effect.flip(voice.stop(agent.agentId));
@@ -262,7 +308,13 @@ describe("voice", () => {
       const call = yield* voice.start(grant.channel, grant.uid);
       yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
       yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
-      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      yield* core.apply({
+        type: "report",
+        id: "w1",
+        outcome: "completed",
+        summary: "做完了",
+        runs: 1,
+      });
       const at = yield* Effect.promise(async () => {
         for (let i = 0; i < 300; i++) {
           const found = capture.urls.findIndex((u) => u.endsWith(`/agents/${call.agentId}/speak`));
@@ -315,8 +367,20 @@ describe("voice", () => {
         yield* core.apply({ type: "hired", session: helperOn(w, t) });
         yield* core.apply({ type: "issue", issue: issueOf(t, n, w) });
       }
-      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
-      yield* core.apply({ type: "report", id: "w2", outcome: "failed", summary: "没做成", runs: 1 });
+      yield* core.apply({
+        type: "report",
+        id: "w1",
+        outcome: "completed",
+        summary: "做完了",
+        runs: 1,
+      });
+      yield* core.apply({
+        type: "report",
+        id: "w2",
+        outcome: "failed",
+        summary: "没做成",
+        runs: 1,
+      });
       const speaks = () => capture.urls.filter((u) => u.endsWith(`/agents/${call.agentId}/speak`)).length;
       yield* Effect.promise(async () => {
         for (let i = 0; i < 300 && speaks() === 0; i++) await new Promise((r) => setTimeout(r, 10));
@@ -365,22 +429,73 @@ describe("voice", () => {
       capture.status = 500;
       capture.body = `{"detail":"stop failed"}`;
       yield* Effect.flip(voice.stop(call.agentId));
-      expect(yield* Effect.flip(voice.heard(call.agentId, "late", "", ""))).toMatchObject({ _tag: "VoiceAgentFailed" });
-      expect(yield* Effect.flip(voice.said(call.agentId, "late"))).toMatchObject({ _tag: "VoiceAgentFailed" });
+      expect(yield* Effect.flip(voice.heard(call.agentId, "late", "", ""))).toMatchObject({
+        _tag: "VoiceAgentFailed",
+      });
+      expect(yield* Effect.flip(voice.said(call.agentId, "late"))).toMatchObject({
+        _tag: "VoiceAgentFailed",
+      });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
   it.live("relays the owner's words without a call id only with one call on", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({ _tag: "VoiceAgentFailed" });
+      expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({
+        _tag: "VoiceAgentFailed",
+      });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
 
   it.live("says dictation is not set up", () =>
     Effect.gen(function* () {
       const voice = yield* Voice;
-      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("听写还没配") });
+      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+        _tag: "VoiceUnavailable",
+        reason: expect.stringContaining("听写还没配"),
+      });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
+  );
+
+  it.live("sends a recording to the dictation address, and says what it answered when it is not a transcription", () =>
+    Effect.gen(function* () {
+      const asked: { auth: string; body: string }[] = [];
+      let answer = { status: 200, body: JSON.stringify({ text: " 你好 " }) };
+      const server = createServer((req, res) => {
+        const chunks: Buffer[] = [];
+        req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("end", () => {
+          asked.push({
+            auth: req.headers.authorization ?? "",
+            body: Buffer.concat(chunks).toString(),
+          });
+          res.writeHead(answer.status, { "content-type": "application/json" }).end(answer.body);
+        });
+      });
+      yield* Effect.acquireRelease(
+        Effect.callback<void>((resume) => void server.listen(0, "127.0.0.1", () => resume(Effect.void))),
+        () => Effect.sync(() => server.close()),
+      );
+      const { port } = server.address() as AddressInfo;
+      const setting = yield* Setting;
+      yield* Effect.orDie(
+        setting.save({
+          dictation: { url: `http://127.0.0.1:${port}/v1`, model: "whisper-1" },
+          dictationKey: "k",
+        }),
+      );
+      const voice = yield* Voice;
+      expect(yield* voice.dictate("AAAA", "wav")).toEqual({ text: "你好" });
+      expect(asked[0]?.auth).toBe("Bearer k");
+      expect(asked[0]?.body).toContain("whisper-1");
+      answer = { status: 500, body: JSON.stringify({ error: { message: "模型没加载" } }) };
+      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+        reason: expect.stringContaining("回了 500：模型没加载"),
+      });
+      answer = { status: 200, body: "<html>" };
+      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({
+        reason: expect.stringContaining("不是 OpenAI 的转写格式"),
+      });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
 });

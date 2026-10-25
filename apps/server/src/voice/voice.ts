@@ -9,7 +9,8 @@ import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type Voic
 import { type ApiError, Refused, VoiceAgentFailed, type VoiceFix, VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Context, Deferred, Effect, Exit, FiberMap, Layer, Scope, Semaphore, Stream } from "effect";
+import { Context, Deferred, Effect, Exit, FiberMap, Layer, Schedule, Schema, Scope, Semaphore, Stream } from "effect";
+import { HttpClient, HttpClientRequest } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { chatCompletions } from "../agent/brain/openai.ts";
 import { Settings } from "../base/config.ts";
@@ -19,6 +20,7 @@ import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { orchestratorModel } from "../orchestrator/rules.ts";
 import { Notices } from "../notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { callbackLog } from "../base/log.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
@@ -57,7 +59,11 @@ export interface CallLine {
 /** For a member added to the union and not to vendorsFor. */
 export const voiceUnknown = "服务端还不会用";
 
-type Vendors = { stt: AresSTT | DeepgramSTT | MicrosoftSTT; llm: OpenAI; tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS };
+type Vendors = {
+  stt: AresSTT | DeepgramSTT | MicrosoftSTT;
+  llm: OpenAI;
+  tts: MiniMaxTTS | OpenAITTS | MicrosoftTTS;
+};
 
 /** The three vendors the voice page chose, or why they cannot be: a vendor whose key is missing. Agora-hosted ones need
  * no key of their own. line undefined: the orchestrator does not answer the call itself. */
@@ -97,7 +103,12 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         break;
       case "deepseek":
         if (!deepseekKey) return unavailable("用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填", "deepseek");
-        llm = new OpenAI({ apiKey: deepseekKey, url: deepseekChat, model: answer.model, ...speech });
+        llm = new OpenAI({
+          apiKey: deepseekKey,
+          url: deepseekChat,
+          model: answer.model,
+          ...speech,
+        });
         break;
       case "openai":
         if (!keys.llmKey) return unavailable("自己的大模型还没有 key：在声音页的「想」里填", "voice");
@@ -132,7 +143,12 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area] ?? AgoraArea.US;
 
 export const clientOf = (c: AgoraCredentials, area: Area, fetcher?: typeof fetch) =>
-  new AgoraClient({ area: areaOf(area) as never, appId: c.appId, appCertificate: c.appCertificate, ...(fetcher ? { fetch: fetcher } : {}) });
+  new AgoraClient({
+    area: areaOf(area) as never,
+    appId: c.appId,
+    appCertificate: c.appCertificate,
+    ...(fetcher ? { fetch: fetcher } : {}),
+  });
 
 /** Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: the client has no RTM. */
 export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Vendors) {
@@ -144,14 +160,22 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
       language: voice.language,
       config: {
         speech_threshold: 0.5,
-        start_of_speech: { mode: "vad", vad_config: { interrupt_duration_ms: voice.interruptMs, prefix_padding_ms: 300 } },
+        start_of_speech: {
+          mode: "vad",
+          vad_config: { interrupt_duration_ms: voice.interruptMs, prefix_padding_ms: 300 },
+        },
         end_of_speech: { mode: "vad", vad_config: { silence_duration_ms: voice.silenceMs } },
       },
     } as never,
     // RTM carries transcripts and the agent's state; a client without RTM asks for the RTC data stream, which carries
     // the transcripts (chunked); RTM is then off, or the agent keeps sending to RTM and nothing reaches the data stream.
     advancedFeatures: { enable_rtm: false, enable_tools: true },
-    parameters: { audio_scenario: "chorus", data_channel: "datastream", enable_error_message: true, enable_metrics: true } as never,
+    parameters: {
+      audio_scenario: "chorus",
+      data_channel: "datastream",
+      enable_error_message: true,
+      enable_metrics: true,
+    } as never,
   })
     .withStt(vendors.stt)
     .withLlm(vendors.llm)
@@ -160,7 +184,11 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
 
 /** Already left or leaving counts as success, as the quickstart treats it. */
 function alreadyStopping(e: unknown): boolean {
-  const err = e as { statusCode?: number; body?: { detail?: string; reason?: string }; message?: string } | null;
+  const err = e as {
+    statusCode?: number;
+    body?: { detail?: string; reason?: string };
+    message?: string;
+  } | null;
   if (err?.statusCode === 404) return true;
   return [err?.body?.detail, err?.body?.reason, err?.message].join(" ").toLowerCase().includes("already in the process of shutting down");
 }
@@ -300,22 +328,30 @@ const cloudflared = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
       Effect.andThen(Deferred.fail(said, new Error("cloudflared 退出了，没给出地址"))),
       Effect.forkScoped,
     );
-    return yield* Deferred.await(said).pipe(Effect.timeoutOrElse({ duration: 30_000, orElse: () => Effect.fail(new Error("cloudflared 30 秒没给出地址")) }));
+    return yield* Deferred.await(said).pipe(
+      Effect.timeoutOrElse({
+        duration: 30_000,
+        orElse: () => Effect.fail(new Error("cloudflared 30 秒没给出地址")),
+      }),
+    );
   });
 
-/** The line refusing a keyless request counts as an answer. */
-async function tunnelAnswers(url: string): Promise<boolean> {
-  for (const deadline = Date.now() + lineReadyMs; Date.now() < deadline;) {
-    try {
-      const res = await fetch(url + "/llm/ready/chat/completions", { method: "POST", signal: AbortSignal.timeout(5_000) });
-      if (res.status === 401) return true;
-    } catch {
-      // Not yet.
-    }
-    await new Promise((r) => setTimeout(r, 2_000));
-  }
-  return false;
-}
+/** The line refusing a keyless request counts as an answer: asked every two seconds, each try at most five. */
+const tunnelAnswers = (http: HttpClient.HttpClient, url: string) =>
+  http.post(url + "/llm/ready/chat/completions").pipe(
+    Effect.timeout(5_000),
+    Effect.flatMap((res) => (res.status === 401 ? Effect.succeed(true) : Effect.fail(new Error("not yet")))),
+    Effect.retry(Schedule.spaced(2_000)),
+    Effect.timeoutOrElse({ duration: lineReadyMs, orElse: () => Effect.succeed(false) }),
+  );
+
+/** OpenAI's transcription answer, or its error. */
+const readTranscription = jsonOrNone(
+  Schema.Struct({
+    text: Schema.optionalKey(Schema.String),
+    error: Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) })),
+  }),
+);
 
 export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
   const logs = yield* callbackLog;
@@ -325,6 +361,7 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
   const settings = yield* Setting;
   const chat = yield* Channels;
   const orchestrator = yield* Orchestrator;
+  const http = yield* HttpClient.HttpClient;
   const now = options.now ?? Date.now;
 
   const grants = new Map<string, Grant>();
@@ -408,7 +445,7 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
     options.tunnel ??
     ((port: number) =>
       Effect.tap(cloudflared(spawner, port), (url) =>
-        Effect.promise(() => tunnelAnswers(url)).pipe(
+        tunnelAnswers(http, url).pipe(
           Effect.flatMap((answers) =>
             answers ? Effect.void : Effect.sync(() => logs.info(`vibevalley: the voice line's tunnel ${url} does not answer yet; the call goes on`)),
           ),
@@ -549,17 +586,28 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
       const c = yield* creds();
       const channel = newChannel();
       const uid = newUid();
-      const issued = yield* Effect.try({ try: () => sign(c, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+      const issued = yield* Effect.try({
+        try: () => sign(c, channel, uid),
+        catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+      });
       if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
       prune();
-      grants.set(keyOf(channel, uid), { credentials: c, expires: now() + tokenSeconds * 1000, starting: false, agent: "" });
+      grants.set(keyOf(channel, uid), {
+        credentials: c,
+        expires: now() + tokenSeconds * 1000,
+        starting: false,
+        agent: "",
+      });
       return issued;
     }),
     renew: Effect.fn("Voice.renew")(function* (channel, uid) {
       prune();
       const g = grants.get(keyOf(channel, uid));
       if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
-      const issued = yield* Effect.try({ try: () => sign(g.credentials, channel, uid), catch: (e) => unavailable("签不出语音令牌：" + message(e)) });
+      const issued = yield* Effect.try({
+        try: () => sign(g.credentials, channel, uid),
+        catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+      });
       g.expires = now() + tokenSeconds * 1000;
       return issued;
     }),
@@ -596,7 +644,10 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
           idleTimeout: voice.idleSeconds,
           expiresIn: tokenSeconds,
         });
-        const id = yield* Effect.tryPromise({ try: () => session.start(), catch: (e) => failed("请管家进频道失败：" + message(e)) });
+        const id = yield* Effect.tryPromise({
+          try: () => session.start(),
+          catch: (e) => failed("请管家进频道失败：" + message(e)),
+        });
         if (stopped || grants.get(key) !== g) {
           yield* Effect.promise(() => client.stopAgent(id).catch(() => undefined));
           return yield* Effect.fail(unavailable("语音服务已经停下"));
@@ -613,7 +664,10 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
           ending: false,
         });
         if (about) tell([], about);
-        return { agentId: id, answeredBy: callLine === undefined ? "agora" : "orchestrator" } as const;
+        return {
+          agentId: id,
+          answeredBy: callLine === undefined ? "agora" : "orchestrator",
+        } as const;
       });
       const agent = yield* Effect.tapError(started, () =>
         Effect.sync(() => {
@@ -633,9 +687,10 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
         call.ending = true;
         client = call.client;
       } else client = clientOf(yield* creds(), settings.voice().area, options.fetch);
-      const stopping = Effect.tryPromise({ try: () => client.stopAgent(agentId), catch: (e) => e }).pipe(
-        Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))),
-      );
+      const stopping = Effect.tryPromise({
+        try: () => client.stopAgent(agentId),
+        catch: (e) => e,
+      }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))));
       yield* Effect.ensuring(
         stopping,
         Effect.sync(() => call?.release()),
@@ -670,27 +725,21 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
       form.append("model", d.model);
       form.append("response_format", "json");
       // A local model's first request loads it, which takes a while.
-      const res = yield* Effect.tryPromise({
-        try: () =>
-          fetch(d.url + "/audio/transcriptions", {
-            method: "POST",
-            body: form,
-            headers: d.key ? { authorization: "Bearer " + d.key } : {},
-            signal: AbortSignal.timeout(120_000),
-          }),
-        catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
-      });
-      const raw = (yield* Effect.tryPromise({ try: () => res.text(), catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice") })).slice(
-        0,
-        1 << 20,
-      );
-      let got: { text?: string; error?: { message?: string } } | undefined;
-      try {
-        got = JSON.parse(raw) as typeof got;
-      } catch {
-        got = undefined;
-      }
-      if (!res.ok) return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(got?.error?.message || raw.trim())].slice(0, 200).join("")}`));
+      const [res, raw] = yield* http
+        .execute(
+          HttpClientRequest.post(d.url + "/audio/transcriptions").pipe(
+            HttpClientRequest.bodyFormData(form),
+            d.key ? HttpClientRequest.bearerToken(d.key) : (r) => r,
+          ),
+        )
+        .pipe(
+          Effect.flatMap((res) => Effect.map(res.text, (text) => [res, text.slice(0, 1 << 20)] as const)),
+          Effect.timeout(120_000),
+          Effect.mapError((e) => unavailable("听写的地址连不上：" + message(e), "voice")),
+        );
+      const got = readTranscription(raw);
+      if (res.status < 200 || res.status > 299)
+        return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(got?.error?.message || raw.trim())].slice(0, 200).join("")}`));
       if (!got) return yield* Effect.fail(unavailable("听写的地址回的不是 OpenAI 的转写格式"));
       return { text: (got.text ?? "").trim() };
     }),

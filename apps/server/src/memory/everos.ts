@@ -6,7 +6,11 @@
 
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { createHash } from "node:crypto";
+import { Effect, Schema } from "effect";
+import { HttpClient, HttpClientRequest } from "effect/http";
+import { outside } from "../base/http.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { clip, recallCount, type MemoryScope } from "./recall.ts";
@@ -24,20 +28,43 @@ interface Message {
   content: string;
 }
 
-interface FoundBody {
-  readonly data?: {
-    readonly episodes?: readonly { id: string; subject?: string; summary?: string; episode?: string; score?: number; app_id?: string; project_id?: string }[];
-    readonly agent_cases?: readonly {
-      id: string;
-      task_intent?: string;
-      approach?: string;
-      key_insight?: string;
-      score?: number;
-      app_id?: string;
-      project_id?: string;
-    }[];
-  };
-}
+const ownedBy = {
+  app_id: Schema.optionalKey(Schema.String),
+  project_id: Schema.optionalKey(Schema.String),
+};
+const score = Schema.optionalKey(Schema.Number);
+const readFound = jsonOrNone(
+  Schema.Struct({
+    data: Schema.optionalKey(
+      Schema.Struct({
+        episodes: Schema.optionalKey(
+          Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              subject: Schema.optionalKey(Schema.String),
+              summary: Schema.optionalKey(Schema.String),
+              episode: Schema.optionalKey(Schema.String),
+              score,
+              ...ownedBy,
+            }),
+          ),
+        ),
+        agent_cases: Schema.optionalKey(
+          Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              task_intent: Schema.optionalKey(Schema.String),
+              approach: Schema.optionalKey(Schema.String),
+              key_insight: Schema.optionalKey(Schema.String),
+              score,
+              ...ownedBy,
+            }),
+          ),
+        ),
+      }),
+    ),
+  }),
+);
 
 // EverOS scope ids are ASCII and at most 128 characters; a real project named "global" must stay separate from global notes.
 const scopeOf = (project: string) => (project ? "project-" + createHash("sha256").update(project).digest("hex") : "global");
@@ -55,20 +82,17 @@ export function everos(c: MemorySourceConfig): Source {
   /** Sessions whose job it was given already: a later run sends only what the helper said. */
   const told = new Set<string>();
 
-  const post = async (path: string, body: unknown, signal: AbortSignal, closing = false) => {
-    if (!closing) signal = AbortSignal.any([signal, life.signal]);
-    signal.throwIfAborted();
-    const res = await fetch(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(c.key ? { authorization: `Bearer ${c.key}` } : {}) },
-      body: JSON.stringify(body),
-      signal,
-    });
-    const text = (await res.text()).slice(0, 4 << 20);
-    signal.throwIfAborted();
-    if (!res.ok) throw new Error(`memory/${path}: ${res.status} ${text.slice(0, 300)}`);
-    return text;
-  };
+  const post = (path: string, body: unknown, signal: AbortSignal, closing = false) =>
+    outside(
+      Effect.gen(function* () {
+        const request = HttpClientRequest.post(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`).pipe(HttpClientRequest.bodyJsonUnsafe(body));
+        const res = yield* HttpClient.execute(c.key ? HttpClientRequest.bearerToken(request, c.key) : request);
+        const text = (yield* res.text).slice(0, 4 << 20);
+        if (res.status < 200 || res.status > 299) return yield* Effect.fail(new Error(`memory/${path}: ${res.status} ${text.slice(0, 300)}`));
+        return text;
+      }),
+      closing ? signal : AbortSignal.any([signal, life.signal]),
+    );
 
   const add = async (session: string, project: string, messages: Message[], signal: AbortSignal) => {
     for (const m of messages) m.content = redact(m.content);
@@ -90,12 +114,8 @@ export function everos(c: MemorySourceConfig): Source {
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
     };
     const text = await post("search", body, signal);
-    let found: FoundBody;
-    try {
-      found = JSON.parse(text) as FoundBody;
-    } catch {
-      throw new Error("memory/search answered what it should not: " + text.slice(0, 200));
-    }
+    const found = readFound(text);
+    if (!found) throw new Error("memory/search answered what it should not: " + text.slice(0, 200));
     const ownership = (hit: { app_id?: string; project_id?: string }): MemoryScope =>
       hit.app_id !== app || hit.project_id !== scope ? { kind: "unknown" } : project ? { kind: "project", project } : { kind: "global" };
     const hits: { id: string; text: string; score: number; scope: MemoryScope }[] = [];
@@ -111,7 +131,12 @@ export function everos(c: MemorySourceConfig): Source {
       });
     for (const ep of found.data?.episodes ?? []) {
       const t = ep.summary || ep.episode || "";
-      hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${t}` : t, score: ep.score ?? 0, scope: ownership(ep) });
+      hits.push({
+        id: `${scope}:${ep.id}`,
+        text: ep.subject ? `${ep.subject}：${t}` : t,
+        score: ep.score ?? 0,
+        scope: ownership(ep),
+      });
     }
     return hits;
   };
@@ -151,7 +176,17 @@ export function everos(c: MemorySourceConfig): Source {
       return {
         found: hits
           .filter((h) => h.text !== "")
-          .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
+          .map((h) => ({
+            id: h.id,
+            agent: q.agent,
+            kind,
+            text: h.text,
+            at: 0,
+            recalled: 0,
+            source: "everos",
+            score: h.score,
+            scope: h.scope,
+          })),
       };
     },
     list: async () => {
@@ -165,7 +200,13 @@ export function everos(c: MemorySourceConfig): Source {
       if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: now, content: run.job });
       let said = run.said.trim() === "" ? run.summary : run.said;
       if (run.outcome === "failed") said = "（这一轮没做成）" + said;
-      if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: now, content: said });
+      if (said.trim() !== "")
+        messages.push({
+          sender_id: agentOf(run.agent),
+          role: "assistant",
+          timestamp: now,
+          content: said,
+        });
       if (messages.length === 0) return;
       await add(sessionOf(run.session), run.project, messages, signal);
       told.add(run.session);
@@ -187,8 +228,18 @@ export function everos(c: MemorySourceConfig): Source {
         session,
         project,
         [
-          { sender_id: user, role: "user", timestamp: now, content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}` },
-          { sender_id: agentOf(n.agent), role: "assistant", timestamp: now, content: `记下了：${n.text}` },
+          {
+            sender_id: user,
+            role: "user",
+            timestamp: now,
+            content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}`,
+          },
+          {
+            sender_id: agentOf(n.agent),
+            role: "assistant",
+            timestamp: now,
+            content: `记下了：${n.text}`,
+          },
         ],
         signal,
       );

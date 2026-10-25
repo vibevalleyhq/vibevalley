@@ -65,9 +65,18 @@ export function localSource(m: Memories, profiles: () => string[], run: <A>(e: E
       if (cue.peek) {
         if (cue.project === "") return [];
         const all = await run(m.list(cue.agent));
-        picked = pick(all, { project: cue.project, text: cue.text, now: Date.now(), matches: await run(m.matches(cue.agent, cue.text)) });
+        picked = pick(all, {
+          project: cue.project,
+          text: cue.text,
+          now: Date.now(),
+          matches: await run(m.matches(cue.agent, cue.text)),
+        });
       } else picked = await run(m.recallable(cue));
-      return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.project), score: picked.length - i }));
+      return picked.map((x, i) => ({
+        id: x.id,
+        line: lineOf(x, cue.project),
+        score: picked.length - i,
+      }));
     },
     syncTurn: (r) => run(m.keep(r)),
     sessionEnded: async () => {},
@@ -210,14 +219,28 @@ export class Sources {
     const key = JSON.stringify(configured);
     if (key !== this.built) {
       if (this.current) void this.retire(this.current, "memory sources changed; outside operation canceled");
-      const next: Generation = { all: [this.local], off: [], control: new AbortController(), active: new Set(), queue: Promise.resolve() };
+      const next: Generation = {
+        all: [this.local],
+        off: [],
+        control: new AbortController(),
+        active: new Set(),
+        queue: Promise.resolve(),
+      };
       this.current = next;
       this.generations.add(next);
       this.built = key;
       for (const c of configured) {
         const name = c.kind;
         const off = (why: string) =>
-          next.off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
+          next.off.push({
+            name,
+            label: sourceLabels[name] ?? name,
+            on: false,
+            canList: false,
+            canForget: false,
+            transcripts: false,
+            off: why,
+          });
         if (!c.enabled) {
           off("没打开");
           continue;
@@ -311,7 +334,10 @@ export class Sources {
     const generation = this.snapshot();
     return generation
       ? this.readAll(generation, cue.agent, async (one, signal) =>
-          (await one.prefetch(cueFor(one, cue), signal)).map((line) => ({ ...line, id: idOf(one, line.id) })),
+          (await one.prefetch(cueFor(one, cue), signal)).map((line) => ({
+            ...line,
+            id: idOf(one, line.id),
+          })),
         )
       : Promise.resolve([]);
   }
@@ -324,7 +350,11 @@ export class Sources {
     return {
       memories: groups.flatMap((listed, i) => {
         const one = listing[i]!;
-        return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
+        return listed.map((m) => ({
+          ...m,
+          id: idOf(one, m.id),
+          ...(one.name !== localName ? { source: one.name } : {}),
+        }));
       }),
       sources: this.infoOf(generation),
     };
@@ -338,7 +368,11 @@ export class Sources {
       const page = groups[i]?.[0];
       return {
         source: one.name,
-        found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
+        found: (page?.found ?? []).map((found) => ({
+          ...found,
+          id: idOf(one, found.id),
+          source: one.name,
+        })),
         coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
       };
     });

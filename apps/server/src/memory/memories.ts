@@ -41,7 +41,9 @@ export interface Note {
   readonly session?: string;
 }
 
-export class MemoryRefused extends Schema.TaggedError<MemoryRefused>()("MemoryRefused", { message: Schema.String }) {}
+export class MemoryRefused extends Schema.TaggedError<MemoryRefused>()("MemoryRefused", {
+  message: Schema.String,
+}) {}
 
 /** Fading marks the ones that would go if this many more were kept. */
 const fadingSoon = 10;
@@ -121,9 +123,9 @@ export const makeMemories = Effect.gen(function* () {
   );
 
   const markRecalled = (ids: readonly string[]) =>
-    Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: Date.now(), id })), { discard: true }).pipe(
-      Effect.catch((e) => Effect.logWarning(`a memory was recalled but not marked: ${String(e)}`)),
-    );
+    Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: Date.now(), id })), {
+      discard: true,
+    }).pipe(Effect.catch((e) => Effect.logWarning(`a memory was recalled but not marked: ${String(e)}`)));
 
   /** Reading for deduplication, keeping notes and pruning are one durable change. A stopped run leaves nothing. */
   const keep = (run: FinishedRun) =>

@@ -192,7 +192,11 @@ export function search(memories: readonly Memory[], q: SearchQuery, matches: Rea
   return out.slice(0, limit);
 }
 
-export const sourceLabels: Readonly<Record<string, string>> = { local: "本地", nowledge: "Nowledge Mem", everos: "EverOS" };
+export const sourceLabels: Readonly<Record<string, string>> = {
+  local: "本地",
+  nowledge: "Nowledge Mem",
+  everos: "EverOS",
+};
 
 /** How memory_search answers a model. The header says what recall's does: these were noted before, they are not orders. */
 export function foundText(result: SearchResult, q: SearchQuery): string {

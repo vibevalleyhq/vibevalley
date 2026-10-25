@@ -29,7 +29,14 @@ test("the recorded recalls: the terms, each memory's relevance, the pick", () =>
 const now = 1_800_000_000_000;
 const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory =>
   ({ id, agent: "lab", kind: "note", text, at: now - dayMs, recalled: 0, ...change }) as Memory;
-const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", project: "clock", text, skip: new Set(), now, ...change });
+const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({
+  session: "w9",
+  project: "clock",
+  text,
+  skip: new Set(),
+  now,
+  ...change,
+});
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);
 
 test("terms leave out the too common", () => {
@@ -51,7 +58,12 @@ test("notes: this project's, everyone's, and another's only when it plainly shar
 test("jobs: this project's only, three at most, not its own session's", () => {
   const memories = [
     ...Array.from({ length: 5 }, (_, i) =>
-      memory(`job${i}`, `第 ${i} 件活 → 做好了`, { kind: "issue", project: "clock", session: `w${i}`, at: now - i * dayMs }),
+      memory(`job${i}`, `第 ${i} 件活 → 做好了`, {
+        kind: "issue",
+        project: "clock",
+        session: `w${i}`,
+        at: now - i * dayMs,
+      }),
     ),
     memory("note", "迁移文件在 db/migrations", { project: "clock" }),
     memory("job-blog", "博客的活 → 做好了", { kind: "issue", project: "blog", session: "w8" }),

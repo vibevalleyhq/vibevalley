@@ -31,9 +31,7 @@
         "channel": "parity-channel",
         "token": "parity-token",
         "agent_rtc_uid": "123456",
-        "remote_rtc_uids": [
-          "10001"
-        ],
+        "remote_rtc_uids": ["10001"],
         "idle_timeout": 30,
         "advanced_features": {
           "enable_rtm": false,
@@ -79,9 +77,7 @@
           ],
           "greeting_message": "来啦！今天想种点什么？",
           "failure_message": "我这边卡了一下，你再说一遍？",
-          "input_modalities": [
-            "text"
-          ],
+          "input_modalities": ["text"],
           "style": "openai"
         },
         "tts": {
@@ -133,9 +129,7 @@
         "channel": "parity-channel",
         "token": "parity-token",
         "agent_rtc_uid": "123456",
-        "remote_rtc_uids": [
-          "10001"
-        ],
+        "remote_rtc_uids": ["10001"],
         "idle_timeout": 120,
         "advanced_features": {
           "enable_rtm": false,
@@ -184,9 +178,7 @@
           ],
           "greeting_message": "来啦！今天想种点什么？",
           "failure_message": "我这边卡了一下，你再说一遍？",
-          "input_modalities": [
-            "text"
-          ],
+          "input_modalities": ["text"],
           "style": "openai"
         },
         "tts": {
@@ -243,9 +235,7 @@
         "channel": "parity-channel",
         "token": "parity-token",
         "agent_rtc_uid": "123456",
-        "remote_rtc_uids": [
-          "10001"
-        ],
+        "remote_rtc_uids": ["10001"],
         "idle_timeout": 30,
         "advanced_features": {
           "enable_rtm": false,
@@ -294,9 +284,7 @@
           ],
           "greeting_message": "在呢。",
           "failure_message": "再说一遍？",
-          "input_modalities": [
-            "text"
-          ],
+          "input_modalities": ["text"],
           "style": "openai"
         },
         "tts": {
@@ -356,9 +344,7 @@
         "channel": "parity-channel",
         "token": "parity-token",
         "agent_rtc_uid": "123456",
-        "remote_rtc_uids": [
-          "10001"
-        ],
+        "remote_rtc_uids": ["10001"],
         "idle_timeout": 30,
         "advanced_features": {
           "enable_rtm": false,
@@ -407,9 +393,7 @@
           ],
           "greeting_message": "来啦！今天想种点什么？",
           "failure_message": "我这边卡了一下，你再说一遍？",
-          "input_modalities": [
-            "text"
-          ],
+          "input_modalities": ["text"],
           "style": "openai"
         },
         "tts": {
