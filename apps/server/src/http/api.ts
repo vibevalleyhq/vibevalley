@@ -34,11 +34,15 @@ function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, A
     for (const p of endpoint.query) {
       if (!query.has(p.name)) continue;
       const raw = query.get(p.name)!;
-      if (!p.number) args[p.name] = raw;
-      else if (/^-?\d+$/.test(raw)) args[p.name] = Number(raw);
+      if (!p.number) {
+        args[p.name] = raw;
+      } else if (/^-?\d+$/.test(raw)) {
+        const n = Number(raw);
+        if (Number.isSafeInteger(n)) args[p.name] = n;
+      }
     }
     if (endpoint.body) {
-      const text = yield* request.text.pipe(Effect.orElseSucceed(() => ""));
+      const text = yield* request.text;
       let json: unknown;
       try {
         json = JSON.parse(text);
@@ -52,14 +56,15 @@ function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, A
     const out = yield* handle(args).pipe(Effect.result);
     if (out._tag === "Failure") {
       const e = out.failure;
-      return HttpServerResponse.jsonUnsafe(e, { status: errorStatus[e._tag] });
+      return yield* HttpServerResponse.schemaJson(ApiError)(e, { status: errorStatus[e._tag] });
     }
     if (!endpoint.result) return HttpServerResponse.empty({ status: 204 });
-    return HttpServerResponse.jsonUnsafe(out.success);
+    return yield* HttpServerResponse.schemaJson(endpoint.result)(out.success);
   }).pipe(
     Effect.catchCause((cause) => {
+      if (Cause.hasInterrupts(cause)) return Effect.failCause(cause);
       const failure = Cause.squash(cause);
-      if (isApiError(failure)) return Effect.succeed(HttpServerResponse.jsonUnsafe(failure, { status: errorStatus[failure._tag] }));
+      if (isApiError(failure)) return HttpServerResponse.schemaJson(ApiError)(failure, { status: errorStatus[failure._tag] });
       return Effect.as(
         Effect.logError(`${endpoint.op}: ${Cause.pretty(cause)}`),
         HttpServerResponse.text(String(failure instanceof Error ? failure.message : failure) + "\n", { status: 500 }),

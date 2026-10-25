@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, Schedule } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
@@ -19,6 +19,7 @@ import { Setting } from "../setting/setting.ts";
 import { dbStore } from "../agent/brain/taskStore.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+import { jsonOf } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
@@ -110,6 +111,11 @@ interface Spent {
   byRuntime: Record<string, number>;
 }
 
+const SpentSchema: Schema.Codec<Spent> = Schema.Struct({
+  day: Schema.String,
+  byRuntime: Schema.Record(Schema.String, Schema.Finite),
+});
+
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -176,8 +182,9 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const cache = new Map<string, Observation>();
     /**
-     * Each read of a runtime takes the next number as it starts; the cache keeps the number of the read it holds, and a
-     * read that started before it is dropped, so a slow probe never overwrites a newer one.
+     * Each full probe takes the next number as it starts; the cache keeps the number of the probe it holds, and a probe
+     * that started before it is dropped, so a slow full refresh never overwrites a newer one. Usage reads merge by the
+     * identity of the observation they started from instead of taking a full-refresh number.
      */
     const reads = new Map<string, number>();
     // The waits started from spend and usageSoon: one fiber per key, all ended with the service.
@@ -190,7 +197,7 @@ export const make = (options: RuntimeOptions = {}) =>
     let spent: Spent = { day: today(), byRuntime: {} };
     if (existsSync(spendFile)) {
       try {
-        const kept = JSON.parse(readFileSync(spendFile, "utf8")) as Spent;
+        const kept = jsonOf(SpentSchema)(readFileSync(spendFile, "utf8"));
         if (kept.day === today() && kept.byRuntime) spent = kept;
       } catch {
         // An unreadable tally starts the day again.
@@ -342,12 +349,12 @@ export const make = (options: RuntimeOptions = {}) =>
     async function refreshUsage(id: string) {
       const runtime = registry.get(id);
       const before = cache.get(id);
-      const read = begin(id);
       // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
       const usage = await usageOf(id, runtime, before.found, before.info.settings).catch(() => null);
+      if (closed || cache.get(id) !== before) return;
       if (JSON.stringify(usage) === JSON.stringify(before.info.usage)) return;
-      remember({ ...before, info: { ...before.info, usage, checkedAt: Date.now() } }, read);
+      remember({ ...before, info: { ...before.info, usage, checkedAt: Date.now() } }, before.read);
     }
 
     /** At most four runtimes asked at once. */

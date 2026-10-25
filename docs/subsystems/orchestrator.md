@@ -48,6 +48,7 @@
 - **完成工单、合进主分支、计划开工要这一轮最新那条输入有主人的话**（`tool.Caller.Owner`）：完成、改工单和挪状态（`issue_status`、`issue_update`）否则回「没动：改工单、挪状态要主人说一声。……」；`graph_action merge` 回「没合：合进主分支要主人说一声。……」，`graph_action start` 也不动手，要它在频道里问主人。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
 - **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **管家的状态**在 `WorkspaceState.Orchestrator`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
+- **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`agent_task.after` 必须是字符串数组，坏值只回退这个字段；`recurrences.json` 的每项按 `Job` 解码，坏文件不被覆盖，也不触发任务。
 
 ## 怎么走
 
@@ -62,7 +63,7 @@
 
 - 交给管家的话里，不是主人说的超过 800 字（UTF-16，`orchestratorLineMax`）只给前 800 字，后面写明这条有多少字、用 `read_chat` 读哪里（`#频道` 或 `#频道:消息号`）；主人的话照原样给。`read_chat` 给全文，`check` 给帮工上一轮汇报的结尾 2000 字。
 - 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`answerer("phone")`）带一句口语、一两句、先说结论的提示，回答边长边念。
-- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。
+- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。MCP 和 OpenAI 的入口由 `HttpEffect.fromWebHandler` 适配，平台转发请求的中断和 typed failure；客户端断开时，等待中的请求处理器收到取消。MCP SDK 已启动的工作能否随之取消由 SDK 的取消接口决定。
 
 **说话**：管家说的字边长边进它回话的那个频道（至多每 120 毫秒推一次），一句说完写成定稿；空的不发。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
 
@@ -77,6 +78,8 @@
 5. 压缩之后重拼开头，下一条输入的现状带全文。生成失败只留下「摘要没生成出来，原文见归档」。
 
 **叫停**（`orchestrator.stop`，`vibevalley orchestrator stop`；管家在 `thinking` 或 `speaking` 时输入框旁边有停止键）：停掉正在跑的这一轮、丢掉排着等它的话（巡查过后还会再报，计划的状态在计划板上）；已经说出来的半句留在田头，派出去的帮工照常干活；交给管家的工单那一轮记成 `interrupted`，日志记「主人叫停了」。管家闲着时什么也不做。
+
+**关闭**：`AgentHost.close` 先拒绝新输入并取消启动，等 start、Build、deliver 的串行链结束，再关 Brain、events 和 execution；关闭中的输入只结束 caller，不记新的 failed run，迟到文本不交给已关闭的 Brain。`Brain.close` 和 `AgentHost.close` 都 memoize 同一份清理 Promise，重复调用不提前返回。
 
 **重启后接着做**：服务端停下（`close`）时还在跑的一轮，取消造出的消息不写进对话文件，文件停在被打断的地方，和崩溃一样。开机时 `brain.SessionUnfinished(orchestrator.jsonl)` 看按 `replay` 读出的最后一条：是用户的话、`custom`、没被叫停的工具结果，或带工具调用的回答，就是没做完。没做完、有钥匙，就在后台起大脑、`Resume(30 分钟)`：
 
@@ -98,7 +101,7 @@
 - **田头（`channel`）**：经 `forOrchestrator` 收话、`orchestratorDigest` 取这期间的汇报（读了不算已读，消费后才提交回执）、`orchestratorSays` 把字写进频道；`say`、`spoken` 把主人的话写进田头，带 `sendKey` 的重发不再交给管家（[田头](docs/subsystems/channel.md)的「重发不成两条」）。
 - **工单（`issue`）**：派给管家的工单和管家的定时经 `forOrchestrator` 交来；管家这一轮结束（答完、没答成、叫停），工单都进「等你看」、记下结局，主人点头才关（完成，交付 `none`）（[工单](docs/subsystems/issue.md)）。`issues`、`issue_create`、`issue_update`、`issue_status`、`accept`、`changes` 是工单服务的方法（`list`、`add`、`start`、`draft`、`edit`、`setStatus`……）。
 - **执行（`session`）**：`agentExecution` 把管家的每一轮记成 Run 和日志，`Roster` 给现状和工具找帮工。挑档案归 `Runtimes.choose`。
-- **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完），电话和 `brief` 都不会一直等着。
+- **语音（`voice`）**：电话里的每句经 `answerer("phone")`；要告诉在电话上的主人的事经 `brief`（[语音](docs/subsystems/voice.md)「管家打电话找主人」），自己一个回答流，整段交回去念；有新的一句进了这一轮，前一句的回答流就此结束（不等这一轮跑完）。`brief` 可带 `AbortSignal`，只结束这次等回答的 listener，不取消大家共享的 run；提交失败会拒绝这次 `brief`，不会变成未处理的 rejection。
 - **定时（`recurrence`）**：管家的 `recurrence` 工具经 `Recurrence.Add(req, orchestrator, owner)`；`wakeSoon` 读定时决定空闲时压不压。
 - **计划（`task`）**：`news` 交来提醒；`graph_split`、`graph_action`、`task_edit`、`task_action` 调它。
 - **记性（`memory`）**：`orchestratorHome` 定家目录；管家页的记性和旧账接口读写 `MEMORY.md` 和 `archive/`，和管家自己的工具用同一套函数（`agent/brain/memory.ts`）。
@@ -138,5 +141,6 @@
 - 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`npm run evals`，照 [verify-orchestrator-evals](.agents/skills/verify-orchestrator-evals/SKILL.md)）。
 - `tool/tool.test.ts`：管家每个工具的参数对照 `testdata/tool_schemas.json`；钱的说法；轨迹里工具的名字和说法。
 - `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束、照 OpenAI 的样子拒绝）、`tools.test.ts`。
+- `session/host.test.ts`：Caller 的监听器随 push、end、abort 清理；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 共享清理结果。
 - `agent/agent.test.ts`：管家是内置的档案。
 - 页面：`apps/web/test/orchestrator.spec.ts`（记性、轨迹、「这一轮做错了」、旧账、声音）；`farm-chat.spec.ts`（管家回答田头的话）。

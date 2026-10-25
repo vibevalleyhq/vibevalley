@@ -111,8 +111,9 @@ describe("projects", () => {
         writeFileSync(join(place.cwd, "a.txt"), "a\n");
         expect((yield* p.mergeInto(place, "vibevalley/task-1")).hashes).toHaveLength(1);
         const changes = yield* p.branchChanges("task", "vibevalley/task-1");
-        expect(changes.files.map((f) => f.path)).toEqual(["a.txt"]);
-        expect(changes.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/);
+        expect(changes!.files.map((f) => f.path)).toEqual(["a.txt"]);
+        expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/);
+        expect(yield* p.branchChanges("task", "vibevalley/missing")).toBeUndefined();
         expect(yield* p.mergeBranch("task", "vibevalley/task-1")).toMatch(/1 个提交合进了 task 的 main/);
         expect(yield* p.run(join(root, "task"), "cat a.txt && exit 3")).toEqual({ ok: false, output: "a" });
       }),

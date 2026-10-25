@@ -130,56 +130,51 @@ const asFarm = ["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@local
 const commit = (cwd: string, message: string) =>
   git(cwd, "commit", "-q", "-m", message).pipe(Effect.catch(() => git(cwd, ...asFarm, "commit", "-q", "-m", message)));
 
-const mergeCommit = (path: string, ours: string, theirs: string, message: string) =>
-  Effect.gen(function* () {
-    const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0]!;
-    const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
-    return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
-  });
+const mergeCommit = Effect.fnUntraced(function* (path: string, ours: string, theirs: string, message: string) {
+  const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0]!;
+  const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
+  return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
+});
 
 /** The files merging branch into base would conflict on; none when it merges cleanly. */
-const conflictsOf = (path: string, base: string, branch: string) =>
-  Effect.gen(function* () {
-    const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
-    if (r.code === 0) return [] as string[];
-    if (r.code !== 1) return yield* fail(r.code < 0 ? r.stderr : `git merge-tree 出错（${r.code}）`);
-    // First line: the tree it would write; then each conflicted file.
-    return [
-      ...new Set(
-        r.stdout
-          .trim()
-          .split("\n")
-          .slice(1)
-          .filter((l) => l !== ""),
-      ),
-    ];
-  });
+const conflictsOf = Effect.fnUntraced(function* (path: string, base: string, branch: string) {
+  const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
+  if (r.code === 0) return [] as string[];
+  if (r.code !== 1) return yield* fail(r.code < 0 ? r.stderr : `git merge-tree 出错（${r.code}）`);
+  // First line: the tree it would write; then each conflicted file.
+  return [
+    ...new Set(
+      r.stdout
+        .trim()
+        .split("\n")
+        .slice(1)
+        .filter((l) => l !== ""),
+    ),
+  ];
+});
 
-const commitLeft = (cwd: string, message: string) =>
-  Effect.gen(function* () {
-    if ((yield* git(cwd, "status", "--porcelain")) === "") return;
-    yield* git(cwd, "add", "-A", "--", ".", ...neverCommitted);
-    if ((yield* git(cwd, "diff", "--cached", "--name-only")) === "") return;
-    yield* commit(cwd, message);
-  });
+const commitLeft = Effect.fnUntraced(function* (cwd: string, message: string) {
+  if ((yield* git(cwd, "status", "--porcelain")) === "") return;
+  yield* git(cwd, "add", "-A", "--", ".", ...neverCommitted);
+  if ((yield* git(cwd, "diff", "--cached", "--name-only")) === "") return;
+  yield* commit(cwd, message);
+});
 
 const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
 
-const unchangedBranch = (path: string, branch: string, checked: string) =>
-  Effect.gen(function* () {
-    if ((yield* git(path, "rev-parse", "refs/heads/" + branch)) !== checked)
-      return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
-  });
+const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
+  if ((yield* git(path, "rev-parse", "refs/heads/" + branch)) !== checked)
+    return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
+});
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
-const cleanupMerged = (place: Workplace, path: string) =>
-  Effect.gen(function* () {
-    const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
-    if (removed.code !== 0) return `改动已合并，worktree ${place.cwd} 和分支 ${place.branch} 尚未清理：${reason(removed.stderr)}`;
-    const deleted = yield* gitRun(path, "branch", "-D", place.branch!);
-    if (deleted.code !== 0) return `改动已合并，分支 ${place.branch} 尚未清理：${reason(deleted.stderr)}`;
-    return "";
-  });
+const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: string) {
+  const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
+  if (removed.code !== 0) return `改动已合并，worktree ${place.cwd} 和分支 ${place.branch} 尚未清理：${reason(removed.stderr)}`;
+  const deleted = yield* gitRun(path, "branch", "-D", place.branch!);
+  if (deleted.code !== 0) return `改动已合并，分支 ${place.branch} 尚未清理：${reason(deleted.stderr)}`;
+  return "";
+});
 
 export const issueBranch = (n: number) => `vibevalley/issue-${n}`;
 
@@ -302,19 +297,18 @@ const runGitHub: GitHubRun = (...args) =>
     (r) => ({ out: r.stdout + r.stderr, ok: r.code === 0, missing: r.missing }),
   );
 
-export const probeGitHub = (gh: GitHubRun) =>
-  Effect.gen(function* () {
-    const s: GitHubStatus = { checkedAt: Date.now(), installed: false, loggedIn: false } as GitHubStatus;
-    const version = yield* gh("--version");
-    if (!version.ok) return { ...s, reason: version.missing ? "没装 gh" : "gh 检测失败" };
-    const v = ghVersion.exec(version.out)?.[1];
-    const installed: GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
-    const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
-    if (!auth.ok) return { ...installed, reason: "没登录 GitHub" };
-    const account = ghAccount.exec(auth.out)?.[1];
-    if (!account) return { ...installed, reason: "无法确认 GitHub 登录账号" };
-    return { ...installed, loggedIn: true, account };
-  });
+export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitHubRun) {
+  const s: GitHubStatus = { checkedAt: Date.now(), installed: false, loggedIn: false } as GitHubStatus;
+  const version = yield* gh("--version");
+  if (!version.ok) return { ...s, reason: version.missing ? "没装 gh" : "gh 检测失败" };
+  const v = ghVersion.exec(version.out)?.[1];
+  const installed: GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
+  const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
+  if (!auth.ok) return { ...installed, reason: "没登录 GitHub" };
+  const account = ghAccount.exec(auth.out)?.[1];
+  if (!account) return { ...installed, reason: "无法确认 GitHub 登录账号" };
+  return { ...installed, loggedIn: true, account };
+});
 
 export interface ProjectShape {
   readonly root: string;
@@ -331,7 +325,7 @@ export interface ProjectShape {
   readonly contributions: (extra: readonly string[]) => Effect.Effect<Repo[]>;
   readonly workplace: (project: string, issueNumber: number, worktree: boolean, baseBranch: string) => Effect.Effect<Workplace, ProjectError>;
   readonly changes: (place: Workplace) => Effect.Effect<Changes, ProjectError>;
-  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes, ProjectError>;
+  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
   readonly changedFiles: (cwd: string, baseBranch: string) => Effect.Effect<string[], ProjectError>;
   readonly conflict: (place: Workplace, baseBranch?: string) => Effect.Effect<Conflict | undefined>;
   readonly merge: (place: Workplace) => Effect.Effect<Merged, MergeFailure>;
@@ -725,7 +719,13 @@ export const make = (hooks: ProjectHooks = {}) =>
           }),
         ),
       changes: (place) => describe(place.project, place.cwd, place.branch),
-      branchChanges: (project, branch) => describe(project, "", branch),
+      branchChanges: Effect.fn("Projects.branchChanges")(function* (project, branch) {
+        const path = join(root, project);
+        const present = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch);
+        if (present.code === 1) return undefined;
+        if (present.code !== 0) return yield* fail(`没能读取分支 ${branch}：${reason(present.stderr)}`);
+        return yield* describe(project, "", branch);
+      }),
       changedFiles: Effect.fn("Projects.changedFiles")(
         function* (cwd, baseBranch) {
           const fork = yield* git(cwd, "merge-base", baseBranch, "HEAD");

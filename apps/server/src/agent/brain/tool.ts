@@ -52,6 +52,7 @@ export function textTool<P>(spec: TextToolSpec<P>): AgentTool {
     parameters: spec.parameters as unknown as TSchema,
     execute: async (callId, params, signal) => {
       const s = signal ?? never;
+      if (s.aborted) throw new Error(stopped);
       const text = await spec.run(params as P, { callId, signal: s });
       if (s.aborted) throw new Error(stopped);
       return { content: [{ type: "text", text: clip(text) }], details: undefined };

@@ -4,10 +4,12 @@
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+import { jsonOf } from "../base/json.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
 interface Stored {
@@ -15,6 +17,12 @@ interface Stored {
   readonly skills: readonly Skill[];
   readonly settings: Readonly<Record<string, RuntimeSettings>>;
 }
+
+const StoredSchema: Schema.Codec<Stored> = Schema.Struct({
+  agents: Schema.Array(S.Agent),
+  skills: Schema.Array(S.Skill),
+  settings: Schema.Record(Schema.String, S.RuntimeSettings),
+});
 
 /** The runtime id of VibeValley's own agent, the one the orchestrator runs on. */
 export const orchestratorRuntime = "vibevalley";
@@ -96,7 +104,7 @@ export const make = Effect.gen(function* () {
   let s: Stored = seed;
   if (existsSync(file)) {
     try {
-      s = JSON.parse(readFileSync(file, "utf8")) as Stored;
+      s = jsonOf(StoredSchema)(readFileSync(file, "utf8"));
     } catch (e) {
       // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
       const aside = `${file}.unreadable-${Date.now()}`;
@@ -110,7 +118,7 @@ export const make = Effect.gen(function* () {
     }
   }
   const agents = s.agents.some((a) => a.id === orchestratorAgent) ? s.agents : [...s.agents, orchestratorProfile()];
-  s = { agents: agents.map(withCast), skills: s.skills ?? [], settings: s.settings ?? {} };
+  s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   disk.write(() => JSON.stringify(s));
 
   /** A change is kept only once it is on disk: one that cannot be written is refused and leaves the profiles as they were. */

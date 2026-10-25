@@ -189,6 +189,17 @@ describe("recurrences", () => {
     expect(wakes).toBe(1);
   });
 
+  it("do not run a persisted job whose shape is wrong", () => {
+    const dir = home();
+    const woke: string[] = [];
+    const s = new Recurrences(dir, (text) => woke.push(text));
+    const damaged = JSON.stringify([{ id: "important", name: "", message: "", everyMinutes: "5", created: new Date(0).toISOString() }]);
+    writeFileSync(join(dir, "recurrences.json"), damaged);
+    s.tick(new Date());
+    expect(woke).toEqual([]);
+    expect(readFileSync(join(dir, "recurrences.json"), "utf8")).toBe(damaged);
+  });
+
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
     const s = new Recurrences(dir, () => {
@@ -238,8 +249,13 @@ describe("MCP", () => {
       { name: "calc", command: "node", args: ["c.js"] },
       { name: "web", url: "http://x", headers: { a: "b" } },
     ]);
+    writeFileSync(file, `{"mcpServers":[]}`);
+    expect(() => readMcpConfig(file)).toThrow(/形状不对/);
     writeFileSync(file, "nope");
     expect(() => readMcpConfig(file)).toThrow(/不是 JSON/);
+    const directory = join(dir, "directory");
+    mkdirSync(directory);
+    expect(() => readMcpConfig(directory)).toThrow();
   });
 
   it("gets a server's tools over stdio, every page, and leaves out one that cannot be reached", async () => {

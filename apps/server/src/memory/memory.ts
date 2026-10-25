@@ -146,10 +146,12 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       });
 
     // forgetOf and its dry run judge by this: the memory is there, and its source lets it be forgotten here.
+    const fileRefused = (e: unknown) => refused(e instanceof Error ? e.message : String(e));
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
       const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed = agent === orchestratorAgent ? orchestrator() : yield* Effect.promise(() => sources.list(agent));
+      const listed =
+        agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* Effect.promise(() => sources.list(agent));
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
       return m;
@@ -159,7 +161,10 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.promise(() => sources.list(agent))),
       remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
       forgetOf: (agent, id) =>
-        Effect.andThen(forgettable(agent, id), agent === orchestratorAgent ? Effect.sync(() => forgetLine(home, id)) : forget(agent, id)),
+        Effect.andThen(
+          forgettable(agent, id),
+          agent === orchestratorAgent ? Effect.try({ try: () => forgetLine(home, id), catch: fileRefused }) : forget(agent, id),
+        ),
       previewForgetOf: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
           does: [agent === orchestratorAgent ? `从管家的 MEMORY.md 删掉这一行：「${m.text}」` : `从 ${agent} 的记性里忘掉：「${m.text}」`],

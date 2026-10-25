@@ -144,7 +144,7 @@ export class Brain {
   private waiters: ((r: RunResult) => void)[] = [];
   private steps = 0;
   private stopping = false;
-  private closed = false;
+  private closing: Promise<void> | undefined;
   /** Made once per place. */
   private folds = new Map<string, CompactionSummaryMessage>();
   /** What the last request's prompt start hashed to, per part; absent before the first request and after a compaction. */
@@ -161,8 +161,19 @@ export class Brain {
   private scheduleTimer: NodeJS.Timeout | undefined;
 
   /** Connects to its MCP servers first; one that cannot be reached is left out (mcpStatus). */
-  static async start(options: BrainOptions): Promise<Brain> {
-    return new Brain(options, await connectAll(options.mcpServers ?? []));
+  static async start(options: BrainOptions, signal?: AbortSignal): Promise<Brain> {
+    if (signal?.aborted) throw signal.reason ?? new Error("aborted");
+    const mcp = await connectAll(options.mcpServers ?? [], signal);
+    if (signal?.aborted) {
+      await mcp.close();
+      throw signal.reason ?? new Error("aborted");
+    }
+    try {
+      return new Brain(options, mcp);
+    } catch (e) {
+      await mcp.close();
+      throw e;
+    }
   }
 
   private constructor(
@@ -181,22 +192,25 @@ export class Brain {
     let helper: Helper | undefined;
     if (!options.noSubagents) {
       helper = async (brief, label, signal) => {
-        const h = await Brain.start({
-          name: options.name + "-帮手",
-          instructions: subagentInstructions(options.name),
-          llm: options.llm,
-          ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
-          home: options.home,
-          cwd: options.cwd,
-          tools: hostTools,
-          ...(options.disallowedTools ? { disallowedTools: options.disallowedTools } : {}),
-          skills: this.skillDirs,
-          noMemory: true,
-          maxSteps: 30,
-          noSession: true,
-          noSubagents: true,
-          recurrences: false,
-        });
+        const h = await Brain.start(
+          {
+            name: options.name + "-帮手",
+            instructions: subagentInstructions(options.name),
+            llm: options.llm,
+            ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
+            home: options.home,
+            cwd: options.cwd,
+            tools: hostTools,
+            ...(options.disallowedTools ? { disallowedTools: options.disallowedTools } : {}),
+            skills: this.skillDirs,
+            noMemory: true,
+            maxSteps: 30,
+            noSession: true,
+            noSubagents: true,
+            recurrences: false,
+          },
+          signal,
+        );
         try {
           const said = await h.ask(userMessage(brief), AbortSignal.any([signal, this.life.signal]));
           return said || "帮手「" + label + "」没有交回结果。";
@@ -446,12 +460,23 @@ export class Brain {
   ask(message: AgentMessage, signal?: AbortSignal): Promise<string> {
     return new Promise((resolve, reject) => {
       if (this.life.signal.aborted) return reject(new Error("the agent is closed"));
-      const abort = () => reject(signal?.reason ?? new Error("aborted"));
-      signal?.addEventListener("abort", abort, { once: true });
-      this.waiters.push((r) => {
+      if (signal?.aborted) return reject(signal.reason ?? new Error("aborted"));
+      let settled = false;
+      const waiter = (r: RunResult) => {
+        if (settled) return;
+        settled = true;
         signal?.removeEventListener("abort", abort);
         resolve(r.text);
-      });
+      };
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        this.waiters = this.waiters.filter((w) => w !== waiter);
+        signal?.removeEventListener("abort", abort);
+        reject(signal?.reason ?? new Error("aborted"));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      this.waiters.push(waiter);
       this.deliver(message, true);
     });
   }
@@ -565,9 +590,15 @@ export class Brain {
     this.refreshPrefix();
   }
 
-  async close() {
-    if (this.closed) return;
-    this.closed = true;
+  close(): Promise<void> {
+    if (!this.closing) {
+      this.life.abort();
+      this.closing = Promise.resolve().then(() => this.closeOnce());
+    }
+    return this.closing;
+  }
+
+  private async closeOnce() {
     this.stopIdle();
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
     this.life.abort();

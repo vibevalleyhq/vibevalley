@@ -2,9 +2,10 @@
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { Cron, Result } from "effect";
+import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { jsonOf } from "../../base/json.ts";
 import { numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
 
 export interface Job {
@@ -18,6 +19,17 @@ export interface Job {
   readonly created: string;
   readonly lastRun?: string;
 }
+
+const JobSchema: Schema.Codec<Job> = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  message: Schema.String,
+  cron: Schema.optionalKey(Schema.String),
+  at: Schema.optionalKey(Schema.String),
+  everyMinutes: Schema.optionalKey(Schema.Finite),
+  created: Schema.String,
+  lastRun: Schema.optionalKey(Schema.String),
+});
 
 const parseDate = (text: string) => {
   const d = new Date(text.trim());
@@ -80,7 +92,7 @@ export class Recurrences {
 
   private load(): Job[] {
     if (!existsSync(this.file)) return [];
-    return JSON.parse(readFileSync(this.file, "utf8")) as Job[];
+    return jsonOf(Schema.mutable(Schema.Array(JobSchema)))(readFileSync(this.file, "utf8"));
   }
 
   private store(jobs: readonly Job[]) {

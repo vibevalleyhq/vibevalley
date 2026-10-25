@@ -2,7 +2,7 @@ import { chmodSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
-import { Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
@@ -10,7 +10,26 @@ import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
 
-const draft = (change: Partial<Agent> = {}) => ({ ...withCast({ id: "x" } as Agent), id: "", name: "同名", runtime: "pi", ...change }) as Agent;
+const draft = (change: Partial<Agent> = {}): Agent => ({
+  id: "",
+  name: "同名",
+  role: "",
+  enabled: true,
+  runtime: "pi",
+  model: "",
+  effort: "",
+  persona: "",
+  personaMode: "append",
+  skills: [],
+  mcpServers: [],
+  disallowedTools: [],
+  env: {},
+  workdir: "",
+  worktree: false,
+  tags: [],
+  look: { build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
+  ...change,
+});
 
 describe("profiles", () => {
   it.effect("deleting a skill removes profile references and a recreated name does not reattach it", () => {
@@ -58,6 +77,21 @@ describe("profiles", () => {
     );
   });
 
+  it.effect("valid JSON with the wrong profile shape is kept aside", () => {
+    const config = testConfig();
+    const raw = `{"agents":{},"skills":[],"settings":{}}`;
+    writeFileSync(join(config.home, "config.json"), raw);
+    return run(
+      config,
+      Effect.gen(function* () {
+        expect((yield* Agents).agents().length).toBeGreaterThan(0);
+        const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
+        expect(kept).toHaveLength(1);
+        expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
+      }),
+    );
+  });
+
   it.effect("one that cannot be kept aside stops the start, and is not touched", () => {
     const config = testConfig();
     writeFileSync(join(config.home, "config.json"), "{not json");
@@ -65,7 +99,7 @@ describe("profiles", () => {
     return Effect.gen(function* () {
       const exit = yield* Effect.exit(run(config, Agents));
       chmodSync(config.home, 0o755);
-      expect(Exit.isFailure(exit)).toBe(true);
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
       expect(readFileSync(join(config.home, "config.json"), "utf8")).toBe("{not json");
     });
   });
@@ -94,7 +128,7 @@ describe("profiles", () => {
         expect(s.agents().some((a) => a.id === orchestratorAgent)).toBe(false);
         expect(s.all().some((a) => a.id === orchestratorAgent)).toBe(true);
         expect((yield* Effect.flip(s.deleteAgent(orchestratorAgent)))._tag).toBe("Refused");
-        expect(Exit.isFailure(yield* Effect.exit(s.saveAgent({ ...orchestrator, runtime: "claude" })))).toBe(true);
+        expect((yield* Effect.flip(s.saveAgent({ ...orchestrator, runtime: "claude" })))._tag).toBe("Refused");
         yield* s.saveAgent({ ...orchestrator, model: "deepseek-pro" });
       }),
     ).pipe(

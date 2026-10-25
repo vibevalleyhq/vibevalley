@@ -33,7 +33,7 @@
 | Run | `Run`、`session_run` | 一次触发到一次汇报：帮工的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run；核心状态里是 `run` 到 `report` 两个事实 |
 | oar 会话 | oar 的会话、`Subagent` | 农机的一条可续的记录流；重启或接不上时换一个 |
 
-- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session；`report` 事实按结果折成 `done`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`（合进了主分支）、`completed`（它的工单完成了、没合进主分支：分支留着、没有改动、计划的一步合进计划的分支）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。
+- **核心状态只放在地里的**：`WorkspaceState.sessions` 是在地里的 Session；`report` 事实按结果折成 `done`（做完）、`failed`、`resting`（叫停、重启打断）。走了的从 `session` 表读，阶段是 `closed`（什么时候、怎么走的，`SessionClose`：`merged`（合进了主分支）、`completed`（它的工单完成了、没合进主分支：分支留着、没有改动、计划的一步合进计划的分支）、`dismissed`、`lost`），轮数、最后一轮的结果和花费从 `session_run` 算，不另存。`triggered_by`、`heard`、`spent`、计划、工作目录和想起过的记性各自按 Schema 读回；某个字段读不了只按那个字段原有的空值处理，坏工作目录仍按接不回来处理。
 
 **在场阶段**（`Session.phase` 是生命周期的唯一状态）：
 
@@ -77,7 +77,7 @@
 **额度和花费**（`runtime`）：
 
 - 有套餐的农机读 oar 的账户用量；pi 用它自己配置的 DeepSeek 钥匙读 `GET /user/balance`（只读）；VibeValley 自己的农机不报额度。开机读一遍，之后每 5 分钟读一次；一轮结束后 20 秒再读一次（几轮共用一次）。剩不到 15%（`quotaLow`）的，管家的「农场现状」标「快用完了」，管家尽量换人。
-- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `ai/models.ts` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。今天每台农机花了多少在 `spend.json`（写盘合并 1 秒，推给页面合并 3 秒）。
+- 花费按价目折成人民币（估算，汇率 `cny_per_usd`）：pi 按 pi-ai 自带的价目（不含 pi 配置里自加的模型），VibeValley 自己的农机和 dsh 的 DeepSeek 模型按 `ai/models.ts` 的价格；claude、codex 等按套餐计费的只记 token，没有每日预算。今天每台农机花了多少在 `spend.json`（写盘合并 1 秒，推给页面合并 3 秒）。读回时校验日期和每台农机的有限数值；读不了、形状不对或日期不是今天的，从今天的空账开始，不拿 Infinity 绕过预算。pi 的 settings/auth/models 和 DeepSeek 余额回答也按形状读；本机配置读不了按缺省处理，余额形状不对回「没读到 DeepSeek 余额」，不在解析成功以后才炸开。
 
 ## 怎么走
 
@@ -86,10 +86,10 @@
 1. 接收工单服务给的完整工单身份（id 和编号），查上限；分一个编号 `w<n>`；`Projects` 按工单编号开或复用 worktree。
 2. 想起这个档案的记性（「【你记得的】」一段，和活之间隔 `jobBreak`）。
 3. `Runtimes.resolve` 定农机、模型、安装；`spawn` 开 oar 会话。开不成就放回 worktree、作废令牌，报「派不出去」。
-4. 调 `SendOptions.hiring`（工单服务记下既有工单和 Session 的关联）；失败就关闭会话，按项目的释放回执交代现场是否保留，不上地。关闭也失败时，执行模块保留这次未发布的启动分配，继续占位置，拒绝再派同一张工单和清理它的工作区；关机时再尽力关闭。工单已经在开 worktree 以前写好，这里不补建。
+4. 调 `SendOptions.hiring`（工单服务记下既有工单和 Session 的关联）；失败就关闭会话，按项目的释放回执交代现场是否保留，不上地。关联登记遇到 SQL 错误时拒绝派活，其他 defect 保留原 Cause；两种退出都先关闭刚开的会话。关闭也失败时，执行模块保留这次未发布的启动分配，继续占位置，拒绝再派同一张工单和清理它的工作区；关机时再尽力关闭。工单已经在开 worktree 以前写好，这里不补建。
 5. 写 `session` 表一行，施加 `hired`，接上事件（`Subagent` 的 follow）和没动静的计时，第一次 run 的触发默认是 `issue`。
 
-从取得 `Subagents` 到发布帮工、叫醒和离场，执行只用一份资源分配（`Allocation`）。每个真正返回的 oar 会话立即登记，`dispose` 的成功或失败只认同一次调用；启动、第一句话、工单关联或日志登记失败都经同一处关闭。只有 `Subagents` 和取得的全部会话都确认释放，才交回现场。接回旧会话失败时也先完成这次释放，才能换新会话；不能停止的不会再尝试另开一个。未发布分配与已发布帮工按同一个 Session id 算位置，不重复占位。
+从取得 `Subagents` 到发布帮工、叫醒和离场，执行只用一份资源分配（`Allocation`）。每个真正返回的 oar 会话立即登记，`dispose` 的成功或失败只认同一次调用；启动、第一句话、工单关联或日志登记失败，以及 attach 前的中断，都经同一处关闭。不能取消的 spawn 由 `Subagents.close()` 等到迟到返回再销毁。只有 `Subagents` 和取得的全部会话都确认释放，才交回现场和令牌。接回旧会话失败时也先完成这次释放，才能换新会话；不能停止的不会再尝试另开一个。未发布分配与已发布帮工按同一个 Session id 算位置，不重复占位。
 
 **一次 run**：农机开一轮时施加 `run`、写 `session_run` 一行、日志写 `run/start`；之后每个 oar 事件经 `facts.ts` 变成事实（`doing` 是头顶的气泡，只在变了时施加；`retry`；`spent`）和日志。汇报（`SubagentReport`）经 `readReport` 读成 `report` 事实，带上 run 的 id、这一轮的花费和问主人的问题，`session_run` 记上结果、摘要和花费，日志写 `run/end`，交给记性记下这一轮，20 秒后读一次额度。oar 的 follow 在一个消费者上按顺序交来事件和汇报，汇报不越过它那条记录里的事件：claude 在 `turn_ended` 那一帧里才报用量，汇报照样带得上这一轮的花费。农机进程在干活时退出，记成一次失败的汇报并提醒。
 
@@ -110,7 +110,7 @@
 - 做完的一轮里以「要问主人：」开头的行进 `report` 事实的 `questions`，工单服务记成问题（等你回答）。
 - 做完的一轮里最后一个读得出结论（`conclusion` 不空、`evidence` 至少一条）的 json 代码块进 `report` 事实的 `answer`（`parseAnswer`），折进 `lastRun.answer`：交付物是结论的工单看它判这一轮交没交出结论，不等工单服务写库。
 
-**没动静**：`session.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
+**没动静**：`session.ts` 的 `watchStalls` 用 oar 的 `reduceStatus`、`stallOf` 从这个会话的第一条记录起折出状态（oar 自己的 `observeStalls` 只听订阅以后的记录），一轮在干、超过 `session.stall_seconds`（默认 240 秒）没有任何记录时报一次。等待和计时使用同一个 Clock，到点读一次时间，`quiet.since` 由这一刻回推。Session 施加 `quiet`（地块干裂、挂「没动静」，管家的「农场现状」和 Inbox 里也会说），日志记一条 `run/error`，农场提醒一次（带最后在做什么）。下一个不是用量的事件结束它。不自动叫停。
 
 **叫停**（`session.stop`）：打断这一轮，Session 留在地里，带句话开下一轮。
 

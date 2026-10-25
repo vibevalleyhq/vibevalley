@@ -2,10 +2,11 @@
 // keeps what it returns, all at once; a finished graph is put away and the owner's open graph is empty again. It answers
 // the graph as kept, before putting it away, so the caller can still say how it ended.
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import * as q from "../../../db/generated/agent_task.sql.ts";
 import { newId } from "../../base/ids.ts";
+import { jsonOrNone } from "../../base/json.ts";
 import { type By, finished, type State, type Task } from "./taskGraph.ts";
 
 export interface TaskStore {
@@ -13,24 +14,17 @@ export interface TaskStore {
   readonly change: <E>(f: (g: Task[]) => Effect.Effect<Task[], E>) => Effect.Effect<Task[], E>;
 }
 
-const fromRow = (r: q.OpenGraphTasksResult): Task => {
-  let after: string[] = [];
-  try {
-    after = (JSON.parse(r.after) as string[] | null) ?? [];
-  } catch {
-    after = [];
-  }
-  return {
-    id: r.id,
-    title: r.title,
-    brief: r.brief,
-    after,
-    by: r.executor as By,
-    state: r.state as State,
-    ...(r.result ? { result: r.result } : {}),
-    ...(r.tries ? { tries: r.tries } : {}),
-  };
-};
+const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
+const fromRow = (r: q.OpenGraphTasksResult): Task => ({
+  id: r.id,
+  title: r.title,
+  brief: r.brief,
+  after: afterOf(r.after) ?? [],
+  by: r.executor as By,
+  state: r.state as State,
+  ...(r.result ? { result: r.result } : {}),
+  ...(r.tries ? { tries: r.tries } : {}),
+});
 
 /** The farm's database (agent_task). A finished graph stays, stamped finished_at. */
 export const dbStore = (sql: SqlClient.SqlClient, owner: string): TaskStore => {

@@ -54,12 +54,29 @@ export interface McpConnection {
 
 const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
   new Promise<A>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timed out")), ms);
-    signal?.addEventListener("abort", () => reject(new Error("canceled")), { once: true });
-    p.then(resolve, reject).finally(() => clearTimeout(timer));
+    if (signal?.aborted) {
+      reject(new Error("canceled"));
+      return;
+    }
+    let settled = false;
+    const finish = (f: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      f();
+    };
+    const timer = setTimeout(() => finish(() => reject(new Error("timed out"))), ms);
+    const abort = () => finish(() => reject(new Error("canceled")));
+    signal?.addEventListener("abort", abort, { once: true });
+    p.then(
+      (value) => finish(() => resolve(value)),
+      (e: unknown) => finish(() => reject(e)),
+    );
   });
 
 export async function connectMcp(server: McpServer, signal?: AbortSignal): Promise<McpConnection> {
+  if (signal?.aborted) throw new Error("canceled");
   let stderr = "";
   let transport: Transport;
   if (server.url) {

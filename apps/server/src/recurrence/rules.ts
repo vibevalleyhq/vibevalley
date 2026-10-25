@@ -49,7 +49,7 @@ export function recurrenceProblem(req: RecurrenceRequest, now: number): string {
     case "weekly": {
       if (!recurrenceTime.test(w.time)) return "时间写成 HH:MM，比如 09:00：" + w.time;
       const days = w.days ?? [];
-      return days.length > 0 && !days.some((d) => d < 0 || d > 6) ? "" : "每周的哪几天：0 到 6，0 是周日";
+      return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : "每周的哪几天：0 到 6，0 是周日";
     }
     case "cron":
       return cronProblem(w.expr, now, req.tz);

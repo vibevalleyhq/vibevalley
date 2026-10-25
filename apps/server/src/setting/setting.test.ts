@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { type Config, Settings } from "../base/config.ts";
@@ -123,4 +123,18 @@ describe("settings", () => {
       }),
     );
   });
+
+  it.effect("an unreadable or invalid settings file stops startup without being overwritten", () =>
+    Effect.gen(function* () {
+      const cases = ["{not json", JSON.stringify({ deepseekApiKey: 7, agoraAppId: appId })];
+      for (const raw of cases) {
+        const config = testConfig();
+        const path = join(config.home, "settings.json");
+        writeFileSync(path, raw);
+        const out = yield* Effect.exit(run(config, Setting));
+        expect(out._tag).toBe("Failure");
+        expect(readFileSync(path, "utf8")).toBe(raw);
+      }
+    }),
+  );
 });

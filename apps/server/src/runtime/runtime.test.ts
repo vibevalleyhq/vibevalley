@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import type { Agent, LiveEvent, RuntimeInfo } from "@vibevalley/protocol";
+import type { AccountUsage, Agent, LiveEvent, RuntimeInfo } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { Effect, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
@@ -94,6 +94,67 @@ describe("runtime", () => {
       expect(used).toBe("new");
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
+
+  for (const first of ["full", "usage"] as const)
+    it.live(`a changed usage cannot overwrite a newer full probe (${first} first)`, () => {
+      let releaseFull!: () => void;
+      let releaseUsage!: () => void;
+      const fullGate = new Promise<void>((resolve) => (releaseFull = resolve));
+      const usageGate = new Promise<void>((resolve) => (releaseUsage = resolve));
+      return Effect.gen(function* () {
+        let full = 0;
+        let usageCalls = 0;
+        const changed: AccountUsage = { status: "ok", subscription: "pro", windows: [] };
+        const registry = new RuntimeRegistry([
+          fake("pi", {
+            installation: async (): Promise<InstallationSnapshot> => {
+              const n = ++full;
+              if (n === 2) await fullGate;
+              return { kind: "available", via: "executable", command: n === 1 ? "old" : "new" };
+            },
+          }),
+        ]);
+        const r = yield* make({
+          registry,
+          background: false,
+          usageOf: async () => {
+            if (++usageCalls === 2) {
+              await usageGate;
+              return changed;
+            }
+            return null;
+          },
+        });
+        yield* r.refresh("pi");
+        const fullRefresh = Effect.runPromise(r.refresh("pi"));
+        yield* Effect.promise(() => until(() => full === 2));
+        const usageRefresh = r.refreshUsage("pi");
+        yield* Effect.promise(() => until(() => usageCalls === 2));
+        if (first === "full") {
+          releaseFull();
+          yield* Effect.promise(() => fullRefresh);
+          releaseUsage();
+          yield* Effect.promise(() => usageRefresh);
+        } else {
+          releaseUsage();
+          yield* Effect.promise(() => usageRefresh);
+          releaseFull();
+          yield* Effect.promise(() => fullRefresh);
+        }
+        const got = yield* r.info("pi");
+        expect(got!.installation).toMatchObject({ command: "new" });
+        expect(got!.usage).toBeNull();
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            releaseFull();
+            releaseUsage();
+          }),
+        ),
+        Effect.scoped,
+        Effect.provide(world()),
+      );
+    });
 
   it.live("an adapter's refusals stop a profile, under the farm's", () =>
     Effect.gen(function* () {
@@ -337,6 +398,20 @@ describe("runtime", () => {
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
 
+  it.live("an infinite persisted spend cannot bypass the day's budget", () => {
+    const config = testConfig();
+    const d = new Date();
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    writeFileSync(join(config.home, "spend.json"), `{"day":${JSON.stringify(day)},"byRuntime":{"pi":1e999}}`);
+    return Effect.gen(function* () {
+      const r = yield* runtimes({ probe: notFound });
+      yield* r.refresh("pi");
+      expect((yield* r.info("pi"))!.spentToday).toBeUndefined();
+      r.spend("pi", 2);
+      expect((yield* r.info("pi"))!.spentToday).toBe(2);
+    }).pipe(Effect.scoped, Effect.provide(world(config)));
+  });
+
   it.live("an update that cannot be saved is refused, and nothing is probed", () => {
     const config = testConfig();
     let probed = false;
@@ -394,20 +469,20 @@ describe("runtime", () => {
 
   it("pi's balance, as pi configures DeepSeek", async () => {
     const saved = { dir: process.env.OAR_PI_AGENT_DIR, key: process.env.DEEPSEEK_API_KEY, mine: process.env.MY_DEEPSEEK };
-    const balance = async (key: string) => {
+    const balance = async (key: string, answer: unknown = { is_available: true, balance_infos: [{ currency: "CNY", total_balance: "12.50" }] }) => {
       const s = createServer((req, res) => {
         if (req.url !== "/user/balance" || req.headers.authorization !== "Bearer " + key) return void res.writeHead(401).end();
-        res.end(JSON.stringify({ is_available: true, balance_infos: [{ currency: "CNY", total_balance: "12.50" }] }));
+        res.end(JSON.stringify(answer));
       });
       servers.push(s);
       await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
       return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
     };
-    const piHome = (models: string, auth: string) => {
+    const piHome = (models: string, auth: string, settings = `{"defaultProvider":"deepseek","defaultModel":"deepseek-chat"}`) => {
       const dir = mkdtempSync(join(tmpdir(), "pi-"));
       dirs.push(dir);
       process.env.OAR_PI_AGENT_DIR = dir;
-      writeFileSync(join(dir, "settings.json"), `{"defaultProvider":"deepseek","defaultModel":"deepseek-chat"}`);
+      writeFileSync(join(dir, "settings.json"), settings);
       if (models) writeFileSync(join(dir, "models.json"), models);
       if (auth) writeFileSync(join(dir, "auth.json"), auth);
     };
@@ -429,6 +504,12 @@ describe("runtime", () => {
       piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
       expect(await piBalance({ defaultModel: "" })).toEqual({ status: "login_required" });
       expect(await piBalance({ defaultModel: "anthropic/claude" })).toEqual({ status: "unavailable", reason: "anthropic 不报余额" });
+      url = await balance("sk-bad", { is_available: true, balance_infos: {} });
+      process.env.DEEPSEEK_API_KEY = "sk-bad";
+      piHome(`{"providers":{"deepseek":{"baseUrl":"${url}"}}}`, "");
+      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "unavailable", reason: "没读到 DeepSeek 余额" });
+      piHome("", "", `{"defaultProvider":{}}`);
+      expect(await piBalance({ defaultModel: "" })).toEqual({ status: "unavailable", reason: "pi 没有设默认模型" });
     } finally {
       env("OAR_PI_AGENT_DIR", saved.dir);
       env("DEEPSEEK_API_KEY", saved.key);

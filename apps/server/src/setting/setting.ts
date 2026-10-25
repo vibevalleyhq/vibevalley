@@ -4,25 +4,40 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, VoiceSettings } from "@vibevalley/protocol";
-import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
-import { Context, Data, Effect, Layer } from "effect";
+import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
+import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
+import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+import { jsonOf } from "../base/json.ts";
+
+const MemorySourceConfig = Schema.Struct({
+  kind: S.MemorySourceKind,
+  url: Schema.String,
+  enabled: Schema.optionalKey(Schema.Boolean),
+  read: Schema.optionalKey(Schema.Boolean),
+  write: Schema.optionalKey(Schema.Boolean),
+  everything: Schema.optionalKey(Schema.Boolean),
+  user: Schema.optionalKey(Schema.String),
+  key: Schema.optionalKey(Schema.String),
+});
+type MemorySourceConfig = typeof MemorySourceConfig.Type;
 
 /** settings.json, in the order the file has it. */
-interface Stored {
-  readonly deepseekApiKey?: string;
-  readonly agoraAppId?: string;
-  readonly agoraAppCertificate?: string;
-  readonly asrKey?: string;
-  readonly llmKey?: string;
-  readonly ttsKey?: string;
-  readonly voice?: SettingsUpdateVoice;
-  readonly dictationKey?: string;
-  readonly dictation?: Dictation;
-  readonly memorySources?: readonly MemorySourceConfig[];
-}
+const Stored = Schema.Struct({
+  deepseekApiKey: Schema.optionalKey(Schema.String),
+  agoraAppId: Schema.optionalKey(Schema.String),
+  agoraAppCertificate: Schema.optionalKey(Schema.String),
+  asrKey: Schema.optionalKey(Schema.String),
+  llmKey: Schema.optionalKey(Schema.String),
+  ttsKey: Schema.optionalKey(Schema.String),
+  voice: Schema.optionalKey(S.SettingsUpdateVoice),
+  dictationKey: Schema.optionalKey(Schema.String),
+  dictation: Schema.optionalKey(S.Dictation),
+  memorySources: Schema.optionalKey(Schema.Array(MemorySourceConfig)),
+});
+type Stored = typeof Stored.Type;
 
 export interface VoiceKeys {
   readonly asrKey: string;
@@ -65,13 +80,7 @@ export interface SettingShape {
 
 export class Setting extends Context.Service<Setting, SettingShape>()("vibevalley/Setting") {}
 
-const read = (file: string): Stored => {
-  try {
-    return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Stored) : {};
-  } catch {
-    return {};
-  }
-};
+const read = (file: string): Stored => (existsSync(file) ? jsonOf(Stored)(readFileSync(file, "utf8")) : {});
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 

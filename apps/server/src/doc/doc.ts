@@ -93,7 +93,7 @@ export const make = (options: DocOptions = {}) =>
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;
 
-    const findDoc = (id: string) => db(Effect.option(qd.doc({ id })));
+    const findDoc = (id: string) => db(Effect.catchNoSuchElement(qd.doc({ id })));
     const blocksOf = (doc: string) => db(Effect.map(qb.docBlocks({ doc_id: doc }), (rows) => rows.map(blockOf)));
 
     const get = Effect.fn("Docs.get")(function* (id: string) {
@@ -130,7 +130,7 @@ export const make = (options: DocOptions = {}) =>
           Effect.gen(function* () {
             const d = yield* findDoc(id);
             if (Option.isNone(d)) return yield* Effect.fail(missingDoc(id));
-            const seen = yield* db(Effect.option(qc.docChangeByBatch({ batch_id: body.batchId })));
+            const seen = yield* db(Effect.catchNoSuchElement(qc.docChangeByBatch({ batch_id: body.batchId })));
             if (Option.isSome(seen)) return yield* again(id, seen.value);
             const now = Date.now();
             const p = new Page(id, actor, now, yield* blocksOf(id));
@@ -145,13 +145,13 @@ export const make = (options: DocOptions = {}) =>
                 revisions.set(`${b.id}@${op.baseRev}`, b.text);
                 continue;
               }
-              const raw = yield* db(Effect.option(qr.docBlockRevision({ block_id: b.id, rev: op.baseRev })));
+              const raw = yield* db(Effect.catchNoSuchElement(qr.docBlockRevision({ block_id: b.id, rev: op.baseRev })));
               if (Option.isSome(raw)) revisions.set(`${b.id}@${op.baseRev}`, storedSpans(raw.value.spans) ?? []);
             }
             const taken = new Set<string>();
             for (const op of body.ops ?? []) {
               const fresh = op.op === "insert_block" ? op.block.id : op.op === "split_block" ? op.newBlock.id : undefined;
-              if (fresh && Option.isSome(yield* db(Effect.option(qb.docBlockDoc({ id: fresh }))))) taken.add(fresh);
+              if (fresh && Option.isSome(yield* db(Effect.catchNoSuchElement(qb.docBlockDoc({ id: fresh }))))) taken.add(fresh);
             }
             p.base = (block, rev) => revisions.get(`${block}@${rev}`);
             p.taken = (block) => taken.has(block);

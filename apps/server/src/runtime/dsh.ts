@@ -18,6 +18,7 @@ import {
   type SessionOptions,
   type StartSession,
 } from "@botiverse/oar";
+import { Predicate } from "effect";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
 const internal = <T>(path: string) => import(new URL(path, dist).href) as Promise<T>;
@@ -102,7 +103,7 @@ function displayName(id: string, choice: Record<string, unknown>): string {
 }
 
 type Rec = Record<string, unknown>;
-const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter((x): x is Rec => typeof x === "object" && x !== null && !Array.isArray(x)) : []);
+const records = (v: unknown): Rec[] => (Array.isArray(v) ? v.filter(Predicate.isObject) : []);
 
 /** A session/new response's models; undefined when it has no `model` config option. dsh has no model-list method: the
  * catalog rides on every new session as the `model` option, its choices grouped by provider or flat. The effort menu

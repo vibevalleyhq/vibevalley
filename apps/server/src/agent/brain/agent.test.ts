@@ -38,6 +38,47 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
+  it("does not start an ask or a tool for an already aborted signal", async () => {
+    const dir = home();
+    await withAgent(dir, [], async (r) => {
+      const ended = new AbortController();
+      ended.abort();
+      await expect(r.agent.ask(userMessage("不该开始"), ended.signal)).rejects.toThrow("aborted");
+      expect(r.requests).toHaveLength(0);
+      let runs = 0;
+      const tool = textTool({ name: "count", description: "count", parameters: objectSchema(), run: () => String(++runs) });
+      await expect(tool.execute("t", {}, ended.signal)).rejects.toThrow(stopped);
+      expect(runs).toBe(0);
+    });
+  });
+
+  it("shares the actual close with every concurrent caller", async () => {
+    const dir = home();
+    await withAgent(dir, [], async (r) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const waitForIdle = r.agent.core.waitForIdle.bind(r.agent.core);
+      r.agent.core.waitForIdle = () => gate;
+      try {
+        const first = r.agent.close();
+        const second = r.agent.close();
+        expect(second).toBe(first);
+        let done = false;
+        void second.then(() => {
+          done = true;
+        });
+        await sleep(10);
+        expect(done).toBe(false);
+        release();
+        await Promise.all([first, second]);
+        expect(done).toBe(true);
+      } finally {
+        release();
+        r.agent.core.waitForIdle = waitForIdle;
+      }
+    });
+  });
+
   it("runs a tool and gives its result back", async () => {
     const dir = home();
     writeFileSync(join(dir, "notes.txt"), "第一行\n第二行\n");

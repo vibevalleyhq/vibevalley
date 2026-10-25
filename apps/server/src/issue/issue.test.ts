@@ -5,7 +5,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session, TaskGraph } from "@vibevalley/protocol";
 import { seedAgents } from "../agent/seed.ts";
-import { Effect } from "effect";
+import { Cause, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels } from "../channel/chat.ts";
@@ -461,6 +461,20 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  it.live("an optional SQL row hides only absence, never a database failure", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sql = yield* SqlClient.SqlClient;
+      const issue = yield* issues.add({ title: "read errors" });
+      expect((yield* Effect.flip(issues.get("not-there")))._tag).toBe("Missing");
+      yield* sql.unsafe("alter table issue rename to issue_broken").pipe(Effect.orDie);
+      const out = yield* Effect.exit(issues.get(issue.id));
+      expect(out._tag).toBe("Failure");
+      if (out._tag === "Failure") expect(Cause.hasDies(out.cause)).toBe(true);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("resolving says what git said when git fails", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -471,6 +485,33 @@ describe("issues", () => {
       renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
       const err = yield* Effect.flip(issues.resolve(got.session!.issue!));
       expect(JSON.stringify(err)).not.toContain("没有冲突");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("a git failure cannot complete an issue as if it had no changes", () => {
+    const worker = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        writeFileSync(join(turn.options.cwd, "committed.txt"), "work\n");
+        git(turn.options.cwd, "add", "committed.txt");
+        git(turn.options.cwd, "-c", "user.name=test", "-c", "user.email=test@test", "commit", "-qm", "work");
+        turn.say("结论：做完了");
+      },
+    });
+    const f = farm([worker]);
+    return Effect.gen(function* () {
+      const issues = yield* Issues;
+      const sessions = yield* Sessions;
+      const chat = yield* Channels;
+      yield* (yield* Agents).saveAgent(lab());
+      const hired = yield* issues.hire({ ...lab(), worktree: true }, "keep my work", "demo");
+      yield* until(() => sessions.sessionOf(hired.session!.id)?.phase._tag === "done", "the report");
+      const repo = join(f.config.workRoot, "projects", "demo");
+      renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
+      expect((yield* Effect.flip(issues.previewStatus(hired.session!.issue!, "done", "")))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.general())))._tag).toBe("Refused");
+      const after = yield* issues.get(hired.session!.issue!);
+      expect([after.status, after.delivered]).toEqual(["in_review", undefined]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

@@ -87,4 +87,26 @@ describe("chat/completions", () => {
     expect([misheard.status, await misheard.text()]).toEqual([200, expect.stringContaining("没听清")]);
     expect((await ask(strict, undefined, "GET")).status).toBe(405);
   });
+
+  it("rejects valid JSON with an invalid request shape before answering", async () => {
+    let calls = 0;
+    const handle = chatCompletions({
+      answerer: only("m", () => {
+        calls++;
+        return said("不该回答");
+      }),
+    });
+    const cases = [
+      { model: "m", messages: {} },
+      { model: "m", messages: [null] },
+      { model: "m", messages: [{ role: "user", content: 1 }] },
+      { model: "m", stream: "false", messages: [] },
+      { model: 1, messages: [] },
+    ];
+    for (const body of cases) {
+      const res = await ask(handle, body);
+      expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([400, "invalid_json"]);
+    }
+    expect(calls).toBe(0);
+  });
 });

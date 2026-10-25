@@ -4,6 +4,7 @@ import { SqlClient } from "effect/sql";
 import { testDatabase } from "../../testing/layers.ts";
 import { add, begin, type Change, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
 import { dbStore, memoryStore, type TaskStore } from "./taskStore.ts";
+import * as q from "../../../db/generated/agent_task.sql.ts";
 
 const ids = (g: readonly Task[]) => g.map((t) => t.id);
 
@@ -129,6 +130,37 @@ describe("an agent's task graph", () => {
         expect(finished(ended), name).toBe(true);
         expect(yield* s.load, name).toEqual([]);
       }
+    }).pipe(Effect.provide(testDatabase())),
+  );
+
+  it.effect("a database store decodes task dependencies before using them", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      for (const [id, position, after] of [
+        ["bad", 0, `{}`],
+        ["good", 1, `["bad"]`],
+      ] as const)
+        yield* Effect.orDie(
+          q.addGraphTask({
+            graph: "g1",
+            owner: "s1",
+            id,
+            position,
+            title: "",
+            brief: "",
+            after,
+            executor: "self",
+            state: "waiting",
+            result: "",
+            tries: 0,
+            updated_at: 0,
+          }),
+        );
+      const got = yield* dbStore(sql, "s1").load;
+      expect(got.map((t) => [t.id, t.after])).toEqual([
+        ["bad", []],
+        ["good", ["bad"]],
+      ]);
     }).pipe(Effect.provide(testDatabase())),
   );
 

@@ -133,8 +133,8 @@ export interface OrchestratorShape {
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in 田头
-   * as always; the whole answer comes back to be read out. It does not end the call's own answer. */
-  readonly brief: (line: string) => Promise<string>;
+   * as always; the whole answer comes back to be read out. Aborting ends only this wait, not the shared run. */
+  readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
   /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in 田头.
    * On the phone (the voice line) the words are said in 田头 too, and the answer is one to be read out. */
   readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
@@ -439,12 +439,20 @@ export const make = (options: OrchestratorOptions = {}) =>
           owner: true,
         });
       }),
-      brief: async (line) => {
+      brief: async (line, signal) => {
+        if (signal?.aborted) return "";
         const me = new Caller();
-        void take({ source: "issue", line, conversation: general, caller: me });
-        let said = "";
-        for await (const w of me.words()) said += w;
-        return said.trim();
+        const stop = () => me.end();
+        signal?.addEventListener("abort", stop, { once: true });
+        try {
+          if (!signal?.aborted) void take({ source: "issue", line, conversation: general, caller: me }).catch((e) => me.fail(e));
+          let said = "";
+          for await (const w of me.words(signal)) said += w;
+          return said.trim();
+        } finally {
+          signal?.removeEventListener("abort", stop);
+          me.end();
+        }
       },
       answerer: (on) => (model) => {
         if (model !== orchestratorModel) return undefined;

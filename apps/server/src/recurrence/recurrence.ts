@@ -3,12 +3,14 @@
 // is published for the orchestrator, who does it.
 
 import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
@@ -67,14 +69,9 @@ export const make = (options: RecurrenceOptions = {}) =>
     const dueHub = yield* PubSub.unbounded<Due>();
 
     for (const row of yield* db(q.recurrences())) {
-      let when: Recurrence["when"] | undefined;
-      try {
-        when = JSON.parse(row.spec) as Recurrence["when"];
-      } catch {
-        when = undefined;
-      }
-      // A recurrence whose time this code cannot read any more is left out.
-      if (!when?.kind) continue;
+      const when = jsonOrNone(S.RecurrenceWhen)(row.spec);
+      // A recurrence whose time or owner this code cannot read any more is left out.
+      if (!when || !Schema.is(S.RecurrenceBy)(row.set_by)) continue;
       const s: Recurrence = {
         id: row.id,
         name: row.name,
@@ -87,9 +84,9 @@ export const make = (options: RecurrenceOptions = {}) =>
         enabled: row.enabled,
         created: row.created_at,
         ...(row.last_run ? { lastRun: row.last_run } : {}),
-        by: row.set_by as RecurrenceBy,
+        by: row.set_by,
         ...(row.pending ? { pending: true } : {}),
-      } as Recurrence;
+      };
       yield* core.apply({ type: "recurrence", recurrence: s });
     }
 
@@ -106,9 +103,12 @@ export const make = (options: RecurrenceOptions = {}) =>
         for (const s of dueRecurrences(core.state().recurrences ?? [], at)) {
           const missed = isMissed(s, at);
           const after = afterRun(s, at);
-          const written = yield* Effect.exit(ran(after.id, at, after.enabled));
+          const written = yield* Effect.result(
+            Effect.provideService(q.recurrenceRan({ last_run: at, enabled: after.enabled, id: after.id }), SqlClient.SqlClient, sql),
+          );
           if (written._tag === "Failure") {
-            yield* Effect.logWarning(`vibevalley: recurrence ${s.id}'s run was not kept: ${String(written.cause)}`);
+            const failure = written.failure;
+            yield* Effect.logWarning(`vibevalley: recurrence ${s.id}'s run was not kept: ${failure instanceof Error ? failure.message : String(failure)}`);
             continue;
           }
           yield* core.apply({ type: "recurrence", recurrence: after });

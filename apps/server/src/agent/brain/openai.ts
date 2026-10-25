@@ -4,6 +4,7 @@
 // keys) is the mounting side's business.
 
 import { randomBytes } from "node:crypto";
+import { Schema } from "effect";
 
 /** One turn's words as they come; done when the turn is over. */
 export type Answer = (text: string, signal: AbortSignal) => AsyncIterable<string>;
@@ -16,11 +17,20 @@ export interface ChatCompletions {
   readonly log?: (line: string) => void;
 }
 
-interface ChatRequest {
-  readonly model?: string;
-  readonly stream?: boolean;
-  readonly messages?: readonly { readonly role?: string; readonly content?: unknown }[];
-}
+const ContentPart = Schema.Struct({ type: Schema.optionalKey(Schema.String), text: Schema.optionalKey(Schema.String) });
+const ChatRequest = Schema.Struct({
+  model: Schema.optionalKey(Schema.String),
+  stream: Schema.optionalKey(Schema.Boolean),
+  messages: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        role: Schema.optionalKey(Schema.String),
+        content: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(ContentPart)])),
+      }),
+    ),
+  ),
+});
+type ChatRequest = typeof ChatRequest.Type;
 
 /** Content is a string or a list of parts, of which only the text ones count. */
 export function newestUserText(req: ChatRequest): string {
@@ -28,7 +38,7 @@ export function newestUserText(req: ChatRequest): string {
   if (!m) return "";
   if (typeof m.content === "string") return m.content.trim();
   if (!Array.isArray(m.content)) return "";
-  return (m.content as { type?: string; text?: string }[])
+  return m.content
     .filter((p) => p.type === "text")
     .map((p) => p.text ?? "")
     .join("")
@@ -59,8 +69,7 @@ export function chatCompletions(c: ChatCompletions) {
     const asked = Date.now();
     let req: ChatRequest;
     try {
-      req = (await request.json()) as ChatRequest;
-      if (!req || typeof req !== "object" || Array.isArray(req)) throw new Error("not an object");
+      req = Schema.decodeUnknownSync(ChatRequest)(await request.json());
     } catch (e) {
       return refuse(400, "invalid_request_error", "invalid_json", e instanceof Error ? e.message : String(e));
     }

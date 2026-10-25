@@ -176,8 +176,8 @@ export const MessageKind: Schema.Codec<T.MessageKind> = Schema.Literals(T.Messag
 export const Outcome: Schema.Codec<T.Outcome> = Schema.Literals(T.OutcomeValues);
 
 export const Spent: Schema.Codec<T.Spent> = Schema.Struct({
-  tokens: Schema.Number,
-  cny: Schema.optionalKey(Schema.Number),
+  tokens: Schema.Finite,
+  cny: Schema.optionalKey(Schema.Finite),
 });
 
 export const ChatMessage: Schema.Codec<T.ChatMessage> = Schema.Struct({
@@ -449,7 +449,7 @@ export const RecurrenceWhenDaily: Schema.Codec<T.RecurrenceWhenDaily> = Schema.S
 
 export const RecurrenceWhenWeekly: Schema.Codec<T.RecurrenceWhenWeekly> = Schema.Struct({
   kind: Schema.Literal("weekly"),
-  days: Schema.mutable(Schema.Array(Schema.Number)),
+  days: Schema.mutable(Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })))),
   time: Schema.String,
 });
 
@@ -899,65 +899,65 @@ export const StateFrame: Schema.Codec<T.StateFrame> = Schema.Struct({
 
 export const LedgerEntryHarvested: Schema.Codec<T.LedgerEntryHarvested> = Schema.Struct({
   kind: Schema.Literal("harvested"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   project: Schema.String,
   runtime: Schema.String,
-  commits: Schema.Number,
-  cny: Schema.optionalKey(Schema.Number),
-  runs: Schema.Number,
+  commits: Schema.Finite,
+  cny: Schema.optionalKey(Schema.Finite),
+  runs: Schema.Finite,
 });
 
 export const LedgerEntryFailed: Schema.Codec<T.LedgerEntryFailed> = Schema.Struct({
   kind: Schema.Literal("failed"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
   agent: Schema.optionalKey(Schema.String),
 });
 
 export const LedgerEntryConflicted: Schema.Codec<T.LedgerEntryConflicted> = Schema.Struct({
   kind: Schema.Literal("conflicted"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
 });
 
 export const LedgerEntryTold: Schema.Codec<T.LedgerEntryTold> = Schema.Struct({
   kind: Schema.Literal("told"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
 });
 
 export const LedgerEntryReviewed: Schema.Codec<T.LedgerEntryReviewed> = Schema.Struct({
   kind: Schema.Literal("reviewed"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
 });
 
 export const LedgerEntryGraph: Schema.Codec<T.LedgerEntryGraph> = Schema.Struct({
   kind: Schema.Literal("graph"),
-  at: Schema.Number,
+  at: Schema.Finite,
   graph: Schema.String,
-  merged: Schema.Number,
+  merged: Schema.Finite,
   parallel: Schema.Boolean,
 });
 
 export const LedgerEntryHandoff: Schema.Codec<T.LedgerEntryHandoff> = Schema.Struct({
   kind: Schema.Literal("handoff"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
   to: Schema.String,
 });
 
 export const LedgerEntryCalled: Schema.Codec<T.LedgerEntryCalled> = Schema.Struct({
   kind: Schema.Literal("called"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
 });
 
 export const LedgerEntryHired: Schema.Codec<T.LedgerEntryHired> = Schema.Struct({
   kind: Schema.Literal("hired"),
-  at: Schema.Number,
+  at: Schema.Finite,
   session: Schema.String,
   agent: Schema.optionalKey(Schema.String),
 });
@@ -966,20 +966,20 @@ export const LedgerEntryMomentKind: Schema.Codec<T.LedgerEntryMomentKind> = Sche
 
 export const LedgerEntryMoment: Schema.Codec<T.LedgerEntryMoment> = Schema.Struct({
   kind: LedgerEntryMomentKind,
-  at: Schema.Number,
+  at: Schema.Finite,
 });
 
 export const LedgerEntryLevel: Schema.Codec<T.LedgerEntryLevel> = Schema.Struct({
   kind: Schema.Literal("level"),
-  at: Schema.Number,
-  level: Schema.Number,
+  at: Schema.Finite,
+  level: Schema.Finite,
 });
 
 export const LedgerEntryTitled: Schema.Codec<T.LedgerEntryTitled> = Schema.Struct({
   kind: Schema.Literal("titled"),
-  at: Schema.Number,
+  at: Schema.Finite,
   achievement: Schema.optionalKey(Schema.String),
-  tier: Schema.optionalKey(Schema.Number),
+  tier: Schema.optionalKey(Schema.Finite),
 });
 
 export const LedgerEntry: Schema.Codec<T.LedgerEntry> = Schema.Union([

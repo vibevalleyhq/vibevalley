@@ -225,7 +225,7 @@ export const make = (options: IssueOptions = {}) =>
     const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
     const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-    const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
+    const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.catchNoSuchElement(e)), Option.getOrUndefined);
     const inTx = <A, E>(e: Effect.Effect<A, E>) =>
       sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
     const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
@@ -299,29 +299,27 @@ export const make = (options: IssueOptions = {}) =>
       return rows.map((r) => issueOf(r, runs.get(r.id))).sort(issueOrder);
     });
 
-    const idOf = (ref: string): Effect.Effect<string, ApiError> =>
-      Effect.gen(function* () {
-        const r = ref.trim();
-        const number = /^#?(\d+)$/.exec(r)?.[1];
-        if (number !== undefined) {
-          const row = yield* one(q.issueByNumber({ number: Number(number) }));
-          if (!row) return yield* Effect.fail(missing("工单 #" + number, [lookIn.issue]));
-          return row.id;
-        }
-        return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
-      });
+    const idOf = Effect.fn("Issues.idOf")(function* (ref: string): Effect.fn.Return<string, ApiError> {
+      const r = ref.trim();
+      const number = /^#?(\d+)$/.exec(r)?.[1];
+      if (number !== undefined) {
+        const row = yield* one(q.issueByNumber({ number: Number(number) }));
+        if (!row) return yield* Effect.fail(missing("工单 #" + number, [lookIn.issue]));
+        return row.id;
+      }
+      return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
+    });
 
     /** By any of what idOf reads. */
-    const get = (ref: string): Effect.Effect<Issue, ApiError> =>
-      Effect.gen(function* () {
-        const issue = yield* idOf(ref);
-        const row = yield* one(q.getIssue({ id: issue }));
-        if (!row) return yield* Effect.fail(missing("工单 " + ref, [lookIn.issue]));
-        return issueOf(
-          row,
-          (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
-        );
-      });
+    const get = Effect.fn("Issues.get")(function* (ref: string): Effect.fn.Return<Issue, ApiError> {
+      const issue = yield* idOf(ref);
+      const row = yield* one(q.getIssue({ id: issue }));
+      if (!row) return yield* Effect.fail(missing("工单 " + ref, [lookIn.issue]));
+      return issueOf(
+        row,
+        (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
+      );
+    });
 
     const publish = (id: string) =>
       get(id).pipe(
@@ -530,24 +528,23 @@ export const make = (options: IssueOptions = {}) =>
     });
 
     /** by undefined: the issue sent out. said: the owner's words with it, when it is asked again. */
-    const start = (id: string, channel: string, by?: RunTrigger, said?: string): Effect.Effect<Dispatched, ApiError> =>
-      Effect.gen(function* () {
-        const mine = yield* Effect.option(get(id));
-        if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
-          yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, undefined, said);
-          return {};
-        }
-        const [issue, agent, project] = yield* ready(id);
-        let where = channel;
-        let trigger = by;
-        if (issue.queuedAt !== undefined) [where, trigger] = yield* queuedDispatch(id);
-        const full = sessions.noRoom(agent.runtime, project);
-        if (full) {
-          yield* queueRow(issue.id, true, (yield* chat.channelOf(where)).id, trigger);
-          return { queued: full + "：排上队了，有空位就自动开工" };
-        }
-        return { session: yield* send(issue, agent, project, where, trigger) };
-      });
+    const start = Effect.fn("Issues.start")(function* (id: string, channel: string, by?: RunTrigger, said?: string): Effect.fn.Return<Dispatched, ApiError> {
+      const mine = yield* Effect.option(get(id));
+      if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
+        yield* toOrchestrator(mine.value, channel, by ?? { kind: "issue" }, undefined, said);
+        return {};
+      }
+      const [issue, agent, project] = yield* ready(id);
+      let where = channel;
+      let trigger = by;
+      if (issue.queuedAt !== undefined) [where, trigger] = yield* queuedDispatch(id);
+      const full = sessions.noRoom(agent.runtime, project);
+      if (full) {
+        yield* queueRow(issue.id, true, (yield* chat.channelOf(where)).id, trigger);
+        return { queued: full + "：排上队了，有空位就自动开工" };
+      }
+      return { session: yield* send(issue, agent, project, where, trigger) };
+    });
 
     /** In the board's order; one that cannot go any more leaves the queue, said in a notice. */
     const tryQueued = trying.withPermits(1)(
@@ -596,8 +593,8 @@ export const make = (options: IssueOptions = {}) =>
       const agent = to ?? store.agent(last.agent);
       if (!agent) return yield* Effect.fail(refused("派它的帮工档案 " + last.agent + " 不在了"));
       const where = issue.project ?? "";
-      const changes = yield* Effect.option(projects.branchChanges(where, issueBranch(issue.number)));
-      const previous = Option.isSome(changes) && changes.value.commits.length > 0;
+      const changes = yield* projects.branchChanges(where, issueBranch(issue.number)).pipe(Effect.mapError((e) => refused(e.message)));
+      const previous = (changes?.commits.length ?? 0) > 0;
       const task = reopenTask(issue, last, text, previous, agent.id !== last.agent);
       const hired = yield* hire(agent, task, where, { channel, issue: issue.id, trigger: by });
       if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
@@ -667,7 +664,7 @@ export const make = (options: IssueOptions = {}) =>
     /** The commits on the issue's branch that the main branch does not have; none for one without a project or branch. */
     const commitsOf = (t: Issue) =>
       t.project
-        ? Effect.map(Effect.option(projects.branchChanges(t.project, issueBranch(t.number))), (c) => (Option.isSome(c) ? c.value.commits.length : 0))
+        ? Effect.map(projects.branchChanges(t.project, issueBranch(t.number)).pipe(Effect.mapError((e) => refused(e.message))), (c) => c?.commits.length ?? 0)
         : Effect.succeed(0);
 
     /** The profile that takes an issue on as it moves to todo; undefined when it is the one it has. Refused before anything

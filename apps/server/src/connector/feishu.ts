@@ -4,6 +4,7 @@
 // API to the owner's open_id, with no reply window.
 
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { sleep } from "./wait.ts";
 
 export type Domain = "feishu" | "lark";
 
@@ -60,13 +61,6 @@ const str = (m: unknown, key: string) => {
   const v = (m as Record<string, unknown> | undefined)?.[key];
   return typeof v === "string" ? v : "";
 };
-
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<boolean>((resolve) => {
-    if (signal.aborted) return resolve(false);
-    const t = setTimeout(() => resolve(true), ms);
-    signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
-  });
 
 export class FeishuClient implements FeishuApi {
   private async register(signal: AbortSignal) {
@@ -129,11 +123,14 @@ export class FeishuClient implements FeishuApi {
   }
 
   listen(signal: AbortSignal, app: App, got: (m: Message) => Promise<void>): Promise<void> {
+    if (signal.aborted) return Promise.resolve();
     return new Promise((resolve, reject) => {
       let done = false;
+      const abort = () => end();
       const end = (e?: Error) => {
         if (done) return;
         done = true;
+        signal.removeEventListener("abort", abort);
         client.close({ force: true });
         if (e && !signal.aborted) reject(new Error("飞书长连接断了：" + e.message));
         else resolve();
@@ -159,7 +156,8 @@ export class FeishuClient implements FeishuApi {
           });
         },
       });
-      signal.addEventListener("abort", () => end(), { once: true });
+      if (done) return;
+      signal.addEventListener("abort", abort, { once: true });
       void client.start({ eventDispatcher: dispatcher }).catch((e: unknown) => end(e instanceof Error ? e : new Error(String(e))));
     });
   }

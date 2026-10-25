@@ -12,6 +12,8 @@ import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
 import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
 import { untilGot as until } from "../testing/until.ts";
+import * as accountQ from "../../db/generated/connector_account.sql.ts";
+import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 
 const owner = "o9cq80wkM5NnOwnerOfThisFarm@im.wechat";
 
@@ -202,6 +204,35 @@ describe("the chat apps", () => {
       expect(yield* saidIn(chat.general())).toEqual(["帮我看看打卡页"]);
       expect(yield* Effect.promise(yield* statusOf("weixin"))).toMatchObject({ lastInbound: expect.any(Number) });
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
+  });
+
+  it.live("a malformed durable inbound is settled without blocking later valid messages", () => {
+    const script = new Script();
+    return Effect.gen(function* () {
+      const chat = yield* Channels;
+      yield* weixinConnected;
+      yield* Effect.orDie(inboundQ.acceptInbound({ connector: "weixin", ext_id: "poison", payload: `{"id":"poison","from":42}`, created_at: Date.now() }));
+      script.weixinIn.push(wx(owner, "后面的正常消息", "ctx-good"));
+      expect(yield* nth(script, "weixin", 0, "the valid message after a bad row")).toMatchObject({ text: "【管家】\n收到：后面的正常消息" });
+      expect(yield* saidIn(chat.general())).toEqual(["后面的正常消息"]);
+      expect(yield* Effect.orDie(inboundQ.pendingInbound({ connector: "weixin" }))).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+  });
+
+  it.live("saved connector secrets must be a string map", () => {
+    const config = { ...testConfig(), db: "" };
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        yield* weixinConnected;
+        yield* Effect.orDie(
+          accountQ.connectAccount({ connector: "weixin", secrets: `{"token":42}`, owner_id: owner, pair_code: null, connected_at: Date.now() }),
+        );
+      }).pipe(Effect.scoped, Effect.provide(farm(new Script(), config)));
+      yield* Effect.gen(function* () {
+        const status = yield* Effect.promise(yield* statusOf("weixin"));
+        expect(status.error).toContain("存着的登录信息读不出来");
+      }).pipe(Effect.scoped, Effect.provide(farm(new Script(), config)));
+    });
   });
 
   it.live("tie WeChat to another channel", () => {
@@ -451,6 +482,48 @@ describe("the chat apps", () => {
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在田头上说的。"]);
       }).pipe(Effect.scoped, Effect.provide(farm(second, config)));
     }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
+  });
+
+  it.live("keeps a quoted message pending when its lookup fails, then delivers it after recovery", () => {
+    const script = new Script();
+    return Effect.gen(function* () {
+      const chat = yield* Channels;
+      const sql = yield* SqlClient.SqlClient;
+      yield* weixinConnected;
+      yield* sql.unsafe("alter table connector_outbox rename to connector_outbox_broken").pipe(Effect.orDie);
+      const inbound = wx(owner, "引用读取失败");
+      script.weixinIn.push({ ...inbound, item_list: [...inbound.item_list!, { ref_msg: { svr_id: "missing" } }] });
+      const status = yield* statusOf("weixin");
+      yield* until(async () => (await status()).error !== undefined, "the failed quote lookup");
+      expect(script.by("weixin")).toEqual([]);
+      expect(yield* saidIn(chat.general())).toEqual([]);
+      expect(yield* sql`select ext_id from connector_inbound where not delivered`.pipe(Effect.orDie)).toHaveLength(1);
+      yield* sql.unsafe("alter table connector_outbox_broken rename to connector_outbox").pipe(Effect.orDie);
+      yield* nth(script, "weixin", 0, "the quoted message after recovery");
+      expect(yield* saidIn(chat.general())).toContain("引用读取失败");
+    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
+  });
+
+  it.live("backs off instead of spinning when a stale pause cannot be saved", () => {
+    const script = new Script();
+    let polls = 0;
+    return Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* weixinConnected;
+      yield* sql.unsafe(`create function fail_pause() returns trigger language plpgsql as $$ begin raise exception 'pause failure'; end $$`).pipe(Effect.orDie);
+      yield* sql
+        .unsafe(`create trigger fail_pause before update of paused_until on connector_account for each row execute function fail_pause()`)
+        .pipe(Effect.orDie);
+      script.weixin.getUpdates = async () => {
+        polls++;
+        return { ret: -14 };
+      };
+      yield* until(() => polls === 1, "the first stale poll");
+      yield* Effect.sleep(20);
+      expect(polls).toBe(1);
+      yield* sql.unsafe("drop trigger fail_pause on connector_account").pipe(Effect.orDie);
+      yield* until(() => polls >= 2, "polling after the backoff");
+    }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
   });
 
   it.live("keep the account when retiring what waited fails", () => {

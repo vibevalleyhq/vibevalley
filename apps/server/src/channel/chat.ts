@@ -22,6 +22,7 @@ import {
   type Spent,
   type SubjectKind,
 } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { keepConversations, keepMessages, targetOf } from "./state.ts";
 import { head } from "../base/text.ts";
@@ -43,10 +44,11 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { type ApiError, refused, lookIn, missing } from "../errors.ts";
@@ -121,17 +123,19 @@ interface Meta {
   spoken?: boolean;
 }
 
+const MetaSchema: Schema.Codec<Meta> = Schema.Struct({
+  run: Schema.optionalKey(Schema.String),
+  mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  session: Schema.optionalKey(Schema.String),
+  outcome: Schema.optionalKey(S.Outcome),
+  spent: Schema.optionalKey(S.Spent),
+  forTask: Schema.optionalKey(Schema.Boolean),
+  code: Schema.optionalKey(Schema.String),
+  spoken: Schema.optionalKey(Schema.Boolean),
+});
+
 /** Anything unreadable is no meta. */
-function metaOf(raw: string | null): Meta {
-  if (!raw) return {};
-  try {
-    const m = JSON.parse(raw) as Meta;
-    if (m.outcome !== undefined && !["completed", "failed", "interrupted"].includes(m.outcome)) return {};
-    return m ?? {};
-  } catch {
-    return {};
-  }
-}
+const metaOf = (raw: string | null): Meta => jsonOrNone(MetaSchema)(raw) ?? {};
 
 /** As Go's omitempty writes it: nothing empty kept. */
 const metaText = (m: Meta | undefined) =>
@@ -337,7 +341,7 @@ export const make = Effect.gen(function* () {
   let helpers: Helpers | undefined;
   const sql = yield* SqlClient.SqlClient;
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.option(e)), Option.getOrUndefined);
+  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.catchNoSuchElement(e)), Option.getOrUndefined);
   const inTx = <A, E>(e: Effect.Effect<A, E>) =>
     sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
   const lock = yield* Semaphore.make(1);
@@ -502,24 +506,24 @@ export const make = Effect.gen(function* () {
   // ── reading ──
 
   /** A read cursor subsumes individual seen marks and completes the same deliveries. */
-  const readThrough = (who: string, conversation: string, upto: number) =>
-    inTx(
-      Effect.gen(function* () {
-        const now = Date.now();
-        yield* db(qr.setReadCursor({ participant_id: who, conversation_id: conversation, read_number: upto, updated_at: now }));
-        yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
-        yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
-      }),
-    ).pipe(Effect.andThen(who === "user" ? publishOwnerMentions : Effect.void));
+  const readThrough = Effect.fnUntraced(
+    function* (who: string, conversation: string, upto: number) {
+      const now = Date.now();
+      yield* db(qr.setReadCursor({ participant_id: who, conversation_id: conversation, read_number: upto, updated_at: now }));
+      yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
+      yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
+    },
+    (effect, who) => inTx(effect).pipe(Effect.andThen(who === "user" ? publishOwnerMentions : Effect.void)),
+  );
 
   /** Speaking acknowledges the launch's handed messages without advancing past unseen messages. */
-  const heardLaunch = (who: string, launch: string) =>
-    inTx(
-      Effect.gen(function* () {
-        const seen = yield* db(qd.seenHanded({ seen_at: Date.now(), recipient_id: who, launch }));
-        for (const r of seen) yield* db(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
-      }),
-    );
+  const heardLaunch = Effect.fnUntraced(
+    function* (who: string, launch: string) {
+      const seen = yield* db(qd.seenHanded({ seen_at: Date.now(), recipient_id: who, launch }));
+      for (const r of seen) yield* db(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
+    },
+    (effect) => inTx(effect),
+  );
 
   // ── writing ──
 
@@ -587,60 +591,58 @@ export const make = Effect.gen(function* () {
     return written;
   });
 
-  const write = (w: Write): Effect.Effect<Written> =>
-    Effect.gen(function* () {
-      const written = yield* inTx(
-        Effect.gen(function* () {
-          if (!w.id && w.sendKey) {
-            const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-            if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
-          }
-          let id = w.id ?? "";
-          let number: number;
-          if (!id) {
-            id = newId();
-            number = (yield* db(
-              qm.insertMessage({
-                id,
-                conversation: w.conversation,
-                sender: w.from,
-                kind: w.kind,
-                body: w.text,
-                final: w.final,
-                meta: metaText(w.meta),
-                send_key: w.sendKey || null,
-                created_at: Date.now(),
-              }),
-            )).number;
-            yield* db(qc.touchConversation({ number, id: w.conversation }));
-          } else {
-            yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: Date.now(), id }));
-            const row = yield* one(qm.messageByID({ id }));
-            if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
-            number = row.number;
-          }
-          const out: Written = w.final ? yield* settle(id) : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
-          out.id = id;
-          out.number = number;
-          if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
-          if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
-          return out;
-        }),
-      );
-      if (!written.again) yield* after(w.conversation, written, w.answers);
-      return written;
-    });
+  const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
+    const written = yield* inTx(
+      Effect.gen(function* () {
+        if (!w.id && w.sendKey) {
+          const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
+          if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
+        }
+        let id = w.id ?? "";
+        let number: number;
+        if (!id) {
+          id = newId();
+          number = (yield* db(
+            qm.insertMessage({
+              id,
+              conversation: w.conversation,
+              sender: w.from,
+              kind: w.kind,
+              body: w.text,
+              final: w.final,
+              meta: metaText(w.meta),
+              send_key: w.sendKey || null,
+              created_at: Date.now(),
+            }),
+          )).number;
+          yield* db(qc.touchConversation({ number, id: w.conversation }));
+        } else {
+          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: Date.now(), id }));
+          const row = yield* one(qm.messageByID({ id }));
+          if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
+          number = row.number;
+        }
+        const out: Written = w.final ? yield* settle(id) : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
+        out.id = id;
+        out.number = number;
+        if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
+        if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
+        return out;
+      }),
+    );
+    if (!written.again) yield* after(w.conversation, written, w.answers);
+    return written;
+  });
 
-  const after = (conversation: string, written: Written, answers: string | undefined): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      for (const r of written.resetWake) breaker.reset(r);
-      yield* publishMessage(written.id, answers);
-      yield* publishConversation(conversation);
-      if (written.ownerMentionsChanged) yield* publishOwnerMentions;
-      if (written.thread) yield* publishConversation(written.thread);
-      if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
-      for (const r of written.recipients) yield* kick(r);
-    });
+  const after = Effect.fnUntraced(function* (conversation: string, written: Written, answers: string | undefined): Effect.fn.Return<void> {
+    for (const r of written.resetWake) breaker.reset(r);
+    yield* publishMessage(written.id, answers);
+    yield* publishConversation(conversation);
+    if (written.ownerMentionsChanged) yield* publishOwnerMentions;
+    if (written.thread) yield* publishConversation(written.thread);
+    if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
+    for (const r of written.recipients) yield* kick(r);
+  });
 
   // ── delivering ──
 
@@ -691,93 +693,89 @@ export const make = Effect.gen(function* () {
   const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
     helpers ? helpers.deliver(recipient, text, { kind: "comment", message } as RunTrigger) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
-  const kick = (recipient: string): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
-      const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
-      if (recipient === orchestratorAgent) {
-        const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
-        const now = Date.now();
-        for (const [conversation, rs] of byConversation) {
-          const messages = rs.map(asInbox);
-          PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
-          for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
-        }
-        return;
-      }
-      const session = sessionOf(recipient);
-      if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
-      if (isBusy(session)) {
-        // Gathered for a moment: a burst of messages is one notice.
-        if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
-        return;
-      }
-      if (waking.length === 0 || breaker.isOpen(recipient)) return;
-      const messages = waking.map(asInbox);
-      const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
-      const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
-      if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
+  const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+    const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
+    const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
+    if (recipient === orchestratorAgent) {
+      const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
       const now = Date.now();
-      for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
-    });
+      for (const [conversation, rs] of byConversation) {
+        const messages = rs.map(asInbox);
+        PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
+        for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
+      }
+      return;
+    }
+    const session = sessionOf(recipient);
+    if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
+    if (isBusy(session)) {
+      // Gathered for a moment: a burst of messages is one notice.
+      if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
+      return;
+    }
+    if (waking.length === 0 || breaker.isOpen(recipient)) return;
+    const messages = waking.map(asInbox);
+    const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
+    const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
+    if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
+    const now = Date.now();
+    for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+  });
 
-  const notify = (recipient: string): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      if (compacting.has(recipient)) return;
-      const session = sessionOf(recipient);
-      if (!session) return;
-      if (!isBusy(session)) return yield* kick(recipient);
-      const rows = (yield* db(qd.openDeliveries({ recipient_id: recipient }))).filter((r) => r.state === "pending" && r.held_by === null);
-      if (rows.length === 0) return;
-      const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
-      if (delivered.kind === "refused") return;
-      const now = Date.now();
-      for (const r of rows)
-        yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
-    });
+  const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
+    if (compacting.has(recipient)) return;
+    const session = sessionOf(recipient);
+    if (!session) return;
+    if (!isBusy(session)) return yield* kick(recipient);
+    const rows = (yield* db(qd.openDeliveries({ recipient_id: recipient }))).filter((r) => r.state === "pending" && r.held_by === null);
+    if (rows.length === 0) return;
+    const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
+    if (delivered.kind === "refused") return;
+    const now = Date.now();
+    for (const r of rows) yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+  });
 
-  const onActivity = (a: LaunchActivity): Effect.Effect<void> =>
-    Effect.gen(function* () {
-      if (closed) return;
-      switch (a.kind) {
-        case "spoke":
-          breaker.spoke(a.id);
-          return yield* heardLaunch(a.id, a.launch);
-        case "ended": {
-          if (!a.spoke) {
-            const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
-            if (rolled.length > 0) {
-              const { count: failed, tripped } = breaker.failed(a.id);
-              if (tripped) {
-                const where = (yield* threadOfSession(a.id)) ?? general;
-                const name = sessionOf(a.id)?.name ?? a.id;
-                yield* write({
-                  conversation: where,
-                  from: "system",
-                  kind: "notice",
-                  text: `${name} 连续 ${failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。`,
-                  final: true,
-                  meta: { code: "wake_breaker" },
-                });
-              }
-              // Not straight away: what failed may fail again.
-              later(`wake:${a.id}`, config.chat.retryWakeMs, () => kick(a.id));
-              return;
+  const onActivity = Effect.fnUntraced(function* (a: LaunchActivity): Effect.fn.Return<void> {
+    if (closed) return;
+    switch (a.kind) {
+      case "spoke":
+        breaker.spoke(a.id);
+        return yield* heardLaunch(a.id, a.launch);
+      case "ended": {
+        if (!a.spoke) {
+          const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
+          if (rolled.length > 0) {
+            const { count: failed, tripped } = breaker.failed(a.id);
+            if (tripped) {
+              const where = (yield* threadOfSession(a.id)) ?? general;
+              const name = sessionOf(a.id)?.name ?? a.id;
+              yield* write({
+                conversation: where,
+                from: "system",
+                kind: "notice",
+                text: `${name} 连续 ${failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。`,
+                final: true,
+                meta: { code: "wake_breaker" },
+              });
             }
+            // Not straight away: what failed may fail again.
+            later(`wake:${a.id}`, config.chat.retryWakeMs, () => kick(a.id));
+            return;
           }
-          return yield* kick(a.id);
         }
-        case "closed":
-          yield* db(qd.rollbackHanded({ recipient_id: a.id }));
-          return yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
-        case "compacting":
-          if (a.on) compacting.add(a.id);
-          else {
-            compacting.delete(a.id);
-            yield* kick(a.id);
-          }
+        return yield* kick(a.id);
       }
-    });
+      case "closed":
+        yield* db(qd.rollbackHanded({ recipient_id: a.id }));
+        return yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
+      case "compacting":
+        if (a.on) compacting.add(a.id);
+        else {
+          compacting.delete(a.id);
+          yield* kick(a.id);
+        }
+    }
+  });
 
   /** Reading a digest only proposes context; the execution acknowledges what it actually took. */
   const consumed = (input: InputConsumed) =>
@@ -902,33 +900,30 @@ export const make = Effect.gen(function* () {
   );
 
   /** A target as who would mean it: empty is a session's own thread (or 田头), a channel by name, or a thread by its parent's number. */
-  const resolveTarget = (who: string, target: string): Effect.Effect<string, ApiError> =>
-    Effect.gen(function* () {
-      if (!target.trim()) {
-        if (who !== orchestratorAgent && who !== "user") {
-          const own = yield* threadOfSession(who);
-          if (own) return own;
-        }
-        return general;
+  const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
+    if (!target.trim()) {
+      if (who !== orchestratorAgent && who !== "user") {
+        const own = yield* threadOfSession(who);
+        if (own) return own;
       }
-      const parsed = parseChatTarget(target);
-      if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
-      let channel = general;
-      const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
-      if (name) {
-        const found = yield* one(qc.channelByName({ name }));
-        if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
-        channel = found.id;
-      }
-      if (parsed.kind === "channel") return channel;
-      const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
-      if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
-      const thread = yield* inTx(
-        threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }),
-      );
-      yield* publishConversation(thread);
-      return thread;
-    });
+      return general;
+    }
+    const parsed = parseChatTarget(target);
+    if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
+    let channel = general;
+    const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
+    if (name) {
+      const found = yield* one(qc.channelByName({ name }));
+      if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
+      channel = found.id;
+    }
+    if (parsed.kind === "channel") return channel;
+    const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
+    if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
+    const thread = yield* inTx(threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }));
+    yield* publishConversation(thread);
+    return thread;
+  });
 
   const messageOrFail = (id: string) =>
     Effect.flatMap(one(qm.messageByID({ id })), (row) => (row ? Effect.succeed(row) : Effect.fail(refused("写进去了，但读不回来"))));

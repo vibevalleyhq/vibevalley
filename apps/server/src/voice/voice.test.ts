@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
-import { Effect, Layer } from "effect";
-import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
+import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
+import { layer as orchestrator, Orchestrator } from "../orchestrator/orchestrator.ts";
 import { Setting } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
+import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
@@ -23,11 +25,14 @@ class Capture {
   readonly auths: string[] = [];
   status = 200;
   body = `{"agent_id":"parity-agent"}`;
+  before: ((call: string) => Promise<void> | undefined) | undefined;
   readonly fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
-    this.urls.push((init?.method ?? "GET") + " " + url);
+    const call = (init?.method ?? "GET") + " " + url;
+    this.urls.push(call);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
     this.requests.push(init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {});
+    await this.before?.(call);
     return new Response(this.body, { status: this.status, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
 }
@@ -106,11 +111,15 @@ describe("a call's agent", () => {
 });
 
 /** The farm with a voice service, its line on a free port behind a line of its own. */
-const farm = (capture: Capture) => {
+const farm = (capture: Capture, brief?: (line: string, signal?: AbortSignal) => Promise<string>) => {
   const config = { ...testConfig(), voice: { id: "", line: { port: 0, url: "https://line.example.com" } } };
-  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(
-    Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)))),
-  );
+  const answering = orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config }).pipe(notificationsStart)));
+  const chosen = brief
+    ? Layer.unwrap(Effect.map(Orchestrator, (current) => Layer.succeed(Orchestrator, Orchestrator.of({ ...current, brief })))).pipe(
+        Layer.provideMerge(answering),
+      )
+    : answering;
+  return layer({ fetch: capture.fetch, gatherMs: 30 }).pipe(Layer.provideMerge(chosen));
 };
 
 /** A helper at work on an issue, and the issue, as the core has them. */
@@ -190,6 +199,44 @@ describe("voice", () => {
       capture.status = 500;
       capture.body = `{"detail":"boom"}`;
       expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceAgentFailed" });
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  it.live("interrupting a start releases the line and stops the late agent", () => {
+    const capture = new Capture();
+    let arrived = () => {};
+    const requested = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    let release = () => {};
+    const answer = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    capture.before = (call) => {
+      if (!call.endsWith("/join")) return undefined;
+      arrived();
+      return answer;
+    };
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      yield* credentials({ answer: { vendor: "orchestrator" } });
+      const grant = yield* voice.session();
+      const starting = yield* Effect.forkChild(voice.start(grant.channel, grant.uid));
+      yield* Effect.promise(() => requested);
+      const interrupting = yield* Effect.forkChild(Fiber.interrupt(starting));
+      yield* Effect.yieldNow;
+      capture.before = undefined;
+      release();
+      yield* Fiber.join(interrupting);
+      yield* Effect.promise(async () => {
+        for (let i = 0; i < 300; i++) {
+          if (capture.urls.some((url) => url.includes("/agents/parity-agent/leave"))) return;
+          await new Promise((r) => setTimeout(r, 10));
+        }
+        throw new Error("the late agent was not stopped");
+      });
+      expect(voice.lines()).toBe(0);
+      expect(yield* Effect.flip(voice.start(grant.channel, grant.uid))).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("失效") });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
@@ -296,6 +343,106 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
+  it.live("a rejected brief is contained and a later update can be told", () => {
+    const capture = new Capture();
+    let asks = 0;
+    const brief = async () => {
+      asks++;
+      if (asks === 1) throw new Error("brief failed");
+      return "第二件说完了";
+    };
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const core = yield* Core;
+      yield* credentials({ answer: { vendor: "orchestrator" } });
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid);
+      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      yield* until(() => asks === 1, "the failed brief");
+      yield* Effect.sleep(50);
+      yield* core.apply({ type: "hired", session: helperOn("w2", "t2") });
+      yield* core.apply({ type: "issue", issue: issueOf("t2", 42, "w2") });
+      yield* core.apply({ type: "report", id: "w2", outcome: "failed", summary: "没做成", runs: 1 });
+      yield* until(() => capture.requests.some((r) => r.text === "第二件说完了"), "the next brief");
+      expect(capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`))).toBe(true);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture, brief)));
+  });
+
+  it.live("closing Voice aborts a brief that has not finished", () => {
+    const capture = new Capture();
+    let asked = 0;
+    let cancelled = false;
+    const brief = async (_line: string, signal?: AbortSignal) => {
+      if (!signal) throw new Error("missing abort signal");
+      asked++;
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          cancelled = true;
+          resolve();
+        };
+        if (signal.aborted) done();
+        else signal.addEventListener("abort", done, { once: true });
+      });
+      return "不该念出来";
+    };
+    return Effect.gen(function* () {
+      const scope = yield* Scope.make();
+      yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
+      const context = yield* Layer.buildWithScope(farm(capture, brief), scope);
+      const voice = Context.get(context, Voice);
+      const core = Context.get(context, Core);
+      yield* Effect.provide(credentials({ answer: { vendor: "orchestrator" } }), context);
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid);
+      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      yield* until(() => asked === 1, "the pending brief");
+      yield* Scope.close(scope, Exit.void);
+      expect(cancelled).toBe(true);
+      yield* Effect.sleep(50);
+      expect(capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`))).toBe(false);
+    }).pipe(Effect.scoped);
+  });
+
+  it.live("hanging up between speech pieces sends no later piece", () => {
+    const capture = new Capture();
+    let arrived = () => {};
+    const first = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let speaks = 0;
+    capture.before = (call) => {
+      if (!call.endsWith("/speak")) return undefined;
+      speaks++;
+      if (speaks !== 1) return undefined;
+      arrived();
+      return held;
+    };
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const core = yield* Core;
+      yield* credentials({ answer: { vendor: "orchestrator" } });
+      const grant = yield* voice.session();
+      const call = yield* voice.start(grant.channel, grant.uid);
+      yield* core.apply({ type: "hired", session: helperOn("w1", "t1") });
+      yield* core.apply({ type: "issue", issue: issueOf("t1", 41, "w1") });
+      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "做完了", runs: 1 });
+      yield* Effect.promise(() => first);
+      yield* voice.stop(call.agentId);
+      capture.before = undefined;
+      release();
+      yield* Effect.sleep(80);
+      expect(speaks).toBe(1);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture, async () => "这一句要分很多段念。".repeat(40))));
+  });
+
   it("asks the orchestrator for one answer of everything that waited", () => {
     expect(onCallLine(["#41「写打卡」交回来了，等你验收", "#42「修登录」这一轮没做成"])).toBe(
       "【要告诉主人】\n- #41「写打卡」交回来了，等你验收\n- #42「修登录」这一轮没做成\n\n主人正在和你通电话，你的回答会念给主人听：这 2 件合成一段说，一件一句，口语，先说结论；不念代码、路径、命令和长列表。",
@@ -346,6 +493,47 @@ describe("voice", () => {
       expect(yield* Effect.flip(voice.heardCurrent("none", "", ""))).toMatchObject({ _tag: "VoiceAgentFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
+
+  it.live("validates dictation responses and keeps ordinary HTTP errors", () => {
+    const capture = new Capture();
+    const answers = [
+      { status: 200, body: `{"text":123}` },
+      { status: 200, body: `[]` },
+      { status: 200, body: `{"text":" 好 "}` },
+      { status: 500, body: `{"error":{"message":"bad"}}` },
+    ];
+    let seen = 0;
+    return Effect.gen(function* () {
+      const server = createServer((req, res) => {
+        req.resume();
+        req.on("end", () => {
+          const answer = answers[seen++]!;
+          res.writeHead(answer.status, { "content-type": "application/json" });
+          res.end(answer.body);
+        });
+      });
+      yield* Effect.promise(() => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve())));
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(
+          () =>
+            new Promise<void>((resolve) => {
+              server.closeAllConnections();
+              server.close(() => resolve());
+            }),
+        ),
+      );
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      yield* Effect.orDie((yield* Setting).save({ dictation: { url: `http://127.0.0.1:${port}/v1`, model: "m" } }));
+      const voice = yield* Voice;
+      for (let i = 0; i < 2; i++) {
+        expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("转写格式") });
+      }
+      expect(yield* voice.dictate("AAAA", "wav")).toEqual({ text: "好" });
+      expect(yield* Effect.flip(voice.dictate("AAAA", "wav"))).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("500：bad") });
+      expect(seen).toBe(4);
+    }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
 
   it.live("says dictation is not set up", () =>
     Effect.gen(function* () {

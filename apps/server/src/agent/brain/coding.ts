@@ -5,7 +5,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
-import { booleanSchema, integerSchema, numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
+import { booleanSchema, integerSchema, numberSchema, objectSchema, stopped, stringSchema, textTool } from "./tool.ts";
 
 export interface CodingOptions {
   readonly cwd: string;
@@ -45,6 +45,7 @@ const outputCap = 200_000;
  * killed, so a child left behind does not hold the output open. */
 export function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
   if (argv.length === 0) return Promise.reject(new Error("跑不起来：没有命令"));
+  if (signal?.aborted) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {
     const child = spawn(argv[0]!, argv.slice(1), { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
