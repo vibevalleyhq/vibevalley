@@ -75,9 +75,9 @@ describe("a session's work", () => {
       yield* issues.merge(session.issue!);
       const entries = () =>
         Effect.runPromise(
-          sql<{ n: number }>`select count(*)::int as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(
-            Effect.orDie,
-          ),
+          sql<{
+            n: number;
+          }>`select count(*)::int as n from game_ledger where kind = 'harvested' and payload like ${`%"session":"${session.id}"%`}`.pipe(Effect.orDie),
         ).then((r) => r[0]!.n);
       yield* until(async () => (await entries()) > 0, "a harvested entry");
       expect(yield* Effect.promise(entries)).toBe(1);

@@ -778,6 +778,8 @@ export const make = (hooks: ProjectHooks = {}) =>
         ),
       changes: (place) => describe(place.project, place.cwd, place.branch),
       branchChanges: Effect.fn("Projects.branchChanges")(function* (project, branch) {
+        // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
+        if (!project) return undefined;
         const path = join(root, project);
         const present = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch);
         if (present.code === 1) return undefined;

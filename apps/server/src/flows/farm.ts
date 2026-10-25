@@ -32,11 +32,20 @@ export interface Farm {
  * left on the farm by the last run come back (Agent Sessions' startup), and the game keeps its ledger. */
 export { helper };
 
-export function farm(options: Omit<WorldOptions, "runtimes"> & { readonly change?: (c: Config) => Config; readonly runtime?: Runtime } = {}): Farm {
+export function farm(
+  options: Omit<WorldOptions, "runtimes"> & {
+    readonly change?: (c: Config) => Config;
+    readonly runtime?: Runtime;
+  } = {},
+): Farm {
   const base = options.config ?? testConfig();
   const config = options.change ? options.change(base) : base;
   const turns: ScriptedTurn[] = [];
-  return { config, turns, layer: farmLayer({ ...options, config, runtimes: [options.runtime ?? helper(turns)] }) };
+  return {
+    config,
+    turns,
+    layer: farmLayer({ ...options, config, runtimes: [options.runtime ?? helper(turns)] }),
+  };
 }
 
 /** Every fact and notice from now on, kept as they come. */
