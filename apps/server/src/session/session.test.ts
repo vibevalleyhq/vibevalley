@@ -372,7 +372,7 @@ describe("sessions", () => {
   );
 
   it.live("a registration SQL failure is refused rather than hidden as a defect", () => {
-    const config = { ...testConfig(), repos: ["demo"] };
+    const config = testConfig();
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       const sql = yield* SqlClient.SqlClient;
@@ -381,11 +381,11 @@ describe("sessions", () => {
         hiring: () => Effect.orDie(sql.unsafe("select no_such_column from issue_session")),
       });
       expect(got.refused).toContain("工单没记下来");
-    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+    }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
   });
 
   it.live("a non-SQL registration defect is rethrown after the opened session is stopped", () => {
-    const config = { ...testConfig(), repos: ["demo"] };
+    const config = testConfig();
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       const exit = yield* Effect.exit(
@@ -394,6 +394,6 @@ describe("sessions", () => {
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
       const next = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i3", number: 3 } });
       expect(next.session).toBeDefined();
-    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+    }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
   });
 });
