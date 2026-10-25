@@ -46,6 +46,16 @@ const runtimes = (options: RuntimeOptions = {}) => make({ background: false, pro
 
 const agent = (a: Partial<Agent>): Agent => ({ id: "a", name: "小禾", runtime: "pi", enabled: true, ...a }) as Agent;
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
 const until = async (ok: () => boolean) => {
   for (let i = 0; i < 500 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
   expect(ok()).toBe(true);
@@ -200,6 +210,57 @@ describe("runtime", () => {
       out[1]!(used(70));
       yield* Effect.promise(() => older);
       expect((yield* r.info("pi"))!.usage).toEqual(used(100));
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("a failed list probe is retried without changing the synchronous checking answer", () => {
+    const first = deferred<RuntimeInfo>();
+    let probes = 0;
+    return Effect.gen(function* () {
+      const r = yield* runtimes({
+        probe: (id) => {
+          if (id !== "pi") return notFound(id);
+          probes++;
+          return probes === 1 ? first.promise : notFound(id);
+        },
+      });
+      const pi = () => r.list().find((info) => info.id === "pi")!;
+      expect(pi().installation.status).toBe("checking");
+      yield* Effect.promise(() => until(() => probes === 1));
+      first.reject(new Error("first probe failed"));
+      yield* Effect.sleep(20);
+      expect(pi().installation.status).toBe("checking");
+      yield* Effect.promise(() => until(() => probes === 2 && pi().installation.status === "not_found"));
+      expect(probes).toBe(2);
+    }).pipe(Effect.scoped, Effect.provide(world()));
+  });
+
+  it.live("an old read's failure does not clear the newer read's checking marker", () => {
+    const old = deferred<RuntimeInfo>();
+    const latest = deferred<RuntimeInfo>();
+    let probes = 0;
+    return Effect.gen(function* () {
+      const r = yield* runtimes({
+        probe: (id) => {
+          if (id !== "pi") return notFound(id);
+          probes++;
+          return probes === 1 ? old.promise : latest.promise;
+        },
+      });
+      const oldResult = Effect.runPromise(r.refresh("pi")).then(
+        () => ({ status: "resolved" as const }),
+        (error: unknown) => ({ status: "rejected" as const, error }),
+      );
+      yield* Effect.promise(() => until(() => probes === 1));
+      const latestResult = Effect.runPromise(r.refresh("pi"));
+      yield* Effect.promise(() => until(() => probes === 2));
+      old.reject(new Error("old probe failed"));
+      expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
+      expect(r.list().find((info) => info.id === "pi")!.installation.status).toBe("checking");
+      yield* Effect.sleep(20);
+      expect(probes).toBe(2);
+      latest.resolve(yield* Effect.promise(() => notFound("pi")));
+      expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
 
