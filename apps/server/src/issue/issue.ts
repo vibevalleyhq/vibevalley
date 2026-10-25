@@ -37,6 +37,7 @@ import {
   type Session,
   type TaskGraph,
 } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { actLabel, attentionLabel, closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
@@ -242,7 +243,7 @@ export const make = (options: IssueOptions = {}) =>
       const lastRun = column.run(row.last_run);
       const answer = column.answer(row.answer);
       const out: Issue = {
-        id: row.id,
+        id: issueId(row.id),
         number: row.number,
         title: row.title,
         ...(row.description ? { description: row.description } : {}),
@@ -251,11 +252,11 @@ export const make = (options: IssueOptions = {}) =>
         priority: row.priority as Priority,
         createdAt: row.created_at,
         ...(row.queued_at !== null ? { queuedAt: row.queued_at } : {}),
-        sessions: [...(runs ?? [])],
+        sessions: (runs ?? []).map((s) => sessionId(s)),
         ...(row.closed_at !== null ? { closedAt: row.closed_at } : {}),
         ...(row.delivered !== null ? { delivered: row.delivered as Delivery } : {}),
         ...(row.canceled !== null ? { canceled: row.canceled as IssueCanceled } : {}),
-        ...(row.parent !== null ? { parent: row.parent } : {}),
+        ...(row.parent !== null ? { parent: issueId(row.parent) } : {}),
         ...(blockedBy ? { blockedBy } : {}),
         ...(graph ? { graph } : {}),
         ...(task ? { task } : {}),
@@ -948,7 +949,7 @@ export const make = (options: IssueOptions = {}) =>
       }),
       move: Effect.fn("Issues.move")(function* (id, before) {
         yield* unsent(id);
-        const order = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
+        const order: string[] = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
         const at = order.indexOf(before);
         order.splice(at < 0 ? order.length : at, 0, id);
         yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));

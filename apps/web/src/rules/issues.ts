@@ -45,7 +45,7 @@ export function issueTitle(issue: Issue, graphs: TaskGraph[] = []) {
   return job.split("\n")[0]!.trim();
 }
 
-export const issueIs = (issue: Issue, id: string) => issue.id === id || issue.sessions.includes(id);
+export const issueIs = (issue: Issue, id: string) => issue.id === id || issue.sessions.some((s) => s === id);
 
 export function taskLine(g: TaskGraph) {
   switch (g.state) {

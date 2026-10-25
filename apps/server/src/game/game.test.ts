@@ -14,6 +14,7 @@ import { world } from "../testing/world.ts";
 import { Game, layer, start as gameStart } from "./game.ts";
 import { waitFor as until } from "../testing/until.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const farm = (config = testConfig()) => layer.pipe(Layer.provideMerge(world({ config })));
 
@@ -33,12 +34,12 @@ describe("the game", () => {
       const before = yield* Effect.gen(function* () {
         const game = yield* Game;
         const core = yield* Core;
-        yield* game.record({ kind: "harvested", session: "w1", agent: "lab", project: "demo", runtime: "pi", commits: 1, runs: 1 });
+        yield* game.record({ kind: "harvested", session: sessionId("w1"), agent: "lab", project: "demo", runtime: "pi", commits: 1, runs: 1 });
         const p = core.state().progress!;
         expect(p.coins).toBeGreaterThanOrEqual(35);
         expect(p.counts.harvests).toBe(1);
         yield* core.apply({ type: "hired", session: helper("w2") });
-        yield* core.apply({ type: "report", id: "w2", outcome: "failed", summary: "坏了", runs: 1 });
+        yield* core.apply({ type: "report", id: sessionId("w2"), outcome: "failed", summary: "坏了", runs: 1 });
         yield* core.apply({ type: "commits", commits: { total: 1000, repos: [] } });
         yield* until(kinds, (k) => k.join() === "harvested,hired,failed,level", "the ledger");
         return core.state().progress!;
@@ -83,7 +84,7 @@ describe("the game", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       yield* Effect.sleep(10);
-      yield* core.did({ kind: "reviewed", session: "w1" });
+      yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
       yield* until(kinds, (k) => [...k].sort().join() === "reviewed,voice", "both");
     }).pipe(Effect.scoped, Effect.provide(farm())),
@@ -155,7 +156,7 @@ describe("the game", () => {
           Effect.gen(function* () {
             const core = yield* Core;
             yield* core.apply({ type: "hired", session: helper("w1") });
-            yield* core.apply({ type: "report", id: "w1", outcome: "failed", summary: "", runs: 1 });
+            yield* core.apply({ type: "report", id: sessionId("w1"), outcome: "failed", summary: "", runs: 1 });
             yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
             yield* TestClock.adjust(15_000);
             if (secondFirst) {

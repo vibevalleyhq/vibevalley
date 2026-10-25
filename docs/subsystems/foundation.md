@@ -48,6 +48,7 @@
 - **Effect 代码里不另起运行时**：在 `Effect.gen` 里施加事实、发提醒是 `yield* core.apply(...)`；`Effect.runSync` 只留给外面的库的回调（oar 的事件、汇报），它们不在纤程里、要照给的次序落下。给外面的库（oar、记性的来源、MCP、node 的 http）的回调起的纤程用 `FiberSet.makeRuntime*`，归服务的作用域。
 - **定时归作用域**：服务里等一会儿再做的（防抖存盘、合并写、攒一下再提醒、太久没动静）是服务自己的 `FiberMap` 里的纤程：同一个键再来就换掉上一个，`onlyIfMissing` 是已经在等就不再排；超时用 `Effect.timeoutOption`。服务关的时候作用域收掉它们，不手动 `clearTimeout`。同一段逻辑的 `Effect.sleep` 和静默时长用同一个 Clock；同步回调要读时间时用它的 `currentTimeMillisUnsafe`，不另读墙钟。Effect 的生成器里读现在是 `yield* Clock.currentTimeMillis`，不写 `Date.now()`：`it.effect` 的测试用 `TestClock` 拨它（从 0 开始，要真实的时间先 `TestClock.setTime`）。普通函数和 Promise 交界里的 `Date.now()` 不在此列。
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
+- **工单和执行的 id 带品牌**：`IssueId`、`SessionId`（protocol 的 `shapes.ts`），线上和库里仍是字符串。从库的行、外来的字符串、新起的 id 变成它们时用 `@vibevalley/protocol/schema` 的 `issueId`、`sessionId`（`Brand.nominal`，不检查），只在知道是哪一种的地方用；提及、参与者这种几种 id 混着走的地方是 `string`，和品牌比较不用转。
 - **定期的后台任务用 `Schedule`**：`x.pipe(Effect.repeat(Schedule.spaced(n)))`，先等一个周期再做的加 `Effect.delay(n)`；不写 `Effect.forever` 加 `Effect.sleep`。等到有事才攒一阵的（核心状态出帧）不是定期，照旧用 `Effect.forever`。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
 - **库经 `Db` 服务用**（`base/db.ts`，`platform` 提供）：`run` 跑生成的查询、失败是缺陷；`attempt` 留着失败给要记日志或说成拒绝的调用方；`one` 取单行，只把 `NoSuchElementError` 折成 `undefined`，`SqlError`、`SchemaError` 照旧是缺陷，不用 `Effect.option` 把它们当成「没有这一行」；`inTx` 包一个事务。模块不各写一份 `provideService(SqlClient)`。
@@ -55,7 +56,7 @@
 
 **形状和规则**
 
-- **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Schema.Codec<T.X>`，两边对不上就编不过；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
+- **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Codec<T.X>`（`Schema.Codec<T.X, Wire<T.X>>`：线上的一侧是去掉 id 品牌的同一个形状），两边对不上就编不过，`schema.test.ts` 再逐个查 Schema 和 interface 的键；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
 - **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`bun run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
 - **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/state.ts`、`issue/state.ts`、`task/graph.ts`、`game/view.ts`、`notice/inbox.ts`、`setting/rules.ts`、`runtime/rules.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
@@ -120,7 +121,7 @@
 - **照 Effect v4 的写法，但不在交界处硬改。** 服务的方法用 `Effect.fn`、定时进作用域、Effect 代码里不另起运行时，是因为名字、中断和收尾由 Effect 管才不会漏（关不干净的定时器、跑在纤程外的事实）。和 Promise 写的库交界的地方（oar、pi-agent-core、MCP 的 SDK、连接器、语音的隧道、终端里的对话）照旧是 Promise 和回调：改了只是换写法。放弃了把服务的状态都换成 `Ref`：大多是同步的读改写，换了要处处 `getUnsafe`，不消掉竞争。放弃了把 `ApiError` 换成 `Schema.TaggedErrorClass`：它是页面和服务端共用的契约，129 处拒绝都要动，收益只是栈和 cause。放弃了把 `project/git.ts` 的子进程换成 `ChildProcess`：它也会杀整个进程组，但超时被打断时会丢掉已经读到的输出（检查超时要说出最后几行），每个 git 的帮手还要多带一个 `ChildProcessSpawner`；现在的 `Effect.callback` 加打断时杀进程组，就是 v4 给这种交界的写法。
 - **服务端不打包。** PGlite 的 wasm、分词的词典、表结构、各家 agent 的 SDK 都按包的位置找自己的文件；打成一个文件要逐个改路径。tsx 直接跑源码，桌面版带着 `apps/server` 和它的 `node_modules`（[客户端](docs/subsystems/app.md)）。
 - **PGlite，不是 SQLite。** effect-sqlc 读 Postgres 的表结构和查询，类型推得出来；PGlite 在进程里，不要单独装数据库，桌面版带得走。代价是库比 SQLite 大、开机多花一点时间。
-- **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Schema.Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。
+- **形状写在 TypeScript，Schema 由类型定。** 只写 Schema 再推类型时，类型的名字和注释在推出来的东西里看不清；只写类型又没有运行时的解码。两样都写、用 `Codec<T.X>` 绑住，编译器保证一致。没有生成这一步，服务端和页面 import 同一份文件。
 - **一个模块一个服务，名字单数、用我们的词。** 按「谁调谁」切层切口最少，但那是按代码现状分；按概念分，模块就是产品里的东西（[概念先行](.agents/notes/proposed/architecture/2026-10-15-concepts-first.md)）。一块业务一个入口，调用处读得出是谁的事。
 - **反方向走流，不让慢订阅者拖住发布者。** 下层要告诉上层的事（事实、执行的动静、给管家的消息）如果直接调，就有环；发布的人不该被慢的订阅者挡住。能从快照恢复的三条 SSE 各经容量 64 的有界 relay，正常顺序不变；到上限的连接明确结束并记错误、释放源订阅，不静默丢帧。必须完整接收的内部事实订阅不在这里断开，也不能用容量上限伪装成可靠交付。
 - **规则跟着主人，黄金数据跟着规则。** 规则都堆在一处时，没有哪个名字说得清是谁的。黄金数据跟着规则走，删一条规则就删它的用例；共用的规则在 `packages/protocol`，页面拿到的就是服务端用的那份。

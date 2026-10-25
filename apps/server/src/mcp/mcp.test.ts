@@ -12,6 +12,7 @@ import { Memories } from "../memory/memory.ts";
 import { world } from "../testing/world.ts";
 import { Mcp } from "./mcp.ts";
 import { until } from "../testing/until.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -116,9 +117,9 @@ describe("mcp", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
-      yield* hired(core, { id: "failed", name: "失败的", phase: { _tag: "failed" } as Session["phase"] });
-      yield* hired(core, { id: "resting", name: "歇着的", phase: { _tag: "resting" } as Session["phase"] });
-      yield* hired(core, { id: "clash", name: "冲突的", phase: { _tag: "done" } as Session["phase"], conflict: { base: "main", files: ["a.go"] } });
+      yield* hired(core, { id: sessionId("failed"), name: "失败的", phase: { _tag: "failed" } as Session["phase"] });
+      yield* hired(core, { id: sessionId("resting"), name: "歇着的", phase: { _tag: "resting" } as Session["phase"] });
+      yield* hired(core, { id: sessionId("clash"), name: "冲突的", phase: { _tag: "done" } as Session["phase"], conflict: { base: "main", files: ["a.go"] } });
       const text = yield* Effect.promise(() => client(mcp, "token").tool("session_list"));
       for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"]) expect(text).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(world({ who: () => "caller" }))),
@@ -140,7 +141,7 @@ describe("mcp", () => {
       const core = yield* Core;
       const mcp = yield* Mcp;
       const memory = yield* Memories;
-      yield* hired(core, { id: "w1", name: "一号", agent: "lab", project: "demo" });
+      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", project: "demo" });
       yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: "owner" });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
@@ -165,7 +166,7 @@ describe("mcp", () => {
       const core = yield* Core;
       const mcp = yield* Mcp;
       const docs = yield* Docs;
-      yield* hired(core, { id: "w1", name: "一号", agent: "lab" });
+      yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab" });
       const d = yield* docs.create("周报");
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));

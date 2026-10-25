@@ -17,6 +17,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { Issues } from "./issue.ts";
 import { until } from "../testing/until.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -363,7 +364,7 @@ describe("issues", () => {
     const f = farm();
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
-      const got = yield* sessions.send({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", { issue: { id: "i1", number: 1 } });
+      const got = yield* sessions.send({ ...lab(), runtime: "missing-runtime", worktree: true }, "test", "demo", { issue: { id: issueId("i1"), number: 1 } });
       expect([got.session, got.refused !== undefined]).toEqual([undefined, true]);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -424,7 +425,10 @@ describe("issues", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       const got = yield* Effect.all(
-        [sessions.send(lab(), "test", "demo", { issue: { id: "i1", number: 1 } }), sessions.send(lab(), "test", "demo", { issue: { id: "i2", number: 2 } })],
+        [
+          sessions.send(lab(), "test", "demo", { issue: { id: issueId("i1"), number: 1 } }),
+          sessions.send(lab(), "test", "demo", { issue: { id: issueId("i2"), number: 2 } }),
+        ],
         { concurrency: "unbounded" },
       );
       expect(got.filter((h) => h.session).length).toBe(1);
@@ -551,7 +555,7 @@ describe("issues", () => {
       expect((yield* sql<{ channel: string }>`select channel from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).map((r) => r.channel)).toEqual([
         first.id,
       ]);
-      yield* core.apply({ type: "left", id: "occupied" });
+      yield* core.apply({ type: "left", id: sessionId("occupied") });
       const started = yield* issues.start(issue.id, second.id);
       expect(started.session).toBeDefined();
       const got = yield* issues.get(issue.id);
@@ -585,7 +589,7 @@ describe("issues", () => {
       yield* recurrences.tick;
       let issue = yield* issues.ofRecurrence(sc.id);
       yield* until(async () => (issue = await Effect.runPromise(issues.ofRecurrence(sc.id)))?.queuedAt !== undefined, "the recurrence queued");
-      yield* core.apply({ type: "left", id: "occupied" });
+      yield* core.apply({ type: "left", id: sessionId("occupied") });
       yield* issues.tryQueued;
       yield* until(() => Effect.runPromise(sessions.runs(issue!.id)).then((r) => r.length > 0), "the scheduled run");
       const [run] = yield* sessions.runs(issue!.id);
@@ -609,7 +613,7 @@ describe("issues", () => {
       const still = yield* issues.dispatchQueued(issue.id);
       expect([still.queued !== undefined, still.session]).toEqual([true, undefined]);
       expect((yield* issues.get(issue.id)).queuedAt).toBe(queued.queuedAt);
-      yield* core.apply({ type: "left", id: "occupied" });
+      yield* core.apply({ type: "left", id: sessionId("occupied") });
       expect((yield* issues.dispatchQueued(issue.id)).session).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

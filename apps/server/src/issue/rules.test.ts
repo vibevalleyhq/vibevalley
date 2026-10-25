@@ -20,6 +20,7 @@ import {
   milestonesOf,
   splitJob,
 } from "./rules.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 test("the recorded cases", () => {
   const cases = goldenCases("issue");
@@ -50,13 +51,13 @@ describe("an issue as a job", () => {
 
   it("the story of an issue, newest first", () => {
     const issue = {
-      id: "t1",
+      id: issueId("t1"),
       number: 1,
       title: "评估",
       priority: "medium",
       deliver: "change",
       createdAt: 100,
-      sessions: ["w1"],
+      sessions: [sessionId("w1")],
       status: "in_review",
       moves: [],
       review: "glance",
@@ -67,7 +68,7 @@ describe("an issue as a job", () => {
     const runs: Run[] = [
       {
         id: "r1",
-        session: "w1",
+        session: sessionId("w1"),
         triggeredBy: { kind: "issue" },
         heard: [],
         startedAt: 200,
@@ -78,7 +79,7 @@ describe("an issue as a job", () => {
       },
       {
         id: "r2",
-        session: "w1",
+        session: sessionId("w1"),
         triggeredBy: { kind: "comment" },
         heard: [],
         startedAt: 410,
@@ -221,7 +222,7 @@ describe("templates", () => {
       issue("修登录", "app", 4),
       issue("别的项目", "web", 9),
       issue("没派过", "app", 8, { sessions: [] }),
-      issue("计划里的一步", "app", 8, { parent: "g" }),
+      issue("计划里的一步", "app", 8, { parent: issueId("g") }),
       issue("定时", "app", 8, { recurrence: "s1" }),
       issue("给管家", "app", 8, { assignee: orchestratorAgent }),
       issue("长".repeat(61), "app", 8),

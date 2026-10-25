@@ -17,6 +17,7 @@ import { testConfig } from "../testing/layers.ts";
 import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
 import { until } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -45,7 +46,7 @@ class FakeSessions {
     const fresh = `${id}-${++this.n}`;
     this.running.set(id, fresh);
     this.inputs.set(id, [...this.runsOf(id), text]);
-    this.apply({ type: "run", id });
+    this.apply({ type: "run", id: sessionId(id) });
     void this.run(id, fresh, text);
     return { kind: "run", launch: fresh, woke: true };
   };
@@ -62,7 +63,7 @@ class FakeSessions {
     const runs = this.runsOf(id).length;
     if (input.includes("必败")) {
       this.running.delete(id);
-      this.apply({ type: "report", id, outcome: "failed", summary: "provider said no", runs });
+      this.apply({ type: "report", id: sessionId(id), outcome: "failed", summary: "provider said no", runs });
       this.publish({ kind: "ended", id, launch, outcome: "failed", spoke: false });
       return;
     }
@@ -70,7 +71,7 @@ class FakeSessions {
     this.last.set(id, "结论：收到了（" + line + "）");
     this.publish({ kind: "spoke", id, launch });
     this.running.delete(id);
-    this.apply({ type: "report", id, outcome: "completed", summary: "收到了", runs });
+    this.apply({ type: "report", id: sessionId(id), outcome: "completed", summary: "收到了", runs });
     this.publish({ kind: "ended", id, launch, outcome: "completed", spoke: true });
   }
 }
@@ -436,7 +437,7 @@ describe("the chat", () => {
         yield* hireAndRun(f, x, "w13", "写 hello", "chat-m");
         yield* until(() => !isBusy(f.core.session("w13")!), "resting");
         yield* f.chat.say("随便说说", f.chat.general(), "");
-        yield* f.core.apply({ type: "left", id: "w13" });
+        yield* f.core.apply({ type: "left", id: sessionId("w13") });
         yield* until(async () => (await f.deliveries("w13")).at(-1)?.state === "dropped", "dropped");
         const left = yield* f.sql<{ left_at: number | null }>`select left_at from channel_participant where id = 'w13'`;
         expect(left[0]?.left_at).not.toBeNull();
@@ -464,7 +465,7 @@ describe("the chat", () => {
           Effect.gen(function* () {
             y.slow = 10;
             expect(g.core.session("w14")).toBeDefined();
-            yield* g.core.apply({ type: "report", id: "w14", outcome: "interrupted", summary: "重启了", runs: 1 });
+            yield* g.core.apply({ type: "report", id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
             expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
@@ -507,7 +508,7 @@ describe("the chat", () => {
           ["unlinked", undefined],
         ]);
         yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
-        yield* f.core.apply({ type: "report", id: "run-helper", outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
+        yield* f.core.apply({ type: "report", id: sessionId("run-helper"), outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
         yield* until(
           () => (f.core.state().chat?.messages ?? []).some((m) => m.from === "run-helper" && m.run === "finished-run"),
           "the report carries its run",

@@ -49,7 +49,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 改形状、规则和表
 
-- **形状**：改 `packages/protocol/src/shapes.ts`（类型）和 `schema.ts`（同一个形状的 Schema，以 `Schema.Codec<T.X>` 定类型，两边对不上就编不过），接口在 `api.ts` 的 `endpoints`。服务端和页面都直接 import，没有生成这一步。
+- **形状**：改 `packages/protocol/src/shapes.ts`（类型）和 `schema.ts`（同一个形状的 Schema，以 `Codec<T.X>` 定类型，两边对不上就编不过；id 的品牌只在类型上，线上一侧是 `Wire<T.X>`），接口在 `api.ts` 的 `endpoints`。服务端和页面都直接 import，没有生成这一步。
 - **规则**：改拥有它的包里的纯函数（几处都用的在 `packages/protocol/src/rules`），`bun run golden:update` 重写黄金数据（`-- setting` 这样只重写一个模块的，不带名字重写全部），看 diff。页面不重写服务端的规则（[客户端问服务端](docs/subsystems/app.md)）。
 - **表和查询**：表结构是 `apps/server/db/migrations/0001_schema.up.sql` 一个文件（直接改），查询在 `apps/server/db/queries/<表>.sql`；改完跑 `npm run db:generate`。`src/base/schema.test.ts` 查表名、索引名和一张表一个查询文件。
 - **旧名字**：`bun run names:verify` 查 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 里有没有已经改掉的旧名（挂在 `docs:verify` 里）；加了新名字就把它写进 `scripts/stale-names.ts`。

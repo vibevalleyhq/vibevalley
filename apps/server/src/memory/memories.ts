@@ -2,6 +2,7 @@
 // 「记住：」 lines and the owner's notes) and one line for each job it did. A memory that cannot be read or written never
 // stops a run: it is logged, and the run goes on without it.
 
+import { sessionId } from "@vibevalley/protocol/schema";
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
@@ -67,7 +68,7 @@ export const makeMemories = Effect.gen(function* () {
             at: r.created_at,
             recalled: r.recalled,
             ...(r.project !== null ? { project: r.project } : {}),
-            ...(r.session !== null ? { session: r.session } : {}),
+            ...(r.session !== null ? { session: sessionId(r.session) } : {}),
             ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
           })),
       ),

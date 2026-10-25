@@ -19,6 +19,7 @@ import { worldBelowTasks } from "../testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
 import { untilGot } from "../testing/until.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const step = (id: string, ...needs: string[]) => ({
   id,
@@ -109,7 +110,7 @@ class FakeWork implements TaskWork {
     this.last.set(id, said);
     const at = said.lastIndexOf("结论：");
     const summary = outcome === "failed" || at < 0 ? said : said.slice(at + 3);
-    await Effect.runPromise(this.core.apply({ type: "report", id, outcome: outcome as never, summary, runs: 1 }));
+    await Effect.runPromise(this.core.apply({ type: "report", id: sessionId(id), outcome: outcome as never, summary, runs: 1 }));
   }
 
   hire = (agent: Agent, task: string, project: string, opt: HireOptions): Effect.Effect<Hired> => {
@@ -140,13 +141,13 @@ class FakeWork implements TaskWork {
     const self = this;
     return Effect.gen(function* () {
       self.told.set(id, [...(self.told.get(id) ?? []), text]);
-      yield* self.core.apply({ type: "run", id });
+      yield* self.core.apply({ type: "run", id: sessionId(id) });
       void self.run(id, text);
       return "说了";
     });
   };
 
-  dismiss = (id: string) => Effect.as(this.core.apply({ type: "left", id }), true);
+  dismiss = (id: string) => Effect.as(this.core.apply({ type: "left", id: sessionId(id) }), true);
 
   find = (id: string): Roster | undefined => {
     const session = this.core.session(id);
@@ -410,7 +411,7 @@ describe("task graphs", () => {
             const paused = yield* f.until(id, (g) => g.state === "paused");
             expect(paused.note).toContain("重启");
             // What the sessions do as the farm comes back: the run cut off is reported.
-            yield* f.core.apply({ type: "report", id: session, outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
+            yield* f.core.apply({ type: "report", id: sessionId(session), outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
             f.work.release();
             yield* f.tasks.act(id, "resume", "user");
             const ready = yield* f.until(id, (g) => g.state === "ready");
@@ -509,7 +510,7 @@ describe("task graphs", () => {
         expect([parent.number, parent.assignee, parent.criteria, parent.sessions[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], "h1"]);
         expect((yield* f.issues.get(taskIssueID(issue.id, "c"))).parent).toBe(issue.id);
         expect((yield* Effect.exit(f.tasks.splitIssue("h1", "", steps)))._tag).toBe("Failure");
-        yield* f.core.apply({ type: "report", id: "h1", outcome: "completed", summary: "拆成了三步", runs: 1 });
+        yield* f.core.apply({ type: "report", id: sessionId("h1"), outcome: "completed", summary: "拆成了三步", runs: 1 });
         yield* Effect.promise(async () => {
           for (let i = 0; i < 300 && f.core.session("h1"); i++) await new Promise((r) => setTimeout(r, 10));
         });
@@ -532,7 +533,7 @@ describe("task graphs", () => {
             state: action === "resume" ? "paused" : "running",
             parallel: 1,
             createdAt: 0,
-            tasks: [{ id: "a", title: "步骤", brief: "做事", needs: [], state: "failed", session: "w900", tries: 0 }],
+            tasks: [{ id: "a", title: "步骤", brief: "做事", needs: [], state: "failed", session: sessionId("w900"), tries: 0 }],
           } as TaskGraph;
           yield* f.issues.putTask(graph);
           yield* f.core.apply({

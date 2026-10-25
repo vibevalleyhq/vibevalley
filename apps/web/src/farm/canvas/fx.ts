@@ -5,7 +5,7 @@
 // page's labels.
 
 import { dot, particles, type PointLight } from "@vibevalley/engine/pixi";
-import type { GameEffectReward } from "@vibevalley/protocol";
+import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
 import { Container, Graphics, Sprite, type Texture } from "pixi.js";
 import type { BedFx } from "../store";
 import type { BedFxKind } from "../tools";
@@ -19,7 +19,7 @@ export interface PlotFx {
    * Starts what is new in the store's lists (each is started once: the store keeps them a few seconds) and moves
    * everything on by `dt` seconds. `bedOf` is the bed a session's plot is in.
    */
-  readonly update: (dt: number, fx: readonly BedFx[], rewards: readonly GameEffectReward[], bedOf: (sessionId: string) => number | undefined) => void;
+  readonly update: (dt: number, fx: readonly BedFx[], rewards: readonly GameEffectReward[], bedOf: (sessionId: SessionId) => number | undefined) => void;
   /** A plot that was clicked dips a pixel for a moment: when it was, by plot index, on `clock`. */
   readonly pressedAt: Map<number, number>;
   readonly clock: () => number;
@@ -99,7 +99,7 @@ export function plotFx(world: Container, texture: (name: string) => Texture, plo
     }
   }
 
-  function update(dt: number, fx: readonly BedFx[], rewards: readonly GameEffectReward[], bedOf: (sessionId: string) => number | undefined) {
+  function update(dt: number, fx: readonly BedFx[], rewards: readonly GameEffectReward[], bedOf: (sessionId: SessionId) => number | undefined) {
     clock += dt;
     for (const f of fx) {
       if (seen.has(f.id)) continue;
@@ -109,7 +109,7 @@ export function plotFx(world: Container, texture: (name: string) => Texture, plo
     for (const r of rewards) {
       if (paid.has(r)) continue;
       paid.add(r);
-      const bed = bedOf(r.sessionId);
+      const bed = r.sessionId === undefined ? undefined : bedOf(r.sessionId);
       if (bed !== undefined) coins(bed, r.coins);
     }
     for (let i = flashes.length - 1; i >= 0; i--) {

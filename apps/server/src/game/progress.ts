@@ -14,6 +14,7 @@ import {
   type ProgressNews,
   type TaskGraph,
   type Unlock,
+  type SessionId,
 } from "@vibevalley/protocol";
 import { sessionOf, sessionOnIssue } from "../session/state.ts";
 import { achievements } from "../agent/seed.ts";
@@ -77,7 +78,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
   let seen = folded.seen;
   let counts = p.counts;
   let coins = 0;
-  let session = "";
+  let session: SessionId | undefined;
   const at = entry.at;
   switch (entry.kind) {
     case "harvested": {
@@ -241,8 +242,10 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
-        for (const named of fact.message.mentions ?? [])
-          if (named !== orchestratorAgent && named !== "user" && named !== everyone && sessionOf(before, named)) out.push({ kind: "called", session: named });
+        for (const named of fact.message.mentions ?? []) {
+          const h = named !== orchestratorAgent && named !== "user" && named !== everyone ? sessionOf(before, named) : undefined;
+          if (h) out.push({ kind: "called", session: h.id });
+        }
       } else if (fact.message.fromKind === "agent" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
