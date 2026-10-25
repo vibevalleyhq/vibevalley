@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
@@ -210,6 +211,8 @@ describe("memory", () => {
 
   it.effect("what is shown fading is what goes", () =>
     Effect.gen(function* () {
+      // The rows below were written at 1; what is kept now is later, by the test's clock.
+      yield* TestClock.setTime(Date.UTC(2026, 9, 1));
       const m = yield* Memories;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
