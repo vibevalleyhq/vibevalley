@@ -9,6 +9,9 @@ import { defaultVoice, keyHint, type MemorySourceConfig, memorySourcesOver, sett
 import { Context, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
+import { jsonOrNone } from "../base/json.ts";
+import * as S from "@vibevalley/protocol/schema";
+import { MemorySourceKindValues } from "@vibevalley/protocol";
 
 /** settings.json, in the order the file has it. */
 interface Stored {
@@ -65,13 +68,34 @@ export interface SettingShape {
 
 export class Setting extends Context.Service<Setting, SettingShape>()("vibevalley/Setting") {}
 
-const read = (file: string): Stored => {
-  try {
-    return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Stored) : {};
-  } catch {
-    return {};
-  }
-};
+const MemorySourceConfigSchema = Schema.Struct({
+  kind: Schema.Literals(MemorySourceKindValues),
+  url: Schema.String,
+  enabled: Schema.optionalKey(Schema.Boolean),
+  read: Schema.optionalKey(Schema.Boolean),
+  write: Schema.optionalKey(Schema.Boolean),
+  everything: Schema.optionalKey(Schema.Boolean),
+  user: Schema.optionalKey(Schema.String),
+  key: Schema.optionalKey(Schema.String),
+});
+
+/** settings.json: every field may be missing; one that does not read is as no file. */
+const readStored = jsonOrNone<Stored>(
+  Schema.Struct({
+    deepseekApiKey: Schema.optionalKey(Schema.String),
+    agoraAppId: Schema.optionalKey(Schema.String),
+    agoraAppCertificate: Schema.optionalKey(Schema.String),
+    asrKey: Schema.optionalKey(Schema.String),
+    llmKey: Schema.optionalKey(Schema.String),
+    ttsKey: Schema.optionalKey(Schema.String),
+    voice: Schema.optionalKey(S.SettingsUpdateVoice),
+    dictationKey: Schema.optionalKey(Schema.String),
+    dictation: Schema.optionalKey(S.Dictation),
+    memorySources: Schema.optionalKey(Schema.Array(MemorySourceConfigSchema)),
+  }),
+);
+
+const read = (file: string): Stored => (existsSync(file) ? (readStored(readFileSync(file, "utf8")) ?? {}) : {});
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 

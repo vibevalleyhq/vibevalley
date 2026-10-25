@@ -19,11 +19,15 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, Result, Schema, type Scope, Stream } from "effect";
+import * as S from "@vibevalley/protocol/schema";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
 export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
+
+const readObject = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
+const readState = Schema.decodeUnknownResult(S.WorkspaceState);
 
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
@@ -110,11 +114,11 @@ export const make = Effect.gen(function* () {
   const file = join(config.home, "state.json");
   let kept = emptyWorkspaceState();
   if (existsSync(file)) {
-    try {
-      kept = { ...emptyWorkspaceState(), ...(JSON.parse(readFileSync(file, "utf8")) as WorkspaceState) };
-    } catch (e) {
-      yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
-    }
+    // What it lacks is the empty state's; what does not read (not JSON, or not the state's shape) starts empty.
+    const raw = readObject(readFileSync(file, "utf8"));
+    const read = Result.isSuccess(raw) ? readState({ ...emptyWorkspaceState(), ...raw.success }) : Result.fail(raw.failure);
+    if (Result.isSuccess(read)) kept = read.success;
+    else yield* Effect.logWarning(`state.json unreadable, starting empty: ${read.failure.message}`);
   }
   let state = restore(restarted(kept));
   const disk = new FileWriter(file);

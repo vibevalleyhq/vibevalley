@@ -5,7 +5,8 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Clock, Context, Effect, Layer } from "effect";
+import { Clock, Context, Effect, Layer, Result, Schema } from "effect";
+import * as S from "@vibevalley/protocol/schema";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
@@ -88,6 +89,17 @@ export class Agents extends Context.Service<Agents, AgentShape>()("vibevalley/Ag
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
+/** config.json as the profiles are kept: skills and settings may be missing (a file from before they were). */
+const readStored = Schema.decodeUnknownResult(
+  Schema.fromJsonString(
+    Schema.Struct({
+      agents: Schema.Array(S.Agent),
+      skills: Schema.optionalKey(Schema.Array(S.Skill)),
+      settings: Schema.optionalKey(Schema.Record(Schema.String, S.RuntimeSettings)),
+    }),
+  ),
+);
+
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const file = join(config.home, "config.json");
@@ -95,17 +107,19 @@ export const make = Effect.gen(function* () {
   const seed: Stored = { agents: seedAgents(), skills: [], settings: {} };
   let s: Stored = seed;
   if (existsSync(file)) {
-    try {
-      s = JSON.parse(readFileSync(file, "utf8")) as Stored;
-    } catch (e) {
-      // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
+    const read = readStored(readFileSync(file, "utf8"));
+    if (Result.isSuccess(read)) s = { agents: read.success.agents, skills: read.success.skills ?? [], settings: read.success.settings ?? {} };
+    else {
+      const e = read.failure;
+      // A file that does not read (not JSON, or not the profiles' shape) is kept aside, never written over: one that cannot be
+      // moved stops the start.
       const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
       try {
         renameSync(file, aside);
       } catch (moved) {
         return yield* Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${String(moved)}`));
       }
-      yield* Effect.logWarning(`${file} could not be read (${String(e)}): kept as ${aside}, the profiles start from the seeds`);
+      yield* Effect.logWarning(`${file} could not be read (${e.message}): kept as ${aside}, the profiles start from the seeds`);
       s = seed;
     }
   }

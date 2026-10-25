@@ -6,11 +6,13 @@ import { Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
+import { seedAgents } from "./seed.ts";
 
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
 
-const draft = (change: Partial<Agent> = {}) => ({ ...withCast({ id: "x" } as Agent), id: "", name: "同名", runtime: "pi", ...change }) as Agent;
+/** A whole profile (a seed), as the page sends one: config.json keeps only what reads as a profile. */
+const draft = (change: Partial<Agent> = {}): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, id: "", name: "同名", runtime: "pi", ...change });
 
 describe("profiles", () => {
   it.effect("deleting a skill removes profile references and a recreated name does not reattach it", () => {
