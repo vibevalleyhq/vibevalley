@@ -359,11 +359,17 @@ export const make = (options: RuntimeOptions = {}) =>
     const known = (id: string) => runtimeIds().includes(id);
 
     async function refresh(id: string): Promise<RuntimeInfo | undefined> {
-      if (!known(id)) return undefined;
+      if (!known(id) || closed) return undefined;
       const read = begin(id);
-      // The settings are the farm's own, whatever stands in for the machine.
-      const next: Observation = options.probe ? { info: { ...(await options.probe(id)), settings: store.settings(id) }, read: 0 } : await probe(id);
-      return remember(next, read);
+      try {
+        // The settings are the farm's own, whatever stands in for the machine.
+        const next: Observation = options.probe ? { info: { ...(await options.probe(id)), settings: store.settings(id) }, read: 0 } : await probe(id);
+        if (closed) return undefined;
+        return remember(next, read);
+      } finally {
+        // A probe that failed leaves nothing cached: the next list asks again instead of showing "checking" for good.
+        if (!cache.has(id) && reads.get(id) === read) reads.delete(id);
+      }
     }
 
     async function info(id: string): Promise<RuntimeInfo | undefined> {
@@ -428,7 +434,8 @@ export const make = (options: RuntimeOptions = {}) =>
         runtimeIds().map((id) => {
           const hit = cache.get(id);
           if (hit) return withSpend(hit.info);
-          if (!reads.has(id)) void refresh(id);
+          // In the service's own fiber set: a probe that fails is retried by the next list, and none outlives the service.
+          if (!closed && !reads.has(id)) emit(Effect.ignore(Effect.tryPromise(() => refresh(id))));
           return {
             id,
             preset: presetOf(id),

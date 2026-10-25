@@ -54,7 +54,7 @@ import {
 } from "./rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
-import { SqlClient } from "effect/sql";
+import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { causeMessage } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
@@ -220,7 +220,9 @@ export const make = (options: TaskOptions = {}) =>
 
     const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: GraphActor, why = "") {
       const before = get(graph.id);
-      yield* issues.putTask(graph).pipe(Effect.catchDefect((d) => Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`))));
+      yield* issues
+        .putTask(graph)
+        .pipe(Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`)) : Effect.die(d))));
       yield* record(before, graph, by, why);
     });
 
@@ -288,10 +290,15 @@ export const make = (options: TaskOptions = {}) =>
         }
         const session = hired.id;
         graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
-        const saved = yield* Effect.result(putSystem(graph));
+        // Whatever stops the save (a refusal, a defect, an interruption), the session hired for it does not stay.
+        const saved = yield* Effect.exit(putSystem(graph));
         if (saved._tag === "Failure") {
-          yield* dismiss(session);
-          return yield* Effect.fail(saved.failure);
+          yield* Effect.uninterruptible(
+            dismiss(session).pipe(
+              Effect.catchCause((cause) => Effect.logWarning(`vibevalley: could not dismiss ${session} after the graph was not saved`, cause)),
+            ),
+          );
+          return yield* saved;
         }
       }
     });

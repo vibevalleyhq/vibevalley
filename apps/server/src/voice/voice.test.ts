@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import { describe, expect, it } from "@effect/vitest";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import type { Issue, Session, VoiceSettings } from "@vibevalley/protocol";
 import { defaultVoice } from "../setting/rules.ts";
 import { Context, Effect, Exit, Fiber, Layer, Scope } from "effect";
@@ -13,6 +13,33 @@ import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
 import { agentFor, type CallLine, clientOf, layer, onCallLine, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+/** A dictation upload that never answers: it ends only when its signal aborts (the 120 s timeout is the test's to fire). */
+const pendingDictation = () => {
+  const timeout = new AbortController();
+  let seen: AbortSignal | undefined;
+  let entered!: () => void;
+  const started = new Promise<void>((done) => (entered = done));
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    expect(ms).toBe(120_000);
+    return timeout.signal;
+  });
+  vi.stubGlobal("fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+    const signal = init?.signal ?? undefined;
+    seen = signal;
+    entered();
+    return new Promise<Response>((_, reject) => {
+      if (signal?.aborted) reject(signal.reason);
+      else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  });
+  return { timeout, started, signal: () => seen };
+};
 
 const appId = "11111111111111111111111111111111";
 const cert = "22222222222222222222222222222222";
@@ -632,6 +659,35 @@ describe("voice", () => {
       });
       expect(seen).toBe(4);
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
+  });
+
+  it.live("interrupting dictation aborts its upload", () => {
+    const pending = pendingDictation();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const setting = yield* Setting;
+      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      const dictating = yield* Effect.forkChild(voice.dictate("AAAA", "wav"));
+      yield* Effect.promise(() => pending.started);
+      yield* Fiber.interrupt(dictating);
+      expect(pending.signal()?.aborted).toBe(true);
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
+  });
+
+  it.live("dictation's timeout still aborts its upload", () => {
+    const pending = pendingDictation();
+    return Effect.gen(function* () {
+      const voice = yield* Voice;
+      const setting = yield* Setting;
+      yield* Effect.orDie(setting.save({ dictation: { url: "http://dictation.test/v1", model: "whisper-1" } }));
+      const dictating = yield* Effect.forkChild(Effect.flip(voice.dictate("AAAA", "wav")));
+      yield* Effect.promise(() => pending.started);
+      const reason = new DOMException("test timeout", "TimeoutError");
+      pending.timeout.abort(reason);
+      const failure = yield* Fiber.join(dictating);
+      expect(pending.signal()?.reason).toBe(reason);
+      expect(failure).toMatchObject({ _tag: "VoiceUnavailable", reason: expect.stringContaining("test timeout") });
+    }).pipe(Effect.scoped, Effect.provide(farm(new Capture())));
   });
 
   it.live("says dictation is not set up", () =>

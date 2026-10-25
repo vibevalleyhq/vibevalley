@@ -823,12 +823,13 @@ export const make = (options: VoiceOptions = {}) =>
         form.append("response_format", "json");
         // A local model's first request loads it, which takes a while.
         const res = yield* Effect.tryPromise({
-          try: () =>
+          // Effect's own signal too: an interrupted dictation (the page went away) stops its upload, not only the timeout.
+          try: (signal) =>
             fetch(d.url + "/audio/transcriptions", {
               method: "POST",
               body: form,
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
-              signal: AbortSignal.timeout(120_000),
+              signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
           catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
         });
