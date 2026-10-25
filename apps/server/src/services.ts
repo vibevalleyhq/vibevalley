@@ -9,7 +9,7 @@ import { Layer } from "effect";
 import { NodeServices } from "@effect/platform-node";
 import { layer as agent } from "./agent/agent.ts";
 import { type Config, Settings } from "./base/config.ts";
-import { Database } from "./base/db.ts";
+import { Database, DbLayer } from "./base/db.ts";
 import { layer as core } from "./core/core.ts";
 import { layer as channel } from "./channel/chat.ts";
 import { type DocOptions, layer as doc } from "./doc/doc.ts";
@@ -57,7 +57,14 @@ export interface ServiceOptions {
 /** Platform: Node's services (files, paths, processes), the database, the settings and secrets, the core state (folded by
  * the projection, which reads every module's rules). */
 export const platform = (config: Config) =>
-  Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)), Layer.provideMerge(NodeServices.layer), on(projection), on(core), on(setting));
+  Database.pipe(
+    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(NodeServices.layer),
+    on(DbLayer),
+    on(projection),
+    on(core),
+    on(setting),
+  );
 
 /** Agents: the profiles, their memory, the runtimes they run on. */
 export const agents =

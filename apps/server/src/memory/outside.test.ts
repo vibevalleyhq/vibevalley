@@ -9,7 +9,7 @@ import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { foundText, Memories, make } from "./memory.ts";
@@ -175,6 +175,7 @@ const world = (timeoutMs?: number) =>
   Layer.effect(Memories, make(undefined, timeoutMs)).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),
+    Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, testConfig())),
   );

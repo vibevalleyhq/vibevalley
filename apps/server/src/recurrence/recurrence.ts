@@ -9,6 +9,7 @@ import { Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
+import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Channels } from "../channel/chat.ts";
@@ -62,7 +63,7 @@ export const make = (options: RecurrenceOptions = {}) =>
     const store = yield* Agents;
     const chat = yield* Channels;
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+    const { run: db } = yield* Db;
     const now = options.now ?? Date.now;
     // The ticker, the tools and the pages all change the list.
     const lock = yield* Semaphore.make(1);

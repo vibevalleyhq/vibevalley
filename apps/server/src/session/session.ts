@@ -41,6 +41,7 @@ import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type
 
 export type { SessionNews };
 import { serverAddress, Settings } from "../base/config.ts";
+import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core, type FactIn } from "../core/core.ts";
@@ -373,7 +374,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const projects = yield* Projects;
     const runtimes = yield* Runtimes;
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+    const { run: db } = yield* Db;
     /** A write that must not stop a run: logged, and the run goes on. */
     const logged = <A, E>(what: string, e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
       Effect.provideService(e, SqlClient.SqlClient, sql).pipe(

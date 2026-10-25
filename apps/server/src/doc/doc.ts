@@ -5,6 +5,7 @@
 import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
+import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { type ApiError, missing, lookIn, refused } from "../errors.ts";
 import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
@@ -88,7 +89,7 @@ export interface DocOptions {
 export const make = (options: DocOptions = {}) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+    const { run: db } = yield* Db;
     const lock = yield* Semaphore.make(1);
     const scope = yield* Effect.scope;
     const tick = options.tickMs ?? 1000;

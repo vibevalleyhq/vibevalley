@@ -50,7 +50,7 @@
 - **读写过异步的状态才上锁**：服务里的 `let` 多是句柄、标记、读改写在同一步里的同步状态，不换成 `Ref`；读和写之间隔着 `yield*` 的才要一把锁或 `SynchronizedRef`（连接到本机的开和关）。
 - **定期的后台任务用 `Schedule`**：`x.pipe(Effect.repeat(Schedule.spaced(n)))`，先等一个周期再做的加 `Effect.delay(n)`；不写 `Effect.forever` 加 `Effect.sleep`。等到有事才攒一阵的（核心状态出帧）不是定期，照旧用 `Effect.forever`。
 - **文件走 `FileSystem`，表里的 JSON 照 Schema 读**：`platform` 提供 `NodeServices.layer`；服务的 Effect 代码里用 `FileSystem`，失败照旧是缺陷（`Effect.orDie`）。自己写进表的 JSON 列用 protocol 的 Schema 读回来（`base/json.ts` 的 `jsonOf`、`jsonOrNone`），不 `JSON.parse(...) as T`。
-- **单行查询只把无行折成空**：用 `Effect.catchNoSuchElement` 接 `NoSuchElementError`，不用 `Effect.option` 把 `SqlError`、`SchemaError` 也当成「没有这一行」。
+- **库经 `Db` 服务用**（`base/db.ts`，`platform` 提供）：`run` 跑生成的查询、失败是缺陷；`attempt` 留着失败给要记日志或说成拒绝的调用方；`one` 取单行，只把 `NoSuchElementError` 折成 `undefined`，`SqlError`、`SchemaError` 照旧是缺陷，不用 `Effect.option` 把它们当成「没有这一行」；`inTx` 包一个事务。模块不各写一份 `provideService(SqlClient)`。
 - **错误带 `_tag`**：服务自己的错误是 `Data.TaggedError`（`ProjectError`、`MergeFailure`、`NotTakenIn`、`SettingRefused`、`MemoryRefused`），按 `catchTag` 接、能直接 `yield*`，不用 `instanceof` 分；`MergeFailure` 由 `MergeFailure.conflict(base, files)`、`.check(why)`、`.error(why)` 造。只在同步或 Promise 的代码里抛的照旧是 `Error`。
 
 **形状和规则**

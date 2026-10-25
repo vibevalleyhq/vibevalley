@@ -7,8 +7,8 @@ import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol
 import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
 import { Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
-import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
+import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOf } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -42,8 +42,7 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
   const projects = yield* Projects;
-  const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql);
+  const { attempt: db } = yield* Db;
 
   // A row this code cannot read any more is left out of the fold.
   const rows = yield* Effect.orDie(db(q.ledgerEntries()));
