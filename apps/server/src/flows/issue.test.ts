@@ -17,6 +17,7 @@ import { Recurrences } from "../recurrence/recurrence.ts";
 import { Sessions, type SessionsInside } from "../session/session.ts";
 import { write } from "../testing/git.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const refusedWith = (e: unknown, words = "") => {
   const tagged = e as { _tag?: string; reason?: string };
@@ -215,7 +216,7 @@ describe("an issue", () => {
       expect(yield* status()).toBe("todo");
       yield* issues.tryQueued;
       expect(yield* status()).toBe("todo");
-      yield* core.apply({ type: "left", id: "w90" });
+      yield* core.apply({ type: "left", id: sessionId("w90") });
       yield* issues.tryQueued;
       yield* w.nextReport;
       expect(yield* status()).toBe("in_review");

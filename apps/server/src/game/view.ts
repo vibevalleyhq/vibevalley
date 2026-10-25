@@ -156,7 +156,7 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
       const news = fact.news;
       if (!news) return [];
       const out: GameEffect[] = [];
-      if (news.coins) out.push({ kind: "reward", sessionId: news.session ?? "", coins: news.coins, streak: fact.progress.streak });
+      if (news.coins) out.push({ kind: "reward", ...(news.session ? { sessionId: news.session } : {}), coins: news.coins, streak: fact.progress.streak });
       for (const u of news.unlocked ?? []) out.push(achievementEffect(u.id, u.tier));
       return out;
     }

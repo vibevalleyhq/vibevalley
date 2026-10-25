@@ -7,6 +7,7 @@ import type { Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("vibevalley.title.seen", "true"));
@@ -21,7 +22,7 @@ async function firstFrame(url: string): Promise<StateFrame> {
 
 const helper = (id: string, station: number, phase: Session["phase"], crop: string): { session: Session; crop: string } => ({
   session: {
-    id,
+    id: sessionId(id),
     name: `帮工${id}`,
     agent: `agent-${id}`,
     runtime: "nobody",
@@ -29,7 +30,7 @@ const helper = (id: string, station: number, phase: Session["phase"], crop: stri
     hiredAt: 0,
     runs: 1,
     phase,
-    issue: `issue-${id}`,
+    issue: issueId(`issue-${id}`),
     play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as unknown as Session["play"],
   },
   crop,

@@ -9,8 +9,9 @@ import { Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { Core, emptyWorkspaceState, layer, stateEveryMs } from "./core.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
-const helper: Session = { id: "w1", name: "帮工", agent: "lab", runtime: "pi", brief: "写", hiredAt: 0, runs: 0, phase: { _tag: "done" } };
+const helper: Session = { id: sessionId("w1"), name: "帮工", agent: "lab", runtime: "pi", brief: "写", hiredAt: 0, runs: 0, phase: { _tag: "done" } };
 
 describe("core", () => {
   it.effect("started again from state.json: idle, without the database's parts, the sessions at their stations", () => {

@@ -20,6 +20,7 @@ import {
   type TaskEdit,
   type TaskGraph,
 } from "@vibevalley/protocol";
+import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
@@ -70,8 +71,9 @@ import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
-const EventPayloadSchema: Schema.Codec<Pick<GraphEvent, "session" | "detail" | "changes" | "commits">> = Schema.Struct({
-  session: Schema.optionalKey(Schema.String),
+type EventPayload = Pick<GraphEvent, "session" | "detail" | "changes" | "commits">;
+const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schema.Struct({
+  session: Schema.optionalKey(S.SessionId),
   detail: Schema.optionalKey(Schema.String),
   changes: Schema.optionalKey(Schema.mutable(Schema.Array(S.TaskFieldChange))),
   commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),

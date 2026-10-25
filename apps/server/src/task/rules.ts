@@ -11,7 +11,9 @@ import {
   type Task,
   type TaskEdit,
   type TaskGraph,
+  type IssueId,
 } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 import { isForOrchestrator } from "../issue/state.ts";
 import { slice } from "../base/text.ts";
 import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, maxTasks, taskOf, taskStateText } from "./graph.ts";
@@ -271,7 +273,7 @@ export function issueSplitRefusal(session: Session | undefined, issue: Issue | u
   return "";
 }
 
-export const taskIssueID = (graph: string, key: string) => graph + "." + key;
+export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
 
 /** What only the issues know (their runs, priority, when they were written down and closed) comes from before; one closing now closes at now. */
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
@@ -294,12 +296,12 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
   const out = [
     keep(
       {
-        id: graph.id,
+        id: issueId(graph.id),
         title: graph.title,
         description: graph.goal,
         project,
         // A helper's issue split under it keeps who it was given to.
-        assignee: was.get(graph.id)?.assignee,
+        assignee: was.get(issueId(graph.id))?.assignee,
         deliver: "change",
         graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
       },
@@ -318,7 +320,7 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
           deliver: "change",
           assignee: n.agent,
           rank: i > 0 ? i : undefined,
-          parent: graph.id,
+          parent: issueId(graph.id),
           blockedBy: blocked.length > 0 ? blocked : undefined,
           task: {
             key: n.id,

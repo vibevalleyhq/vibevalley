@@ -17,6 +17,7 @@ import type {
   SessionEvent,
   SideEvent,
   StateFrame,
+  SessionId,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
@@ -54,7 +55,7 @@ export interface Transition {
 }
 
 /** What the owner did that changes no state (so it is no fact), said by the service it went through: the game counts some. */
-export type OwnerDid = { readonly kind: "reviewed"; readonly session: string } | { readonly kind: "talked" };
+export type OwnerDid = { readonly kind: "reviewed"; readonly session: SessionId } | { readonly kind: "talked" };
 
 export interface CoreShape {
   readonly state: () => WorkspaceState;

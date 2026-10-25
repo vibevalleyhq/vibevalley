@@ -22,9 +22,10 @@ import {
   withRecall,
 } from "./rules.ts";
 import { shellCommand } from "./shell.ts";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
-const ctx: FactContext = { id: "w1", runtime: "pi", cwd: "/work/clock-in" };
+const ctx: FactContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>
   ({ id: "w1", name: "老周", agent: "zhou", runtime: "pi", brief: "加接口", project: "clock-in", phase: { _tag: "arriving" } }) as Session;
 const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", doing } }) as Session;

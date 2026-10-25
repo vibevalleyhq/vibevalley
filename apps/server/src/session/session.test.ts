@@ -17,6 +17,7 @@ import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
 import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
 import { until } from "../testing/until.ts";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
@@ -68,7 +69,7 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       yield* (yield* Agents).saveAgent(lab());
-      const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: "i1", number: 1 }, worktree: true }));
+      const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true }));
       yield* Effect.promise(() => opening);
       const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
       yield* Effect.yieldNow;
@@ -76,7 +77,7 @@ describe("sessions", () => {
       yield* Fiber.join(interrupting);
       expect(disposed).toBe(1);
       expect(sessions.noRoom("pi", "demo")).toBe("");
-      const again = yield* sessions.send(lab(), "again", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const again = yield* sessions.send(lab(), "again", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       expect(again.session).toBeDefined();
       expect(again.refused).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config: testConfig(), runtimes: [runtime], repos: ["demo"] })));
@@ -104,7 +105,7 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
@@ -169,7 +170,7 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.check("fix next time"))));
@@ -211,7 +212,7 @@ describe("sessions", () => {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
       const sessions = yield* Sessions;
       const core = yield* Core;
-      const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the report");
       const before = sessions.find(id)!;
@@ -243,7 +244,7 @@ describe("sessions", () => {
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
       yield* Effect.sleep(5);
 
-      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = hired.session!.id;
       expect(id).toBe("w1");
       yield* until(() => phase(core, id) === "done", "the first run's report");
@@ -297,7 +298,7 @@ describe("sessions", () => {
         session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "done" } } as Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
-        id: "w1",
+        id: sessionId("w1"),
         place: { project: "demo", cwd: "/nowhere" },
         access: Semaphore.makeUnsafe(1),
         journal: s.trajectories.openLog("w1"),
@@ -320,13 +321,13 @@ describe("sessions", () => {
       });
       for (const step of ["pending", "started"]) {
         if (step === "started") {
-          yield* core.apply({ type: "run", id: "w1" });
+          yield* core.apply({ type: "run", id: sessionId("w1") });
           s.unexpect(h);
         }
-        const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i2", number: 2 } });
+        const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 } });
         expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
       }
-      yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "", runs: 1 });
+      yield* core.apply({ type: "report", id: sessionId("w1"), outcome: "completed", summary: "", runs: 1 });
       expect(sessions.noRoom("pi", "demo")).toBe("");
     }).pipe(Effect.scoped, Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, repos: ["demo"] }))),
   );
@@ -377,7 +378,7 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const sql = yield* SqlClient.SqlClient;
       const got = yield* sessions.send(lab(), "another", "demo", {
-        issue: { id: "i2", number: 2 },
+        issue: { id: issueId("i2"), number: 2 },
         hiring: () => Effect.orDie(sql.unsafe("select no_such_column from issue_session")),
       });
       expect(got.refused).toContain("工单没记下来");
@@ -389,10 +390,10 @@ describe("sessions", () => {
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
       const exit = yield* Effect.exit(
-        sessions.send(lab(), "another", "demo", { issue: { id: "i2", number: 2 }, hiring: () => Effect.die(new Error("registration bug")) }),
+        sessions.send(lab(), "another", "demo", { issue: { id: issueId("i2"), number: 2 }, hiring: () => Effect.die(new Error("registration bug")) }),
       );
       expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
-      const next = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i3", number: 3 } });
+      const next = yield* sessions.send(lab(), "another", "demo", { issue: { id: issueId("i3"), number: 3 } });
       expect(next.session).toBeDefined();
     }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
   });
