@@ -6,7 +6,7 @@
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
-import { Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, Layer, Predicate, Schedule, Schema, Semaphore, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
@@ -64,7 +64,7 @@ export const make = Effect.gen(function* () {
   const record = (input: Entry) =>
     one.withPermits(1)(
       Effect.gen(function* () {
-        const at = Date.now();
+        const at = yield* Clock.currentTimeMillis;
         const entry = { ...input, at } as LedgerEntry;
         const { kind, at: _, ...payload } = entry;
         yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));

@@ -44,7 +44,7 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
@@ -383,11 +383,11 @@ export const make = Effect.gen(function* () {
     [orchestratorAgent, "orchestrator", "管家"],
     ["system", "system", "VibeValley"],
   ] as const)
-    yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: Date.now() }));
+    yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
   let general = (yield* one(qc.generalID()))?.id ?? "";
   if (!general) {
     general = newId();
-    yield* db(qc.createGeneral({ id: general, name: generalName, created_at: Date.now() }));
+    yield* db(qc.createGeneral({ id: general, name: generalName, created_at: yield* Clock.currentTimeMillis }));
   }
 
   const loadChannels = Effect.gen(function* () {
@@ -492,7 +492,7 @@ export const make = Effect.gen(function* () {
         subject_kind: subject.kind,
         subject_id: subject.id || null,
         channel_id: parent.conversation,
-        created_at: Date.now(),
+        created_at: yield* Clock.currentTimeMillis,
       }),
     );
     if (subject.owner) yield* db(qf.follow({ conversation_id: id, participant_id: subject.owner, reason: "owner", from_number: parent.number }));
@@ -504,7 +504,7 @@ export const make = Effect.gen(function* () {
   /** A read cursor subsumes individual seen marks and completes the same deliveries. */
   const readThrough = Effect.fnUntraced(
     function* (who: string, conversation: string, upto: number) {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       yield* db(qr.setReadCursor({ participant_id: who, conversation_id: conversation, read_number: upto, updated_at: now }));
       yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
       yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
@@ -515,7 +515,7 @@ export const make = Effect.gen(function* () {
   /** Speaking acknowledges the launch's handed messages without advancing past unseen messages. */
   const heardLaunch = Effect.fnUntraced(
     function* (who: string, launch: string) {
-      const seen = yield* db(qd.seenHanded({ seen_at: Date.now(), recipient_id: who, launch }));
+      const seen = yield* db(qd.seenHanded({ seen_at: yield* Clock.currentTimeMillis, recipient_id: who, launch }));
       for (const r of seen) yield* db(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
     },
     (effect) => inTx(effect),
@@ -549,7 +549,7 @@ export const make = Effect.gen(function* () {
       followers = (yield* db(qf.followers({ conversation_id: conv.id }))).map((f) => f.participant_id);
     }
     const hops = (yield* db(qd.agentWakesSinceUser({ conversation: conv.id }))).n ?? 0;
-    const now = Date.now();
+    const now = yield* Clock.currentTimeMillis;
     const cooling: string[] = [];
     for (const h of sessionsNow) {
       const last = (yield* db(qd.lastAgentWake({ recipient_id: h.id }))).at ?? 0;
@@ -608,12 +608,12 @@ export const make = Effect.gen(function* () {
               final: w.final,
               meta: metaText(w.meta),
               send_key: w.sendKey || null,
-              created_at: Date.now(),
+              created_at: yield* Clock.currentTimeMillis,
             }),
           )).number;
           yield* db(qc.touchConversation({ number, id: w.conversation }));
         } else {
-          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: Date.now(), id }));
+          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: yield* Clock.currentTimeMillis, id }));
           const row = yield* one(qm.messageByID({ id }));
           if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
           number = row.number;
@@ -694,7 +694,7 @@ export const make = Effect.gen(function* () {
     const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
     if (recipient === orchestratorAgent) {
       const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       for (const [conversation, rs] of byConversation) {
         const messages = rs.map(asInbox);
         PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
@@ -714,7 +714,7 @@ export const make = Effect.gen(function* () {
     const others = (yield* inboxRows(recipient)).filter((o) => !messages.some((m) => m.target === o.target));
     const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
-    const now = Date.now();
+    const now = yield* Clock.currentTimeMillis;
     for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
   });
 
@@ -727,7 +727,7 @@ export const make = Effect.gen(function* () {
     if (rows.length === 0) return;
     const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
     if (delivered.kind === "refused") return;
-    const now = Date.now();
+    const now = yield* Clock.currentTimeMillis;
     for (const r of rows) yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
   });
 
@@ -780,13 +780,15 @@ export const make = Effect.gen(function* () {
   // ── sessions coming and going ──
 
   const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
-    yield* db(qp.upsertParticipant({ id: h.id, kind: "agent", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: Date.now() }));
+    yield* db(
+      qp.upsertParticipant({ id: h.id, kind: "agent", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: yield* Clock.currentTimeMillis }),
+    );
     const job = jobOf(h);
     const thread = yield* threadOf(job);
     if (thread) return yield* handedOn(h, thread);
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
-    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
+    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: yield* Clock.currentTimeMillis }));
     const what = h.graph?.task
       ? `做计划 ${h.graph.id} 的「${h.graph.task}」`
       : h.graph
@@ -814,7 +816,7 @@ export const make = Effect.gen(function* () {
     if (followers.includes(h.id)) return;
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
-    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: Date.now() }));
+    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: yield* Clock.currentTimeMillis }));
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
     const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
@@ -823,7 +825,7 @@ export const make = Effect.gen(function* () {
 
   const sessionsLeft = Effect.gen(function* () {
     const on = new Set(presentSessions().map((h) => h.id));
-    const now = Date.now();
+    const now = yield* Clock.currentTimeMillis;
     for (const p of yield* db(qp.participants())) {
       if (p.kind !== "agent" || p.left_at !== null || on.has(p.id)) continue;
       yield* db(qp.participantLeft({ left_at: now, id: p.id }));
@@ -854,7 +856,7 @@ export const make = Effect.gen(function* () {
   yield* locked(
     Effect.gen(function* () {
       // A word half said when the server stopped is as said as it got; whatever was handed and not seen goes back.
-      yield* db(qm.finalizeAll({ updated_at: Date.now() }));
+      yield* db(qm.finalizeAll({ updated_at: yield* Clock.currentTimeMillis }));
       yield* db(qd.rollbackAll());
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
       for (const c of [...convs].reverse()) yield* core.apply({ type: "conversation", conversation: yield* toConversation(c) });
@@ -974,7 +976,9 @@ export const make = Effect.gen(function* () {
           if (!row) return yield* Effect.fail(refused("找不到这个对话"));
           const target = targetOfConv(row);
           // A retry of the same words is the same message.
-          const again = yield* one(qm.recentDuplicate({ sender_id: from, conversation_id: conversation, body: words, since: Date.now() - retryWindowMs }));
+          const again = yield* one(
+            qm.recentDuplicate({ sender_id: from, conversation_id: conversation, body: words, since: (yield* Clock.currentTimeMillis) - retryWindowMs }),
+          );
           if (again) {
             const m = yield* one(qm.messageByID({ id: again.id }));
             if (m) return { kind: "sent", message: toMessage(m), target, absent: [] } as Spoken;
@@ -985,7 +989,7 @@ export const make = Effect.gen(function* () {
           // Newer messages it has not seen: show them instead of sending.
           const unseen = (yield* db(qm.unseenIn({ conversation, participant: from }))).map((r) => r.id);
           if (unseen.length > 0 && !opt.anyway) {
-            const now = Date.now();
+            const now = yield* Clock.currentTimeMillis;
             const shown: InboxMessage[] = [];
             for (const id of unseen.slice(0, heldShown)) {
               const m = yield* one(qm.messageByID({ id }));
@@ -1009,7 +1013,9 @@ export const make = Effect.gen(function* () {
             ...(answers ? { answers } : {}),
             meta: run ? { run } : {},
           });
-          yield* db(qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: written.number, updated_at: Date.now() }));
+          yield* db(
+            qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: written.number, updated_at: yield* Clock.currentTimeMillis }),
+          );
           return { kind: "sent", message: toMessage(yield* messageOrFail(written.id)), target, absent: written.absent } as Spoken;
         }),
       ),
@@ -1097,7 +1103,7 @@ export const make = Effect.gen(function* () {
           const desc = optional(description);
           const proj = optional(project);
           const id = newId();
-          yield* db(qc.createChannel({ id, name: clean, description: desc, project: proj, created_at: Date.now() }));
+          yield* db(qc.createChannel({ id, name: clean, description: desc, project: proj, created_at: yield* Clock.currentTimeMillis }));
           names.set(id, clean);
           yield* publishConversation(id);
           return infoOf({ id, name: clean, description: desc, project: proj });

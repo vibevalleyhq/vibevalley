@@ -3,7 +3,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { Effect } from "effect";
+import { Clock, Effect } from "effect";
 
 /**
  * An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the
@@ -16,7 +16,7 @@ export const readOrSetAside = <A>(file: string, read: (text: string) => A, start
     try {
       return read(readFileSync(file, "utf8"));
     } catch (e) {
-      const aside = `${file}.unreadable-${Date.now()}`;
+      const aside = `${file}.unreadable-${yield* Clock.currentTimeMillis}`;
       try {
         renameSync(file, aside);
       } catch (moved) {

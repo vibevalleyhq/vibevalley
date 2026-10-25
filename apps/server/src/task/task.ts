@@ -53,7 +53,7 @@ import {
   withTask,
 } from "./rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { causeMessage, Db } from "../base/db.ts";
@@ -456,7 +456,7 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from = "") {
-      const branch = "vibevalley/task-" + graph.id + "-" + Date.now().toString(36);
+      const branch = "vibevalley/task-" + graph.id + "-" + (yield* Clock.currentTimeMillis).toString(36);
       yield* projects.openBranch(graph.project, branch, from).pipe(Effect.mapError((e) => refused(e.message)));
       return branch;
     });
@@ -504,7 +504,7 @@ export const make = (options: TaskOptions = {}) =>
           state: "splitting",
           tasks: [],
           parallel: defaultParallel,
-          createdAt: Date.now(),
+          createdAt: yield* Clock.currentTimeMillis,
         };
         yield* put(graph, by);
         const hired = yield* work.hire(
