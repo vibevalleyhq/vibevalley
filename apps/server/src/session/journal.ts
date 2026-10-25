@@ -94,6 +94,8 @@ class FileJournal implements Journal {
     private readonly file: string,
     initial: readonly SessionEvent[],
     private readonly push: (e: SessionEvent) => void,
+    /** Where a save that failed is said: the service's logger. */
+    private readonly warn: (message: string) => void,
     private readonly keep = keepEvents,
   ) {
     this.disk = new FileWriter(file);
@@ -127,7 +129,7 @@ class FileJournal implements Journal {
       try {
         this.disk.write(this.body);
       } catch (e) {
-        console.warn(`vibevalley: could not save ${this.file}: ${String(e)}`);
+        this.warn(`vibevalley: could not save ${this.file}: ${String(e)}`);
       }
     }, saveAfterMs);
   }
@@ -276,7 +278,7 @@ class FileJournal implements Journal {
     try {
       this.disk.finish(this.body);
     } catch (e) {
-      console.warn(`vibevalley: could not save ${this.file}: ${String(e)}`);
+      this.warn(`vibevalley: could not save ${this.file}: ${String(e)}`);
     }
   }
 }
@@ -292,6 +294,8 @@ export class Trajectories {
   constructor(
     home: string,
     private readonly push: (id: string, e: SessionEvent) => void,
+    /** Where a log that could not be saved is said: the service's logger (Effect.logWarning on its fiber). */
+    private readonly warn: (message: string) => void,
   ) {
     this.dir = join(home, "events");
   }
@@ -300,7 +304,7 @@ export class Trajectories {
 
   /** A session's log, carried on from what it kept: a session back from a restart goes on where it was. */
   openLog(id: string, keep = 0): Journal {
-    const j = new FileJournal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), keep > 0 ? keep : keepEvents);
+    const j = new FileJournal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), this.warn, keep > 0 ? keep : keepEvents);
     this.open.set(id, j);
     return j;
   }
