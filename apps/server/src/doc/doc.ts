@@ -3,7 +3,7 @@
 // serial and its seq goes up in order.
 
 import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
-import { Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
+import { Clock, Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
@@ -104,7 +104,7 @@ export const make = (options: DocOptions = {}) =>
     });
 
     const create = Effect.fn("Docs.create")(function* (title: string) {
-      const now = Date.now();
+      const now = yield* Clock.currentTimeMillis;
       const id = newId();
       yield* db(qd.addDoc({ id, title: titleOf(title), created_at: now, updated_at: now }));
       return yield* get(id);
@@ -133,7 +133,7 @@ export const make = (options: DocOptions = {}) =>
             if (Option.isNone(d)) return yield* Effect.fail(missingDoc(id));
             const seen = yield* db(Effect.catchNoSuchElement(qc.docChangeByBatch({ batch_id: body.batchId })));
             if (Option.isSome(seen)) return yield* again(id, seen.value);
-            const now = Date.now();
+            const now = yield* Clock.currentTimeMillis;
             const p = new Page(id, actor, now, yield* blocksOf(id));
             // The page asks synchronously, so what it may ask is read first: the base of each stale edit, the ids each insert makes.
             const revisions = new Map<string, DocSpan[]>();

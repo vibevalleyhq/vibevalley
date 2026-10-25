@@ -963,7 +963,7 @@ export const make = (options: SessionOptionsIn = {}) =>
 
     const expireLogs = Effect.fn("Sessions.expireLogs")(function* (days: number) {
       if (days <= 0) return;
-      const ids = yield* db(qs.sessionsEndedBefore({ before: Date.now() - days * dayMs }));
+      const ids = yield* db(qs.sessionsEndedBefore({ before: (yield* Clock.currentTimeMillis) - days * dayMs }));
       for (const r of ids) trajectories.forget(r.id);
     });
 
@@ -1083,7 +1083,7 @@ export const make = (options: SessionOptionsIn = {}) =>
             runtime: agent.runtime,
             brief: task,
             project: place.project,
-            hiredAt: Date.now(),
+            hiredAt: yield* Clock.currentTimeMillis,
             runs: 0,
             phase: { _tag: "arriving" },
             ...(opt.taskGraph ? { graph: opt.taskGraph } : {}),

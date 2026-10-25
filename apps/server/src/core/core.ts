@@ -19,7 +19,7 @@ import type {
   StateFrame,
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
-import { Cause, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import { Cause, Clock, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
@@ -227,7 +227,7 @@ export const make = Effect.gen(function* () {
     events: Stream.unwrap(
       Effect.gen(function* () {
         const sub = yield* PubSub.subscribe(events);
-        return Stream.concat(Stream.succeed<SideEvent>({ type: "snapshot", at: Date.now(), state }), Stream.fromSubscription(sub));
+        return Stream.concat(Stream.succeed<SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state }), Stream.fromSubscription(sub));
       }),
     ),
     subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),

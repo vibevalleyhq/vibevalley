@@ -12,7 +12,7 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -533,7 +533,7 @@ export const make = (options: ConnectorOptions = {}) =>
                   connector: id,
                   ext_id: withId.id,
                   payload: JSON.stringify(withId),
-                  created_at: Date.now(),
+                  created_at: yield* Clock.currentTimeMillis,
                 });
               }
               if (cursor) yield* accountQ.accountCursor({ connector: id, cursor });
@@ -683,7 +683,7 @@ export const make = (options: ConnectorOptions = {}) =>
                     secrets: JSON.stringify(linked.secrets),
                     owner_id: linked.owner || null,
                     pair_code: pair,
-                    connected_at: Date.now(),
+                    connected_at: yield* Clock.currentTimeMillis,
                   });
                   yield* inboundQ.clearInbound({ connector: id });
                   yield* retire("换了账号");
