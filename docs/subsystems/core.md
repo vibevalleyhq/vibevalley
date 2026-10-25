@@ -44,7 +44,7 @@
 - **存除了田头、进度、定时、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`recurrences`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。接回要的工作目录、oar 会话 id、最后一轮原话和想起过的记性在 `session` 表（`place`、`oar_session`、`last_text`、`recalled`），干活过程、diff 这类大块的旁路数据不进核心状态。
 - **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`base/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
 - **关时写最后一份**：关的时候停掉等着的那次，写最后的状态并封住，已经在路上的定时回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
-- **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema 就从空的开始并记日志；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
+- **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema，就改名成 `state.json.unreadable-<毫秒>` 留着（不会被之后的保存盖掉）、从空的开始并记日志；改不了名就不开机（`base/files.ts` 的 `readOrSetAside`，`config.json`、`settings.json` 同样）；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
 
 **三条流**（`http/streams.ts`；「连接到本机」按同样的三个路径放行）
 
@@ -141,7 +141,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
+- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；形状不对的 `state.json` 原样留在一边、从空的开始；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`recurrence/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `DELETE` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `bun run golden:update -- cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。

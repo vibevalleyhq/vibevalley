@@ -1,14 +1,13 @@
 // The profiles work is sent to, the skills and each runtime's settings: config.json in
 // the home. The orchestrator is a profile every farm has, built in, never deleted, on VibeValley's own agent.
 
-import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings, seedAgents } from "./seed.ts";
 import { Context, Effect, Layer, Predicate, Schema } from "effect";
 import { Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
+import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
 interface Stored {
@@ -123,21 +122,7 @@ export const make = Effect.gen(function* () {
   const disk = new FileWriter(file);
   const seed: Stored = { agents: seedAgents(), skills: [], settings: {} };
   let s: Stored = seed;
-  if (existsSync(file)) {
-    try {
-      s = readStored(readFileSync(file, "utf8"));
-    } catch (e) {
-      // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
-      const aside = `${file}.unreadable-${Date.now()}`;
-      try {
-        renameSync(file, aside);
-      } catch (moved) {
-        return yield* Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${String(moved)}`));
-      }
-      yield* Effect.logWarning(`${file} could not be read (${String(e)}): kept as ${aside}, the profiles start from the seeds`);
-      s = seed;
-    }
-  }
+  s = (yield* readOrSetAside(file, readStored, "the profiles start from the seeds")) ?? seed;
   const agents = s.agents.some((a) => a.id === orchestratorAgent) ? s.agents : [...s.agents, orchestratorProfile()];
   s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   disk.write(() => JSON.stringify(s));

@@ -2,14 +2,13 @@
 // (0600). A key saved here wins over the configuration's. Keys are read each time they are used, so one saved is used at
 // once; a page sees only where each comes from and its last characters; keys are never logged.
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
+import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
 const MemorySourceConfig = Schema.Struct({
@@ -80,8 +79,6 @@ export interface SettingShape {
 
 export class Setting extends Context.Service<Setting, SettingShape>()("vibevalley/Setting") {}
 
-const read = (file: string): Stored => (existsSync(file) ? jsonOf(Stored)(readFileSync(file, "utf8")) : {});
-
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 
 /** Fields set to "" or nothing leave the file. */
@@ -98,7 +95,7 @@ export const make = Effect.gen(function* () {
     const tts = defaultVoice().tts;
     defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
   }
-  let stored = read(file);
+  let stored: Stored = (yield* readOrSetAside(file, jsonOf(Stored), "the settings start empty")) ?? {};
 
   const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
     saved ? [saved, "settings"] : given ? [given, "config"] : undefined;

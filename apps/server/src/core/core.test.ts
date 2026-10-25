@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { WorkspaceState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
@@ -35,12 +35,21 @@ describe("core", () => {
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));
   });
 
-  it.effect("valid JSON with the wrong state shape starts empty", () => {
+  it.effect("valid JSON with the wrong state shape is kept aside untouched, and the farm starts empty", () => {
     const config = testConfig();
-    writeFileSync(join(config.home, "state.json"), JSON.stringify({ call: "idle", orchestrator: "idle", sessions: {} }));
+    const raw = JSON.stringify({ call: "idle", orchestrator: "idle", sessions: {} });
+    writeFileSync(join(config.home, "state.json"), raw);
     return Effect.gen(function* () {
-      expect((yield* Core).state()).toEqual(emptyWorkspaceState());
-    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          expect((yield* Core).state()).toEqual(emptyWorkspaceState());
+        }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
+      );
+      // Closing wrote a new state.json; the owner's old one is kept as it was.
+      const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
+      expect(kept).toHaveLength(1);
+      expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
+    });
   });
 
   it.effect("open reads the call state when its effect runs", () => {

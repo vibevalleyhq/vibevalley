@@ -1,4 +1,4 @@
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { type Config, Settings } from "../base/config.ts";
@@ -124,16 +124,25 @@ describe("settings", () => {
     );
   });
 
-  it.effect("an unreadable or invalid settings file stops startup without being overwritten", () =>
+  it.effect("an unreadable or invalid settings file is kept aside untouched, and the settings start empty", () =>
     Effect.gen(function* () {
       const cases = ["{not json", JSON.stringify({ deepseekApiKey: 7, agoraAppId: appId })];
       for (const raw of cases) {
         const config = testConfig();
         const path = join(config.home, "settings.json");
         writeFileSync(path, raw);
-        const out = yield* Effect.exit(run(config, Setting));
-        expect(out._tag).toBe("Failure");
-        expect(readFileSync(path, "utf8")).toBe(raw);
+        yield* run(
+          config,
+          Effect.gen(function* () {
+            const s = yield* Setting;
+            expect(s.agora()).toBeUndefined();
+            // A save after it writes a new file; the one set aside keeps the owner's bytes.
+            yield* s.save({ dictation: { url: "http://127.0.0.1:1/v1", model: "m" } });
+          }),
+        );
+        const kept = readdirSync(config.home).filter((f) => f.startsWith("settings.json.unreadable-"));
+        expect(kept).toHaveLength(1);
+        expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
       }
     }),
   );

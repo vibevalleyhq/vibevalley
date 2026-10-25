@@ -3,7 +3,6 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   CommitCount,
@@ -22,7 +21,7 @@ import type {
 import * as S from "@vibevalley/protocol/schema";
 import { Cause, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
+import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
 
 export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
@@ -123,14 +122,8 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
-  let kept = emptyWorkspaceState();
-  if (existsSync(file)) {
-    try {
-      kept = { ...emptyWorkspaceState(), ...jsonOf(S.WorkspaceState)(readFileSync(file, "utf8")) };
-    } catch (e) {
-      yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
-    }
-  }
+  const read = jsonOf(S.WorkspaceState);
+  const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
   let state = restore(restarted(kept));
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));

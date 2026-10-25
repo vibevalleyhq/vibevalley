@@ -64,7 +64,7 @@
 
 **设置**：
 
-- **`settings.json` 只有你能读**（0600），由 `base/files.ts` 的 `FileWriter` 写：先写临时文件再改名，写到一半崩了也不留半个文件。开机按 `Stored` 的 Schema 读一次进内存，之后读内存；只有文件不存在才从空设置开始，读取、JSON 解析或形状校验失败都阻止启动，原文件不被覆盖。
+- **`settings.json` 只有你能读**（0600），由 `base/files.ts` 的 `FileWriter` 写：先写临时文件再改名，写到一半崩了也不留半个文件。开机按 `Stored` 的 Schema 读一次进内存，之后读内存；文件不存在就从空设置开始；读取、JSON 解析或形状校验失败，就改名成 `settings.json.unreadable-<毫秒>` 留着、从空设置开始并记日志：钥匙还在那份文件里，之后的保存写的是新文件，不会盖掉它；改不了名就不开机。
 - **设置 > 配置**：`deepseekApiKey()`、`agora()` 每次被调时按「设置里有就用设置的，没有用配置的」取，App ID 和 Certificate 各取各的；两样凑不齐时 `agora()` 是 `undefined`，语音不可用，别的照常。来源（`KeyStatus.source`）只有 `settings` 和 `config` 两种。
 - **只在设置里有的**：语音服务的 ASR、LLM、TTS key，听写（地址、模型、key），记性的来源（地址、key、开关）。听写没填地址就是关着（`dictation()` 是 `undefined`）。
 - **钥匙不出服务端**：`status()` 对每把钥匙只给来源和末四位（`keyHint`：`…` 加最后 4 个 UTF-16 码元）；Agora 的 App ID 不算钥匙，整串给。
