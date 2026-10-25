@@ -3,7 +3,7 @@ import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -59,6 +59,7 @@ const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
   Layer.effect(Memories, make(build, timeoutMs)).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),
+    Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, testConfig())),
   );

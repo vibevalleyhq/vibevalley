@@ -5,6 +5,7 @@
 import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
 import { Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
+import { Db } from "../base/db.ts";
 import * as q from "../../db/generated/memory.sql.ts";
 import { newId } from "../base/ids.ts";
 import { clip, memoryIsNewNote, memoryJobText, memoryNotesOf, nextForgotten, noteMaxChars, pick, type PickCue } from "./recall.ts";
@@ -49,7 +50,7 @@ const recutBatch = 100;
 
 export const makeMemories = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql);
+  const { attempt: db } = yield* Db;
 
   const list = (agent: string) =>
     db(

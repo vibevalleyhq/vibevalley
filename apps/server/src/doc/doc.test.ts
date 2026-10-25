@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { Agent, DocOp } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { Settings, type Config } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { make } from "./doc.ts";
@@ -10,7 +10,7 @@ import { demoPieces, demoScript } from "./demo.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
-const on = (config: Config = testConfig()) => Database.pipe(Layer.provideMerge(Layer.succeed(Settings, config)));
+const on = (config: Config = testConfig()) => DbLayer.pipe(Layer.provideMerge(Database), Layer.provideMerge(Layer.succeed(Settings, config)));
 
 type Service = Effect.Success<ReturnType<typeof make>>;
 

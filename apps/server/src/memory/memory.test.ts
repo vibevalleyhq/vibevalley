@@ -8,7 +8,7 @@ import * as q from "../../db/generated/memory.sql.ts";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { remember, rewriteMemory } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
-import { Database } from "../base/db.ts";
+import { Database, DbLayer } from "../base/db.ts";
 import { layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { orchestratorHome, Memories, make } from "./memory.ts";
@@ -18,6 +18,7 @@ const world = (config = testConfig()) =>
   Layer.effect(Memories, make()).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),
+    Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
     Layer.provideMerge(Layer.succeed(Settings, config)),
   );

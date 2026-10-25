@@ -56,7 +56,7 @@ import { actorText, graphChanges, graphEventText } from "./changes.ts";
 import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -168,7 +168,7 @@ export const make = (options: TaskOptions = {}) =>
     };
     const projects: TaskGit = options.git ?? (yield* Projects);
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
+    const { run: db } = yield* Db;
     /** A step's run ending and the person pressing a button must not both read the same graph and write over each other. */
     const lock = yield* Semaphore.make(1);
     const newsHub = yield* PubSub.unbounded<string>();

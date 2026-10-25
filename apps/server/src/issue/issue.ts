@@ -66,7 +66,7 @@ import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -224,10 +224,7 @@ export const make = (options: IssueOptions = {}) =>
     const chat = yield* Channels;
     const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-    const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.catchNoSuchElement(e)), Option.getOrUndefined);
-    const inTx = <A, E>(e: Effect.Effect<A, E>) =>
-      sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+    const { run: db, one, inTx } = yield* Db;
     const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);

@@ -15,8 +15,8 @@ import { pipeline } from "node:stream/promises";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
-import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
+import { Db } from "../base/db.ts";
 import { code as newCode, newId } from "../base/ids.ts";
 import { missing, lookIn } from "../errors.ts";
 import { callbackLog } from "../base/log.ts";
@@ -127,8 +127,7 @@ export const make = (options: LanOptions = {}) =>
     // Writes set off by a request belong to this service: they end with it and keep its services.
     const runHere = yield* FiberSet.makeRuntimePromise<never>();
     const config = yield* Settings;
-    const sql = yield* SqlClient.SqlClient;
-    const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.orDie(Effect.provideService(e, SqlClient.SqlClient, sql));
+    const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
     const now = options.now ?? Date.now;
 

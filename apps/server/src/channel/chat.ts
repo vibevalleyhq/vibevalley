@@ -44,9 +44,9 @@ import {
   type UnreadRow,
   wakeInput,
 } from "./rules.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
-import { SqlClient } from "effect/sql";
+import { Context, Effect, FiberMap, FiberSet, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { Settings } from "../base/config.ts";
+import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
@@ -339,11 +339,7 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const core = yield* Core;
   let helpers: Helpers | undefined;
-  const sql = yield* SqlClient.SqlClient;
-  const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
-  const one = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.map(db(Effect.catchNoSuchElement(e)), Option.getOrUndefined);
-  const inTx = <A, E>(e: Effect.Effect<A, E>) =>
-    sql.withTransaction(e).pipe(Effect.catchTag("SqlError", Effect.die)) as Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
+  const { run: db, one, inTx } = yield* Db;
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
