@@ -20,6 +20,7 @@ import {
   type TaskEdit,
   type TaskGraph,
 } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
 import { graphActions, graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskActions, taskActionText, taskOf } from "./graph.ts";
@@ -52,11 +53,12 @@ import {
   withTask,
 } from "./rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
-import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { causeMessage } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
@@ -68,6 +70,12 @@ import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews
 import * as q from "../../db/generated/task_event.sql.ts";
 
 const readLimit = 1000;
+const EventPayloadSchema: Schema.Codec<Pick<GraphEvent, "session" | "detail" | "changes" | "commits">> = Schema.Struct({
+  session: Schema.optionalKey(Schema.String),
+  detail: Schema.optionalKey(Schema.String),
+  changes: Schema.optionalKey(Schema.mutable(Schema.Array(S.TaskFieldChange))),
+  commits: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
@@ -127,7 +135,7 @@ export interface TaskGit {
   readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
   readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
   readonly mergeBranch: (project: string, branch: string) => Effect.Effect<string, MergeFailure>;
-  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes, ProjectError>;
+  readonly branchChanges: (project: string, branch: string) => Effect.Effect<Changes | undefined, ProjectError>;
   readonly changedFiles: (cwd: string, base: string) => Effect.Effect<string[], ProjectError>;
   readonly mergeInto: ProjectShape["mergeInto"];
 }
@@ -253,41 +261,40 @@ export const make = (options: TaskOptions = {}) =>
       yield* tellOrchestrator(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
     });
 
-    const recurrence = (id: string): Effect.Effect<void, ApiError> =>
-      Effect.gen(function* () {
-        let graph = get(id);
-        if (!graph || graph.state !== "running") return;
-        for (const task of startable(graph)) {
-          const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
-          let refusal = "没有能派的帮工";
-          let hired: Session | undefined;
-          if (agent) {
-            const tag: SessionGraph = { id: graph.id, task: task.id };
-            const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
-              worktree: true,
-              taskGraph: tag,
-              base: graph.branch ?? "",
-              trigger: { kind: "task" },
-              issue: taskIssueID(graph.id, task.id),
-            });
-            hired = got.session;
-            refusal = got.refused ?? refusal;
-          }
-          if (!hired) {
-            // Not now: it waits, and is tried again when a session finishes or leaves.
-            const note = "「" + task.title + "」先等着：" + refusal;
-            if (graph.note !== note) yield* putSystem(withNote(graph, note));
-            return;
-          }
-          const session = hired.id;
-          graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
-          const saved = yield* Effect.result(putSystem(graph));
-          if (saved._tag === "Failure") {
-            yield* dismiss(session);
-            return yield* Effect.fail(saved.failure);
-          }
+    const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
+      let graph = get(id);
+      if (!graph || graph.state !== "running") return;
+      for (const task of startable(graph)) {
+        const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
+        let refusal = "没有能派的帮工";
+        let hired: Session | undefined;
+        if (agent) {
+          const tag: SessionGraph = { id: graph.id, task: task.id };
+          const got = yield* work.hire(agent, taskBrief(graph, task), graph.project, {
+            worktree: true,
+            taskGraph: tag,
+            base: graph.branch ?? "",
+            trigger: { kind: "task" },
+            issue: taskIssueID(graph.id, task.id),
+          });
+          hired = got.session;
+          refusal = got.refused ?? refusal;
         }
-      });
+        if (!hired) {
+          // Not now: it waits, and is tried again when a session finishes or leaves.
+          const note = "「" + task.title + "」先等着：" + refusal;
+          if (graph.note !== note) yield* putSystem(withNote(graph, note));
+          return;
+        }
+        const session = hired.id;
+        graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
+        const saved = yield* Effect.result(putSystem(graph));
+        if (saved._tag === "Failure") {
+          yield* dismiss(session);
+          return yield* Effect.fail(saved.failure);
+        }
+      }
+    });
 
     const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
@@ -315,27 +322,26 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
-    const verified = (graph: TaskGraph, task: Task, cwd: string): Effect.Effect<Verification> =>
-      Effect.gen(function* () {
-        const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
-        let changed: string[] = [];
-        if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
-          const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-          if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
-          changed = files.success;
-        }
-        if (isAcceptance(task) && task.check) {
-          if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
-          return { frozen: changed };
-        }
-        const touched = frozenTouched(graph, task, changed);
-        if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
-        for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
-          const ran = yield* projects.run(cwd, check);
-          if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
-        }
-        return { frozen: [] };
-      });
+    const verified = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, cwd: string) {
+      const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
+      let changed: string[] = [];
+      if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
+        const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
+        if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
+        changed = files.success;
+      }
+      if (isAcceptance(task) && task.check) {
+        if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
+        return { frozen: changed };
+      }
+      const touched = frozenTouched(graph, task, changed);
+      if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
+      for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
+        const ran = yield* projects.run(cwd, check);
+        if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
+      }
+      return { frozen: [] };
+    });
 
     const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
@@ -659,12 +665,7 @@ export const make = (options: TaskOptions = {}) =>
         return rows.flatMap((row): GraphEvent[] => {
           // A row this code no longer knows how to read is left out.
           if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(GraphActorValues as readonly string[]).includes(row.actor)) return [];
-          let p: Partial<GraphEvent> = {};
-          try {
-            p = JSON.parse(row.payload) as Partial<GraphEvent>;
-          } catch {
-            p = {};
-          }
+          const p = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
           const e: GraphEvent = {
             id: row.id,
             graph: row.graph_id,
@@ -683,7 +684,9 @@ export const make = (options: TaskOptions = {}) =>
       changes: Effect.fn("Tasks.changes")(function* (id) {
         const graph = yield* need(id);
         if (!graph.branch) return yield* Effect.fail(refused("计划「" + graph.title + "」还没开工，没有分支"));
-        return yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
+        const changes = yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
+        if (!changes) return yield* Effect.fail(refused("计划「" + graph.title + "」的分支不在了：先确认它是不是被删掉了"));
+        return changes;
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),
     };

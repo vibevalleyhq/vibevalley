@@ -849,10 +849,13 @@ export interface LanguageCount {
 
 export interface GitHubStatus {
   installed: boolean;
-  version: string;
+  /** gh's version, when it says one. */
+  version?: string;
   loggedIn: boolean;
-  account: string;
-  reason: string;
+  /** The logged-in account, when logged in. */
+  account?: string;
+  /** Why it is not usable, when it is not. */
+  reason?: string;
   checkedAt: number;
 }
 

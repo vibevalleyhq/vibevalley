@@ -59,6 +59,7 @@ class FakeNowledge {
   adds: Record<string, unknown>[] = [];
   others: string[] = [];
   details: string[] = [];
+  searchResult: unknown;
 
   private server() {
     const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
@@ -78,6 +79,7 @@ class FakeNowledge {
         }
         case "memory_search": {
           this.searches.push(a);
+          if (this.searchResult !== undefined) return text(this.searchResult);
           const query = (a.query as string) ?? "";
           const label = (a.filter_labels as string) ?? "";
           const results = [...this.memories]
@@ -123,6 +125,7 @@ interface EverosRequest {
 /** EverOS's /api/v2 played: every request as it came, and a search that answers with one case and one episode. */
 class FakeEveros {
   requests: EverosRequest[] = [];
+  searchData: unknown;
   serve() {
     return listen(
       createServer(async (req, res) => {
@@ -157,7 +160,7 @@ class FakeEveros {
                     },
                   ],
                 };
-          res.end(JSON.stringify({ request_id: "r1", data }));
+          res.end(JSON.stringify(this.searchData === undefined ? { request_id: "r1", data } : this.searchData));
         } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(JSON.stringify({ request_id: "r2", data: {} }));
         else res.writeHead(404).end();
       }),
@@ -276,6 +279,22 @@ describe("Nowledge Mem", () => {
       expect(Date.now() - start).toBeLessThan(1000);
     }).pipe(Effect.provide(world(100))),
   );
+
+  it.live("malformed Nowledge responses degrade to no outside memories and can recover", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      yield* save({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      const m = yield* Memories;
+      const q = { agent: "lab", project: "", text: "有效", kind: "" as const, limit: 10 };
+      fake.searchResult = { results: {} };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchResult = { results: [{ id: 42, content: "bad" }] };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchResult = undefined;
+      fake.memories = [{ id: "nm-1", title: "有效", content: "有效的记忆", labels: nowledgeLabels("lab", "").split(",") }];
+      expect((yield* m.search(q)).found.map((f) => f.id)).toEqual(["nowledge:nm-1"]);
+    }).pipe(Effect.provide(world())),
+  );
 });
 
 describe("EverOS", () => {
@@ -300,6 +319,21 @@ describe("EverOS", () => {
       expect(text).toContain("EverOS");
       expect(text).toContain("不支持跨项目");
       expect(fake.seen("search")).toHaveLength(2);
+    }).pipe(Effect.provide(world())),
+  );
+
+  it.live("malformed EverOS responses degrade to no outside memories and can recover", () =>
+    Effect.gen(function* () {
+      const fake = new FakeEveros();
+      yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: false });
+      const m = yield* Memories;
+      const q = { agent: "lab", project: "demo", text: "分页", kind: "" as const, limit: 10 };
+      fake.searchData = { data: { agent_cases: {} } };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchData = { data: { agent_cases: [{ id: 42 }] } };
+      expect((yield* m.search(q)).found).toEqual([]);
+      fake.searchData = undefined;
+      expect((yield* m.search(q)).found.some((f) => f.text.includes("给打卡接口加分页"))).toBe(true);
     }).pipe(Effect.provide(world())),
   );
 

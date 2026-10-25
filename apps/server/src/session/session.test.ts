@@ -2,17 +2,20 @@ import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scriptedRuntime, type ScriptedTurn } from "@botiverse/oar/testing";
+import type { Session as RuntimeSession } from "@botiverse/oar";
 import { describe, expect, it } from "@effect/vitest";
+import { TestClock } from "effect/testing";
 import type { Agent, Session } from "@vibevalley/protocol";
 import { seedAgents } from "../agent/seed.ts";
 import { Agents } from "../agent/agent.ts";
-import { Effect, Fiber, Semaphore, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber, Semaphore, Stream } from "effect";
+import { SqlClient } from "effect/sql";
 import { Core } from "../core/core.ts";
 import { MergeFailure, Projects } from "../project/project.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
-import { Sessions, type SessionsInside } from "./session.ts";
+import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
 import { until } from "../testing/until.ts";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
@@ -36,6 +39,49 @@ const worker = (turns: ScriptedTurn[]) =>
 const phase = (core: Core["Service"], id: string) => core.session(id)?.phase._tag;
 
 describe("sessions", () => {
+  it.live("interrupting an opening disposes the late session and releases its allocation", () => {
+    let entered = () => {};
+    const opening = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let disposed = 0;
+    const base = worker([]);
+    const runtime = {
+      ...base,
+      session: async (...args: Parameters<typeof base.session>) => {
+        entered();
+        await gate;
+        const session = await base.session(...args);
+        return {
+          ...session,
+          dispose: async () => {
+            disposed++;
+            await session.dispose();
+          },
+        };
+      },
+    };
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      yield* (yield* Agents).saveAgent(lab());
+      const sending = yield* Effect.forkChild(sessions.send(lab(), "interrupted", "demo", { issue: { id: "i1", number: 1 }, worktree: true }));
+      yield* Effect.promise(() => opening);
+      const interrupting = yield* Effect.forkChild(Fiber.interrupt(sending));
+      yield* Effect.yieldNow;
+      release();
+      yield* Fiber.join(interrupting);
+      expect(disposed).toBe(1);
+      expect(sessions.noRoom("pi", "demo")).toBe("");
+      const again = yield* sessions.send(lab(), "again", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      expect(again.session).toBeDefined();
+      expect(again.refused).toBeUndefined();
+    }).pipe(Effect.scoped, Effect.provide(world({ config: testConfig(), runtimes: [runtime], repos: ["demo"] })));
+  });
+
   it.live("a released failed resume can fall back without reserving its old allocation", () => {
     let opens = 0;
     const base = worker([]);
@@ -284,4 +330,70 @@ describe("sessions", () => {
       expect(sessions.noRoom("pi", "demo")).toBe("");
     }).pipe(Effect.scoped, Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, repos: ["demo"] }))),
   );
+
+  it.effect("stall sleeping and the quiet timestamp use the same clock", () =>
+    Effect.gen(function* () {
+      const record = {
+        kind: "request",
+        id: "r1",
+        direction: "toRuntime",
+        body: { kind: "prompt", input: "start" },
+        sessionId: "w1",
+        agentPath: [],
+        seq: 0,
+        receivedAt: 0,
+      } as const;
+      let emit = () => {};
+      const session = {
+        id: "w1",
+        rawEvents: (observer: (event: typeof record) => void) => {
+          emit = () => observer(record);
+          return () => undefined;
+        },
+      } as unknown as RuntimeSession;
+      const clock = yield* Clock.Clock;
+      const waits: Effect.Effect<void>[] = [];
+      const seen: { silentForMs: number; at: number }[] = [];
+      watchStalls(
+        session,
+        50,
+        (silentForMs, at) => seen.push({ silentForMs, at }),
+        (wait) => waits.push(wait),
+        () => clock.currentTimeMillisUnsafe(),
+      );
+      emit();
+      expect(waits).toHaveLength(1);
+      yield* Effect.forkChild(waits[0]!);
+      yield* TestClock.adjust(49);
+      expect(seen).toEqual([]);
+      yield* TestClock.adjust(1);
+      expect(seen).toEqual([{ silentForMs: 50, at: 50 }]);
+    }),
+  );
+
+  it.live("a registration SQL failure is refused rather than hidden as a defect", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const sql = yield* SqlClient.SqlClient;
+      const got = yield* sessions.send(lab(), "another", "demo", {
+        issue: { id: "i2", number: 2 },
+        hiring: () => Effect.orDie(sql.unsafe("select no_such_column from issue_session")),
+      });
+      expect(got.refused).toContain("工单没记下来");
+    }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
+  });
+
+  it.live("a non-SQL registration defect is rethrown after the opened session is stopped", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const exit = yield* Effect.exit(
+        sessions.send(lab(), "another", "demo", { issue: { id: "i2", number: 2 }, hiring: () => Effect.die(new Error("registration bug")) }),
+      );
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
+      const next = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i3", number: 3 } });
+      expect(next.session).toBeDefined();
+    }).pipe(Effect.scoped, Effect.provide(world({ config, runtimes: [worker([])], repos: ["demo"] })));
+  });
 });

@@ -55,14 +55,29 @@ export interface LanRefused {
 /** What a route may refuse with: written as JSON with its _tag, at its status. */
 export type ApiError = Refused | Missing | VoiceUnavailable | VoiceAgentFailed | ConnectorRefused | LanRefused;
 
-const NextSchema: Schema.Codec<Next> = Schema.Struct({ say: Schema.String, run: Schema.optionalKey(Schema.Array(Schema.String)) });
+const NextSchema: Schema.Codec<Next> = Schema.Struct({
+  say: Schema.String,
+  run: Schema.optionalKey(Schema.Array(Schema.String)),
+});
 const reasonOf = <Tag extends string>(tag: Tag) => Schema.Struct({ _tag: Schema.tag(tag), reason: Schema.String });
 
 /** The error as a route writes it, for a client to read back (the command line's failures). */
 export const ApiError: Schema.Codec<ApiError> = Schema.Union([
-  Schema.Struct({ _tag: Schema.tag("Refused"), reason: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
-  Schema.Struct({ _tag: Schema.tag("Missing"), what: Schema.String, next: Schema.optionalKey(Schema.Array(NextSchema)) }),
-  Schema.Struct({ _tag: Schema.tag("VoiceUnavailable"), reason: Schema.String, settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])) }),
+  Schema.Struct({
+    _tag: Schema.tag("Refused"),
+    reason: Schema.String,
+    next: Schema.optionalKey(Schema.Array(NextSchema)),
+  }),
+  Schema.Struct({
+    _tag: Schema.tag("Missing"),
+    what: Schema.String,
+    next: Schema.optionalKey(Schema.Array(NextSchema)),
+  }),
+  Schema.Struct({
+    _tag: Schema.tag("VoiceUnavailable"),
+    reason: Schema.String,
+    settings: Schema.optionalKey(Schema.Literals(["agora", "deepseek", "voice"])),
+  }),
   reasonOf("VoiceAgentFailed"),
   reasonOf("ConnectorRefused"),
   reasonOf("LanRefused"),
@@ -251,7 +266,16 @@ export interface Endpoint {
 }
 
 export const endpoints: readonly Endpoint[] = [
-  { op: "server.health", method: "GET", path: "/api/v1/health", pathParams: [], query: [], body: undefined, result: S.Health, can: ["owner", "remote"] },
+  {
+    op: "server.health",
+    method: "GET",
+    path: "/api/v1/health",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.Health,
+    can: ["owner", "remote"],
+  },
   {
     op: "orchestrator.open",
     method: "POST",
@@ -292,8 +316,26 @@ export const endpoints: readonly Endpoint[] = [
     result: S.SettingsCheck,
     can: ["owner", "remote"],
   },
-  { op: "setting.save", method: "PUT", path: "/api/v1/settings", pathParams: [], query: [], body: S.SettingsUpdate, result: S.SettingsStatus, can: ["owner"] },
-  { op: "channel.say", method: "POST", path: "/api/v1/say", pathParams: [], query: [], body: S.SayRequest, result: undefined, can: ["owner", "remote"] },
+  {
+    op: "setting.save",
+    method: "PUT",
+    path: "/api/v1/settings",
+    pathParams: [],
+    query: [],
+    body: S.SettingsUpdate,
+    result: S.SettingsStatus,
+    can: ["owner"],
+  },
+  {
+    op: "channel.say",
+    method: "POST",
+    path: "/api/v1/say",
+    pathParams: [],
+    query: [],
+    body: S.SayRequest,
+    result: undefined,
+    can: ["owner", "remote"],
+  },
   {
     op: "channel.create",
     method: "POST",
@@ -485,7 +527,16 @@ export const endpoints: readonly Endpoint[] = [
     result: S.IssueTimeline,
     can: ["owner", "remote"],
   },
-  { op: "issue.create", method: "POST", path: "/api/v1/issues", pathParams: [], query: [], body: S.IssueRequest, result: S.Issue, can: ["owner", "remote"] },
+  {
+    op: "issue.create",
+    method: "POST",
+    path: "/api/v1/issues",
+    pathParams: [],
+    query: [],
+    body: S.IssueRequest,
+    result: S.Issue,
+    can: ["owner", "remote"],
+  },
   {
     op: "issue.update",
     method: "PUT",
@@ -735,7 +786,16 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.RuntimeInfo)),
     can: ["owner", "remote"],
   },
-  { op: "github.status", method: "GET", path: "/api/v1/github", pathParams: [], query: [], body: undefined, result: S.GitHubStatus, can: ["owner", "remote"] },
+  {
+    op: "github.status",
+    method: "GET",
+    path: "/api/v1/github",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.GitHubStatus,
+    can: ["owner", "remote"],
+  },
   {
     op: "github.refresh",
     method: "POST",
@@ -786,7 +846,16 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.AgentCheck)),
     can: ["owner", "remote"],
   },
-  { op: "agent.create", method: "POST", path: "/api/v1/agents", pathParams: [], query: [], body: S.Agent, result: S.Agent, can: ["owner", "orchestrator"] },
+  {
+    op: "agent.create",
+    method: "POST",
+    path: "/api/v1/agents",
+    pathParams: [],
+    query: [],
+    body: S.Agent,
+    result: S.Agent,
+    can: ["owner", "orchestrator"],
+  },
   {
     op: "agent.save",
     method: "PUT",
@@ -918,7 +987,16 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.Skill)),
     can: ["owner", "remote"],
   },
-  { op: "skill.create", method: "POST", path: "/api/v1/skills", pathParams: [], query: [], body: S.Skill, result: S.Skill, can: ["owner", "orchestrator"] },
+  {
+    op: "skill.create",
+    method: "POST",
+    path: "/api/v1/skills",
+    pathParams: [],
+    query: [],
+    body: S.Skill,
+    result: S.Skill,
+    can: ["owner", "orchestrator"],
+  },
   {
     op: "skill.save",
     method: "PUT",
@@ -1130,9 +1208,36 @@ export const endpoints: readonly Endpoint[] = [
     result: S.ConnectorStatus,
     can: ["owner"],
   },
-  { op: "lan.status", method: "GET", path: "/api/v1/lan", pathParams: [], query: [], body: undefined, result: S.LanStatus, can: ["owner"] },
-  { op: "lan.update", method: "PUT", path: "/api/v1/lan", pathParams: [], query: [], body: S.SetOpenRequest, result: S.LanStatus, can: ["owner"] },
-  { op: "lan.startPairing", method: "POST", path: "/api/v1/lan/pairing", pathParams: [], query: [], body: undefined, result: S.LanStatus, can: ["owner"] },
+  {
+    op: "lan.status",
+    method: "GET",
+    path: "/api/v1/lan",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.LanStatus,
+    can: ["owner"],
+  },
+  {
+    op: "lan.update",
+    method: "PUT",
+    path: "/api/v1/lan",
+    pathParams: [],
+    query: [],
+    body: S.SetOpenRequest,
+    result: S.LanStatus,
+    can: ["owner"],
+  },
+  {
+    op: "lan.startPairing",
+    method: "POST",
+    path: "/api/v1/lan/pairing",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.LanStatus,
+    can: ["owner"],
+  },
   {
     op: "lan.stopPairing",
     method: "DELETE",
@@ -1195,7 +1300,16 @@ export const endpoints: readonly Endpoint[] = [
     result: S.LanPaired,
     can: ["owner", "remote"],
   },
-  { op: "lan.me", method: "GET", path: "/api/v1/lan/me", pathParams: [], query: [], body: undefined, result: S.LanDevice, can: ["owner", "remote"] },
+  {
+    op: "lan.me",
+    method: "GET",
+    path: "/api/v1/lan/me",
+    pathParams: [],
+    query: [],
+    body: undefined,
+    result: S.LanDevice,
+    can: ["owner", "remote"],
+  },
   {
     op: "doc.list",
     method: "GET",
@@ -1206,7 +1320,16 @@ export const endpoints: readonly Endpoint[] = [
     result: Schema.mutable(Schema.Array(S.Document)),
     can: ["owner", "remote"],
   },
-  { op: "doc.create", method: "POST", path: "/api/v1/docs", pathParams: [], query: [], body: S.DocRequest, result: S.DocSnapshot, can: ["owner", "remote"] },
+  {
+    op: "doc.create",
+    method: "POST",
+    path: "/api/v1/docs",
+    pathParams: [],
+    query: [],
+    body: S.DocRequest,
+    result: S.DocSnapshot,
+    can: ["owner", "remote"],
+  },
   {
     op: "doc.import",
     method: "POST",

@@ -16,6 +16,7 @@ import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
 import { until } from "../testing/until.ts";
+import * as qm from "../../db/generated/channel_message.sql.ts";
 
 /** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
 class FakeSessions {
@@ -479,6 +480,18 @@ describe("the chat", () => {
     expect(summaryOf("第一段\n\n第二段")).toBe("第一段\n\n第二段");
     expect(head("😀abc", 1)).toBe("");
   });
+
+  it.live("a valid JSON message meta with the wrong shape degrades to none", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const { message } = yield* f.chat.say("带元数据", undefined, "");
+        yield* Effect.orDie(qm.updateMessageMeta({ meta: `{"mentions":{},"spent":{"tokens":1e999}}`, id: message.id }));
+        const saved = (yield* f.chat.history(f.chat.general())).find((m) => m.id === message.id)!;
+        expect(saved.text).toBe("带元数据");
+        expect([saved.mentions, saved.spent, saved.run]).toEqual([undefined, undefined, undefined]);
+      }),
+    ),
+  );
 
   it.live("a message keeps the run that made it", () =>
     run((f, x) =>

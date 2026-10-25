@@ -18,6 +18,7 @@ import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
 import { untilGot } from "../testing/until.ts";
+import * as q from "../../db/generated/task_event.sql.ts";
 
 const step = (id: string, ...needs: string[]) => ({
   id,
@@ -231,6 +232,28 @@ const run = <A, E>(
 ) => Effect.flatMap(farm, body).pipe(Effect.scoped, Effect.provide(worldBelowTasks({ config })));
 
 describe("task graphs", () => {
+  it.live("an event with malformed payload keeps its durable identity but no invented details", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const id = yield* f.split("菱形", "diamond");
+        yield* Effect.orDie(
+          q.addGraphEvent({
+            id: "bad-payload",
+            graph_id: id,
+            task_id: null,
+            kind: "splitting",
+            actor: "system",
+            payload: `{"session":"w1","changes":[{"field":"check","from":1,"to":"ok"}]}`,
+            created_at: 1,
+          }),
+        );
+        const bad = (yield* f.tasks.events(id)).find((e) => e.id === "bad-payload")!;
+        expect(bad).toMatchObject({ id: "bad-payload", graph: id, kind: "splitting", actor: "system" });
+        expect([bad.session, bad.changes]).toEqual([undefined, undefined]);
+      }),
+    ),
+  );
+
   it.live("a diamond is split, worked side by side, and merged", () =>
     run((f) =>
       Effect.gen(function* () {

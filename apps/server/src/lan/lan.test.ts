@@ -1,4 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
@@ -13,11 +14,12 @@ const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
 
 /** The whole farm on a free port, with a page, its lan listener on loopback, which it calls its network address. */
-const farm = Effect.gen(function* () {
-  const config = { ...testConfig(), web, lan: { port: 0 } };
-  const built = yield* Layer.build(app(config, 0, () => Effect.void, { lan: { host: "127.0.0.1", address: () => "127.0.0.1" } }));
-  return Context.get(built, Lan);
-});
+const farm = (lanPort = 0) =>
+  Effect.gen(function* () {
+    const config = { ...testConfig(), web, lan: { port: lanPort } };
+    const built = yield* Layer.build(app(config, 0, () => Effect.void, { lan: { host: "127.0.0.1", address: () => "127.0.0.1" } }));
+    return Context.get(built, Lan);
+  });
 
 const request = async (method: string, url: string, key: string, body?: unknown) => {
   const res = await fetch(url, {
@@ -54,7 +56,7 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
 describe("lan access", () => {
   it.live("is shut until opened", () =>
     Effect.gen(function* () {
-      const lan = yield* farm;
+      const lan = yield* farm();
       expect(lan.status()).toMatchObject({ open: false, devices: [] });
       expect(lan.status().url).toBeUndefined();
       expect(yield* Effect.flip(lan.startPairing())).toMatchObject({ _tag: "LanRefused" });
@@ -77,9 +79,25 @@ describe("lan access", () => {
     }).pipe(Effect.scoped),
   );
 
+  it.live("waits for the old listener to close before reopening a fixed port", () =>
+    Effect.gen(function* () {
+      const probe = createServer();
+      yield* Effect.promise(() => new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", () => resolve())));
+      const address = probe.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      yield* Effect.promise(() => new Promise<void>((resolve) => probe.close(() => resolve())));
+      const lan = yield* farm(port);
+      for (let i = 0; i < 3; i++) {
+        const addr = yield* open(lan);
+        expect(new URL(addr).port).toBe(String(port));
+        yield* lan.setOpen(false);
+      }
+    }).pipe(Effect.scoped),
+  );
+
   it.live("lets a paired device use the farm, and only what is remote", () =>
     Effect.gen(function* () {
-      const lan = yield* farm;
+      const lan = yield* farm();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "  小明的\niPhone ");
       const s = lan.status();
@@ -118,7 +136,7 @@ describe("lan access", () => {
 
   it.live("lets the owner refuse a device, and holds a second one off", () =>
     Effect.gen(function* () {
-      const lan = yield* farm;
+      const lan = yield* farm();
       const addr = yield* open(lan);
       const s = yield* lan.startPairing();
       const got = ask(addr, s.pairing!.code, "陌生人");
@@ -135,7 +153,7 @@ describe("lan access", () => {
 
   it.live("calls the pairing off after too many wrong codes", () =>
     Effect.gen(function* () {
-      const lan = yield* farm;
+      const lan = yield* farm();
       const addr = yield* open(lan);
       const s = yield* lan.startPairing();
       for (let i = 0; i < 5; i++) expect(yield* Effect.promise(() => ask(addr, "WRONGCODE", "猜码的"))).toContain("配对码不对");
@@ -145,7 +163,7 @@ describe("lan access", () => {
 
   it.live("ends a forgotten device's streams", () =>
     Effect.gen(function* () {
-      const lan = yield* farm;
+      const lan = yield* farm();
       const addr = yield* open(lan);
       const paired = yield* pair(lan, addr, "旧手机");
       const res = yield* Effect.promise(() => fetch(addr + "/api/v1/state", { headers: { authorization: "Bearer " + paired.key } }));

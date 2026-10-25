@@ -218,6 +218,16 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  it.live("does not start a brief whose caller already left", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator;
+      expect(yield* Effect.promise(() => orchestrator.brief("【要告诉主人】\n- #41 交回来了", AbortSignal.abort()))).toBe("");
+      yield* settle;
+      expect(f.requests).toHaveLength(0);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("says once why it cannot start", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {

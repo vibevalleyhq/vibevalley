@@ -1,13 +1,13 @@
 // The profiles work is sent to, the skills and each runtime's settings: config.json in
 // the home. The orchestrator is a profile every farm has, built in, never deleted, on VibeValley's own agent.
 
-import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Predicate, Schema } from "effect";
 import { Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
+import { FileWriter, readOrSetAside } from "../base/files.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
 interface Stored {
@@ -15,6 +15,34 @@ interface Stored {
   readonly skills: readonly Skill[];
   readonly settings: Readonly<Record<string, RuntimeSettings>>;
 }
+
+// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed. They are
+// filled first, then the profile is read whole; anything else that does not fit makes the file unreadable.
+const readFile = Schema.decodeUnknownSync(
+  Schema.fromJsonString(
+    Schema.Struct({
+      agents: Schema.Array(Schema.Unknown),
+      skills: Schema.Array(S.Skill),
+      settings: Schema.Record(Schema.String, S.RuntimeSettings),
+    }),
+  ),
+);
+const readAgent = Schema.decodeUnknownSync(S.Agent);
+const lookFilled = (raw: unknown): unknown =>
+  Predicate.isObject(raw) && Predicate.isObject(raw.look)
+    ? {
+        ...raw,
+        look: { ...raw.look, build: raw.look.build || "biped", head: raw.look.head || "rounded" },
+      }
+    : raw;
+const readStored = (text: string): Stored => {
+  const file = readFile(text);
+  return {
+    agents: file.agents.map((a) => readAgent(lookFilled(a))),
+    skills: file.skills,
+    settings: file.settings,
+  };
+};
 
 /** The runtime id of VibeValley's own agent, the one the orchestrator runs on. */
 export const orchestratorRuntime = "vibevalley";
@@ -94,23 +122,9 @@ export const make = Effect.gen(function* () {
   const disk = new FileWriter(file);
   const seed: Stored = { agents: seedAgents(), skills: [], settings: {} };
   let s: Stored = seed;
-  if (existsSync(file)) {
-    try {
-      s = JSON.parse(readFileSync(file, "utf8")) as Stored;
-    } catch (e) {
-      // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
-      const aside = `${file}.unreadable-${Date.now()}`;
-      try {
-        renameSync(file, aside);
-      } catch (moved) {
-        return yield* Effect.die(new Error(`${file} cannot be read, and could not be kept aside as ${aside}: ${String(moved)}`));
-      }
-      yield* Effect.logWarning(`${file} could not be read (${String(e)}): kept as ${aside}, the profiles start from the seeds`);
-      s = seed;
-    }
-  }
+  s = (yield* readOrSetAside(file, readStored, "the profiles start from the seeds")) ?? seed;
   const agents = s.agents.some((a) => a.id === orchestratorAgent) ? s.agents : [...s.agents, orchestratorProfile()];
-  s = { agents: agents.map(withCast), skills: s.skills ?? [], settings: s.settings ?? {} };
+  s = { agents: agents.map(withCast), skills: s.skills, settings: s.settings };
   disk.write(() => JSON.stringify(s));
 
   /** A change is kept only once it is on disk: one that cannot be written is refused and leaves the profiles as they were. */
@@ -170,7 +184,9 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
       ),
     previewDeleteAgent: (id) =>
-      Effect.map(deletableAgent(id), (a) => ({ does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`] })),
+      Effect.map(deletableAgent(id), (a) => ({
+        does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`],
+      })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
@@ -201,7 +217,9 @@ export const make = Effect.gen(function* () {
     previewDeleteSkill: (id) =>
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => `「${a.name}」`);
-        return { does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])] };
+        return {
+          does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])],
+        };
       }),
     saveSettings: (runtime, settings) =>
       Effect.as(

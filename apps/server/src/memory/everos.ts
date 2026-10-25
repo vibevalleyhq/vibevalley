@@ -5,6 +5,7 @@
 // first: a helper's words may carry a key.
 
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
+import { Schema } from "effect";
 import { createHash } from "node:crypto";
 import { newId } from "../base/ids.ts";
 import { redact } from "../base/redact.ts";
@@ -38,6 +39,29 @@ interface FoundBody {
     }[];
   };
 }
+
+const Episode = Schema.Struct({
+  id: Schema.String,
+  subject: Schema.optionalKey(Schema.String),
+  summary: Schema.optionalKey(Schema.String),
+  episode: Schema.optionalKey(Schema.String),
+  score: Schema.optionalKey(Schema.Finite),
+  app_id: Schema.optionalKey(Schema.String),
+  project_id: Schema.optionalKey(Schema.String),
+});
+const AgentCase = Schema.Struct({
+  id: Schema.String,
+  task_intent: Schema.optionalKey(Schema.String),
+  approach: Schema.optionalKey(Schema.String),
+  key_insight: Schema.optionalKey(Schema.String),
+  score: Schema.optionalKey(Schema.Finite),
+  app_id: Schema.optionalKey(Schema.String),
+  project_id: Schema.optionalKey(Schema.String),
+});
+const FoundPayload: Schema.Codec<FoundBody> = Schema.Struct({
+  data: Schema.optionalKey(Schema.Struct({ episodes: Schema.optionalKey(Schema.Array(Episode)), agent_cases: Schema.optionalKey(Schema.Array(AgentCase)) })),
+});
+const FoundBodySchema = Schema.fromJsonString(FoundPayload);
 
 // EverOS scope ids are ASCII and at most 128 characters; a real project named "global" must stay separate from global notes.
 const scopeOf = (project: string) => (project ? "project-" + createHash("sha256").update(project).digest("hex") : "global");
@@ -92,7 +116,7 @@ export function everos(c: MemorySourceConfig): Source {
     const text = await post("search", body, signal);
     let found: FoundBody;
     try {
-      found = JSON.parse(text) as FoundBody;
+      found = Schema.decodeUnknownSync(FoundBodySchema)(text);
     } catch {
       throw new Error("memory/search answered what it should not: " + text.slice(0, 200));
     }

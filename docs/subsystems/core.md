@@ -44,7 +44,7 @@
 - **存除了田头、进度、定时、工单以外的全部**（`toKeep` 清掉 `chat`、`progress`、`recurrences`、`issues`）：它们的家是库，开机由拥有者从库里放回核心状态。工单只放开着的和最近关的 50 家（`keepClosedIssues`）。接回要的工作目录、oar 会话 id、最后一轮原话和想起过的记性在 `session` 表（`place`、`oar_session`、`last_text`、`recalled`），干活过程、diff 这类大块的旁路数据不进核心状态。
 - **合并写**：从第一条变化起算 500 毫秒写一次，持续有事实也不推迟这一次；一次崩溃最多丢半秒。写的是临时文件再改名（`base/files.ts` 的 `FileWriter`），不会留下半个文件；写不了记日志，不停服务。
 - **关时写最后一份**：关的时候停掉等着的那次，写最后的状态并封住，已经在路上的定时回调写不进来。`core` 最先建、最后关，所以最后一份是所有服务都停下之后的。
-- **读回时**：读不了或解析不了就从空的开始并记日志；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
+- **读回时**：读不了、解析不了或不符合 `WorkspaceState` 的 Schema，就改名成 `state.json.unreadable-<毫秒>` 留着（不会被之后的保存盖掉）、从空的开始并记日志；改不了名就不开机（`base/files.ts` 的 `readOrSetAside`，`config.json`、`settings.json` 同样）；通话回到 `idle`、没有通话原因、管家回到 `idle`（没人在通话上，管家也不在说话），帮工的地块按 `withStations` 重新排。
 
 **三条流**（`http/streams.ts`；「连接到本机」按同样的三个路径放行）
 
@@ -54,13 +54,15 @@
 | `GET /api/v1/events` | `snapshot`（整份核心状态） | `SideEvent`：每条事实、轨迹的一步（`step`）、提醒（`Notice`）、农机变了（`runtime`） | 命令行 `vibevalley events`、调试 |
 | `GET /api/v1/live` | 什么也不发 | `LiveEvent` 的三种：`SessionEvent`、`Notice`、`Runtime`；不发事实和快照 | 页面 |
 
+- 三条流分别用 `StateFrame`、`SideEvent`、`LiveEvent` 的 Schema 编码；不合形状的值记错误并终止这条流，不发给客户端。重启后的核心状态省略 `callReason`，不保留一个显式 `undefined`。
 - 每 20 秒一行心跳（`: ping`），免得代理关掉空闲的连接；客户端断开，这条流和出帧的那一头跟着停。
+- 三条 SSE 每个连接都有容量 64 的有界 relay。正常顺序不变；积压到上限的连接明确结束并记警告，源订阅释放，不静默丢帧，也不把发布者挡住。客户端重连取快照。内部的事实和 Transition 订阅不能靠重连补齐，不走这条会断开的 relay；Core 关闭时 shutdown 四个 PubSub。
 - 断线不补发：重连从一帧（或快照）重新开始。页面的状态流断了 1 秒后重连。
 - 命令的结果不走流：要么是 HTTP 的答复，要么是之后的事实或提醒。
 
 **接口和能力表**
 
-- **一个操作是 `endpoints` 的一行**：操作名（`组.动作`，页面里是 `api.组.动作`）、方法和路径、路径和查询参数、请求和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
+- **一个操作是 `endpoints` 的一行**：操作名（`组.动作`，页面里是 `api.组.动作`）、方法和路径、路径和查询参数、请求和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。成功和拒绝的答复都按同一个 Schema 编码，处理函数返回不合形状的值是服务端错误（500），不发给客户端。读写不另标，HTTP 方法已经说明。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
 - **「连接到本机」只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`chatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
 - **`orchestrator` 一列只是记录**：代码不按它放行，管家和帮工能调什么由 `apps/server/src/tool` 的工具表定。
 - **都在 `/api/v1` 下**，包括 `/api/v1/health` 和三条流。`endpoints` 里的路径就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
@@ -139,7 +141,7 @@
 
 ## 怎么验证
 
-- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧。
+- `apps/server/src/core/core.test.ts`：从 `state.json` 读回（通话和管家回到 `idle`、库的部分不进文件、帮工回到各自的地）；形状不对的 `state.json` 原样留在一边、从空的开始；事实盖时间、发出，同样的再来一次不算新闻，关的时候写 `state.json`、不带给人看的话；一阵事实合成一帧；延迟保存失败记日志，文件恢复可写后关机仍能留下最后一份。
 - `apps/server/src/core/golden.test.ts`：几千个随机事实逐个比状态、特效和视图（`reduce.jsonl.gz`）；`recurrence/cron.test.ts` 查折法和出帧填的话。
 - `apps/server/src/cli.test.ts`：每个接口都有命令、调一个接口打出回答、失败时 stdout 是空的、退出码按种类、拒绝的 `next` 原样能跑、每个 `DELETE` 都有同形状的试跑且试跑不动东西、`lookIn` 的每条命令都在。`apps/server/src/cli/golden.test.ts`：帮助、典型的错误和试跑录在 `cli/testdata/cli.jsonl.gz`，改了 `bun run golden:update -- cli` 再看 diff。`scripts/verify-server.test.ts`：沙箱里只用命令行把一张工单派出去、交回来、试跑完成、完成。`lan/lan.test.ts`：「连接到本机」按 `can` 放行。
 - 契约：`apps/web/test/*.spec.ts` 每个 worker 起一个真的服务端，经接口和三条流走一遍每块页面。

@@ -16,7 +16,9 @@ describe("an issue's thread", () => {
   // in the same thread; the person's words wake the session working the issue now, and only keep when none is.
   it.live("is one across its sessions", () => {
     // Says only that it is done: echoing its input would @ the orchestrator, who would then follow the thread.
-    const f = farm({ runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }) });
+    const f = farm({
+      runtime: scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做好了") }),
+    });
     return Effect.gen(function* () {
       const issues = yield* Issues;
       const channels = yield* Channels;
@@ -47,7 +49,9 @@ describe("an issue's thread", () => {
         "cancelled",
       );
       const kept = yield* channels.say("先记一下：时区用东八区", thread!.id, "");
-      const woken = yield* sql<{ n: number }>`select count(*)::int as n from channel_delivery where message_id = ${kept.message.id}`.pipe(Effect.orDie);
+      const woken = yield* sql<{
+        n: number;
+      }>`select count(*)::int as n from channel_delivery where message_id = ${kept.message.id}`.pipe(Effect.orDie);
       expect(woken[0]!.n).toBe(0);
 
       const second = yield* issues.reopen(issue.id, "接着做", "");
@@ -74,7 +78,12 @@ describe("an issue's thread", () => {
       const channels = yield* Channels;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const issue = yield* issues.add({ title: "先问清楚，再写打卡", project: "clock", assignee: "lab", review: "required" });
+      const issue = yield* issues.add({
+        title: "先问清楚，再写打卡",
+        project: "clock",
+        assignee: "lab",
+        review: "required",
+      });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(
         () => channels.jobThread(sent.session!),

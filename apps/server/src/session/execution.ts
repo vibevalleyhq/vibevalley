@@ -171,12 +171,14 @@ export class AgentExecution {
   }
 
   close(): Effect.Effect<void, Error> {
-    this.closed = true;
-    if (this.run && !this.ending) {
-      this.outcome = "interrupted";
-      this.summary = "VibeValley 停下了，这一轮中断了";
-    }
-    return this.finish();
+    return Effect.suspend(() => {
+      this.closed = true;
+      if (this.run && !this.ending) {
+        this.outcome = "interrupted";
+        this.summary = "VibeValley 停下了，这一轮中断了";
+      }
+      return this.finish();
+    });
   }
 
   currentRun() {

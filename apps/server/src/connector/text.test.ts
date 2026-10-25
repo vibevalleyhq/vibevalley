@@ -24,7 +24,10 @@ describe("the connector's words", () => {
           return shortId(c.in as string);
         case "ownerLine": {
           const given = c.in as { m: ChatMessage; where: Conversation | null };
-          return { line: ownerLine(given.m, given.where ?? undefined), forOwner: forOwner(given.m) };
+          return {
+            line: ownerLine(given.m, given.where ?? undefined),
+            forOwner: forOwner(given.m),
+          };
         }
       }
       throw new Error(`unknown fn ${c.fn}`);

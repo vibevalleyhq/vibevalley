@@ -4,7 +4,8 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Api, AssistantMessage, Message, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { Schema } from "effect";
 import { getModel, models } from "../../ai/models.ts";
 
 export const defaultModel = "deepseek-flash";
@@ -31,7 +32,10 @@ export function deepseek(id: string, key: string | (() => string | undefined)): 
 
 /** One answer, whole. */
 export async function complete(llm: LLM, messages: Message[], options: SimpleStreamOptions = {}): Promise<AssistantMessage> {
-  const stream = await llm.stream(llm.model, { messages } as Parameters<StreamFn>[1], { ...options, apiKey: llm.apiKey?.() ?? options.apiKey });
+  const stream = await llm.stream(llm.model, { messages } as Parameters<StreamFn>[1], {
+    ...options,
+    apiKey: llm.apiKey?.() ?? options.apiKey,
+  });
   return stream.result();
 }
 
@@ -55,20 +59,26 @@ interface McpEntry {
   readonly disabled?: boolean;
 }
 
-/** A missing file has none; one that is not JSON is an error. */
+const McpEntrySchema: Schema.Codec<McpEntry> = Schema.Struct({
+  command: Schema.optionalKey(Schema.String),
+  args: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  env: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  cwd: Schema.optionalKey(Schema.String),
+  url: Schema.optionalKey(Schema.String),
+  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  disabled: Schema.optionalKey(Schema.Boolean),
+});
+const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optionalKey(Schema.Record(Schema.String, McpEntrySchema)) }));
+
+/** A missing file has none; unreadable JSON or a wrong shape is an error. */
 export function readMcpConfig(path: string): McpServer[] {
-  let data = "{}";
-  try {
-    data = readFileSync(path, "utf8");
-  } catch {
-    data = "{}";
-  }
+  const data = existsSync(path) ? readFileSync(path, "utf8") : "{}";
+  if (data.trim() === "") throw new Error(`${path} 不是 JSON`);
   let config: { mcpServers?: Record<string, McpEntry> };
   try {
-    if (data.trim() === "") throw new Error("empty");
-    config = JSON.parse(data) as typeof config;
-  } catch {
-    throw new Error(`${path} 不是 JSON`);
+    config = Schema.decodeUnknownSync(McpConfigSchema)(data);
+  } catch (e) {
+    throw new Error(`${path} 不是 JSON 或配置形状不对：${String(e)}`);
   }
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];
@@ -77,7 +87,13 @@ export function readMcpConfig(path: string): McpServer[] {
     if (e.disabled) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
     else if (e.command)
-      out.push({ name, command: e.command, ...(e.args ? { args: e.args } : {}), ...(e.env ? { env: e.env } : {}), ...(e.cwd ? { cwd: e.cwd } : {}) });
+      out.push({
+        name,
+        command: e.command,
+        ...(e.args ? { args: e.args } : {}),
+        ...(e.env ? { env: e.env } : {}),
+        ...(e.cwd ? { cwd: e.cwd } : {}),
+      });
   }
   return out;
 }

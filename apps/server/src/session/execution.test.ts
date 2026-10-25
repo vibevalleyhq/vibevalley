@@ -4,7 +4,7 @@ import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
-import { type RunFinished, type RunStore, Sessions, type SessionsInside } from "./session.ts";
+import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside } from "./session.ts";
 
 const user = (text: string) => ({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } }) as AgentEvent;
 const said = (text: string, stopReason = "stop", errorMessage?: string) =>
@@ -78,6 +78,42 @@ describe("the orchestrator's runs", () => {
       yield* Fiber.interrupt(following);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
+
+  it.live("close changes execution only when its effect runs", () =>
+    Effect.gen(function* () {
+      const sessions = (yield* Sessions) as SessionsInside;
+      const x = new AgentExecution(
+        "orchestrator",
+        sessions.trajectories.openLog("orchestrator"),
+        (tool) => ({ text: tool, action: "other", tool }),
+        sessions.runStore,
+      );
+      const closing = x.close();
+      yield* x.observe(user("still accepted"), { by: { kind: "comment" } });
+      expect(sessions.currentRun("orchestrator")).not.toBe("");
+      yield* closing;
+      expect(sessions.currentRun("orchestrator")).toBe("");
+    }).pipe(Effect.scoped, Effect.provide(world())),
+  );
+
+  it("restores each persisted run field by its own schema", () => {
+    const row = {
+      id: "r1",
+      session: "w1",
+      triggered_by: `{"kind":"runtime"}`,
+      heard: null,
+      started_at: 0,
+      ended_at: null,
+      outcome: null,
+      summary: null,
+      issue: null,
+      spent: null,
+    } satisfies Parameters<typeof runOf>[0];
+    const valid = runOf({ ...row, triggered_by: `{"kind":"issue","message":"继续"}`, heard: `["m1"]`, spent: `{"tokens":3,"cny":0.5}` });
+    expect([valid.triggeredBy, valid.heard, valid.spent]).toEqual([{ kind: "issue", message: "继续" }, ["m1"], { tokens: 3, cny: 0.5 }]);
+    const invalid = runOf({ ...row, triggered_by: `{"kind":{}}`, heard: `{}`, spent: `{"tokens":1e999}` });
+    expect([invalid.triggeredBy, invalid.heard, invalid.spent]).toEqual([{ kind: "runtime" }, [], undefined]);
+  });
 
   it.live("a run whose end could not be written ends before the next starts", () =>
     Effect.gen(function* () {

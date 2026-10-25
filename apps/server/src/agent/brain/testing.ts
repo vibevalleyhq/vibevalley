@@ -46,7 +46,12 @@ export function fauxLLM(options: RegisterFauxProviderOptions = {}) {
     return faux.provider.streamSimple(model, context, o);
   };
   const llm: LLM = { model: faux.getModel(), stream };
-  return { faux, llm, requests, append: (steps: FauxResponseStep[]) => faux.appendResponses(steps) };
+  return {
+    faux,
+    llm,
+    requests,
+    append: (steps: FauxResponseStep[]) => faux.appendResponses(steps),
+  };
 }
 
 export function tempHome(): { dir: string; done: () => void } {
@@ -93,7 +98,14 @@ export async function withAgent(
   const events: BrainEvent[] = [];
   agent.subscribe((e) => events.push(e));
   try {
-    await body({ agent, events, requests, faux, has: (type) => events.some((e) => e.type === type), ask: (text) => agent.ask(userMessage(text)) });
+    await body({
+      agent,
+      events,
+      requests,
+      faux,
+      has: (type) => events.some((e) => e.type === type),
+      ask: (text) => agent.ask(userMessage(text)),
+    });
   } finally {
     await agent.close();
   }

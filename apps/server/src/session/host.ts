@@ -31,6 +31,8 @@ const streamEveryMs = 120;
 export class Caller {
   private readonly queue: string[] = [];
   private ended = false;
+  private failed = false;
+  private failure: unknown;
   private wake: (() => void) | undefined;
 
   push(text: string) {
@@ -43,6 +45,14 @@ export class Caller {
     this.wake?.();
   }
 
+  fail(error: unknown) {
+    if (!this.ended) {
+      this.failed = true;
+      this.failure = error;
+    }
+    this.end();
+  }
+
   async *words(signal?: AbortSignal): AsyncGenerator<string> {
     while (!signal?.aborted) {
       const next = this.queue.shift();
@@ -50,12 +60,23 @@ export class Caller {
         yield next;
         continue;
       }
-      if (this.ended) return;
+      if (this.ended) {
+        if (this.failed) throw this.failure;
+        return;
+      }
       await new Promise<void>((resolve) => {
-        this.wake = resolve;
-        signal?.addEventListener("abort", () => resolve(), { once: true });
+        let settled = false;
+        const wake = () => {
+          if (settled) return;
+          settled = true;
+          signal?.removeEventListener("abort", wake);
+          if (this.wake === wake) this.wake = undefined;
+          resolve();
+        };
+        this.wake = wake;
+        signal?.addEventListener("abort", wake, { once: true });
+        if (signal?.aborted) wake();
       });
-      this.wake = undefined;
     }
   }
 }
@@ -117,6 +138,8 @@ export class AgentHost<R> {
   private lastPush = 0;
   private prefixChanged: string[] = [];
   private closing = false;
+  private readonly life = new AbortController();
+  private closePromise: Promise<void> | undefined;
   private brain: Brain | undefined;
   private starting: Promise<Brain> | undefined;
   private events = Promise.resolve();
@@ -152,6 +175,11 @@ export class AgentHost<R> {
     return sessionUnfinished(this.transcript);
   }
 
+  private closeInput(input: Hosted<R>) {
+    input.caller?.end();
+    return { ok: false as const, why: this.o.label + "已经停下", run: "" };
+  }
+
   /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the agent
    * cannot start: that input is recorded as a failed run of its own. */
   async submit(
@@ -159,47 +187,55 @@ export class AgentHost<R> {
     input: Hosted<R>,
     now: boolean,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string }> {
+    if (this.closing) return this.closeInput(input);
     const run: RunInput = { ...input.run, by: input.run.by.kind ? input.run.by : { kind: "comment" } };
-    let b: Brain;
-    try {
-      b = await this.start();
-    } catch (err) {
-      const why = err instanceof Error ? err.message : String(err);
-      const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", "起不来：" + why)).catch((e: Error) => {
-        this.o.notice("error", this.o.label + "的执行没能记下：" + e.message);
-        return "";
-      });
-      this.o.notice("error", this.o.label + "起不来：" + why);
-      input.caller?.push("我这边起不来：" + why);
-      input.caller?.end();
-      return { ok: false, why, run: id };
-    }
-    await this.serially(async () => {
+    return this.serially(async () => {
+      let b: Brain;
+      try {
+        b = await this.start();
+      } catch (err) {
+        if (this.closing) return this.closeInput(input);
+        const why = err instanceof Error ? err.message : String(err);
+        const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", "起不来：" + why)).catch((e: Error) => {
+          this.o.notice("error", this.o.label + "的执行没能记下：" + e.message);
+          return "";
+        });
+        this.o.notice("error", this.o.label + "起不来：" + why);
+        input.caller?.push("我这边起不来：" + why);
+        input.caller?.end();
+        return { ok: false, why, run: id };
+      }
+      if (this.closing) return this.closeInput(input);
       const { text, heard } = await build(b.busy() || b.core.hasQueuedMessages(), b.memoryNews());
+      if (this.closing) return this.closeInput(input);
       const message = customMessage(this.o.inputType, text, { details: input.route });
       this.local.set(message, { ...input, run: { ...run, ...(heard ? { heard } : {}) } });
       if (now) b.send(message);
       else b.later(message);
+      return { ok: true };
     });
-    return { ok: true };
   }
 
   /** The run the last start was cut off in goes on, with the input it was taking, within maxAgeMs. */
   async resume(maxAgeMs: number): Promise<void> {
-    let b: Brain;
-    try {
-      b = await this.start();
-    } catch (err) {
-      this.o.log("error", `vibevalley: ${this.o.name} could not go on with its last run: ${String(err)}`);
-      return;
-    }
-    const at = this.current();
-    this.input = at;
-    this.toCaller = 0;
-    this.execution.resume(this.o.restored(at.route));
-    if (b.resume(maxAgeMs)) return;
-    this.execution.resume(undefined);
-    if (!b.busy()) this.journal.note("run/error", "上一轮停在了半路，太久了，没有接着做");
+    return this.serially(async () => {
+      if (this.closing) return;
+      let b: Brain;
+      try {
+        b = await this.start();
+      } catch (err) {
+        if (!this.closing) this.o.log("error", `vibevalley: ${this.o.name} could not go on with its last run: ${String(err)}`);
+        return;
+      }
+      if (this.closing) return;
+      const at = this.current();
+      this.input = at;
+      this.toCaller = 0;
+      this.execution.resume(this.o.restored(at.route));
+      if (b.resume(maxAgeMs)) return;
+      this.execution.resume(undefined);
+      if (!b.busy()) this.journal.note("run/error", "上一轮停在了半路，太久了，没有接着做");
+    });
   }
 
   /** The inputs waiting are dropped with the run. */
@@ -207,9 +243,19 @@ export class AgentHost<R> {
     await this.brain?.stop();
   }
 
-  async close(): Promise<void> {
-    this.closing = true;
-    const b = this.brain ?? (await this.starting?.catch(() => undefined));
+  close(): Promise<void> {
+    if (!this.closePromise) {
+      this.closing = true;
+      this.life.abort();
+      this.closePromise = Promise.resolve().then(() => this.closeOnce());
+    }
+    return this.closePromise;
+  }
+
+  private async closeOnce() {
+    const starting = this.starting;
+    await this.inputs;
+    const b = this.brain ?? (await starting?.catch(() => undefined));
     await b?.close();
     await this.events;
     await this.o.go(this.execution.close()).catch((err: Error) => this.o.log("error", `${this.o.name} execution: ${err.message}`));
@@ -259,20 +305,28 @@ export class AgentHost<R> {
   // Started on first use: loading it is not free, and a farm without a model works otherwise.
   private start(): Promise<Brain> {
     if (this.brain) return Promise.resolve(this.brain);
+    if (this.closing) return Promise.reject(new Error(this.o.label + "已经停下"));
     this.starting ??= (async () => {
       const llm = this.o.llm();
-      const b = await Brain.start({
-        name: this.o.name,
-        instructions: this.o.instructions,
-        llm,
-        home: this.o.home,
-        cwd: this.o.cwd,
-        tools: this.o.tools(() => this.current().route),
-        noSkills: true,
-        noSubagents: true,
-        recurrences: false,
-        ...(this.o.wakeSoon ? { wakeSoon: this.o.wakeSoon } : {}),
-      });
+      const b = await Brain.start(
+        {
+          name: this.o.name,
+          instructions: this.o.instructions,
+          llm,
+          home: this.o.home,
+          cwd: this.o.cwd,
+          tools: this.o.tools(() => this.current().route),
+          noSkills: true,
+          noSubagents: true,
+          recurrences: false,
+          ...(this.o.wakeSoon ? { wakeSoon: this.o.wakeSoon } : {}),
+        },
+        this.life.signal,
+      );
+      if (this.closing) {
+        await b.close();
+        throw new Error(this.o.label + "已经停下");
+      }
       this.o.fresh();
       // Listening before the first input is sent.
       b.subscribe((e) => this.follow(e));

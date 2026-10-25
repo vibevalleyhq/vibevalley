@@ -18,7 +18,11 @@ export const actionText: Readonly<Record<SessionAction, string>> = {
 };
 
 /** How a round ended. */
-export const outcomeLabel: Readonly<Record<Outcome, string>> = { completed: "做完了", failed: "没做成", interrupted: "停在半路" };
+export const outcomeLabel: Readonly<Record<Outcome, string>> = {
+  completed: "做完了",
+  failed: "没做成",
+  interrupted: "停在半路",
+};
 
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
@@ -29,7 +33,12 @@ export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._ta
 export function roomLeft(sessions: readonly Session[], project: string, workspace: number, perProject: number, except = "") {
   const busy = sessions.filter((h) => isBusy(h) && h.id !== except);
   const inProject = busy.filter((h) => h.project === project).length;
-  return { farm: Math.max(0, workspace - busy.length), project: perProject > 0 ? Math.max(0, perProject - inProject) : Infinity, busy: busy.length, inProject };
+  return {
+    farm: Math.max(0, workspace - busy.length),
+    project: perProject > 0 ? Math.max(0, perProject - inProject) : Infinity,
+    busy: busy.length,
+    inProject,
+  };
 }
 
 export type Need =

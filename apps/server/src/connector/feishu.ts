@@ -4,10 +4,14 @@
 // API to the owner's open_id, with no reply window.
 
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { sleep } from "./wait.ts";
 
 export type Domain = "feishu" | "lark";
 
-const accounts: Record<Domain, string> = { feishu: "https://accounts.feishu.cn", lark: "https://accounts.larksuite.com" };
+const accounts: Record<Domain, string> = {
+  feishu: "https://accounts.feishu.cn",
+  lark: "https://accounts.larksuite.com",
+};
 const larkDomain = (d: Domain) => (d === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu);
 
 export interface Message {
@@ -61,19 +65,21 @@ const str = (m: unknown, key: string) => {
   return typeof v === "string" ? v : "";
 };
 
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<boolean>((resolve) => {
-    if (signal.aborted) return resolve(false);
-    const t = setTimeout(() => resolve(true), ms);
-    signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
-  });
-
 export class FeishuClient implements FeishuApi {
   private async register(signal: AbortSignal) {
     const init = await form("feishu", { action: "init" }, signal);
     const methods = Array.isArray(init.supported_auth_methods) ? init.supported_auth_methods : [];
     if (!methods.includes("client_secret")) throw new Error("飞书现在不支持扫码建应用，请稍后再试。");
-    const begin = await form("feishu", { action: "begin", archetype: "PersonalAgent", auth_method: "client_secret", request_user_info: "open_id" }, signal);
+    const begin = await form(
+      "feishu",
+      {
+        action: "begin",
+        archetype: "PersonalAgent",
+        auth_method: "client_secret",
+        request_user_info: "open_id",
+      },
+      signal,
+    );
     const deviceCode = str(begin, "device_code");
     let link = str(begin, "verification_uri_complete");
     if (!deviceCode || !link) throw new Error("飞书没给二维码，请重试。");
@@ -89,7 +95,12 @@ export class FeishuClient implements FeishuApi {
     }
     const interval = typeof begin.interval === "number" ? begin.interval : 5;
     const expires = typeof begin.expires_in === "number" ? begin.expires_in : typeof begin.expire_in === "number" ? begin.expire_in : 600;
-    return { deviceCode, link, intervalMs: Math.max(2, interval) * 1000, expiresMs: expires * 1000 };
+    return {
+      deviceCode,
+      link,
+      intervalMs: Math.max(2, interval) * 1000,
+      expiresMs: expires * 1000,
+    };
   }
 
   private async poll(deviceCode: string, domain: Domain, signal: AbortSignal) {
@@ -102,7 +113,11 @@ export class FeishuClient implements FeishuApi {
     const user = res.user_info;
     const where: Domain = str(user, "tenant_brand") === "lark" ? "lark" : domain;
     if (typeof res.client_id === "string" && typeof res.client_secret === "string")
-      return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, owner: str(user, "open_id") };
+      return {
+        status: "succeeded" as const,
+        app: { appId: res.client_id, appSecret: res.client_secret, domain: where },
+        owner: str(user, "open_id"),
+      };
     if (res.error === "access_denied") return { status: "failed" as const, reason: "在飞书里拒绝了。" };
     if (res.error === "expired_token") return { status: "failed" as const, reason: "二维码过期了。" };
     return { status: "pending" as const, domain: where };
@@ -129,11 +144,14 @@ export class FeishuClient implements FeishuApi {
   }
 
   listen(signal: AbortSignal, app: App, got: (m: Message) => Promise<void>): Promise<void> {
+    if (signal.aborted) return Promise.resolve();
     return new Promise((resolve, reject) => {
       let done = false;
+      const abort = () => end();
       const end = (e?: Error) => {
         if (done) return;
         done = true;
+        signal.removeEventListener("abort", abort);
         client.close({ force: true });
         if (e && !signal.aborted) reject(new Error("飞书长连接断了：" + e.message));
         else resolve();
@@ -159,13 +177,19 @@ export class FeishuClient implements FeishuApi {
           });
         },
       });
-      signal.addEventListener("abort", () => end(), { once: true });
+      if (done) return;
+      signal.addEventListener("abort", abort, { once: true });
       void client.start({ eventDispatcher: dispatcher }).catch((e: unknown) => end(e instanceof Error ? e : new Error(String(e))));
     });
   }
 
   async sendText(_signal: AbortSignal, app: App, openId: string, text: string): Promise<string> {
-    const client = new Lark.Client({ appId: app.appId, appSecret: app.appSecret, domain: larkDomain(app.domain), loggerLevel: Lark.LoggerLevel.warn });
+    const client = new Lark.Client({
+      appId: app.appId,
+      appSecret: app.appSecret,
+      domain: larkDomain(app.domain),
+      loggerLevel: Lark.LoggerLevel.warn,
+    });
     let res: { code?: number; msg?: string; data?: { message_id?: string } };
     try {
       res = await client.im.v1.message.create({
@@ -183,7 +207,17 @@ export class FeishuClient implements FeishuApi {
 
 export function text(m: Message): string {
   if (m.messageType !== "text")
-    return ({ image: "[图片]", file: "[文件]", audio: "[语音]", media: "[视频]", sticker: "[表情]" } as Record<string, string>)[m.messageType] ?? "[消息]";
+    return (
+      (
+        {
+          image: "[图片]",
+          file: "[文件]",
+          audio: "[语音]",
+          media: "[视频]",
+          sticker: "[表情]",
+        } as Record<string, string>
+      )[m.messageType] ?? "[消息]"
+    );
   try {
     return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();
   } catch {

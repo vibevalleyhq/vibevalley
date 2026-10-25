@@ -224,4 +224,14 @@ describe("memory", () => {
       expect(before.filter((x) => !after.has(x.id)).map((x) => x.id)).toEqual(predicted);
     }).pipe(Effect.provide(world())),
   );
+
+  it.effect("forget and its preview turn file failures into Refused", () => {
+    const config = testConfig();
+    mkdirSync(join(orchestratorHome(config.home), "MEMORY.md"), { recursive: true });
+    return Effect.gen(function* () {
+      const m = yield* Memories;
+      expect((yield* Effect.flip(m.previewForgetOf("orchestrator", "m1")))._tag).toBe("Refused");
+      expect((yield* Effect.flip(m.forgetOf("orchestrator", "m1")))._tag).toBe("Refused");
+    }).pipe(Effect.provide(world(config)));
+  });
 });

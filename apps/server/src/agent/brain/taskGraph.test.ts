@@ -4,6 +4,7 @@ import { SqlClient } from "effect/sql";
 import { testDatabase } from "../../testing/layers.ts";
 import { add, begin, type Change, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
 import { dbStore, memoryStore, type TaskStore } from "./taskStore.ts";
+import * as q from "../../../db/generated/agent_task.sql.ts";
 
 const ids = (g: readonly Task[]) => g.map((t) => t.id);
 
@@ -107,7 +108,11 @@ describe("an agent's task graph", () => {
 
   const stores = Effect.map(
     SqlClient.SqlClient,
-    (sql) => ({ database: (owner: string) => dbStore(sql, owner), memory: (_: string) => memoryStore() }) as Record<string, (owner: string) => TaskStore>,
+    (sql) =>
+      ({
+        database: (owner: string) => dbStore(sql, owner),
+        memory: (_: string) => memoryStore(),
+      }) as Record<string, (owner: string) => TaskStore>,
   );
 
   it.effect("a store keeps the graph and puts a finished one away", () =>
@@ -129,6 +134,37 @@ describe("an agent's task graph", () => {
         expect(finished(ended), name).toBe(true);
         expect(yield* s.load, name).toEqual([]);
       }
+    }).pipe(Effect.provide(testDatabase())),
+  );
+
+  it.effect("a database store decodes task dependencies before using them", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      for (const [id, position, after] of [
+        ["bad", 0, `{}`],
+        ["good", 1, `["bad"]`],
+      ] as const)
+        yield* Effect.orDie(
+          q.addGraphTask({
+            graph: "g1",
+            owner: "s1",
+            id,
+            position,
+            title: "",
+            brief: "",
+            after,
+            executor: "self",
+            state: "waiting",
+            result: "",
+            tries: 0,
+            updated_at: 0,
+          }),
+        );
+      const got = yield* dbStore(sql, "s1").load;
+      expect(got.map((t) => [t.id, t.after])).toEqual([
+        ["bad", []],
+        ["good", ["bad"]],
+      ]);
     }).pipe(Effect.provide(testDatabase())),
   );
 

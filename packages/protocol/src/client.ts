@@ -11,8 +11,38 @@ export class VibeValleyApiError extends Error {
     readonly reason: string,
     /** The error as the server wrote it, for what it carries besides the reason. */
     readonly error?: ApiError,
+    /** The response exactly as received, including plain text that was not JSON. */
+    readonly body?: string,
   ) {
     super(reason);
+  }
+}
+
+const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string");
+const validNext = (value: unknown): boolean =>
+  value === undefined ||
+  (Array.isArray(value) && value.every((item) => record(item) && typeof item.say === "string" && (item.run === undefined || strings(item.run))));
+const validReason = (value: unknown): boolean => record(value) && typeof value.reason === "string";
+
+// Kept dependency-free: the page does not load the endpoint Schemas just to read an error.
+function apiErrorOf(value: unknown): ApiError | undefined {
+  if (!record(value) || typeof value._tag !== "string") return undefined;
+  switch (value._tag) {
+    case "Refused":
+    case "ConnectorRefused":
+    case "LanRefused":
+      return validReason(value) && validNext(value.next) ? (value as unknown as ApiError) : undefined;
+    case "Missing":
+      return typeof value.what === "string" && validNext(value.next) ? (value as unknown as ApiError) : undefined;
+    case "VoiceUnavailable":
+      return validReason(value) && (value.settings === undefined || ["agora", "deepseek", "voice"].includes(value.settings as string))
+        ? (value as unknown as ApiError)
+        : undefined;
+    case "VoiceAgentFailed":
+      return validReason(value) ? (value as unknown as ApiError) : undefined;
+    default:
+      return undefined;
   }
 }
 
@@ -339,18 +369,26 @@ export class VibeValleyApi {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();
-    const decoded: unknown = text === "" ? undefined : JSON.parse(text);
     if (!res.ok) {
-      const j = (decoded ?? {}) as { _tag?: unknown; reason?: unknown; what?: unknown };
-      // Missing says what is not there; every other ApiError gives its reason.
-      const reason = typeof j.reason === "string" ? j.reason : typeof j.what === "string" ? j.what : "服务端答 " + res.status;
-      throw new VibeValleyApiError(
-        res.status,
-        typeof j._tag === "string" ? j._tag : undefined,
-        reason,
-        typeof j._tag === "string" ? (j as ApiError) : undefined,
-      );
+      let decoded: unknown;
+      try {
+        decoded = text === "" ? undefined : JSON.parse(text);
+      } catch {
+        decoded = undefined;
+      }
+      const error = apiErrorOf(decoded);
+      const j = record(decoded) ? decoded : {};
+      const reason = error
+        ? error._tag === "Missing"
+          ? error.what
+          : error.reason
+        : typeof j.reason === "string"
+          ? j.reason
+          : typeof j.what === "string"
+            ? j.what
+            : text.trim() || "服务端答 " + res.status;
+      throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason, error, text);
     }
-    return decoded;
+    return text === "" ? undefined : JSON.parse(text);
   }
 }

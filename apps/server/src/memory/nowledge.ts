@@ -5,6 +5,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Memory } from "@vibevalley/protocol";
+import { Option, Schema } from "effect";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
@@ -55,6 +56,24 @@ interface Hit {
   readonly content_preview?: string;
   readonly relevance_score?: number;
 }
+
+const HitSchema: Schema.Codec<Hit> = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
+  memory_id: Schema.optionalKey(Schema.String),
+  title: Schema.optionalKey(Schema.String),
+  content: Schema.optionalKey(Schema.String),
+  content_preview: Schema.optionalKey(Schema.String),
+  relevance_score: Schema.optionalKey(Schema.Finite),
+});
+const SearchResponse = Schema.fromJsonString(Schema.Struct({ results: Schema.optionalKey(Schema.mutable(Schema.Array(HitSchema))) }));
+const AddedResponse = Schema.fromJsonString(
+  Schema.Struct({
+    id: Schema.optionalKey(Schema.String),
+    memory_id: Schema.optionalKey(Schema.String),
+    memory: Schema.optionalKey(Schema.Struct({ id: Schema.optionalKey(Schema.String) })),
+  }),
+);
+const DetailResponse = Schema.fromJsonString(Schema.Struct({ labels: Schema.optionalKey(Schema.Unknown) }));
 
 const hitID = (h: Hit) => h.memory_id || h.id || "";
 
@@ -122,7 +141,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     if (!everything) args.filter_labels = agent ? label("agent", agent) : app;
     const text = await call("memory_search", args, signal);
     try {
-      return (JSON.parse(text) as { results?: Hit[] }).results ?? [];
+      return Schema.decodeUnknownSync(SearchResponse)(text).results ?? [];
     } catch {
       throw new Error("memory_search answered what it should not: " + head(text, 200));
     }
@@ -132,12 +151,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     const body = redact(text);
     const answer = await call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app }, signal);
     // The new memory's id, at the top or under memory; none when it found the same memory there already.
-    let added: { id?: string; memory_id?: string; memory?: { id?: string } } = {};
-    try {
-      added = JSON.parse(answer) as typeof added;
-    } catch {
-      // No id to give back.
-    }
+    const added = Option.getOrUndefined(Schema.decodeUnknownOption(AddedResponse)(answer)) ?? {};
     return added.memory_id || added.id || added.memory?.id || "";
   };
 
@@ -177,7 +191,7 @@ export function nowledge(c: MemorySourceConfig): Source {
             const id = hitID(selected[index]!);
             if (!id) continue;
             try {
-              const detail = JSON.parse(await call("get_memory_by_id", { memory_id: id }, signal)) as { labels?: unknown };
+              const detail = Schema.decodeUnknownSync(DetailResponse)(await call("get_memory_by_id", { memory_id: id }, signal));
               scopes[index] = scopeOf(detail.labels);
             } catch {
               // An unreadable detail does not turn an unknown project into a global memory.

@@ -12,21 +12,34 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Context, Effect, FiberSet, Layer, Option, Stream } from "effect";
+import { Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOf } from "../base/json.ts";
 import { causeMessage } from "../base/db.ts";
 import { Channels } from "../channel/chat.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
 import { digestOver, flushText, isPairing, maxChars, ownerLine, shortId, splitText } from "./text.ts";
-import { baseUrl, failed as weixinFailed, quoted, restricted, staleToken, text as weixinText, type WeixinApi, WeixinClient, WeixinError } from "./weixin.ts";
+import {
+  baseUrl,
+  decodeUpdates,
+  failed as weixinFailed,
+  quoted,
+  restricted,
+  staleToken,
+  text as weixinText,
+  type WeixinApi,
+  WeixinClient,
+  WeixinError,
+} from "./weixin.ts";
 import { callbackLog } from "../base/log.ts";
 import { Notices } from "../notice/notice.ts";
+import { sleep, waitFor } from "./wait.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -41,6 +54,14 @@ export interface Inbound {
   readonly reply?: string;
   readonly quoted?: string;
 }
+
+const InboundSchema: Schema.Codec<Inbound> = Schema.Struct({
+  id: Schema.String,
+  from: Schema.String,
+  text: Schema.String,
+  reply: Schema.optionalKey(Schema.String),
+  quoted: Schema.optionalKey(Schema.String),
+});
 
 export interface Failure {
   readonly kind: "restricted" | "stale" | "failed";
@@ -74,12 +95,22 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isFailure = (x: unknown): x is Failure => typeof x === "object" && x !== null && "kind" in x && "reason" in x;
 
 export function weixinAdapter(api: WeixinApi): Adapter {
-  const accountOf = (s: Record<string, string>) => ({ baseUrl: s.baseUrl || baseUrl, token: s.token ?? "" });
+  const accountOf = (s: Record<string, string>) => ({
+    baseUrl: s.baseUrl || baseUrl,
+    token: s.token ?? "",
+  });
   return {
     id: "weixin",
     login: async (signal, _input, progress, verifyCode) => {
       const linked = await api.login(signal, (state, url) => progress({ state, qr: url }), verifyCode);
-      return { secrets: { token: linked.account.token, botId: linked.botId, baseUrl: linked.account.baseUrl }, owner: linked.owner };
+      return {
+        secrets: {
+          token: linked.account.token,
+          botId: linked.botId,
+          baseUrl: linked.account.baseUrl,
+        },
+        owner: linked.owner,
+      };
     },
     receive: async (signal, secrets, io) => {
       const account = accountOf(secrets);
@@ -88,7 +119,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
       while (!signal.aborted) {
         let updates;
         try {
-          updates = await api.getUpdates(signal, account, buf, timeout);
+          updates = decodeUpdates(await api.getUpdates(signal, account, buf, timeout));
         } catch (e) {
           return signal.aborted ? undefined : { kind: "failed", reason: message(e) };
         }
@@ -102,7 +133,13 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         // Its own messages echo back; groups are not for the farm.
         const messages = (updates.msgs ?? [])
           .filter((m) => m.message_type !== 2 && !m.group_id && m.from_user_id)
-          .map((m) => ({ id: m.message_id ?? "", from: m.from_user_id!, text: weixinText(m), reply: m.context_token ?? "", quoted: quoted(m) }));
+          .map((m) => ({
+            id: m.message_id ?? "",
+            from: m.from_user_id!,
+            text: weixinText(m),
+            reply: m.context_token ?? "",
+            quoted: quoted(m),
+          }));
         try {
           await io.accept(messages, updates.get_updates_buf ?? "");
         } catch (e) {
@@ -117,7 +154,10 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         return await api.sendText(signal, accountOf(secrets), to, text, reply);
       } catch (e) {
         const code = e instanceof WeixinError ? e.code : 0;
-        return { kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", reason: message(e) };
+        return {
+          kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed",
+          reason: message(e),
+        };
       }
     },
   };
@@ -133,7 +173,14 @@ export function feishuAdapter(api: FeishuApi): Adapter {
     id: "feishu",
     login: async (signal, _input, progress) => {
       const linked = await api.login(signal, (url) => progress({ state: "waiting", qr: url }));
-      return { secrets: { appId: linked.app.appId, appSecret: linked.app.appSecret, domain: linked.app.domain }, owner: linked.owner };
+      return {
+        secrets: {
+          appId: linked.app.appId,
+          appSecret: linked.app.appSecret,
+          domain: linked.app.domain,
+        },
+        owner: linked.owner,
+      };
     },
     // Returning to the SDK acknowledges only a durable inbox write; the orchestrator's work runs elsewhere.
     receive: async (signal, secrets, io) => {
@@ -184,7 +231,10 @@ export function qqAdapter(api: QQApi): Adapter {
       } catch (e) {
         // A refused passive reply (too late, too many) waits for the owner's next message; a bad login is stale.
         const status = e instanceof SendError ? e.status : 0;
-        return { kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", reason: message(e) };
+        return {
+          kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed",
+          reason: message(e),
+        };
       }
     },
   };
@@ -203,13 +253,6 @@ interface Account {
 }
 
 const paused = (a: Account) => a.pausedUntil !== 0 && a.pausedUntil > Date.now();
-
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<boolean>((resolve) => {
-    if (signal.aborted) return resolve(false);
-    const t = setTimeout(() => resolve(true), Math.max(0, ms));
-    signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
-  });
 
 interface Generation {
   readonly control: AbortController;
@@ -276,7 +319,7 @@ export const make = (options: ConnectorOptions = {}) =>
       };
 
       const reload = async () => {
-        const row = await run(Effect.option(accountQ.connectorAccount({ connector: id })));
+        const row = await run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
         if (Option.isNone(row)) {
           account = undefined;
           return;
@@ -284,7 +327,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const r = row.value;
         let secrets: Record<string, string> = {};
         try {
-          secrets = JSON.parse(r.secrets) as Record<string, string>;
+          secrets = jsonOf(Schema.Record(Schema.String, Schema.String))(r.secrets);
         } catch (e) {
           err = "存着的登录信息读不出来，断开重新连一次";
           logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
@@ -317,7 +360,13 @@ export const make = (options: ConnectorOptions = {}) =>
         }
         if (progress) return { ...s, state: progress.state, ...(progress.qr ? { qr: progress.qr } : {}) };
         if (!a) return s;
-        if (!a.owner) return { ...s, state: "pairing", ...(a.pairCode ? { pairCode: a.pairCode } : {}), since: a.connectedAt };
+        if (!a.owner)
+          return {
+            ...s,
+            state: "pairing",
+            ...(a.pairCode ? { pairCode: a.pairCode } : {}),
+            since: a.connectedAt,
+          };
         return {
           ...s,
           state: paused(a) ? "paused" : "connected",
@@ -329,14 +378,20 @@ export const make = (options: ConnectorOptions = {}) =>
       };
 
       const pause = async () => {
-        await kept(run(accountQ.pauseAccount({ paused_until: Date.now() + stalePauseMs, connector: id })));
-        await kept(reload());
-        err = "登录过期了，一小时后再试；也可以断开重新连。";
+        try {
+          await run(accountQ.pauseAccount({ paused_until: Date.now() + stalePauseMs, connector: id }));
+          await reload();
+          err = "登录过期了，一小时后再试；也可以断开重新连。";
+          return true;
+        } catch (e) {
+          err = message(e);
+          return false;
+        }
       };
 
       const quotedConversation = async (ext: string | undefined) => {
         if (!ext) return undefined;
-        const rows = await run(outboxQ.messageOfExt({ connector: id, ext_id: ext })).catch(() => []);
+        const rows = await run(outboxQ.messageOfExt({ connector: id, ext_id: ext }));
         const message = rows[0]?.message_id;
         if (!message) return undefined;
         return (await runHere(chat.messageLocation(message)))?.conversation.id;
@@ -345,6 +400,7 @@ export const make = (options: ConnectorOptions = {}) =>
       // The outbox: one drain at a time, in order.
       let sending = Promise.resolve(true);
       let wakeOutbox: (() => void) | undefined;
+      let outboxDirty = false;
       const drain = (signal: AbortSignal, late: boolean) => {
         const next = sending.then(async () => {
           if (signal.aborted) return false;
@@ -397,7 +453,14 @@ export const make = (options: ConnectorOptions = {}) =>
           await inTx(
             Effect.forEach(
               splitText(ownerLine(m, place.conversation), maxChars[id]),
-              (piece) => outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: Date.now() }),
+              (piece) =>
+                outboxQ.addOutbox({
+                  id: newId(),
+                  connector: id,
+                  message_id: m.id,
+                  body: piece,
+                  created_at: Date.now(),
+                }),
               {
                 discard: true,
               },
@@ -407,23 +470,25 @@ export const make = (options: ConnectorOptions = {}) =>
           err = message(e);
           return;
         }
+        outboxDirty = true;
         wakeOutbox?.();
       };
 
       const outboxRun = async (signal: AbortSignal) => {
         let wait = retryFirst;
         while (!signal.aborted) {
-          const woke = await new Promise<boolean>((resolve) => {
-            const t = setTimeout(() => resolve(false), wait);
-            wakeOutbox = () => (clearTimeout(t), resolve(true));
-            signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
-          });
-          wakeOutbox = undefined;
-          if (signal.aborted) return;
-          if (woke) {
+          if (outboxDirty) {
+            outboxDirty = false;
             await drain(signal, false);
             wait = retryFirst;
-          } else wait = (await drain(signal, false)) ? retryFirst : Math.min(2 * wait, retryMost);
+            continue;
+          }
+          const result = await waitFor(wait, signal, (wake) => {
+            wakeOutbox = wake;
+          });
+          wakeOutbox = undefined;
+          if (result === "aborted") return;
+          if (result === "timeout") wait = (await drain(signal, false)) ? retryFirst : Math.min(2 * wait, retryMost);
         }
       };
 
@@ -464,7 +529,12 @@ export const make = (options: ConnectorOptions = {}) =>
               yield* accountQ.connectorAccount({ connector: id });
               for (const m of messages) {
                 const withId = m.id ? m : { ...m, id: newId() };
-                yield* inboundQ.acceptInbound({ connector: id, ext_id: withId.id, payload: JSON.stringify(withId), created_at: Date.now() });
+                yield* inboundQ.acceptInbound({
+                  connector: id,
+                  ext_id: withId.id,
+                  payload: JSON.stringify(withId),
+                  created_at: Date.now(),
+                });
               }
               if (cursor) yield* accountQ.accountCursor({ connector: id, cursor });
             }),
@@ -479,8 +549,16 @@ export const make = (options: ConnectorOptions = {}) =>
         const rows = await run(inboundQ.pendingInbound({ connector: id }));
         for (const row of rows) {
           if (signal.aborted) return;
-          const m = JSON.parse(row.payload) as Inbound;
-          if (m.id !== row.ext_id) throw new Error("收件记录的编号不一致");
+          let m: Inbound;
+          try {
+            m = jsonOf(InboundSchema)(row.payload);
+            if (m.id !== row.ext_id) throw new Error("收件记录的编号不一致");
+          } catch (e) {
+            // A malformed row can never be delivered; settle it explicitly so later valid messages are not blocked.
+            logs.error(`vibevalley: ${id}: discarding malformed durable inbound ${row.ext_id}:`, message(e));
+            await run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
+            continue;
+          }
           await got(signal, m);
           await run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
         }
@@ -492,32 +570,33 @@ export const make = (options: ConnectorOptions = {}) =>
           } catch (e) {
             if (!signal.aborted) err = message(e);
           }
-          await new Promise<void>((resolve) => {
-            const t = setTimeout(resolve, 1_000);
-            wakeInbox = () => (clearTimeout(t), resolve());
-            signal.addEventListener("abort", () => (clearTimeout(t), resolve()), { once: true });
+          await waitFor(1_000, signal, (wake) => {
+            wakeInbox = wake;
           });
           wakeInbox = undefined;
         }
       };
       // An SDK handler may outlive receive: acceptance is sealed and in-flight writes joined before it returns.
       const receive = async (signal: AbortSignal, secrets: Record<string, string>) => {
-        const cursor = (await run(Effect.option(accountQ.connectorAccount({ connector: id }))).catch(() => undefined))?.pipe((o) =>
-          Option.match(o, { onNone: () => "", onSome: (a) => a.cursor }),
-        );
+        const row = await run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
+        const cursor = Option.match(row, { onNone: () => "", onSome: (a) => a.cursor });
         let closed = false;
         const pending = new Set<Promise<void>>();
-        const result = await adapter.receive(signal, secrets, {
-          cursor: cursor ?? "",
-          accept: (messages, c) => {
-            if (closed || signal.aborted) return Promise.reject(new Error("canceled"));
-            const p = accept(messages, c);
-            pending.add(p);
-            return p.finally(() => pending.delete(p));
-          },
-        });
-        closed = true;
-        await Promise.allSettled(pending);
+        let result: Failure | undefined;
+        try {
+          result = await adapter.receive(signal, secrets, {
+            cursor,
+            accept: (messages, c) => {
+              if (closed || signal.aborted) return Promise.reject(new Error("canceled"));
+              const p = accept(messages, c);
+              pending.add(p);
+              return p.finally(() => pending.delete(p));
+            },
+          });
+        } finally {
+          closed = true;
+          await Promise.allSettled(pending);
+        }
         return result;
       };
       const receiving = async (signal: AbortSignal) => {
@@ -527,14 +606,27 @@ export const make = (options: ConnectorOptions = {}) =>
           if (!a) return;
           if (paused(a)) {
             if (!(await sleep(a.pausedUntil - Date.now(), signal))) return;
-            await kept(run(accountQ.pauseAccount({ paused_until: null, connector: id })));
-            await kept(reload());
+            try {
+              await run(accountQ.pauseAccount({ paused_until: null, connector: id }));
+              await reload();
+            } catch (e) {
+              err = message(e);
+              if (!(await sleep(Math.min(30_000, retryMost), signal))) return;
+            }
             continue;
           }
-          const stopped = (await receive(signal, a.secrets)) ?? { kind: "failed", reason: "收消息停了" };
+          let stopped: Failure;
+          try {
+            stopped = (await receive(signal, a.secrets)) ?? {
+              kind: "failed",
+              reason: "收消息停了",
+            };
+          } catch (e) {
+            stopped = { kind: "failed", reason: message(e) };
+          }
           if (signal.aborted) return;
           if (stopped.kind === "stale") {
-            await pause();
+            if (!(await pause()) && !(await sleep(Math.min(30_000, retryMost), signal))) return;
             continue;
           }
           err = stopped.reason;
@@ -563,7 +655,10 @@ export const make = (options: ConnectorOptions = {}) =>
         const control = new AbortController();
         const stop = () => control.abort();
         life.signal.addEventListener("abort", stop, { once: true });
-        return { control, done: work(control.signal).catch((e) => logs.error(`vibevalley: ${id}:`, message(e))) };
+        const done = work(control.signal)
+          .catch((e) => logs.error(`vibevalley: ${id}:`, message(e)))
+          .finally(() => life.signal.removeEventListener("abort", stop));
+        return { control, done };
       };
       const connected = () => (account && !life.signal.aborted ? generation((s) => Promise.all([receiving(s), inboxRun(s), outboxRun(s)])) : undefined);
       const resetProgress = () => {
@@ -735,9 +830,17 @@ export const make = (options: ConnectorOptions = {}) =>
       logout: (id) => Effect.promise(async () => (bridge(id) ? bridge(id)!.logout() : off(id))),
       setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
         const b = bridge(id);
-        if (!b) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有 ${id} 这个连接` });
+        if (!b)
+          return yield* Effect.fail<ApiError>({
+            _tag: "ConnectorRefused",
+            reason: `没有 ${id} 这个连接`,
+          });
         const channel = yield* chat.channelByName(name);
-        if (!channel) return yield* Effect.fail<ApiError>({ _tag: "ConnectorRefused", reason: `没有叫 ${name} 的频道` });
+        if (!channel)
+          return yield* Effect.fail<ApiError>({
+            _tag: "ConnectorRefused",
+            reason: `没有叫 ${name} 的频道`,
+          });
         return yield* Effect.tryPromise({
           try: () => b.setChannel(channel.id !== general ? channel.id : undefined),
           catch: (e): ApiError => ({ _tag: "ConnectorRefused", reason: message(e) }),

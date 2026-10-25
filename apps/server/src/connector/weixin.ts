@@ -2,6 +2,8 @@
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { Schema } from "effect";
+import { sleep } from "./wait.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -28,8 +30,26 @@ export interface Item {
   readonly text_item?: { readonly text?: string };
   readonly voice_item?: { readonly text?: string };
   readonly file_item?: { readonly file_name?: string };
-  readonly ref_msg?: { readonly svr_id?: string; readonly title?: string; readonly message_item?: Item };
+  readonly ref_msg?: {
+    readonly svr_id?: string;
+    readonly title?: string;
+    readonly message_item?: Item;
+  };
 }
+
+const ItemSchema: Schema.Codec<Item> = Schema.Struct({
+  type: Schema.optionalKey(Schema.Number),
+  text_item: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String) })),
+  voice_item: Schema.optionalKey(Schema.Struct({ text: Schema.optionalKey(Schema.String) })),
+  file_item: Schema.optionalKey(Schema.Struct({ file_name: Schema.optionalKey(Schema.String) })),
+  ref_msg: Schema.optionalKey(
+    Schema.Struct({
+      svr_id: Schema.optionalKey(Schema.String),
+      title: Schema.optionalKey(Schema.String),
+      message_item: Schema.optionalKey(Schema.suspend((): Schema.Codec<Item> => ItemSchema)),
+    }),
+  ),
+});
 
 export interface Message {
   readonly message_id?: string;
@@ -40,6 +60,15 @@ export interface Message {
   readonly item_list?: readonly Item[];
 }
 
+const MessageSchema: Schema.Codec<Message> = Schema.Struct({
+  message_id: Schema.optionalKey(Schema.String),
+  from_user_id: Schema.optionalKey(Schema.String),
+  message_type: Schema.optionalKey(Schema.Number),
+  context_token: Schema.optionalKey(Schema.String),
+  group_id: Schema.optionalKey(Schema.String),
+  item_list: Schema.optionalKey(Schema.Array(ItemSchema)),
+});
+
 export interface Updates {
   readonly ret?: number;
   readonly errcode?: number;
@@ -48,6 +77,36 @@ export interface Updates {
   readonly get_updates_buf?: string;
   readonly longpolling_timeout_ms?: number;
 }
+
+const UpdatesSchema: Schema.Codec<Updates> = Schema.Struct({
+  ret: Schema.optionalKey(Schema.Number),
+  errcode: Schema.optionalKey(Schema.Number),
+  errmsg: Schema.optionalKey(Schema.String),
+  msgs: Schema.optionalKey(Schema.Array(MessageSchema)),
+  get_updates_buf: Schema.optionalKey(Schema.String),
+  longpolling_timeout_ms: Schema.optionalKey(Schema.Number),
+});
+
+export const decodeUpdates = Schema.decodeUnknownSync(UpdatesSchema);
+
+const QrCodeResponse = Schema.Struct({
+  qrcode: Schema.optionalKey(Schema.String),
+  qrcode_img_content: Schema.optionalKey(Schema.String),
+});
+const QrStatusResponse = Schema.Struct({
+  status: Schema.optionalKey(Schema.String),
+  bot_token: Schema.optionalKey(Schema.String),
+  ilink_bot_id: Schema.optionalKey(Schema.String),
+  baseurl: Schema.optionalKey(Schema.String),
+  ilink_user_id: Schema.optionalKey(Schema.String),
+  redirect_host: Schema.optionalKey(Schema.String),
+});
+const SendMessageResponse = Schema.Struct({
+  ret: Schema.optionalKey(Schema.Number),
+  errcode: Schema.optionalKey(Schema.Number),
+  errmsg: Schema.optionalKey(Schema.String),
+  message_id: Schema.optionalKey(Schema.String),
+});
 
 export type LoginState = "waiting" | "scanned" | "verify";
 
@@ -75,7 +134,10 @@ const clientVersion = (v: string) => {
 const baseInfo = { channel_version: version, bot_agent: "vibevalley/0.1.0" };
 
 function headers(token: string, auth: boolean): Record<string, string> {
-  const h: Record<string, string> = { "iLink-App-Id": "bot", "iLink-App-ClientVersion": String(clientVersion(version)) };
+  const h: Record<string, string> = {
+    "iLink-App-Id": "bot",
+    "iLink-App-ClientVersion": String(clientVersion(version)),
+  };
   if (!auth) return h;
   h["Content-Type"] = "application/json";
   h.AuthorizationType = "ilink_bot_token";
@@ -90,27 +152,34 @@ const endpoint = (base: string, path: string) => (base.endsWith("/") ? base : ba
 /** Message ids are 64-bit numbers: kept as text before they are decoded. */
 const lossless = /"(message_id|msg_id|svr_id)"(\s*):(\s*)(-?\d+)/g;
 
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<boolean>((resolve) => {
-    if (signal.aborted) return resolve(false);
-    const t = setTimeout(() => resolve(true), ms);
-    signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
-  });
-
 export class WeixinClient implements WeixinApi {
   constructor(private readonly base = baseUrl) {}
 
-  private async request<T>(label: string, method: string, url: string, body: unknown, token: string, auth: boolean, signal: AbortSignal): Promise<T> {
+  private async request<T>(
+    label: string,
+    method: string,
+    url: string,
+    body: unknown,
+    token: string,
+    auth: boolean,
+    signal: AbortSignal,
+    schema: Schema.Codec<T>,
+  ): Promise<T> {
     let res: Response;
     try {
-      res = await fetch(url, { method, headers: headers(token, auth), ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal });
+      res = await fetch(url, {
+        method,
+        headers: headers(token, auth),
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        signal,
+      });
     } catch (e) {
       throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
     }
     const text = await res.text();
     if (res.status < 200 || res.status > 299) throw new WeixinError(`${label}: ${res.status}`);
     try {
-      return JSON.parse(text.replace(lossless, '"$1"$2:$3"$4"')) as T;
+      return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(text.replace(lossless, '"$1"$2:$3"$4"'));
     } catch (e) {
       throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
     }
@@ -128,6 +197,7 @@ export class WeixinClient implements WeixinApi {
         "",
         true,
         timed,
+        QrCodeResponse,
       );
     } catch (e) {
       if (timed.aborted && !signal.aborted) throw new WeixinError("get_bot_qrcode: timed out");
@@ -141,14 +211,16 @@ export class WeixinClient implements WeixinApi {
     let q = "ilink/bot/get_qrcode_status?qrcode=" + encodeURIComponent(qrcode);
     if (verifyCode) q += "&verify_code=" + encodeURIComponent(verifyCode);
     try {
-      const s = await this.request<{
-        status?: string;
-        bot_token?: string;
-        ilink_bot_id?: string;
-        baseurl?: string;
-        ilink_user_id?: string;
-        redirect_host?: string;
-      }>("get_qrcode_status", "GET", endpoint(base, q), undefined, "", false, AbortSignal.any([signal, AbortSignal.timeout(35_000)]));
+      const s = await this.request(
+        "get_qrcode_status",
+        "GET",
+        endpoint(base, q),
+        undefined,
+        "",
+        false,
+        AbortSignal.any([signal, AbortSignal.timeout(35_000)]),
+        QrStatusResponse,
+      );
       return s.status ? s : { status: "wait" };
     } catch {
       return { status: "wait" };
@@ -197,9 +269,13 @@ export class WeixinClient implements WeixinApi {
         case "binded_redirect":
           throw new Error("这个微信已经连过了：先在微信里删掉它，或者换一个微信扫。");
         case "confirmed": {
-          const s = status as { bot_token?: string; ilink_bot_id?: string; ilink_user_id?: string; baseurl?: string };
+          const s = status;
           if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error("微信确认了，但没给齐登录信息，请重试。");
-          return { account: { baseUrl: s.baseurl || base, token: s.bot_token }, botId: s.ilink_bot_id, owner: s.ilink_user_id };
+          return {
+            account: { baseUrl: s.baseurl || base, token: s.bot_token },
+            botId: s.ilink_bot_id,
+            owner: s.ilink_user_id,
+          };
         }
       }
     }
@@ -210,7 +286,7 @@ export class WeixinClient implements WeixinApi {
   async getUpdates(signal: AbortSignal, account: Account, buf: string, timeoutMs: number): Promise<Updates> {
     const poll = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
     try {
-      return await this.request<Updates>(
+      return await this.request(
         "getupdates",
         "POST",
         endpoint(account.baseUrl, "ilink/bot/getupdates"),
@@ -218,6 +294,7 @@ export class WeixinClient implements WeixinApi {
         account.token,
         true,
         poll,
+        UpdatesSchema,
       );
     } catch (e) {
       if (!signal.aborted && poll.aborted) return { ret: 0, get_updates_buf: buf };
@@ -246,6 +323,7 @@ export class WeixinClient implements WeixinApi {
         account.token,
         true,
         timed,
+        SendMessageResponse,
       );
     } catch (e) {
       if (timed.aborted && !signal.aborted) throw new WeixinError("sendmessage: timed out");

@@ -29,7 +29,12 @@ afterEach(() => {
 async function call(tools: readonly AgentTool[], name: string, params: unknown): Promise<string> {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`no ${name}`);
-  const args = validateToolArguments(tool, { type: "toolCall", id: "t", name, arguments: params as never });
+  const args = validateToolArguments(tool, {
+    type: "toolCall",
+    id: "t",
+    name,
+    arguments: params as never,
+  });
   const result = await tool.execute("t", args);
   return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 }
@@ -71,7 +76,12 @@ describe("the coding tools", () => {
     expect(await call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 })).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
     expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/);
     expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/);
-    await call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "$&2", replace_all: true });
+    await call(tools, "edit_file", {
+      path: "src/a.ts",
+      old_text: "two",
+      new_text: "$&2",
+      replace_all: true,
+    });
     expect(readFileSync(join(dir, "src/a.ts"), "utf8")).toBe("one\n$&2\nthree\n$&2");
   });
 
@@ -153,7 +163,11 @@ describe("recurrences", () => {
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
     await new Promise((r) => setTimeout(r, 2));
-    await call(s.tools, "recurrence", { name: "提醒", message: "开会", at: new Date(Date.now() + 60_000).toISOString() });
+    await call(s.tools, "recurrence", {
+      name: "提醒",
+      message: "开会",
+      at: new Date(Date.now() + 60_000).toISOString(),
+    });
     expect(await call(s.tools, "list_recurrences", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
     const later = new Date(Date.now() + 3_600_000);
     s.tick(later);
@@ -175,7 +189,13 @@ describe("recurrences", () => {
     writeFileSync(
       join(dir, "recurrences.json"),
       JSON.stringify([
-        { id: "once", name: "", message: "", at: new Date(now.getTime() - 60_000).toISOString(), created: new Date(now.getTime() - 3_600_000).toISOString() },
+        {
+          id: "once",
+          name: "",
+          message: "",
+          at: new Date(now.getTime() - 60_000).toISOString(),
+          created: new Date(now.getTime() - 3_600_000).toISOString(),
+        },
       ]),
     );
     // A directory at the temporary file's path makes the atomic write fail.
@@ -187,6 +207,25 @@ describe("recurrences", () => {
     s.tick(now);
     s.tick(now);
     expect(wakes).toBe(1);
+  });
+
+  it("do not run a persisted job whose shape is wrong", () => {
+    const dir = home();
+    const woke: string[] = [];
+    const s = new Recurrences(dir, (text) => woke.push(text));
+    const damaged = JSON.stringify([
+      {
+        id: "important",
+        name: "",
+        message: "",
+        everyMinutes: "5",
+        created: new Date(0).toISOString(),
+      },
+    ]);
+    writeFileSync(join(dir, "recurrences.json"), damaged);
+    s.tick(new Date());
+    expect(woke).toEqual([]);
+    expect(readFileSync(join(dir, "recurrences.json"), "utf8")).toBe(damaged);
   });
 
   it("do not read a damaged file as an empty list", async () => {
@@ -231,15 +270,24 @@ describe("MCP", () => {
     writeFileSync(
       file,
       JSON.stringify({
-        mcpServers: { web: { url: "http://x", headers: { a: "b" } }, off: { command: "x", disabled: true }, calc: { command: "node", args: ["c.js"] } },
+        mcpServers: {
+          web: { url: "http://x", headers: { a: "b" } },
+          off: { command: "x", disabled: true },
+          calc: { command: "node", args: ["c.js"] },
+        },
       }),
     );
     expect(readMcpConfig(file)).toEqual([
       { name: "calc", command: "node", args: ["c.js"] },
       { name: "web", url: "http://x", headers: { a: "b" } },
     ]);
+    writeFileSync(file, `{"mcpServers":[]}`);
+    expect(() => readMcpConfig(file)).toThrow(/形状不对/);
     writeFileSync(file, "nope");
     expect(() => readMcpConfig(file)).toThrow(/不是 JSON/);
+    const directory = join(dir, "directory");
+    mkdirSync(directory);
+    expect(() => readMcpConfig(directory)).toThrow();
   });
 
   it("gets a server's tools over stdio, every page, and leaves out one that cannot be reached", async () => {

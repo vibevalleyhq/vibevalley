@@ -1,8 +1,8 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { WorkspaceState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
-import { Effect, Fiber, Layer, Queue, Stream } from "effect";
+import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { emptyProgress } from "../game/progress.ts";
 import { Settings } from "../base/config.ts";
@@ -35,6 +35,36 @@ describe("core", () => {
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));
   });
 
+  it.effect("valid JSON with the wrong state shape is kept aside untouched, and the farm starts empty", () => {
+    const config = testConfig();
+    const raw = JSON.stringify({ call: "idle", orchestrator: "idle", sessions: {} });
+    writeFileSync(join(config.home, "state.json"), raw);
+    return Effect.gen(function* () {
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          expect((yield* Core).state()).toEqual(emptyWorkspaceState());
+        }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
+      );
+      // Closing wrote a new state.json; the owner's old one is kept as it was.
+      const kept = readdirSync(config.home).filter((f) => f.startsWith("state.json.unreadable-"));
+      expect(kept).toHaveLength(1);
+      expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
+    });
+  });
+
+  it.effect("open reads the call state when its effect runs", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const core = yield* Core;
+      yield* core.open();
+      const reopen = core.open();
+      yield* core.apply({ type: "call", state: "idle" });
+      expect(core.state().call).toBe("idle");
+      yield* reopen;
+      expect(core.state().call).toBe("live");
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config)))));
+  });
+
   it.effect("a fact is stamped and sent; the same again is no news; state.json is written on close, without the words", () => {
     const config = testConfig();
     return Effect.gen(function* () {
@@ -42,7 +72,7 @@ describe("core", () => {
         Effect.gen(function* () {
           const core = yield* Core;
           const seen = yield* core.events.pipe(Stream.take(4), Stream.runCollect, Effect.forkScoped);
-          yield* Effect.yieldNow;
+          yield* TestClock.adjust(5);
           yield* core.apply({ type: "hired", session: { ...helper, phase: { _tag: "arriving" } } });
           yield* core.setOrchestrator("thinking");
           yield* core.setOrchestrator("thinking");
@@ -76,6 +106,53 @@ describe("core", () => {
       expect([next.state.orchestrator, next.state.commits?.total]).toEqual(["speaking", 2]);
       yield* TestClock.adjust(stateEveryMs * 2);
       expect(yield* Queue.size(frames)).toBe(0);
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
+  );
+
+  it.effect("an internal subscriber keeps a whole burst while it works", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      const incoming = yield* core.subscribe;
+      const seen = yield* Effect.forkScoped(
+        incoming.pipe(
+          Stream.take(128),
+          Stream.tap(() => Effect.sleep(1)),
+          Stream.runCount,
+        ),
+      );
+      yield* TestClock.adjust(5);
+      for (let i = 0; i < 128; i++) yield* core.setOrchestrator(i % 2 === 0 ? "thinking" : "speaking");
+      yield* TestClock.adjust(200);
+      expect(yield* Fiber.join(seen)).toBe(128);
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
+  );
+
+  it.effect("a delayed save failure is logged and the final save still works", () => {
+    const config = testConfig();
+    const messages: unknown[] = [];
+    const logger = Logger.make((options) => {
+      messages.push(options.message);
+    });
+    return Effect.gen(function* () {
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          mkdirSync(join(config.home, "state.json"));
+          const core = yield* Core;
+          yield* core.setOrchestrator("thinking");
+          yield* TestClock.adjust(600);
+          expect(messages.some((message) => String(message).includes("state.json could not be saved"))).toBe(true);
+          rmSync(join(config.home, "state.json"), { recursive: true });
+        }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),
+      );
+      expect(readFileSync(join(config.home, "state.json"), "utf8")).toContain("thinking");
+    }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
+  });
+
+  it.effect("apply stays synchronous for oar callbacks", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      yield* Effect.sync(() => Effect.runSync(core.apply({ type: "orchestrator", state: "thinking" })));
+      expect(core.state().orchestrator).toBe("thinking");
     }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
   );
 });

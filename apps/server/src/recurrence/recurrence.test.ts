@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Recurrence, RecurrenceRequest, RecurrenceWhen } from "@vibevalley/protocol";
+import { RecurrenceWhenWeekly } from "@vibevalley/protocol/schema";
 import { nextText } from "./when.ts";
-import { Effect, Stream } from "effect";
+import { Effect, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { test } from "vite-plus/test";
 import { type Config } from "../base/config.ts";
@@ -12,6 +13,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { afterRun, dueRecurrences, isMissed, needsOK } from "./rules.ts";
 import { type Due, Recurrences } from "./recurrence.ts";
+import * as q from "../../db/generated/recurrence.sql.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("recurrence");
@@ -155,6 +157,22 @@ describe("recurrences", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(testConfig(), clock)));
   });
 
+  it.live("weekly days are integers from zero to six", () => {
+    const clock = { now: Date.now() };
+    return Effect.gen(function* () {
+      const s = yield* Recurrences;
+      const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
+      expect((yield* Effect.flip(s.add(bad, "owner", true)))._tag).toBe("Refused");
+      expect(s.list()).toEqual([]);
+      expect(Schema.decodeUnknownExit(RecurrenceWhenWeekly)(bad.when)._tag).toBe("Failure");
+      expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), "owner", true)).when).toEqual({
+        kind: "weekly",
+        days: [0, 6],
+        time: "09:00",
+      });
+    }).pipe(Effect.scoped, Effect.provide(farm(testConfig(), clock)));
+  });
+
   it.live("a cron recurrence is kept, and a bad one is refused", () => {
     const config = { ...testConfig(), db: "" };
     const clock = { now: Date.now() };
@@ -167,6 +185,38 @@ describe("recurrences", () => {
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
         expect((yield* Recurrences).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
+      }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
+    });
+  });
+
+  it.live("a stored recurrence with the wrong spec is not restored beside a valid one", () => {
+    const config = { ...testConfig(), db: "" };
+    const clock = { now: Date.now() };
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        const channel = (yield* Channels).general();
+        for (const [id, spec] of [
+          ["bad-spec", `{"kind":"weekly","days":[1.5],"time":"09:00"}`],
+          ["good", `{"kind":"daily","time":"09:00"}`],
+        ] as const)
+          yield* Effect.orDie(
+            q.addRecurrence({
+              id,
+              name: id,
+              body: "",
+              channel_id: channel,
+              agent: null,
+              project: null,
+              spec,
+              tz: "UTC",
+              pending: false,
+              set_by: "owner",
+              created_at: 0,
+            }),
+          );
+      }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
+      yield* Effect.gen(function* () {
+        expect((yield* Recurrences).list().map((r) => [r.id, r.when, r.by])).toEqual([["good", { kind: "daily", time: "09:00" }, "owner"]]);
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
     });
   });

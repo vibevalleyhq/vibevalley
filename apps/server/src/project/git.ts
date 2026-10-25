@@ -27,7 +27,12 @@ export interface RunOptions {
  */
 export const run = (command: string, args: readonly string[], options: RunOptions = {}): Effect.Effect<Ran> =>
   Effect.callback<Ran>((resume) => {
-    const child = spawn(command, args, { cwd: options.cwd, env: options.env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     child.stdout.on("data", (b: Buffer) => out.push(b));
@@ -54,7 +59,15 @@ export const run = (command: string, args: readonly string[], options: RunOption
       clearTimeout(timer);
       resume(Effect.succeed(r));
     };
-    child.on("error", (e: NodeJS.ErrnoException) => finish({ stdout: "", stderr: e.message, code: -1, missing: e.code === "ENOENT", timedOut: false }));
+    child.on("error", (e: NodeJS.ErrnoException) =>
+      finish({
+        stdout: "",
+        stderr: e.message,
+        code: -1,
+        missing: e.code === "ENOENT",
+        timedOut: false,
+      }),
+    );
     child.on("close", (code) =>
       finish({
         stdout: Buffer.concat(out).toString("utf8"),

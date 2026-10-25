@@ -1,9 +1,29 @@
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
+import { Schema } from "effect";
+
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
 const intents = 1 << 25;
+
+// A refused AppID or secret answers without a token, with QQ's reason in message: that reason is what the owner sees.
+const TokenResponse = Schema.Struct({
+  access_token: Schema.optionalKey(Schema.String),
+  expires_in: Schema.optionalKey(Schema.Union([Schema.Number, Schema.String])),
+  message: Schema.optionalKey(Schema.String),
+});
+const GatewayResponse = Schema.Struct({ url: Schema.String });
+const GatewayEvent = Schema.Struct({
+  op: Schema.Number,
+  // Frames that are not dispatches may carry s and t as null.
+  s: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  t: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  d: Schema.optionalKey(Schema.Unknown),
+});
+export const decodeGatewayEvent = Schema.decodeUnknownSync(Schema.fromJsonString(GatewayEvent));
+const decodeTokenResponse = Schema.decodeUnknownSync(TokenResponse);
+const decodeGatewayResponse = Schema.decodeUnknownSync(GatewayResponse);
 
 export interface App {
   readonly appId: string;
@@ -49,7 +69,7 @@ export class QQClient implements QQApi {
     const cached = this.tokens.get(key);
     if (cached && cached.until > Date.now()) return cached.token;
     const timed = AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
-    let body: { access_token?: string; expires_in?: number | string; message?: string };
+    let body: typeof TokenResponse.Type;
     try {
       const res = await fetch(this.tokenAt, {
         method: "POST",
@@ -57,7 +77,7 @@ export class QQClient implements QQApi {
         body: JSON.stringify({ appId: app.appId, clientSecret: app.secret }),
         signal: timed,
       });
-      body = (await res.json()) as typeof body;
+      body = decodeTokenResponse(await res.json());
     } catch (e) {
       if (timed.aborted && !signal.aborted) throw new Error("QQ 鉴权：超时了");
       throw new Error("QQ 鉴权：" + (e instanceof Error ? e.message : String(e)));
@@ -69,7 +89,11 @@ export class QQClient implements QQApi {
   }
 
   private headers(app: App, token: string) {
-    return { Authorization: "QQBot " + token, "X-Union-Appid": app.appId, "Content-Type": "application/json" };
+    return {
+      Authorization: "QQBot " + token,
+      "X-Union-Appid": app.appId,
+      "Content-Type": "application/json",
+    };
   }
 
   async check(signal: AbortSignal, app: App) {
@@ -77,29 +101,33 @@ export class QQClient implements QQApi {
   }
 
   async listen(signal: AbortSignal, app: App, got: (m: Message) => Promise<void>): Promise<void> {
+    if (signal.aborted) return;
     const token = await this.token(signal, app);
-    let gateway: { url?: string };
+    let gateway: typeof GatewayResponse.Type;
     try {
-      gateway = (await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json()) as { url?: string };
+      gateway = decodeGatewayResponse(await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json());
     } catch (e) {
       if (signal.aborted) return;
       throw new Error("QQ 网关：" + (e instanceof Error ? e.message : String(e)));
     }
     if (!gateway.url) throw new Error("QQ 没给网关地址");
+    if (signal.aborted) return;
     const ws = new WebSocket(gateway.url);
     return new Promise((resolve, reject) => {
       let seq: number | null = null;
       let beat: NodeJS.Timeout | undefined;
       let done = false;
+      const abort = () => end();
       const end = (e?: Error) => {
         if (done) return;
         done = true;
+        signal.removeEventListener("abort", abort);
         if (beat) clearInterval(beat);
         ws.close();
         if (e && !signal.aborted) reject(e);
         else resolve();
       };
-      signal.addEventListener("abort", () => end(), { once: true });
+      signal.addEventListener("abort", abort, { once: true });
       const send = (payload: unknown) => {
         try {
           ws.send(JSON.stringify(payload));
@@ -110,39 +138,56 @@ export class QQClient implements QQApi {
       // One message at a time: each is handed over before the next is read.
       let chain = Promise.resolve();
       ws.addEventListener("message", (event) => {
-        chain = chain.then(async () => {
-          if (done) return;
-          let msg: { op?: number; s?: number; t?: string; d?: unknown };
-          try {
-            msg = JSON.parse(String(event.data)) as typeof msg;
-          } catch {
-            return end(new Error("QQ 网关：连接出错"));
-          }
-          if (typeof msg.s === "number") seq = msg.s;
-          switch (msg.op) {
-            case 10: {
-              send({ op: 2, d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} } });
-              const every = (msg.d as { heartbeat_interval?: number } | undefined)?.heartbeat_interval ?? 0;
-              beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
-              return;
+        chain = chain
+          .then(async () => {
+            if (done) return;
+            let msg: typeof GatewayEvent.Type;
+            try {
+              msg = decodeGatewayEvent(String(event.data));
+            } catch {
+              return end(new Error("QQ 网关：连接出错"));
             }
-            case 0: {
-              if (msg.t !== "C2C_MESSAGE_CREATE") return;
-              const d = msg.d as { id?: string; content?: string; author?: { user_openid?: string }; attachments?: unknown[] } | undefined;
-              if (!d?.id || !d.author?.user_openid) return;
-              try {
-                await got({ id: d.id, from: d.author.user_openid, content: d.content ?? "", attachments: d.attachments?.length ?? 0 });
-              } catch (e) {
-                end(e instanceof Error ? e : new Error(String(e)));
+            if (typeof msg.s === "number") seq = msg.s;
+            switch (msg.op) {
+              case 10: {
+                send({
+                  op: 2,
+                  d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} },
+                });
+                const every = (msg.d as { heartbeat_interval?: number } | undefined)?.heartbeat_interval ?? 0;
+                beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
+                return;
               }
-              return;
+              case 0: {
+                if (msg.t !== "C2C_MESSAGE_CREATE") return;
+                const d = msg.d as
+                  | {
+                      id?: string;
+                      content?: string;
+                      author?: { user_openid?: string };
+                      attachments?: unknown[];
+                    }
+                  | undefined;
+                if (!d?.id || !d.author?.user_openid) return;
+                try {
+                  await got({
+                    id: d.id,
+                    from: d.author.user_openid,
+                    content: d.content ?? "",
+                    attachments: d.attachments?.length ?? 0,
+                  });
+                } catch (e) {
+                  end(e instanceof Error ? e : new Error(String(e)));
+                }
+                return;
+              }
+              case 7:
+                return end(new Error("QQ 网关：QQ 让重新连接"));
+              case 9:
+                return end(new Error("QQ 网关：QQ 说会话无效"));
             }
-            case 7:
-              return end(new Error("QQ 网关：QQ 让重新连接"));
-            case 9:
-              return end(new Error("QQ 网关：QQ 说会话无效"));
-          }
-        });
+          })
+          .catch((e: unknown) => end(e instanceof Error ? e : new Error(String(e))));
       });
       ws.addEventListener("close", (event) => end(new Error(`QQ 网关：连接关了（${event.code}）`)));
       ws.addEventListener("error", () => end(new Error("QQ 网关：连接出错")));

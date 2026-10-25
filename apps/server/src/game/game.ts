@@ -4,11 +4,13 @@
 // entry that cannot be written is logged, and the farm goes on.
 
 import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
-import { Context, Effect, Layer, Semaphore, Stream } from "effect";
+import { Context, Effect, Layer, Predicate, Semaphore, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Settings } from "../base/config.ts";
 import { newId } from "../base/ids.ts";
+import { jsonOf } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { Projects } from "../project/project.ts";
 import * as q from "../../db/generated/game_ledger.sql.ts";
@@ -28,6 +30,8 @@ export interface GameShape {
   readonly record: (entry: Entry) => Effect.Effect<void>;
   /** Commits on every project, a repository with several worktrees once: "yours" by author email. */
   readonly count: () => Effect.Effect<CommitCount>;
+  /** The count and its write, serialized with run-end refreshes. */
+  readonly refresh: Effect.Effect<void>;
   /** How many runs' ends asked for a count. */
   readonly asked: () => number;
 }
@@ -46,8 +50,9 @@ export const make = Effect.gen(function* () {
   const entries: LedgerEntry[] = [];
   for (const row of rows) {
     try {
-      const fields = (JSON.parse(row.payload) as Record<string, unknown> | null) ?? {};
-      entries.push({ ...fields, kind: row.kind, at: row.at } as LedgerEntry);
+      const fields = jsonOf(Schema.Unknown)(row.payload);
+      if (!Predicate.isObject(fields) || Array.isArray(fields)) continue;
+      entries.push(Schema.decodeUnknownSync(S.LedgerEntry)({ ...fields, kind: row.kind, at: row.at }));
     } catch {
       continue;
     }
@@ -126,6 +131,7 @@ export const make = Effect.gen(function* () {
     },
     record,
     count,
+    refresh,
     asked: () => asked,
   });
 });
@@ -136,7 +142,6 @@ export const layer = Layer.effect(Game, make);
 export const start = Layer.effectDiscard(
   Effect.gen(function* () {
     const game = yield* Game;
-    const core = yield* Core;
-    yield* Effect.forkScoped(Effect.forever(Effect.andThen(Effect.flatMap(game.count(), core.setCommits), Effect.sleep(countEveryMs))));
+    yield* Effect.forkScoped(Effect.forever(Effect.andThen(game.refresh, Effect.sleep(countEveryMs))));
   }),
 );

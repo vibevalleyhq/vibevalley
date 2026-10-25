@@ -38,6 +38,52 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
+  it("does not start an ask or a tool for an already aborted signal", async () => {
+    const dir = home();
+    await withAgent(dir, [], async (r) => {
+      const ended = new AbortController();
+      ended.abort();
+      await expect(r.agent.ask(userMessage("不该开始"), ended.signal)).rejects.toThrow("aborted");
+      expect(r.requests).toHaveLength(0);
+      let runs = 0;
+      const tool = textTool({
+        name: "count",
+        description: "count",
+        parameters: objectSchema(),
+        run: () => String(++runs),
+      });
+      await expect(tool.execute("t", {}, ended.signal)).rejects.toThrow(stopped);
+      expect(runs).toBe(0);
+    });
+  });
+
+  it("shares the actual close with every concurrent caller", async () => {
+    const dir = home();
+    await withAgent(dir, [], async (r) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const waitForIdle = r.agent.core.waitForIdle.bind(r.agent.core);
+      r.agent.core.waitForIdle = () => gate;
+      try {
+        const first = r.agent.close();
+        const second = r.agent.close();
+        expect(second).toBe(first);
+        let done = false;
+        void second.then(() => {
+          done = true;
+        });
+        await sleep(10);
+        expect(done).toBe(false);
+        release();
+        await Promise.all([first, second]);
+        expect(done).toBe(true);
+      } finally {
+        release();
+        r.agent.core.waitForIdle = waitForIdle;
+      }
+    });
+  });
+
   it("runs a tool and gives its result back", async () => {
     const dir = home();
     writeFileSync(join(dir, "notes.txt"), "第一行\n第二行\n");
@@ -87,7 +133,12 @@ describe("the agent", () => {
 
   it("steers with send and waits with later", async () => {
     const dir = home();
-    const nap = textTool<object>({ name: "nap", description: "睡一会", parameters: objectSchema(), run: async () => (await sleep(40), "醒了") });
+    const nap = textTool<object>({
+      name: "nap",
+      description: "睡一会",
+      parameters: objectSchema(),
+      run: async () => (await sleep(40), "醒了"),
+    });
     await withAgent(
       dir,
       [
@@ -421,7 +472,14 @@ describe("the agent", () => {
     const u = (text: string) => userMessage(text);
     const a = (text: string) => fauxAssistantMessage(text);
     const call = fauxAssistantMessage([fauxToolCall("x", {})]);
-    const result: AgentMessage = { role: "toolResult", toolCallId: "", toolName: "x", content: [], isError: false, timestamp: 0 };
+    const result: AgentMessage = {
+      role: "toolResult",
+      toolCallId: "",
+      toolName: "x",
+      content: [],
+      isError: false,
+      timestamp: 0,
+    };
     const tools = [u("1"), a("一"), u("2"), a("二"), u("3"), call, result, call, result, call, result, a("三"), u("4"), call, result, a("四")];
     expect(cutPoint(tools, 3, 0)).toBe(12);
     expect(cutPoint(tools, 3, 3)).toBe(2);
@@ -434,7 +492,10 @@ describe("the agent", () => {
   describe("a run cut off", () => {
     const now = Date.now();
     const asked: AgentMessage = { role: "user", content: "列一下", timestamp: now };
-    const call = fauxAssistantMessage([fauxToolCall("list_dir", {}, { id: "call-1" })], { timestamp: now, stopReason: "toolUse" });
+    const call = fauxAssistantMessage([fauxToolCall("list_dir", {}, { id: "call-1" })], {
+      timestamp: now,
+      stopReason: "toolUse",
+    });
     const result: AgentMessage = {
       role: "toolResult",
       toolCallId: "call-1",
@@ -444,7 +505,11 @@ describe("the agent", () => {
       timestamp: now,
     };
     const old = { ...result, timestamp: now - 2 * 3_600_000 };
-    const stop: AgentMessage = { ...result, content: [{ type: "text", text: stopped }], isError: true };
+    const stop: AgentMessage = {
+      ...result,
+      content: [{ type: "text", text: stopped }],
+      isError: true,
+    };
     const answer = fauxAssistantMessage("列完了");
     const cases: [string, AgentMessage[], boolean, boolean][] = [
       ["a tool done, not answered", [asked, call, result], true, true],

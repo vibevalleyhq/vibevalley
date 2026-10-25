@@ -29,7 +29,17 @@ describe("chat/completions", () => {
         },
         "让老周跑测试",
       ],
-      [{ messages: [{ role: "user", content: [{ type: "text", text: "看看" }, { type: "image_url" }, { type: "text", text: "进度" }] }] }, "看看进度"],
+      [
+        {
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: "看看" }, { type: "image_url" }, { type: "text", text: "进度" }],
+            },
+          ],
+        },
+        "看看进度",
+      ],
       [{ messages: [{ role: "assistant", content: "好" }] }, ""],
       [{}, ""],
     ];
@@ -56,15 +66,26 @@ describe("chat/completions", () => {
       }),
     });
     const res = await ask(handle, { model: "m", messages: [{ role: "user", content: "跑测试" }] });
-    const got = (await res.json()) as { object: string; model: string; choices: { message: { role: string; content: string }; finish_reason: string }[] };
+    const got = (await res.json()) as {
+      object: string;
+      model: string;
+      choices: { message: { role: string; content: string }; finish_reason: string }[];
+    };
     expect([res.status, got.object, got.model, got.choices.length]).toEqual([200, "chat.completion", "m", 1]);
-    expect(got.choices[0]).toMatchObject({ message: { role: "assistant", content: "好，这就去。" }, finish_reason: "stop" });
+    expect(got.choices[0]).toMatchObject({
+      message: { role: "assistant", content: "好，这就去。" },
+      finish_reason: "stop",
+    });
     expect(heard).toBe("跑测试");
   });
 
   it("streams its words, then stop and [DONE]", async () => {
     const handle = chatCompletions({ answerer: only("m", () => said("好，", "这就去。")) });
-    const res = await ask(handle, { model: "m", stream: true, messages: [{ role: "user", content: "跑测试" }] });
+    const res = await ask(handle, {
+      model: "m",
+      stream: true,
+      messages: [{ role: "user", content: "跑测试" }],
+    });
     const lines = (await res.text()).split("\n\n").filter(Boolean);
     expect(lines.at(-1)).toBe("data: [DONE]");
     expect(lines.slice(0, 2).map((l) => JSON.parse(l.slice(6)).choices[0].delta.content)).toEqual(["好，", "这就去。"]);
@@ -86,5 +107,27 @@ describe("chat/completions", () => {
     const misheard = await ask(lenient, { model: "m", messages: [] });
     expect([misheard.status, await misheard.text()]).toEqual([200, expect.stringContaining("没听清")]);
     expect((await ask(strict, undefined, "GET")).status).toBe(405);
+  });
+
+  it("rejects valid JSON with an invalid request shape before answering", async () => {
+    let calls = 0;
+    const handle = chatCompletions({
+      answerer: only("m", () => {
+        calls++;
+        return said("不该回答");
+      }),
+    });
+    const cases = [
+      { model: "m", messages: {} },
+      { model: "m", messages: [null] },
+      { model: "m", messages: [{ role: "user", content: 1 }] },
+      { model: "m", stream: "false", messages: [] },
+      { model: 1, messages: [] },
+    ];
+    for (const body of cases) {
+      const res = await ask(handle, body);
+      expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([400, "invalid_json"]);
+    }
+    expect(calls).toBe(0);
   });
 });

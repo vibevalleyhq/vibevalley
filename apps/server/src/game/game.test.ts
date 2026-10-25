@@ -1,16 +1,19 @@
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { Session } from "@vibevalley/protocol";
+import type { Repo, Session } from "@vibevalley/protocol";
 import { sessionOf } from "../session/state.ts";
 import { playOf } from "./play.ts";
-import { Effect, Layer } from "effect";
+import { Deferred, Effect, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import { Core } from "../core/core.ts";
+import { Projects } from "../project/project.ts";
 import { gitSync, repo } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
-import { Game, layer } from "./game.ts";
+import { Game, layer, start as gameStart } from "./game.ts";
 import { waitFor as until } from "../testing/until.ts";
+import * as q from "../../db/generated/game_ledger.sql.ts";
 
 const farm = (config = testConfig()) => layer.pipe(Layer.provideMerge(world({ config })));
 
@@ -45,6 +48,32 @@ describe("the game", () => {
         expect(core.state().progress).toEqual(before);
         // A level already on the ledger is not told again.
         expect((yield* kinds).at(-1)).toBe("level");
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+    });
+  });
+
+  it.live("malformed and infinite ledger entries stay out of the fold", () => {
+    const config = { ...testConfig(), db: "" };
+    return Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        yield* Effect.orDie(
+          q.addLedgerEntry({
+            id: "bad-infinity",
+            kind: "harvested",
+            at: 1,
+            payload: `{"session":"bad","project":"demo","runtime":"pi","commits":1e999,"runs":1}`,
+          }),
+        );
+        yield* Effect.orDie(q.addLedgerEntry({ id: "bad-shape", kind: "level", at: 2, payload: `{"level":"high"}` }));
+        yield* Effect.orDie(
+          q.addLedgerEntry({ id: "good", kind: "harvested", at: 3, payload: `{"session":"good","project":"demo","runtime":"pi","commits":1,"runs":1}` }),
+        );
+      }).pipe(Effect.scoped, Effect.provide(farm(config)));
+      yield* Effect.gen(function* () {
+        const progress = (yield* Core).state().progress!;
+        expect(progress.counts.harvests).toBe(1);
+        expect(Number.isFinite(progress.coins)).toBe(true);
+        expect(progress.coins).toBeGreaterThan(0);
       }).pipe(Effect.scoped, Effect.provide(farm(config)));
     });
   });
@@ -103,5 +132,49 @@ describe("the game", () => {
       // A taken station is not given again, and the wish is used once.
       expect([yield* stationOf("w3"), yield* stationOf("w4")]).toEqual([1, 2]);
     }).pipe(Effect.scoped, Effect.provide(farm())),
+  );
+
+  it.effect("a slow old commit count cannot overwrite a newer one in either completion order", () =>
+    Effect.gen(function* () {
+      for (const secondFirst of [false, true]) {
+        const first = yield* Deferred.make<void>();
+        const second = yield* Deferred.make<void>();
+        let calls = 0;
+        const contributions: Effect.Effect<Repo[]> = Effect.suspend(() => {
+          calls++;
+          if (calls === 1) return Deferred.await(first).pipe(Effect.as([{ path: "old", commits: 1 }]));
+          if (calls === 2) return Deferred.await(second).pipe(Effect.as([{ path: "new", commits: 2 }]));
+          return Effect.succeed([]);
+        });
+        const config = testConfig();
+        const projects = Layer.unwrap(
+          Effect.map(Projects, (current) => Layer.succeed(Projects, Projects.of({ ...current, contributions: () => contributions }))),
+        ).pipe(Layer.provideMerge(world({ config })));
+        const app = gameStart.pipe(Layer.provideMerge(layer)).pipe(Layer.provideMerge(projects));
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const core = yield* Core;
+            yield* core.apply({ type: "hired", session: helper("w1") });
+            yield* core.apply({ type: "report", id: "w1", outcome: "failed", summary: "", runs: 1 });
+            yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
+            yield* TestClock.adjust(15_000);
+            if (secondFirst) {
+              yield* Deferred.succeed(second, undefined);
+              yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
+              yield* Deferred.succeed(first, undefined);
+              yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
+              expect(core.state().commits?.total).toBe(2);
+            } else {
+              yield* Deferred.succeed(first, undefined);
+              yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
+              expect(core.state().commits?.total).toBe(1);
+              yield* Deferred.succeed(second, undefined);
+              yield* Effect.yieldNow.pipe(Effect.repeat({ times: 10 }));
+              expect(core.state().commits?.total).toBe(2);
+            }
+          }).pipe(Effect.provide(app)),
+        );
+      }
+    }).pipe(Effect.scoped),
   );
 });

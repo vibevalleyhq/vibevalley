@@ -11,6 +11,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
@@ -143,7 +144,7 @@ export const make = (options: LanOptions = {}) =>
       });
     }
     // No row yet is shut.
-    let open = Option.match(yield* Effect.option(Effect.provideService(lanQ.lanOpen(), SqlClient.SqlClient, sql)), {
+    let open = Option.match(yield* db(Effect.catchNoSuchElement(lanQ.lanOpen())), {
       onNone: () => false,
       onSome: (r) => r.open,
     });
@@ -211,8 +212,7 @@ export const make = (options: LanOptions = {}) =>
       } as RequestInit);
       res.writeHead(answer.status, Object.fromEntries(answer.headers));
       if (!answer.body) return void res.end();
-      for await (const chunk of answer.body as unknown as AsyncIterable<Uint8Array>) res.write(chunk);
-      res.end();
+      await pipeline(Readable.fromWeb(answer.body as import("node:stream/web").ReadableStream<Uint8Array>), res, { signal });
     };
 
     const guard = (req: IncomingMessage, res: ServerResponse) => {
@@ -265,14 +265,14 @@ export const make = (options: LanOptions = {}) =>
         });
       });
 
-    const shut = () => {
+    const shut = async () => {
       dropPairing();
-      if (server) {
-        server.closeAllConnections();
-        server.close();
-        logs.info("vibevalley: lan access is shut");
-      }
+      const current = server;
       server = undefined;
+      if (!current) return;
+      current.closeAllConnections();
+      await new Promise<void>((resolve) => current.close(() => resolve()));
+      logs.info("vibevalley: lan access is shut");
     };
 
     const status = (): LanStatus => {
@@ -290,7 +290,7 @@ export const make = (options: LanOptions = {}) =>
     };
 
     if (open) yield* Effect.promise(listen);
-    yield* Effect.addFinalizer(() => Effect.sync(shut));
+    yield* Effect.addFinalizer(() => Effect.promise(() => shut()));
 
     const addDevice = Effect.fn("Lan.addDevice")(function* (name: string) {
       const key = randomBytes(32).toString("base64url");
@@ -309,7 +309,7 @@ export const make = (options: LanOptions = {}) =>
         if (want) yield* Effect.promise(listen);
         else {
           problem = "";
-          shut();
+          yield* Effect.promise(() => shut());
         }
         return status();
       }, opening.withPermits(1)),

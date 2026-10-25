@@ -3,7 +3,6 @@
 // on the side events, the facts and (as the page wants it) a frame stream; a transition carries the state each fact
 // changed, so a reader that comes late needs no second fold.
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   CommitCount,
@@ -19,9 +18,11 @@ import type {
   SideEvent,
   StateFrame,
 } from "@vibevalley/protocol";
-import { Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
+import * as S from "@vibevalley/protocol/schema";
+import { Cause, Context, Effect, FiberMap, Layer, PubSub, Queue, type Scope, Stream } from "effect";
 import { Settings } from "../base/config.ts";
-import { FileWriter } from "../base/files.ts";
+import { FileWriter, readOrSetAside } from "../base/files.ts";
+import { jsonOf } from "../base/json.ts";
 
 export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
 
@@ -87,7 +88,10 @@ export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") 
 const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: WorkspaceState): WorkspaceState => kept;
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
-const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, orchestrator: "idle" });
+const restarted = (kept: WorkspaceState): WorkspaceState => {
+  const { callReason: _callReason, ...rest } = toKeep(kept);
+  return { ...rest, call: "idle", orchestrator: "idle" };
+};
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -102,20 +106,24 @@ const liveOf = (e: SideEvent): LiveEvent | undefined => {
   }
 };
 
-const isFact = (e: SideEvent): e is Fact => e.type !== "snapshot" && e.type !== "event" && e.type !== "notice" && e.type !== "runtime";
+const isFact = (e: SideEvent): e is Fact => {
+  switch (e.type) {
+    case "snapshot":
+    case "event":
+    case "notice":
+    case "runtime":
+      return false;
+    default:
+      return (e satisfies Fact) !== undefined;
+  }
+};
 
 export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
-  let kept = emptyWorkspaceState();
-  if (existsSync(file)) {
-    try {
-      kept = { ...emptyWorkspaceState(), ...(JSON.parse(readFileSync(file, "utf8")) as WorkspaceState) };
-    } catch (e) {
-      yield* Effect.logWarning(`state.json unreadable, starting empty: ${String(e)}`);
-    }
-  }
+  const read = jsonOf(S.WorkspaceState);
+  const kept = { ...emptyWorkspaceState(), ...(yield* readOrSetAside(file, read, "the farm starts empty")) };
   let state = restore(restarted(kept));
   const disk = new FileWriter(file);
   const body = () => JSON.stringify(toKeep(state));
@@ -129,7 +137,9 @@ export const make = Effect.gen(function* () {
       later(
         "save",
         Effect.delay(
-          Effect.sync(() => disk.write(body)),
+          Effect.sync(() => disk.write(body)).pipe(
+            Effect.onError((cause) => (Cause.hasInterrupts(cause) ? Effect.void : Effect.logError("vibevalley: state.json could not be saved", cause))),
+          ),
           saveAfterMs,
         ),
         { onlyIfMissing: true },
@@ -147,6 +157,9 @@ export const make = Effect.gen(function* () {
   const owner = yield* PubSub.unbounded<OwnerDid>();
   /** Each fact and effect, for the frames: a frame waits for the burst it starts. */
   const changes = yield* PubSub.unbounded<GameEffect | undefined>();
+  yield* Effect.addFinalizer(() =>
+    Effect.all([PubSub.shutdown(events), PubSub.shutdown(transitions), PubSub.shutdown(owner), PubSub.shutdown(changes)], { discard: true }),
+  );
 
   const publish = (e: SideEvent) => {
     PubSub.publishUnsafe(events, e);
@@ -202,10 +215,10 @@ export const make = Effect.gen(function* () {
     apply,
     setOrchestrator: (orchestrator) => apply({ type: "orchestrator", state: orchestrator }),
     setCommits: (commits) => apply({ type: "commits", commits }),
-    open: () => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" })),
-    sessionEvent: (id, activity) => side({ type: "event", at: Date.now(), id, activity }),
-    notice: (level, text) => side({ type: "notice", at: Date.now(), level, text }),
-    runtime: (info) => side({ type: "runtime", at: Date.now(), info }),
+    open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" }))),
+    sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: Date.now(), id, activity })),
+    notice: (level, text) => Effect.suspend(() => side({ type: "notice", at: Date.now(), level, text })),
+    runtime: (info) => Effect.suspend(() => side({ type: "runtime", at: Date.now(), info })),
     did: (d) => Effect.asVoid(PubSub.publish(owner, d)),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);
