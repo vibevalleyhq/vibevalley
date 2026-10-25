@@ -396,7 +396,7 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
   let mcpUrl = `http://${serverAddress(config)}/mcp`;
   const trajectories = new Trajectories(
     config.home,
-    (id, e) => Effect.runSync(core.sessionEvent(id, e)),
+    (id, e) => fire(core.sessionEvent(id, e)),
     (message) => fire(Effect.logWarning(message)),
   );
   // A hand is acquired before admission; no path holding admission waits for a hand.
