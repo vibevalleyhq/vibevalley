@@ -11,7 +11,10 @@ export const achievements = seeds.achievements as AchievementDef[];
 /** The profiles a new farm starts with: a copy each call. */
 export const seedAgents = (): Agent[] => structuredClone(seeds.agents) as Agent[];
 
-export const defaultSettings = (): RuntimeSettings => ({ ...(seeds.defaultSettings as RuntimeSettings), env: {} });
+export const defaultSettings = (): RuntimeSettings => ({
+  ...(seeds.defaultSettings as RuntimeSettings),
+  env: {},
+});
 
 /** Every runtime the farm knows, in the order the page shows them. */
 export const runtimeIds = (): string[] => [...seeds.runtimeIds];

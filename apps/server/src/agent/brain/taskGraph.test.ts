@@ -108,7 +108,11 @@ describe("an agent's task graph", () => {
 
   const stores = Effect.map(
     SqlClient.SqlClient,
-    (sql) => ({ database: (owner: string) => dbStore(sql, owner), memory: (_: string) => memoryStore() }) as Record<string, (owner: string) => TaskStore>,
+    (sql) =>
+      ({
+        database: (owner: string) => dbStore(sql, owner),
+        memory: (_: string) => memoryStore(),
+      }) as Record<string, (owner: string) => TaskStore>,
   );
 
   it.effect("a store keeps the graph and puts a finished one away", () =>

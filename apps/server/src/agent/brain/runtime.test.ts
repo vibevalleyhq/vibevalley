@@ -66,7 +66,10 @@ describe("VibeValley's runtime", () => {
     const kinds = new Set(r.events.map((e) => e.kind));
     for (const k of ["model", "text_delta", "tool_call_started", "tool_call_ended", "turn_ended", "usage"]) expect(kinds).toContain(k);
     const started = r.events.find((e) => e.kind === "tool_call_started");
-    expect(started).toMatchObject({ tool: "write_file", input: `{"path":"hello.txt","content":"hi"}` });
+    expect(started).toMatchObject({
+      tool: "write_file",
+      input: `{"path":"hello.txt","content":"hi"}`,
+    });
     expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({ result: "ok" });
     expect(ended(r)[0]!.kind).toBe("completed");
     expect(text(r)).toBe("我来写写好了 hello.txt");
@@ -110,7 +113,11 @@ describe("VibeValley's runtime", () => {
     await first.session.prompt("一");
     await until(() => ended(first).length === 1);
     await first.session.dispose();
-    const again = await open([count], { resume: first.session.id, home: first.home, cwd: first.cwd });
+    const again = await open([count], {
+      resume: first.session.id,
+      home: first.home,
+      cwd: first.cwd,
+    });
     expect(again.session.id).toBe(first.session.id);
     await again.session.prompt("二");
     await until(() => ended(again).length === 1);
@@ -140,7 +147,9 @@ rl.on('line', (line) => {
     await r.session.prompt("汇报");
     await until(() => ended(r).length === 1);
     expect(toolsOf(r.requests[0]!).map((t) => t.name)).toContain("farm__say");
-    expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({ content: [{ type: "text", text: "说了：做完了" }] });
+    expect(r.events.find((e) => e.kind === "tool_call_ended")).toMatchObject({
+      content: [{ type: "text", text: "说了：做完了" }],
+    });
   });
 
   it("fails the turn when the model fails", async () => {
@@ -162,6 +171,9 @@ rl.on('line', (line) => {
         throw new Error("没有 DeepSeek 的密钥");
       },
     });
-    expect(await keyless.installation!()).toEqual({ kind: "unsupported", reason: "没有 DeepSeek 的密钥" });
+    expect(await keyless.installation!()).toEqual({
+      kind: "unsupported",
+      reason: "没有 DeepSeek 的密钥",
+    });
   });
 });

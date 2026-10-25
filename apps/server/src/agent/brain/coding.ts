@@ -47,7 +47,12 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
   if (argv.length === 0) return Promise.reject(new Error("跑不起来：没有命令"));
   if (signal?.aborted) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {
-    const child = spawn(argv[0]!, argv.slice(1), { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(argv[0]!, argv.slice(1), {
+      cwd,
+      env,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let output = "";
     const take = (b: Buffer) => {
       if (output.length < outputCap) output += b.toString("utf8");
@@ -79,7 +84,11 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     };
     child.on("error", (e) => {
       done();
-      reject(Object.assign(new Error("跑不起来：" + e.message), { code: (e as NodeJS.ErrnoException).code }));
+      reject(
+        Object.assign(new Error("跑不起来：" + e.message), {
+          code: (e as NodeJS.ErrnoException).code,
+        }),
+      );
     });
     // close waits for the output to end; a daemon that left the group may hold it open, so exit gives it 2 s.
     let exited: { code: number } | undefined;
@@ -151,11 +160,21 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const edit = textTool<{ path: string; old_text: string; new_text: string; replace_all?: boolean }>({
+  const edit = textTool<{
+    path: string;
+    old_text: string;
+    new_text: string;
+    replace_all?: boolean;
+  }>({
     name: "edit_file",
     description: "把文件里的一段原文换成新的。old_text 要和文件里一字不差、而且只出现一次（不唯一就多带几行上下文），要全换就把 replace_all 设成 true。",
     parameters: objectSchema(
-      { path: stringSchema(), old_text: stringSchema(), new_text: stringSchema(), replace_all: booleanSchema() },
+      {
+        path: stringSchema(),
+        old_text: stringSchema(),
+        new_text: stringSchema(),
+        replace_all: booleanSchema(),
+      },
       "path",
       "old_text",
       "new_text",
@@ -213,7 +232,15 @@ export function codingTools(o: CodingOptions): AgentTool[] {
   const grep = textTool<{ pattern: string; path?: string; glob?: string; ignore_case?: boolean }>({
     name: "grep",
     description: "在文件里搜一个正则，返回「文件:行号:那一行」。path 默认工作目录；glob 只搜某些文件，比如 *.ts。",
-    parameters: objectSchema({ pattern: stringSchema(), path: stringSchema(), glob: stringSchema(), ignore_case: booleanSchema() }, "pattern"),
+    parameters: objectSchema(
+      {
+        pattern: stringSchema(),
+        path: stringSchema(),
+        glob: stringSchema(),
+        ignore_case: booleanSchema(),
+      },
+      "pattern",
+    ),
     run: async (p, tc) => {
       const argv = [
         "rg",
@@ -260,7 +287,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       const timeoutSignal = AbortSignal.timeout(30_000);
       let res: Response;
       try {
-        res = await fetch(p.url, { headers: { "user-agent": "vibevalley-agent/0.1" }, signal: AbortSignal.any([tc.signal, timeoutSignal]) });
+        res = await fetch(p.url, {
+          headers: { "user-agent": "vibevalley-agent/0.1" },
+          signal: AbortSignal.any([tc.signal, timeoutSignal]),
+        });
       } catch (e) {
         if (timeoutSignal.aborted) throw new Error(`打开 ${p.url} 超时了`);
         throw new Error(`打不开 ${p.url}：${why(e)}`);

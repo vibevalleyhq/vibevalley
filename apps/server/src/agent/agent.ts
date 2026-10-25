@@ -6,10 +6,9 @@ import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { defaultSettings, seedAgents } from "./seed.ts";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Predicate, Schema } from "effect";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
-import { jsonOf } from "../base/json.ts";
 import { type ApiError, missing, refused, lookIn } from "../errors.ts";
 
 interface Stored {
@@ -18,11 +17,33 @@ interface Stored {
   readonly settings: Readonly<Record<string, RuntimeSettings>>;
 }
 
-const StoredSchema: Schema.Codec<Stored> = Schema.Struct({
-  agents: Schema.Array(S.Agent),
-  skills: Schema.Array(S.Skill),
-  settings: Schema.Record(Schema.String, S.RuntimeSettings),
-});
+// A profile's look may lack what withCast fills in (a build and a head): config.json from before those existed. They are
+// filled first, then the profile is read whole; anything else that does not fit makes the file unreadable.
+const readFile = Schema.decodeUnknownSync(
+  Schema.fromJsonString(
+    Schema.Struct({
+      agents: Schema.Array(Schema.Unknown),
+      skills: Schema.Array(S.Skill),
+      settings: Schema.Record(Schema.String, S.RuntimeSettings),
+    }),
+  ),
+);
+const readAgent = Schema.decodeUnknownSync(S.Agent);
+const lookFilled = (raw: unknown): unknown =>
+  Predicate.isObject(raw) && Predicate.isObject(raw.look)
+    ? {
+        ...raw,
+        look: { ...raw.look, build: raw.look.build || "biped", head: raw.look.head || "rounded" },
+      }
+    : raw;
+const readStored = (text: string): Stored => {
+  const file = readFile(text);
+  return {
+    agents: file.agents.map((a) => readAgent(lookFilled(a))),
+    skills: file.skills,
+    settings: file.settings,
+  };
+};
 
 /** The runtime id of VibeValley's own agent, the one the orchestrator runs on. */
 export const orchestratorRuntime = "vibevalley";
@@ -104,7 +125,7 @@ export const make = Effect.gen(function* () {
   let s: Stored = seed;
   if (existsSync(file)) {
     try {
-      s = jsonOf(StoredSchema)(readFileSync(file, "utf8"));
+      s = readStored(readFileSync(file, "utf8"));
     } catch (e) {
       // An unreadable file is kept aside, never written over: one that cannot be moved stops the start.
       const aside = `${file}.unreadable-${Date.now()}`;
@@ -178,7 +199,9 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
       ),
     previewDeleteAgent: (id) =>
-      Effect.map(deletableAgent(id), (a) => ({ does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`] })),
+      Effect.map(deletableAgent(id), (a) => ({
+        does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`],
+      })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
@@ -209,7 +232,9 @@ export const make = Effect.gen(function* () {
     previewDeleteSkill: (id) =>
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => `「${a.name}」`);
-        return { does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])] };
+        return {
+          does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])],
+        };
       }),
     saveSettings: (runtime, settings) =>
       Effect.as(

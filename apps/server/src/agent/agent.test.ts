@@ -6,6 +6,7 @@ import { Cause, Effect, Exit, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Agents, layer, orchestratorRuntime, withCast } from "./agent.ts";
+import { defaultSettings, seedAgents } from "./seed.ts";
 
 const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
@@ -39,13 +40,23 @@ describe("profiles", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        const skill = yield* s.createSkill({ id: "", name: "Transient Skill", description: "", body: "old" });
+        const skill = yield* s.createSkill({
+          id: "",
+          name: "Transient Skill",
+          description: "",
+          body: "old",
+        });
         profile = (yield* s.createAgent(draft({ skills: [skill.id, "other"] }))).id;
         yield* s.saveAgent({ ...s.agent(orchestratorAgent)!, skills: [skill.id] });
         yield* s.deleteSkill(skill.id);
         expect(s.agent(profile)?.skills).toEqual(["other"]);
         expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
-        const recreated = yield* s.createSkill({ id: "", name: skill.name, description: "", body: "new" });
+        const recreated = yield* s.createSkill({
+          id: "",
+          name: skill.name,
+          description: "",
+          body: "new",
+        });
         expect(recreated.id).toBe(skill.id);
         expect(s.agent(profile)?.skills).not.toContain(recreated.id);
       }),
@@ -88,6 +99,28 @@ describe("profiles", () => {
         const kept = readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"));
         expect(kept).toHaveLength(1);
         expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
+      }),
+    );
+  });
+
+  it.effect("a profile whose look lacks a build and a head is filled in, and nothing is set aside", () => {
+    const config = testConfig();
+    const mine = { ...seedAgents().find((a) => a.id === "lab")!, id: "mine", name: "我的" };
+    const { build: _, head: __, ...look } = mine.look;
+    const raw = JSON.stringify({
+      agents: [{ ...mine, look }],
+      skills: [{ id: "s1", name: "tidy", description: "整理", body: "整理代码" }],
+      settings: { pi: { ...defaultSettings(), defaultModel: "deepseek-chat" } },
+    });
+    writeFileSync(join(config.home, "config.json"), raw);
+    return run(
+      config,
+      Effect.gen(function* () {
+        const agents = yield* Agents;
+        expect(agents.agent("mine")?.look).toMatchObject({ build: "biped", head: "rounded" });
+        expect(agents.skills().map((k) => k.id)).toEqual(["s1"]);
+        expect(agents.settings("pi").defaultModel).toBe("deepseek-chat");
+        expect(readdirSync(config.home).filter((f) => f.startsWith("config.json.unreadable-"))).toEqual([]);
       }),
     );
   });
@@ -155,7 +188,10 @@ describe("profiles", () => {
         expect(ids.size).toBe(12);
         expect([...skills].slice(0, 3)).toEqual(["same-skill", "same-skill-2", "same-skill-3"]);
         expect((yield* Effect.flip(s.createAgent(draft({ id: "mine" }))))._tag).toBe("Refused");
-        const saved = yield* s.saveAgent({ ...draft({ id: "agent-7" }), look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"] });
+        const saved = yield* s.saveAgent({
+          ...draft({ id: "agent-7" }),
+          look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"],
+        });
         expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
       }),
     ),

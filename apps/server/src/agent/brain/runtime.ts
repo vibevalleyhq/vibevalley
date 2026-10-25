@@ -38,7 +38,12 @@ const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibev
 const toMcp = (s: OarMcpServer): McpServer =>
   "url" in s
     ? { name: s.name, url: s.url, ...(s.headers ? { headers: { ...s.headers } } : {}) }
-    : { name: s.name, command: s.command, ...(s.args ? { args: [...s.args] } : {}), ...(s.env ? { env: { ...s.env } } : {}) };
+    : {
+        name: s.name,
+        command: s.command,
+        ...(s.args ? { args: [...s.args] } : {}),
+        ...(s.env ? { env: { ...s.env } } : {}),
+      };
 
 const refusedOptions = {
   launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数",
@@ -98,7 +103,11 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
               cacheRead: progress.lifetime.cacheRead,
               cacheWrite: progress.lifetime.cacheWrite,
             },
-            context: { tokens, contextWindow: window, percent: window > 0 ? (tokens / window) * 100 : 0 },
+            context: {
+              tokens,
+              contextWindow: window,
+              percent: window > 0 ? (tokens / window) * 100 : 0,
+            },
           },
         },
       ]);
@@ -124,10 +133,22 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
           break;
         }
         case "tool_execution_end": {
-          const text = messageText({ role: "toolResult", toolCallId: "", toolName: "", content: e.result?.content ?? [], isError: false, timestamp: 0 });
+          const text = messageText({
+            role: "toolResult",
+            toolCallId: "",
+            toolName: "",
+            content: e.result?.content ?? [],
+            isError: false,
+            timestamp: 0,
+          });
           const result = e.isError ? "failed" : "ok";
           frame("vibevalley/tool_end", { callId: e.toolCallId, output: text, result }, [
-            { kind: "tool_call_ended", callId: e.toolCallId, result, content: [{ type: "text", text }] },
+            {
+              kind: "tool_call_ended",
+              callId: e.toolCallId,
+              result,
+              content: [{ type: "text", text }],
+            },
           ]);
           break;
         }
@@ -135,7 +156,13 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
           frame("vibevalley/compaction", { phase: "start" }, [{ kind: "compaction_started", trigger: e.reason }]);
           break;
         case "compaction_end":
-          frame("vibevalley/compaction", { phase: "end" }, [{ kind: "compaction_ended", outcome: e.compaction ? "completed" : "failed", trigger: e.reason }]);
+          frame("vibevalley/compaction", { phase: "end" }, [
+            {
+              kind: "compaction_ended",
+              outcome: e.compaction ? "completed" : "failed",
+              trigger: e.reason,
+            },
+          ]);
           break;
         case "tasks_changed":
           // oar has no event for a task: the graph goes in the raw record, where the session's trajectory keeps it.
@@ -173,7 +200,11 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
         kernel.control({ kind: "queue", input, ...inputOptions }, () => {
           const refused = inputImagesRefusal(capabilities, inputOptions?.images);
           if (refused !== null) return refused;
-          if (active) queued.push({ input, ...(inputOptions?.inputId ? { inputId: inputOptions.inputId } : {}) });
+          if (active)
+            queued.push({
+              input,
+              ...(inputOptions?.inputId ? { inputId: inputOptions.inputId } : {}),
+            });
           else begin(input);
           return { kind: "accepted" };
         }),
@@ -216,7 +247,12 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
     },
     listModels: async () => ({
       kind: "ok",
-      models: models.map((m) => ({ id: m.id, displayName: m.name, effortLevels: [...efforts], ...(m.id === defaultModel ? { default: true as const } : {}) })),
+      models: models.map((m) => ({
+        id: m.id,
+        displayName: m.name,
+        effortLevels: [...efforts],
+        ...(m.id === defaultModel ? { default: true as const } : {}),
+      })),
     }),
   });
 }

@@ -80,12 +80,18 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   let stderr = "";
   let transport: Transport;
   if (server.url) {
-    transport = new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: server.headers ?? {} } });
+    transport = new StreamableHTTPClientTransport(new URL(server.url), {
+      requestInit: { headers: server.headers ?? {} },
+    });
   } else {
     const stdio = new StdioClientTransport({
       command: server.command ?? "",
       args: server.args ?? [],
-      env: { ...getDefaultEnvironment(), ...(process.env as Record<string, string>), ...server.env },
+      env: {
+        ...getDefaultEnvironment(),
+        ...(process.env as Record<string, string>),
+        ...server.env,
+      },
       ...(server.cwd ? { cwd: server.cwd } : {}),
       stderr: "pipe",
     });
@@ -130,7 +136,10 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
     run: async (params, tc) => {
       let r: Awaited<ReturnType<Client["callTool"]>>;
       try {
-        r = await client.callTool({ name: t.name, arguments: params ?? {} }, undefined, { timeout: callTimeoutMs, signal: tc.signal });
+        r = await client.callTool({ name: t.name, arguments: params ?? {} }, undefined, {
+          timeout: callTimeoutMs,
+          signal: tc.signal,
+        });
       } catch (e) {
         throw new Error(`${server} 的 ${t.name} 出错：${e instanceof Error ? e.message : String(e)}`);
       }
@@ -156,5 +165,9 @@ export async function connectAll(servers: readonly McpServer[], signal?: AbortSi
     if (o.status === "fulfilled") connections.push(o.value);
     else failed.push(o.reason instanceof Error ? o.reason.message : String(o.reason));
   }
-  return { tools: connections.flatMap((c) => c.tools), failed, close: async () => void (await Promise.all(connections.map((c) => c.close()))) };
+  return {
+    tools: connections.flatMap((c) => c.tools),
+    failed,
+    close: async () => void (await Promise.all(connections.map((c) => c.close()))),
+  };
 }

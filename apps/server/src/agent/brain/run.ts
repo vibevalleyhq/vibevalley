@@ -49,7 +49,15 @@ export function addUsage(a: Usage, b: Usage): Usage {
   return out;
 }
 
-const blank = (id: number): RunResult => ({ id, usage: zeroUsage(), contextTokens: 0, text: "", aborted: false, error: "", settled: false });
+const blank = (id: number): RunResult => ({
+  id,
+  usage: zeroUsage(),
+  contextTokens: 0,
+  text: "",
+  aborted: false,
+  error: "",
+  settled: false,
+});
 
 export class RunAccounting {
   current: RunResult = blank(0);
@@ -98,7 +106,12 @@ export class RunAccounting {
   }
 
   settle(aborted: boolean): RunResult {
-    this.current = { ...this.current, usage: addUsage(this.current.usage, this.pending), aborted: this.current.aborted || aborted, settled: true };
+    this.current = {
+      ...this.current,
+      usage: addUsage(this.current.usage, this.pending),
+      aborted: this.current.aborted || aborted,
+      settled: true,
+    };
     this.pending = zeroUsage();
     return this.snapshot().current;
   }

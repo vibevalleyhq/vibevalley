@@ -112,7 +112,10 @@ export async function compactInPlace(
   signal?: AbortSignal,
 ): Promise<Summarized> {
   const messages = [...withPrefix(prefix, tools, plan.messages), { role: "user" as const, content: summaryInPlace, timestamp: Date.now() }];
-  const answer = await complete(options.llm, messages, { toolChoice: "none", ...(signal ? { signal } : {}) });
+  const answer = await complete(options.llm, messages, {
+    toolChoice: "none",
+    ...(signal ? { signal } : {}),
+  });
   const said = messageText(answer).trim();
   const called = answer.content.some((c) => c.type === "toolCall");
   if (answer.stopReason === "error" || answer.stopReason === "aborted" || said === "" || called) return compact(plan, options, signal);

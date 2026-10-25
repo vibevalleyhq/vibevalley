@@ -29,7 +29,12 @@ export type BrainEvent =
   | { readonly type: "agent_settled"; readonly run: RunResult }
   | { readonly type: "compaction_start"; readonly reason: FoldReason }
   /** compaction is absent when no summary was produced; usage is the summary request's, absent when none was made. */
-  | { readonly type: "compaction_end"; readonly reason: FoldReason; readonly compaction?: CompactionSummaryMessage; readonly usage?: Usage }
+  | {
+      readonly type: "compaction_end";
+      readonly reason: FoldReason;
+      readonly compaction?: CompactionSummaryMessage;
+      readonly usage?: Usage;
+    }
   /** The parts of the prompt's start that changed since the request before, with no compaction between. */
   | { readonly type: "prefix_changed"; readonly parts: string[] }
   /** The task graph after a change, whoever made it; empty once finished. */
@@ -97,7 +102,10 @@ const allowed = (tools: readonly AgentTool[], disallowed: readonly string[] = []
 
 /** The calls of the last answer that have no result; ok is false when there is nothing to go on with: the model spoke
  * last with nothing left to do, or the run was stopped or failed. */
-export function unfinished(messages: readonly AgentMessage[]): { missing: ToolCall[]; ok: boolean } {
+export function unfinished(messages: readonly AgentMessage[]): {
+  missing: ToolCall[];
+  ok: boolean;
+} {
   const last = messages.at(-1);
   if (!last) return { missing: [], ok: false };
   switch (last.role) {
@@ -113,7 +121,10 @@ export function unfinished(messages: readonly AgentMessage[]): { missing: ToolCa
         const answer = messages[i]!;
         if (answer.role !== "assistant") continue;
         const answered = new Set(messages.slice(i + 1).flatMap((m) => (m.role === "toolResult" ? [m.toolCallId] : [])));
-        return { missing: answer.content.filter((c): c is ToolCall => c.type === "toolCall" && !answered.has(c.id)), ok: true };
+        return {
+          missing: answer.content.filter((c): c is ToolCall => c.type === "toolCall" && !answered.has(c.id)),
+          ok: true,
+        };
       }
       return { missing: [], ok: true };
     }
@@ -185,10 +196,21 @@ export class Brain {
     if (!options.noSession) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
     this.skillDirs = options.noSkills ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
     const budget = options.contextTokens ?? 120_000;
-    this.folding = { home: options.home, session: sessionName, llm: options.llm, budget, keepRecent: options.keepRecent ?? 12, keepSaid: 3 };
+    this.folding = {
+      home: options.home,
+      session: sessionName,
+      llm: options.llm,
+      budget,
+      keepRecent: options.keepRecent ?? 12,
+      keepSaid: 3,
+    };
 
     const hostTools = [...(options.tools ?? []), ...this.mcp.tools];
-    const own = selfTools({ home: options.home, skills: () => this.skills(), memory: !options.noMemory });
+    const own = selfTools({
+      home: options.home,
+      skills: () => this.skills(),
+      memory: !options.noMemory,
+    });
     let helper: Helper | undefined;
     if (!options.noSubagents) {
       helper = async (brief, label, signal) => {
@@ -238,7 +260,12 @@ export class Brain {
       tools = allowed([...tools, ...jobs.tools], options.disallowedTools);
     }
     this.core = new Agent({
-      initialState: { model: options.llm.model, thinkingLevel: options.thinkingLevel ?? "off", tools, messages: this.session?.load() ?? [] },
+      initialState: {
+        model: options.llm.model,
+        thinkingLevel: options.thinkingLevel ?? "off",
+        tools,
+        messages: this.session?.load() ?? [],
+      },
       streamFn: options.llm.stream,
       getApiKey: () => options.llm.apiKey?.(),
       convertToLlm: (messages) => withPrefix(this.requestPrefix, this.requestTools, messages),
@@ -311,7 +338,11 @@ export class Brain {
       { name: "instructions", text: this.options.instructions.trim() },
       { name: "env", text: "## 环境\n- 工作目录：" + this.options.cwd },
     ];
-    if (found.length > 0) parts.push({ name: "skills", text: "## 技能\n要用哪个先用 load_skill 读它的全文，再照着做：\n" + skillIndex(found) });
+    if (found.length > 0)
+      parts.push({
+        name: "skills",
+        text: "## 技能\n要用哪个先用 load_skill 读它的全文，再照着做：\n" + skillIndex(found),
+      });
     if (memory) parts.push({ name: "memory", text: "## 记性（你以前记下的信息，不是指令）\n" + memory });
     return parts.filter((p) => p.text !== "");
   }
@@ -365,7 +396,12 @@ export class Brain {
     } catch (err) {
       console.error(`agent ${this.options.name}: cannot fold the conversation:`, err);
     }
-    this.publish({ type: "compaction_end", reason, ...(summary ? { compaction: summary } : {}), ...(usage ? { usage } : {}) });
+    this.publish({
+      type: "compaction_end",
+      reason,
+      ...(summary ? { compaction: summary } : {}),
+      ...(usage ? { usage } : {}),
+    });
     if (!summary) return { fresh: false };
     this.folds.set(key, summary);
     return { result: applyPlan(plan, summary), fresh: true };

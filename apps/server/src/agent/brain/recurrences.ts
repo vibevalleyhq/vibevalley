@@ -117,12 +117,24 @@ export class Recurrences {
   }
 
   private makeTools(): AgentTool[] {
-    const add = textTool<{ name: string; message: string; at?: string; every_minutes?: number; cron?: string }>({
+    const add = textTool<{
+      name: string;
+      message: string;
+      at?: string;
+      every_minutes?: number;
+      cron?: string;
+    }>({
       name: "recurrence",
       description:
         "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
       parameters: objectSchema(
-        { name: stringSchema(), message: stringSchema(), at: stringSchema(), every_minutes: numberSchema(), cron: stringSchema() },
+        {
+          name: stringSchema(),
+          message: stringSchema(),
+          at: stringSchema(),
+          every_minutes: numberSchema(),
+          cron: stringSchema(),
+        },
         "name",
         "message",
       ),

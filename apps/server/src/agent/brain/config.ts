@@ -32,7 +32,10 @@ export function deepseek(id: string, key: string | (() => string | undefined)): 
 
 /** One answer, whole. */
 export async function complete(llm: LLM, messages: Message[], options: SimpleStreamOptions = {}): Promise<AssistantMessage> {
-  const stream = await llm.stream(llm.model, { messages } as Parameters<StreamFn>[1], { ...options, apiKey: llm.apiKey?.() ?? options.apiKey });
+  const stream = await llm.stream(llm.model, { messages } as Parameters<StreamFn>[1], {
+    ...options,
+    apiKey: llm.apiKey?.() ?? options.apiKey,
+  });
   return stream.result();
 }
 
@@ -84,7 +87,13 @@ export function readMcpConfig(path: string): McpServer[] {
     if (e.disabled) continue;
     if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
     else if (e.command)
-      out.push({ name, command: e.command, ...(e.args ? { args: e.args } : {}), ...(e.env ? { env: e.env } : {}), ...(e.cwd ? { cwd: e.cwd } : {}) });
+      out.push({
+        name,
+        command: e.command,
+        ...(e.args ? { args: e.args } : {}),
+        ...(e.env ? { env: e.env } : {}),
+        ...(e.cwd ? { cwd: e.cwd } : {}),
+      });
   }
   return out;
 }
