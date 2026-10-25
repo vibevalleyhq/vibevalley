@@ -65,12 +65,20 @@ export const make = Effect.gen(function* () {
         yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
         const [next, news] = progressStep(folded, entry);
         folded = next;
-        yield* core.apply({ type: "progress", progress: next.progress, ...((news.coins ?? 0) !== 0 || (news.unlocked?.length ?? 0) > 0 ? { news } : {}) });
+        yield* core.apply({
+          type: "progress",
+          progress: next.progress,
+          ...((news.coins ?? 0) !== 0 || (news.unlocked?.length ?? 0) > 0 ? { news } : {}),
+        });
       }).pipe(Effect.catchCause((cause) => Effect.logError(`vibevalley: a ledger entry (${input.kind}) was not kept`, cause))),
     );
 
   const extra = config.gitEmails.map((e) => e.trim().toLowerCase()).filter((e) => e !== "");
-  const count = () => Effect.map(projects.contributions(extra), (repos): CommitCount => ({ repos, total: repos.reduce((n, r) => n + r.commits, 0) }));
+  const count = () =>
+    Effect.map(projects.contributions(extra), (repos): CommitCount => ({
+      repos,
+      total: repos.reduce((n, r) => n + r.commits, 0),
+    }));
   // The ticker and a run's end both count: one at a time, so an older count never lands after a newer one.
   const counting = yield* Semaphore.make(1);
   const refresh = counting.withPermits(1)(Effect.flatMap(count(), core.setCommits));
@@ -119,7 +127,12 @@ export const make = Effect.gen(function* () {
 
   return Game.of({
     achievements: achievementsInWords,
-    chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier ? { tier } : {}) }),
+    chooseTitle: (achievement, tier) =>
+      record({
+        kind: "titled",
+        ...(achievement ? { achievement } : {}),
+        ...(tier ? { tier } : {}),
+      }),
     want: (station) => {
       wanted = { station, until: Date.now() + wantStationForMs };
     },

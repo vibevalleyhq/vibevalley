@@ -153,7 +153,11 @@ function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>
     subscription: usage.plan || null,
     windows: usage.windows.map((w) => {
       const at = w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN;
-      return { label: w.label, usedPercent: Math.round(w.usedRatio * 100), resetsAt: Number.isNaN(at) ? null : at };
+      return {
+        label: w.label,
+        usedPercent: Math.round(w.usedRatio * 100),
+        resetsAt: Number.isNaN(at) ? null : at,
+      };
     }),
   };
 }
@@ -235,7 +239,10 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
   /** What the runtime takes: seeds.json's facts, with what it refuses taken from the adapter and the farm's policy laid over it. */
   function facts(id: string) {
     const f = factsOf(id);
-    return { ...f, refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string> };
+    return {
+      ...f,
+      refused: { ...registry.get(id)?.refusedSessionOptions, ...f.refused } as Record<string, string>,
+    };
   }
 
   const begin = (id: string) => {
@@ -277,14 +284,22 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
     const snapshot = await within(() => probeInstallation(runtime, settings.binPath), probeTimeoutMs, { kind: "not_found" } as InstallationSnapshot);
     if (snapshot.kind !== "available") {
       return {
-        info: { ...info, installation: snapshot.kind === "unsupported" ? { status: "unsupported", reason: snapshot.reason } : { status: "not_found" } },
+        info: {
+          ...info,
+          installation: snapshot.kind === "unsupported" ? { status: "unsupported", reason: snapshot.reason } : { status: "not_found" },
+        },
         read: 0,
       };
     }
     const found = snapshot;
     info.installation =
       found.via === "executable"
-        ? { status: "available", via: "executable", command: found.command, version: found.version || null }
+        ? {
+            status: "available",
+            via: "executable",
+            command: found.command,
+            version: found.version || null,
+          }
         : { status: "available", via: "bundled", command: id, version: null };
     const cwd = projectsDir(config);
     const [models, usage, skills, mcpServers, tools] = await Promise.all([
@@ -293,7 +308,12 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
             m?.kind === "ok"
               ? m.models
                   .filter((x) => !x.disabled)
-                  .map((x) => ({ id: x.id, name: x.displayName || x.id, effortLevels: [...(x.effortLevels ?? [])], isDefault: !!x.default }))
+                  .map((x) => ({
+                    id: x.id,
+                    name: x.displayName || x.id,
+                    effortLevels: [...(x.effortLevels ?? [])],
+                    isDefault: !!x.default,
+                  }))
               : null,
           )
         : Promise.resolve(null),
@@ -490,7 +510,12 @@ export const make = Effect.fnUntraced(function* (options: RuntimeOptions = {}) {
       );
     },
   });
-  return Object.assign(shape, { refreshUsage, cached: cache, spent: () => spent, setSpent: (s: Spent) => (spent = s) });
+  return Object.assign(shape, {
+    refreshUsage,
+    cached: cache,
+    spent: () => spent,
+    setSpent: (s: Spent) => (spent = s),
+  });
 });
 
 /** The farm's: VibeValley's own agent among them, unless options name the runtimes. */

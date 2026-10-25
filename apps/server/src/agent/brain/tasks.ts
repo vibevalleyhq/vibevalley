@@ -17,13 +17,18 @@ const run = <A>(e: Effect.Effect<A, unknown>) => Effect.runPromise(e);
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: TaskStore, changed: (g: engine.Task[]) => void): TaskStore {
-  return { load: store.load, change: (f) => Effect.tap(store.change(f), (g) => Effect.sync(() => changed(g))) };
+  return {
+    load: store.load,
+    change: (f) => Effect.tap(store.change(f), (g) => Effect.sync(() => changed(g))),
+  };
 }
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
 export function taskTools(store: TaskStore, canHelp: boolean, changed: () => void): AgentTool[] {
   const ids: Schema = { type: "array", items: stringSchema() };
-  const task = textTool<{ tasks: { id: string; title?: string; brief: string; after?: string[]; by?: engine.By }[] }>({
+  const task = textTool<{
+    tasks: { id: string; title?: string; brief: string; after?: string[]; by?: engine.By }[];
+  }>({
     name: "task_add",
     description:
       "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；helper 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
@@ -63,7 +68,13 @@ export function taskTools(store: TaskStore, canHelp: boolean, changed: () => voi
       return engine.text(g);
     },
   });
-  const update = textTool<{ id: string; state?: engine.State; result?: string; brief?: string; after?: string[] }>({
+  const update = textTool<{
+    id: string;
+    state?: engine.State;
+    result?: string;
+    brief?: string;
+    after?: string[];
+  }>({
     name: "task_update",
     description:
       "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。" +

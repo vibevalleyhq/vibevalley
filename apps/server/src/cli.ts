@@ -24,7 +24,15 @@ const asked = (p: Option.Option<string>) => (Option.isSome(p) ? { p: p.value } :
  * any other command must not end it: it runs uninterruptible and ends when the conversation does. */
 const chat = (talk: () => Promise<void>) =>
   Effect.uninterruptible(
-    Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: e instanceof Error ? e.message : String(e) }) }),
+    Effect.tryPromise({
+      try: talk,
+      catch: (e) =>
+        new Failure({
+          code: exit.other,
+          tag: "Chat",
+          text: e instanceof Error ? e.message : String(e),
+        }),
+    }),
   );
 
 const prompt = text("prompt", "问一句就走，不进对话").pipe(Flag.withAlias("p"));
@@ -61,7 +69,15 @@ const root = Command.make(
     prompt,
   },
   (o) =>
-    chat(() => ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
+    chat(() =>
+      ownChat({
+        cwd: some(o.cwd) ?? "",
+        name: some(o.name) ?? "vibevalley",
+        model: some(o.model) ?? "",
+        mcp: some(o.mcp) ?? "",
+        ...asked(o.prompt),
+      }),
+    ),
 ).pipe(
   Command.withDescription("不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON"),
   Command.withSubcommands([...groupCommands({ issue: [issueRunCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
@@ -85,7 +101,12 @@ function usageOf(e: CliError.CliError): Failure {
 export const run = Effect.fnUntraced(function* (args: readonly string[]) {
   const held: string[] = [];
   const hold = (...a: unknown[]) => void held.push(a.map(String).join(" "));
-  const console_ = Object.assign(Object.create(console) as Console.Console, { log: hold, error: hold, info: hold, warn: hold });
+  const console_ = Object.assign(Object.create(console) as Console.Console, {
+    log: hold,
+    error: hold,
+    info: hold,
+    warn: hold,
+  });
   const flush = (to: (s: string) => Effect.Effect<void, never, Stdio.Stdio>) =>
     Effect.suspend(() => {
       const text = held.join("\n").replace(/\n+$/, "");
@@ -111,6 +132,9 @@ const codeOf = (end: Exit.Exit<unknown, unknown>) =>
 if (import.meta.main ?? process.argv[1] === new URL(import.meta.url).pathname) {
   run(process.argv.slice(2)).pipe(
     Effect.provide([NodeServices.layer, FetchHttpClient.layer]),
-    NodeRuntime.runMain({ disableErrorReporting: true, teardown: (end) => process.exit(codeOf(end)) }),
+    NodeRuntime.runMain({
+      disableErrorReporting: true,
+      teardown: (end) => process.exit(codeOf(end)),
+    }),
   );
 }

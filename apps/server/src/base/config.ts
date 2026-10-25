@@ -23,7 +23,10 @@ export interface Config {
   /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
   readonly deepseek: { readonly apiKey: string };
   readonly agora: { readonly appId: string; readonly appCertificate: string };
-  readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
+  readonly voice: {
+    readonly id: string;
+    readonly line: { readonly port: number; readonly url: string };
+  };
   readonly lan: { readonly port: number };
   /** Commits by these emails count as yours too; in the environment, comma-separated. */
   readonly gitEmails: readonly string[];
@@ -156,7 +159,13 @@ export function loadConfig(file = "", env: NodeJS.ProcessEnv = process.env): Con
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new ConfigError(`${path}: ${name} 不是端口：${port}`);
   }
   if (c.github.prPollSeconds <= 0) throw new ConfigError("github.pr_poll_seconds 必须大于 0");
-  return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
+  return {
+    ...c,
+    workRoot: expandHome(c.workRoot),
+    tokei: expandHome(c.tokei),
+    web: expandHome(c.web),
+    db: expandHome(c.db),
+  };
 }
 
 /** The database's folder, or "memory". */

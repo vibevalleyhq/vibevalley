@@ -34,9 +34,23 @@ describe("doc", () => {
         Effect.gen(function* () {
           const s = yield* make();
           const d = yield* s.create("周报");
-          yield* submit(s, d.doc.id, "b1", { op: "insert_block", block: para("a", "V", "你好世界") });
-          yield* submit(s, d.doc.id, "b2", { op: "split_block", blockId: "a", baseRev: 1, offset: 2, newBlock: para("b", "W", "") });
-          yield* submit(s, d.doc.id, "b3", { op: "update_text", blockId: "b", baseRev: 1, text: [bold("世界🌾")] });
+          yield* submit(s, d.doc.id, "b1", {
+            op: "insert_block",
+            block: para("a", "V", "你好世界"),
+          });
+          yield* submit(s, d.doc.id, "b2", {
+            op: "split_block",
+            blockId: "a",
+            baseRev: 1,
+            offset: 2,
+            newBlock: para("b", "W", ""),
+          });
+          yield* submit(s, d.doc.id, "b3", {
+            op: "update_text",
+            blockId: "b",
+            baseRev: 1,
+            text: [bold("世界🌾")],
+          });
           return d.doc.id;
         }),
       ).pipe(Effect.provide(on(config)));
@@ -58,8 +72,14 @@ describe("doc", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const d = yield* s.create("");
-        const first = yield* submit(s, d.doc.id, "same", { op: "insert_block", block: para("a", "V", "一") });
-        const second = yield* submit(s, d.doc.id, "same", { op: "insert_block", block: para("a", "V", "一") });
+        const first = yield* submit(s, d.doc.id, "same", {
+          op: "insert_block",
+          block: para("a", "V", "一"),
+        });
+        const second = yield* submit(s, d.doc.id, "same", {
+          op: "insert_block",
+          block: para("a", "V", "一"),
+        });
         expect([first.seq, second.seq, second.results[0]!.status, second.blocks.length]).toEqual([1, 1, "applied", 1]);
         const snap = yield* s.get(d.doc.id);
         expect([snap.doc.seq, snap.blocks.length, snap.doc.title]).toEqual([1, 1, "没起名的文档"]);
@@ -67,7 +87,12 @@ describe("doc", () => {
         expect((yield* Effect.flip(submit(s, other.doc.id, "same")))._tag).toBe("Refused");
         expect((yield* Effect.flip(submit(s, "nope", "x")))._tag).toBe("Missing");
         // A block id is the doc's that has it.
-        expect((yield* submit(s, other.doc.id, "dup", { op: "insert_block", block: para("a", "V", "撞了") })).results[0]!.status).toBe("rejected");
+        expect(
+          (yield* submit(s, other.doc.id, "dup", {
+            op: "insert_block",
+            block: para("a", "V", "撞了"),
+          })).results[0]!.status,
+        ).toBe("rejected");
       }),
     ).pipe(Effect.provide(on())),
   );
@@ -81,15 +106,29 @@ describe("doc", () => {
         yield* submit(s, id, "1", { op: "insert_block", block: para("a", "V", "原来") });
         const [, r] = yield* s.updateText(id, "lab", "a", 1, "帮工改的");
         expect([r!.status, r!.rev]).toEqual(["applied", 2]);
-        const ack = yield* submit(s, id, "3", { op: "update_text", blockId: "a", baseRev: 1, text: [span("我改的")] });
+        const ack = yield* submit(s, id, "3", {
+          op: "update_text",
+          blockId: "a",
+          baseRev: 1,
+          text: [span("我改的")],
+        });
         expect([ack.results[0]!.status, plain(ack.results[0]!.yours!), ack.results[0]!.rev, ack.seq]).toEqual(["conflict", "我改的", 2, 3]);
         const snap = yield* s.get(id);
         expect([texts(snap.blocks), snap.blocks[0]!.updatedBy]).toEqual(["帮工改的", "lab"]);
-        const kinds = yield* sql<{ kind: string }>`select kind from doc_block_revision where block_id = 'a' and spans like '%我改的%'`;
+        const kinds = yield* sql<{
+          kind: string;
+        }>`select kind from doc_block_revision where block_id = 'a' and spans like '%我改的%'`;
         expect(kinds.map((k) => k.kind)).toEqual(["conflict"]);
         // A checkbox ticked since does not make my text stale.
         yield* submit(s, id, "4", { op: "set_attrs", blockId: "a", attrs: { checked: true } });
-        expect((yield* submit(s, id, "5", { op: "update_text", blockId: "a", baseRev: 2, text: [span("接着改")] })).results[0]!.status).toBe("applied");
+        expect(
+          (yield* submit(s, id, "5", {
+            op: "update_text",
+            blockId: "a",
+            baseRev: 2,
+            text: [span("接着改")],
+          })).results[0]!.status,
+        ).toBe("applied");
       }),
     ).pipe(Effect.provide(on())),
   );
@@ -99,7 +138,10 @@ describe("doc", () => {
       Effect.gen(function* () {
         const s = yield* make();
         const id = (yield* s.create("待办")).doc.id;
-        yield* submit(s, id, "insert", { op: "insert_block", block: { ...para("a", "V", "原文"), type: "todo", attrs: { checked: false } } });
+        yield* submit(s, id, "insert", {
+          op: "insert_block",
+          block: { ...para("a", "V", "原文"), type: "todo", attrs: { checked: false } },
+        });
         const ack = yield* submit(
           s,
           id,
@@ -108,7 +150,11 @@ describe("doc", () => {
           { op: "update_text", blockId: "a", baseRev: 1, text: [span("新文")] },
         );
         expect(ack.results.map((r) => r.status)).toEqual(["applied", "applied"]);
-        expect((yield* s.get(id)).blocks[0]).toMatchObject({ attrs: { checked: true }, text: [span("新文")], rev: 3 });
+        expect((yield* s.get(id)).blocks[0]).toMatchObject({
+          attrs: { checked: true },
+          text: [span("新文")],
+          rev: 3,
+        });
       }),
     ).pipe(Effect.provide(on())),
   );
@@ -137,10 +183,15 @@ describe("doc", () => {
       Effect.gen(function* () {
         const s = yield* make({ tickMs: 1 });
         const id = (yield* s.create("演示")).doc.id;
-        yield* submit(s, id, "mine", { op: "insert_block", block: para("first", "V", "主人先写的") });
+        yield* submit(s, id, "mine", {
+          op: "insert_block",
+          block: para("first", "V", "主人先写的"),
+        });
         const all = helpers(["off", false], ["backend", true], ["tester", true], ["frontend", true], ["docs", true]);
         yield* s.demo(id, all);
-        expect(yield* Effect.flip(s.demo(id, all))).toMatchObject({ reason: expect.stringContaining("演示正在写") });
+        expect(yield* Effect.flip(s.demo(id, all))).toMatchObject({
+          reason: expect.stringContaining("演示正在写"),
+        });
         yield* finished(s);
         const snap = yield* s.get(id);
         expect(snap.blocks[0]!.id).toBe("first");
@@ -177,7 +228,12 @@ describe("doc", () => {
           const snap = yield* s.get(id);
           const b = snap.blocks[1];
           if (snap.blocks.length === 2 && b && b.rev >= 2) {
-            const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
+            const ack = yield* submit(s, id, "owner", {
+              op: "update_text",
+              blockId: b.id,
+              baseRev: b.rev,
+              text: [span("主人接手了")],
+            });
             if (ack.results[0]!.status === "applied") taken = b.id;
           }
           if (!taken) yield* Effect.sleep(2);

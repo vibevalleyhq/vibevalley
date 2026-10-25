@@ -27,7 +27,11 @@ describe("a pull request", () => {
   for (const ending of ["MERGED", "CLOSED"] as const) {
     it.live(`merges by PR, and closes when the PR is ${ending.toLowerCase()}`, () => {
       const base = testConfig();
-      const config = { ...base, db: join(base.home, "db"), github: { ...base.github, prProjects: ["clock"] } };
+      const config = {
+        ...base,
+        db: join(base.home, "db"),
+        github: { ...base.github, prProjects: ["clock"] },
+      };
       const work = config.workRoot;
       const path = join(work, "projects", "clock");
       const bare = join(work, "origin.git");
@@ -81,7 +85,11 @@ describe("a pull request", () => {
           const main = git(path, "rev-parse", "main");
           yield* projects.refreshGitHub();
           issue = yield* issues.setStatus(issue.id, "done", "", "");
-          expect(issue.pullRequest).toMatchObject({ number: 7, state: "open", url: "https://github.com/test/clock/pull/7" });
+          expect(issue.pullRequest).toMatchObject({
+            number: 7,
+            state: "open",
+            url: "https://github.com/test/clock/pull/7",
+          });
           expect(issue.status).toBe("in_review");
           expect(git(path, "rev-parse", "main")).toBe(main);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));

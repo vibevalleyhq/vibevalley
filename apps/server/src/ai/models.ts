@@ -15,14 +15,31 @@ const deepseek = (id: string, name: string, cost: Model<"openai-completions">["c
   cost,
   contextWindow: 1_000_000,
   maxTokens: 384_000,
-  thinkingLevelMap: { minimal: "high", low: "high", medium: "high", high: "high", xhigh: "max", max: "max" },
+  thinkingLevelMap: {
+    minimal: "high",
+    low: "high",
+    medium: "high",
+    high: "high",
+    xhigh: "max",
+    max: "max",
+  },
   compat: { requiresReasoningContentOnAssistantMessages: true, thinkingFormat: "deepseek" },
 });
 
 /** Prices in dollars per million tokens. */
 export const models: readonly Model<"openai-completions">[] = [
-  deepseek("deepseek-flash", "DeepSeek V4.1 Flash", { input: 0.14, output: 0.28, cacheRead: 0.028, cacheWrite: 0 }),
-  deepseek("deepseek-v4-pro", "DeepSeek V4 Pro", { input: 1.74, output: 3.48, cacheRead: 0.145, cacheWrite: 0 }),
+  deepseek("deepseek-flash", "DeepSeek V4.1 Flash", {
+    input: 0.14,
+    output: 0.28,
+    cacheRead: 0.028,
+    cacheWrite: 0,
+  }),
+  deepseek("deepseek-v4-pro", "DeepSeek V4 Pro", {
+    input: 1.74,
+    output: 3.48,
+    cacheRead: 0.145,
+    cacheWrite: 0,
+  }),
 ];
 
 export const getModel = (provider: string, id: string) => models.find((m) => m.provider === provider && m.id === id);

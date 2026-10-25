@@ -6,7 +6,14 @@ import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToo
 const call = fauxAssistantMessage(fauxToolCall("issue_create", { title: "加个 README", project: "demo", start: true }, { id: "c1" }));
 const turn: AgentMessage[] = [
   call,
-  { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
+  {
+    role: "toolResult",
+    toolCallId: "c1",
+    toolName: "issue_create",
+    content: [{ type: "text", text: "派了" }],
+    isError: false,
+    timestamp: 0,
+  },
   fauxAssistantMessage("派给了 Kimi"),
 ];
 const quiet = turn.slice(0, 2);
@@ -46,7 +53,14 @@ describe("the orchestrator's evals", () => {
     expect(cases.length).toBeGreaterThan(0);
     const tools = orchestratorToolNames();
     for (const { file, case: c } of cases) {
-      expect({ file, id: !!c.id, want: !!c.want, model: !!c.model, input: isInput(c.input), expect: c.expect.length > 0 }).toEqual({
+      expect({
+        file,
+        id: !!c.id,
+        want: !!c.want,
+        model: !!c.model,
+        input: isInput(c.input),
+        expect: c.expect.length > 0,
+      }).toEqual({
         file,
         id: true,
         want: true,

@@ -66,7 +66,11 @@ describe("DeepSeek Harness", () => {
 
   it("sets a session's model by its pair, and its effort", async () => {
     const fake = fakeDsh();
-    const session = await dshRuntime.session({ via: "executable", command: fake.script } as never, { cwd: fake.dir, model: "deepseek-flash", effort: "low" });
+    const session = await dshRuntime.session({ via: "executable", command: fake.script } as never, {
+      cwd: fake.dir,
+      model: "deepseek-flash",
+      effort: "low",
+    });
     await session.prompt("hi");
     await session.dispose();
     const values = readFileSync(fake.log, "utf8")
@@ -88,10 +92,18 @@ describe("DeepSeek Harness", () => {
   it("says a dsh with no session/new cannot list its models", async () => {
     const fake = fakeDsh(true);
     const listed = await dshRuntime.listModels!({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
-    expect(listed).toEqual({ kind: "unsupported", reason: "this dsh build has no session/new method" });
+    expect(listed).toEqual({
+      kind: "unsupported",
+      reason: "this dsh build has no session/new method",
+    });
   });
 
   it("refuses a system prompt", async () => {
-    await expect(dshRuntime.session({ via: "executable", command: "/nonexistent" } as never, { cwd: tmpdir(), systemPrompt: "x" })).rejects.toThrow();
+    await expect(
+      dshRuntime.session({ via: "executable", command: "/nonexistent" } as never, {
+        cwd: tmpdir(),
+        systemPrompt: "x",
+      }),
+    ).rejects.toThrow();
   });
 });

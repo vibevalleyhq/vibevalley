@@ -71,7 +71,10 @@ const readLimit = 1000;
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
-  graphActions(graph).map((action) => ({ say: graphActionText[action], run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })] }));
+  graphActions(graph).map((action) => ({
+    say: graphActionText[action],
+    run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })],
+  }));
 
 /** What the step allows now, as commands. */
 const stepNext = (graph: TaskGraph, task: Task): Next[] =>
@@ -244,7 +247,15 @@ export const make = (options: TaskOptions = {}) =>
         yield* tell(session.id, "计划有问题：\n" + parsed.problems.map((x) => "- " + x).join("\n") + "\n\n改好，在最后用一个 json 代码块重新给出整张计划。");
         return;
       }
-      const draft = withNote({ ...graph, ...(parsed.title ? { title: parsed.title } : {}), tasks: parsed.tasks, state: "draft" }, "");
+      const draft = withNote(
+        {
+          ...graph,
+          ...(parsed.title ? { title: parsed.title } : {}),
+          tasks: parsed.tasks,
+          state: "draft",
+        },
+        "",
+      );
       yield* putSystem(draft);
       splitters.delete(graph.id);
       splitterTries.delete(graph.id);
@@ -279,7 +290,12 @@ export const make = (options: TaskOptions = {}) =>
           return;
         }
         const session = hired.id;
-        graph = withTask(withNote(graph, ""), task.id, (n) => ({ ...n, state: "working", session, tries: 0 }));
+        graph = withTask(withNote(graph, ""), task.id, (n) => ({
+          ...n,
+          state: "working",
+          session,
+          tries: 0,
+        }));
         const saved = yield* Effect.result(putSystem(graph));
         if (saved._tag === "Failure") {
           yield* dismiss(session);
@@ -289,7 +305,14 @@ export const make = (options: TaskOptions = {}) =>
     });
 
     const taskFailed = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, why: string) {
-      yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
+      yield* putSystem(
+        withTask(graph, task.id, (n) => ({
+          ...n,
+          state: "failed",
+          conclusion: why,
+          failures: (n.failures ?? 0) + 1,
+        })),
+      );
       yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
       yield* tellOrchestrator(
         graph.id +
@@ -315,7 +338,10 @@ export const make = (options: TaskOptions = {}) =>
 
     /** Runs while handOver holds the stopped session; a failed check is acted on after that hold ends. */
     const verified = Effect.fnUntraced(function* (graph: TaskGraph, task: Task, cwd: string): Effect.fn.Return<Verification> {
-      const rejected = (why: string, fix = ""): Verification => ({ frozen: [], rejected: { why, fix } });
+      const rejected = (why: string, fix = ""): Verification => ({
+        frozen: [],
+        rejected: { why, fix },
+      });
       let changed: string[] = [];
       if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
         const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
@@ -500,7 +526,12 @@ export const make = (options: TaskOptions = {}) =>
             all.filter((c) => c.usable).map((c) => c.agent),
           ),
           where,
-          { worktree: true, taskGraph: { id: graph.id }, issue: graph.id, trigger: { kind: "task" } },
+          {
+            worktree: true,
+            taskGraph: { id: graph.id },
+            issue: graph.id,
+            trigger: { kind: "task" },
+          },
         );
         if (!hired.session) {
           const reason = hired.refused || "没派出去";

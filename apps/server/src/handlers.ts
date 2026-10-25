@@ -85,7 +85,10 @@ export const handlers = Effect.gen(function* () {
         Effect.sync(() => body.station !== undefined && game.want(body.station)),
         orchestrator.say(
           body.text,
-          { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
+          {
+            ...(body.agent ? { agent: body.agent } : {}),
+            ...(body.project ? { project: body.project } : {}),
+          },
           body.conversation,
           body.sendKey ?? "",
         ),
@@ -166,7 +169,10 @@ export const handlers = Effect.gen(function* () {
           id,
           body.status,
           body.text ?? "",
-          { ...(body.agent ? { agent: body.agent } : {}), ...(body.keepBranch ? { keepBranch: true } : {}) },
+          {
+            ...(body.agent ? { agent: body.agent } : {}),
+            ...(body.keepBranch ? { keepBranch: true } : {}),
+          },
           body.edit,
         ),
       ),

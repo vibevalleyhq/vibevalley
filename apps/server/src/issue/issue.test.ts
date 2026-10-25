@@ -21,7 +21,10 @@ import { until } from "../testing/until.ts";
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
 /** A helper that works until it is stopped. */
-const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });
+const busy = scriptedRuntime({
+  id: "pi",
+  turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())),
+});
 
 const config = () => {
   const c = testConfig();
@@ -390,7 +393,11 @@ describe("issues", () => {
       expect(sessions.roster()).toEqual([]);
       noWorktree(f.config.workRoot);
 
-      const existing = yield* issues.add({ title: "already queued", project: "demo", assignee: agent.id });
+      const existing = yield* issues.add({
+        title: "already queued",
+        project: "demo",
+        assignee: agent.id,
+      });
       const queued = yield* issues.queue(existing.id, true);
       expect((yield* issues.hire(agent, "new attempt", "demo", { issue: existing.id })).refused).toContain("startup refused");
       const kept = yield* issues.get(existing.id);
@@ -453,7 +460,11 @@ describe("issues", () => {
         ],
       };
       yield* issues.putTask(graph);
-      const ranks = () => sql<{ id: string; rank: number }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
+      const ranks = () =>
+        sql<{
+          id: string;
+          rank: number;
+        }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
       const before = yield* ranks();
       expect(before.length).toBeGreaterThan(0);
       yield* issues.move(one.id, "");
@@ -507,9 +518,11 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", assignee: "lab", project: "demo" });
       for (const channel of [first.id, second.id]) expect((yield* issues.start(issue.id, channel)).queued).toBeDefined();
-      expect((yield* sql<{ channel: string }>`select channel from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).map((r) => r.channel)).toEqual([
-        first.id,
-      ]);
+      expect(
+        (yield* sql<{
+          channel: string;
+        }>`select channel from issue_queue where issue = ${issue.id}`.pipe(Effect.orDie)).map((r) => r.channel),
+      ).toEqual([first.id]);
       yield* core.apply({ type: "left", id: "occupied" });
       const started = yield* issues.start(issue.id, second.id);
       expect(started.session).toBeDefined();
@@ -535,7 +548,13 @@ describe("issues", () => {
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
       const sc = yield* recurrences.add(
-        { name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } },
+        {
+          name: "scheduled",
+          text: "work",
+          channel: channel.id,
+          agent: "lab",
+          when: { kind: "every", minutes: 1 },
+        },
         "owner",
         true,
       );
@@ -594,7 +613,9 @@ describe("issues", () => {
       expect(yield* refused("done", "lab2")).toContain("换人是挪到待办时的事");
       expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的帮工档案");
 
-      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), { agent: "Lab Two" });
+      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), {
+        agent: "Lab Two",
+      });
       expect([handed.assignee, handed.sessions.length, handed.closedAt]).toEqual(["lab2", 2, undefined]);
       expect(sessions.find(first!)).toBeUndefined();
       const second = (yield* sessions.get(handed.sessions[1]!))!;
@@ -630,7 +651,16 @@ describe("issues", () => {
       yield* sql`insert into session (id, agent, name, runtime, brief, hired_at, ended_at, closed) values ('ended', 'lab', 'old', 'pi', 'history', 1, 2, 'merged')`.pipe(
         Effect.orDie,
       );
-      const live = { id: "live", agent: "lab", name: "current", runtime: "pi", brief: "history", hiredAt: 3, runs: 0, phase: { _tag: "done" } } as Session;
+      const live = {
+        id: "live",
+        agent: "lab",
+        name: "current",
+        runtime: "pi",
+        brief: "history",
+        hiredAt: 3,
+        runs: 0,
+        phase: { _tag: "done" },
+      } as Session;
       yield* core.apply({ type: "hired", session: live });
       for (const [id, at] of [
         ["ended", 1],

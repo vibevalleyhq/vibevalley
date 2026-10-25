@@ -249,7 +249,10 @@ describe("the chat", () => {
         expect([n.messages.length, n.messages[0]!.text, n.target, n.conversation]).toEqual([1, "今天进度怎么样", "#田头", f.chat.general()]);
         yield* settle;
         expect(x.runsOf("w3")).toHaveLength(before);
-        expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({ reason: "general", wakes: false });
+        expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({
+          reason: "general",
+          wakes: false,
+        });
         expect(yield* Effect.promise(() => f.deliveryOf(orchestratorAgent, said.id))).toMatchObject({ state: "seen" });
       }),
     ),
@@ -259,8 +262,14 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const channel = yield* f.chat.openChannel("#clock-in", "打卡页", "chat-ch");
-        expect(channel).toMatchObject({ name: "clock-in", project: "chat-ch", description: "打卡页" });
-        expect(yield* Effect.flip(f.chat.openChannel("clock-in", "", ""))).toMatchObject({ reason: expect.stringContaining("已经有") });
+        expect(channel).toMatchObject({
+          name: "clock-in",
+          project: "chat-ch",
+          description: "打卡页",
+        });
+        expect(yield* Effect.flip(f.chat.openChannel("clock-in", "", ""))).toMatchObject({
+          reason: expect.stringContaining("已经有"),
+        });
         expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["田头", "clock-in"]);
         const thread = yield* hireAndRun(f, x, "w4", "写 hello", "chat-ch", channel.id);
         expect(thread.channel).toBe(channel.id);
@@ -271,17 +280,28 @@ describe("the chat", () => {
         const { message: said } = yield* f.chat.say("打卡页今天能好吗", channel.id, "");
         const n = yield* heard.of(said.id);
         expect([n.conversation, n.target]).toEqual([channel.id, "#clock-in"]);
-        expect(yield* Effect.promise(() => f.deliveryOf("w4", said.id))).toMatchObject({ reason: "general" });
+        expect(yield* Effect.promise(() => f.deliveryOf("w4", said.id))).toMatchObject({
+          reason: "general",
+        });
         expect(yield* Effect.promise(() => f.deliveryOf("w5", said.id))).toBeUndefined();
         expect((yield* f.chat.read("w4", { target: "#clock-in" })).target).toBe("#clock-in");
-        expect((yield* f.chat.speak("w4", "今天能好", { target: "#clock-in", anyway: true, confirm: true })).kind).toBe("sent");
+        expect(
+          (yield* f.chat.speak("w4", "今天能好", {
+            target: "#clock-in",
+            anyway: true,
+            confirm: true,
+          })).kind,
+        ).toBe("sent");
         expect(yield* Effect.flip(f.chat.read("w4", { target: "#nowhere" }))).toMatchObject({
           _tag: "Missing",
           what: expect.stringContaining("没有叫 #nowhere 的频道"),
         });
         expect((yield* f.chat.channelOf(thread.id)).name).toBe("clock-in");
         yield* f.chat.updateChannel(channel.id, undefined, "");
-        expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
+        expect(yield* f.chat.channelByName("clock-in")).toMatchObject({
+          project: "",
+          description: "打卡页",
+        });
         expect(conversationOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
       }),
     ),
@@ -359,7 +379,10 @@ describe("the chat", () => {
           reason: expect.stringContaining("没有 999999 这条消息"),
         });
         const { message: sq } = yield* f.chat.say("大家早", f.chat.general(), "");
-        const talk = yield* f.chat.speak("w10", "早", { target: `#田头:${sq.number}`, anyway: true });
+        const talk = yield* f.chat.speak("w10", "早", {
+          target: `#田头:${sq.number}`,
+          anyway: true,
+        });
         expect([talk.kind, talk.target]).toEqual(["sent", `#田头:${sq.number}`]);
         const under = f.core.state().chat?.conversations?.find((c) => c.parent === sq.id);
         expect(under?.subjectKind).toBe("talk");
@@ -400,7 +423,11 @@ describe("the chat", () => {
         expect(got.map((m) => m.number)).toEqual([seqs[2], seqs[3]]);
         const page = yield* f.chat.read("user", { target: "#田头", before: seqs[4], limit: 2 });
         expect([page.messages.map((m) => m.number), page.older]).toEqual([[seqs[2], seqs[3]], true]);
-        const older = yield* f.chat.read("user", { target: "#田头", before: page.messages[0]!.number, limit: 2 });
+        const older = yield* f.chat.read("user", {
+          target: "#田头",
+          before: page.messages[0]!.number,
+          limit: 2,
+        });
         expect([older.messages.map((m) => m.number), older.older]).toEqual([[seqs[0], seqs[1]], false]);
         yield* f.chat.markRead(general, seqs[1]!);
         expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Missing");
@@ -437,7 +464,9 @@ describe("the chat", () => {
         yield* f.chat.say("随便说说", f.chat.general(), "");
         yield* f.core.apply({ type: "left", id: "w13" });
         yield* until(async () => (await f.deliveries("w13")).at(-1)?.state === "dropped", "dropped");
-        const left = yield* f.sql<{ left_at: number | null }>`select left_at from channel_participant where id = 'w13'`;
+        const left = yield* f.sql<{
+          left_at: number | null;
+        }>`select left_at from channel_participant where id = 'w13'`;
         expect(left[0]?.left_at).not.toBeNull();
       }),
     ),
@@ -463,7 +492,13 @@ describe("the chat", () => {
           Effect.gen(function* () {
             y.slow = 10;
             expect(g.core.session("w14")).toBeDefined();
-            yield* g.core.apply({ type: "report", id: "w14", outcome: "interrupted", summary: "重启了", runs: 1 });
+            yield* g.core.apply({
+              type: "report",
+              id: "w14",
+              outcome: "interrupted",
+              summary: "重启了",
+              runs: 1,
+            });
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
             expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
@@ -494,7 +529,14 @@ describe("the chat", () => {
           ["unlinked", undefined],
         ]);
         yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
-        yield* f.core.apply({ type: "report", id: "run-helper", outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
+        yield* f.core.apply({
+          type: "report",
+          id: "run-helper",
+          outcome: "completed",
+          summary: "done",
+          run: "finished-run",
+          runs: 2,
+        });
         yield* until(
           () => (f.core.state().chat?.messages ?? []).some((m) => m.from === "run-helper" && m.run === "finished-run"),
           "the report carries its run",
@@ -511,7 +553,9 @@ describe("the chat", () => {
         expect([first.again, second.again, second.message.id, second.message.number]).toEqual([false, true, first.message.id, first.message.number]);
         expect((yield* f.chat.say("早", undefined, "k2")).again).toBe(false);
         for (let i = 0; i < 2; i++) expect((yield* f.chat.say("晚", undefined, "")).again).toBe(false);
-        expect(yield* Effect.flip(f.chat.say("早", undefined, "k".repeat(65)))).toMatchObject({ reason: "sendKey 太长" });
+        expect(yield* Effect.flip(f.chat.say("早", undefined, "k".repeat(65)))).toMatchObject({
+          reason: "sendKey 太长",
+        });
         for (let i = 0; i < 2; i++) yield* f.chat.spoken("user", "电话里说的", "k3");
         const said: Record<string, number> = {};
         for (const m of f.messagesOf(f.chat.general())) if (m.from === "user") said[m.text] = (said[m.text] ?? 0) + 1;
@@ -572,7 +616,16 @@ describe("the chat", () => {
         // Another hire opens every job on the farm again.
         yield* f.core.apply({
           type: "hired",
-          session: { id: "w2", name: "other", agent: "lab", runtime: "pi", brief: "more", hiredAt: Date.now(), runs: 0, phase: { _tag: "resting" } } as Session,
+          session: {
+            id: "w2",
+            name: "other",
+            agent: "lab",
+            runtime: "pi",
+            brief: "more",
+            hiredAt: Date.now(),
+            runs: 0,
+            phase: { _tag: "resting" },
+          } as Session,
         });
         yield* until(() => f.messagesOf(f.chat.general()).filter((m) => m.kind === "dispatch").length === 2, "both dispatched");
         const thread = (yield* f.chat.jobThread("w1"))!;

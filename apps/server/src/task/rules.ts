@@ -153,8 +153,15 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
 export function removeTask(graph: TaskGraph, id: string): EditResult {
   const task = taskOf(graph, id);
   if (!task) return { ok: false, problem: "计划里没有「" + id + "」这一步" };
-  if (!canRemoveTask(graph, task)) return { ok: false, problem: "「" + task.title + "」" + taskStateText[task.state] + "，不能删了：可以跳过它" };
-  return checked({ ...graph, tasks: graph.tasks.filter((n) => n.id !== id).map((n) => ({ ...n, needs: n.needs.filter((x) => x !== id) })) });
+  if (!canRemoveTask(graph, task))
+    return {
+      ok: false,
+      problem: "「" + task.title + "」" + taskStateText[task.state] + "，不能删了：可以跳过它",
+    };
+  return checked({
+    ...graph,
+    tasks: graph.tasks.filter((n) => n.id !== id).map((n) => ({ ...n, needs: n.needs.filter((x) => x !== id) })),
+  });
 }
 
 /** What a step's session is told: the task graph, its job, what came before it, and how it is judged. */
@@ -238,10 +245,20 @@ export const taskIssueID = (graph: string, key: string) => graph + "." + key;
 export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: number): Issue[] {
   const was = new Map(before.map((t) => [t.id, t]));
   const keep = (draft: Draft, closed: Closing | undefined): Issue => {
-    const t = { ...draft, sessions: [], priority: "medium", createdAt: graph.createdAt } as unknown as Issue;
+    const t = {
+      ...draft,
+      sessions: [],
+      priority: "medium",
+      createdAt: graph.createdAt,
+    } as unknown as Issue;
     const old = was.get(t.id);
     if (old) {
-      Object.assign(t, { sessions: old.sessions, priority: old.priority, createdAt: old.createdAt, status: old.status });
+      Object.assign(t, {
+        sessions: old.sessions,
+        priority: old.priority,
+        createdAt: old.createdAt,
+        status: old.status,
+      });
       if (closed !== undefined && old.closedAt !== undefined) t.closedAt = old.closedAt;
     }
     t.sessions ??= [];
@@ -262,7 +279,12 @@ export function graphIssues(graph: TaskGraph, before: readonly Issue[], now: num
         // A helper's issue split under it keeps who it was given to.
         assignee: was.get(graph.id)?.assignee,
         deliver: "change",
-        graph: { state: graph.state, branch: graph.branch, parallel: graph.parallel, note: graph.note },
+        graph: {
+          state: graph.state,
+          branch: graph.branch,
+          parallel: graph.parallel,
+          note: graph.note,
+        },
       },
       graphClosed(graph.state),
     ),
@@ -387,9 +409,32 @@ export function splitBrief(goal: string, project: string, agents: readonly Agent
   const example = {
     title: "按月查询打卡记录",
     tasks: [
-      { id: "accept", title: "验收", brief: "……", needs: [], scope: ["test/month.test.ts"], check: "pnpm test test/month.test.ts", acceptance: true },
-      { id: "schema", title: "数据层", brief: "……", needs: ["accept"], scope: ["src/db"], check: "pnpm test" },
-      { id: "api", title: "查询接口", brief: "……", needs: ["schema"], agent, scope: ["src/api"], check: "pnpm test" },
+      {
+        id: "accept",
+        title: "验收",
+        brief: "……",
+        needs: [],
+        scope: ["test/month.test.ts"],
+        check: "pnpm test test/month.test.ts",
+        acceptance: true,
+      },
+      {
+        id: "schema",
+        title: "数据层",
+        brief: "……",
+        needs: ["accept"],
+        scope: ["src/db"],
+        check: "pnpm test",
+      },
+      {
+        id: "api",
+        title: "查询接口",
+        brief: "……",
+        needs: ["schema"],
+        agent,
+        scope: ["src/api"],
+        check: "pnpm test",
+      },
     ],
   };
   const lines = [

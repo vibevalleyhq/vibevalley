@@ -36,7 +36,10 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "hired": {
       const others = state.sessions.filter((h) => h.id !== f.session.id);
       const was = sessionOf(state, f.session.id);
-      const play = was?.play ?? { ...playOf(f.session), station: freeStation(others, farmOf(f.session)) };
+      const play = was?.play ?? {
+        ...playOf(f.session),
+        station: freeStation(others, farmOf(f.session)),
+      };
       const h: Session = { ...f.session, play };
       return [{ ...state, sessions: [...others, h] }, true];
     }
@@ -50,14 +53,21 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
         play: playedRun(playOf(h), f.at),
       }));
     case "doing": {
-      const [after, changed] = whileWorking(state, f.id, (p) => ({ _tag: "working", since: p.since, doing: { action: f.action, label: f.label } }));
+      const [after, changed] = whileWorking(state, f.id, (p) => ({
+        _tag: "working",
+        since: p.since,
+        doing: { action: f.action, label: f.label },
+      }));
       if (!changed) return [state, false];
       return withSession(after, f.id, (h) => ({ ...h, play: playedDoing(playOf(h), f) }));
     }
     case "quiet":
       return whileWorking(state, f.id, (p) => ({ ...p, quietSince: f.since }));
     case "retry":
-      return whileWorking(state, f.id, (p) => ({ ...p, retry: f.of ? { attempt: f.attempt, of: f.of } : { attempt: f.attempt } }));
+      return whileWorking(state, f.id, (p) => ({
+        ...p,
+        retry: f.of ? { attempt: f.attempt, of: f.of } : { attempt: f.attempt },
+      }));
     case "spent":
       return withSession(state, f.id, (h) => ({ ...h, spent: f.spent }));
     case "report":
@@ -67,7 +77,13 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
           ...x,
           runs: f.runs,
           phase: ended(f.outcome),
-          lastRun: { outcome: f.outcome, summary: f.summary, at: f.at, spent: f.spent, ...(f.answer ? { answer: f.answer } : {}) },
+          lastRun: {
+            outcome: f.outcome,
+            summary: f.summary,
+            at: f.at,
+            spent: f.spent,
+            ...(f.answer ? { answer: f.answer } : {}),
+          },
         }))[0],
         true,
       ];

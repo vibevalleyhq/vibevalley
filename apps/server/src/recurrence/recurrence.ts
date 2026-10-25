@@ -163,7 +163,11 @@ export const make = Effect.gen(function* () {
       const was = yield* find(id);
       // Turned on is the owner's yes (only the owner may: recurrence.update); the queries clear pending the same way.
       const { pending: _, ...rest } = was;
-      let s: Recurrence = { ...rest, enabled, ...(was.pending && !enabled ? { pending: true } : {}) };
+      let s: Recurrence = {
+        ...rest,
+        enabled,
+        ...(was.pending && !enabled ? { pending: true } : {}),
+      };
       // Switched back on: it counts from now, not from runs it skipped while off.
       if (enabled && !was.enabled && was.when.kind !== "once") {
         const at = yield* Clock.currentTimeMillis;

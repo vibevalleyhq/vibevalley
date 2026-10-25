@@ -3,7 +3,13 @@
 import type { EventTokens } from "@vibevalley/protocol";
 
 /** As the brain's prefix_changed names the parts. */
-const prefixParts: Record<string, string> = { instructions: "说明", env: "环境", skills: "技能", memory: "记性", tools: "工具" };
+const prefixParts: Record<string, string> = {
+  instructions: "说明",
+  env: "环境",
+  skills: "技能",
+  memory: "记性",
+  tools: "工具",
+};
 
 export const tokensOf = (u: { input: number; cacheRead: number; output: number }): EventTokens => ({
   input: u.input,

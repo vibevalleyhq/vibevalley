@@ -35,7 +35,11 @@ export const cli = (args: string[], stdin = "", env: Record<string, string> = {}
     [out, err] = [out.replace(/\n$/, ""), err.replace(/\n$/, "")];
     const last = err.split("\n").at(-1) ?? "";
     const failure = last.startsWith('{"error"')
-      ? (JSON.parse(last) as { error: { tag: string; message: string; next?: { say: string; run?: string[] }[] } }).error
+      ? (
+          JSON.parse(last) as {
+            error: { tag: string; message: string; next?: { say: string; run?: string[] }[] };
+          }
+        ).error
       : undefined;
     return { code, out, err, failure };
   });

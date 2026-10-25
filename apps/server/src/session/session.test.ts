@@ -25,7 +25,9 @@ const worker = (turns: ScriptedTurn[]) =>
       turns.push(turn);
       await turn.tool("bash", JSON.stringify({ command: `cd ${turn.options.cwd} && touch done.txt` }), () => {
         writeFileSync(join(turn.options.cwd, `done-${turns.length}.txt`), "done\n");
-        execFileSync("git", ["-c", "user.name=w", "-c", "user.email=w@x", "add", "-A"], { cwd: turn.options.cwd });
+        execFileSync("git", ["-c", "user.name=w", "-c", "user.email=w@x", "add", "-A"], {
+          cwd: turn.options.cwd,
+        });
         execFileSync("git", ["-c", "user.name=w", "-c", "user.email=w@x", "commit", "-qm", `做完第 ${turns.length} 轮`], { cwd: turn.options.cwd });
         return "ok";
       });
@@ -58,7 +60,10 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", {
+        issue: { id: "i1", number: 1 },
+        worktree: true,
+      });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.ofCheck("fix next time"))));
@@ -69,7 +74,13 @@ describe("sessions", () => {
       expect((yield* sessions.list("lab")).map((s) => s.id)).toEqual([id]);
     }).pipe(
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(
+        world({
+          config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } },
+          runtimes: [runtime],
+          repos: ["demo"],
+        }),
+      ),
     );
   });
 
@@ -123,7 +134,10 @@ describe("sessions", () => {
       const sessions = yield* Sessions;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      const sent = yield* sessions.send(lab(), "first run", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "first run", "demo", {
+        issue: { id: "i1", number: 1 },
+        worktree: true,
+      });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the initial report");
       yield* Effect.flip(sessions.handOver(id, "merged", () => Effect.fail(MergeFailure.ofCheck("fix next time"))));
@@ -136,7 +150,13 @@ describe("sessions", () => {
       expect(opens).toBe(2);
     }).pipe(
       Effect.scoped,
-      Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, runtimes: [runtime], repos: ["demo"] })),
+      Effect.provide(
+        world({
+          config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } },
+          runtimes: [runtime],
+          repos: ["demo"],
+        }),
+      ),
     );
   });
 
@@ -165,7 +185,10 @@ describe("sessions", () => {
       yield* Effect.addFinalizer(() => Effect.promise(() => cleanup()));
       const sessions = yield* Sessions;
       const core = yield* Core;
-      const sent = yield* sessions.send(lab(), "work", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const sent = yield* sessions.send(lab(), "work", "demo", {
+        issue: { id: "i1", number: 1 },
+        worktree: true,
+      });
       const id = sent.session!.id;
       yield* until(() => phase(core, id) === "done", "the report");
       const before = sessions.find(id)!;
@@ -197,7 +220,10 @@ describe("sessions", () => {
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
       yield* Effect.sleep(5);
 
-      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: "i1", number: 1 }, worktree: true });
+      const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", {
+        issue: { id: "i1", number: 1 },
+        worktree: true,
+      });
       const id = hired.session!.id;
       expect(id).toBe("w1");
       yield* until(() => phase(core, id) === "done", "the first run's report");
@@ -248,7 +274,17 @@ describe("sessions", () => {
       const s = sessions as SessionsInside;
       yield* core.apply({
         type: "hired",
-        session: { id: "w1", name: "w1", agent: "lab", runtime: "pi", brief: "", project: "demo", hiredAt: 0, runs: 0, phase: { _tag: "done" } } as Session,
+        session: {
+          id: "w1",
+          name: "w1",
+          agent: "lab",
+          runtime: "pi",
+          brief: "",
+          project: "demo",
+          hiredAt: 0,
+          runs: 0,
+          phase: { _tag: "done" },
+        } as Session,
       });
       const h: Parameters<typeof s.expect>[0] = {
         id: "w1",
@@ -277,11 +313,21 @@ describe("sessions", () => {
           yield* core.apply({ type: "run", id: "w1" });
           s.unexpect(h);
         }
-        const got = yield* sessions.send(lab(), "another", "demo", { issue: { id: "i2", number: 2 } });
+        const got = yield* sessions.send(lab(), "another", "demo", {
+          issue: { id: "i2", number: 2 },
+        });
         expect([got.session, got.refused !== undefined, s.hired()]).toEqual([undefined, true, 0]);
       }
       yield* core.apply({ type: "report", id: "w1", outcome: "completed", summary: "", runs: 1 });
       expect(sessions.noRoom("pi", "demo")).toBe("");
-    }).pipe(Effect.scoped, Effect.provide(world({ config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } }, repos: ["demo"] }))),
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        world({
+          config: { ...testConfig(), project: { maxSessions: 1, checkTimeoutSeconds: 60 } },
+          repos: ["demo"],
+        }),
+      ),
+    ),
   );
 });

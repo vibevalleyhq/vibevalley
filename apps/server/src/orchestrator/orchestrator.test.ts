@@ -473,13 +473,20 @@ describe("the orchestrator", () => {
       yield* until(() => words().length >= 1, "its words");
       const asked = yield* until(() => (sessions.events(orchestratorAgent) ?? []).find((e) => e.type === "user/message"), "its log");
       const made = yield* orchestrator.markWrong(asked.seq, "应该先看一眼地里");
-      const saved = JSON.parse(readFileSync(made.file, "utf8")) as { want: string; input: { customType: string }; did: { role: string }[]; tools: string[] };
+      const saved = JSON.parse(readFileSync(made.file, "utf8")) as {
+        want: string;
+        input: { customType: string };
+        did: { role: string }[];
+        tools: string[];
+      };
       expect(saved.want).toBe("应该先看一眼地里");
       expect(saved.input.customType).toBe("orchestratorInput");
       expect(saved.did.map((m) => m.role)).toContain("assistant");
       expect(saved.tools).toContain("issue_create");
       expect(saved.tools).toContain("remember");
-      expect(yield* Effect.flip(orchestrator.markWrong(9_999, "x"))).toMatchObject({ _tag: "Missing" });
+      expect(yield* Effect.flip(orchestrator.markWrong(9_999, "x"))).toMatchObject({
+        _tag: "Missing",
+      });
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 });

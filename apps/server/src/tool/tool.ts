@@ -138,7 +138,12 @@ export function toolStart(name: string, args: unknown): ToolStart {
   }
   const label = labels[name] ?? name;
   if (about.length > 40) about = head(about, 40) + "…";
-  return { text: about ? label + "：" + about : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
+  return {
+    text: about ? label + "：" + about : label,
+    action: "other",
+    tool: name,
+    input: args === undefined || args === null ? "{}" : JSON.stringify(args),
+  };
 }
 
 const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
@@ -171,9 +176,21 @@ export const make = Effect.gen(function* () {
   const answered = (e: Effect.Effect<string, unknown>) => go(Effect.catch(e, (err) => Effect.succeed("没成：" + toError(err).message)));
 
   const tool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
-    textTool<P>({ name, label: labels[name] ?? name, description, parameters: schemas[name]!, run: (p) => runIt(p) });
+    textTool<P>({
+      name,
+      label: labels[name] ?? name,
+      description,
+      parameters: schemas[name]!,
+      run: (p) => runIt(p),
+    });
   const sessionSchemaTool = <P>(name: string, description: string, runIt: (p: P) => string | Promise<string>) =>
-    textTool<P>({ name, label: labels[name] ?? name, description, parameters: sessionSchemas[name]!, run: (p) => runIt(p) });
+    textTool<P>({
+      name,
+      label: labels[name] ?? name,
+      description,
+      parameters: sessionSchemas[name]!,
+      run: (p) => runIt(p),
+    });
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
@@ -231,7 +248,14 @@ export const make = Effect.gen(function* () {
   };
   const notWorking = "你不在场：记性只给在干活的帮工用";
 
-  const query = (q: Partial<SearchQuery>): SearchQuery => ({ agent: "", project: "", text: "", kind: "", limit: 0, ...q });
+  const query = (q: Partial<SearchQuery>): SearchQuery => ({
+    agent: "",
+    project: "",
+    text: "",
+    kind: "",
+    limit: 0,
+    ...q,
+  });
 
   const projectsTool = tool<object>("projects", "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。", async () => {
     const all = await go(projects.list());
@@ -369,7 +393,13 @@ export const make = Effect.gen(function* () {
     (p) =>
       withIssue(p.issue, async (t) => {
         try {
-          const done = await go(issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }));
+          const done = await go(
+            issue.review(t.id, {
+              pass: p.pass,
+              ...(p.findings ? { findings: p.findings } : {}),
+              ...(p.text ? { text: p.text } : {}),
+            }),
+          );
           return p.pass ? `#${done.number} 验收过了，等主人点完成` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`;
         } catch (e) {
           return toError(e).message;
@@ -411,7 +441,15 @@ export const make = Effect.gen(function* () {
     return `${w.session.name} 收工了（#${t.number}）`;
   });
 
-  const issuesTool = tool<{ issue?: string; status?: string; wants_owner?: boolean; project?: string; text?: string; closed?: boolean; limit?: number }>(
+  const issuesTool = tool<{
+    issue?: string;
+    status?: string;
+    wants_owner?: boolean;
+    project?: string;
+    text?: string;
+    closed?: boolean;
+    limit?: number;
+  }>(
     "issues",
     "找工单、看一批工单：主人问「哪些在等我」（wants_owner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；填 issue 是看一张的全部。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
     async (p) => {
@@ -577,7 +615,10 @@ export const make = Effect.gen(function* () {
               agent = chosen.id;
             }
             const done = await go(
-              issue.setStatus(t.id, to, p.text ?? "", c.here, { ...(agent ? { agent } : {}), ...(p.keep_branch ? { keepBranch: true } : {}) }),
+              issue.setStatus(t.id, to, p.text ?? "", c.here, {
+                ...(agent ? { agent } : {}),
+                ...(p.keep_branch ? { keepBranch: true } : {}),
+              }),
             );
             // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
             if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
@@ -634,7 +675,11 @@ export const make = Effect.gen(function* () {
               when = { kind: "cron", expr: p.cron ?? "" };
               break;
             default:
-              when = { kind: "weekly", days: (p.days ?? []).map((d) => Math.trunc(d)), time: p.time ?? "" };
+              when = {
+                kind: "weekly",
+                days: (p.days ?? []).map((d) => Math.trunc(d)),
+                time: p.time ?? "",
+              };
           }
           const made = await go(
             recurrence.add(
@@ -710,7 +755,16 @@ export const make = Effect.gen(function* () {
     return p.id ? "没有 " + p.id + " 这个计划" : "现在没有计划。";
   });
 
-  const taskEdit = tool<{ graph: string; task: string; title?: string; brief?: string; needs?: string[]; agent?: string; check?: string; remove?: boolean }>(
+  const taskEdit = tool<{
+    graph: string;
+    task: string;
+    title?: string;
+    brief?: string;
+    needs?: string[];
+    agent?: string;
+    check?: string;
+    remove?: boolean;
+  }>(
     "task_edit",
     "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
     (p) => {
@@ -747,7 +801,16 @@ export const make = Effect.gen(function* () {
   const issueSplit = (who: Who) =>
     sessionSchemaTool<{
       title?: string;
-      tasks: { id: string; title?: string; brief: string; needs?: string[]; agent?: string; check?: string; scope?: string[]; acceptance?: boolean }[];
+      tasks: {
+        id: string;
+        title?: string;
+        brief: string;
+        needs?: string[];
+        agent?: string;
+        check?: string;
+        scope?: string[];
+        acceptance?: boolean;
+      }[];
     }>(
       "issue_split",
       `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
@@ -774,7 +837,11 @@ export const make = Effect.gen(function* () {
           "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
           async (p) => {
             try {
-              const q = query({ text: p.query ?? "", project: (p.project ?? "").trim(), ...((p.agent ?? "").trim() ? { agent: profile(p.agent!) } : {}) });
+              const q = query({
+                text: p.query ?? "",
+                project: (p.project ?? "").trim(),
+                ...((p.agent ?? "").trim() ? { agent: profile(p.agent!) } : {}),
+              });
               return foundText(await go(memory.search(q)), q);
             } catch (e) {
               return "没成：" + toError(e).message;
@@ -787,7 +854,11 @@ export const make = Effect.gen(function* () {
           async (p) => {
             const c = await who();
             if (!c.agent) throw new Error(notWorking);
-            const q = query({ agent: c.agent, project: p.all_projects ? "" : c.project, text: p.query ?? "" });
+            const q = query({
+              agent: c.agent,
+              project: p.all_projects ? "" : c.project,
+              text: p.query ?? "",
+            });
             return foundText(await go(memory.search(q)), q);
           },
         );
@@ -800,7 +871,14 @@ export const make = Effect.gen(function* () {
           async (p) => {
             try {
               const id = profile(p.agent);
-              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "orchestrator" }));
+              const m = await go(
+                memory.remember({
+                  agent: id,
+                  text: p.text,
+                  project: p.project ?? "",
+                  by: "orchestrator",
+                }),
+              );
               return "替 " + id + " 记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
             } catch (e) {
               return "没成：" + toError(e).message;
@@ -814,7 +892,15 @@ export const make = Effect.gen(function* () {
             const c = await who();
             if (!c.agent) throw new Error(notWorking);
             if (p.agent && p.agent !== c.agent) throw new Error("只能记进你自己的档案（" + c.agent + "），" + p.agent + " 的记性不归你写");
-            const m = await go(memory.remember({ agent: c.agent, text: p.text, project: p.all_projects ? "" : c.project, by: "agent", session: c.session }));
+            const m = await go(
+              memory.remember({
+                agent: c.agent,
+                text: p.text,
+                project: p.all_projects ? "" : c.project,
+                by: "agent",
+                session: c.session,
+              }),
+            );
             return "记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
           },
         );

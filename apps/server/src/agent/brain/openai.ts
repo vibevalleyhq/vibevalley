@@ -44,7 +44,13 @@ export function chatChunk(id: string, created: number, model: string, content: s
   const delta = stop ? {} : { ...(first ? { role: "assistant" } : {}), content };
   return (
     "data: " +
-    JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: stop ? "stop" : null }] }) +
+    JSON.stringify({
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [{ index: 0, delta, finish_reason: stop ? "stop" : null }],
+    }) +
     "\n\n"
   );
 }
@@ -110,6 +116,13 @@ export function chatCompletions(c: ChatCompletions) {
         ended.abort();
       },
     });
-    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" } });
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      },
+    });
   };
 }

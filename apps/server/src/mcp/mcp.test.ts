@@ -16,7 +16,10 @@ import { until } from "../testing/until.ts";
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
 interface Answer {
-  readonly result?: { readonly content?: { readonly text: string }[]; readonly tools?: { readonly name: string }[] };
+  readonly result?: {
+    readonly content?: { readonly text: string }[];
+    readonly tools?: { readonly name: string }[];
+  };
   readonly error?: unknown;
 }
 
@@ -27,7 +30,11 @@ const client = (mcp: Mcp["Service"], token: string) => {
     const res = await mcp.handle(
       new Request("http://127.0.0.1/mcp", {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(token ? { authorization: "Bearer " + token } : {}) },
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...(token ? { authorization: "Bearer " + token } : {}),
+        },
         body: JSON.stringify(body),
       }),
     );
@@ -36,7 +43,12 @@ const client = (mcp: Mcp["Service"], token: string) => {
   };
   const call = (method: string, params: unknown) => post({ jsonrpc: "2.0", id: ++id, method, params });
   return {
-    init: () => call("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } }),
+    init: () =>
+      call("initialize", {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "0" },
+      }),
     list: async () => ((await call("tools/list", {})).result?.tools ?? []).map((t) => t.name),
     tool: async (name: string, args: Record<string, unknown> = {}) =>
       ((await call("tools/call", { name, arguments: args })).result?.content ?? []).map((c) => c.text).join(""),
@@ -116,9 +128,22 @@ describe("mcp", () => {
     Effect.gen(function* () {
       const core = yield* Core;
       const mcp = yield* Mcp;
-      yield* hired(core, { id: "failed", name: "失败的", phase: { _tag: "failed" } as Session["phase"] });
-      yield* hired(core, { id: "resting", name: "歇着的", phase: { _tag: "resting" } as Session["phase"] });
-      yield* hired(core, { id: "clash", name: "冲突的", phase: { _tag: "done" } as Session["phase"], conflict: { base: "main", files: ["a.go"] } });
+      yield* hired(core, {
+        id: "failed",
+        name: "失败的",
+        phase: { _tag: "failed" } as Session["phase"],
+      });
+      yield* hired(core, {
+        id: "resting",
+        name: "歇着的",
+        phase: { _tag: "resting" } as Session["phase"],
+      });
+      yield* hired(core, {
+        id: "clash",
+        name: "冲突的",
+        phase: { _tag: "done" } as Session["phase"],
+        conflict: { base: "main", files: ["a.go"] },
+      });
       const text = yield* Effect.promise(() => client(mcp, "token").tool("session_list"));
       for (const want of ["这一轮没做成", "歇着（上一轮没做完）", "合进 main 会冲突（a.go）"]) expect(text).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(world({ who: () => "caller" }))),
@@ -141,7 +166,12 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const memory = yield* Memories;
       yield* hired(core, { id: "w1", name: "一号", agent: "lab", project: "demo" });
-      yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: "owner" });
+      yield* memory.write({
+        agent: "scout",
+        text: "这个项目测试用 make check",
+        project: "demo",
+        by: "owner",
+      });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       expect(yield* tool("memory_add", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
@@ -176,13 +206,25 @@ describe("mcp", () => {
       const read = yield* tool("doc_read", { doc: d.doc.id });
       expect(read).toContain("《周报》，2 块");
       expect(read).toContain("〔" + block + " · 第 1 版 · paragraph〕这周做完了第一步");
-      expect(yield* tool("doc_update", { doc: d.doc.id, block, base_rev: 1, text: "这周做完了第一步和第二步" })).toContain("现在是第 2 版");
+      expect(
+        yield* tool("doc_update", {
+          doc: d.doc.id,
+          block,
+          base_rev: 1,
+          text: "这周做完了第一步和第二步",
+        }),
+      ).toContain("现在是第 2 版");
       // The owner changes it in the editor; the helper's next rewrite was made against rev 2.
       yield* docs.submit(d.doc.id, "owner", {
         batchId: "owner",
         ops: [{ op: "update_text", blockId: block, baseRev: 2, text: [{ t: "主人改过的", marks: {} }] }],
       });
-      const stale = yield* tool("doc_update", { doc: d.doc.id, block, base_rev: 2, text: "帮工又改" });
+      const stale = yield* tool("doc_update", {
+        doc: d.doc.id,
+        block,
+        base_rev: 2,
+        text: "帮工又改",
+      });
       expect(stale).toContain("没改：这一块刚被别人改过，现在是第 3 版");
       expect(stale).toContain("主人改过的");
       const snap = yield* docs.get(d.doc.id);

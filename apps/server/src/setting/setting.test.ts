@@ -22,7 +22,11 @@ describe("settings", () => {
         const s = yield* Setting;
         expect(s.status().deepseekApiKey).toEqual({ source: "config", hint: "…0000" });
         expect(s.status().agoraAppId).toEqual({});
-        const after = yield* s.save({ deepseekApiKey: " sk-saved-in-settings-1234 ", agoraAppId: appId, agoraAppCertificate: cert });
+        const after = yield* s.save({
+          deepseekApiKey: " sk-saved-in-settings-1234 ",
+          agoraAppId: appId,
+          agoraAppCertificate: cert,
+        });
         expect(after.deepseekApiKey).toEqual({ source: "settings", hint: "…1234" });
         expect(after.agoraAppId).toEqual({ source: "settings", value: appId });
         expect(after.agoraAppCertificate).toEqual({ source: "settings", hint: "…2222" });
@@ -30,7 +34,11 @@ describe("settings", () => {
         expect(s.deepseekApiKey()).toBe("sk-saved-in-settings-1234");
         expect(s.agora()).toEqual({ appId, appCertificate: cert });
         expect(statSync(join(config.home, "settings.json")).mode & 0o777).toBe(0o600);
-        expect(file(config)).toEqual({ deepseekApiKey: "sk-saved-in-settings-1234", agoraAppId: appId, agoraAppCertificate: cert });
+        expect(file(config)).toEqual({
+          deepseekApiKey: "sk-saved-in-settings-1234",
+          agoraAppId: appId,
+          agoraAppCertificate: cert,
+        });
         const cleared = yield* s.save({ deepseekApiKey: "" });
         expect(cleared.deepseekApiKey).toEqual({ source: "config", hint: "…0000" });
         expect(cleared.agoraAppId.value).toBe(appId);
@@ -59,17 +67,28 @@ describe("settings", () => {
   );
 
   it.effect("the voice keeps only what differs from its defaults, which the configuration sets", () => {
-    const config = testConfig({ voice: { id: "English_captivating_female1", line: { port: 0, url: "" } } });
+    const config = testConfig({
+      voice: { id: "English_captivating_female1", line: { port: 0, url: "" } },
+    });
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Setting;
         const before = s.status();
         expect(before.voiceDefaults.answer).toEqual({ vendor: "orchestrator" });
-        expect(before.voiceDefaults.tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "English_captivating_female1" });
+        expect(before.voiceDefaults.tts).toEqual({
+          vendor: "minimax",
+          model: "speech_2_6_turbo",
+          voiceId: "English_captivating_female1",
+        });
         expect(before.voiceDefaults.greeting).toBe(defaultVoice().greeting);
         expect(before.voice).toEqual(before.voiceDefaults);
-        const wanted = { ...before.voiceDefaults, area: "CN" as const, silenceMs: 600, greeting: "在呢。" };
+        const wanted = {
+          ...before.voiceDefaults,
+          area: "CN" as const,
+          silenceMs: 600,
+          greeting: "在呢。",
+        };
         expect((yield* s.save({ voice: { area: "CN", silenceMs: 600, greeting: "在呢。" } })).voice).toEqual(wanted);
         expect(s.voice()).toEqual(wanted);
         expect(file(config).voice).toEqual({ area: "CN", silenceMs: 600, greeting: "在呢。" });
@@ -94,12 +113,20 @@ describe("settings", () => {
       Effect.gen(function* () {
         const s = yield* Setting;
         expect(s.status().ttsKey).toEqual({});
-        const tts = { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } as const;
+        const tts = {
+          vendor: "microsoft",
+          region: "eastasia",
+          voiceName: "zh-CN-XiaoxiaoNeural",
+        } as const;
         const after = yield* s.save({ voice: { tts }, ttsKey: " azure-speech-key-9f3a " });
         expect(after.voice.tts).toEqual(tts);
         expect(after.ttsKey).toEqual({ source: "settings", hint: "…9f3a" });
         expect(JSON.stringify(after)).not.toContain("azure-speech-key");
-        expect(s.voiceConfig().keys).toEqual({ asrKey: "", llmKey: "", ttsKey: "azure-speech-key-9f3a" });
+        expect(s.voiceConfig().keys).toEqual({
+          asrKey: "",
+          llmKey: "",
+          ttsKey: "azure-speech-key-9f3a",
+        });
         expect(file(config).voice).toEqual({ tts });
       }),
     );
@@ -107,15 +134,33 @@ describe("settings", () => {
 
   it.effect("a memory source keeps its key until cleared", () => {
     const config = testConfig();
-    const nowledge = { kind: "nowledge", url: " http://127.0.0.1:14242/mcp/ ", enabled: true, read: true, write: true, key: "nmem-secret-9876" } as const;
+    const nowledge = {
+      kind: "nowledge",
+      url: " http://127.0.0.1:14242/mcp/ ",
+      enabled: true,
+      read: true,
+      write: true,
+      key: "nmem-secret-9876",
+    } as const;
     return run(
       config,
       Effect.gen(function* () {
         const s = yield* Setting;
         expect(s.status().memorySources).toEqual([]);
-        expect((yield* s.save({ memorySources: [nowledge] })).memorySources[0]!.key).toEqual({ source: "settings", hint: "…9876" });
+        expect((yield* s.save({ memorySources: [nowledge] })).memorySources[0]!.key).toEqual({
+          source: "settings",
+          hint: "…9876",
+        });
         yield* s.save({ memorySources: [{ ...nowledge, key: undefined, write: false }] });
-        expect(s.memorySources()).toEqual([{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, key: "nmem-secret-9876" }]);
+        expect(s.memorySources()).toEqual([
+          {
+            kind: "nowledge",
+            url: "http://127.0.0.1:14242/mcp/",
+            enabled: true,
+            read: true,
+            key: "nmem-secret-9876",
+          },
+        ]);
         yield* s.save({ deepseekApiKey: "sk-other-key-0000" });
         expect(s.memorySources()).toHaveLength(1);
         yield* s.save({ memorySources: [] });

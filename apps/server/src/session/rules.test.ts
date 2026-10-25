@@ -26,7 +26,15 @@ import { shellCommand } from "./shell.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: FactContext = { id: "w1", runtime: "pi", cwd: "/work/clock-in" };
 const base = (): Session =>
-  ({ id: "w1", name: "老周", agent: "zhou", runtime: "pi", brief: "加接口", project: "clock-in", phase: { _tag: "arriving" } }) as Session;
+  ({
+    id: "w1",
+    name: "老周",
+    agent: "zhou",
+    runtime: "pi",
+    brief: "加接口",
+    project: "clock-in",
+    phase: { _tag: "arriving" },
+  }) as Session;
 const working = (doing: Doing): Session => ({ ...base(), phase: { _tag: "working", doing } }) as Session;
 const thinking: Doing = { action: "thinking", label: "" };
 const none: Tracking = {};
@@ -35,7 +43,10 @@ describe("an answer handed back", () => {
   const block = (o: unknown) => "查过了。\n\n```json\n" + JSON.stringify(o) + "\n```\n\n结论：查清楚了";
   it("reads the last block with a conclusion and what it rests on", () => {
     const text = block({ conclusion: "旧的", evidence: ["a.ts:1"] }) + "\n\n" + block({ conclusion: " 新的 ", evidence: "b.ts:2", next: ["  ", "接着改"] });
-    expect(parseAnswer(text)).toEqual({ answer: { conclusion: "新的", evidence: ["b.ts:2"], unsure: [], next: ["接着改"] }, problem: "" });
+    expect(parseAnswer(text)).toEqual({
+      answer: { conclusion: "新的", evidence: ["b.ts:2"], unsure: [], next: ["接着改"] },
+      problem: "",
+    });
     // A later block that is not an answer does not hide an earlier one that is.
     expect(parseAnswer(text + '\n\n```json\n{"title": 1\n```').answer?.conclusion).toBe("新的");
   });
@@ -49,7 +60,12 @@ describe("an answer handed back", () => {
   });
   it("a completed report carries it; a failed one does not", () => {
     const said = block({ conclusion: "慢在读配置", evidence: ["clock.ts:1"] });
-    expect(readReport({ kind: "completed" } as never, said).answer).toEqual({ conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] });
+    expect(readReport({ kind: "completed" } as never, said).answer).toEqual({
+      conclusion: "慢在读配置",
+      evidence: ["clock.ts:1"],
+      unsure: [],
+      next: [],
+    });
     expect(readReport({ kind: "interrupted" } as never, said).answer).toBeUndefined();
   });
 });
@@ -65,7 +81,16 @@ describe("a session's events", () => {
 
   it("a run is reminded of memories", () => {
     const block = recallHead + "你以前记下的……\n- （这个项目）测试用 pnpm test";
-    const r = eventFacts(ev({ kind: "turn_started", requestId: "r", input: "你是老周" + jobBreak + withRecall(block, "加一个查询接口") }), base(), none, ctx);
+    const r = eventFacts(
+      ev({
+        kind: "turn_started",
+        requestId: "r",
+        input: "你是老周" + jobBreak + withRecall(block, "加一个查询接口"),
+      }),
+      base(),
+      none,
+      ctx,
+    );
     expect(r.journal).toEqual([
       { type: "prompt", text: "加一个查询接口" },
       { type: "note", kind: "memory/recalled", text: "- （这个项目）测试用 pnpm test" },
@@ -74,7 +99,12 @@ describe("a session's events", () => {
 
   it("a command shows from its folder", () => {
     const started = eventFacts(
-      ev({ kind: "tool_call_started", callId: "c1", tool: "bash", input: `{"command":"cd /work/clock-in && pnpm test"}` }),
+      ev({
+        kind: "tool_call_started",
+        callId: "c1",
+        tool: "bash",
+        input: `{"command":"cd /work/clock-in && pnpm test"}`,
+      }),
       working(thinking),
       none,
       ctx,
@@ -83,14 +113,24 @@ describe("a session's events", () => {
     expect(started.journal[0]!.type).toBe("toolStarted");
     expect(started.tracking.shownCall).toEqual({ id: "c1", tool: "bash" });
     const same = eventFacts(
-      ev({ kind: "tool_call_started", callId: "c2", tool: "bash", input: `{"command":"pnpm test"}` }),
+      ev({
+        kind: "tool_call_started",
+        callId: "c2",
+        tool: "bash",
+        input: `{"command":"pnpm test"}`,
+      }),
       working({ action: "run_command", label: "pnpm test" }),
       none,
       ctx,
     );
     expect(same.facts).toEqual([]);
     const failed = eventFacts(
-      ev({ kind: "tool_call_ended", callId: "c1", exitCode: 1, content: [{ type: "text", text: "1 failing" }] }),
+      ev({
+        kind: "tool_call_ended",
+        callId: "c1",
+        exitCode: 1,
+        content: [{ type: "text", text: "1 failing" }],
+      }),
       working({ action: "run_command", label: "pnpm test" }),
       started.tracking,
       ctx,
@@ -125,7 +165,18 @@ describe("a session's events", () => {
 
   it("a sub-agent's steps say whose", () => {
     expect(eventFacts(ev({ kind: "text_delta", text: "好" }), working(thinking), none, ctx).journal).toEqual([{ type: "response", text: "好" }]);
-    const sub = eventFacts(ev({ kind: "tool_call_started", callId: "c1", tool: "bash", input: "{}", agentPath: ["task-1"] }), working(thinking), none, ctx);
+    const sub = eventFacts(
+      ev({
+        kind: "tool_call_started",
+        callId: "c1",
+        tool: "bash",
+        input: "{}",
+        agentPath: ["task-1"],
+      }),
+      working(thinking),
+      none,
+      ctx,
+    );
     expect(sub.journal[0]!.from).toEqual(["task-1"]);
   });
 
@@ -171,7 +222,10 @@ describe("a session's events", () => {
     expect(retry.journal).toEqual([{ type: "note", kind: "llm/retry", text: "调用模型没成功，第 2/3 次重试，2 秒后：429" }]);
     expect(eventFacts(ev({ kind: "model", model: "deepseek-flash" }), working(thinking), none, ctx).model).toBe("deepseek-flash");
     const failed = eventFacts(
-      ev({ kind: "turn_ended", outcome: { kind: "failed", failure: "billing", reason: "Insufficient Balance" } }),
+      ev({
+        kind: "turn_ended",
+        outcome: { kind: "failed", failure: "billing", reason: "Insufficient Balance" },
+      }),
       working(thinking),
       none,
       ctx,
@@ -179,7 +233,15 @@ describe("a session's events", () => {
     expect(failed.journal[0]!.type).toBe("note");
     expect((failed.journal[0] as { text: string }).text).toMatch(/^余额不够了：Insufficient Balance/);
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
-    expect(exited.facts).toEqual([{ type: "report", id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
+    expect(exited.facts).toEqual([
+      {
+        type: "report",
+        id: "w1",
+        outcome: "failed",
+        summary: "pi 进程退出了（退出码 137）",
+        runs: 2,
+      },
+    ]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
     expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } } as Session, none, ctx).facts).toEqual([]);
   });
@@ -262,7 +324,14 @@ describe("a run's report", () => {
 
 describe("room and names", () => {
   const h = (id: string, runtime: string, project: string, busy: boolean) =>
-    ({ id, name: id, agent: "zhou", runtime, project, phase: busy ? { _tag: "working", doing: thinking } : { _tag: "done" } }) as Session;
+    ({
+      id,
+      name: id,
+      agent: "zhou",
+      runtime,
+      project,
+      phase: busy ? { _tag: "working", doing: thinking } : { _tag: "done" },
+    }) as Session;
   const limits = { workspace: 3, perRuntime: 2, perProject: 2 };
 
   it("room in the workspace", () => {
@@ -307,12 +376,18 @@ describe("work that does not go in", () => {
     expect(notTakenIn(conflict, "阿狐", "owner").fix).toBe("");
     expect(notTakenIn(conflict, "阿狐", "owner").owner).toContain("要它解决就用 tell 告诉它");
     expect(notTakenIn(conflict, "阿狐", "helper").fix).toBe(conflictBrief("main", ["a.ts", "b.ts"]));
-    expect(notTakenIn(MergeFailure.ofError("git 坏了"), "阿狐", "helper")).toMatchObject({ fix: "", short: "git 坏了" });
+    expect(notTakenIn(MergeFailure.ofError("git 坏了"), "阿狐", "helper")).toMatchObject({
+      fix: "",
+      short: "git 坏了",
+    });
   });
 
   it("reads a conflict off a preview", () => {
     expect(conflictOf({ base: "main", conflicts: [] })).toBeUndefined();
-    expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({ base: "main", files: ["a.ts"] });
+    expect(conflictOf({ base: "main", conflicts: ["a.ts"] })).toEqual({
+      base: "main",
+      files: ["a.ts"],
+    });
   });
 });
 

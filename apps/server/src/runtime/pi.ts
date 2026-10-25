@@ -6,8 +6,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AccountUsage, RuntimeSettings } from "@vibevalley/protocol";
 import { Effect, Schema } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
-import { outside } from "../base/http.ts";
+import { HttpClientRequest } from "effect/http";
+import { answer, outside } from "../base/http.ts";
 import { jsonOrNone } from "../base/json.ts";
 
 /** Past this a read of pi's balance counts as unknown. */
@@ -81,9 +81,9 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
   if (!key) return { status: "login_required" };
   return outside(
     Effect.gen(function* () {
-      const res = yield* HttpClient.execute(HttpClientRequest.get(base + "/user/balance").pipe(HttpClientRequest.bearerToken(key)));
-      if (res.status < 200 || res.status > 299) return unavailable(`HTTP ${res.status}`);
-      const b = readBalance(yield* res.text);
+      const got = yield* answer(HttpClientRequest.get(base + "/user/balance").pipe(HttpClientRequest.bearerToken(key)));
+      if (!got.ok) return unavailable(`HTTP ${got.status}`);
+      const b = readBalance(got.text);
       if (!b) return unavailable("没读到 DeepSeek 余额");
       return {
         status: "balance",

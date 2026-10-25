@@ -61,9 +61,10 @@ process.on("exit", release);
 const observed = config.otlp.url
   ? farm.pipe(
       Layer.provide(
-        Otlp.layer({ baseUrl: config.otlp.url, resource: { serviceName: "vibevalley", serviceVersion: config.version } }).pipe(
-          Layer.provide([FetchHttpClient.layer, OtlpSerialization.layerJson]),
-        ),
+        Otlp.layer({
+          baseUrl: config.otlp.url,
+          resource: { serviceName: "vibevalley", serviceVersion: config.version },
+        }).pipe(Layer.provide([FetchHttpClient.layer, OtlpSerialization.layerJson])),
       ),
     )
   : farm;

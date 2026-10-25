@@ -120,9 +120,20 @@ class Script {
 let ids = 100;
 const wx = (who: string, text: string, context = ""): WeixinMessage => {
   const id = ++ids;
-  return { message_id: String(id), from_user_id: who, message_type: 1, context_token: context || `ctx-${id}`, item_list: [{ type: 1, text_item: { text } }] };
+  return {
+    message_id: String(id),
+    from_user_id: who,
+    message_type: 1,
+    context_token: context || `ctx-${id}`,
+    item_list: [{ type: 1, text_item: { text } }],
+  };
 };
-const qqMsg = (from: string, content: string): QQMessage => ({ id: `qm${++ids}`, from, content, attachments: 0 });
+const qqMsg = (from: string, content: string): QQMessage => ({
+  id: `qm${++ids}`,
+  from,
+  content,
+  attachments: 0,
+});
 const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage => ({
   messageId: `om${++ids}`,
   from,
@@ -200,7 +211,9 @@ describe("the chat apps", () => {
         reply: "ctx-a",
       });
       expect(yield* saidIn(chat.general())).toEqual(["帮我看看打卡页"]);
-      expect(yield* Effect.promise(yield* statusOf("weixin"))).toMatchObject({ lastInbound: expect.any(Number) });
+      expect(yield* Effect.promise(yield* statusOf("weixin"))).toMatchObject({
+        lastInbound: expect.any(Number),
+      });
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
@@ -212,7 +225,9 @@ describe("the chat apps", () => {
       yield* weixinConnected;
       const channel = yield* chat.openChannel("clock-in", "", "");
       expect((yield* c.setChannel("weixin", "#clock-in")).channel).toBe("clock-in");
-      expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({ reason: expect.stringContaining("没有叫") });
+      expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({
+        reason: expect.stringContaining("没有叫"),
+      });
       yield* chat.orchestratorSays(chat.general(), "sq", "田头上的话", true, "");
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       expect(yield* nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
@@ -268,7 +283,10 @@ describe("the chat apps", () => {
       yield* until(async () => (await status()).pending === 1, "held");
       yield* Effect.sleep(100);
       script.restricted = false;
-      expect(yield* nth(script, "weixin", 0, "the held answer")).toMatchObject({ text: "【管家】\n收到：一", reply: "ctx-1" });
+      expect(yield* nth(script, "weixin", 0, "the held answer")).toMatchObject({
+        text: "【管家】\n收到：一",
+        reply: "ctx-1",
+      });
       yield* until(async () => (await status()).pending === 0, "nothing pending");
     }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
   });
@@ -311,7 +329,12 @@ describe("the chat apps", () => {
       script.qqIn.push(qqMsg("someone", "我也想派活"));
       const last = qqMsg("owner-openid", "跑一下测试");
       script.qqIn.push(last);
-      expect(yield* nth(script, "qq", 1, "the answer in QQ")).toEqual({ app: "qq", to: "owner-openid", text: "【管家】\n收到：跑一下测试", reply: last.id });
+      expect(yield* nth(script, "qq", 1, "the answer in QQ")).toEqual({
+        app: "qq",
+        to: "owner-openid",
+        text: "【管家】\n收到：跑一下测试",
+        reply: last.id,
+      });
       expect(yield* saidIn(chat.general())).toEqual(["跑一下测试"]);
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
@@ -347,7 +370,12 @@ describe("the chat apps", () => {
       script.feishuIn.push(feishuMsg("ou_owner", "群里的话", "group"));
       script.feishuIn.push(feishuMsg("ou_owner", "看看昨天的提交"));
       const answer = yield* until(async () => script.by("feishu").find((m) => m.text.startsWith("【管家】")), "the answer in Feishu");
-      expect(answer).toEqual({ app: "feishu", to: "ou_owner", text: "【管家】\n收到：看看昨天的提交", reply: "" });
+      expect(answer).toEqual({
+        app: "feishu",
+        to: "ou_owner",
+        text: "【管家】\n收到：看看昨天的提交",
+        reply: "",
+      });
       expect(yield* saidIn(chat.general())).toEqual(["看看昨天的提交"]);
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
@@ -389,7 +417,10 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         expect(chat.now()?.messages.some((m) => m.id === message)).toBe(false);
         const inbound = wx(owner, text);
-        script.weixinIn.push({ ...inbound, item_list: [...inbound.item_list!, { ref_msg: { svr_id: "wx1" } }] });
+        script.weixinIn.push({
+          ...inbound,
+          item_list: [...inbound.item_list!, { ref_msg: { svr_id: "wx1" } }],
+        });
         yield* nth(script, "weixin", sent, "the quoted reply answered");
         expect(yield* saidIn(thread)).toContain(text);
         expect(yield* saidIn(chat.general())).not.toContain(text);
@@ -402,7 +433,10 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         yield* weixinConnected;
         const parent = (yield* chat.say("这个话题", undefined, "")).message;
-        const written = yield* chat.speak(orchestratorAgent, "旧的答复", { target: `#田头:${parent.number}`, anyway: true });
+        const written = yield* chat.speak(orchestratorAgent, "旧的答复", {
+          target: `#田头:${parent.number}`,
+          anyway: true,
+        });
         thread = written.message!.conversation;
         message = written.message!.id;
         yield* nth(first, "weixin", 0, "the original answer sent");
@@ -428,13 +462,19 @@ describe("the chat apps", () => {
         const linked = yield* chat.openChannel("linked", "", "");
         yield* c.setChannel("weixin", "linked");
         const parent = (yield* chat.say("旧话题", linked.id, "")).message;
-        thread = (yield* chat.speak(orchestratorAgent, "旧的答复", { target: `#linked:${parent.number}`, anyway: true })).message!.conversation;
+        thread = (yield* chat.speak(orchestratorAgent, "旧的答复", {
+          target: `#linked:${parent.number}`,
+          anyway: true,
+        })).message!.conversation;
         yield* nth(first, "weixin", 0, "the old answer sent");
         const status = yield* statusOf("weixin");
         yield* until(async () => (await status()).pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
           const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-          const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.conversation;
+          const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", {
+            target: `#田头:${other.number}`,
+            anyway: true,
+          })).message!.conversation;
           yield* chat.notice(fresh, "第一条动静", "history");
           yield* chat.notice(fresh, "第二条动静", "history");
         }

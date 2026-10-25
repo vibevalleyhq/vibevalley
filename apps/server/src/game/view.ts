@@ -156,7 +156,13 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
       const news = fact.news;
       if (!news) return [];
       const out: GameEffect[] = [];
-      if (news.coins) out.push({ kind: "reward", sessionId: news.session ?? "", coins: news.coins, streak: fact.progress.streak });
+      if (news.coins)
+        out.push({
+          kind: "reward",
+          sessionId: news.session ?? "",
+          coins: news.coins,
+          streak: fact.progress.streak,
+        });
       for (const u of news.unlocked ?? []) out.push(achievementEffect(u.id, u.tier));
       return out;
     }
@@ -180,8 +186,21 @@ export function viewOf(state: WorkspaceState): FarmView {
 }
 
 export function achievementInWords(a: AchievementDef): Achievement {
-  const tiers: AchievementTier[] = a.tiers.map((need, i) => ({ need, title: tierTitle(a, i + 1), coins: a.coins[i] ?? 0, reached: reachedText(a, i + 1) }));
-  return { id: a.id, category: a.category, title: a.title, detail: a.detail, unit: a.unit, wearable: a.category !== "starter", tiers };
+  const tiers: AchievementTier[] = a.tiers.map((need, i) => ({
+    need,
+    title: tierTitle(a, i + 1),
+    coins: a.coins[i] ?? 0,
+    reached: reachedText(a, i + 1),
+  }));
+  return {
+    id: a.id,
+    category: a.category,
+    title: a.title,
+    detail: a.detail,
+    unit: a.unit,
+    wearable: a.category !== "starter",
+    tiers,
+  };
 }
 
 function tierTitle(a: AchievementDef, tier: number): string {
@@ -197,7 +216,15 @@ function reachedText(a: AchievementDef, tier: number): string {
 }
 
 function achievementEffect(id: string, tier: number): GameEffectAchievement {
-  const e: GameEffectAchievement = { kind: "achievement", achievement: id, tier, title: "", reached: "", detail: "", coins: 0 };
+  const e: GameEffectAchievement = {
+    kind: "achievement",
+    achievement: id,
+    tier,
+    title: "",
+    reached: "",
+    detail: "",
+    coins: 0,
+  };
   for (const a of achievements) {
     if (a.id !== id) continue;
     const words = achievementInWords(a);

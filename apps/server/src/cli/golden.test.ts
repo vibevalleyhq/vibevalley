@@ -32,7 +32,11 @@ describe("the command line's answers", () => {
           }
           case "dry": {
             const r = yield* cli([...at, "--dry-run"]);
-            answers.set(c.line, { code: r.code, out: r.out === "" ? null : (JSON.parse(r.out) as unknown), error: r.failure });
+            answers.set(c.line, {
+              code: r.code,
+              out: r.out === "" ? null : (JSON.parse(r.out) as unknown),
+              error: r.failure,
+            });
             break;
           }
           default:

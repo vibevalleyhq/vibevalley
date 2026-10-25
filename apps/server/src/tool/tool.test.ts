@@ -14,7 +14,10 @@ describe("the tools", () => {
     expect(Object.keys(schemas).sort()).toEqual(Object.keys(baseline).sort());
     // Omitted additionalProperties lets unknown fields through as true does.
     for (const [name, want] of Object.entries(baseline))
-      expect({ name, schema: schemas[name] }).toEqual({ name, schema: { ...want, additionalProperties: true } });
+      expect({ name, schema: schemas[name] }).toEqual({
+        name,
+        schema: { ...want, additionalProperties: true },
+      });
   });
 
   it("word money", () => {

@@ -39,7 +39,15 @@ const graphs: Record<string, unknown> = {
   验收先行: {
     title: "验收先行",
     tasks: [
-      { id: "repro", title: "复现", brief: "写一个现在会失败的测试", needs: [], agent: "lab", check: "test -f steps/fix.txt", acceptance: true },
+      {
+        id: "repro",
+        title: "复现",
+        brief: "写一个现在会失败的测试",
+        needs: [],
+        agent: "lab",
+        check: "test -f steps/fix.txt",
+        acceptance: true,
+      },
       { id: "fix", title: "修", brief: "修好它", needs: ["repro"], agent: "lab" },
     ],
   },
@@ -183,7 +191,12 @@ class FakeGit implements TaskGit {
       this.from.set(branch, from);
     });
   mergeBranch = (project: string) => Effect.succeed("合进了 " + project + " 的 main");
-  mergeInto = (place: Workplace) => Effect.succeed({ text: "", commits: 1, hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//, "")] });
+  mergeInto = (place: Workplace) =>
+    Effect.succeed({
+      text: "",
+      commits: 1,
+      hashes: ["c0ffee-" + place.cwd.replace(/^\/wt\//, "")],
+    });
   branchChanges = (project: string, branch: string) => Effect.succeed({ project, base: "main", branch } as unknown as Changes);
 }
 
@@ -343,7 +356,9 @@ describe("task graphs", () => {
         const said = yield* f.tasks.act(id, "abandon", "user");
         const gone = yield* f.until(id, (g) => g.state === "abandoned");
         expect(said).toContain("分支 " + gone.branch + " 留着");
-        expect(yield* Effect.flip(f.tasks.act(id, "merge", "user"))).toMatchObject({ reason: expect.stringContaining("不能合进主分支") });
+        expect(yield* Effect.flip(f.tasks.act(id, "merge", "user"))).toMatchObject({
+          reason: expect.stringContaining("不能合进主分支"),
+        });
       }),
     ),
   );
@@ -357,7 +372,9 @@ describe("task graphs", () => {
         expect(yield* Effect.flip(f.tasks.editTask(id, "fixed", { needs: ["fixed"] }, "user"))).toMatchObject({
           reason: expect.stringContaining("不能等自己"),
         });
-        expect(yield* Effect.flip(f.tasks.changes(id))).toMatchObject({ reason: expect.stringContaining("没有分支") });
+        expect(yield* Effect.flip(f.tasks.changes(id))).toMatchObject({
+          reason: expect.stringContaining("没有分支"),
+        });
         yield* f.tasks.act(id, "abandon", "user");
         expect((yield* Effect.flip(f.tasks.split(" ", "x", "", "user")))._tag).toBe("Refused");
       }),
@@ -387,7 +404,13 @@ describe("task graphs", () => {
             const paused = yield* f.until(id, (g) => g.state === "paused");
             expect(paused.note).toContain("重启");
             // What the sessions do as the farm comes back: the run cut off is reported.
-            yield* f.core.apply({ type: "report", id: session, outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
+            yield* f.core.apply({
+              type: "report",
+              id: session,
+              outcome: "interrupted",
+              summary: "VibeValley 重启了",
+              runs: 1,
+            });
             f.work.release();
             yield* f.tasks.act(id, "resume", "user");
             const ready = yield* f.until(id, (g) => g.state === "ready");
@@ -455,7 +478,12 @@ describe("task graphs", () => {
   it.live("a helper splits its issue, and its steps start at once", () =>
     run((f) =>
       Effect.gen(function* () {
-        const issue = yield* f.issues.add({ title: "整个看板重做", description: "像 Linear 那样", project: "board", assignee: "lab" });
+        const issue = yield* f.issues.add({
+          title: "整个看板重做",
+          description: "像 Linear 那样",
+          project: "board",
+          assignee: "lab",
+        });
         yield* f.issues.edit(issue.id, { criteria: ["卡片紧凑"] });
         const helper = {
           id: "h1",
@@ -486,7 +514,13 @@ describe("task graphs", () => {
         expect([parent.number, parent.assignee, parent.criteria, parent.sessions[0]]).toEqual([issue.number, "lab", ["卡片紧凑"], "h1"]);
         expect((yield* f.issues.get(taskIssueID(issue.id, "c"))).parent).toBe(issue.id);
         expect((yield* Effect.exit(f.tasks.splitIssue("h1", "", steps)))._tag).toBe("Failure");
-        yield* f.core.apply({ type: "report", id: "h1", outcome: "completed", summary: "拆成了三步", runs: 1 });
+        yield* f.core.apply({
+          type: "report",
+          id: "h1",
+          outcome: "completed",
+          summary: "拆成了三步",
+          runs: 1,
+        });
         yield* Effect.promise(async () => {
           for (let i = 0; i < 300 && f.core.session("h1"); i++) await new Promise((r) => setTimeout(r, 10));
         });
@@ -509,26 +543,55 @@ describe("task graphs", () => {
             state: action === "resume" ? "paused" : "running",
             parallel: 1,
             createdAt: 0,
-            tasks: [{ id: "a", title: "步骤", brief: "做事", needs: [], state: "failed", session: "w900", tries: 0 }],
+            tasks: [
+              {
+                id: "a",
+                title: "步骤",
+                brief: "做事",
+                needs: [],
+                state: "failed",
+                session: "w900",
+                tries: 0,
+              },
+            ],
           } as TaskGraph;
           yield* f.issues.putTask(graph);
           yield* f.core.apply({
             type: "hired",
-            session: { id: "w900", name: "帮工", agent: "lab", runtime: "pi", brief: "", hiredAt: 0, runs: 0, phase: { _tag: "resting" } } as Session,
+            session: {
+              id: "w900",
+              name: "帮工",
+              agent: "lab",
+              runtime: "pi",
+              brief: "",
+              hiredAt: 0,
+              runs: 0,
+              phase: { _tag: "resting" },
+            } as Session,
           });
           yield* sql
             .unsafe(`create function fail_save() returns trigger language plpgsql as $$ begin raise exception 'injected write failure'; end $$`)
             .pipe(Effect.orDie);
           yield* sql.unsafe(`create trigger fail_save before insert or update on issue for each row execute function fail_save()`).pipe(Effect.orDie);
-          const before = { told: f.work.told.size, hired: f.work.n, left: f.core.session("w900") !== undefined };
+          const before = {
+            told: f.work.told.size,
+            hired: f.work.n,
+            left: f.core.session("w900") !== undefined,
+          };
           const done =
             action === "retry" || action === "skip"
               ? f.tasks.taskAct(graph.id, "a", action, "user")
               : action === "edit"
                 ? f.tasks.editTask(graph.id, "a", { title: "changed" }, "user")
                 : f.tasks.act(graph.id, action, "user");
-          expect(yield* Effect.flip(done)).toMatchObject({ reason: expect.stringContaining("injected write failure") });
-          expect({ told: f.work.told.size, hired: f.work.n, left: f.core.session("w900") !== undefined }).toEqual(before);
+          expect(yield* Effect.flip(done)).toMatchObject({
+            reason: expect.stringContaining("injected write failure"),
+          });
+          expect({
+            told: f.work.told.size,
+            hired: f.work.n,
+            left: f.core.session("w900") !== undefined,
+          }).toEqual(before);
           const after = graphOf(f.core.state(), graph.id)!;
           expect([after.state, after.title, after.tasks[0]!.state]).toEqual([graph.state, graph.title, "failed"]);
           yield* sql.unsafe(`drop trigger fail_save on issue`).pipe(Effect.orDie);

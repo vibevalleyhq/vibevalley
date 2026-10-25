@@ -72,7 +72,13 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure>()("MergeFailu
   message: Schema.String,
 }) {
   static ofConflict(base: string, files: readonly string[]) {
-    return new MergeFailure({ kind: "conflict", reasonText: "", base, files, message: `合进 ${base} 有冲突` });
+    return new MergeFailure({
+      kind: "conflict",
+      reasonText: "",
+      base,
+      files,
+      message: `合进 ${base} 有冲突`,
+    });
   }
   static ofCheck(why: string) {
     return new MergeFailure({ kind: "check", reasonText: why, base: "", files: [], message: why });
@@ -82,7 +88,9 @@ export class MergeFailure extends Schema.TaggedError<MergeFailure>()("MergeFailu
   }
 }
 
-export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", { message: Schema.String }) {}
+export class ProjectError extends Schema.TaggedError<ProjectError>()("ProjectError", {
+  message: Schema.String,
+}) {}
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 
@@ -225,13 +233,26 @@ const localeCompare = (a: string, b: string) => {
 // What tools answer, read by the fields used; one that does not read is as one that is not JSON.
 const tokeiOutput = Schema.decodeUnknownOption(
   Schema.fromJsonString(
-    Schema.Record(Schema.String, Schema.Struct({ code: Schema.Number, comments: Schema.Number, blanks: Schema.Number, reports: Schema.Array(Schema.Unknown) })),
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({
+        code: Schema.Number,
+        comments: Schema.Number,
+        blanks: Schema.Number,
+        reports: Schema.Array(Schema.Unknown),
+      }),
+    ),
   ),
 );
 const ghPermission = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ viewerPermission: Schema.optionalKey(Schema.String) })));
 const ghPullRequests = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Number }))));
 const ghPullRequestState = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Struct({ state: Schema.optionalKey(Schema.String), mergedAt: Schema.optionalKey(Schema.NullOr(Schema.String)) })),
+  Schema.fromJsonString(
+    Schema.Struct({
+      state: Schema.optionalKey(Schema.String),
+      mergedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    }),
+  ),
 );
 
 /** Its total, and languages with nothing but blank lines, left out; undefined when it is not tokei's output. */
@@ -241,7 +262,13 @@ export function countsOf(output: string): LanguageCount[] | undefined {
   const out: LanguageCount[] = [];
   for (const [name, l] of Object.entries(raw)) {
     if (name === "Total" || l.code + l.comments <= 0) continue;
-    out.push({ name, files: l.reports.length, code: Math.trunc(l.code), comments: Math.trunc(l.comments), blanks: Math.trunc(l.blanks) });
+    out.push({
+      name,
+      files: l.reports.length,
+      code: Math.trunc(l.code),
+      comments: Math.trunc(l.comments),
+      blanks: Math.trunc(l.blanks),
+    });
   }
   return out.sort((a, b) => b.code + b.comments - (a.code + a.comments) || localeCompare(a.name, b.name));
 }
@@ -302,7 +329,11 @@ const runGitHub: GitHubRun = (...args) =>
   );
 
 export const probeGitHub = Effect.fnUntraced(function* (gh: GitHubRun) {
-  const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false } as GitHubStatus;
+  const s: GitHubStatus = {
+    checkedAt: yield* Clock.currentTimeMillis,
+    installed: false,
+    loggedIn: false,
+  } as GitHubStatus;
   const version = yield* gh("--version");
   if (!version.ok) return { ...s, reason: version.missing ? "没装 gh" : "gh 检测失败" };
   const v = ghVersion.exec(version.out)?.[1];
@@ -418,7 +449,11 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       const real = yield* Effect.option(fs.realPath(join(root, e.name)));
       if (Option.isNone(real)) continue;
       const path = real.value;
-      out.push({ name: e.name, path, git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path });
+      out.push({
+        name: e.name,
+        path,
+        git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path,
+      });
     }
     return out;
   });
@@ -431,7 +466,13 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
   const maxSessions = () => (perProject <= 0 || perProject > maxRunning ? maxRunning : perProject);
 
   const summary = Effect.fnUntraced(function* (p: Project) {
-    const s: ProjectSummary = { name: p.name, path: p.path, git: p.git, maxSessions: maxSessions(), pullRequest: capability(p.name) };
+    const s: ProjectSummary = {
+      name: p.name,
+      path: p.path,
+      git: p.git,
+      maxSessions: maxSessions(),
+      pullRequest: capability(p.name),
+    };
     if (p.git) {
       const last = secondsOf(yield* gitQuiet(p.path, "log", "--all", "-1", "--format=%at"));
       if (last > 0) s.last = last;
@@ -439,7 +480,11 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
     return s;
   });
 
-  const issueWorkplace = (name: string, n: number): Workplace => ({ project: name, cwd: join(trees, `${name}.${n}`), branch: issueBranch(n) });
+  const issueWorkplace = (name: string, n: number): Workplace => ({
+    project: name,
+    cwd: join(trees, `${name}.${n}`),
+    branch: issueBranch(n),
+  });
 
   /** Called under the project's turn. Failing keeps the local main branch as the next issue's base. */
   const syncMain = Effect.fnUntraced(function* (name: string) {
@@ -478,10 +523,21 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
         for (const line of status.stdout.replace(/\n+$/, "").split("\n")) {
           if (line.length < 4) continue;
           const code = line.slice(0, 2).trim();
-          uncommitted.push({ path: line.slice(3), status: code === "??" ? "A" : code === "" ? "" : code[0]! });
+          uncommitted.push({
+            path: line.slice(3),
+            status: code === "??" ? "A" : code === "" ? "" : code[0]!,
+          });
         }
       }
-      const changes: Changes = { project, base, commits: [], files: [], uncommitted, conflicts: [], behind: 0 } as unknown as Changes;
+      const changes: Changes = {
+        project,
+        base,
+        commits: [],
+        files: [],
+        uncommitted,
+        conflicts: [],
+        behind: 0,
+      } as unknown as Changes;
       if (!branch) return changes;
       changes.branch = branch;
       const range = `${base}...${branch}`;
@@ -495,7 +551,10 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       for (const line of numbers.split("\n")) {
         const parts = line.split("\t");
         if (line === "" || parts.length < 3) continue;
-        counts.set(parts.slice(2).join("\t"), { added: parts[0] === "-" ? -1 : Number(parts[0]), removed: parts[1] === "-" ? -1 : Number(parts[1]) });
+        counts.set(parts.slice(2).join("\t"), {
+          added: parts[0] === "-" ? -1 : Number(parts[0]),
+          removed: parts[1] === "-" ? -1 : Number(parts[1]),
+        });
       }
       const chunks = patch === "" ? [] : patch.split("\ndiff --git ").map((c, i) => (i > 0 ? "diff --git " + c : c));
       let budget = patchesMax;
@@ -505,7 +564,12 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
         const letter = tab < 0 ? line : line.slice(0, tab);
         const file = tab < 0 ? "" : line.slice(tab + 1);
         const n = counts.get(file) ?? { added: 0, removed: 0 };
-        const changed: ChangedFile = { path: file, status: letter.slice(0, 1), added: n.added, removed: n.removed };
+        const changed: ChangedFile = {
+          path: file,
+          status: letter.slice(0, 1),
+          added: n.added,
+          removed: n.removed,
+        };
         if (n.added >= 0) {
           const head = `diff --git a/${file} b/${file}\n`;
           const i = chunks.findIndex((c) => c.startsWith(head));
@@ -525,7 +589,11 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       for (const line of log.split("\n")) {
         if (line === "") continue;
         const parts = line.split("\t");
-        changes.commits.push({ hash: parts[0]!, at: (Number(parts[1]) || 0) * 1000, subject: parts.slice(2).join("\t") });
+        changes.commits.push({
+          hash: parts[0]!,
+          at: (Number(parts[1]) || 0) * 1000,
+          subject: parts.slice(2).join("\t"),
+        });
       }
       changes.conflicts.push(...conflicts);
       changes.behind = Number(behind) || 0;
@@ -664,7 +732,13 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
       const p = yield* find(name);
       if (!p) return undefined;
       const now = yield* Clock.currentTimeMillis;
-      const out: ProjectActivity = { project: name, at: now, days: [], authors: [], total: 0 } as unknown as ProjectActivity;
+      const out: ProjectActivity = {
+        project: name,
+        at: now,
+        days: [],
+        authors: [],
+        total: 0,
+      } as unknown as ProjectActivity;
       if (!p.git) return out;
       const since = new Date(now - yearDays * 86_400_000).toISOString();
       const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");
@@ -694,7 +768,10 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
         const mine = new Set([global, (yield* gitQuiet("", "-C", dir, "config", "user.email")).toLowerCase(), ...extra].filter((e) => e !== ""));
         const emails = (yield* gitQuiet("", "-C", dir, "log", "--all", "--format=%ae")).split("\n");
         const commits = emails.filter((e) => e !== "" && mine.has(e.toLowerCase())).length;
-        out.push({ path: (yield* gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir, commits });
+        out.push({
+          path: (yield* gitQuiet("", "-C", dir, "rev-parse", "--show-toplevel")) || dir,
+          commits,
+        });
       }
       return out;
     }),
@@ -786,7 +863,12 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
                 yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
               }
               const warning = yield* cleanupMerged(place, path);
-              return { text: "", commits: brought.length, hashes: brought, ...(warning ? { warning } : {}) };
+              return {
+                text: "",
+                commits: brought.length,
+                hashes: brought,
+                ...(warning ? { warning } : {}),
+              };
             }),
           );
         }),
@@ -813,7 +895,10 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           const path = join(root, place.project);
           // A worktree with changes stays where it is: removing it would lose them.
           if (!(yield* gitOk(path, "worktree", "remove", place.cwd)))
-            return { kept: true, reason: `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}` };
+            return {
+              kept: true,
+              reason: `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}`,
+            };
           // A branch with nothing new on it is clutter; one with commits is kept, so nothing is lost.
           const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
           const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
@@ -822,7 +907,10 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
             const removed = yield* gitRun(path, "branch", "-D", place.branch);
             return removed.code === 0 ? { kept: false } : { kept: true, reason: `${place.branch} 没清掉：${reason(removed.stderr)}` };
           }
-          return { kept: true, reason: `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了` };
+          return {
+            kept: true,
+            reason: `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了`,
+          };
         }),
       ),
     reset: Effect.fn("Projects.reset")(function* (place) {
@@ -844,12 +932,19 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           const place = issueWorkplace(project, issueNumber);
           if (yield* exists(place.cwd)) {
             const removed = yield* gitRun(path, "worktree", "remove", ...(work === "discard" ? ["--force"] : []), place.cwd);
-            if (removed.code !== 0) return { kept: true, reason: `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}` };
+            if (removed.code !== 0)
+              return {
+                kept: true,
+                reason: `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}`,
+              };
           }
           const branch = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + place.branch);
           if (branch.code !== 0) {
             if (branch.code === 1 || !(yield* exists(path))) return { kept: false };
-            return { kept: true, reason: `没能确认 ${place.branch} 已清掉：${reason(branch.stderr)}` };
+            return {
+              kept: true,
+              reason: `没能确认 ${place.branch} 已清掉：${reason(branch.stderr)}`,
+            };
           }
           const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
           const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
@@ -879,7 +974,15 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
         return "";
       }
     },
-    githubStatus: () => (status?.checkedAt ? status : ({ checkedAt: 0, installed: false, loggedIn: false, reason: "尚未检测 GitHub" } as GitHubStatus)),
+    githubStatus: () =>
+      status?.checkedAt
+        ? status
+        : ({
+            checkedAt: 0,
+            installed: false,
+            loggedIn: false,
+            reason: "尚未检测 GitHub",
+          } as GitHubStatus),
     refreshGitHub: Effect.fn("Projects.refreshGitHub")(function* () {
       const probed = yield* probeGitHub(gh);
       const next = new Map<string, PullRequestCapability>();
@@ -922,7 +1025,10 @@ export const make = Effect.fnUntraced(function* (hooks: ProjectHooks = {}) {
           if (files.length > 0) return yield* Effect.fail(MergeFailure.ofConflict(main, files));
           const pushed = hooks.push
             ? yield* hooks.push(place.cwd, place.branch!)
-            : (yield* run("git", ["push", "-u", "origin", place.branch!], { cwd: place.cwd, timeoutMs: cloneTimeoutMs })).code === 0;
+            : (yield* run("git", ["push", "-u", "origin", place.branch!], {
+                cwd: place.cwd,
+                timeoutMs: cloneTimeoutMs,
+              })).code === 0;
           if (!pushed) return yield* fail("推送工单分支失败，请检查 origin 和登录后重试");
           if (issue.pullRequest?.state === "open") return issue.pullRequest;
           // Recover a creation whose receipt was lost before it was saved.

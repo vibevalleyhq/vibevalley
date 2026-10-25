@@ -3,9 +3,17 @@
 
 import { type Conversation, everyone, generalName, orchestratorAgent, type MessageKind, type Outcome, type SenderKind } from "@vibevalley/protocol";
 
-const chatNamed: Readonly<Record<string, string>> = { 管家: orchestratorAgent, 主人: "user", 所有人: everyone };
+const chatNamed: Readonly<Record<string, string>> = {
+  管家: orchestratorAgent,
+  主人: "user",
+  所有人: everyone,
+};
 
-export const mentionOf: Readonly<Record<string, string>> = { [orchestratorAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Readonly<Record<string, string>> = {
+  [orchestratorAgent]: "@管家",
+  user: "@主人",
+  [everyone]: "@所有人",
+};
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;

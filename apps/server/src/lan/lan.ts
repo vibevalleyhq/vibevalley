@@ -110,7 +110,10 @@ const dropped = new Set(["host", "connection", "cookie", "authorization", device
 const remote = [
   ...endpoints.filter((e) => e.can.includes("remote")).map((e) => ({ method: e.method, path: e.path })),
   ...[statePath, eventsPath, livePath].map((path) => ({ method: "GET", path })),
-].map((r) => ({ method: r.method, pattern: new RegExp("^" + r.path.replace(/\{\w+\}/g, "[^/]+") + "$") }));
+].map((r) => ({
+  method: r.method,
+  pattern: new RegExp("^" + r.path.replace(/\{\w+\}/g, "[^/]+") + "$"),
+}));
 
 export const remoteMay = (method: string, path: string) => remote.some((r) => r.method === method && r.pattern.test(path));
 
@@ -296,7 +299,13 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
       else s.url = addr;
     }
     const p = livePairing();
-    if (p && addr) s.pairing = { code: p.code, link: pairLink(addr, p.code), expiresAt: p.expires, ...(p.asking ? { asking: p.asking } : {}) };
+    if (p && addr)
+      s.pairing = {
+        code: p.code,
+        link: pairLink(addr, p.code),
+        expiresAt: p.expires,
+        ...(p.asking ? { asking: p.asking } : {}),
+      };
     s.devices = [...devices.values()].map(({ keyHash: _, written: __, ...d }) => d).sort((a, b) => a.pairedAt - b.pairedAt);
     return s;
   };
@@ -378,7 +387,9 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
     previewStopPairing: () => {
       const p = livePairing();
       if (!p) return { does: ["没有在配对的码：什么都不会动"] };
-      return { does: [`收起配对码 ${p.code}`, ...(p.asking ? [`正在等你点头的「${p.asking}」连不进来`] : [])] };
+      return {
+        does: [`收起配对码 ${p.code}`, ...(p.asking ? [`正在等你点头的「${p.asking}」连不进来`] : [])],
+      };
     },
     forget: Effect.fn("Lan.forget")(function* (id) {
       yield* known(id);
@@ -391,7 +402,9 @@ export const make = Effect.fnUntraced(function* (options: LanOptions = {}) {
     previewForget: (id) =>
       Effect.map(known(id), (d) => {
         const open = conns.get(id)?.size ?? 0;
-        return { does: [`忘掉设备「${d.name}」：它的钥匙作废，要再连得重新配对`, ...(open > 0 ? [`断开它连着的 ${open} 条连接`] : [])] };
+        return {
+          does: [`忘掉设备「${d.name}」：它的钥匙作废，要再连得重新配对`, ...(open > 0 ? [`断开它连着的 ${open} 条连接`] : [])],
+        };
       }),
     me: (device) => {
       const d = device ? devices.get(device) : undefined;

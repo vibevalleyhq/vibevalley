@@ -37,12 +37,24 @@ export const make = Effect.fnUntraced(function* (options: McpOptions = {}) {
   // A session no longer in the fields still talks; its profile and project are empty.
   const callerOf = (id: string): Caller => {
     const h = sessions.sessionOf(id);
-    return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", owner: false };
+    return {
+      agent: h?.agent ?? "",
+      session: id,
+      project: h?.project ?? "",
+      here: "",
+      picked: "",
+      owner: false,
+    };
   };
 
   const call = async (tool: AgentTool, args: unknown): Promise<string> => {
     try {
-      const checked = validateToolArguments(tool, { type: "toolCall", id: "", name: tool.name, arguments: (args ?? {}) as never });
+      const checked = validateToolArguments(tool, {
+        type: "toolCall",
+        id: "",
+        name: tool.name,
+        arguments: (args ?? {}) as never,
+      });
       const r = await tool.execute("", checked);
       return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
     } catch (e) {
@@ -60,7 +72,11 @@ export const make = Effect.fnUntraced(function* (options: McpOptions = {}) {
     });
     const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters as { type: "object" } })),
+      tools: list.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.parameters as { type: "object" },
+      })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const tool = list.find((t) => t.name === req.params.name);
@@ -69,7 +85,10 @@ export const make = Effect.fnUntraced(function* (options: McpOptions = {}) {
       if (!id) return text("没成：" + unknownCaller);
       return text(await call(tool, req.params.arguments));
     });
-    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
     await server.connect(transport);
     try {
       return await transport.handleRequest(request);

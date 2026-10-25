@@ -303,7 +303,13 @@ export interface Delivered {
 /** What a helper's launch did, as the channels hear it: it spoke, its turn ended or closed, it compacts. */
 export type LaunchActivity =
   | { readonly kind: "spoke"; readonly id: string; readonly launch: string }
-  | { readonly kind: "ended"; readonly id: string; readonly launch: string; readonly outcome: Outcome; readonly spoke: boolean }
+  | {
+      readonly kind: "ended";
+      readonly id: string;
+      readonly launch: string;
+      readonly outcome: Outcome;
+      readonly spoke: boolean;
+    }
   | { readonly kind: "closed"; readonly id: string; readonly launch: string }
   | { readonly kind: "compacting"; readonly id: string; readonly on: boolean };
 
@@ -312,7 +318,11 @@ export type LaunchActivity =
  * left). */
 export type SessionNews =
   | { readonly _tag: "hired"; readonly session: Session }
-  | { readonly _tag: "reported"; readonly report: FactReport; readonly session: Session | undefined }
+  | {
+      readonly _tag: "reported";
+      readonly report: FactReport;
+      readonly session: Session | undefined;
+    }
   | { readonly _tag: "left"; readonly left: FactLeft };
 
 export interface InputConsumed {
@@ -385,11 +395,26 @@ export const make = Effect.gen(function* () {
     [orchestratorAgent, "orchestrator", "管家"],
     ["system", "system", "VibeValley"],
   ] as const)
-    yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
+    yield* db(
+      qp.upsertParticipant({
+        id,
+        kind,
+        name,
+        agent_id: null,
+        runtime: null,
+        joined_at: yield* Clock.currentTimeMillis,
+      }),
+    );
   let general = (yield* one(qc.generalID()))?.id ?? "";
   if (!general) {
     general = newId();
-    yield* db(qc.createGeneral({ id: general, name: generalName, created_at: yield* Clock.currentTimeMillis }));
+    yield* db(
+      qc.createGeneral({
+        id: general,
+        name: generalName,
+        created_at: yield* Clock.currentTimeMillis,
+      }),
+    );
   }
 
   const loadChannels = Effect.gen(function* () {
@@ -460,7 +485,12 @@ export const make = Effect.gen(function* () {
     if (!row) return;
     const conv = yield* one(qc.conversationByID({ id: row.conversation_id }));
     const thread = conv?.kind === "thread" && conv.subject_kind === "issue" && conv.subject_id ? conv.subject_id : undefined;
-    yield* core.apply({ type: "message", message: toMessage(row), ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    yield* core.apply({
+      type: "message",
+      message: toMessage(row),
+      ...(thread ? { thread } : {}),
+      ...(answers ? { answers } : {}),
+    });
   });
 
   // ── threads ──
@@ -497,7 +527,15 @@ export const make = Effect.gen(function* () {
         created_at: yield* Clock.currentTimeMillis,
       }),
     );
-    if (subject.owner) yield* db(qf.follow({ conversation_id: id, participant_id: subject.owner, reason: "owner", from_number: parent.number }));
+    if (subject.owner)
+      yield* db(
+        qf.follow({
+          conversation_id: id,
+          participant_id: subject.owner,
+          reason: "owner",
+          from_number: parent.number,
+        }),
+      );
     return id;
   });
 
@@ -508,7 +546,14 @@ export const make = Effect.gen(function* () {
     inTx(
       Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis;
-        yield* db(qr.setReadCursor({ participant_id: who, conversation_id: conversation, read_number: upto, updated_at: now }));
+        yield* db(
+          qr.setReadCursor({
+            participant_id: who,
+            conversation_id: conversation,
+            read_number: upto,
+            updated_at: now,
+          }),
+        );
         yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
         yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
       }),
@@ -544,10 +589,24 @@ export const make = Effect.gen(function* () {
     if (conv.kind === "thread") {
       // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
       if (row.sender_id !== "system" && row.kind !== "dispatch")
-        yield* db(qf.follow({ conversation_id: conv.id, participant_id: row.sender_id, reason: "replied", from_number: row.number }));
+        yield* db(
+          qf.follow({
+            conversation_id: conv.id,
+            participant_id: row.sender_id,
+            reason: "replied",
+            from_number: row.number,
+          }),
+        );
       for (const m of named)
         if (m.how === "delivered" && (m.id === orchestratorAgent || present.includes(m.id)))
-          yield* db(qf.follow({ conversation_id: conv.id, participant_id: m.id, reason: "mentioned", from_number: row.number - 1 }));
+          yield* db(
+            qf.follow({
+              conversation_id: conv.id,
+              participant_id: m.id,
+              reason: "mentioned",
+              from_number: row.number - 1,
+            }),
+          );
       followers = (yield* db(qf.followers({ conversation_id: conv.id }))).map((f) => f.participant_id);
     }
     const hops = (yield* db(qd.agentWakesSinceUser({ conversation: conv.id }))).n ?? 0;
@@ -577,9 +636,25 @@ export const make = Effect.gen(function* () {
     });
     for (const d of deliveries)
       yield* db(
-        qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
+        qd.insertDelivery({
+          recipient_id: d.recipient,
+          message_id: row.id,
+          reason: d.reason,
+          wakes: d.wakes,
+          held_by: d.heldBy ?? null,
+          created_at: now,
+        }),
       );
-    const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
+    const written: Written = {
+      id: row.id,
+      number: row.number,
+      recipients: [],
+      resetWake: [],
+      absent: [],
+      held: false,
+      thread: "",
+      again: false,
+    };
     written.ownerMentionsChanged = row.sender_id === "user" || mentions.includes("user");
     // The breaker is reset only after the message's transaction commits.
     if (row.sender_id === "user") written.resetWake = deliveries.filter((d) => d.wakes).map((d) => d.recipient);
@@ -594,7 +669,17 @@ export const make = Effect.gen(function* () {
       Effect.gen(function* () {
         if (!w.id && w.sendKey) {
           const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-          if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
+          if (seen)
+            return {
+              id: seen.id,
+              number: seen.number,
+              recipients: [],
+              resetWake: [],
+              absent: [],
+              held: false,
+              thread: "",
+              again: true,
+            } as Written;
         }
         let id = w.id ?? "";
         let number: number;
@@ -615,15 +700,41 @@ export const make = Effect.gen(function* () {
           )).number;
           yield* db(qc.touchConversation({ number, id: w.conversation }));
         } else {
-          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: yield* Clock.currentTimeMillis, id }));
+          yield* db(
+            qm.updateMessageBody({
+              body: w.text,
+              final: w.final,
+              updated_at: yield* Clock.currentTimeMillis,
+              id,
+            }),
+          );
           const row = yield* one(qm.messageByID({ id }));
           if (!row) return yield* Effect.die(new Error(`没有 ${id} 这条消息`));
           number = row.number;
         }
-        const out: Written = w.final ? yield* settle(id) : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false };
+        const out: Written = w.final
+          ? yield* settle(id)
+          : {
+              id,
+              number,
+              recipients: [],
+              resetWake: [],
+              absent: [],
+              held: false,
+              thread: "",
+              again: false,
+            };
         out.id = id;
         out.number = number;
-        if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
+        if (w.follow)
+          yield* db(
+            qf.follow({
+              conversation_id: w.conversation,
+              participant_id: w.follow,
+              reason: "owner",
+              from_number: number,
+            }),
+          );
         if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
         return out;
       }),
@@ -638,7 +749,15 @@ export const make = Effect.gen(function* () {
     yield* publishConversation(conversation);
     if (written.ownerMentionsChanged) yield* publishOwnerMentions;
     if (written.thread) yield* publishConversation(written.thread);
-    if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
+    if (written.held)
+      yield* write({
+        conversation,
+        from: "system",
+        kind: "notice",
+        text: hopLimitText(hopLimit),
+        final: true,
+        meta: { code: "hop_limit" },
+      });
     for (const r of written.recipients) yield* kick(r);
   });
 
@@ -699,7 +818,11 @@ export const make = Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
       for (const [conversation, rs] of byConversation) {
         const messages = rs.map(asInbox);
-        PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
+        PubSub.publishUnsafe(orchestratorHub, {
+          conversation,
+          target: messages[0]!.target,
+          messages,
+        });
         for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
       }
       return;
@@ -717,7 +840,15 @@ export const make = Effect.gen(function* () {
     const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
     const now = yield* Clock.currentTimeMillis;
-    for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+    for (const r of waking)
+      yield* db(
+        qd.markHanded({
+          launch: delivered.launch ?? "",
+          handed_at: now,
+          recipient_id: recipient,
+          message_id: r.message_id,
+        }),
+      );
   });
 
   const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
@@ -730,7 +861,15 @@ export const make = Effect.gen(function* () {
     const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
     if (delivered.kind === "refused") return;
     const now = yield* Clock.currentTimeMillis;
-    for (const r of rows) yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+    for (const r of rows)
+      yield* db(
+        qd.markAnnounced({
+          launch: delivered.launch ?? "",
+          announced_at: now,
+          recipient_id: recipient,
+          message_id: r.message_id,
+        }),
+      );
   });
 
   const onActivity = Effect.fnUntraced(function* (a: LaunchActivity): Effect.fn.Return<void> {
@@ -783,14 +922,28 @@ export const make = Effect.gen(function* () {
 
   const openJob = Effect.fnUntraced(function* (h: Session) {
     yield* db(
-      qp.upsertParticipant({ id: h.id, kind: "agent", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: yield* Clock.currentTimeMillis }),
+      qp.upsertParticipant({
+        id: h.id,
+        kind: "agent",
+        name: h.name,
+        agent_id: h.agent,
+        runtime: h.runtime,
+        joined_at: yield* Clock.currentTimeMillis,
+      }),
     );
     const job = jobOf(h);
     const thread = yield* threadOf(job);
     if (thread) return yield* handedOn(h, thread);
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
-    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: yield* Clock.currentTimeMillis }));
+    yield* db(
+      qr.setReadCursor({
+        participant_id: h.id,
+        conversation_id: channel,
+        read_number: latest,
+        updated_at: yield* Clock.currentTimeMillis,
+      }),
+    );
     const what = h.graph?.task
       ? `做计划 ${h.graph.id} 的「${h.graph.task}」`
       : h.graph
@@ -818,11 +971,26 @@ export const make = Effect.gen(function* () {
     if (followers.includes(h.id)) return;
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
-    yield* db(qr.setReadCursor({ participant_id: h.id, conversation_id: channel, read_number: latest, updated_at: yield* Clock.currentTimeMillis }));
+    yield* db(
+      qr.setReadCursor({
+        participant_id: h.id,
+        conversation_id: channel,
+        read_number: latest,
+        updated_at: yield* Clock.currentTimeMillis,
+      }),
+    );
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
     const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
-    yield* write({ conversation: thread, from: orchestratorAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
+    yield* write({
+      conversation: thread,
+      from: orchestratorAgent,
+      kind: "dispatch",
+      text,
+      final: true,
+      meta: { session: h.id },
+      follow: h.id,
+    });
   });
 
   const sessionsLeft = Effect.gen(function* () {
@@ -843,8 +1011,20 @@ export const make = Effect.gen(function* () {
     const thread = yield* threadOfSession(id);
     if (!thread) return;
     const said = outcome === "completed" ? (helpers?.report(id) ?? "") : "";
-    const meta: Meta = { outcome, ...(spent ? { spent } : {}), forTask: !!w.graph, ...(run ? { run } : {}) };
-    yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), final: true, meta });
+    const meta: Meta = {
+      outcome,
+      ...(spent ? { spent } : {}),
+      forTask: !!w.graph,
+      ...(run ? { run } : {}),
+    };
+    yield* write({
+      conversation: thread,
+      from: id,
+      kind: "report",
+      text: head(said || summary, reportMax),
+      final: true,
+      meta,
+    });
   });
 
   // ── coming back ──
@@ -938,7 +1118,14 @@ export const make = Effect.gen(function* () {
           if (sendKey.length > sendKeyMax) return yield* refused("sendKey 太长");
           const where = conversation ?? general;
           if (!(yield* one(qc.conversationByID({ id: where })))) return yield* missing(`没有 ${where} 这个对话`, [lookIn.channel]);
-          const written = yield* write({ conversation: where, from: "user", kind: "chat", text: text.trim(), final: true, sendKey });
+          const written = yield* write({
+            conversation: where,
+            from: "user",
+            kind: "chat",
+            text: text.trim(),
+            final: true,
+            sendKey,
+          });
           if (written.again) return { message: toMessage(yield* messageOrFail(written.id)), again: true };
           yield* readThrough("user", where, written.number);
           yield* publishConversation(where);
@@ -957,7 +1144,15 @@ export const make = Effect.gen(function* () {
             return undefined;
           }
           const run = helpers?.currentRun(from);
-          const written = yield* write({ conversation: thread, from, kind: "chat", text: text.trim(), final: true, meta: run ? { run } : {}, sendKey });
+          const written = yield* write({
+            conversation: thread,
+            from,
+            kind: "chat",
+            text: text.trim(),
+            final: true,
+            meta: run ? { run } : {},
+            sendKey,
+          });
           if (from === "user") yield* readThrough("user", thread, written.number);
           return toMessage(yield* messageOrFail(written.id));
         }),
@@ -973,7 +1168,12 @@ export const make = Effect.gen(function* () {
           const target = targetOfConv(row);
           // A retry of the same words is the same message.
           const again = yield* one(
-            qm.recentDuplicate({ sender_id: from, conversation_id: conversation, body: words, since: (yield* Clock.currentTimeMillis) - retryWindowMs }),
+            qm.recentDuplicate({
+              sender_id: from,
+              conversation_id: conversation,
+              body: words,
+              since: (yield* Clock.currentTimeMillis) - retryWindowMs,
+            }),
           );
           if (again) {
             const m = yield* one(qm.messageByID({ id: again.id }));
@@ -995,8 +1195,20 @@ export const make = Effect.gen(function* () {
               yield* db(qd.seenOne({ seen_at: now, recipient_id: from, message_id: m.id }));
             }
             if (shown.length === unseen.length)
-              yield* db(qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: shown.at(-1)!.number, updated_at: now }));
-            return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length } as Spoken;
+              yield* db(
+                qr.setReadCursor({
+                  participant_id: from,
+                  conversation_id: conversation,
+                  read_number: shown.at(-1)!.number,
+                  updated_at: now,
+                }),
+              );
+            return {
+              kind: "held",
+              target,
+              shown: shown.reverse(),
+              more: unseen.length - shown.length,
+            } as Spoken;
           }
           const answers = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
           const run = helpers?.currentRun(from);
@@ -1010,9 +1222,19 @@ export const make = Effect.gen(function* () {
             meta: run ? { run } : {},
           });
           yield* db(
-            qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: written.number, updated_at: yield* Clock.currentTimeMillis }),
+            qr.setReadCursor({
+              participant_id: from,
+              conversation_id: conversation,
+              read_number: written.number,
+              updated_at: yield* Clock.currentTimeMillis,
+            }),
           );
-          return { kind: "sent", message: toMessage(yield* messageOrFail(written.id)), target, absent: written.absent } as Spoken;
+          return {
+            kind: "sent",
+            message: toMessage(yield* messageOrFail(written.id)),
+            target,
+            absent: written.absent,
+          } as Spoken;
         }),
       ),
     spoken: (from, text, sendKey) =>
@@ -1020,7 +1242,15 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           if (sendKey.length > sendKeyMax) return yield* refused("sendKey 太长");
           if (!text.trim()) return false;
-          const written = yield* write({ conversation: general, from, kind: "chat", text: text.trim(), final: true, meta: { spoken: true }, sendKey });
+          const written = yield* write({
+            conversation: general,
+            from,
+            kind: "chat",
+            text: text.trim(),
+            final: true,
+            meta: { spoken: true },
+            sendKey,
+          });
           if (written.again) return true;
           if (from === "user") yield* readThrough("user", general, written.number);
           yield* publishConversation(general);
@@ -1032,7 +1262,15 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const id = streaming.get(key);
           if (!id && !text.trim() && !final) return;
-          const written = yield* write({ ...(id ? { id } : {}), conversation, from: orchestratorAgent, kind: "chat", text, final, meta: run ? { run } : {} });
+          const written = yield* write({
+            ...(id ? { id } : {}),
+            conversation,
+            from: orchestratorAgent,
+            kind: "chat",
+            text,
+            final,
+            meta: run ? { run } : {},
+          });
           if (final) streaming.delete(key);
           else streaming.set(key, written.id);
         }),
@@ -1050,7 +1288,15 @@ export const make = Effect.gen(function* () {
           const cursor = (yield* one(qr.readCursor({ participant_id: who, conversation_id: conversation })))?.read_number ?? 0;
           const rows = opt.unread
             ? yield* db(qm.messagesAfter({ conversation_id: conversation, number: cursor, n: limit }))
-            : [...(yield* db(qm.messagesBefore({ conversation_id: conversation, number: opt.before || 2147483647, n: limit })))].reverse();
+            : [
+                ...(yield* db(
+                  qm.messagesBefore({
+                    conversation_id: conversation,
+                    number: opt.before || 2147483647,
+                    n: limit,
+                  }),
+                )),
+              ].reverse();
           if (rows.length > 0 && !opt.before) yield* readThrough(who, conversation, rows.at(-1)!.number);
           lastRead.set(who, target);
           const older = rows.length > 0 && (yield* db(qm.messagesBefore({ conversation_id: conversation, number: rows[0]!.number, n: 1 }))).length > 0;
@@ -1060,8 +1306,15 @@ export const make = Effect.gen(function* () {
     inbox: (who) =>
       locked(inboxRows(who).pipe(Effect.catchCause((c) => Effect.as(Effect.logWarning(`chat: inbox of ${who}: ${String(c)}`), [] as UnreadRow[])))),
     history: (conversation, before, limit) =>
-      Effect.map(db(qm.messagesBefore({ conversation_id: conversation, number: before ?? 2147483647, n: Math.min(Math.max(limit ?? 50, 1), 200) })), (rows) =>
-        [...rows].reverse().map(toMessage),
+      Effect.map(
+        db(
+          qm.messagesBefore({
+            conversation_id: conversation,
+            number: before ?? 2147483647,
+            n: Math.min(Math.max(limit ?? 50, 1), 200),
+          }),
+        ),
+        (rows) => [...rows].reverse().map(toMessage),
       ),
     markRead: (conversation, seq) =>
       locked(
@@ -1099,7 +1352,15 @@ export const make = Effect.gen(function* () {
           const desc = optional(description);
           const proj = optional(project);
           const id = newId();
-          yield* db(qc.createChannel({ id, name: clean, description: desc, project: proj, created_at: yield* Clock.currentTimeMillis }));
+          yield* db(
+            qc.createChannel({
+              id,
+              name: clean,
+              description: desc,
+              project: proj,
+              created_at: yield* Clock.currentTimeMillis,
+            }),
+          );
           names.set(id, clean);
           yield* publishConversation(id);
           return infoOf({ id, name: clean, description: desc, project: proj });

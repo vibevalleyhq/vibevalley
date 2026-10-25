@@ -17,7 +17,15 @@ const session = (phase: Session["phase"]): Session => ({
   issue: "t1",
 });
 const issue = (attention: IssueAttention, more: Partial<Issue> = {}): Issue =>
-  ({ id: "t1", sessions: ["w1"], findings: [], questions: [], status: "in_review", attention, ...more }) as unknown as Issue;
+  ({
+    id: "t1",
+    sessions: ["w1"],
+    findings: [],
+    questions: [],
+    status: "in_review",
+    attention,
+    ...more,
+  }) as unknown as Issue;
 const done = session({ _tag: "done" });
 
 describe("a plot", () => {
@@ -38,7 +46,11 @@ describe("a plot", () => {
     ];
     for (const [attention, more, crop, badge] of cases) {
       const plot = plotOf(done, issue(attention, more));
-      expect({ attention, crop: plot.crop, badge: plot.badge?.text }).toEqual({ attention, crop, badge });
+      expect({ attention, crop: plot.crop, badge: plot.badge?.text }).toEqual({
+        attention,
+        crop,
+        badge,
+      });
     }
   });
 

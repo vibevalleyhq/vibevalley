@@ -30,7 +30,9 @@ describe("the command line", () => {
       expect(got.title).toBe("试一下");
       const edited = yield* cli(["issue", "update", issue.id, "--server", server, "--json", "-"], JSON.stringify({ title: "改一下" }));
       expect((JSON.parse(edited.out) as { title: string }).title).toBe("改一下");
-      const list = JSON.parse((yield* cli(["issue", "list", "--server", server])).out) as { id: string }[];
+      const list = JSON.parse((yield* cli(["issue", "list", "--server", server])).out) as {
+        id: string;
+      }[];
       expect(list.map((i) => i.id)).toContain(issue.id);
       expect(JSON.parse((yield* cli(["state", "--server", server])).out)).toHaveProperty("state");
       // With no --server, VIBEVALLEY_SERVER says where.
@@ -99,7 +101,13 @@ describe("the command line", () => {
       expect((yield* cli(["issue", "get", made.id, "--server", server])).code).toBe(0);
       const cancel = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "canceled" })]);
       expect((JSON.parse(cancel.out) as { does: string[] }).does).toEqual([`#${made.number} 关成已取消：还没派过`]);
-      expect((JSON.parse((yield* cli(["issue", "get", made.id, "--server", server])).out) as { status: string }).status).toBe("backlog");
+      expect(
+        (
+          JSON.parse((yield* cli(["issue", "get", made.id, "--server", server])).out) as {
+            status: string;
+          }
+        ).status,
+      ).toBe("backlog");
       // Refused as the real move would be, with the same words.
       const real = yield* cli(["issue", "status", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
       const dry = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "done" })]);
@@ -119,11 +127,24 @@ describe("the command line", () => {
       const doc = (r: { out: string }) => JSON.parse(r.out) as { id: string; does: string[] } & Record<string, unknown>;
       const list = (args: string[]) => Effect.map(run(args), (r) => JSON.parse(r.out) as unknown);
 
-      const recurrence = doc(yield* run(["recurrence", "create"], { name: "早上看看", text: "看看昨天的改动", when: { kind: "daily", time: "09:00" } }));
+      const recurrence = doc(
+        yield* run(["recurrence", "create"], {
+          name: "早上看看",
+          text: "看看昨天的改动",
+          when: { kind: "daily", time: "09:00" },
+        }),
+      );
       expect(doc(yield* run(["recurrence", "delete", recurrence.id, "--dry-run"])).does[0]).toContain("删掉定时「早上看看」");
       expect(JSON.stringify(yield* list(["recurrence", "list"]))).toContain(recurrence.id);
 
-      const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
+      const skill = doc(
+        yield* run(["skill", "create"], {
+          id: "",
+          name: "写测试",
+          description: "先写测试",
+          body: "先写测试再改",
+        }),
+      );
       const agents = (yield* list(["agent", "list"])) as { id: string; name: string }[];
       const docs = agents.find((a) => a.id === "docs")!;
       yield* run(["agent", "save", "docs"], { ...docs, skills: [skill.id] });

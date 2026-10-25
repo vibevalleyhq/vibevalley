@@ -68,7 +68,10 @@ export function playedDoing(p: SessionPlay, f: FactDoing): SessionPlay {
   const history = p.history ?? [];
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
-  const next: SessionPlay = { ...p, history: lastN([...history, { at: f.at, action: f.action, label: f.label }], historyLimit) };
+  const next: SessionPlay = {
+    ...p,
+    history: lastN([...history, { at: f.at, action: f.action, label: f.label }], historyLimit),
+  };
   if (!isToolAction(f.action)) return next;
   next.toolsThisRun = p.toolsThisRun + 1;
   next.counts = { ...p.counts, [f.action]: (p.counts?.[f.action] ?? 0) + 1 };

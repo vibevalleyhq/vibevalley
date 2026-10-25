@@ -7,8 +7,8 @@
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { createHash } from "node:crypto";
 import { Effect, Schema } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
-import { outside } from "../base/http.ts";
+import { HttpClientRequest } from "effect/http";
+import { answer, outside } from "../base/http.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { redact } from "../base/redact.ts";
@@ -86,10 +86,9 @@ export function everos(c: MemorySourceConfig): Source {
     outside(
       Effect.gen(function* () {
         const request = HttpClientRequest.post(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`).pipe(HttpClientRequest.bodyJsonUnsafe(body));
-        const res = yield* HttpClient.execute(c.key ? HttpClientRequest.bearerToken(request, c.key) : request);
-        const text = (yield* res.text).slice(0, 4 << 20);
-        if (res.status < 200 || res.status > 299) return yield* Effect.fail(new Error(`memory/${path}: ${res.status} ${text.slice(0, 300)}`));
-        return text;
+        const got = yield* answer(c.key ? HttpClientRequest.bearerToken(request, c.key) : request);
+        if (!got.ok) return yield* Effect.fail(new Error(`memory/${path}: ${got.status} ${got.text.slice(0, 300)}`));
+        return got.text;
       }),
       closing ? signal : AbortSignal.any([signal, life.signal]),
     );

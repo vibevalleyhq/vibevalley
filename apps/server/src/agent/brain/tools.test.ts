@@ -1,6 +1,8 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { memoryStore } from "./taskStore.ts";
@@ -29,7 +31,12 @@ afterEach(() => {
 async function call(tools: readonly AgentTool[], name: string, params: unknown): Promise<string> {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`no ${name}`);
-  const args = validateToolArguments(tool, { type: "toolCall", id: "t", name, arguments: params as never });
+  const args = validateToolArguments(tool, {
+    type: "toolCall",
+    id: "t",
+    name,
+    arguments: params as never,
+  });
   const result = await tool.execute("t", args);
   return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 }
@@ -71,7 +78,12 @@ describe("the coding tools", () => {
     expect(await call(tools, "read_file", { path: "src/a.ts", offset: 2, limit: 1 })).toBe("     2\ttwo\n（共 4 行，这里到第 2 行；接着读用 offset=3）");
     expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "2" }))).toMatch(/出现了 2 次/);
     expect(await fails(call(tools, "edit_file", { path: "src/a.ts", old_text: "four", new_text: "4" }))).toMatch(/找不到 old_text/);
-    await call(tools, "edit_file", { path: "src/a.ts", old_text: "two", new_text: "$&2", replace_all: true });
+    await call(tools, "edit_file", {
+      path: "src/a.ts",
+      old_text: "two",
+      new_text: "$&2",
+      replace_all: true,
+    });
     expect(readFileSync(join(dir, "src/a.ts"), "utf8")).toBe("one\n$&2\nthree\n$&2");
   });
 
@@ -86,6 +98,23 @@ describe("the coding tools", () => {
     if (found !== "这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。") expect(found).toContain("b.txt:1:needle here");
     expect(await call(tools, "bash", { command: "echo hi; exit 3" })).toBe("hi\n（退出码 3）");
     expect(await call(tools, "bash", { command: "sleep 5", timeout_seconds: 0.2 })).toMatch(/超时，停掉了/);
+  });
+
+  it("open a web page as its words, and say why one does not open", async () => {
+    const server = createServer((req, res) => {
+      if (req.url === "/page") res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end("<h1>标题</h1><p>正文</p>");
+      else res.writeHead(404, { "content-type": "text/plain" }).end("没有");
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    try {
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const tools = codingTools({ cwd: home() });
+      expect(await call(tools, "web_fetch", { url: url + "/page" })).toBe(`200 ${url}/page\n\n标题\n正文`);
+      expect(await call(tools, "web_fetch", { url: url + "/gone" })).toBe(`404 ${url}/gone\n\n没有`);
+      expect(await fails(call(tools, "web_fetch", { url: "http://127.0.0.1:1/" }))).toMatch(/^打不开 http:\/\/127\.0\.0\.1:1\/：/);
+    } finally {
+      server.close();
+    }
   });
 
   it("turn a web page into its words", () => {
@@ -153,7 +182,11 @@ describe("recurrences", () => {
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
     await new Promise((r) => setTimeout(r, 2));
-    await call(s.tools, "recurrence", { name: "提醒", message: "开会", at: new Date(Date.now() + 60_000).toISOString() });
+    await call(s.tools, "recurrence", {
+      name: "提醒",
+      message: "开会",
+      at: new Date(Date.now() + 60_000).toISOString(),
+    });
     expect(await call(s.tools, "list_recurrences", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
     const later = new Date(Date.now() + 3_600_000);
     s.tick(later);
@@ -175,7 +208,13 @@ describe("recurrences", () => {
     writeFileSync(
       join(dir, "recurrences.json"),
       JSON.stringify([
-        { id: "once", name: "", message: "", at: new Date(now.getTime() - 60_000).toISOString(), created: new Date(now.getTime() - 3_600_000).toISOString() },
+        {
+          id: "once",
+          name: "",
+          message: "",
+          at: new Date(now.getTime() - 60_000).toISOString(),
+          created: new Date(now.getTime() - 3_600_000).toISOString(),
+        },
       ]),
     );
     // A directory at the temporary file's path makes the atomic write fail.
@@ -231,7 +270,11 @@ describe("MCP", () => {
     writeFileSync(
       file,
       JSON.stringify({
-        mcpServers: { web: { url: "http://x", headers: { a: "b" } }, off: { command: "x", disabled: true }, calc: { command: "node", args: ["c.js"] } },
+        mcpServers: {
+          web: { url: "http://x", headers: { a: "b" } },
+          off: { command: "x", disabled: true },
+          calc: { command: "node", args: ["c.js"] },
+        },
       }),
     );
     expect(readMcpConfig(file)).toEqual([

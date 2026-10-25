@@ -4,10 +4,17 @@
 // API to the owner's open_id, with no reply window.
 
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { Effect, Schema } from "effect";
+import { HttpClientRequest } from "effect/http";
+import { answer, outside } from "../base/http.ts";
+import { jsonOrNone } from "../base/json.ts";
 
 export type Domain = "feishu" | "lark";
 
-const accounts: Record<Domain, string> = { feishu: "https://accounts.feishu.cn", lark: "https://accounts.larksuite.com" };
+const accounts: Record<Domain, string> = {
+  feishu: "https://accounts.feishu.cn",
+  lark: "https://accounts.larksuite.com",
+};
 const larkDomain = (d: Domain) => (d === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu);
 
 export interface Message {
@@ -39,22 +46,21 @@ export interface FeishuApi {
   sendText(signal: AbortSignal, app: App, openId: string, text: string): Promise<string>;
 }
 
+const readObject = jsonOrNone(Schema.Record(Schema.String, Schema.Unknown));
+
 /** The endpoint answers JSON even with an error status (a pending poll is a 400). */
-async function form(domain: Domain, body: Record<string, string>, signal: AbortSignal): Promise<Record<string, unknown>> {
-  const timed = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
-  try {
-    const res = await fetch(accounts[domain] + "/oauth/v1/app/registration", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(body),
-      signal: timed,
-    });
-    return (await res.json()) as Record<string, unknown>;
-  } catch (e) {
-    if (timed.aborted && !signal.aborted) throw new Error("飞书注册：超时了");
-    throw new Error("飞书注册：" + (e instanceof Error ? e.message : String(e)));
-  }
-}
+const form = (domain: Domain, body: Record<string, string>, signal: AbortSignal): Promise<Record<string, unknown>> =>
+  outside(
+    answer(HttpClientRequest.post(accounts[domain] + "/oauth/v1/app/registration").pipe(HttpClientRequest.bodyUrlParams(body))).pipe(
+      Effect.timeoutOrElse({ duration: 10_000, orElse: () => Effect.fail(new Error("超时了")) }),
+      Effect.flatMap((got) => {
+        const read = readObject(got.text);
+        return read ? Effect.succeed(read) : Effect.fail(new Error("回答不是 JSON：" + got.text.slice(0, 200)));
+      }),
+      Effect.mapError((e) => new Error("飞书注册：" + e.message)),
+    ),
+    signal,
+  );
 
 const str = (m: unknown, key: string) => {
   const v = (m as Record<string, unknown> | undefined)?.[key];
@@ -73,7 +79,16 @@ export class FeishuClient implements FeishuApi {
     const init = await form("feishu", { action: "init" }, signal);
     const methods = Array.isArray(init.supported_auth_methods) ? init.supported_auth_methods : [];
     if (!methods.includes("client_secret")) throw new Error("飞书现在不支持扫码建应用，请稍后再试。");
-    const begin = await form("feishu", { action: "begin", archetype: "PersonalAgent", auth_method: "client_secret", request_user_info: "open_id" }, signal);
+    const begin = await form(
+      "feishu",
+      {
+        action: "begin",
+        archetype: "PersonalAgent",
+        auth_method: "client_secret",
+        request_user_info: "open_id",
+      },
+      signal,
+    );
     const deviceCode = str(begin, "device_code");
     let link = str(begin, "verification_uri_complete");
     if (!deviceCode || !link) throw new Error("飞书没给二维码，请重试。");
@@ -89,7 +104,12 @@ export class FeishuClient implements FeishuApi {
     }
     const interval = typeof begin.interval === "number" ? begin.interval : 5;
     const expires = typeof begin.expires_in === "number" ? begin.expires_in : typeof begin.expire_in === "number" ? begin.expire_in : 600;
-    return { deviceCode, link, intervalMs: Math.max(2, interval) * 1000, expiresMs: expires * 1000 };
+    return {
+      deviceCode,
+      link,
+      intervalMs: Math.max(2, interval) * 1000,
+      expiresMs: expires * 1000,
+    };
   }
 
   private async poll(deviceCode: string, domain: Domain, signal: AbortSignal) {
@@ -102,7 +122,11 @@ export class FeishuClient implements FeishuApi {
     const user = res.user_info;
     const where: Domain = str(user, "tenant_brand") === "lark" ? "lark" : domain;
     if (typeof res.client_id === "string" && typeof res.client_secret === "string")
-      return { status: "succeeded" as const, app: { appId: res.client_id, appSecret: res.client_secret, domain: where }, owner: str(user, "open_id") };
+      return {
+        status: "succeeded" as const,
+        app: { appId: res.client_id, appSecret: res.client_secret, domain: where },
+        owner: str(user, "open_id"),
+      };
     if (res.error === "access_denied") return { status: "failed" as const, reason: "在飞书里拒绝了。" };
     if (res.error === "expired_token") return { status: "failed" as const, reason: "二维码过期了。" };
     return { status: "pending" as const, domain: where };
@@ -165,7 +189,12 @@ export class FeishuClient implements FeishuApi {
   }
 
   async sendText(_signal: AbortSignal, app: App, openId: string, text: string): Promise<string> {
-    const client = new Lark.Client({ appId: app.appId, appSecret: app.appSecret, domain: larkDomain(app.domain), loggerLevel: Lark.LoggerLevel.warn });
+    const client = new Lark.Client({
+      appId: app.appId,
+      appSecret: app.appSecret,
+      domain: larkDomain(app.domain),
+      loggerLevel: Lark.LoggerLevel.warn,
+    });
     let res: { code?: number; msg?: string; data?: { message_id?: string } };
     try {
       res = await client.im.v1.message.create({
@@ -183,7 +212,17 @@ export class FeishuClient implements FeishuApi {
 
 export function text(m: Message): string {
   if (m.messageType !== "text")
-    return ({ image: "[图片]", file: "[文件]", audio: "[语音]", media: "[视频]", sticker: "[表情]" } as Record<string, string>)[m.messageType] ?? "[消息]";
+    return (
+      (
+        {
+          image: "[图片]",
+          file: "[文件]",
+          audio: "[语音]",
+          media: "[视频]",
+          sticker: "[表情]",
+        } as Record<string, string>
+      )[m.messageType] ?? "[消息]"
+    );
   try {
     return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();
   } catch {

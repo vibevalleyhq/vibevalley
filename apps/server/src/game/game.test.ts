@@ -20,8 +20,24 @@ const kinds = Effect.gen(function* () {
   return rows.map((r) => r.kind);
 });
 
-const helper = (id: string, phase = { _tag: "working", since: 0, doing: { action: "thinking", label: "" } } as Session["phase"]) =>
-  ({ id, name: id, agent: "lab", runtime: "pi", brief: "试试", hiredAt: 0, runs: 0, phase }) as Session;
+const helper = (
+  id: string,
+  phase = {
+    _tag: "working",
+    since: 0,
+    doing: { action: "thinking", label: "" },
+  } as Session["phase"],
+) =>
+  ({
+    id,
+    name: id,
+    agent: "lab",
+    runtime: "pi",
+    brief: "试试",
+    hiredAt: 0,
+    runs: 0,
+    phase,
+  }) as Session;
 
 describe("the game", () => {
   it.live("keeps a ledger the progress folds back from", () => {
@@ -30,12 +46,26 @@ describe("the game", () => {
       const before = yield* Effect.gen(function* () {
         const game = yield* Game;
         const core = yield* Core;
-        yield* game.record({ kind: "harvested", session: "w1", agent: "lab", project: "demo", runtime: "pi", commits: 1, runs: 1 });
+        yield* game.record({
+          kind: "harvested",
+          session: "w1",
+          agent: "lab",
+          project: "demo",
+          runtime: "pi",
+          commits: 1,
+          runs: 1,
+        });
         const p = core.state().progress!;
         expect(p.coins).toBeGreaterThanOrEqual(35);
         expect(p.counts.harvests).toBe(1);
         yield* core.apply({ type: "hired", session: helper("w2") });
-        yield* core.apply({ type: "report", id: "w2", outcome: "failed", summary: "坏了", runs: 1 });
+        yield* core.apply({
+          type: "report",
+          id: "w2",
+          outcome: "failed",
+          summary: "坏了",
+          runs: 1,
+        });
         yield* core.apply({ type: "commits", commits: { total: 1000, repos: [] } });
         yield* until(kinds, (k) => k.join() === "harvested,hired,failed,level", "the ledger");
         return core.state().progress!;

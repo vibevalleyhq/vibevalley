@@ -12,7 +12,13 @@ const run = <A, E>(config: Config, body: Effect.Effect<A, E, Agents>) =>
   Effect.scoped(body.pipe(Effect.provide(layer.pipe(Layer.provide(Layer.succeed(Settings, config))))));
 
 /** A whole profile (a seed), as the page sends one: config.json keeps only what reads as a profile. */
-const draft = (change: Partial<Agent> = {}): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, id: "", name: "同名", runtime: "pi", ...change });
+const draft = (change: Partial<Agent> = {}): Agent => ({
+  ...seedAgents().find((a) => a.id === "lab")!,
+  id: "",
+  name: "同名",
+  runtime: "pi",
+  ...change,
+});
 
 describe("profiles", () => {
   it.effect("deleting a skill removes profile references and a recreated name does not reattach it", () => {
@@ -22,13 +28,23 @@ describe("profiles", () => {
       config,
       Effect.gen(function* () {
         const s = yield* Agents;
-        const skill = yield* s.createSkill({ id: "", name: "Transient Skill", description: "", body: "old" });
+        const skill = yield* s.createSkill({
+          id: "",
+          name: "Transient Skill",
+          description: "",
+          body: "old",
+        });
         profile = (yield* s.createAgent(draft({ skills: [skill.id, "other"] }))).id;
         yield* s.saveAgent({ ...s.agent(orchestratorAgent)!, skills: [skill.id] });
         yield* s.deleteSkill(skill.id);
         expect(s.agent(profile)?.skills).toEqual(["other"]);
         expect(s.agent(orchestratorAgent)?.skills).toEqual([]);
-        const recreated = yield* s.createSkill({ id: "", name: skill.name, description: "", body: "new" });
+        const recreated = yield* s.createSkill({
+          id: "",
+          name: skill.name,
+          description: "",
+          body: "new",
+        });
         expect(recreated.id).toBe(skill.id);
         expect(s.agent(profile)?.skills).not.toContain(recreated.id);
       }),
@@ -123,7 +139,10 @@ describe("profiles", () => {
         expect(ids.size).toBe(12);
         expect([...skills].slice(0, 3)).toEqual(["same-skill", "same-skill-2", "same-skill-3"]);
         expect((yield* Effect.flip(s.createAgent(draft({ id: "mine" }))))._tag).toBe("Refused");
-        const saved = yield* s.saveAgent({ ...draft({ id: "agent-7" }), look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"] });
+        const saved = yield* s.saveAgent({
+          ...draft({ id: "agent-7" }),
+          look: { body: "", trim: "", hat: "", eye: "" } as Agent["look"],
+        });
         expect([saved.look.species, saved.look.outfit, saved.look.build, saved.look.head]).toEqual(["fox", "farmer", "biped", "rounded"]);
       }),
     ),

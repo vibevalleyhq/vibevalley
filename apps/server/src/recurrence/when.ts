@@ -64,7 +64,14 @@ export function daily(from: number, at: string, days: readonly number[], tz: str
   if (!m || !timeZone) return undefined;
   // Cron reads only 0 to 7 (7 is Sunday again); anything else is no cron.
   if (days.some((d) => d < 0 || d > 7)) return undefined;
-  const cron = Cron.make({ minutes: [Number(m[2])], hours: [Number(m[1])], days: [], months: [], weekdays: days.map((d) => d % 7), tz: timeZone });
+  const cron = Cron.make({
+    minutes: [Number(m[2])],
+    hours: [Number(m[1])],
+    days: [],
+    months: [],
+    weekdays: days.map((d) => d % 7),
+    tz: timeZone,
+  });
   return nextOf(cron, from);
 }
 
@@ -173,7 +180,14 @@ export function parseCron(expr: string): CronSpec | string {
   }
   const dow = bits[4]!;
   if (dow.delete(7)) dow.add(0);
-  return { minutes: bits[0]!, hours: bits[1]!, days: bits[2]!, months: bits[3]!, weekdays: dow, and: f[2]!.startsWith("*") || f[4]!.startsWith("*") };
+  return {
+    minutes: bits[0]!,
+    hours: bits[1]!,
+    days: bits[2]!,
+    months: bits[3]!,
+    weekdays: dow,
+    and: f[2]!.startsWith("*") || f[4]!.startsWith("*"),
+  };
 }
 
 function cronNext(from: number, expr: string, tz: string): number | undefined {

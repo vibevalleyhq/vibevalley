@@ -31,12 +31,18 @@ it.live("an unresolved owner mention survives both history windows and restart u
       const chat = yield* Channels;
       const core = yield* Core;
       const parent = (yield* chat.say("需要确认的话题", undefined, "")).message;
-      const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", { target: `#田头:${parent.number}`, anyway: true })).message!;
+      const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", {
+        target: `#田头:${parent.number}`,
+        anyway: true,
+      })).message!;
       ({ conversation: thread, id: message, at, number } = written);
       expect(mentionIds(core)).toEqual([message]);
       for (let i = 0; i < 101; i++) {
         const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-        const fresh = (yield* chat.speak("orchestrator", "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.conversation;
+        const fresh = (yield* chat.speak("orchestrator", "其他答复", {
+          target: `#田头:${other.number}`,
+          anyway: true,
+        })).message!.conversation;
         yield* chat.notice(fresh, "动静一", "history");
         yield* chat.notice(fresh, "动静二", "history");
       }
@@ -59,16 +65,25 @@ it.live("only reading or replying in the mentioned conversation completes an own
     const chat = yield* Channels;
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
-    const first = (yield* chat.speak("orchestrator", "@主人 第一份变更", { target: "#review", anyway: true })).message!;
+    const first = (yield* chat.speak("orchestrator", "@主人 第一份变更", {
+      target: "#review",
+      anyway: true,
+    })).message!;
     yield* chat.say("田头的另一件事", undefined, "");
     expect(mentionIds(core)).toEqual([first.id]);
     yield* chat.say("确认了", channel.id, "");
     expect(mentionIds(core)).toEqual([]);
-    const second = (yield* chat.speak("orchestrator", "@主人 第二份变更", { target: "#review", anyway: true })).message!;
+    const second = (yield* chat.speak("orchestrator", "@主人 第二份变更", {
+      target: "#review",
+      anyway: true,
+    })).message!;
     expect(mentionIds(core)).toEqual([second.id]);
     yield* chat.markRead(channel.id, second.number);
     expect(mentionIds(core)).toEqual([]);
-    const third = (yield* chat.speak("orchestrator", "@主人 第三份变更", { target: "#review", anyway: true })).message!;
+    const third = (yield* chat.speak("orchestrator", "@主人 第三份变更", {
+      target: "#review",
+      anyway: true,
+    })).message!;
     expect(mentionIds(core)).toEqual([third.id]);
     yield* chat.read("user", { target: "#review" });
     expect(mentionIds(core)).toEqual([]);

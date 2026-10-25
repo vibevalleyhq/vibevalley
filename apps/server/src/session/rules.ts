@@ -146,7 +146,11 @@ export function questionsOf(said: string): Question[] {
 
 /** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
 const checkLine = /^[\s>*#_-]*(?:\*\*)?标准\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定)(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/;
-const checkWords: Record<string, CheckResult> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
+const checkWords: Record<string, CheckResult> = {
+  做到了: "met",
+  没做到: "unmet",
+  不确定: "unsure",
+};
 
 /** Numbered from 1 as the brief lists them; the last word on a criterion stands. */
 export function checksOf(said: string): CriterionCheck[] {
@@ -298,7 +302,12 @@ export function notTakenIn(
   f: MergeFailure,
   name: string,
   settle: Settle,
-): { readonly fix: string; readonly owner: string; readonly notice: string; readonly short: string } {
+): {
+  readonly fix: string;
+  readonly owner: string;
+  readonly notice: string;
+  readonly short: string;
+} {
   switch (f.kind) {
     case "conflict": {
       const files = f.files.join("、");
@@ -318,7 +327,12 @@ export function notTakenIn(
       };
     case "error": {
       const why = f.reasonText || f.message;
-      return { fix: "", owner: `没合进去：${why}。${name} 还在`, notice: `${name} 的活没合进去：${why}`, short: why };
+      return {
+        fix: "",
+        owner: `没合进去：${why}。${name} 还在`,
+        notice: `${name} 的活没合进去：${why}`,
+        short: why,
+      };
     }
   }
 }

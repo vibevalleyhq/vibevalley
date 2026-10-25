@@ -11,7 +11,10 @@ export const isChannel = (c: Conversation) => c.kind !== "thread";
 
 const emptyChat = (): Chat => ({ conversations: [], messages: [] });
 
-export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
+export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({
+  ...(chat ?? emptyChat()),
+  ownerMentions,
+});
 
 export const messagesIn = (chat: Chat | undefined, conversation: string) => (chat?.messages ?? []).filter((m) => m.conversation === conversation);
 

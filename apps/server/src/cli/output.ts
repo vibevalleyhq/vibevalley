@@ -60,6 +60,11 @@ export const printBody = (text: string) => (text.trim() === "" ? Effect.void : O
 export const printFailure = (f: Failure) =>
   err(
     JSON.stringify({
-      error: { tag: f.tag, message: f.text, ...(f.status !== undefined ? { status: f.status } : {}), ...(f.next && f.next.length > 0 ? { next: f.next } : {}) },
+      error: {
+        tag: f.tag,
+        message: f.text,
+        ...(f.status !== undefined ? { status: f.status } : {}),
+        ...(f.next && f.next.length > 0 ? { next: f.next } : {}),
+      },
     }),
   );

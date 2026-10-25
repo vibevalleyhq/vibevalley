@@ -36,7 +36,11 @@ describe("an issue as a job", () => {
   });
 
   it("an answer issue's job is read only and ends with the block its conclusion comes back in", () => {
-    const job = issueJob({ title: "查一下打卡为什么慢", description: "主人觉得最近慢了", deliver: "answer" });
+    const job = issueJob({
+      title: "查一下打卡为什么慢",
+      description: "主人觉得最近慢了",
+      deliver: "answer",
+    });
     expect(job.startsWith(answerOpening + "\n\n查一下打卡为什么慢\n\n主人觉得最近慢了\n\n")).toBe(true);
     expect(job).toContain('"conclusion"');
     expect(job).toContain('"evidence"');
@@ -101,9 +105,13 @@ describe("an issue as a job", () => {
   });
 
   it("the job carries its criteria", () => {
-    expect(issueJob({ title: "改拖卡", description: "为什么：\n旧接口", criteria: ["拖到待办就开工", "测试通过"] })).toBe(
-      "改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过",
-    );
+    expect(
+      issueJob({
+        title: "改拖卡",
+        description: "为什么：\n旧接口",
+        criteria: ["拖到待办就开工", "测试通过"],
+      }),
+    ).toBe("改拖卡\n\n为什么：\n旧接口\n\n" + criteriaHead + "\n1. 拖到待办就开工\n2. 测试通过");
   });
 
   it("the next task's id", () => {
@@ -171,7 +179,13 @@ describe("drafts", () => {
 });
 
 describe("templates", () => {
-  const goStack: ProjectStack = { name: "go", label: "Go", test: "go test ./...", lint: "go vet ./...", build: "go build ./..." };
+  const goStack: ProjectStack = {
+    name: "go",
+    label: "Go",
+    test: "go test ./...",
+    lint: "go vet ./...",
+    build: "go build ./...",
+  };
 
   it("the catalog is well formed", () => {
     const kinds = templateCatalog();
@@ -190,7 +204,12 @@ describe("templates", () => {
   });
 
   it("a template is filled for the stack", () => {
-    const template = { id: "x", title: "修一个 bug：〔现象〕", done: "{build} 不再报错；跑一遍 {test}，再看（{lint}）", text: "" };
+    const template = {
+      id: "x",
+      title: "修一个 bug：〔现象〕",
+      done: "{build} 不再报错；跑一遍 {test}，再看（{lint}）",
+      text: "",
+    };
     const got = filledTemplate(template, goStack);
     expect(got.done).toBe("`go build ./...` 不再报错；跑一遍 `go test ./...`，再看（`go vet ./...`）");
     expect(got.text).toBe("修一个 bug：〔现象〕\n做到什么程度算完：" + got.done);

@@ -106,7 +106,12 @@ describe("memory", () => {
         recalled.join("\n"),
       ]);
 
-      yield* memories.write({ agent: "scribe", text: "下班打卡也要有测试", project: "memo", by: "owner" });
+      yield* memories.write({
+        agent: "scribe",
+        text: "下班打卡也要有测试",
+        project: "memo",
+        by: "owner",
+      });
       expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", { kind: "comment" })).kind).toBe("run");
       [recalled, asked] = reminded(yield* nextPrompt(f, next, 2));
       expect([recalled, asked]).toEqual([["- （这个项目）下班打卡也要有测试"], "顺手把下班打卡的测试也补上"]);

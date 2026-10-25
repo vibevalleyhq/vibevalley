@@ -24,7 +24,10 @@ describe("the ledger's fold", () => {
         case "entries": {
           const given = c.in as { before: WorkspaceState; fact: Fact };
           const [after] = reduce(given.before, given.fact);
-          return { entries: entriesFor(given.before, given.fact, after), catchUp: catchUp(given.before) };
+          return {
+            entries: entriesFor(given.before, given.fact, after),
+            catchUp: catchUp(given.before),
+          };
         }
       }
       throw new Error(`unknown fn ${c.fn}`);

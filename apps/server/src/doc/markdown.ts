@@ -190,7 +190,12 @@ export function blocksOfMarkdown(md: string): MdBlock[] {
       }
       k.rest = text.join("\n");
     }
-    out.push({ depth, type: k.type, attrs: k.attrs, text: k.type === "code" ? unmarked([{ t: k.rest, marks: {} }]) : textFor(k.type, inlineSpans(k.rest)) });
+    out.push({
+      depth,
+      type: k.type,
+      attrs: k.attrs,
+      text: k.type === "code" ? unmarked([{ t: k.rest, marks: {} }]) : textFor(k.type, inlineSpans(k.rest)),
+    });
     open = depth + 1;
   }
   return out;

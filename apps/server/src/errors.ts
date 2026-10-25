@@ -28,7 +28,10 @@ export const lookIn = {
 } as const satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */
-export const memoriesOf = (agent: string): Next => ({ say: "列出它的记性，找那一条的 id", run: ["memory", "list", agent] });
+export const memoriesOf = (agent: string): Next => ({
+  say: "列出它的记性，找那一条的 id",
+  run: ["memory", "list", agent],
+});
 
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>

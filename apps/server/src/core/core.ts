@@ -24,7 +24,11 @@ import * as S from "@vibevalley/protocol/schema";
 import { Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 
-export const emptyWorkspaceState = (): WorkspaceState => ({ call: "idle", orchestrator: "idle", sessions: [] });
+export const emptyWorkspaceState = (): WorkspaceState => ({
+  call: "idle",
+  orchestrator: "idle",
+  sessions: [],
+});
 
 const readObject = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 const readState = Schema.decodeUnknownResult(S.WorkspaceState);
@@ -91,7 +95,12 @@ export class Core extends Context.Service<Core, CoreShape>()("vibevalley/Core") 
 const toKeep = ({ chat: _chat, progress: _progress, recurrences: _recurrences, issues: _issues, ...kept }: WorkspaceState): WorkspaceState => kept;
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
-const restarted = (kept: WorkspaceState): WorkspaceState => ({ ...toKeep(kept), call: "idle", callReason: undefined, orchestrator: "idle" });
+const restarted = (kept: WorkspaceState): WorkspaceState => ({
+  ...toKeep(kept),
+  call: "idle",
+  callReason: undefined,
+  orchestrator: "idle",
+});
 
 const liveOf = (e: SideEvent): LiveEvent | undefined => {
   switch (e.type) {
@@ -218,7 +227,14 @@ export const make = Effect.gen(function* () {
     events: Stream.unwrap(
       Effect.gen(function* () {
         const sub = yield* PubSub.subscribe(events);
-        return Stream.concat(Stream.succeed<SideEvent>({ type: "snapshot", at: yield* Clock.currentTimeMillis, state }), Stream.fromSubscription(sub));
+        return Stream.concat(
+          Stream.succeed<SideEvent>({
+            type: "snapshot",
+            at: yield* Clock.currentTimeMillis,
+            state,
+          }),
+          Stream.fromSubscription(sub),
+        );
       }),
     ),
     subscribe: Effect.map(PubSub.subscribe(events), Stream.fromSubscription),

@@ -11,7 +11,10 @@ test("the recorded cases", () => {
       case "moneyStop":
         return moneyStop(c.in as RuntimeInfo | null) || null;
       case "quota":
-        return { left: quotaLeft(c.in as AccountUsage) ?? null, text: quotaText(c.in as AccountUsage) };
+        return {
+          left: quotaLeft(c.in as AccountUsage) ?? null,
+          text: quotaText(c.in as AccountUsage),
+        };
       case "agentIssues": {
         const i = c.in as { agent: Agent; runtime: RuntimeInfo | null };
         return agentIssues(i.agent, i.runtime);

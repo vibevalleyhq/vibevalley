@@ -2,6 +2,9 @@
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { Effect, Schema } from "effect";
+import { HttpClientRequest } from "effect/http";
+import { answer, outside } from "../base/http.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -28,7 +31,11 @@ export interface Item {
   readonly text_item?: { readonly text?: string };
   readonly voice_item?: { readonly text?: string };
   readonly file_item?: { readonly file_name?: string };
-  readonly ref_msg?: { readonly svr_id?: string; readonly title?: string; readonly message_item?: Item };
+  readonly ref_msg?: {
+    readonly svr_id?: string;
+    readonly title?: string;
+    readonly message_item?: Item;
+  };
 }
 
 export interface Message {
@@ -48,6 +55,55 @@ export interface Updates {
   readonly get_updates_buf?: string;
   readonly longpolling_timeout_ms?: number;
 }
+
+const str = Schema.optionalKey(Schema.String);
+const ItemSchema: Schema.Codec<Item> = Schema.Struct({
+  type: Schema.optionalKey(Schema.Number),
+  text_item: Schema.optionalKey(Schema.Struct({ text: str })),
+  voice_item: Schema.optionalKey(Schema.Struct({ text: str })),
+  file_item: Schema.optionalKey(Schema.Struct({ file_name: str })),
+  ref_msg: Schema.optionalKey(
+    Schema.Struct({
+      svr_id: str,
+      title: str,
+      message_item: Schema.optionalKey(Schema.suspend((): Schema.Codec<Item> => ItemSchema)),
+    }),
+  ),
+});
+const UpdatesSchema: Schema.Codec<Updates> = Schema.Struct({
+  ret: Schema.optionalKey(Schema.Number),
+  errcode: Schema.optionalKey(Schema.Number),
+  errmsg: str,
+  msgs: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        message_id: str,
+        from_user_id: str,
+        message_type: Schema.optionalKey(Schema.Number),
+        context_token: str,
+        group_id: str,
+        item_list: Schema.optionalKey(Schema.Array(ItemSchema)),
+      }),
+    ),
+  ),
+  get_updates_buf: str,
+  longpolling_timeout_ms: Schema.optionalKey(Schema.Number),
+});
+const QrCode = Schema.Struct({ qrcode: str, qrcode_img_content: str });
+const QrStatus = Schema.Struct({
+  status: str,
+  bot_token: str,
+  ilink_bot_id: str,
+  baseurl: str,
+  ilink_user_id: str,
+  redirect_host: str,
+});
+const Sent = Schema.Struct({
+  ret: Schema.optionalKey(Schema.Number),
+  errcode: Schema.optionalKey(Schema.Number),
+  errmsg: str,
+  message_id: str,
+});
 
 export type LoginState = "waiting" | "scanned" | "verify";
 
@@ -75,7 +131,10 @@ const clientVersion = (v: string) => {
 const baseInfo = { channel_version: version, bot_agent: "vibevalley/0.1.0" };
 
 function headers(token: string, auth: boolean): Record<string, string> {
-  const h: Record<string, string> = { "iLink-App-Id": "bot", "iLink-App-ClientVersion": String(clientVersion(version)) };
+  const h: Record<string, string> = {
+    "iLink-App-Id": "bot",
+    "iLink-App-ClientVersion": String(clientVersion(version)),
+  };
   if (!auth) return h;
   h["Content-Type"] = "application/json";
   h.AuthorizationType = "ilink_bot_token";
@@ -100,27 +159,37 @@ const sleep = (ms: number, signal: AbortSignal) =>
 export class WeixinClient implements WeixinApi {
   constructor(private readonly base = baseUrl) {}
 
-  private async request<T>(label: string, method: string, url: string, body: unknown, token: string, auth: boolean, signal: AbortSignal): Promise<T> {
-    let res: Response;
-    try {
-      res = await fetch(url, { method, headers: headers(token, auth), ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal });
-    } catch (e) {
-      throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
-    }
-    const text = await res.text();
-    if (res.status < 200 || res.status > 299) throw new WeixinError(`${label}: ${res.status}`);
-    try {
-      return JSON.parse(text.replace(lossless, '"$1"$2:$3"$4"')) as T;
-    } catch (e) {
-      throw new WeixinError(label + ": " + (e instanceof Error ? e.message : String(e)));
-    }
+  private request<T>(
+    schema: Schema.Codec<T>,
+    label: string,
+    method: "GET" | "POST",
+    url: string,
+    body: unknown,
+    token: string,
+    auth: boolean,
+    signal: AbortSignal,
+  ): Promise<T> {
+    const request = HttpClientRequest.make(method)(url, { headers: headers(token, auth) });
+    return outside(
+      answer(body === undefined ? request : HttpClientRequest.bodyJsonUnsafe(request, body)).pipe(
+        Effect.mapError((e) => new WeixinError(label + ": " + e.message)),
+        Effect.flatMap((got) => (got.ok ? Effect.succeed(got.text) : Effect.fail(new WeixinError(`${label}: ${got.status}`)))),
+        Effect.flatMap((got) =>
+          Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(got.replace(lossless, '"$1"$2:$3"$4"')).pipe(
+            Effect.mapError((e) => new WeixinError(label + ": " + e.message)),
+          ),
+        ),
+      ),
+      signal,
+    );
   }
 
   private async qrCode(signal: AbortSignal): Promise<[string, string]> {
     const timed = AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
-    let body: { qrcode?: string; qrcode_img_content?: string };
+    let body: typeof QrCode.Type;
     try {
       body = await this.request(
+        QrCode,
         "get_bot_qrcode",
         "POST",
         endpoint(this.base, "ilink/bot/get_bot_qrcode?bot_type=3"),
@@ -141,14 +210,16 @@ export class WeixinClient implements WeixinApi {
     let q = "ilink/bot/get_qrcode_status?qrcode=" + encodeURIComponent(qrcode);
     if (verifyCode) q += "&verify_code=" + encodeURIComponent(verifyCode);
     try {
-      const s = await this.request<{
-        status?: string;
-        bot_token?: string;
-        ilink_bot_id?: string;
-        baseurl?: string;
-        ilink_user_id?: string;
-        redirect_host?: string;
-      }>("get_qrcode_status", "GET", endpoint(base, q), undefined, "", false, AbortSignal.any([signal, AbortSignal.timeout(35_000)]));
+      const s = await this.request(
+        QrStatus,
+        "get_qrcode_status",
+        "GET",
+        endpoint(base, q),
+        undefined,
+        "",
+        false,
+        AbortSignal.any([signal, AbortSignal.timeout(35_000)]),
+      );
       return s.status ? s : { status: "wait" };
     } catch {
       return { status: "wait" };
@@ -197,9 +268,13 @@ export class WeixinClient implements WeixinApi {
         case "binded_redirect":
           throw new Error("这个微信已经连过了：先在微信里删掉它，或者换一个微信扫。");
         case "confirmed": {
-          const s = status as { bot_token?: string; ilink_bot_id?: string; ilink_user_id?: string; baseurl?: string };
+          const s = status;
           if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error("微信确认了，但没给齐登录信息，请重试。");
-          return { account: { baseUrl: s.baseurl || base, token: s.bot_token }, botId: s.ilink_bot_id, owner: s.ilink_user_id };
+          return {
+            account: { baseUrl: s.baseurl || base, token: s.bot_token },
+            botId: s.ilink_bot_id,
+            owner: s.ilink_user_id,
+          };
         }
       }
     }
@@ -210,7 +285,8 @@ export class WeixinClient implements WeixinApi {
   async getUpdates(signal: AbortSignal, account: Account, buf: string, timeoutMs: number): Promise<Updates> {
     const poll = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
     try {
-      return await this.request<Updates>(
+      return await this.request(
+        UpdatesSchema,
         "getupdates",
         "POST",
         endpoint(account.baseUrl, "ilink/bot/getupdates"),
@@ -236,9 +312,10 @@ export class WeixinClient implements WeixinApi {
       ...(contextToken ? { context_token: contextToken } : {}),
     };
     const timed = AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
-    let body: { ret?: number; errcode?: number; errmsg?: string; message_id?: string };
+    let body: typeof Sent.Type;
     try {
       body = await this.request(
+        Sent,
         "sendmessage",
         "POST",
         endpoint(account.baseUrl, "ilink/bot/sendmessage"),

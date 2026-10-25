@@ -28,7 +28,14 @@ const orchestratorTools = () =>
     Effect.scoped(
       Effect.gen(function* () {
         const t = yield* Tools;
-        return t.orchestrator(() => ({ agent: orchestratorAgent, session: "", project: "", here: "", picked: "", owner: true }));
+        return t.orchestrator(() => ({
+          agent: orchestratorAgent,
+          session: "",
+          project: "",
+          here: "",
+          picked: "",
+          owner: true,
+        }));
       }).pipe(Effect.provide(world())),
     ),
   );

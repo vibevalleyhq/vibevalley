@@ -15,7 +15,15 @@ describe("the database", () => {
       expect((yield* lanOpen()).open).toBe(true);
       yield* addLanDevice({ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123 });
       yield* seenLanDevice({ last_seen: 1_700_000_000_456, id: "d1" });
-      expect(yield* lanDevices()).toEqual([{ id: "d1", name: "手机", key_hash: "h", paired_at: 1_700_000_000_123, last_seen: 1_700_000_000_456 }]);
+      expect(yield* lanDevices()).toEqual([
+        {
+          id: "d1",
+          name: "手机",
+          key_hash: "h",
+          paired_at: 1_700_000_000_123,
+          last_seen: 1_700_000_000_456,
+        },
+      ]);
     }).pipe(Effect.provide(testDatabase())),
   );
 

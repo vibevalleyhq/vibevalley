@@ -107,7 +107,10 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   } catch {
     return [];
   }
-  return names.sort().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
+  return names.sort().map((n) => ({
+    file: join(dir, n),
+    case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase,
+  }));
 }
 
 export const isInput = (m: AgentMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";

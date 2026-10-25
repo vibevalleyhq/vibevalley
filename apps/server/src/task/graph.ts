@@ -50,7 +50,13 @@ export const graphStateText: Record<GraphState, string> = {
 };
 
 /** What each graph action is called; the buttons and the refusals say the same word. */
-export const graphActionText: Record<GraphAction, string> = { start: "开工", pause: "暂停", resume: "继续", abandon: "放弃", merge: "合进主分支" };
+export const graphActionText: Record<GraphAction, string> = {
+  start: "开工",
+  pause: "暂停",
+  resume: "继续",
+  abandon: "放弃",
+  merge: "合进主分支",
+};
 
 /** The short tag beside a graph's state in the list; graphStateText is the longer sentence. */
 export const graphStateTag: Record<GraphState, string> = {
@@ -63,7 +69,13 @@ export const graphStateTag: Record<GraphState, string> = {
   abandoned: "放弃了",
 };
 
-export const taskStateText: Record<TaskState, string> = { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" };
+export const taskStateText: Record<TaskState, string> = {
+  waiting: "等着",
+  working: "在做",
+  merged: "合进去了",
+  failed: "没做成",
+  skipped: "跳过了",
+};
 
 /** What each task action is called. */
 export const taskActionText: Record<TaskAction, string> = { retry: "重试", skip: "跳过" };

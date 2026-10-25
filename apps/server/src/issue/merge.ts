@@ -103,10 +103,23 @@ export function merging(d: MergeDeps) {
       Effect.andThen(
         db(
           state === "closed"
-            ? q.cancelIssue({ id: issue.id, canceled: "dismissed", closed_at: yield* Clock.currentTimeMillis })
-            : q.completeIssue({ id: issue.id, delivered: "pull_request", closed_at: yield* Clock.currentTimeMillis }),
+            ? q.cancelIssue({
+                id: issue.id,
+                canceled: "dismissed",
+                closed_at: yield* Clock.currentTimeMillis,
+              })
+            : q.completeIssue({
+                id: issue.id,
+                delivered: "pull_request",
+                closed_at: yield* Clock.currentTimeMillis,
+              }),
         ),
-        db(q.setIssuePullRequest({ id: issue.id, pull_request: JSON.stringify({ ...issue.pullRequest, state }) })),
+        db(
+          q.setIssuePullRequest({
+            id: issue.id,
+            pull_request: JSON.stringify({ ...issue.pullRequest, state }),
+          }),
+        ),
       ),
     );
     yield* publish(issue.id);

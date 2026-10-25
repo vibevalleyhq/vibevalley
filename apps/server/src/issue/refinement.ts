@@ -115,7 +115,13 @@ export function refinement(d: RefinementDeps) {
         const kept = yield* sessions.clearWorkplace(t.id, where, t.number);
         if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${t.id}: before its draft: ${kept.reason}`);
         // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
-        const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
+        const hired = yield* hire(chosen, brief, where, {
+          worktree: true,
+          channel,
+          issue: id,
+          trigger: { kind: "refine" },
+          refining: true,
+        });
         if (!hired.session) return yield* refused(hired.refused ?? "派不出去");
         // Its moves no longer hold todo while it drafts.
         yield* publish(id);

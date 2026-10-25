@@ -93,8 +93,21 @@ describe("order keys", () => {
 });
 
 describe("ops", () => {
-  const cases: { name: string; blocks: Block[]; history?: Record<string, Record<number, string>>; ops: DocOp[]; status: DocOpStatus[]; want: string }[] = [
-    { name: "insert", blocks: [para("a", "V", "一")], ops: [{ op: "insert_block", block: para("b", "W", "二") }], status: ["applied"], want: "a=一 b=二" },
+  const cases: {
+    name: string;
+    blocks: Block[];
+    history?: Record<string, Record<number, string>>;
+    ops: DocOp[];
+    status: DocOpStatus[];
+    want: string;
+  }[] = [
+    {
+      name: "insert",
+      blocks: [para("a", "V", "一")],
+      ops: [{ op: "insert_block", block: para("b", "W", "二") }],
+      status: ["applied"],
+      want: "a=一 b=二",
+    },
     {
       name: "insert refused",
       blocks: [para("a", "V", "一")],
@@ -123,7 +136,16 @@ describe("ops", () => {
     },
     {
       name: "stale update, only its attrs changed since: taken",
-      blocks: [block({ id: "a", orderKey: "V", type: "todo", text: [span("买菜")], rev: 3, attrs: { checked: true } })],
+      blocks: [
+        block({
+          id: "a",
+          orderKey: "V",
+          type: "todo",
+          text: [span("买菜")],
+          rev: 3,
+          attrs: { checked: true },
+        }),
+      ],
       history: { a: { 2: "买菜", 3: "买菜" } },
       ops: [{ op: "update_text", blockId: "a", baseRev: 2, text: [span("买菜和米")] }],
       status: ["applied"],
@@ -160,7 +182,17 @@ describe("ops", () => {
     },
     {
       name: "merge a deleted source: noop",
-      blocks: [para("a", "V", "前"), block({ id: "b", orderKey: "W", type: "paragraph", text: [span("后")], rev: 2, deleted: true })],
+      blocks: [
+        para("a", "V", "前"),
+        block({
+          id: "b",
+          orderKey: "W",
+          type: "paragraph",
+          text: [span("后")],
+          rev: 2,
+          deleted: true,
+        }),
+      ],
       ops: [{ op: "merge_blocks", targetId: "a", sourceId: "b" }],
       status: ["noop"],
       want: "a=前",
@@ -178,7 +210,16 @@ describe("ops", () => {
     },
     {
       name: "restore",
-      blocks: [block({ id: "a", orderKey: "V", type: "paragraph", text: [span("回来")], rev: 2, deleted: true })],
+      blocks: [
+        block({
+          id: "a",
+          orderKey: "V",
+          type: "paragraph",
+          text: [span("回来")],
+          rev: 2,
+          deleted: true,
+        }),
+      ],
       ops: [{ op: "restore_block", blockId: "a" }],
       status: ["applied"],
       want: "a=回来",
@@ -195,7 +236,15 @@ describe("ops", () => {
     },
     {
       name: "set attrs and type",
-      blocks: [block({ id: "a", orderKey: "V", type: "todo", text: [bold("字")], attrs: { checked: false } })],
+      blocks: [
+        block({
+          id: "a",
+          orderKey: "V",
+          type: "todo",
+          text: [bold("字")],
+          attrs: { checked: false },
+        }),
+      ],
       ops: [
         { op: "set_attrs", blockId: "a", attrs: { checked: true } },
         { op: "set_attrs", blockId: "a", attrs: {}, unset: ["nope"] },
@@ -226,7 +275,13 @@ describe("ops", () => {
 
   it("changed blocks carry their rev and writer", () => {
     const p = new Page("d", "lab", 9, [para("a", "V", "你好")]);
-    p.apply({ op: "split_block", blockId: "a", baseRev: 1, offset: 1, newBlock: para("b", "W", "") });
+    p.apply({
+      op: "split_block",
+      blockId: "a",
+      baseRev: 1,
+      offset: 1,
+      newBlock: para("b", "W", ""),
+    });
     const changed = p.changedBlocks();
     expect(changed.map((b) => [b.rev, b.updatedBy, b.updated])).toEqual([
       [2, "lab", 9],
@@ -263,7 +318,10 @@ describe("ops", () => {
 
   it("code has no marks", () => {
     const p = new Page("d", "owner", 1, []);
-    p.apply({ op: "insert_block", block: { ...para("c", "V", ""), type: "code", text: [bold("x := 1")] } });
+    p.apply({
+      op: "insert_block",
+      block: { ...para("c", "V", ""), type: "code", text: [bold("x := 1")] },
+    });
     expect(p.find("c")!.text).toEqual([{ t: "x := 1", marks: {} }]);
   });
 });
@@ -278,7 +336,14 @@ function laid(md: readonly MdBlock[]): Block[] {
     const key = keyBetween(last.get(parent) ?? "", "");
     last.set(parent, key);
     parents.push(`b${i}`);
-    return block({ id: `b${i}`, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text });
+    return block({
+      id: `b${i}`,
+      ...(parent ? { parentId: parent } : {}),
+      orderKey: key,
+      type: b.type,
+      attrs: b.attrs,
+      text: b.text,
+    });
   });
 }
 
@@ -362,13 +427,24 @@ describe("markdown", () => {
           span("word"),
         ],
       }),
-      block({ id: "s", orderKey: "VV", type: "paragraph", text: [span("doc_append 和 doc_update 是工具名")] }),
+      block({
+        id: "s",
+        orderKey: "VV",
+        type: "paragraph",
+        text: [span("doc_append 和 doc_update 是工具名")],
+      }),
       block({ id: "b", orderKey: "W", type: "paragraph", text: [span("- 像列表的段落")] }),
       block({ id: "c", orderKey: "X", type: "bulleted", text: [span("[ ] 像待办的列表")] }),
       block({ id: "d", orderKey: "Y", type: "numbered", text: [span("一")] }),
       block({ id: "e", orderKey: "V", parentId: "d", type: "numbered", text: [span("一点一")] }),
       block({ id: "f", orderKey: "Z", type: "numbered", text: [span("二")] }),
-      block({ id: "g", orderKey: "a", type: "heading", attrs: { level: 2 }, text: [span("1. 像编号")] }),
+      block({
+        id: "g",
+        orderKey: "a",
+        type: "heading",
+        attrs: { level: 2 },
+        text: [span("1. 像编号")],
+      }),
     ];
     expect(shape(laid(blocksOfMarkdown(markdownOf(input))))).toBe(shape(input));
     expect(markdownOf(input)).toContain("1. 一\n  1. 一点一\n2. 二");

@@ -8,4 +8,9 @@ import { effectsOf } from "../game/view.ts";
 import { frameOf } from "./frame.ts";
 import { reduce } from "./reduce.ts";
 
-export const layer = Layer.succeed(Projection, { reduce, effects: effectsOf, frame: frameOf, restore: withStations });
+export const layer = Layer.succeed(Projection, {
+  reduce,
+  effects: effectsOf,
+  frame: frameOf,
+  restore: withStations,
+});

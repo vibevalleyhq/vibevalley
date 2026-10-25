@@ -75,12 +75,22 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isFailure = (x: unknown): x is Failure => typeof x === "object" && x !== null && "kind" in x && "reason" in x;
 
 export function weixinAdapter(api: WeixinApi): Adapter {
-  const accountOf = (s: Record<string, string>) => ({ baseUrl: s.baseUrl || baseUrl, token: s.token ?? "" });
+  const accountOf = (s: Record<string, string>) => ({
+    baseUrl: s.baseUrl || baseUrl,
+    token: s.token ?? "",
+  });
   return {
     id: "weixin",
     login: async (signal, _input, progress, verifyCode) => {
       const linked = await api.login(signal, (state, url) => progress({ state, qr: url }), verifyCode);
-      return { secrets: { token: linked.account.token, botId: linked.botId, baseUrl: linked.account.baseUrl }, owner: linked.owner };
+      return {
+        secrets: {
+          token: linked.account.token,
+          botId: linked.botId,
+          baseUrl: linked.account.baseUrl,
+        },
+        owner: linked.owner,
+      };
     },
     receive: async (signal, secrets, io) => {
       const account = accountOf(secrets);
@@ -103,7 +113,13 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         // Its own messages echo back; groups are not for the farm.
         const messages = (updates.msgs ?? [])
           .filter((m) => m.message_type !== 2 && !m.group_id && m.from_user_id)
-          .map((m) => ({ id: m.message_id ?? "", from: m.from_user_id!, text: weixinText(m), reply: m.context_token ?? "", quoted: quoted(m) }));
+          .map((m) => ({
+            id: m.message_id ?? "",
+            from: m.from_user_id!,
+            text: weixinText(m),
+            reply: m.context_token ?? "",
+            quoted: quoted(m),
+          }));
         try {
           await io.accept(messages, updates.get_updates_buf ?? "");
         } catch (e) {
@@ -118,7 +134,10 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         return await api.sendText(signal, accountOf(secrets), to, text, reply);
       } catch (e) {
         const code = e instanceof WeixinError ? e.code : 0;
-        return { kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed", reason: message(e) };
+        return {
+          kind: code === staleToken ? "stale" : code === restricted ? "restricted" : "failed",
+          reason: message(e),
+        };
       }
     },
   };
@@ -134,7 +153,14 @@ export function feishuAdapter(api: FeishuApi): Adapter {
     id: "feishu",
     login: async (signal, _input, progress) => {
       const linked = await api.login(signal, (url) => progress({ state: "waiting", qr: url }));
-      return { secrets: { appId: linked.app.appId, appSecret: linked.app.appSecret, domain: linked.app.domain }, owner: linked.owner };
+      return {
+        secrets: {
+          appId: linked.app.appId,
+          appSecret: linked.app.appSecret,
+          domain: linked.app.domain,
+        },
+        owner: linked.owner,
+      };
     },
     // Returning to the SDK acknowledges only a durable inbox write; the orchestrator's work runs elsewhere.
     receive: async (signal, secrets, io) => {
@@ -185,7 +211,10 @@ export function qqAdapter(api: QQApi): Adapter {
       } catch (e) {
         // A refused passive reply (too late, too many) waits for the owner's next message; a bad login is stale.
         const status = e instanceof SendError ? e.status : 0;
-        return { kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed", reason: message(e) };
+        return {
+          kind: status === 401 ? "stale" : status >= 400 && status < 500 ? "restricted" : "failed",
+          reason: message(e),
+        };
       }
     },
   };
@@ -319,7 +348,13 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
       }
       if (progress) return { ...s, state: progress.state, ...(progress.qr ? { qr: progress.qr } : {}) };
       if (!a) return s;
-      if (!a.owner) return { ...s, state: "pairing", ...(a.pairCode ? { pairCode: a.pairCode } : {}), since: a.connectedAt };
+      if (!a.owner)
+        return {
+          ...s,
+          state: "pairing",
+          ...(a.pairCode ? { pairCode: a.pairCode } : {}),
+          since: a.connectedAt,
+        };
       return {
         ...s,
         state: paused(a) ? "paused" : "connected",
@@ -399,7 +434,14 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
         await inTx(
           Effect.forEach(
             splitText(ownerLine(m, place.conversation), maxChars[id]),
-            (piece) => outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: Date.now() }),
+            (piece) =>
+              outboxQ.addOutbox({
+                id: newId(),
+                connector: id,
+                message_id: m.id,
+                body: piece,
+                created_at: Date.now(),
+              }),
             {
               discard: true,
             },
@@ -466,7 +508,12 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
             yield* accountQ.connectorAccount({ connector: id });
             for (const m of messages) {
               const withId = m.id ? m : { ...m, id: newId() };
-              yield* inboundQ.acceptInbound({ connector: id, ext_id: withId.id, payload: JSON.stringify(withId), created_at: yield* Clock.currentTimeMillis });
+              yield* inboundQ.acceptInbound({
+                connector: id,
+                ext_id: withId.id,
+                payload: JSON.stringify(withId),
+                created_at: yield* Clock.currentTimeMillis,
+              });
             }
             if (cursor) yield* accountQ.accountCursor({ connector: id, cursor });
           }),
@@ -533,7 +580,10 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
           await kept(reload());
           continue;
         }
-        const stopped = (await receive(signal, a.secrets)) ?? { kind: "failed", reason: "收消息停了" };
+        const stopped = (await receive(signal, a.secrets)) ?? {
+          kind: "failed",
+          reason: "收消息停了",
+        };
         if (signal.aborted) return;
         if (stopped.kind === "stale") {
           await pause();
@@ -565,7 +615,10 @@ export const make = Effect.fnUntraced(function* (options: ConnectorOptions = {})
       const control = new AbortController();
       const stop = () => control.abort();
       life.signal.addEventListener("abort", stop, { once: true });
-      return { control, done: work(control.signal).catch((e) => logs.error(`vibevalley: ${id}:`, message(e))) };
+      return {
+        control,
+        done: work(control.signal).catch((e) => logs.error(`vibevalley: ${id}:`, message(e))),
+      };
     };
     const connected = () => (account && !life.signal.aborted ? generation((s) => Promise.all([receiving(s), inboxRun(s), outboxRun(s)])) : undefined);
     const resetProgress = () => {

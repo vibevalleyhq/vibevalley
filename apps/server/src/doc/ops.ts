@@ -43,7 +43,13 @@ export interface Revision {
 
 /** A result as the wire has it: rev 0, no reason and no texts are left out. */
 export function result(status: DocOpStatus, blockId: string, rev = 0, more: { yours?: DocSpan[]; reason?: string } = {}): DocOpResult {
-  return { status, blockId, ...(rev ? { rev } : {}), ...(more.yours ? { yours: more.yours } : {}), ...(more.reason ? { reason: more.reason } : {}) };
+  return {
+    status,
+    blockId,
+    ...(rev ? { rev } : {}),
+    ...(more.yours ? { yours: more.yours } : {}),
+    ...(more.reason ? { reason: more.reason } : {}),
+  };
 }
 
 const applied = (b: Block) => result("applied", b.id, b.rev);
@@ -80,7 +86,11 @@ const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 /** A block as the wire has it: no parent, and not deleted, are left out. */
 export function wire(b: Block): Block {
   const { parentId, deleted, ...rest } = b;
-  return { ...rest, ...(parentId !== undefined ? { parentId } : {}), ...(deleted ? { deleted: true } : {}) };
+  return {
+    ...rest,
+    ...(parentId !== undefined ? { parentId } : {}),
+    ...(deleted ? { deleted: true } : {}),
+  };
 }
 
 export class Page {

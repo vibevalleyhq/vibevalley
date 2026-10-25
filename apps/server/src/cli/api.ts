@@ -59,7 +59,13 @@ const apiErrorOf = Schema.decodeUnknownOption(Schema.fromJsonString(ApiError));
 const failureOf = (status: number, text: string): Failure =>
   Option.match(apiErrorOf(text), {
     // Not the server's ApiError (a 400 from decoding, a 404 for no such route): the words as they came.
-    onNone: () => new Failure({ code: status === 404 ? exit.missing : status === 400 ? exit.usage : exit.other, tag: "Server", text: text.trim(), status }),
+    onNone: () =>
+      new Failure({
+        code: status === 404 ? exit.missing : status === 400 ? exit.usage : exit.other,
+        tag: "Server",
+        text: text.trim(),
+        status,
+      }),
     onSome: (e) =>
       new Failure({
         code: codeOf[e._tag],
@@ -105,14 +111,26 @@ const answer =
   <T>(schema: Schema.Codec<T>) =>
   (text: string) =>
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
-      Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: `答复不合 Schema：${issue.message}` })),
+      Effect.mapError(
+        (issue) =>
+          new Failure({
+            code: exit.other,
+            tag: "Server",
+            text: `答复不合 Schema：${issue.message}`,
+          }),
+      ),
     );
 
 /** How a command writes an op: editNode is edit-node. */
 export const kebab = (op: string) => op.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
 const usage = (path: readonly string[], text: string, tag = "InvalidValue") =>
-  new Failure({ code: exit.usage, tag, text, next: [{ say: "看这条命令怎么写", run: [...path, "--help"] }] });
+  new Failure({
+    code: exit.usage,
+    tag,
+    text,
+    next: [{ say: "看这条命令怎么写", run: [...path, "--help"] }],
+  });
 
 /** --json's text: as given, `-` for stdin, `@file` for a file's. */
 const bodyText = (given: string, path: readonly string[]) =>
@@ -188,7 +206,11 @@ const frames = (base: string, path: string) =>
         Stream.mapError((e) =>
           e._tag === "HttpClientError"
             ? unreachable(base)(e)
-            : new Failure({ code: exit.other, tag: "Server", text: e._tag === "Retry" ? "服务端要流重连，命令行不接着连" : `流读不下去：${e.message}` }),
+            : new Failure({
+                code: exit.other,
+                tag: "Server",
+                text: e._tag === "Retry" ? "服务端要流重连，命令行不接着连" : `流读不下去：${e.message}`,
+              }),
         ),
       );
     }),
@@ -196,7 +218,9 @@ const frames = (base: string, path: string) =>
 
 export const stateCommand = Command.make(
   "state",
-  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription("一直看：每一帧一行 JSON")) },
+  {
+    watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription("一直看：每一帧一行 JSON")),
+  },
   ({ watch }) =>
     Effect.flatMap(ServerFlag, (base) =>
       // The server writes each frame on one line, so a stream is one line per frame whatever stdout is; one frame alone
@@ -211,7 +235,11 @@ export const eventsCommand = Command.make("events", {}, () => Effect.flatMap(Ser
 
 /** Only what `issue run` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
-  Schema.Struct({ state: Schema.Struct({ issues: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus }))) }) }),
+  Schema.Struct({
+    state: Schema.Struct({
+      issues: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus }))),
+    }),
+  }),
 );
 const settled = new Set<string>(["in_review", "done", "canceled"] satisfies (typeof IssueStatusValues)[number][]);
 
@@ -232,7 +260,13 @@ export const issueRunCommand = Command.make("run", { id: Argument.String("id") }
         const now = frame.state.issues!.find((i) => i.id === issue.id);
         return now
           ? Effect.succeed(now.status)
-          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: `工单 #${issue.number} 不在了：被删掉了` }));
+          : Effect.fail(
+              new Failure({
+                code: exit.missing,
+                tag: "Missing",
+                text: `工单 #${issue.number} 不在了：被删掉了`,
+              }),
+            );
       }),
       Stream.changes,
       Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),

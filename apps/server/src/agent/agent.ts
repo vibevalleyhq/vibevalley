@@ -108,7 +108,12 @@ export const make = Effect.gen(function* () {
   let s: Stored = seed;
   if (existsSync(file)) {
     const read = readStored(readFileSync(file, "utf8"));
-    if (Result.isSuccess(read)) s = { agents: read.success.agents, skills: read.success.skills ?? [], settings: read.success.settings ?? {} };
+    if (Result.isSuccess(read))
+      s = {
+        agents: read.success.agents,
+        skills: read.success.skills ?? [],
+        settings: read.success.settings ?? {},
+      };
     else {
       const e = read.failure;
       // A file that does not read (not JSON, or not the profiles' shape) is kept aside, never written over: one that cannot be
@@ -184,7 +189,9 @@ export const make = Effect.gen(function* () {
         change((x) => ({ ...x, agents: x.agents.filter((a) => a.id !== id) })),
       ),
     previewDeleteAgent: (id) =>
-      Effect.map(deletableAgent(id), (a) => ({ does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`] })),
+      Effect.map(deletableAgent(id), (a) => ({
+        does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`],
+      })),
     saveSkill: (skill) =>
       Effect.as(
         change((x) => ({ ...x, skills: upsert(x.skills, skill) })),
@@ -215,7 +222,9 @@ export const make = Effect.gen(function* () {
     previewDeleteSkill: (id) =>
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => `「${a.name}」`);
-        return { does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])] };
+        return {
+          does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])],
+        };
       }),
     saveSettings: (runtime, settings) =>
       Effect.as(

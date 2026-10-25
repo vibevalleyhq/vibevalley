@@ -36,7 +36,9 @@ let memoryBase: Promise<Blob> | undefined;
 
 const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
   PgliteMigrator.run({
-    loader: PgliteMigrator.fromRecord({ "1_schema": Effect.promise(() => pglite.exec(baselineSql())).pipe(Effect.asVoid) }),
+    loader: PgliteMigrator.fromRecord({
+      "1_schema": Effect.promise(() => pglite.exec(baselineSql())).pipe(Effect.asVoid),
+    }),
   }).pipe(Effect.provideService(SqlClient.SqlClient, client), Effect.orDie);
 
 /** The database as an SqlClient, with the schema in place. */

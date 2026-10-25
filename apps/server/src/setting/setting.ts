@@ -50,7 +50,9 @@ export interface AgoraCredentials {
   readonly appCertificate: string;
 }
 
-export class SettingRefused extends Schema.TaggedError<SettingRefused>()("SettingRefused", { message: Schema.String }) {}
+export class SettingRefused extends Schema.TaggedError<SettingRefused>()("SettingRefused", {
+  message: Schema.String,
+}) {}
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;
@@ -106,12 +108,23 @@ export const make = Effect.gen(function* () {
   const config = yield* Settings;
   const file = join(config.home, "settings.json");
   const disk = new FileWriter(file, 0o600);
-  const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
+  const fromConfig = {
+    deepseek: config.deepseek.apiKey,
+    appId: config.agora.appId,
+    certificate: config.agora.appCertificate,
+  };
   // 恢复默认 goes back to these.
   let defaults = defaultVoice();
   if (config.voice.id) {
     const tts = defaultVoice().tts;
-    defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
+    defaults = {
+      ...defaults,
+      tts: {
+        vendor: "minimax",
+        model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo",
+        voiceId: config.voice.id,
+      },
+    };
   }
   let stored = read(file);
 
@@ -155,7 +168,10 @@ export const make = Effect.gen(function* () {
       if (given !== undefined) next[key] = given.trim();
     }
     if (u.dictation) {
-      const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
+      const d = {
+        url: u.dictation.url.trim().replace(/\/+$/, ""),
+        model: u.dictation.model.trim(),
+      };
       next.dictation = d.url === "" && d.model === "" ? undefined : d;
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
@@ -190,7 +206,11 @@ export const make = Effect.gen(function* () {
     memorySources: () => [...(stored.memorySources ?? [])],
     voiceConfig: () => ({
       voice: voiceOf(stored),
-      keys: { asrKey: stored.asrKey ?? "", llmKey: stored.llmKey ?? "", ttsKey: stored.ttsKey ?? "" },
+      keys: {
+        asrKey: stored.asrKey ?? "",
+        llmKey: stored.llmKey ?? "",
+        ttsKey: stored.ttsKey ?? "",
+      },
       deepseekApiKey: pick(stored.deepseekApiKey, fromConfig.deepseek)?.[0] ?? "",
     }),
   });

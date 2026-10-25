@@ -30,13 +30,20 @@ describe("the schema", () => {
       const module = modules.find((m) => t === m || t.startsWith(`${m}_`));
       expect({ table: t, module }).toEqual({ table: t, module: expect.any(String) });
       for (const word of t.split("_"))
-        expect({ table: t, plural: word.endsWith("s") && !singularInS.has(word) ? word : undefined }).toEqual({ table: t, plural: undefined });
+        expect({
+          table: t,
+          plural: word.endsWith("s") && !singularInS.has(word) ? word : undefined,
+        }).toEqual({ table: t, plural: undefined });
     }
   });
 
   it("names every index after its table", () => {
     for (const i of indexes)
-      expect({ index: i.name, table: i.table, starts: i.name.startsWith(`${i.table}_`) }).toEqual({ index: i.name, table: i.table, starts: true });
+      expect({ index: i.name, table: i.table, starts: i.name.startsWith(`${i.table}_`) }).toEqual({
+        index: i.name,
+        table: i.table,
+        starts: true,
+      });
   });
 
   it("keeps each table's SQL in a file of its own, and only there", () => {

@@ -25,7 +25,13 @@ test("the recorded cases", () => {
       const got = parseSplit(c.in as string);
       return got.ok ? { ok: true, tasks: got.tasks, ...(got.title !== undefined ? { title: got.title } : {}) } : { ok: false, problems: got.problems };
     }
-    const i = c.in as { task: TaskGraph; edit: TaskEdit; id: string; output: string; index: number };
+    const i = c.in as {
+      task: TaskGraph;
+      edit: TaskEdit;
+      id: string;
+      output: string;
+      index: number;
+    };
     const graph = { ...i.task, tasks: i.task.tasks ?? [] };
     return {
       startable: startable(graph).map((n) => n.id),

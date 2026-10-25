@@ -12,7 +12,12 @@ import { viewOf } from "../game/view.ts";
 
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {
-    const graph = { ...g, stateTag: graphStateTag[g.state], actionText: { ...graphActionText }, actions: graphActions(g) };
+    const graph = {
+      ...g,
+      stateTag: graphStateTag[g.state],
+      actionText: { ...graphActionText },
+      actions: graphActions(g),
+    };
     if (graph.tasks.length === 0) return graph;
     graph.tasks = graph.tasks.map((n) => {
       const actions = taskActions(graph, n);
@@ -38,14 +43,28 @@ function withWords(state: WorkspaceState): WorkspaceState {
       sessions: state.sessions.map((h) => {
         const out = { ...h, phaseText: phaseWords(h) };
         // The phase and the play are the state's: changed on copies.
-        if (h.phase._tag === "working") out.phase = { ...h.phase, doing: { ...h.phase.doing, actionText: actionText[h.phase.doing.action] } };
+        if (h.phase._tag === "working")
+          out.phase = {
+            ...h.phase,
+            doing: { ...h.phase.doing, actionText: actionText[h.phase.doing.action] },
+          };
         if (h.play && (h.play.history ?? []).length > 0)
-          out.play = { ...h.play, history: h.play.history.map((s) => ({ ...s, actionText: actionText[s.action] })) };
+          out.play = {
+            ...h.play,
+            history: h.play.history.map((s) => ({ ...s, actionText: actionText[s.action] })),
+          };
         return out;
       }),
     };
   }
   if ((state.recurrences ?? []).length > 0)
-    next = { ...next, recurrences: state.recurrences!.map((s) => ({ ...s, whenText: whenText(s.when, s.tz), nextText: nextText(s) })) };
+    next = {
+      ...next,
+      recurrences: state.recurrences!.map((s) => ({
+        ...s,
+        whenText: whenText(s.when, s.tz),
+        nextText: nextText(s),
+      })),
+    };
   return next;
 }

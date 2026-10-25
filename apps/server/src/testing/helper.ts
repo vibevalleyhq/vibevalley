@@ -66,7 +66,12 @@ async function answer(turn: ScriptedTurn, input: string) {
     });
   }
   if (input.includes("乱写")) return turn.say("看了一圈，说不清。\n\n结论：没查出来");
-  const found = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
+  const found = {
+    conclusion: "打卡慢是因为每次都重读配置",
+    evidence: ["clock.ts:1 每次调用都读一遍配置"],
+    unsure: [],
+    next: ["把配置读一次缓存起来"],
+  };
   turn.say("查过了。\n\n```json\n" + JSON.stringify(found) + "\n```\n\n结论：查清楚了");
 }
 

@@ -112,7 +112,16 @@ export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map(
 export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
 /** A draft as a helper writes it in its json block. */
-const RefinementBlock = Schema.fromJsonString(Schema.Struct({ title: textField, why: textField, todo: lines, criteria: lines, notDoing: lines, files: lines }));
+const RefinementBlock = Schema.fromJsonString(
+  Schema.Struct({
+    title: textField,
+    why: textField,
+    todo: lines,
+    criteria: lines,
+    notDoing: lines,
+    files: lines,
+  }),
+);
 const readRefinement = Schema.decodeUnknownResult(RefinementBlock);
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
@@ -166,7 +175,9 @@ export const refinementOpening =
 
 /** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
 export function refinementBrief(
-  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
+  t: Pick<Issue, "title" | "description" | "criteria"> & {
+    readonly questions?: readonly Question[];
+  },
   word: string,
   project: string,
 ): string {
@@ -242,7 +253,11 @@ const words: Record<string, string> = { test: "测试", lint: "代码检查", bu
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
 export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): IssueTemplate {
-  const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
+  const commands: Record<string, string | undefined> = {
+    test: stack.test,
+    lint: stack.lint,
+    build: stack.build,
+  };
   const done = s.done.replace(commandHoles, (hole, name: string) => (commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : words[name]!));
   const text = s.title + "\n做到什么程度算完：" + done;
   const blank = firstBlank(text);
@@ -295,8 +310,19 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     switch (r.outcome) {
       case "completed":
         if (i === lastDone && t.questions.length > 0)
-          out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.questions.map((a) => a.question).join(" / ") });
-        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
+          out.push({
+            at: r.endedAt,
+            kind: "asked",
+            ...by,
+            text: "问你：" + t.questions.map((a) => a.question).join(" / "),
+          });
+        else
+          out.push({
+            at: r.endedAt,
+            kind: draft ? "refined" : "reported",
+            ...by,
+            text: (draft ? "起草好了" : "交回来了") + said,
+          });
         break;
       case "failed":
         out.push({ at: r.endedAt, kind: "failed", ...by, text: outcomeLabel.failed + said });

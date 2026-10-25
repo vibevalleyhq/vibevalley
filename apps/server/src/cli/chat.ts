@@ -179,9 +179,21 @@ export interface RuntimeChat {
  * any folder, nothing in the core state, the trajectories or the spending. */
 export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
-    return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
+    return ownChat({
+      cwd: values.cwd ?? "",
+      name: "vibevalley",
+      model: values.model ?? "",
+      mcp: "",
+      ...(values.p !== undefined ? { p: values.p } : {}),
+    });
   const config = loadConfig();
-  const registry = registryOf([vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey) }), dshRuntime]);
+  const registry = registryOf([
+    vibevalleyRuntimeOf({
+      home: () => config.home,
+      llm: (model) => deepseek(model, config.deepseek.apiKey),
+    }),
+    dshRuntime,
+  ]);
   const runtime = registry.get(id) as Runtime | undefined;
   if (!runtime) throw new Error(`没有 ${id} 这个农机`);
   if (!runtime.installation) throw new Error(`${id} 看不出装没装`);

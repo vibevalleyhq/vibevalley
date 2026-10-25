@@ -159,7 +159,10 @@ export class AgentHost<R> {
     input: Hosted<R>,
     now: boolean,
   ): Promise<{ readonly ok: true } | { readonly ok: false; readonly why: string; readonly run: string }> {
-    const run: RunInput = { ...input.run, by: input.run.by.kind ? input.run.by : { kind: "comment" } };
+    const run: RunInput = {
+      ...input.run,
+      by: input.run.by.kind ? input.run.by : { kind: "comment" },
+    };
     let b: Brain;
     try {
       b = await this.start();
@@ -358,7 +361,10 @@ export class AgentHost<R> {
     switch (e.type) {
       case "message_start":
         if (isHosted(e.message, this.o.inputType)) {
-          const next = this.local.get(e.message) ?? { route: e.message.details as R, run: { by: { kind: "" } } };
+          const next = this.local.get(e.message) ?? {
+            route: e.message.details as R,
+            run: { by: { kind: "" } },
+          };
           // An input that joins the run takes the words from here on: the one before has what it got, and ends now, or a
           // caller waiting on it (a brief, a call's line) would wait for the run's end with no words.
           if (this.input.caller && this.input.caller !== next.caller) this.input.caller.end();

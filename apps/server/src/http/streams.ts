@@ -14,7 +14,11 @@ function sse<A>(events: Stream.Stream<A>) {
   const data = events.pipe(Stream.map((e) => encoder.encode(`data: ${JSON.stringify(e)}\n\n`)));
   const pings = Stream.fromSchedule(Schedule.spaced(heartbeatMs)).pipe(Stream.map(() => encoder.encode(": ping\n\n")));
   return HttpServerResponse.stream(Stream.merge(data, pings, { haltStrategy: "left" }), {
-    headers: { "content-type": "text/event-stream", "cache-control": "no-cache", "x-accel-buffering": "no" },
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      "x-accel-buffering": "no",
+    },
   });
 }
 

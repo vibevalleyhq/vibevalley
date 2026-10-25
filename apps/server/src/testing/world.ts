@@ -48,7 +48,12 @@ export function worldBelowTasks(options: WorldOptions = {}) {
   }
   const given = options.runtimes ?? [];
   const o: ServiceOptions = {
-    runtime: { registry: registryOf(given), background: false, probe: installedOnly(given, options.usage), usageOf: async () => options.usage?.() ?? null },
+    runtime: {
+      registry: registryOf(given),
+      background: false,
+      probe: installedOnly(given, options.usage),
+      usageOf: async () => options.usage?.() ?? null,
+    },
     project: { gh: noGitHub, ...options.projects },
     ...(options.stallMs !== undefined ? { session: { stallMs: options.stallMs } } : {}),
     issue: { background: false },

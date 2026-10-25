@@ -113,7 +113,11 @@ describe("the golden files", () => {
         const last = t.sessions.at(-1);
         const h = last === undefined ? undefined : next.sessions.find((s) => s.id === last);
         if (!h || h.graph || t.task || t.graph || t.parent) continue;
-        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({ line, issue: t.id, questions: attentionWantsOwner(t.attention.state) });
+        expect({ line, issue: t.id, questions: asked.has(h.id) }).toEqual({
+          line,
+          issue: t.id,
+          questions: attentionWantsOwner(t.attention.state),
+        });
       }
       state = next;
     });

@@ -50,7 +50,11 @@ export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMem
     if (now - since < grace) continue;
     if (last !== undefined && now - last < reportAgainMs) continue;
     next.reported[key] = now;
-    report.push({ key, ...(e.channel !== undefined ? { channel: e.channel } : {}), text: e.brief.replace("{ago}", patrolAgo(now - since)) });
+    report.push({
+      key,
+      ...(e.channel !== undefined ? { channel: e.channel } : {}),
+      text: e.brief.replace("{ago}", patrolAgo(now - since)),
+    });
   }
   return [report, next];
 }

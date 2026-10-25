@@ -56,7 +56,14 @@ function snapshotOf(file: string, raw: string, updatedAt = Date.now()): MemorySn
     }
     offset += [...line].length + 1;
   }
-  return { file, prompt, lines, carried, updatedAt, lineCount: text === "" ? 0 : text.split("\n").length };
+  return {
+    file,
+    prompt,
+    lines,
+    carried,
+    updatedAt,
+    lineCount: text === "" ? 0 : text.split("\n").length,
+  };
 }
 
 export function readMemory(home: string): MemorySnapshot {
@@ -130,7 +137,11 @@ export function archiveFiles(home: string): ArchiveFile[] {
   return archiveNames(home)
     .map((name) => {
       const path = join(archiveDir(home), name);
-      return { name, at: Math.trunc(statSync(path).mtimeMs), chars: readFileSync(path, "utf8").length };
+      return {
+        name,
+        at: Math.trunc(statSync(path).mtimeMs),
+        chars: readFileSync(path, "utf8").length,
+      };
     })
     .sort((a, b) => b.at - a.at);
 }
@@ -152,7 +163,11 @@ export function searchArchive(home: string, query: string, limit = 0): ArchiveHi
     const lines = readFileSync(join(archiveDir(home), file), "utf8").split("\n");
     lines.forEach((l, i) => {
       if (hits.length < most && l.toLowerCase().includes(q))
-        hits.push({ file, line: i + 1, text: lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 3)).join("\n") });
+        hits.push({
+          file,
+          line: i + 1,
+          text: lines.slice(Math.max(0, i - 2), Math.min(lines.length, i + 3)).join("\n"),
+        });
     });
     if (hits.length >= most) break;
   }

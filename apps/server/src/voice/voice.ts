@@ -20,6 +20,7 @@ import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { orchestratorModel } from "../orchestrator/rules.ts";
 import { Notices } from "../notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
+import { answer as outsideAnswer } from "../base/http.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { callbackLog } from "../base/log.ts";
 
@@ -725,21 +726,20 @@ export const make = Effect.fnUntraced(function* (options: VoiceOptions = {}) {
       form.append("model", d.model);
       form.append("response_format", "json");
       // A local model's first request loads it, which takes a while.
-      const [res, raw] = yield* http
-        .execute(
-          HttpClientRequest.post(d.url + "/audio/transcriptions").pipe(
-            HttpClientRequest.bodyFormData(form),
-            d.key ? HttpClientRequest.bearerToken(d.key) : (r) => r,
-          ),
-        )
-        .pipe(
-          Effect.flatMap((res) => Effect.map(res.text, (text) => [res, text.slice(0, 1 << 20)] as const)),
-          Effect.timeout(120_000),
-          Effect.mapError((e) => unavailable("听写的地址连不上：" + message(e), "voice")),
-        );
-      const got = readTranscription(raw);
-      if (res.status < 200 || res.status > 299)
-        return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(got?.error?.message || raw.trim())].slice(0, 200).join("")}`));
+      const sent = yield* outsideAnswer(
+        HttpClientRequest.post(d.url + "/audio/transcriptions").pipe(
+          HttpClientRequest.bodyFormData(form),
+          d.key ? HttpClientRequest.bearerToken(d.key) : (r) => r,
+        ),
+        1 << 20,
+      ).pipe(
+        Effect.provideService(HttpClient.HttpClient, http),
+        Effect.timeout(120_000),
+        Effect.mapError((e) => unavailable("听写的地址连不上：" + message(e), "voice")),
+      );
+      const got = readTranscription(sent.text);
+      if (!sent.ok)
+        return yield* Effect.fail(unavailable(`听写的地址回了 ${sent.status}：${[...(got?.error?.message || sent.text.trim())].slice(0, 200).join("")}`));
       if (!got) return yield* Effect.fail(unavailable("听写的地址回的不是 OpenAI 的转写格式"));
       return { text: (got.text ?? "").trim() };
     }),

@@ -40,7 +40,11 @@ export const customMessage = (customType: string, content: UserContent, options:
   timestamp: Date.now(),
 });
 
-export const userMessage = (text: string): UserMessage => ({ role: "user", content: text, timestamp: Date.now() });
+export const userMessage = (text: string): UserMessage => ({
+  role: "user",
+  content: text,
+  timestamp: Date.now(),
+});
 
 export function summaryText(m: { readonly summary: string; readonly archive?: string }): string {
   const where = m.archive ? "，原文在 " + m.archive : "";
@@ -70,7 +74,12 @@ export function llmMessages(messages: readonly AgentMessage[]): Message[] {
 
 /** One system message leads: the prompt and every tool, the same start for every request until either changes. */
 export function withPrefix(prefix: string, tools: readonly Tool[], messages: readonly AgentMessage[]): Message[] {
-  const head: SystemMessage = { role: "system", content: prefix, ...(tools.length > 0 ? { toolsAdded: [...tools] } : {}), timestamp: 0 };
+  const head: SystemMessage = {
+    role: "system",
+    content: prefix,
+    ...(tools.length > 0 ? { toolsAdded: [...tools] } : {}),
+    timestamp: 0,
+  };
   return [head, ...llmMessages(messages)];
 }
 

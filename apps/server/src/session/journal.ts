@@ -259,7 +259,16 @@ class FileJournal implements Journal {
     const n = this.calls.get(key);
     if (n === undefined) return;
     this.calls.delete(key);
-    this.add({ type: "tool/result", text: "", call: n, ok, ...(output.trim() ? { output: clipOutput(output.trimEnd()) } : {}) }, from);
+    this.add(
+      {
+        type: "tool/result",
+        text: "",
+        call: n,
+        ok,
+        ...(output.trim() ? { output: clipOutput(output.trimEnd()) } : {}),
+      },
+      from,
+    );
   }
 
   note(kind: SessionEventType, text: string, from?: From) {

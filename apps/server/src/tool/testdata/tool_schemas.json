@@ -21,10 +21,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue",
-      "pass"
-    ],
+    "required": ["issue", "pass"],
     "type": "object"
   },
   "cancel_recurrence": {
@@ -34,9 +31,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "id"
-    ],
+    "required": ["id"],
     "type": "object"
   },
   "changes": {
@@ -47,9 +42,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue"
-    ],
+    "required": ["issue"],
     "type": "object"
   },
   "channel_settings": {
@@ -65,9 +58,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "channel"
-    ],
+    "required": ["channel"],
     "type": "object"
   },
   "channels": {
@@ -82,9 +73,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue"
-    ],
+    "required": ["issue"],
     "type": "object"
   },
   "dismiss": {
@@ -95,9 +84,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue"
-    ],
+    "required": ["issue"],
     "type": "object"
   },
   "list_recurrences": {
@@ -120,10 +107,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "agent",
-      "text"
-    ],
+    "required": ["agent", "text"],
     "type": "object"
   },
   "memory_search": {
@@ -148,10 +132,7 @@
     "additionalProperties": true,
     "properties": {
       "action": {
-        "enum": [
-          "retry",
-          "skip"
-        ],
+        "enum": ["retry", "skip"],
         "type": "string"
       },
       "task": {
@@ -163,11 +144,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "graph",
-      "task",
-      "action"
-    ],
+    "required": ["graph", "task", "action"],
     "type": "object"
   },
   "open_channel": {
@@ -183,22 +160,14 @@
         "type": "string"
       }
     },
-    "required": [
-      "name"
-    ],
+    "required": ["name"],
     "type": "object"
   },
   "graph_action": {
     "additionalProperties": true,
     "properties": {
       "action": {
-        "enum": [
-          "start",
-          "pause",
-          "resume",
-          "abandon",
-          "merge"
-        ],
+        "enum": ["start", "pause", "resume", "abandon", "merge"],
         "type": "string"
       },
       "graph": {
@@ -206,10 +175,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "graph",
-      "action"
-    ],
+    "required": ["graph", "action"],
     "type": "object"
   },
   "task_edit": {
@@ -249,10 +215,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "graph",
-      "task"
-    ],
+    "required": ["graph", "task"],
     "type": "object"
   },
   "graphs": {
@@ -317,13 +280,7 @@
         "type": "array"
       },
       "kind": {
-        "enum": [
-          "once",
-          "every",
-          "daily",
-          "weekly",
-          "cron"
-        ],
+        "enum": ["once", "every", "daily", "weekly", "cron"],
         "type": "string"
       },
       "minutes": {
@@ -350,11 +307,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "name",
-      "text",
-      "kind"
-    ],
+    "required": ["name", "text", "kind"],
     "type": "object"
   },
   "stop": {
@@ -365,9 +318,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue"
-    ],
+    "required": ["issue"],
     "type": "object"
   },
   "tell": {
@@ -382,10 +333,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue",
-      "message"
-    ],
+    "required": ["issue", "message"],
     "type": "object"
   },
   "graph_split": {
@@ -404,10 +352,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "goal",
-      "project"
-    ],
+    "required": ["goal", "project"],
     "type": "object"
   },
   "issues": {
@@ -455,10 +400,7 @@
       },
       "deliver": {
         "description": "交付什么：change 是改代码、合进项目（不填就是它）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
-        "enum": [
-          "change",
-          "answer"
-        ],
+        "enum": ["change", "answer"],
         "type": "string"
       },
       "description": {
@@ -486,9 +428,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "title"
-    ],
+    "required": ["title"],
     "type": "object"
   },
   "issue_update": {
@@ -529,9 +469,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue"
-    ],
+    "required": ["issue"],
     "type": "object"
   },
   "issue_status": {
@@ -557,10 +495,7 @@
         "type": "string"
       }
     },
-    "required": [
-      "issue",
-      "to"
-    ],
+    "required": ["issue", "to"],
     "type": "object"
   }
 }

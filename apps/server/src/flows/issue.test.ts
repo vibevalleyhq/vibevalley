@@ -213,7 +213,11 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
-      const session = mustHire(yield* (yield* Issues).hire(lab(), "做一步", "split", { taskGraph: { id: "p1", task: "impl" } }));
+      const session = mustHire(
+        yield* (yield* Issues).hire(lab(), "做一步", "split", {
+          taskGraph: { id: "p1", task: "impl" },
+        }),
+      );
       const head = (yield* (yield* Sessions).get(session.id))!;
       expect(head.graph).toEqual({ id: "p1", task: "impl" });
       yield* w.nextReport;
@@ -229,7 +233,17 @@ describe("an issue", () => {
       const sessions = yield* Sessions;
       const recurrences = yield* Recurrences;
       yield* (yield* Agents).saveAgent({ ...lab(), enabled: true });
-      const made = yield* recurrences.add({ name: "巡检", text: "看一眼", agent: "lab", project: "every", when: { kind: "every", minutes: 5 } }, "owner", true);
+      const made = yield* recurrences.add(
+        {
+          name: "巡检",
+          text: "看一眼",
+          agent: "lab",
+          project: "every",
+          when: { kind: "every", minutes: 5 },
+        },
+        "owner",
+        true,
+      );
       const due = () => {
         now += 5 * 60_000 + 1;
         return recurrences.tick;
@@ -263,7 +277,13 @@ describe("an issue", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = yield* Issues;
-      let issue = yield* issues.add({ title: "写打卡", description: "每天一次", project: "demo", assignee: "lab", priority: "high" });
+      let issue = yield* issues.add({
+        title: "写打卡",
+        description: "每天一次",
+        project: "demo",
+        assignee: "lab",
+        priority: "high",
+      });
       issue = yield* issues.edit(issue.id, { title: "写打卡并提交" });
       expect([issue.title, issue.description, issue.project, issue.assignee, issue.priority]).toEqual(["写打卡并提交", "每天一次", "demo", "lab", "high"]);
       issue = yield* issues.edit(issue.id, { project: "" });
@@ -337,7 +357,11 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
       yield* (yield* Agents).saveAgent(lab());
-      const issue = yield* issues.add({ title: "写打卡并提交", project: "resume", assignee: "lab" });
+      const issue = yield* issues.add({
+        title: "写打卡并提交",
+        project: "resume",
+        assignee: "lab",
+      });
       const sent = yield* issues.start(issue.id, "");
       yield* w.nextReport;
       const first = (yield* sessions.get(sent.session!))!;
@@ -415,7 +439,9 @@ describe("an issue", () => {
       const before = git(project, "log", "--format=%s", "main");
       const merging = yield* issues.previewStatus(committed.issue!, "done", "");
       expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/);
-      const keeping = yield* issues.previewStatus(committed.issue!, "done", "", { keepBranch: true });
+      const keeping = yield* issues.previewStatus(committed.issue!, "done", "", {
+        keepBranch: true,
+      });
       expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/);
       expect([git(project, "log", "--format=%s", "main"), (yield* issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
       yield* issues.setStatus(committed.issue!, "done", "", "");
@@ -445,7 +471,12 @@ describe("an issue", () => {
       const chat = yield* Channels;
       yield* (yield* Agents).saveAgent(lab());
       const project = join(f.config.workRoot, "projects", "clock");
-      const asked = yield* issues.add({ title: "查一下打卡为什么慢，顺手提交", project: "clock", assignee: "lab", deliver: "answer" });
+      const asked = yield* issues.add({
+        title: "查一下打卡为什么慢，顺手提交",
+        project: "clock",
+        assignee: "lab",
+        deliver: "answer",
+      });
       expect(asked.deliver).toBe("answer");
       yield* issues.setStatus(asked.id, "todo", "", "");
       yield* w.nextReport;
@@ -471,7 +502,12 @@ describe("an issue", () => {
       );
       expect([done.status, done.delivered, done.answer?.conclusion]).toEqual(["done", "none", "打卡慢是因为每次都重读配置"]);
 
-      const garbled = yield* issues.add({ title: "查一下 乱写", project: "clock", assignee: "lab", deliver: "answer" });
+      const garbled = yield* issues.add({
+        title: "查一下 乱写",
+        project: "clock",
+        assignee: "lab",
+        deliver: "answer",
+      });
       yield* issues.setStatus(garbled.id, "todo", "", "");
       yield* w.nextReport;
       const stuck = yield* await_(
@@ -528,7 +564,12 @@ describe("an issue", () => {
       const issues = yield* Issues;
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
-      let issue = yield* issues.add({ title: "先问清楚，再写打卡并提交", project: "clock", assignee: "lab", review: "required" });
+      let issue = yield* issues.add({
+        title: "先问清楚，再写打卡并提交",
+        project: "clock",
+        assignee: "lab",
+        review: "required",
+      });
       expect(issue.review).toBe("required");
       yield* issues.setStatus(issue.id, "todo", "", "");
       yield* w.nextReport;
@@ -586,7 +627,12 @@ describe("an issue", () => {
       const hire = () => Effect.map(issues.hire(lab(), "随便做点什么", "money"), (h) => h.refused ?? "");
       const settings = agents.settings("pi");
 
-      usage = { status: "balance", provider: "DeepSeek", available: true, balances: [{ currency: "CNY", amount: 0 }] };
+      usage = {
+        status: "balance",
+        provider: "DeepSeek",
+        available: true,
+        balances: [{ currency: "CNY", amount: 0 }],
+      };
       yield* runtimes.refresh("pi");
       expect(yield* hire()).toMatch(/余额用完了/);
 
@@ -608,7 +654,11 @@ describe("an issue", () => {
       yield* runtimes.update("pi", settings);
       expect(yield* hire()).toMatch(/额度用完了（Codex · 1 week），10 月 14 日 08:00重置/);
 
-      usage = { status: "ok", subscription: "pro", windows: [{ label: "Codex · 1 week", usedPercent: 99, resetsAt: resets }] };
+      usage = {
+        status: "ok",
+        subscription: "pro",
+        windows: [{ label: "Codex · 1 week", usedPercent: 99, resetsAt: resets }],
+      };
       yield* runtimes.refresh("pi");
       expect(yield* hire()).toBe("");
     }).pipe(Effect.scoped, Effect.provide(f.layer));

@@ -37,14 +37,26 @@ test("what it cannot read is refused", () => {
 });
 
 test("the server's own address is always loopback", () => {
-  expect(serverAddress(loadConfig("", { VIBEVALLEY_HOME: temp(), VIBEVALLEY_HOST: "0.0.0.0", VIBEVALLEY_PORT: "9100" }))).toBe("127.0.0.1:9100");
+  expect(
+    serverAddress(
+      loadConfig("", {
+        VIBEVALLEY_HOME: temp(),
+        VIBEVALLEY_HOST: "0.0.0.0",
+        VIBEVALLEY_PORT: "9100",
+      }),
+    ),
+  ).toBe("127.0.0.1:9100");
 });
 
 test("pull requests", () => {
   const home = temp();
   const c = loadConfig("", { VIBEVALLEY_HOME: home });
   expect([c.github.prProjects, c.github.prPollSeconds]).toEqual([[], 180]);
-  const env = { VIBEVALLEY_HOME: home, VIBEVALLEY_GITHUB_PR_PROJECTS: "one,two", VIBEVALLEY_GITHUB_PR_POLL_SECONDS: "12" };
+  const env = {
+    VIBEVALLEY_HOME: home,
+    VIBEVALLEY_GITHUB_PR_PROJECTS: "one,two",
+    VIBEVALLEY_GITHUB_PR_POLL_SECONDS: "12",
+  };
   expect(loadConfig("", env).github).toEqual({ prProjects: ["one", "two"], prPollSeconds: 12 });
   expect(() => loadConfig("", { ...env, VIBEVALLEY_GITHUB_PR_POLL_SECONDS: "0" })).toThrow();
 });

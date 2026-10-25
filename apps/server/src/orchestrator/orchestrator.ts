@@ -191,7 +191,14 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
   const toolsFor = (current: () => Route) =>
     tool.orchestrator(() => {
       const at = current();
-      return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
+      return {
+        agent: orchestratorAgent,
+        session: "",
+        project: "",
+        here: at.conversation,
+        picked: at.agent ?? "",
+        owner: at.owner ?? false,
+      };
     });
 
   // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
@@ -220,7 +227,10 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
     fresh: () => {
       shown = "";
     },
-    restored: (r) => ({ ...(r.issue ? { issue: r.issue } : {}), by: { kind: intake[r.source].trigger } }),
+    restored: (r) => ({
+      ...(r.issue ? { issue: r.issue } : {}),
+      by: { kind: intake[r.source].trigger },
+    }),
     keepEvents,
     toolStart: tool.start,
     notice,
@@ -307,7 +317,11 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
           .join("\n\n");
         return { text, heard: ids };
       },
-      { route, run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked }, ...(i.caller ? { caller: i.caller } : {}) },
+      {
+        route,
+        run: { ...(i.issue ? { issue: i.issue } : {}), by: i.by ?? { kind: rule.trigger }, asked },
+        ...(i.caller ? { caller: i.caller } : {}),
+      },
       rule.now,
     );
     if (taken.ok) {
@@ -347,7 +361,13 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
       fromPerson && n.conversation === general
         ? pickedNote(picked) + "主人说：" + n.messages.map((m) => m.text).join("\n")
         : pickedNote(picked) + "【田头】" + n.target + " 里有给你的话：\n" + orchestratorInboxLines(n.messages) + "\n\n你的回答会发在 " + n.target + "。";
-    await take({ source: fromPerson ? "owner" : "chat", line, conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), owner });
+    await take({
+      source: fromPerson ? "owner" : "chat",
+      line,
+      conversation: n.conversation,
+      ...(picked.agent ? { agent: picked.agent } : {}),
+      owner,
+    });
   };
 
   // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
@@ -360,7 +380,13 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
       const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? "（服务端没开着时错过的，补一次）" : "";
       line = `【定时任务「${s.name}」到点了${missed}】\n${s.text}\n\n这是 #${channel.name} 的定时（${s.id}），你的回答会发在那里；照着做，做完说一两句。`;
     }
-    await take({ source: s ? "recurrence" : "issue", line, conversation: channel.id, issue: w.issue.id, by: w.by });
+    await take({
+      source: s ? "recurrence" : "issue",
+      line,
+      conversation: channel.id,
+      issue: w.issue.id,
+      by: w.by,
+    });
   };
 
   // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
@@ -418,7 +444,10 @@ export const make = Effect.fnUntraced(function* (options: OrchestratorOptions = 
   return Orchestrator.of({
     say: Effect.fn("Orchestrator.say")(function* (text, pick, conversation, sendKey) {
       const a = pick.agent ? store.agent(pick.agent) : undefined;
-      const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
+      const picked: Pick = {
+        ...(a ? { agent: a.id } : {}),
+        ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}),
+      };
       yield* core.open();
       const { message, again } = yield* chat.say(text, conversation, sendKey);
       if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);

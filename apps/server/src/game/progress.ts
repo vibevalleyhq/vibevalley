@@ -55,12 +55,25 @@ export interface Folded {
   readonly seen: Seen;
 }
 
-export const emptyProgress = (): Progress => ({ coins: 0, streak: 0, bestStreak: 0, counts: {}, unlocked: [], multiplier: 1 });
+export const emptyProgress = (): Progress => ({
+  coins: 0,
+  streak: 0,
+  bestStreak: 0,
+  counts: {},
+  unlocked: [],
+  multiplier: 1,
+});
 
-export const emptyFolded = (): Folded => ({ progress: emptyProgress(), seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] } });
+export const emptyFolded = (): Folded => ({
+  progress: emptyProgress(),
+  seen: { told: [], failed: [], conflicted: [], reviewed: [], runtimes: [] },
+});
 
 const added = (list: readonly string[], item: string) => (list.includes(item) ? (list as string[]) : [...list, item]);
-const bump = (counts: Record<string, number>, id: string, by: number) => ({ ...counts, [id]: (counts[id] ?? 0) + by });
+const bump = (counts: Record<string, number>, id: string, by: number) => ({
+  ...counts,
+  [id]: (counts[id] ?? 0) + by,
+});
 const atLeast = (counts: Record<string, number>, id: string, value: number) => ((counts[id] ?? 0) >= value ? counts : { ...counts, [id]: value });
 
 function tallied(p: Progress, e: LedgerEntry): Progress {
@@ -167,9 +180,18 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
       }
     });
   }
-  const next: Progress = { ...tallied(p, entry), coins: p.coins + coins, counts, unlocked: [...p.unlocked, ...unlocked] };
+  const next: Progress = {
+    ...tallied(p, entry),
+    coins: p.coins + coins,
+    counts,
+    unlocked: [...p.unlocked, ...unlocked],
+  };
   next.multiplier = streakMultiplier(next.streak);
-  const news: ProgressNews = { ...(coins !== 0 ? { coins } : {}), ...(session ? { session } : {}), ...(unlocked.length > 0 ? { unlocked } : {}) };
+  const news: ProgressNews = {
+    ...(coins !== 0 ? { coins } : {}),
+    ...(session ? { session } : {}),
+    ...(unlocked.length > 0 ? { unlocked } : {}),
+  };
   return [{ progress: next, seen }, news];
 }
 

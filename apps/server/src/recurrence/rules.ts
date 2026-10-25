@@ -18,7 +18,11 @@ export const dueRecurrences = (all: readonly Recurrence[], now: number) =>
 export const isMissed = (s: Recurrence, now: number) => now - (nextRun(s) ?? now) > missedAfterMs;
 
 /** A one-off runs once: then it is off. */
-export const afterRun = (s: Recurrence, now: number): Recurrence => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
+export const afterRun = (s: Recurrence, now: number): Recurrence => ({
+  ...s,
+  lastRun: now,
+  enabled: s.when.kind === "once" ? false : s.enabled,
+});
 
 /**
  * Whether a recurrence waits for the owner's yes before it can come due. The owner's own never waits, nor the orchestrator's when

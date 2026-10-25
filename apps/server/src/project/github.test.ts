@@ -46,7 +46,9 @@ describe("GitHub", () => {
         [
           "logged in",
           { out: "gh version 2.80.0 (2025-09-01)\n" },
-          { out: "github.com\n  ✓ Logged in to github.com account gardener (keyring)\n  - Active account: true\n  - Token: secret" },
+          {
+            out: "github.com\n  ✓ Logged in to github.com account gardener (keyring)\n  - Active account: true\n  - Token: secret",
+          },
           { installed: true, loggedIn: true, account: "gardener" },
         ],
       ] as const) {
@@ -84,7 +86,10 @@ describe("GitHub", () => {
         }
         gitSync(made.path, "remote", "set-url", "origin", "https://gitlab.com/owner/repo");
         yield* p.refreshGitHub();
-        expect((yield* p.summary(made)).pullRequest).toEqual({ available: false, reason: "不是 GitHub 仓库" });
+        expect((yield* p.summary(made)).pullRequest).toEqual({
+          available: false,
+          reason: "不是 GitHub 仓库",
+        });
       }),
       {},
       { gh: counted },
@@ -134,7 +139,12 @@ describe("GitHub", () => {
     return projects(
       root,
       Effect.gen(function* () {
-        expect((yield* (yield* Projects).create({ name: "private", github: "https://github.com/owner/private" })).git).toBe(true);
+        expect(
+          (yield* (yield* Projects).create({
+            name: "private",
+            github: "https://github.com/owner/private",
+          })).git,
+        ).toBe(true);
       }),
       {},
       { gh: cloning },
@@ -230,7 +240,9 @@ describe("GitHub", () => {
     Effect.gen(function* () {
       for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {
         const root = projectsDir();
-        const hooks: ProjectHooks = { gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")) };
+        const hooks: ProjectHooks = {
+          gh: loggedIn(() => (mode === "not-enabled" ? "READ" : "WRITE")),
+        };
         let failFetch = false;
         let originPath = "";
         yield* projects(

@@ -9,7 +9,12 @@ import { reduce } from "../projection/reduce.ts";
 
 describe("status moves", () => {
   const issue = (status: IssueStatus, sent: boolean, more: Partial<Issue> = {}) =>
-    ({ status, sessions: sent ? ["w1"] : [], attention: { state: "reviewing", acts: [] }, ...more }) as Issue;
+    ({
+      status,
+      sessions: sent ? ["w1"] : [],
+      attention: { state: "reviewing", acts: [] },
+      ...more,
+    }) as Issue;
   it("where each status may go", () => {
     for (const [from, sent, to] of [
       ["backlog", false, ["todo", "canceled"]],
@@ -36,7 +41,9 @@ describe("status moves", () => {
   });
 
   it("a round that failed is not completed, from the board, the command line or the orchestrator alike", () => {
-    const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
+    const failed = issue("in_review", true, {
+      attention: { state: "stuck", stuck: "failed", acts: [] },
+    });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
     // Stopped halfway is not failed: what is there may still be completed.
@@ -45,7 +52,11 @@ describe("status moves", () => {
 
   // Who does the work is not in the table: an issue no session works on (the orchestrator's) has run when its own run says so.
   it("an issue run by no session goes by the same table", () => {
-    const ran = (status: IssueStatus, more: Partial<Issue>) => issue(status, false, { lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" }, ...more });
+    const ran = (status: IssueStatus, more: Partial<Issue>) =>
+      issue(status, false, {
+        lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" },
+        ...more,
+      });
     expect(statusMoves(ran("in_review", {}))).toEqual(["todo", "done", "canceled"]);
     expect(statusMove(ran("in_review", {}), "done")).toEqual(["complete", ""]);
     expect(statusMoves(ran("in_review", { attention: { state: "stuck", stuck: "failed", acts: [] } }))).toEqual(["todo", "canceled"]);
@@ -56,16 +67,36 @@ describe("status moves", () => {
 
 describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
-    ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
-  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], review: "glance", createdAt: 0 } as unknown as Issue;
+    ({
+      id: "w1",
+      phase: { _tag: "done" },
+      lastRun: { outcome: lastRun, summary: "", at: 1 },
+    }) as unknown as Session;
+  const base = {
+    status: "in_review",
+    sessions: ["w1"],
+    questions: [],
+    findings: [],
+    review: "glance",
+    createdAt: 0,
+  } as unknown as Issue;
   const answeredSession = {
     ...session("completed"),
-    lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
+    lastRun: {
+      outcome: "completed",
+      summary: "",
+      at: 1,
+      answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] },
+    },
   } as Session;
   // An answer issue's round that got through but handed back no answer to read did not get it done.
   it("an answer issue waits on a conclusion it can read", () => {
     const answerIssue = { ...base, deliver: "answer" } as Issue;
-    expect(attentionOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
+    expect(attentionOf(answerIssue, session("completed"))).toMatchObject({
+      state: "stuck",
+      stuck: "failed",
+      lead: "cure",
+    });
     expect(attentionOf(answerIssue, answeredSession)).toMatchObject({
       state: "reviewing",
       lead: "acknowledge",
@@ -84,15 +115,39 @@ describe("moves and the attention", () => {
       [{ review: "required", reviewedAt: 5 }, session("completed")],
       [{ deliver: "answer" }, session("completed")],
       [{ deliver: "answer" }, answeredSession],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" } }, undefined],
-      [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],
+      [
+        {
+          sessions: [],
+          deliver: "answer",
+          lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" },
+        },
+        undefined,
+      ],
+      [
+        {
+          sessions: [],
+          deliver: "answer",
+          lastRun: { startedAt: 1, endedAt: 2, outcome: "failed" },
+        },
+        undefined,
+      ],
+      [
+        {
+          sessions: [],
+          deliver: "answer",
+          lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" },
+        },
+        undefined,
+      ],
     ];
     for (const [more, s] of cases) {
       const t = { ...base, ...more } as Issue;
       const attention = attentionOf(t, s);
       const offered = attention.acts.some((a) => a === "complete" || a === "acknowledge");
-      expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, attention }).includes("done") });
+      expect({ more, offered }).toEqual({
+        more,
+        offered: statusMoves({ ...t, attention }).includes("done"),
+      });
     }
   });
 
@@ -126,7 +181,14 @@ describe("moves and the attention", () => {
     ] as Fact[])
       state = reduce(state, fact)[0];
     expect(state.issues![0]!.moves).toContain("done");
-    state = reduce(state, { type: "report", at: 3, id: "w1", outcome: "failed", summary: "没做成", runs: 2 } as Fact)[0];
+    state = reduce(state, {
+      type: "report",
+      at: 3,
+      id: "w1",
+      outcome: "failed",
+      summary: "没做成",
+      runs: 2,
+    } as Fact)[0];
     expect(state.issues![0]!.moves).toEqual(["todo", "canceled"]);
   });
 });

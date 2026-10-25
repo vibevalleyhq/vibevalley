@@ -6,7 +6,11 @@ import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
 import { type RunFinished, type RunStore, Sessions, type SessionsInside } from "./session.ts";
 
-const user = (text: string) => ({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } }) as AgentEvent;
+const user = (text: string) =>
+  ({
+    type: "message_start",
+    message: { role: "user", content: [{ type: "text", text }], timestamp: 0 },
+  }) as AgentEvent;
 const said = (text: string, stopReason = "stop", errorMessage?: string) =>
   ({
     type: "message_end",
@@ -20,10 +24,26 @@ const said = (text: string, stopReason = "stop", errorMessage?: string) =>
       ...(errorMessage ? { errorMessage } : {}),
     },
   }) as unknown as AgentEvent;
-const end = (stopReason = "stop") => ({ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason }] }) as unknown as AgentEvent;
-const tool = (id: string) => ({ type: "tool_execution_start", toolCallId: id, toolName: "issue_list", args: {} }) as AgentEvent;
+const end = (stopReason = "stop") =>
+  ({
+    type: "agent_end",
+    messages: [{ role: "assistant", content: [], stopReason }],
+  }) as unknown as AgentEvent;
+const tool = (id: string) =>
+  ({
+    type: "tool_execution_start",
+    toolCallId: id,
+    toolName: "issue_list",
+    args: {},
+  }) as AgentEvent;
 const toolEnd = (id: string) =>
-  ({ type: "tool_execution_end", toolCallId: id, toolName: "issue_list", result: { content: [{ type: "text", text: "两张" }] }, isError: false }) as AgentEvent;
+  ({
+    type: "tool_execution_end",
+    toolCallId: id,
+    toolName: "issue_list",
+    result: { content: [{ type: "text", text: "两张" }] },
+    isError: false,
+  }) as AgentEvent;
 
 const issue = (id: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) =>
@@ -83,7 +103,10 @@ describe("the orchestrator's runs", () => {
     Effect.gen(function* () {
       const sessions = (yield* Sessions) as SessionsInside;
       let broken = true;
-      const store: RunStore = { ...sessions.runStore, finish: (...a) => (broken ? Effect.fail(new Error("disk full")) : sessions.runStore.finish(...a)) };
+      const store: RunStore = {
+        ...sessions.runStore,
+        finish: (...a) => (broken ? Effect.fail(new Error("disk full")) : sessions.runStore.finish(...a)),
+      };
       const x = new AgentExecution("orchestrator", sessions.trajectories.openLog("orchestrator"), (tool) => ({ text: tool, action: "other", tool }), store);
       yield* x.observe(user("一"), { by: { kind: "comment" } });
       const first = sessions.currentRun("orchestrator");
@@ -95,7 +118,10 @@ describe("the orchestrator's runs", () => {
       expect(second).not.toBe(first);
       yield* x.observe(end());
       const sql = yield* SqlClient.SqlClient;
-      const rows = yield* sql<{ id: string; outcome: string }>`select id, outcome from session_run order by started_at`;
+      const rows = yield* sql<{
+        id: string;
+        outcome: string;
+      }>`select id, outcome from session_run order by started_at`;
       expect(rows.map((r) => r.outcome)).toEqual(["completed", "completed"]);
     }).pipe(Effect.scoped, Effect.provide(world())),
   );

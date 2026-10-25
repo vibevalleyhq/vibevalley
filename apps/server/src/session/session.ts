@@ -134,7 +134,11 @@ interface OarSession extends Allocation {
   stop?: () => void;
 }
 
-type OpenFailure = { readonly session?: never; readonly refused: string; readonly retained: boolean };
+type OpenFailure = {
+  readonly session?: never;
+  readonly refused: string;
+  readonly retained: boolean;
+};
 type Opened = { readonly session: OarSession; readonly refused?: never; readonly retained?: never } | OpenFailure;
 
 interface Hand {
@@ -236,7 +240,11 @@ export function newsOf(fact: Fact, after: WorkspaceState): SessionNews | undefin
       return session ? { _tag: "hired", session } : undefined;
     }
     case "report":
-      return { _tag: "reported", report: fact, session: after.sessions.find((h) => h.id === fact.id) };
+      return {
+        _tag: "reported",
+        report: fact,
+        session: after.sessions.find((h) => h.id === fact.id),
+      };
     case "left":
       return { _tag: "left", left: fact };
     default:
@@ -298,7 +306,11 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
     brief: r.brief,
     hiredAt: r.hired_at,
     runs: runs.length,
-    phase: { _tag: "closed", at: r.ended_at ?? 0, closed: (r.closed ?? "dismissed") as SessionClose },
+    phase: {
+      _tag: "closed",
+      at: r.ended_at ?? 0,
+      closed: (r.closed ?? "dismissed") as SessionClose,
+    },
     ...(r.project !== null ? { project: r.project } : {}),
     ...(r.issue !== null ? { issue: r.issue } : {}),
   };
@@ -318,7 +330,12 @@ function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionRe
   }
   if (tokens > 0 || priced) s.spent = { tokens, ...(priced ? { cny } : {}) };
   const last = runs.at(-1);
-  if (last?.outcome) s.lastRun = { outcome: last.outcome as Outcome, summary: last.summary ?? "", at: last.ended_at ?? 0 };
+  if (last?.outcome)
+    s.lastRun = {
+      outcome: last.outcome as Outcome,
+      summary: last.summary ?? "",
+      at: last.ended_at ?? 0,
+    };
   return s;
 }
 
@@ -483,13 +500,29 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
   // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
   const runs = {
     start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
-      tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() })),
+      tried(
+        qr.startRun({
+          id,
+          session,
+          issue: issue || null,
+          triggered_by: JSON.stringify(trigger),
+          started_at: Date.now(),
+        }),
+      ),
     /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
     link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
     heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
     issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => x.issue)),
     finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
-      tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+      tried(
+        qr.endRun({
+          ended_at: Date.now(),
+          outcome,
+          summary: summary || null,
+          spent: spent ? JSON.stringify(spent) : null,
+          id,
+        }),
+      ),
   };
   /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
   const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>
@@ -568,7 +601,11 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       } else if (event.kind === "compaction_started") signals.push({ kind: "compacting", id: h.id, on: true });
       else if (event.kind === "compaction_ended") signals.push({ kind: "compacting", id: h.id, on: false });
     }
-    const reaction = eventFacts(event, core.session(h.id), h.tracking, { id: h.id, runtime, cwd: h.place.cwd });
+    const reaction = eventFacts(event, core.session(h.id), h.tracking, {
+      id: h.id,
+      runtime,
+      cwd: h.place.cwd,
+    });
     h.tracking = reaction.tracking;
     if (reaction.model) h.tracking = { ...h.tracking, rate: runtimes.quote(runtime, reaction.model) };
     if (opened) {
@@ -632,7 +669,11 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     const session = core.session(h.id);
     if (session?.phase._tag !== "working") return;
     h.tracking = { ...h.tracking, quiet: true };
-    yield* core.apply({ type: "quiet", id: h.id, since: (yield* Clock.currentTimeMillis) - silentForMs });
+    yield* core.apply({
+      type: "quiet",
+      id: h.id,
+      since: (yield* Clock.currentTimeMillis) - silentForMs,
+    });
     const quiet = silentForMs < 60_000 ? `${Math.round(silentForMs / 1000)} 秒` : `${Math.round(silentForMs / 60_000)} 分钟`;
     const last = session.phase.doing.label ? "（最后在：" + session.phase.doing.label + "）" : "";
     h.journal.note("run/error", `已经 ${quiet}没动静了${last}。可能在跑很久的命令，也可能卡住了`);
@@ -731,7 +772,12 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     const r = resolved.success;
     const text = [instructions(agent, store.skills()), workplaceRules(place, projects.houseRules(), id)].filter((s) => s !== "").join("\n\n");
     const mcp = [
-      { name: "vibevalley", type: "http" as const, url: mcpUrl, headers: { authorization: "Bearer " + issueToken(id) } },
+      {
+        name: "vibevalley",
+        type: "http" as const,
+        url: mcpUrl,
+        headers: { authorization: "Bearer " + issueToken(id) },
+      },
       ...(agent.mcpServers ?? []).map(toOarMcp),
     ];
     const own: Partial<SessionOptions> = {
@@ -749,12 +795,21 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
       session: async (installation, opts) => {
         const session = await base.session(installation, { ...opts, ...own });
         let disposing: Promise<void> | undefined;
-        const tracked: RuntimeSession = { ...session, dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())) };
+        const tracked: RuntimeSession = {
+          ...session,
+          dispose: () => (disposing ??= Promise.resolve().then(() => session.dispose())),
+        };
         resources.add(tracked);
         return tracked;
       },
     };
-    const subagents = createSubagents({ runtimes: { get: (rid) => (rid === base.id ? mine : undefined) }, maxRunning, maxDepth: 1, cwd: root, logDir });
+    const subagents = createSubagents({
+      runtimes: { get: (rid) => (rid === base.id ? mine : undefined) },
+      maxRunning,
+      maxDepth: 1,
+      cwd: root,
+      logDir,
+    });
     const allocation: Allocation = { owner, subagents, resources, attached: false };
     allocations.set(id, allocation);
     const task = text && agent.personaMode === "prompt" ? text + jobBreak + input : input;
@@ -770,7 +825,11 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
           ...(resume ? { resume } : {}),
           env: r.env,
         })
-        .catch((e: unknown) => ({ kind: "refused" as const, code: "open_failed" as const, reason: e instanceof Error ? e.message : String(e) })),
+        .catch((e: unknown) => ({
+          kind: "refused" as const,
+          code: "open_failed" as const,
+          reason: e instanceof Error ? e.message : String(e),
+        })),
     );
     if (spawned.kind !== "spawned") return yield* failedOpening(allocation, `${spawned.reason}（${spawned.code}）`);
     const verb = resume ? "叫醒" : "派";
@@ -819,7 +878,10 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         const opening = allocation && (!allocation.attached || allocation.closing);
         // A submitted turn owns its slot before oar opens it: its trigger is the reservation.
         return (opening || (h && h.triggers.length > 0)) && !isBusy(s)
-          ? ({ ...s, phase: { _tag: "working", doing: { action: "thinking", label: "" } } } as Session)
+          ? ({
+              ...s,
+              phase: { _tag: "working", doing: { action: "thinking", label: "" } },
+            } as Session)
           : s;
       }),
       ...[...allocations.values()].filter((a) => !visible.some((s) => s.id === a.owner.id)).map((a) => a.owner),
@@ -835,7 +897,13 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
   const roomFor = (runtime: string, project: string) => noRoom(capacity(), runtime, project.trim(), limits(runtime));
 
   const remind = Effect.fnUntraced(function* (agent: string, session: string, project: string, input: string, recalled: Set<string>) {
-    const found = yield* memories.recall({ agent, session, project, text: input, skip: new Set(recalled) });
+    const found = yield* memories.recall({
+      agent,
+      session,
+      project,
+      text: input,
+      skip: new Set(recalled),
+    });
     for (const id of found.ids) recalled.add(id);
     if (found.ids.length > 0) save();
     return recallBlock(found.lines);
@@ -843,7 +911,11 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
 
   const wake = Effect.fnUntraced(function* (h: Hand, session: Session, input: string, recall: string) {
     const agent = store.agent(session.agent);
-    if (!agent) return { kind: "refused", reason: session.name + " 的 agent 已经删掉了，叫不醒" } as Delivered;
+    if (!agent)
+      return {
+        kind: "refused",
+        reason: session.name + " 的 agent 已经删掉了，叫不醒",
+      } as Delivered;
     const stopped = yield* Effect.result(rest(h));
     if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) } as Delivered;
     const resume = h.oarSessionId;
@@ -872,12 +944,20 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         Effect.gen(function* () {
           const session = core.session(id);
           if (hands.get(id) !== h || !session) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
-          if (h.sess?.closing) return { kind: "refused", reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮` } as Delivered;
+          if (h.sess?.closing)
+            return {
+              kind: "refused",
+              reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮`,
+            } as Delivered;
           const starts = !isBusy(session);
           let recall = "";
           if (starts) {
             const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id);
-            if (full) return { kind: "refused", reason: `${session.name} 先不接着干：${full}` } as Delivered;
+            if (full)
+              return {
+                kind: "refused",
+                reason: `${session.name} 先不接着干：${full}`,
+              } as Delivered;
             recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
           }
           const s = h.sess;
@@ -890,13 +970,18 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
           const launch = h.launch;
           if (starts) expect(h, by);
           const sent = yield* Effect.promise(() =>
-            s.agent
-              .send(withRecall(recall, text), "followup")
-              .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
+            s.agent.send(withRecall(recall, text), "followup").catch((e: unknown) => ({
+              kind: "error" as const,
+              reason: e instanceof Error ? e.message : String(e),
+            })),
           );
           if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch } as Delivered;
           if (starts) unexpect(h);
-          if (sent.kind !== "accepted") return { kind: "refused", reason: `${session.name} 没收到：${sent.reason}` } as Delivered;
+          if (sent.kind !== "accepted")
+            return {
+              kind: "refused",
+              reason: `${session.name} 没收到：${sent.reason}`,
+            } as Delivered;
           if (sent.landed === "queued") {
             expect(h, by);
             return { kind: "queued", launch } as Delivered;
@@ -928,7 +1013,12 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
           Effect.catch((e) =>
             Effect.gen(function* () {
               const f = e instanceof MergeFailure ? e : MergeFailure.ofError(reasonText(e));
-              if (f.kind === "conflict") yield* core.apply({ type: "conflict", id, conflict: { base: f.base, files: [...f.files] } });
+              if (f.kind === "conflict")
+                yield* core.apply({
+                  type: "conflict",
+                  id,
+                  conflict: { base: f.base, files: [...f.files] },
+                });
               const words = notTakenIn(f, current.name, settle);
               return yield* new NotTakenIn({ failure: f, ...words, message: words.owner });
             }),
@@ -991,7 +1081,12 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         yield* core.notice("warn", `${session.name} 没接回来：${place ? "干活的目录不见了（" + place.cwd + "）" : "库里没有它的记录"}`);
         continue;
       }
-      const s = { place, oarSessionId: row.oar_session ?? "", lastText: row.last_text ?? "", recalled: json<string[]>(row.recalled) ?? [] };
+      const s = {
+        place,
+        oarSessionId: row.oar_session ?? "",
+        lastText: row.last_text ?? "",
+        recalled: json<string[]>(row.recalled) ?? [],
+      };
       hands.set(session.id, {
         id: session.id,
         place: s.place,
@@ -1008,7 +1103,13 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
         heard: [],
       });
       if (isBusy(session)) {
-        yield* core.apply({ type: "report", id: session.id, outcome: "interrupted", summary: "VibeValley 重启了，这一轮停在了半路", runs: session.runs });
+        yield* core.apply({
+          type: "report",
+          id: session.id,
+          outcome: "interrupted",
+          summary: "VibeValley 重启了，这一轮停在了半路",
+          runs: session.runs,
+        });
         yield* core.notice("info", `VibeValley 重启过，${session.name} 那一轮停下了；给它带句话就能接着干`);
       }
     }
@@ -1065,7 +1166,11 @@ export const make = Effect.fnUntraced(function* (options: SessionOptionsIn = {})
     }),
     send: Effect.fn("Sessions.send")(function* (agent, task, where, opt) {
       const unclosed = [...allocations.values()].find((a) => a.owner.issue === opt.issue.id);
-      if (unclosed) return { refused: unclosed.failure ?? "这张工单的农机还没交回工作区", retainedWork: true as const };
+      if (unclosed)
+        return {
+          refused: unclosed.failure ?? "这张工单的农机还没交回工作区",
+          retainedWork: true as const,
+        };
       const full = roomFor(agent.runtime, where);
       if (full) return { refused: full };
       hired++;

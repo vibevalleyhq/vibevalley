@@ -14,7 +14,10 @@ test("the recorded cases", () => {
         return voiceProblem(c.in as SettingsUpdateVoice) || null;
       case "voiceOverrides": {
         const want = c.out as { overrides: SettingsUpdateVoice };
-        return { overrides: voiceOverrides(defaultVoice(), c.in as VoiceSettings), settings: voiceSettingsOver(defaultVoice(), want.overrides) };
+        return {
+          overrides: voiceOverrides(defaultVoice(), c.in as VoiceSettings),
+          settings: voiceSettingsOver(defaultVoice(), want.overrides),
+        };
       }
       case "keyHint":
         return keyHint(c.in as string);
@@ -30,7 +33,12 @@ test("what settings refuse", () => {
   expect(settingsProblem({ agoraAppCertificate: "123" })).toMatch(/Certificate/);
   expect(settingsProblem({ agoraAppId: "not-an-app-id" })).toMatch(/App ID/);
   expect(settingsProblem({ deepseekApiKey: "", agoraAppId: "" })).toBe("");
-  expect(settingsProblem({ agoraAppId: "0123456789ABCDEF0123456789abcdef", deepseekApiKey: " sk-12345678 " })).toBe("");
+  expect(
+    settingsProblem({
+      agoraAppId: "0123456789ABCDEF0123456789abcdef",
+      deepseekApiKey: " sk-12345678 ",
+    }),
+  ).toBe("");
   expect(settingsProblem({ ttsKey: " a b " })).toMatch(/空格/);
   expect(settingsProblem({ voice: { silenceMs: 50 } })).toMatch(/200 到 2000/);
   expect(settingsProblem({ voice: { persona: "  " } })).toMatch(/人设/);
@@ -46,12 +54,22 @@ test("the voice keeps only what differs", () => {
   expect(over).toEqual({ area: "CN", silenceMs: 600, greeting: "在呢。" });
   expect(voiceSettingsOver(defaults, over)).toEqual(wanted);
   expect(voiceSettingsOver(defaults, {})).toEqual(defaults);
-  const tts = { vendor: "microsoft", region: "eastasia", voiceName: "zh-CN-XiaoxiaoNeural" } as const;
+  const tts = {
+    vendor: "microsoft",
+    region: "eastasia",
+    voiceName: "zh-CN-XiaoxiaoNeural",
+  } as const;
   expect(voiceOverrides(defaults, { ...defaults, tts })).toEqual({ tts });
 });
 
 test("memory sources", () => {
-  const on = { kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: false, write: false } as const;
+  const on = {
+    kind: "nowledge",
+    url: "http://127.0.0.1:14242/mcp/",
+    enabled: true,
+    read: false,
+    write: false,
+  } as const;
   expect(memorySourcesProblem([on])).toBe("");
   expect(memorySourcesProblem([on, on])).toMatch(/只能接一个/);
   expect(memorySourcesProblem([{ ...on, kind: "mem0" as never }])).toMatch(/不认识/);

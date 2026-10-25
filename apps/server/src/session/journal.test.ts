@@ -19,7 +19,12 @@ const trajectories = (home = mkdtempSync(join(tmpdir(), "journal-")), push: (id:
   return t;
 };
 
-const bash = (text: string, input?: string) => ({ text, action: "run_command" as const, tool: "bash", ...(input ? { input } : {}) });
+const bash = (text: string, input?: string) => ({
+  text,
+  action: "run_command" as const,
+  tool: "bash",
+  ...(input ? { input } : {}),
+});
 
 describe("a session's log", () => {
   it("discards an obsolete event file and writes the current event shape when the session runs again", () => {
@@ -48,7 +53,12 @@ describe("a session's log", () => {
     j.toolStarted("c1", bash("读取参数"));
     const call = j.events()[1]!;
     j.toolInput("c1", '{"command":"pwd"}', "pwd");
-    expect(j.events()[1]).toMatchObject({ seq: call.seq, revision: 1, input: '{"command":"pwd"}', text: "pwd" });
+    expect(j.events()[1]).toMatchObject({
+      seq: call.seq,
+      revision: 1,
+      input: '{"command":"pwd"}',
+      text: "pwd",
+    });
     tr.finish("versioned");
     expect(tr.events("versioned")![0]).toMatchObject({ seq: 0, revision: 1, text: "测试通过" });
   });

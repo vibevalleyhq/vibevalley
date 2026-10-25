@@ -23,7 +23,9 @@ import {
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
 const internal = <T>(path: string) => import(new URL(path, dist).href) as Promise<T>;
 
-const { acpSession } = await internal<{ acpSession: (profile: Record<string, unknown>) => StartSession }>("shared/acp/session.js");
+const { acpSession } = await internal<{
+  acpSession: (profile: Record<string, unknown>) => StartSession;
+}>("shared/acp/session.js");
 const { executableInstallation } = await internal<{
   executableInstallation: (
     env: string,
@@ -33,9 +35,9 @@ const { executableInstallation } = await internal<{
     options?: { versionTimeoutMs?: number },
   ) => InstallationProbe;
 }>("shared/installation.js");
-const { refuseSessionOptions } = await internal<{ refuseSessionOptions: (refused: RefusedSessionOptions, options: SessionOptions) => void }>(
-  "shared/session-options.js",
-);
+const { refuseSessionOptions } = await internal<{
+  refuseSessionOptions: (refused: RefusedSessionOptions, options: SessionOptions) => void;
+}>("shared/session-options.js");
 const { effortLevelOf } = await internal<{ effortLevelOf: (value: unknown) => string | undefined }>("shared/effort-levels.js");
 const { listingCwd } = await internal<{ listingCwd: (options: { cwd?: string }) => string }>("shared/listing-cwd.js");
 
@@ -168,7 +170,13 @@ const readNewSession = (command: string, cwd: string, timeoutMs: number) =>
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const outgoing = yield* Queue.unbounded<Uint8Array>();
-      const handle = yield* spawner.spawn(ChildProcess.make(command, ["--profile", "acp"], { cwd, stdin: Stream.fromQueue(outgoing), stderr: "ignore" }));
+      const handle = yield* spawner.spawn(
+        ChildProcess.make(command, ["--profile", "acp"], {
+          cwd,
+          stdin: Stream.fromQueue(outgoing),
+          stderr: "ignore",
+        }),
+      );
       const waiting = new Map<number, Deferred.Deferred<Rec, Error>>();
       // Lines that are not JSON-RPC answers are its logs.
       yield* handle.stdout.pipe(
@@ -198,9 +206,17 @@ const readNewSession = (command: string, cwd: string, timeoutMs: number) =>
           const answer = yield* Deferred.make<Rec, Error>();
           waiting.set(id, answer);
           yield* Queue.offer(outgoing, encoder.encode(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"));
-          return yield* Deferred.await(answer).pipe(Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.fail(new Error(`${method} timed out`)) }));
+          return yield* Deferred.await(answer).pipe(
+            Effect.timeoutOrElse({
+              duration: timeoutMs,
+              orElse: () => Effect.fail(new Error(`${method} timed out`)),
+            }),
+          );
         });
-      yield* request("initialize", { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false } });
+      yield* request("initialize", {
+        protocolVersion: 1,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      });
       const response = yield* request("session/new", { cwd, mcpServers: [] });
       // Best effort: the list is in hand, and the process is killed next.
       if (typeof response.sessionId === "string") yield* Effect.ignore(request("session/close", { sessionId: response.sessionId }));
@@ -231,10 +247,16 @@ export const dshRuntime = defineRuntime({
   id: "dsh",
   brand: { name: "DeepSeek Harness" } as never,
   // OAR_DSH_BIN pins one; its version is `dsh --version`, which loads the CLI, slowly.
-  installation: executableInstallation("OAR_DSH_BIN", "dsh", undefined, undefined, { versionTimeoutMs: 30_000 }),
+  installation: executableInstallation("OAR_DSH_BIN", "dsh", undefined, undefined, {
+    versionTimeoutMs: 30_000,
+  }),
   refusedSessionOptions,
   // The model may be written provider/model, or as the bare model of DeepSeek's own provider.
-  session: (installation, options) => startSession(installation, { ...options, ...(options.model !== undefined ? { model: optionValue(options.model) } : {}) }),
+  session: (installation, options) =>
+    startSession(installation, {
+      ...options,
+      ...(options.model !== undefined ? { model: optionValue(options.model) } : {}),
+    }),
   listModels: async (installation, options): Promise<ListModelsResult> => {
     if (installation.via !== "executable" || !("command" in installation))
       return { kind: "unsupported", reason: "dsh model listing requires the dsh executable" };
@@ -246,6 +268,11 @@ export const dshRuntime = defineRuntime({
       throw e;
     }
     const models = projectModels(response);
-    return models ? { kind: "ok", models } : { kind: "unsupported", reason: "this dsh build returns no model config option on session/new" };
+    return models
+      ? { kind: "ok", models }
+      : {
+          kind: "unsupported",
+          reason: "this dsh build returns no model config option on session/new",
+        };
   },
 });

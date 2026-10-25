@@ -29,7 +29,17 @@ describe("the orchestrator's rules", () => {
 
   it("cut what others said long, never the owner's words", () => {
     const line = (text: string) =>
-      orchestratorInboxLines([{ id: "m4", number: 4, target: "#田头:3", from: "w1", fromKind: "agent", name: "测试小吴", text } as InboxMessage]);
+      orchestratorInboxLines([
+        {
+          id: "m4",
+          number: 4,
+          target: "#田头:3",
+          from: "w1",
+          fromKind: "agent",
+          name: "测试小吴",
+          text,
+        } as InboxMessage,
+      ]);
     const head = "[target=#田头:3 msg=4 from=w1 测试小吴] ";
     const cases: [string, string, string][] = [
       ["799", "a".repeat(799), "a".repeat(799)],
@@ -40,7 +50,15 @@ describe("the orchestrator's rules", () => {
     ];
     for (const [name, text, want] of cases) expect({ name, got: line(text) }).toEqual({ name, got: head + want });
     const owner = orchestratorInboxLines([
-      { id: "m4", number: 4, target: "#ops", from: "user", fromKind: "user", name: "主人", text: "字".repeat(900) } as InboxMessage,
+      {
+        id: "m4",
+        number: 4,
+        target: "#ops",
+        from: "user",
+        fromKind: "user",
+        name: "主人",
+        text: "字".repeat(900),
+      } as InboxMessage,
     ]);
     expect(owner).toBe("[target=#ops msg=4 from=主人] " + "字".repeat(900));
   });

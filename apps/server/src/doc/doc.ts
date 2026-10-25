@@ -60,7 +60,13 @@ const missingDoc = (id: string) => missing("文档 " + id, [lookIn.doc]);
 
 const titleOf = (title: string) => title.trim() || "没起名的文档";
 
-const document = (d: qd.DocResult): Document => ({ id: d.id, title: d.title, seq: d.seq, created: d.created_at, updated: d.updated_at });
+const document = (d: qd.DocResult): Document => ({
+  id: d.id,
+  title: d.title,
+  seq: d.seq,
+  created: d.created_at,
+  updated: d.updated_at,
+});
 
 const blockOf = (r: qb.DocBlocksResult): Block =>
   wire({
@@ -175,7 +181,15 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
             );
           for (const r of p.revisions)
             yield* db(
-              qr.addDocBlockRevision({ id: newId(), block_id: r.block, rev: r.rev, spans: JSON.stringify(r.spans), actor, kind: r.kind, created_at: now }),
+              qr.addDocBlockRevision({
+                id: newId(),
+                block_id: r.block,
+                rev: r.rev,
+                spans: JSON.stringify(r.spans),
+                actor,
+                kind: r.kind,
+                created_at: now,
+              }),
             );
           const seq = d.value.seq + 1;
           yield* db(
@@ -204,13 +218,31 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
 
   const append = Effect.fnUntraced(function* (doc: string, actor: string, type: string, attrs: BlockAttrs, text: string) {
     const last = new Page(doc, actor, 0, yield* blocksOf(doc)).children("").at(-1)?.orderKey ?? "";
-    const b: BlockInput = { id: newId(), orderKey: yield* keyOrRefuse(last, ""), type, attrs, text: spansOf(type, text) };
-    return one(yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "insert_block", block: b }] }), b.id);
+    const b: BlockInput = {
+      id: newId(),
+      orderKey: yield* keyOrRefuse(last, ""),
+      type,
+      attrs,
+      text: spansOf(type, text),
+    };
+    return one(
+      yield* submitLocked(doc, actor, {
+        batchId: newId(),
+        ops: [{ op: "insert_block", block: b }],
+      }),
+      b.id,
+    );
   }, lock.withPermits(1));
 
   const updateText = Effect.fnUntraced(function* (doc: string, actor: string, block: string, baseRev: number, text: string) {
     const type = (yield* blocksOf(doc)).find((b) => b.id === block)?.type ?? "paragraph";
-    return one(yield* submitLocked(doc, actor, { batchId: newId(), ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }] }), block);
+    return one(
+      yield* submitLocked(doc, actor, {
+        batchId: newId(),
+        ops: [{ op: "update_text", blockId: block, baseRev, text: spansOf(type, text) }],
+      }),
+      block,
+    );
   }, lock.withPermits(1));
 
   const importMarkdown = Effect.fnUntraced(function* (title: string, markdown: string, actor: string) {
@@ -227,7 +259,14 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
       parents.push(id);
       ops.push({
         op: "insert_block" as const,
-        block: { id, ...(parent ? { parentId: parent } : {}), orderKey: key, type: b.type, attrs: b.attrs, text: b.text },
+        block: {
+          id,
+          ...(parent ? { parentId: parent } : {}),
+          orderKey: key,
+          type: b.type,
+          attrs: b.attrs,
+          text: b.text,
+        },
       });
     }
     if (ops.length > 0) yield* submit(created.doc.id, actor, { batchId: newId(), ops });
@@ -254,7 +293,10 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
       }
     }
     const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
-    const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
+    const ack = yield* submitLocked(doc, writer, {
+      batchId: newId(),
+      ops: [{ op: "insert_block", block }],
+    });
     const r = ack.results[0];
     if (r?.status !== "applied") return yield* refused("演示的块没插进去：" + r?.status);
     return blockIn(ack, b.id)!.rev;
@@ -281,7 +323,12 @@ export const make = Effect.fnUntraced(function* (options: DocOptions = {}) {
     function* (doc: string, writers: string[]) {
       const headings: string[] = [];
       for (const [i, w] of writers.entries()) {
-        const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", demoScript[i]!.heading) };
+        const b = {
+          id: newId(),
+          type: "heading",
+          attrs: { level: 2 },
+          text: spansOf("heading", demoScript[i]!.heading),
+        };
         yield* demoInsert(doc, w, b);
         headings.push(b.id);
         yield* wait(0.5);

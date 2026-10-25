@@ -89,9 +89,16 @@ describe("lan access", () => {
       expect([health.status, health.body]).toEqual([200, expect.stringContaining(`"ok":true`)]);
       const me = yield* Effect.promise(() => request("GET", addr + "/api/v1/lan/me", paired.key));
       expect(me.status).toBe(200);
-      expect(JSON.parse(me.body)).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
+      expect(JSON.parse(me.body)).toMatchObject({
+        id: paired.device,
+        lastSeen: expect.any(Number),
+      });
       // A paired browser's cookie is a key as the header is.
-      const byCookie = yield* Effect.promise(() => fetch(addr + "/api/v1/lan/me", { headers: { cookie: `other=1; ${lanKeyCookie}=${paired.key}` } }));
+      const byCookie = yield* Effect.promise(() =>
+        fetch(addr + "/api/v1/lan/me", {
+          headers: { cookie: `other=1; ${lanKeyCookie}=${paired.key}` },
+        }),
+      );
       expect(byCookie.status).toBe(200);
       expect((yield* Effect.promise(() => fetch(addr + "/api/v1/health", { headers: { cookie: `${lanKeyCookie}=nope` } }))).status).toBe(401);
       for (const path of ["/mcp", "/mcp/x"]) expect((yield* Effect.promise(() => request("GET", addr + path, paired.key))).status).toBe(404);

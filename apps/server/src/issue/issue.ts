@@ -394,7 +394,15 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
 
   /** What the session waits on the owner for, from its report; a report with none, or a comment, clears them. */
   const asked = (id: string, questions: readonly Question[] | undefined) =>
-    Effect.andThen(db(q.setIssueQuestions({ id, questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0) })), publish(id));
+    Effect.andThen(
+      db(
+        q.setIssueQuestions({
+          id,
+          questions: jsonOrNull(openQuestions(questions), openQuestions(questions).length > 0),
+        }),
+      ),
+      publish(id),
+    );
 
   /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
   const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
@@ -411,7 +419,16 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
 
   /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
   const judged = (id: string, at: number, findings: readonly Finding[]) =>
-    Effect.andThen(db(q.reviewIssue({ id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) })), publish(id));
+    Effect.andThen(
+      db(
+        q.reviewIssue({
+          id,
+          reviewed_at: at > 0 ? at : null,
+          findings: jsonOrNull(findings, findings.length > 0),
+        }),
+      ),
+      publish(id),
+    );
 
   /** The owner's word answers what it asked, and starts a round that the last acceptance did not see. */
   const ownerSaid = Effect.fnUntraced(function* (id: string) {
@@ -444,7 +461,13 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     yield* inTx(
       queued
         ? Effect.andThen(
-            db(qq.enqueueIssue({ issue: id, channel, triggered_by: JSON.stringify(by ?? { kind: "issue" }) })),
+            db(
+              qq.enqueueIssue({
+                issue: id,
+                channel,
+                triggered_by: JSON.stringify(by ?? { kind: "issue" }),
+              }),
+            ),
             db(q.queueIssue({ at: yield* Clock.currentTimeMillis, id })),
           )
         : Effect.andThen(db(qq.dequeueIssue({ issue: id })), db(q.unqueueIssue({ id }))),
@@ -495,19 +518,32 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
     const issue = prepared.success;
     // A draft's session is not one of the issue's sessions: the issue stays unsent.
-    const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
+    const hired = yield* sessions.send(agent, task, where, {
+      ...opt,
+      issue,
+      ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}),
+    });
     if (!hired.session && !opt.issue && !hired.retainedWork) {
       yield* db(q.removeIssue({ id: issue.id }));
       yield* core.apply({ type: "issueGone", id: issue.id });
     }
-    if (hired.retainedWork) return { ...hired, refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单` };
+    if (hired.retainedWork)
+      return {
+        ...hired,
+        refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单`,
+      };
     return hired.session && evicted ? { ...hired, evicted } : hired;
   });
 
   /** Who an unsent issue goes to and where, or why it cannot go: starting it and its dry run ask the same. */
   const readyOf = Effect.fnUntraced(function* (issue: Issue) {
     if (issue.refining) return yield* refused(issue.refining.name + " 正在起草：等它交回来再开工");
-    const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
+    const pick = [
+      lookIn.agent,
+      {
+        say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）`,
+      },
+    ];
     if (!issue.assignee) return yield* refused("还没选派哪个帮工档案", pick);
     const agent = store.agent(issue.assignee);
     if (!agent) return yield* refused("帮工档案 " + issue.assignee + " 不在了", pick);
@@ -517,8 +553,13 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   const ready = (id: string) => Effect.flatMap(unsent(id), readyOf);
 
   const send = (issue: Issue, agent: Agent, project: string, channel: string, by?: RunTrigger) =>
-    Effect.flatMap(hire(agent, issueJob(issue), project, { channel, issue: issue.id, ...(by ? { trigger: by } : {}) }), (hired) =>
-      hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去")),
+    Effect.flatMap(
+      hire(agent, issueJob(issue), project, {
+        channel,
+        issue: issue.id,
+        ...(by ? { trigger: by } : {}),
+      }),
+      (hired) => (hired.session ? Effect.succeed(hired.session.id) : Effect.fail(refused(hired.refused ?? "派不出去"))),
     );
 
   /** Its run starts as it is handed over: the issue is in progress until the run ends on it (endRun). */
@@ -527,7 +568,13 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     const run: IssueRun = { startedAt: yield* Clock.currentTimeMillis };
     yield* db(q.setLastRun({ id: issue.id, last_run: JSON.stringify(run) }));
     yield* publish(issue.id);
-    PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
+    PubSub.publishUnsafe(orchestratorHub, {
+      issue,
+      channel,
+      by,
+      ...(due ? { recurrence: due } : {}),
+      ...(said ? { said } : {}),
+    });
   });
 
   /** by undefined: the issue sent out. said: the owner's words with it, when it is asked again. */
@@ -608,13 +655,25 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
   const scheduled = Effect.fnUntraced(function* (due: Due) {
     const s = due.recurrence;
     const channel = yield* chat.channelOf(s.channel);
-    const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
+    const by: RunTrigger = {
+      kind: "recurrence",
+      recurrence: s.id,
+      ...(due.missed ? { missed: true } : {}),
+    };
     const found = yield* ofRecurrence(s.id);
     let issue = found;
     if (!issue) {
       const project = s.project ?? (channel.project || undefined);
       const made = yield* Effect.result(
-        add({ title: s.name, description: s.text, ...(project ? { project } : {}), assignee: s.agent ?? orchestratorAgent }, s.id),
+        add(
+          {
+            title: s.name,
+            description: s.text,
+            ...(project ? { project } : {}),
+            assignee: s.agent ?? orchestratorAgent,
+          },
+          s.id,
+        ),
       );
       if (made._tag === "Failure") return yield* chat.notice(channel.id, "定时「" + s.name + "」写不了工单：" + reasonOf(made.failure), "recurrence_refused");
       issue = made.success;
@@ -699,7 +758,10 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     if (!edit) return t;
     const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
     if (words) yield* unsent(t.id);
-    return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) } as Issue;
+    return {
+      ...t,
+      ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)),
+    } as Issue;
   });
 
   /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,
@@ -805,8 +867,16 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         const closing = closingOf(e.closed);
         yield* db(
           "delivered" in closing
-            ? q.completeOpenIssue({ closed_at: yield* Clock.currentTimeMillis, delivered: closing.delivered, id: issue })
-            : q.cancelOpenIssue({ closed_at: yield* Clock.currentTimeMillis, canceled: closing.canceled, id: issue }),
+            ? q.completeOpenIssue({
+                closed_at: yield* Clock.currentTimeMillis,
+                delivered: closing.delivered,
+                id: issue,
+              })
+            : q.cancelOpenIssue({
+                closed_at: yield* Clock.currentTimeMillis,
+                canceled: closing.canceled,
+                id: issue,
+              }),
         );
         yield* publish(issue);
         return;
@@ -916,7 +986,10 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
         was = yield* get(id);
         if (isClosed(was.status)) return yield* refused("这张工单关上了");
       } else was = yield* unsent(id);
-      const [title, description] = yield* issueWords({ title: upd.title ?? was.title, description: upd.description ?? was.description ?? "" });
+      const [title, description] = yield* issueWords({
+        title: upd.title ?? was.title,
+        description: upd.description ?? was.description ?? "",
+      });
       if (upd.project !== undefined && upd.project !== was.project && was.project) {
         const released = yield* sessions.clearWorkplace(was.id, was.project, was.number, "preserve");
         if (released.kept) return yield* refused(`工单 #${was.number} 还不能换项目：${released.reason}`);
@@ -950,7 +1023,11 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
       const order = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
       const at = order.indexOf(before);
       order.splice(at < 0 ? order.length : at, 0, id);
-      yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
+      yield* inTx(
+        Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), {
+          discard: true,
+        }),
+      );
       for (const each of order) yield* publish(each);
       return yield* list;
     }),
@@ -1212,7 +1289,12 @@ export const make = Effect.fnUntraced(function* (options: IssueOptions = {}) {
     templates: Effect.fn("Issues.templates")(function* (name) {
       const stack = yield* projects.stack(name);
       if (!stack) return yield* missing("项目 " + name, [lookIn.project]);
-      return { project: name, stack, recent: sentTitles(yield* list, name), kinds: filledKinds(templateCatalog(), stack) };
+      return {
+        project: name,
+        stack,
+        recent: sentTitles(yield* list, name),
+        kinds: filledKinds(templateCatalog(), stack),
+      };
     }),
     hire,
     ran,

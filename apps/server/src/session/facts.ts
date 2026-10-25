@@ -44,11 +44,37 @@ export interface FactContext {
 }
 
 export type Op =
-  | { readonly type: "prompt" | "response" | "thought"; readonly text: string; readonly from?: From }
-  | { readonly type: "toolStarted"; readonly callId: string; readonly start: ToolStart; readonly from?: From }
-  | { readonly type: "toolInput"; readonly callId: string; readonly input: string; readonly text: string; readonly from?: From }
-  | { readonly type: "toolEnded"; readonly callId: string; readonly output: string; readonly ok: boolean; readonly from?: From }
-  | { readonly type: "note"; readonly kind: SessionEventType; readonly text: string; readonly from?: From };
+  | {
+      readonly type: "prompt" | "response" | "thought";
+      readonly text: string;
+      readonly from?: From;
+    }
+  | {
+      readonly type: "toolStarted";
+      readonly callId: string;
+      readonly start: ToolStart;
+      readonly from?: From;
+    }
+  | {
+      readonly type: "toolInput";
+      readonly callId: string;
+      readonly input: string;
+      readonly text: string;
+      readonly from?: From;
+    }
+  | {
+      readonly type: "toolEnded";
+      readonly callId: string;
+      readonly output: string;
+      readonly ok: boolean;
+      readonly from?: From;
+    }
+  | {
+      readonly type: "note";
+      readonly kind: SessionEventType;
+      readonly text: string;
+      readonly from?: From;
+    };
 
 export interface Reaction {
   readonly tracking: Tracking;
@@ -73,7 +99,10 @@ const actions: Partial<Record<ToolActionKind, ToolAction>> = {
 /** What was spent from from to now; undefined when nothing was counted from. */
 export function since(now: Spent, from: Spent | undefined): Spent | undefined {
   if (!from) return undefined;
-  return { tokens: now.tokens - from.tokens, ...(now.cny !== undefined ? { cny: now.cny - (from.cny ?? 0) } : {}) };
+  return {
+    tokens: now.tokens - from.tokens,
+    ...(now.cny !== undefined ? { cny: now.cny - (from.cny ?? 0) } : {}),
+  };
 }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -125,7 +154,10 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       // A prompt-mode persona and what the turn is reminded of ride on top of the input: the panel shows the job itself,
       // then what was recalled.
       const at = event.input.lastIndexOf(jobBreak);
-      journal.push({ type: "prompt", text: at >= 0 ? event.input.slice(at + jobBreak.length) : event.input });
+      journal.push({
+        type: "prompt",
+        text: at >= 0 ? event.input.slice(at + jobBreak.length) : event.input,
+      });
       const recalled = recalledIn(event.input);
       if (recalled) journal.push({ type: "note", kind: "memory/recalled", text: recalled });
       facts.push({ type: "run", id });
@@ -143,7 +175,12 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       journal.push({
         type: "toolStarted",
         callId: event.callId,
-        start: { text, action, tool: event.tool, ...(event.input !== undefined ? { input: event.input } : {}) },
+        start: {
+          text,
+          action,
+          tool: event.tool,
+          ...(event.input !== undefined ? { input: event.input } : {}),
+        },
       });
       doing(action, clip(text, labelMax));
       break;
@@ -179,7 +216,12 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       if (event.delayMs) text += `，${Math.ceil(event.delayMs / 1000)} 秒后`;
       if (event.reason) text += "：" + clip(event.reason, 160);
       journal.push({ type: "note", kind: "llm/retry", text });
-      facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts ? { of: event.maxAttempts } : {}) });
+      facts.push({
+        type: "retry",
+        id,
+        attempt: event.attempt,
+        ...(event.maxAttempts ? { of: event.maxAttempts } : {}),
+      });
       break;
     }
     case "usage": {
@@ -198,7 +240,14 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       const cny = tracking.rate?.charge(delta);
       const before = session.spent ?? { tokens: 0 };
       const total = before.cny !== undefined || cny !== undefined ? (before.cny ?? 0) + (cny ?? 0) : undefined;
-      facts.push({ type: "spent", id, spent: { tokens: before.tokens + delta.input + delta.output, ...(total !== undefined ? { cny: total } : {}) } });
+      facts.push({
+        type: "spent",
+        id,
+        spent: {
+          tokens: before.tokens + delta.input + delta.output,
+          ...(total !== undefined ? { cny: total } : {}),
+        },
+      });
       if (cny) spentCny = cny;
       break;
     }

@@ -44,7 +44,12 @@ const billed = (content: string | FauxContentBlock | FauxContentBlock[], input: 
     },
   };
 };
-const echo = textTool<object>({ name: "echo", description: "", parameters: objectSchema(), run: () => "ok" });
+const echo = textTool<object>({
+  name: "echo",
+  description: "",
+  parameters: objectSchema(),
+  run: () => "ok",
+});
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Answers as given, usage and all (the faux provider counts its own); hang: the last answer starts and never ends. */
@@ -101,7 +106,12 @@ describe("a run's receipt", () => {
     );
     expect(await agent.ask(userMessage("one"))).toBe("first");
     await until(() => receipts.length === 1);
-    expect(receipts[0]).toMatchObject({ id: 1, settled: true, usage: { input: 60, output: 12, cacheRead: 15 }, contextTokens: 43 });
+    expect(receipts[0]).toMatchObject({
+      id: 1,
+      settled: true,
+      usage: { input: 60, output: 12, cacheRead: 15 },
+      contextTokens: 43,
+    });
     expect(await agent.ask(userMessage("two"))).toBe("second");
     await until(() => receipts.length === 2);
     expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
@@ -110,7 +120,11 @@ describe("a run's receipt", () => {
   });
 
   it("keeps a failure's words and goes by the last answer", async () => {
-    const failed = { ...billed("failed words", 7, 2, 1), stopReason: "error" as const, errorMessage: "broken" };
+    const failed = {
+      ...billed("failed words", 7, 2, 1),
+      stopReason: "error" as const,
+      errorMessage: "broken",
+    };
     const { agent, receipts } = await receiptAgent([failed, billed("recovered", 3, 1, 0)]);
     expect(await agent.ask(userMessage("fail"))).toBe("failed words");
     await until(() => receipts.length === 1);
@@ -167,7 +181,10 @@ describe("a run's receipt", () => {
     accounting.partial(message);
     expect(accounting.snapshot().current).toMatchObject({ usage: { input: 9 }, settled: false });
     accounting.message(message);
-    expect(accounting.snapshot()).toMatchObject({ lifetime: { input: 9 }, current: { usage: { output: 2 } } });
+    expect(accounting.snapshot()).toMatchObject({
+      lifetime: { input: 9 },
+      current: { usage: { output: 2 } },
+    });
   });
 
   it("keeps an answer cut off by closing, with what it used", async () => {
@@ -191,9 +208,15 @@ describe("a run's receipt", () => {
     await until(() => events.some((e) => e.type === "message_update"));
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
-    expect(agent.progress()).toMatchObject({ current: { settled: true, aborted: true }, lifetime: { input: 7, output: 3, cacheRead: 2 } });
+    expect(agent.progress()).toMatchObject({
+      current: { settled: true, aborted: true },
+      lifetime: { input: 7, output: 3, cacheRead: 2 },
+    });
     const receipt = events.find((e) => e.type === "agent_settled");
-    expect(receipt?.type === "agent_settled" && receipt.run).toMatchObject({ usage: { input: 7, output: 3 }, text: "partial" });
+    expect(receipt?.type === "agent_settled" && receipt.run).toMatchObject({
+      usage: { input: 7, output: 3 },
+      text: "partial",
+    });
   });
 });
 
@@ -210,7 +233,13 @@ describe("a compaction", () => {
     ];
     const options = { budget: 1, keepRecent: 2, keepSaid: 0 };
     const initial = planCompaction(messages, options)!;
-    const cached = { role: "compactionSummary" as const, summary: "summary", tokensBefore: 0, timestamp: 0, kept: messages.length - initial.cut };
+    const cached = {
+      role: "compactionSummary" as const,
+      summary: "summary",
+      tokensBefore: 0,
+      timestamp: 0,
+      kept: messages.length - initial.cut,
+    };
     messages.push(fauxAssistantMessage("late tail"));
     const plan = planCompaction(messages, options)!;
     expect(plan.cut).toBe(initial.cut);

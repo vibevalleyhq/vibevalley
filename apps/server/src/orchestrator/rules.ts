@@ -113,7 +113,12 @@ export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
     .map((m) => {
       const text = m.text.trim();
       return messageLine(
-        m.from !== "user" && text.length > lineMax ? { ...m, text: head(text, lineMax) + `…（这条有 ${text.length} 字，全文用 read_chat 读 ${m.target}）` } : m,
+        m.from !== "user" && text.length > lineMax
+          ? {
+              ...m,
+              text: head(text, lineMax) + `…（这条有 ${text.length} 字，全文用 read_chat 读 ${m.target}）`,
+            }
+          : m,
       );
     })
     .join("\n");

@@ -10,7 +10,10 @@ export const waitFor = <A, E, R>(get: Effect.Effect<A, E, R>, ok: (a: A) => bool
   get.pipe(
     Effect.flatMap((a) => (ok(a) ? Effect.succeed(a) : Effect.fail(notYet))),
     Effect.retry({ schedule: Schedule.spaced("10 millis"), while: (e) => e === notYet }),
-    Effect.timeoutOrElse({ duration: ms, orElse: () => Effect.die(new Error(`waited for ${typeof what === "string" ? what : what()}`)) }),
+    Effect.timeoutOrElse({
+      duration: ms,
+      orElse: () => Effect.die(new Error(`waited for ${typeof what === "string" ? what : what()}`)),
+    }),
     // Not yet is retried until the time is up, so it never comes out: what does is get's own failure.
   ) as Effect.Effect<A, E, R>;
 

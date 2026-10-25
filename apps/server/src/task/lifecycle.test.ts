@@ -44,7 +44,18 @@ describe("a task's workplace", () => {
         state: "draft",
         parallel: 1,
         createdAt: Date.now(),
-        tasks: [{ id: "only", title: "one step", brief: "write fixed work", needs: [], state: "waiting", tries: 0, agent: "lab", check: "test -f fixed.txt" }],
+        tasks: [
+          {
+            id: "only",
+            title: "one step",
+            brief: "write fixed work",
+            needs: [],
+            state: "waiting",
+            tries: 0,
+            agent: "lab",
+            check: "test -f fixed.txt",
+          },
+        ],
       });
       yield* tasks.act("p1", "start", "user");
       yield* until(() => tasks.graphs()[0]?.state === "ready", "the same session fixing its rejected work");

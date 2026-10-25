@@ -70,7 +70,14 @@ export function add(g: readonly Task[], more: readonly Partial<Task>[]): [Task[]
     const brief = (t.brief ?? "").trim();
     if (!dagIDValid(id)) problems.push("「" + id + "」不能当 id：用简短的英文，比如 read、fix-auth");
     if (!brief) problems.push("「" + id + "」没有写要做什么（brief）");
-    next.push({ id, title: (t.title ?? "").trim() || head(brief, 20), brief, after: [...(t.after ?? [])], by: t.by || "self", state: "waiting" });
+    next.push({
+      id,
+      title: (t.title ?? "").trim() || head(brief, 20),
+      brief,
+      after: [...(t.after ?? [])],
+      by: t.by || "self",
+      state: "waiting",
+    });
   }
   if (next.length > maxTasks) problems.push(`最多 ${maxTasks} 件，这里有 ${next.length} 件：把小的合并，或者先做完一部分`);
   const all = problems.length === 0 ? edgeProblems(next) : problems;
@@ -85,7 +92,13 @@ export interface Change {
   readonly after?: readonly string[];
 }
 
-const stateWords: Record<State, string> = { waiting: "还没做", working: "在做", done: "做完了", failed: "没做成", skipped: "跳过了" };
+const stateWords: Record<State, string> = {
+  waiting: "还没做",
+  working: "在做",
+  done: "做完了",
+  failed: "没做成",
+  skipped: "跳过了",
+};
 
 export class TaskError extends Error {}
 
