@@ -12,7 +12,7 @@ import { Connectors, layer } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
 import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
-import { untilGot as until, waitFor } from "../testing/until.ts";
+import { untilGot as until, waitFor, whenState } from "../testing/until.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 
@@ -55,10 +55,14 @@ const sleep = (ms: number, signal: AbortSignal) =>
     signal.addEventListener("abort", () => (clearTimeout(t), resolve(false)), { once: true });
   });
 
-/** The three apps, played: what they are sent is kept; restricted, they refuse a reply as an expired window does. */
+/** The three apps, played: what they are sent is kept; restricted, they refuse a reply as an expired window does, but
+ * one to a message the owner has just sent (opened), as the real window opens again. */
 class Script {
   readonly sent: Sent[] = [];
   restricted = false;
+  /** The reply context of the owner's fresh message: a reply to it goes through while restricted. */
+  opened = "";
+  private refuses = (reply: string) => this.restricted && reply !== this.opened;
   readonly weixinIn = new Inbox<WeixinMessage>();
   readonly feishuIn = new Inbox<FeishuMessage>();
   readonly qqIn = new Inbox<QQMessage>();
@@ -81,7 +85,7 @@ class Script {
       return m ? { ret: 0, msgs: [m], get_updates_buf: buf + "+" } : { ret: 0, get_updates_buf: buf };
     },
     sendText: async (_signal, _account, to, text, contextToken) => {
-      if (this.restricted) throw new WeixinError("sendmessage: -2", -2);
+      if (this.refuses(contextToken)) throw new WeixinError("sendmessage: -2", -2);
       return "wx" + this.record({ app: "weixin", to, text, reply: contextToken });
     },
   };
@@ -114,7 +118,7 @@ class Script {
       }
     },
     sendText: async (_signal, _app, openId, text, msgId) => {
-      if (this.restricted) throw new SendError("QQ 发消息：被动回复超时", 400);
+      if (this.refuses(msgId)) throw new SendError("QQ 发消息：被动回复超时", 400);
       return "qq" + this.record({ app: "qq", to: openId, text, reply: msgId });
     },
   };
@@ -166,14 +170,14 @@ const statusOf = (id: ConnectorID) =>
     return () => Effect.runPromise(Effect.map(c.list(), (all) => all.find((s) => s.id === id)!));
   });
 
-const reaches = (id: ConnectorID, state: ConnectorState) =>
-  Effect.gen(function* () {
-    const status = yield* statusOf(id);
-    return yield* until(async () => {
-      const s = await status();
-      return s.state === state && s;
-    }, `${id} ${state}`);
-  });
+/** The chat app's status once ok holds for it, as the connectors say it to the core whenever it changes. */
+const statusIs = (id: ConnectorID, ok: (s: ConnectorStatus) => boolean, what: string) =>
+  whenState((state) => {
+    const s = state.connectors?.find((c) => c.id === id);
+    return s && ok(s) ? s : undefined;
+  }, `${id}: ${what}`);
+
+const reaches = (id: ConnectorID, state: ConnectorState) => statusIs(id, (s) => s.state === state, state);
 
 const nth = (script: Script, app: ConnectorID, n: number, what: string) => until(async () => script.by(app)[n], what);
 
@@ -306,36 +310,37 @@ describe("the chat apps", () => {
   it.live("send what waited as a digest, with the owner's next words", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const status = yield* statusOf("weixin");
+      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
       yield* weixinConnected;
       script.restricted = true;
       for (const word of ["一", "二", "三", "四"]) script.weixinIn.push(wx(owner, word));
-      yield* until(async () => (await status()).pending === 4, "four answers held");
-      script.restricted = false;
+      yield* status((s) => s.pending === 4, "four answers held");
+      // The owner's next words open the window again: whatever was tried before was refused, whenever it was tried.
+      script.opened = "ctx-fresh";
       script.weixinIn.push(wx(owner, "五", "ctx-fresh"));
       const digest = yield* nth(script, "weixin", 0, "the digest");
       expect(digest.text.startsWith("你不在的时候有 4 条消息")).toBe(true);
       expect(digest.reply).toBe("ctx-fresh");
       expect((yield* nth(script, "weixin", 1, "the fresh answer")).text).toBe("【管家】\n收到：五");
-      yield* until(async () => (await status()).pending === 0, "nothing pending");
+      yield* status((s) => s.pending === 0, "nothing pending");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
   it.live("send what waited by themselves, later", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const status = yield* statusOf("weixin");
+      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
       yield* weixinConnected;
       script.restricted = true;
       script.weixinIn.push(wx(owner, "一", "ctx-1"));
-      yield* until(async () => (await status()).pending === 1, "held");
+      yield* status((s) => s.pending === 1, "held");
       yield* Effect.sleep(100);
       script.restricted = false;
       expect(yield* nth(script, "weixin", 0, "the held answer")).toMatchObject({
         text: "【管家】\n收到：一",
         reply: "ctx-1",
       });
-      yield* until(async () => (await status()).pending === 0, "nothing pending");
+      yield* status((s) => s.pending === 0, "nothing pending");
     }).pipe(Effect.scoped, Effect.provide(farm(script, testConfig(), { retryFirstMs: 20, retryMostMs: 80 })));
   });
 
@@ -343,11 +348,11 @@ describe("the chat apps", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const c = yield* Connectors;
-      const status = yield* statusOf("weixin");
+      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
       yield* weixinConnected;
       script.restricted = true;
       script.weixinIn.push(wx(owner, "一"));
-      yield* until(async () => (await status()).pending === 1, "held");
+      yield* status((s) => s.pending === 1, "held");
       const after = yield* c.logout("weixin");
       expect(after).toMatchObject({ state: "off", pending: 0 });
       expect(after.owner).toBeUndefined();
@@ -359,12 +364,8 @@ describe("the chat apps", () => {
     return Effect.gen(function* () {
       const c = yield* Connectors;
       const chat = yield* Channels;
-      const status = yield* statusOf("qq");
       yield* c.login("qq", { appId: "102", secret: "wrong" });
-      const refused = yield* until(async () => {
-        const s = await status();
-        return s.state === "off" && s.error ? s : undefined;
-      }, "refused");
+      const refused = yield* statusIs("qq", (s) => s.state === "off" && !!s.error, "refused");
       expect(refused.error).toContain("不对");
       yield* c.login("qq", { appId: "102", secret: "right" });
       const pairing = yield* reaches("qq", "pairing");
@@ -434,13 +435,13 @@ describe("the chat apps", () => {
   it.live("hold a refused QQ reply for the owner's next message", () => {
     const script = new Script();
     return Effect.gen(function* () {
-      const status = yield* statusOf("qq");
+      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("qq", ok, what);
       yield* qqPaired(script);
       script.restricted = true;
       script.qqIn.push(qqMsg("owner-openid", "一"));
-      yield* until(async () => (await status()).pending === 1, "held");
-      script.restricted = false;
+      yield* status((s) => s.pending === 1, "held");
       const next = qqMsg("owner-openid", "二");
+      script.opened = next.id;
       script.qqIn.push(next);
       const fresh = yield* nth(script, "qq", 2, "both out");
       const held = script.by("qq")[1]!;
@@ -516,8 +517,8 @@ describe("the chat apps", () => {
         yield* nth(script, "weixin", sent, "the quoted reply answered");
         expect(yield* saidIn(thread)).toContain(text);
         expect(yield* saidIn(chat.general())).not.toContain(text);
-        const status = yield* statusOf("weixin");
-        yield* until(async () => (await status()).pending === 0, "the reply saved");
+        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
+        yield* status((s) => s.pending === 0, "the reply saved");
       });
     return Effect.gen(function* () {
       const first = new Script();
@@ -532,8 +533,8 @@ describe("the chat apps", () => {
         thread = written.message!.conversation;
         message = written.message!.id;
         yield* nth(first, "weixin", 0, "the original answer sent");
-        const status = yield* statusOf("weixin");
-        yield* until(async () => (await status()).pending === 0, "the external identity saved");
+        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
+        yield* status((s) => s.pending === 0, "the external identity saved");
         for (let i = 0; i < 301; i++) yield* chat.notice(chat.general(), `动静 ${i}`, "history");
         yield* reply(first, "继续这个话题", 1);
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
@@ -559,8 +560,8 @@ describe("the chat apps", () => {
           anyway: true,
         })).message!.conversation;
         yield* nth(first, "weixin", 0, "the old answer sent");
-        const status = yield* statusOf("weixin");
-        yield* until(async () => (await status()).pending === 0, "the old answer saved");
+        const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
+        yield* status((s) => s.pending === 0, "the old answer saved");
         for (let i = 0; i < 100; i++) {
           const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
           const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", {
@@ -597,8 +598,8 @@ describe("the chat apps", () => {
         ...inbound,
         item_list: [...inbound.item_list!, { ref_msg: { svr_id: "missing" } }],
       });
-      const status = yield* statusOf("weixin");
-      yield* until(async () => (await status()).error !== undefined, "the failed quote lookup");
+      const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
+      yield* status((s) => s.error !== undefined, "the failed quote lookup");
       expect(script.by("weixin")).toEqual([]);
       expect(yield* saidIn(chat.general())).toEqual([]);
       expect(yield* sql`select ext_id from connector_inbound where not delivered`.pipe(Effect.orDie)).toHaveLength(1);

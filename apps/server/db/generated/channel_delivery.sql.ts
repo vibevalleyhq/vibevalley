@@ -25,48 +25,6 @@ export const insertDelivery = Effect.fn("InsertDelivery")(function* (params: Ins
   })(params)
 })
 
-export const OpenDeliveriesParams = Schema.Struct({
-  ["recipient_id"]: Schema.String,
-})
-export type OpenDeliveriesParams = typeof OpenDeliveriesParams.Type
-
-
-export const OpenDeliveriesResult = Schema.Struct({
-  ["message_id"]: Schema.String,
-  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["reason"]: Schema.String,
-  ["wakes"]: Schema.Boolean,
-  ["held_by"]: Schema.NullOr(Schema.String),
-  ["state"]: Schema.String,
-  ["launch"]: Schema.NullOr(Schema.String),
-  ["conversation_id"]: Schema.String,
-  ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["body"]: Schema.String,
-  ["created_at"]: Schema.Number,
-  ["name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
-  ["conversation_kind"]: Schema.String,
-  ["parent_id"]: Schema.NullOr(Schema.String),
-  ["parent_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
-  ["subject_id"]: Schema.NullOr(Schema.String),
-  ["channel_name"]: Schema.NullOr(Schema.String),
-})
-export type OpenDeliveriesResult = typeof OpenDeliveriesResult.Type
-
-
-export const OpenDeliveriesSql = "-- name: OpenDeliveries :many\nselect d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,\n       p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nwhere d.recipient_id = $1 and d.state in ('pending', 'announced', 'handed')\norder by m.id;"
-
-export const openDeliveries = Effect.fn("OpenDeliveries")(function* (params: OpenDeliveriesParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: OpenDeliveriesParams,
-    Result: OpenDeliveriesResult,
-    execute: (p) => sql.unsafe(OpenDeliveriesSql, [p["recipient_id"]]),
-  })(params)
-})
-
 export const MarkAnnouncedParams = Schema.Struct({
   ["launch"]: Schema.NullOr(Schema.String),
   ["announced_at"]: Schema.NullOr(Schema.Number),
@@ -285,5 +243,48 @@ export const lastAgentWakes = Effect.fn("LastAgentWakes")(function* () {
     Request: LastAgentWakesParams,
     Result: LastAgentWakesResult,
     execute: () => sql.unsafe(LastAgentWakesSql, []),
+  })({})
+})
+
+export const AllOpenDeliveriesParams = Schema.Struct({
+
+})
+export type AllOpenDeliveriesParams = typeof AllOpenDeliveriesParams.Type
+
+
+export const AllOpenDeliveriesResult = Schema.Struct({
+  ["recipient_id"]: Schema.String,
+  ["message_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reason"]: Schema.String,
+  ["wakes"]: Schema.Boolean,
+  ["held_by"]: Schema.NullOr(Schema.String),
+  ["state"]: Schema.String,
+  ["launch"]: Schema.NullOr(Schema.String),
+  ["conversation_id"]: Schema.String,
+  ["sender_id"]: Schema.String,
+  ["kind"]: Schema.String,
+  ["body"]: Schema.String,
+  ["created_at"]: Schema.Number,
+  ["name"]: Schema.String,
+  ["sender_kind"]: Schema.String,
+  ["conversation_kind"]: Schema.String,
+  ["parent_id"]: Schema.NullOr(Schema.String),
+  ["parent_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["subject_kind"]: Schema.NullOr(Schema.String),
+  ["subject_id"]: Schema.NullOr(Schema.String),
+  ["channel_name"]: Schema.NullOr(Schema.String),
+})
+export type AllOpenDeliveriesResult = typeof AllOpenDeliveriesResult.Type
+
+
+export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body,\n       m.created_at, p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
+
+export const allOpenDeliveries = Effect.fn("AllOpenDeliveries")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: AllOpenDeliveriesParams,
+    Result: AllOpenDeliveriesResult,
+    execute: () => sql.unsafe(AllOpenDeliveriesSql, []),
   })({})
 })

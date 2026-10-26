@@ -31,6 +31,7 @@ const owners: Readonly<Record<string, string>> = {
   recurrences: "Issues",
   progress: "Gamification",
   commits: "Gamification",
+  connectors: "Gateway",
 };
 
 /** Reads of another module's part that stay, each with why: none. */

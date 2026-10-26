@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置，`audience.ts` 是定一条消息给谁、叫不叫醒要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。
+- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置，`audience.ts` 是定一条消息给谁、叫不叫醒要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。`deliveries.ts` 是还开着的投递（待送、提示过、交出去了），每条带着收件箱要显示的；看到了、丢掉了的就不在里面。
 - **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留哪些（`keepMessages` 300 条、`keepConversations` 100 个）。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
@@ -26,10 +26,10 @@
 
 ## 模型和不变量
 
-- **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个对话、300 条消息，挤出去时频道不挤；更早的用 `channel.history` 取。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递只在库里。
+- **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个对话、300 条消息，挤出去时频道不挤；更早的用 `channel.history` 取。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递不进核心状态：库是它们的家，田头在内存里记着要用的那部分（下一条）。
 - **消息的去处由库里的身份决定**：连接器引用旧消息时回原对话，发件只送到原对话所属频道接的账号。两条路都由田头的 `messageLocation` 按消息 id 查出对话和频道；消息或串被最近状态挤出、服务端重启，都不改变去处。
 - **没处理的 @主人 留到读过或回复过**：田头从库里的 @、已读位置和主人在同一对话里的后续消息算出完整集合，经 `ownerMentions` 事实写进 `Chat.ownerMentions`；不受最近 300 条消息、100 个对话限制。写出 @主人、主人回复、标记已读和开机时刷新，每次用一条查询带回消息、频道和地址。通知只读这个结论，不再从聊天窗口推测完成条件。
-- **记着自己写过的，不再读回来**：田头开机时把全部对话、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找对话、找串、找频道、主人读到哪、谁跟着串、来回了几次、谁刚被叫醒过都问它们；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有田头写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
+- **记着自己写过的，不再读回来**：田头开机时把全部对话、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找对话、找串、找频道、主人读到哪、谁跟着串、来回了几次、谁刚被叫醒过、谁还有哪些没看都问它们；投递的每次变化（提示、交出、看到、退回、丢掉）先写库再告诉 `deliveries.ts`，开机先把交出去没看到的退回，再读一遍；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有田头写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
 - **写库一个一个来**：改田头的都在 `chat.ts` 的一把锁（`Semaphore`）里，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
 - **一个对话一列消息号**：主键是 uuidv7，`number` 在每个对话里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（田头是 `#田头`）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
 - **对话三种**：田头（全库唯一一行）、频道（可以带说明和默认项目）、串（挂在一条消息下，`subject_kind` 是 `issue`、`talk`）。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
@@ -101,7 +101,7 @@
 
 **登录和换账号**：
 
-- 微信、飞书扫码，QQ 填机器人的 AppID 和 AppSecret（先验一次）。一次扫码由各自 SDK 走完：微信拿到二维码后最多等 8 分钟，跟随重定向的域，要输数字时页面显示输入框，二维码过期或验证码被禁用累计 3 次就结束；飞书按注册返回的间隔和有效期轮询，跟随租户跳到 Lark。连接器只把进度（等待扫码、扫过了、要输数字）给页面，成功后保存账号。
+- 微信、飞书扫码，QQ 填机器人的 AppID 和 AppSecret（先验一次）。一次扫码由各自 SDK 走完：微信拿到二维码后最多等 8 分钟，跟随重定向的域，要输数字时页面显示输入框，二维码过期或验证码被禁用累计 3 次就结束；飞书按注册返回的间隔和有效期轮询，跟随租户跳到 Lark。连接器只把进度（等待扫码、扫过了、要输数字）给页面，成功后保存账号。每个连接器的状态（`ConnectorStatus`：进度、账号、错误、还有几条没发）在它的任何一部分可能变了的时候经 `connector` 事实写进核心状态的 `connectors`，一次一个，轮到时才读，所以最后写的是最新的；一样的不出新帧。页面的连接器页读核心状态，不轮询；`state.json` 不存它，开机由连接器重新说一遍。
 - 每个账号同时只有一代任务：登录，或者接收、收件、发件三个工人。协调器（`voiceConnection`）不在任何一代里：重新登录或退出时，它先取消并等旧一代结束，再在一个事务里改 `connector_account`、清掉旧收件、退休旧发件（`dropped`），然后起新一代。保存失败就保留旧账号、重新起旧的那一代。SDK 在接收返回后回调的，不再收下；旧连接迟到的结果不写新账号。
 
 ## 和谁打交道

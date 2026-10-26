@@ -470,6 +470,8 @@ export interface WorkspaceState {
   progress?: Progress;
   recurrences?: Recurrence[];
   issues?: Issue[];
+  /** Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json. */
+  connectors?: ConnectorStatus[];
 }
 
 export const SessionEventTypeValues = [
@@ -1886,7 +1888,8 @@ export type Fact =
   | FactIssueGone
   | FactProgress
   | FactRecurrence
-  | FactRecurrenceGone;
+  | FactRecurrenceGone
+  | FactConnector;
 
 export interface FactCall {
   type: "call";
@@ -2025,6 +2028,12 @@ export interface FactProgress {
   news?: ProgressNews;
 }
 
+export interface FactConnector {
+  type: "connector";
+  at: number;
+  status: ConnectorStatus;
+}
+
 export interface FactRecurrence {
   type: "recurrence";
   at: number;
@@ -2060,6 +2069,7 @@ export type SideEvent =
   | FactProgress
   | FactRecurrence
   | FactRecurrenceGone
+  | FactConnector
   | SideEventSnapshot
   | SideEventSessionEvent
   | SideEventNotice

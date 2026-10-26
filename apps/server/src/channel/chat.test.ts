@@ -435,7 +435,8 @@ describe("the chat", () => {
         const digest = yield* f.chat.orchestratorDigest();
         expect(digest.map((d) => [d.from, d.target])).toEqual([["w12", `#田头:${thread.parentNumber}`]]);
         expect(yield* f.chat.orchestratorDigest()).toHaveLength(1);
-        yield* f.sql`update channel_delivery set state = 'seen' where recipient_id = ${orchestratorAgent} and message_id = ${digest[0]!.id}`.pipe(Effect.orDie);
+        // Taken as input by the orchestrator's run, as its execution says once it took it.
+        yield* f.chat.consumed({ session: orchestratorAgent, messages: [digest[0]!.id] });
         expect(yield* f.chat.orchestratorDigest()).toEqual([]);
         yield* f.chat.say("大家看一下", f.chat.general(), "");
         const inbox = yield* f.chat.inbox("w12");
