@@ -58,7 +58,7 @@ vp run docs:verify                                              # 改完文档�
 vp run site:check && vp run site:build                          # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
 ```
 
-Node 24（服务端经 tsx 跑，脚本经 `vpx` 直接跑 `.ts`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
+Node 24（`.node-version` 定的那个，`vp` 和 CI 都照它；服务端经 tsx 跑，脚本经 `vpx` 直接跑 `.ts`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
 一件事的主线：oar 的会话事件 → `apps/server/src/session/facts.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 

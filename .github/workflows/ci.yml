@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       - uses: voidzero-dev/setup-vp@v1
-        with: { node-version: 24, cache: true }
+        with: { node-version-file: .node-version, cache: true }
       - name: pull request title
         if: github.event_name == 'pull_request'
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
@@ -37,7 +37,8 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
-      - run: vp check
+      # A warning fails too: none are let in to pile up.
+      - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
 
@@ -51,9 +52,9 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
-      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       - uses: voidzero-dev/setup-vp@v1
-        with: { node-version: 24, cache: true }
+        with: { node-version-file: .node-version, cache: true }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
       # can tell whether db/generated is current. The rest runs against the committed db/generated.
@@ -76,9 +77,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       - uses: voidzero-dev/setup-vp@v1
-        with: { node-version: 24, cache: true }
+        with: { node-version-file: .node-version, cache: true }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       # web:check without its vp check, which the check job runs. The page's Playwright suite (e2e) runs on the owner's
       # machine: vp run --filter vibevalley-web e2e.
@@ -90,9 +91,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       - uses: voidzero-dev/setup-vp@v1
-        with: { node-version: 24, cache: true }
+        with: { node-version-file: .node-version, cache: true }
       - run: xvfb-run -a vp run desktop:test
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -103,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
       - uses: voidzero-dev/setup-vp@v1
-        with: { node-version: 24, cache: true }
+        with: { node-version-file: .node-version, cache: true }
       - run: vp run site:check && vp run site:build

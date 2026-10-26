@@ -4,7 +4,7 @@
 
 ## 跑起来
 
-需要 Node 24 和 Vite+（`vp`，它带着 pnpm）。帮工用本机装好并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只要 DeepSeek 的钥匙。
+需要 Vite+（`vp`）：它照 `.node-version` 装 Node（24），照 `packageManager` 用 pnpm。帮工用本机装好并登录的农机（pi、Claude Code、codex）；VibeValley 自己的农机和管家只要 DeepSeek 的钥匙。
 
 ```bash
 vp install                                   # 根目录：装全部 workspace 的依赖
@@ -40,7 +40,7 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 分支、提交和 PR
 
-`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`vp run --filter vibevalley-web e2e`；CI 不跑 `db:check`：生成器 effect-sqlc 没发布，改了 `db/` 要在有 `../effect-sqlc` 的机器上跑 `server:check`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题、正文就是它的说明，合完分支自动删。开、改、合 PR 照 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
+`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样；`check` 跑 `vp check --deny-warnings`，警告也不放过（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`vp run --filter vibevalley-web e2e`；CI 不跑 `db:check`：生成器 effect-sqlc 没发布，改了 `db/` 要在有 `../effect-sqlc` 的机器上跑 `server:check`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题、正文就是它的说明，合完分支自动删。开、改、合 PR 照 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
 
 - **分支**：`<类>/<主题>`，类是 `feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`、`test`（只加测试）；主题用英文小写、连字符，比如 `feat/issue-board-groups`。
 - **提交**：主题用英文，一句话说改完以后代码做什么（「The board groups issues by helper」），不写「改了什么文件」「修了一下」；界面上的中文词放进「」引用，代码和路径放进反引号；最多 100 个字（按码点数），不加句号；细节、原因和取舍写进正文，和主题之间空一行。不带 agent 的署名（`Co-Authored-By: Claude`、「Generated with …」）。这几条由 `scripts/commit-msg.ts` 查：本机是 commit-msg hook，CI 查 PR 的标题、正文和分支名；Git 自己写的（`Merge`、`Revert`、`fixup!`）不查。
