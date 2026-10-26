@@ -40,12 +40,12 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 ## 分支、提交和 PR
 
-`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`cd apps/web && pnpm run test`；CI 不跑 `db:check`：生成器 effect-sqlc 没发布，改了 `db/` 要在有 `../effect-sqlc` 的机器上跑 `server:check`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题，合完分支自动删。
+`main` 只经 PR 改，CI（`.github/workflows/ci.yml`）的 `check`、`server`、`web`、`desktop`、`site` 都过了才能合，管理员也一样（CI 只跑页面的规则测试，页面的 Playwright 在本机跑：`cd apps/web && pnpm run test`；CI 不跑 `db:check`：生成器 effect-sqlc 没发布，改了 `db/` 要在有 `../effect-sqlc` 的机器上跑 `server:check`）；合并只用 squash，PR 的标题就是 `main` 上那条提交的主题、正文就是它的说明，合完分支自动删。开、改、合 PR 照 [vv-pr](.agents/skills/vv-pr/SKILL.md)。
 
-- **分支**：`<类>/<主题>`，类是 `feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`；主题用英文小写、连字符，比如 `feat/issue-board-groups`。
-- **提交**：主题一句话，说改完以后代码做什么（「The board groups issues by helper」），不写「改了什么文件」「修了一下」；最多 100 个字（按码点数，中文一个字算一个），不加句号；细节、原因和取舍写进正文，和主题之间空一行。不带 agent 的署名（`Co-Authored-By: Claude`、「Generated with …」）。这几条由 `scripts/commit-msg.ts` 查：本机是 commit-msg hook，CI 查 PR 的标题；Git 自己写的（`Merge`、`Revert`、`fixup!`）不查。
+- **分支**：`<类>/<主题>`，类是 `feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`、`test`（只加测试）；主题用英文小写、连字符，比如 `feat/issue-board-groups`。
+- **提交**：主题用英文，一句话说改完以后代码做什么（「The board groups issues by helper」），不写「改了什么文件」「修了一下」；界面上的中文词放进「」引用，代码和路径放进反引号；最多 100 个字（按码点数），不加句号；细节、原因和取舍写进正文，和主题之间空一行。不带 agent 的署名（`Co-Authored-By: Claude`、「Generated with …」）。这几条由 `scripts/commit-msg.ts` 查：本机是 commit-msg hook，CI 查 PR 的标题、正文和分支名；Git 自己写的（`Merge`、`Revert`、`fixup!`）不查。
 - **提交前**：`pnpm install` 时 `prepare` 跑 `vp config --hooks`，把 git 的 hook 指到 `.vite-hooks/`；pre-commit 对暂存的文件跑 `vp check --fix`（`vite.config.ts` 的 `staged`）。临时跳过一次用 `git commit --no-verify`，CI 照样会查。
-- **PR**：照模板（`.github/pull_request_template.md`）写三段：改了什么、跑了哪些检查（附验证 skill 要的证据）、什么没验证。
+- **PR**：标题和正文用英文，正文照模板（`.github/pull_request_template.md`）写三段：`## What changed`、`## Checks`（附 [acceptance](.agents/skills/acceptance/SKILL.md) 要的证据）、`## Not verified`。一个 PR 讲一件事；同一块里顺手查出来的几处小问题可以一起，每处一条。
 
 ## 改形状、规则和表
 
