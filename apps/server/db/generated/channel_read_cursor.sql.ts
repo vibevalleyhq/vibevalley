@@ -46,3 +46,27 @@ export const readCursor = Effect.fn("ReadCursor")(function* (params: ReadCursorP
     execute: (p) => sql.unsafe(ReadCursorSql, [p["participant_id"], p["conversation_id"]]),
   })(params)
 })
+
+export const ReadCursorsOfParams = Schema.Struct({
+  ["participant_id"]: Schema.String,
+})
+export type ReadCursorsOfParams = typeof ReadCursorsOfParams.Type
+
+
+export const ReadCursorsOfResult = Schema.Struct({
+  ["conversation_id"]: Schema.String,
+  ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type ReadCursorsOfResult = typeof ReadCursorsOfResult.Type
+
+
+export const ReadCursorsOfSql = "-- name: ReadCursorsOf :many\nselect conversation_id, read_number from channel_read_cursor where participant_id = $1;"
+
+export const readCursorsOf = Effect.fn("ReadCursorsOf")(function* (params: ReadCursorsOfParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: ReadCursorsOfParams,
+    Result: ReadCursorsOfResult,
+    execute: (p) => sql.unsafe(ReadCursorsOfSql, [p["participant_id"]]),
+  })(params)
+})

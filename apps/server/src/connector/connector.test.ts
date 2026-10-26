@@ -238,7 +238,8 @@ describe("the chat apps", () => {
         text: "【管家】\n收到：后面的正常消息",
       });
       expect(yield* saidIn(chat.general())).toEqual(["后面的正常消息"]);
-      expect(yield* Effect.orDie(inboundQ.pendingInbound({ connector: "weixin" }))).toEqual([]);
+      // Settled once the words are in, which is after the answer went out.
+      yield* waitFor(Effect.orDie(inboundQ.pendingInbound({ connector: "weixin" })), (rows) => rows.length === 0, "both rows settled");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 

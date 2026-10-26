@@ -13,25 +13,13 @@ values (sqlc.arg(id), 'channel', sqlc.arg(name), sqlc.narg(description), sqlc.na
 -- name: UpdateChannel :exec
 update channel_conversation set description = sqlc.narg(description), project = sqlc.narg(project) where id = sqlc.arg(id) and kind in ('general', 'channel');
 
--- name: ChannelByName :one
-select id from channel_conversation where name = sqlc.arg(name) and kind in ('general', 'channel');
-
--- name: Channels :many
--- The general channel first.
-select * from channel_conversation where kind in ('general', 'channel') order by case when kind = 'general' then 0 else 1 end, id;
-
 -- name: CreateThread :exec
 insert into channel_conversation (id, kind, parent_id, parent_number, subject_kind, subject_id, channel_id, created_at)
 values (sqlc.arg(id), 'thread', sqlc.arg(parent_id), sqlc.arg(parent_number), sqlc.narg(subject_kind), sqlc.narg(subject_id), sqlc.arg(channel_id), sqlc.arg(created_at));
 
--- name: ConversationByID :one
-select * from channel_conversation where id = sqlc.arg(id);
-
--- name: ThreadByParent :one
-select id from channel_conversation where parent_id = sqlc.arg(parent_id);
-
--- name: ThreadOfSubject :one
-select id from channel_conversation where subject_kind = sqlc.arg(subject_kind) and subject_id = sqlc.arg(subject_id) order by id desc limit 1;
+-- name: AllConversations :many
+-- What the chat keeps in memory (channel/model.ts), loaded when it starts.
+select * from channel_conversation order by id;
 
 -- name: RecentConversations :many
 select * from channel_conversation order by coalesce(last_number, 0) desc, id desc limit sqlc.arg(n)::int;
