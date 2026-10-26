@@ -10,7 +10,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 | 页面的目录和数据层：一条状态流、Solid Query 的读取、共用的 store | 形状和接口的定义（`packages/protocol`） |
 | 工作台的路由和外框、首页 | 规则本身：能不能派、档案的问题、下回想起什么、冲突怎么交代（各自的子系统，页面问服务端） |
 | 宿主接口：通知、菜单栏、语音快捷键、宿主自己的通话线路、窗口没有自己的标题栏时让出的地方；没有的是 null | 像素农场的画面、玩法和面板（[farm.md](docs/subsystems/farm.md)；每页的内容见 [farm-ui.md](docs/reference/farm-ui.md)「界面清单」） |
-| 桌面壳：服务端子进程的生命周期和就绪、窗口、单实例、打包；手机壳：配对、WebView、通知、通话 | 服务端的监听、家目录租约（[地基](docs/subsystems/foundation.md)） |
+| 桌面壳：服务端子进程的生命周期和就绪、窗口、单实例、打包、刘海上的灵动岛；手机壳：配对、WebView、通知、通话 | 服务端的监听、家目录租约（[地基](docs/subsystems/foundation.md)） |
 | 连进来的浏览器：先配对，钥匙存在 cookie | 「连接到本机」的配对和鉴权（[连接到本机](docs/subsystems/lan.md)）；语音通话（[语音](docs/subsystems/voice.md)） |
 
 包的对外约定（目录表、规矩、命令）在 [apps/web/README.md](apps/web/README.md) 和 [农场的 README](apps/web/src/farm/README.md)，这里不重复。
@@ -22,6 +22,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
 - **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
+- **灵动岛** `apps/island`：Swift 的原生小程序（AppKit 的 `NSPanel` 里放 SwiftUI），`IslandCore` 是能离开屏幕测的消息（`Messages.swift`）和位置（`Geometry.swift`），`VibeValleyIsland` 画它；桌面壳那一半在 `apps/desktop/src/island.ts`（`glanceOf`、`startIsland`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
 - **检查**：`vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run desktop:test`；手机壳是 `vp run --filter vibevalley-mobile test` 和 `scripts/e2e.ts`。
@@ -56,6 +57,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 6. 窗口换到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
 
 **打开页面**：`index.html` 构建时嵌进 `opening.html` 里同一段条（`apps/web/vite.config.ts` 的 `opening`），所以页面的脚本还没跑起来时就是这条；`Root` 的 `<Loading>` 第一次安定下来时把它拿掉，农场自己的「进村」条在同一个位置接着走。
+
+**灵动岛（macOS）**：服务端起来后，桌面壳起 `VibeValleyIsland`（开发时是 `apps/island/.build/release`，`scripts/build.ts` 编它；打包的应用在 `Contents/Resources/island`），带上页面的像素字；不是 macOS 或没编出来就只是不显示。桌面壳的主进程自己订阅 `/api/v1/state`（断了一秒后重连），每一帧用 `glanceOf` 算成一份摘要：在做、等你回答、等你验收、卡住了的工单各一行，等你的在前；在做的写帮工和它这一刻在干什么（`phaseText`），等你的写等什么（`attentionLabel`、`stuckLabel`）。摘要变了才写一行 `{"glance": …}` 到岛的 stdin。岛贴着内置屏的刘海（`safeAreaInsets` 和刘海两边的菜单栏算出位置），没有内置屏时挂在主屏菜单栏正中；收起时刘海左边是在干几个，右边是等你几个；指针移上去展开成一行一张工单（最多 6 行）；点一行，岛在 stdout 写 `{"open": "<工单>"}`，桌面壳把窗口叫到前面、开到 `/issues/<工单>`。没有在做也没有等你的，岛不出来。窗口不抢焦点，所有桌面上都有，全屏的应用上不出现。桌面壳退出时关掉岛的 stdin，岛跟着退出。
 
 **退出**：退出前先停服务端（还在起来的，等它起来再停）：SIGTERM，让它存好状态，8 秒没退就 SIGKILL；注销快捷键。macOS 上关窗口不退出，点 Dock 图标再开窗口。
 
@@ -96,6 +99,8 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **页面问服务端，不移植规则。** 页面要的只是结论；档案的问题依赖没存的草稿，记性的预览依赖主人正在打的字，都不是农场的状态，所以另开接口问。服务端和页面都要的纯规则放进 `packages/protocol`，一份代码两处用。
 - **只给真实数据。** 服务端没开时换成模拟农场，提示再大也会被当成真的；没有服务端就说没有。
 - **窗口先开，再等服务端。** 等服务端时没有窗口，双击以后几秒（第一次开、要建库时十来秒）屏幕上什么都没有，像没打开。加载条是一个不靠服务端、也不跑页面脚本的静态文件，所以能在服务端起来之前从应用自己的文件里打开；页面的 `index.html` 带着同一段，换页时画面不跳。放弃了在 Electron 里另画一个窗口（两份样子），和弹系统的启动画面（不像游戏，起不来时也说不了原因）。
+- **灵动岛是原生的，单独一个进程。** 刘海边上要像系统的一部分：不抢焦点、所有桌面都在、点击区域就是岛的形状、动画跟着系统，这些是 AppKit 的窗口才做得好的。放在 Electron 里用 `type: 'panel'` 的网页窗口能做出样子，但它是一个 Chromium 页面挂在刘海上；写成 Node 原生插件要和 Electron 同一个进程，崩了一起倒。单独的进程经 stdin、stdout 一行一个 JSON 说话，崩了只是岛不见。不用 boring.notch 那样的私有接口把岛盖到全屏应用上：苹果的私有接口随时会变，全屏时本来也不该挡。
+- **岛的数据由桌面壳的主进程读，不经页面。** 窗口关掉以后页面就不在了，靠页面推的东西会停；岛要的是农场一直在干什么。规则用 `@vibevalley/protocol` 里页面也在用的说法（`phaseText`、`attentionLabel`），摘要在主进程算好，岛只画。
 - **子进程自己发布就绪地址。** 宿主先绑端口 0、读出端口、关掉再交给服务端，关掉到重绑之间端口可能被抢；从人读的日志里找地址，日志措辞就成了协议。绑定结果只有子进程知道，所以由它写一行 JSON 说出来。
 - **宿主接口封闭、缺的是 null。** 页面问「我在哪个壳里」再分支，每加一个宿主就要改每一处；按能力有没有来画，加宿主只是实现一遍接口。
 - **连进来的浏览器用 cookie 带钥匙。** 页面的状态流和 REST 都走 `fetch`，同源的 cookie 自动带上，页面不用改；监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。
@@ -113,6 +118,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 - 页面的规则：`apps/web/src/rules/*.test.ts`（看板、通知和菜单栏摘要、一轮的瀑布图、项目、文档的块、远端和配对……）。
 - 每块页面的 Playwright：`apps/web/test/*.spec.ts`，每个 worker 一个真的服务端；`shell.spec.ts` 查每个地方在自己的外框里打开，`pair.spec.ts` 查一台「手机」经「连接到本机」配对后打开工单。
-- 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键；家目录是个文件、服务端起不来时，窗口先开在加载条上，再换成原因。
+- 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键；家目录是个文件、服务端起不来时，窗口先开在加载条上，再换成原因；服务端用照字眼干活的帮工（`VIBEVALLEY_TEST_RUNTIMES`）时，一张先问清楚的工单进了岛的摘要（「等你回答」），macOS 上岛真的起来了，点它把窗口开到那张工单。`apps/desktop/src/island.test.ts` 查摘要的规则。
+- 灵动岛：`apps/island` 的 `swift test`（消息、刘海和没有刘海时的位置），CI 的 `island` 跑在 macOS 上；样子用 `--snapshot` 画成图看（`apps/island/README.md`）。
 - 打包：`vp run package:mac` 后用临时家目录开 `apps/desktop/dist/mac-arm64/VibeValley.app`，`desktop-server.log` 里有收据，`curl` 那个地址拿到页面和接口。
 - 真程序：`acceptance/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。

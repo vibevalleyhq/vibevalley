@@ -85,3 +85,60 @@ test("the window opens on the bar at once, and says there why the server could n
     await app.close();
   }
 });
+
+// The island's half that runs everywhere: the main process reads the state stream itself and keeps the glance it sends
+// the native helper (apps/island, macOS only; its own tests are Swift's). A click on a row brings the window to the issue.
+test("the island follows the issues in flight and opens one", async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
+  const app = await electron.launch({
+    args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
+    // The server's pi is the scripted helper (apps/server src/testing/helper.ts): an issue can really be worked.
+    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work"), VIBEVALLEY_TEST_RUNTIMES: "1" },
+  });
+  type Probe = { glance?: { working: number; waiting: number; rows: { issue: string; tone: string; doing: string }[] }; helper: boolean };
+  const probe = () => app.evaluate(() => (globalThis as { vibevalleyIsland?: Probe }).vibevalleyIsland);
+  try {
+    const page = await app.firstWindow();
+    await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 45_000 });
+    const api = new VibeValleyApi(new URL(page.url()).origin);
+    await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, rows: [] });
+    // Built on macOS by scripts/build.ts; elsewhere there is no helper.
+    expect((await probe())?.helper).toBe(process.platform === "darwin");
+
+    const fox = await api.agent.create({ body: scripted });
+    const project = await api.project.create({ body: { name: "clock" } });
+    // The scripted helper asks with options when its job says 先问清楚: the issue waits on the owner.
+    const made = await api.issue.create({ body: { title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id } });
+    await api.issue.status({ id: made.id, body: { status: "todo" } });
+    await expect
+      .poll(async () => (await probe())?.glance?.rows.map((r) => [r.issue, r.tone, r.doing]), { timeout: 20_000 })
+      .toEqual([[made.id, "waiting", "等你回答"]]);
+    expect((await probe())?.glance?.waiting).toBe(1);
+
+    await app.evaluate((_, id) => (globalThis as { vibevalleyIsland?: { open: (issue: string) => void } }).vibevalleyIsland?.open(id), made.id);
+    await page.waitForURL(new RegExp(`/issues/${made.id}$`));
+    await expect(page.getByRole("dialog", { name: "工单" })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+const scripted = {
+  id: "",
+  name: "阿狐",
+  role: "",
+  enabled: true,
+  runtime: "pi",
+  model: "",
+  effort: "",
+  persona: "",
+  personaMode: "append" as const,
+  skills: [],
+  mcpServers: [],
+  disallowedTools: [],
+  env: {},
+  workdir: "",
+  worktree: true,
+  tags: [],
+  look: { species: "fox" as const, outfit: "farmer" as const, build: "biped" as const, head: "rounded" as const, body: "", trim: "", hat: "", eye: "" },
+};

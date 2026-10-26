@@ -6,16 +6,18 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Notice, TraySummary } from "@vibevalley/host";
 import { watchForDev } from "./dev";
+import { startIsland } from "./island";
 import { loginShellPath, type RunningServer, startServer } from "./server";
 
-// In the repository the server is apps/server and the page apps/web/dist; a packaged app has both in its resources
-// (server/, web/).
+// In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build
+// (scripts/build.ts); a packaged app has them in its resources (server/, web/, island/).
 const files = () => {
   const repo = join(app.getAppPath(), "..");
   const home = process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
   return {
     server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
     web: app.isPackaged ? join(process.resourcesPath, "web") : join(repo, "web", "dist"),
+    island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
     log: join(home, "logs", "desktop-server.log"),
   };
 };
@@ -86,6 +88,16 @@ function open(url: string) {
   void loaded(windowNow().loadURL(url));
 }
 
+/** Brings the window up on an issue: what a click on the island's row asks. */
+function openIssue(issue: string) {
+  if (!server) return;
+  open(server.url.replace(/\/$/, "") + "/issues/" + encodeURIComponent(issue));
+  const w = windowNow();
+  if (w.isMinimized()) w.restore();
+  w.show();
+  app.focus({ steal: true });
+}
+
 ipcMain.handle("host:notify", (_event, notice: Notice) => {
   notices.push(notice);
   if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
@@ -154,6 +166,13 @@ if (!app.requestSingleInstanceLock()) {
       starting = undefined;
     }
     open(server.url);
+    const island = startIsland({
+      binary: process.platform === "darwin" ? files().island : undefined,
+      font: join(files().web, "fonts", "fusion-pixel-12px-proportional-zh_hans.otf"),
+      server: () => server?.url ?? "",
+      open: openIssue,
+    });
+    app.on("will-quit", island.stop);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1") {
       const stopWatching = watchForDev({
         web: files().web,

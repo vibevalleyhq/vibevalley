@@ -18,6 +18,7 @@ apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 是像素农场
                            （src/farm，PixiJS），其余是工作台（src/pages/<地方>）；public/ 是全部的图、像素字、指针和样音（apps/web/README.md）
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
+apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
 packages/protocol/         契约：形状（src/shapes.ts）、它们的 Schema（schema.ts）、接口（api.ts）和两边都跑的规则（src/rules）：服务端和页面
                            都用；只有服务端跑的规则在 apps/server/src 各自的模块里
@@ -50,8 +51,9 @@ vp run --filter vibevalley-web e2e                              # 改完页面�
 vp run --filter vibevalley-web e2e:dev                          # 改了页面的响应式写法：Playwright 跑在 Solid 的开发版上，它的诊断（没被追踪的读、不该建的原语、追踪几千个源）连调用栈打出来
 vp run desktop:test                                             # 改完 apps/desktop 或页面：Playwright 起整个 Electron 应用（临时家目录），附截图
 vp run desktop:dev                                              # 桌面版：构建壳和页面，带着 apps/server 起来；改页面窗口自己刷新，改服务端或 protocol 服务端自己重启
+swift test --package-path apps/island                           # 改完灵动岛：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
 vp run --filter vibevalley-mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
-vp run package:mac                                              # macOS 应用和 .dmg（apps/desktop/dist）：壳、页面和带着生产依赖的 apps/server
+vp run package:mac                                              # macOS 应用和 .dmg（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
