@@ -11,7 +11,7 @@ import { Connectors, layer } from "./connector.ts";
 import type { FeishuApi, Message as FeishuMessage } from "./feishu.ts";
 import { type QQApi, type Message as QQMessage, SendError } from "./qq.ts";
 import { type Message as WeixinMessage, type WeixinApi, WeixinError, baseUrl } from "./weixin.ts";
-import { untilGot as until } from "../testing/until.ts";
+import { untilGot as until, waitFor } from "../testing/until.ts";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 
@@ -382,6 +382,45 @@ describe("the chat apps", () => {
         reply: last.id,
       });
       expect(yield* saidIn(chat.general())).toEqual(["跑一下测试"]);
+    }).pipe(Effect.scoped, Effect.provide(farm(script)));
+  });
+
+  it.live("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", () => {
+    const script = new Script();
+    let listens = 0;
+    let late: ((m: QQMessage) => Promise<void>) | undefined;
+    const listen = script.qq.listen;
+    // The SDK's handler can outlive its listen: this one keeps got, and fails the gateway while a message is in flight.
+    (script as { qq: QQApi }).qq = {
+      ...script.qq,
+      listen: async (signal, app, got) => {
+        listens++;
+        return listen(signal, app, async (m) => {
+          if (m.content !== "断开") return got(m);
+          void got(qqMsg("owner-openid", "断开前的一句"));
+          late = got;
+          throw new Error("网关断了");
+        });
+      },
+    };
+    return Effect.gen(function* () {
+      const chat = yield* Channels;
+      yield* qqPaired(script);
+      const before = listens;
+      script.qqIn.push(qqMsg("owner-openid", "断开"));
+      // A failed receive is tried again after its backoff: the same account listens once more.
+      yield* until(async () => listens > before, "it listens again", 10_000);
+      expect(yield* saidIn(chat.general())).toContain("断开前的一句");
+      const refused = yield* Effect.promise(() =>
+        late!(qqMsg("owner-openid", "迟到的一句")).then(
+          () => "",
+          (e: Error) => e.message,
+        ),
+      );
+      expect(refused).toBe("canceled");
+      script.qqIn.push(qqMsg("owner-openid", "重连后的一句"));
+      yield* waitFor(saidIn(chat.general()), (said) => said.includes("重连后的一句"), "the next words");
+      expect(yield* saidIn(chat.general())).not.toContain("迟到的一句");
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
