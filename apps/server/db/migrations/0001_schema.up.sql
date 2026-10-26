@@ -293,21 +293,21 @@ CREATE TABLE issue_queue (
 );
 CREATE TABLE agent_task (
   graph text not null,
-  owner text not null,
+  keeper text not null,
   id text not null,
   position integer not null,
   title text not null,
   brief text not null,
   after text not null,
-  executor text not null,
-  state text not null,
+  executor text not null check (executor in ('self', 'subagent')),
+  state text not null check (state in ('waiting', 'working', 'done', 'failed', 'skipped')),
   result text not null,
   tries integer not null,
   updated_at double precision not null,
   finished_at double precision,
   primary key (graph, id)
 );
-CREATE INDEX agent_task_by_owner on agent_task (owner, finished_at);
+CREATE INDEX agent_task_by_keeper on agent_task (keeper, finished_at);
 -- Documents (doc/doc.go): blocks in a flat list, nested by parent_id and ordered by (order_key, id); every change is an op,
 -- and a batch of ops is one doc_change with the doc's next seq.
 CREATE TABLE doc (

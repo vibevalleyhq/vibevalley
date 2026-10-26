@@ -4,15 +4,15 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-export const OpenGraphTasksParams = Schema.Struct({
-  ["owner"]: Schema.String,
+export const OpenAgentTasksParams = Schema.Struct({
+  ["keeper"]: Schema.String,
 })
-export type OpenGraphTasksParams = typeof OpenGraphTasksParams.Type
+export type OpenAgentTasksParams = typeof OpenAgentTasksParams.Type
 
 
-export const OpenGraphTasksResult = Schema.Struct({
+export const OpenAgentTasksResult = Schema.Struct({
   ["graph"]: Schema.String,
-  ["owner"]: Schema.String,
+  ["keeper"]: Schema.String,
   ["id"]: Schema.String,
   ["position"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
@@ -25,39 +25,39 @@ export const OpenGraphTasksResult = Schema.Struct({
   ["updated_at"]: Schema.Number,
   ["finished_at"]: Schema.NullOr(Schema.Number),
 })
-export type OpenGraphTasksResult = typeof OpenGraphTasksResult.Type
+export type OpenAgentTasksResult = typeof OpenAgentTasksResult.Type
 
 
-export const OpenGraphTasksSql = "-- An agent's own task graph (agent/brain/taskStore.ts): an owner is whoever keeps it, a session id or the orchestrator.\n\n-- name: OpenGraphTasks :many\nselect \"agent_task\".\"graph\", \"agent_task\".\"owner\", \"agent_task\".\"id\", \"agent_task\".\"position\", \"agent_task\".\"title\", \"agent_task\".\"brief\", \"agent_task\".\"after\", \"agent_task\".\"executor\", \"agent_task\".\"state\", \"agent_task\".\"result\", \"agent_task\".\"tries\", \"agent_task\".\"updated_at\", \"agent_task\".\"finished_at\" from agent_task where owner = $1 and finished_at is null order by position;"
+export const OpenAgentTasksSql = "-- An agent's own tasks (agent/brain/agentTaskStore.ts): the keeper is whoever keeps them, a session id or the orchestrator.\n\n-- name: OpenAgentTasks :many\nselect \"agent_task\".\"graph\", \"agent_task\".\"keeper\", \"agent_task\".\"id\", \"agent_task\".\"position\", \"agent_task\".\"title\", \"agent_task\".\"brief\", \"agent_task\".\"after\", \"agent_task\".\"executor\", \"agent_task\".\"state\", \"agent_task\".\"result\", \"agent_task\".\"tries\", \"agent_task\".\"updated_at\", \"agent_task\".\"finished_at\" from agent_task where keeper = $1 and finished_at is null order by position;"
 
-export const openGraphTasks = Effect.fn("OpenGraphTasks")(function* (params: OpenGraphTasksParams) {
+export const openAgentTasks = Effect.fn("OpenAgentTasks")(function* (params: OpenAgentTasksParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: OpenGraphTasksParams,
-    Result: OpenGraphTasksResult,
-    execute: (p) => sql.unsafe(OpenGraphTasksSql, [p["owner"]]),
+    Request: OpenAgentTasksParams,
+    Result: OpenAgentTasksResult,
+    execute: (p) => sql.unsafe(OpenAgentTasksSql, [p["keeper"]]),
   })(params)
 })
 
-export const ClearOpenGraphTasksParams = Schema.Struct({
-  ["owner"]: Schema.String,
+export const ClearOpenAgentTasksParams = Schema.Struct({
+  ["keeper"]: Schema.String,
 })
-export type ClearOpenGraphTasksParams = typeof ClearOpenGraphTasksParams.Type
+export type ClearOpenAgentTasksParams = typeof ClearOpenAgentTasksParams.Type
 
 
-export const ClearOpenGraphTasksSql = "-- name: ClearOpenGraphTasks :exec\ndelete from agent_task where owner = $1 and finished_at is null;"
+export const ClearOpenAgentTasksSql = "-- name: ClearOpenAgentTasks :exec\ndelete from agent_task where keeper = $1 and finished_at is null;"
 
-export const clearOpenGraphTasks = Effect.fn("ClearOpenGraphTasks")(function* (params: ClearOpenGraphTasksParams) {
+export const clearOpenAgentTasks = Effect.fn("ClearOpenAgentTasks")(function* (params: ClearOpenAgentTasksParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: ClearOpenGraphTasksParams,
-    execute: (p) => sql.unsafe(ClearOpenGraphTasksSql, [p["owner"]]),
+    Request: ClearOpenAgentTasksParams,
+    execute: (p) => sql.unsafe(ClearOpenAgentTasksSql, [p["keeper"]]),
   })(params)
 })
 
-export const AddGraphTaskParams = Schema.Struct({
+export const AddAgentTaskParams = Schema.Struct({
   ["graph"]: Schema.String,
-  ["owner"]: Schema.String,
+  ["keeper"]: Schema.String,
   ["id"]: Schema.String,
   ["position"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["title"]: Schema.String,
@@ -69,32 +69,32 @@ export const AddGraphTaskParams = Schema.Struct({
   ["tries"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["updated_at"]: Schema.Number,
 })
-export type AddGraphTaskParams = typeof AddGraphTaskParams.Type
+export type AddAgentTaskParams = typeof AddAgentTaskParams.Type
 
 
-export const AddGraphTaskSql = "-- name: AddGraphTask :exec\ninsert into agent_task (graph, owner, id, position, title, brief, after, executor, state, result, tries, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8,\n        $9, $10, $11, $12);"
+export const AddAgentTaskSql = "-- name: AddAgentTask :exec\ninsert into agent_task (graph, keeper, id, position, title, brief, after, executor, state, result, tries, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8,\n        $9, $10, $11, $12);"
 
-export const addGraphTask = Effect.fn("AddGraphTask")(function* (params: AddGraphTaskParams) {
+export const addAgentTask = Effect.fn("AddAgentTask")(function* (params: AddAgentTaskParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: AddGraphTaskParams,
-    execute: (p) => sql.unsafe(AddGraphTaskSql, [p["graph"], p["owner"], p["id"], p["position"], p["title"], p["brief"], p["after"], p["executor"], p["state"], p["result"], p["tries"], p["updated_at"]]),
+    Request: AddAgentTaskParams,
+    execute: (p) => sql.unsafe(AddAgentTaskSql, [p["graph"], p["keeper"], p["id"], p["position"], p["title"], p["brief"], p["after"], p["executor"], p["state"], p["result"], p["tries"], p["updated_at"]]),
   })(params)
 })
 
-export const FinishGraphTasksParams = Schema.Struct({
+export const FinishAgentTasksParams = Schema.Struct({
   ["finished_at"]: Schema.NullOr(Schema.Number),
-  ["owner"]: Schema.String,
+  ["keeper"]: Schema.String,
 })
-export type FinishGraphTasksParams = typeof FinishGraphTasksParams.Type
+export type FinishAgentTasksParams = typeof FinishAgentTasksParams.Type
 
 
-export const FinishGraphTasksSql = "-- name: FinishGraphTasks :exec\nupdate agent_task set finished_at = $1 where owner = $2 and finished_at is null;"
+export const FinishAgentTasksSql = "-- name: FinishAgentTasks :exec\nupdate agent_task set finished_at = $1 where keeper = $2 and finished_at is null;"
 
-export const finishGraphTasks = Effect.fn("FinishGraphTasks")(function* (params: FinishGraphTasksParams) {
+export const finishAgentTasks = Effect.fn("FinishAgentTasks")(function* (params: FinishAgentTasksParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
-    Request: FinishGraphTasksParams,
-    execute: (p) => sql.unsafe(FinishGraphTasksSql, [p["finished_at"], p["owner"]]),
+    Request: FinishAgentTasksParams,
+    execute: (p) => sql.unsafe(FinishAgentTasksSql, [p["finished_at"], p["keeper"]]),
   })(params)
 })

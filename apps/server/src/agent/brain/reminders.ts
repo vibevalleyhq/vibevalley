@@ -1,4 +1,4 @@
-// What the agent set itself to do later, in recurrences.json in its home. One missed while the agent was away runs once
+// What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -9,7 +9,7 @@ import { jsonOf } from "../../base/json.ts";
 import { numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
 import type { Time } from "../../base/time.ts";
 
-export interface Job {
+export interface Reminder {
   readonly id: string;
   readonly name: string;
   readonly message: string;
@@ -21,7 +21,7 @@ export interface Job {
   readonly lastRun?: string;
 }
 
-const JobSchema: Schema.Codec<Job> = Schema.Struct({
+const ReminderSchema: Schema.Codec<Reminder> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   message: Schema.String,
@@ -43,14 +43,14 @@ export function parseCron(expr: string): Cron.Cron {
   return parsed.success;
 }
 
-export function nextRun(job: Job): Date | undefined {
-  const from = parseDate(job.lastRun || job.created) ?? new Date(0);
-  if (job.at) return job.lastRun ? undefined : parseDate(job.at);
-  if (job.everyMinutes) return new Date(from.getTime() + job.everyMinutes * 60_000);
-  if (job.cron) {
+export function nextRun(reminder: Reminder): Date | undefined {
+  const from = parseDate(reminder.lastRun || reminder.created) ?? new Date(0);
+  if (reminder.at) return reminder.lastRun ? undefined : parseDate(reminder.at);
+  if (reminder.everyMinutes) return new Date(from.getTime() + reminder.everyMinutes * 60_000);
+  if (reminder.cron) {
     try {
       // Effect's Cron starts at the second after from.
-      return Cron.next(parseCron(job.cron), from);
+      return Cron.next(parseCron(reminder.cron), from);
     } catch {
       return undefined;
     }
@@ -58,8 +58,8 @@ export function nextRun(job: Job): Date | undefined {
   return undefined;
 }
 
-export const dueJobs = (jobs: readonly Job[], now: Date) =>
-  jobs.filter((j) => {
+export const dueReminders = (reminders: readonly Reminder[], now: Date) =>
+  reminders.filter((j) => {
     const next = nextRun(j);
     return next !== undefined && next.getTime() <= now.getTime();
   });
@@ -68,52 +68,49 @@ const pad = (n: number) => String(n).padStart(2, "0");
 /** toLocaleString('zh-CN', { hour12: false }). */
 const localeTime = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
 
-/** To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. */
-export const localeMinute = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
-
-export function describeJob(j: Job): string {
+export function describeReminder(j: Reminder): string {
   const when = j.at ? localeTime(parseDate(j.at) ?? new Date(0)) + " 一次" : j.everyMinutes ? `每 ${j.everyMinutes} 分钟` : "cron " + j.cron;
   const next = nextRun(j);
   return "- " + j.id + "「" + j.name + "」" + when + "；下次 " + (next ? localeTime(next) : "（不会再跑）") + "\n  " + j.message;
 }
 
-export const dueMessage = (j: Job) => "【定时任务「" + j.name + "」到点了（" + j.id + "）】\n" + j.message;
+export const dueMessage = (j: Reminder) => "【提醒「" + j.name + "」到点了（" + j.id + "）】\n" + j.message;
 
-export class Recurrences {
+export class Reminders {
   readonly tools: AgentTool[];
   private readonly file: string;
 
   constructor(
     private readonly home: string,
     private readonly wake: (text: string) => void,
-    /** The brain's Time: when a job is due. */
+    /** The brain's Time: when a reminder is due. */
     private readonly time: Time,
   ) {
-    this.file = join(home, "recurrences.json");
+    this.file = join(home, "reminders.json");
     this.tools = this.makeTools();
   }
 
-  private load(): Job[] {
+  private load(): Reminder[] {
     if (!existsSync(this.file)) return [];
-    return jsonOf(Schema.mutable(Schema.Array(JobSchema)))(readFileSync(this.file, "utf8"));
+    return jsonOf(Schema.mutable(Schema.Array(ReminderSchema)))(readFileSync(this.file, "utf8"));
   }
 
-  private store(jobs: readonly Job[]) {
+  private store(reminders: readonly Reminder[]) {
     mkdirSync(this.home, { recursive: true });
-    writeFileSync(this.file + ".tmp", JSON.stringify(jobs));
+    writeFileSync(this.file + ".tmp", JSON.stringify(reminders));
     renameSync(this.file + ".tmp", this.file);
   }
 
   /** At most once each. */
   tick(now = new Date(this.time.now())) {
-    let due: Job[];
+    let due: Reminder[];
     try {
-      const jobs = this.load();
-      due = dueJobs(jobs, now);
+      const reminders = this.load();
+      due = dueReminders(reminders, now);
       const isDue = new Set(due.map((j) => j.id));
-      this.store(jobs.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
+      this.store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
     } catch (e) {
-      console.error("agent: cannot claim due recurrences:", e);
+      console.error("agent: cannot claim due reminders:", e);
       return;
     }
     for (const j of due) this.wake(dueMessage(j));
@@ -127,7 +124,7 @@ export class Recurrences {
       every_minutes?: number;
       cron?: string;
     }>({
-      name: "recurrence",
+      name: "reminder",
       description:
         "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
       parameters: objectSchema(
@@ -152,8 +149,8 @@ export class Recurrences {
         if (p.every_minutes != null && !(p.every_minutes >= 1)) throw new Error("every_minutes 至少是 1。");
         if (p.cron != null) parseCron(p.cron);
         const now = new Date(this.time.now());
-        const job: Job = {
-          id: "job-" + now.getTime().toString(36),
+        const reminder: Reminder = {
+          id: "reminder-" + now.getTime().toString(36),
           name: p.name,
           message: p.message,
           ...(p.cron != null ? { cron: p.cron } : {}),
@@ -161,28 +158,28 @@ export class Recurrences {
           ...(p.every_minutes != null ? { everyMinutes: p.every_minutes } : {}),
           created: now.toISOString(),
         };
-        this.store([...this.load(), job]);
-        return "定好了：\n" + describeJob(job);
+        this.store([...this.load(), reminder]);
+        return "定好了：\n" + describeReminder(reminder);
       },
     });
     const list = textTool<object>({
-      name: "list_recurrences",
+      name: "list_reminders",
       description: "列出定好的事。",
       parameters: objectSchema(),
       run: () => {
-        const jobs = this.load();
-        return jobs.length === 0 ? "没有定好的事。" : jobs.map(describeJob).join("\n");
+        const reminders = this.load();
+        return reminders.length === 0 ? "没有定好的事。" : reminders.map(describeReminder).join("\n");
       },
     });
     const cancel = textTool<{ id: string }>({
-      name: "cancel_recurrence",
-      description: "取消一件定好的事（id 从 list_recurrences 看）。",
+      name: "cancel_reminder",
+      description: "取消一件定好的事（id 从 list_reminders 看）。",
       parameters: objectSchema({ id: stringSchema() }, "id"),
       run: (p) => {
-        const jobs = this.load();
-        const j = jobs.find((x) => x.id === p.id);
-        if (!j) throw new Error(`没有 ${p.id}：先 list_recurrences 看看。`);
-        this.store(jobs.filter((x) => x !== j));
+        const reminders = this.load();
+        const j = reminders.find((x) => x.id === p.id);
+        if (!j) throw new Error(`没有 ${p.id}：先 list_reminders 看看。`);
+        this.store(reminders.filter((x) => x !== j));
         return "取消了「" + j.name + "」。";
       },
     });

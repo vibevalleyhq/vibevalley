@@ -20,7 +20,7 @@
 
 - **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；现状、频道的汇报、听巡查和计划的消息；向 `Sessions.host` 要一个 `AgentHost`，配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
 - **`apps/server/src/tool`**（`Tools`）：管家的 26 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
-- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`recurrences.ts`、`tasks.ts` 帮手和自己的任务图、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。同一个包当帮工用时，`coding.ts` 提供读写和编辑文件、列目录、ripgrep、跑命令、抓网页，`self.ts` 提供 `spawn_agent`、`load_skill`，`tasks.ts` 提供自己的任务图工具；管家不带编码工具和帮手。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
+- **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` 提醒、`agentTask.ts`、`agentTaskStore.ts`、`agentTaskTools.ts` 帮手和自己的任务、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。同一个包当帮工用时，`coding.ts` 提供读写和编辑文件、列目录、ripgrep、跑命令、抓网页，`self.ts` 提供 `spawn_agent`、`load_skill`，`agentTaskTools.ts` 提供自己的任务工具；管家不带编码工具和帮手。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/orchestrator/`**（`orchestratorHome`）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
 - **接口**：`orchestrator.stop`、`orchestrator.hear`、`orchestrator.markWrong`、`orchestrator.listArchive`、`orchestrator.getArchive`，记性走 `memory.*`（档案 `orchestrator`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `agent/brain/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley orchestrator …`。
@@ -30,7 +30,7 @@
 
 - **管家是一份档案，只在 VibeValley 自己的 agent 上跑。** 档案 `orchestrator`（`orchestratorAgent`）每个农场都有：加载时没有就补上，删它拒绝（「管家是每个农场都有的，删不了」），把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。模型从档案读（`vibevalley agent save orchestrator --json …` 改），只接 DeepSeek：写成 `deepseek/<模型>` 或直接写模型名，别家的拒绝；没写是 `deepseek-flash`（`agent/brain/config.ts` 的 `defaultModel`）。模型在大脑起来时读，改了下次起来用上。
 - **大脑第一句话到了才起来**（`brainOf`），起不来（没钥匙、模型不对）下一句再试。钥匙先取「设置」里存的，再取配置的 `deepseek.api_key`（`DEEPSEEK_API_KEY`），每次请求前现取，存了马上生效，不进提示。起不来时在那个频道说原因，同一个原因在一个频道里只说一次，起来了才清掉。
-- **管家的大脑没有编码工具、帮手和自己的定时**（`noSkills`、`noSubagents`、`recurrences: false`）：工具是 `Tools` 管家那张表的 28 个，加上大脑自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`。工具表在大脑建好时定下，轮与轮之间不增减：用不了的工具留着，调用时回一句写明下一步的话。
+- **管家的大脑没有编码工具、帮手和自己的提醒**（`noSkills`、`noSubagents`、`reminders: false`）：工具是 `Tools` 管家那张表的 28 个，加上大脑自己的 `load_skill`、`remember`、`rewrite_memory`、`search_archive`。工具表在大脑建好时定下，轮与轮之间不增减：用不了的工具留着，调用时回一句写明下一步的话。
 - **对话只往后加。** `orchestrator.jsonl` 一条消息一行；压缩追加一行摘要，原文归档到 `archive/`，`search_archive` 和管家页的旧账都能翻。每条输入是一条 `custom` 消息 `orchestratorInput`，带频道、主人选定的档案、来源 `source`、`owner`（这条里有没有主人的话）、交给管家的工单 `issue`，读回来认得出。
 - **提示分三段：不变的开头、只往后加的对话、最新那条输入。**
 
@@ -48,7 +48,7 @@
 - **完成工单、合进主分支、计划开工要这一轮最新那条输入有主人的话**：管家的工具带着 `Actor`（管家，`forOwner` 是这一轮有没有主人的话），由工单和计划自己判断（`actsForOwner`）：改工单和挪状态（`issue_update`、`issue_status`，完成也是挪状态）否则回「改工单、挪状态要主人说一声。……」；计划合进主分支回「合进主分支要主人说一声。……」，计划开工回「计划开工要主人点头。……」，要它在频道里问主人。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
 - **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentProblems` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **管家的状态**在 `WorkspaceState.Orchestrator`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
-- **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`agent_task.after` 必须是字符串数组，坏值只回退这个字段；`recurrences.json` 的每项按 `Job` 解码，坏文件不被覆盖，也不触发任务。
+- **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`agent_task.after` 必须是字符串数组，坏值只回退这个字段；`reminders.json` 的每项按 `Reminder` 解码，坏文件不被覆盖，也不触发任务。
 
 ## 怎么走
 

@@ -7,7 +7,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { models } from "../../ai/models.ts";
-import type { TaskStore } from "./taskStore.ts";
+import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { Brain, type BrainEvent } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import { deepseek, defaultModel, type LLM, type McpServer } from "./config.ts";
@@ -30,8 +30,8 @@ export interface RuntimeOptions {
   readonly home?: () => string;
   /** Asked each session, so a key saved meanwhile is used; "" is the default model. Throws when there is no model to use. */
   readonly llm?: (model: string) => LLM;
-  /** Where a session keeps its task graph; absent, it keeps none. */
-  readonly tasks?: (session: string) => TaskStore;
+  /** Where a session keeps its own tasks; absent, it keeps none. */
+  readonly tasks?: (session: string) => AgentTaskStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
   readonly time: Time;
 }
@@ -79,7 +79,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
       mcpServers: (o.mcpServers ?? []).map(toMcp),
       noMemory: true,
       session: kernel.sessionId,
-      recurrences: false,
+      reminders: false,
       ...(tasks ? { tasks } : {}),
     });
     const queued: { input: string; inputId?: string }[] = [];

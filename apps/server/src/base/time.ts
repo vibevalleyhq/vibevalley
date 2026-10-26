@@ -66,3 +66,8 @@ export const afterRealTime = (ms: number, f: () => void, options: { readonly unr
   if (options.unref) timer.unref();
   return () => clearTimeout(timer);
 };
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** To the minute: what an input says the time is, so that it does not change between two requests a few seconds apart. */
+export const localeMinute = (t: Date) => `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;

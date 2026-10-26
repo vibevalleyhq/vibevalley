@@ -9,14 +9,14 @@ import {
 } from "@earendil-works/pi-ai";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import * as engine from "./taskGraph.ts";
-import { memoryStore } from "./taskStore.ts";
+import * as engine from "./agentTask.ts";
+import { memoryStore } from "./agentTaskStore.ts";
 import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
-import { TaskRunner } from "./tasks.ts";
+import { AgentTaskRunner } from "./agentTaskTools.ts";
 import { answered, fauxLLM, lastUser, type Request, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { objectSchema, textTool } from "./tool.ts";
 import { wallTime } from "../../base/time.ts";
@@ -88,7 +88,7 @@ async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptio
     noMemory: true,
     noSubagents: true,
     noSession: true,
-    recurrences: false,
+    reminders: false,
     ...extra,
   });
   const receipts: RunResult[] = [];
@@ -202,7 +202,7 @@ describe("a run's receipt", () => {
       noMemory: true,
       noSubagents: true,
       noSession: true,
-      recurrences: false,
+      reminders: false,
     });
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
@@ -257,7 +257,7 @@ describe("a compaction", () => {
 
 const subagentBrief = (c: Request) => messageText(c.messages[1]!);
 
-describe("the agent's task graph", () => {
+describe("the agent's own tasks", () => {
   // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
   it("sends a subagent's tasks when ready, and they come back", async () => {
     const dir = home();
@@ -296,7 +296,7 @@ describe("the agent's task graph", () => {
         await until(() => sent.length === 3 && told === 3);
         expect(await Effect.runPromise(store.load)).toEqual([]);
       },
-      { tasks: store, recurrences: false },
+      { tasks: store, reminders: false },
     );
   });
 
@@ -331,7 +331,7 @@ describe("the agent's task graph", () => {
         expect(g[0]).toMatchObject({ state: "waiting" });
         expect(g[0]!.tries ?? 0).toBe(0);
       },
-      { tools: [wait], tasks: store, recurrences: false },
+      { tools: [wait], tasks: store, reminders: false },
     );
   });
 
@@ -367,7 +367,7 @@ describe("the agent's task graph", () => {
         expect(nudged).toBe(2);
         events = [...r.events];
       },
-      { tasks: memoryStore(), maxNudges: 2, recurrences: false },
+      { tasks: memoryStore(), maxNudges: 2, reminders: false },
     );
     const changed = events.filter((e) => e.type === "tasks_changed");
     // The task was one change.
@@ -377,7 +377,7 @@ describe("the agent's task graph", () => {
 
   it("carries the open graph into a fold's summary", async () => {
     const store = memoryStore();
-    const runner = new TaskRunner(store, undefined, new AbortController().signal, () => {});
+    const runner = new AgentTaskRunner(store, undefined, new AbortController().signal, () => {});
     expect(await runner.summary()).toBe("");
     await Effect.runPromise(store.change((g) => Effect.succeed(engine.add(g, [{ id: "a", brief: "读" }])[0])));
     expect(await runner.summary()).toBe("【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读");

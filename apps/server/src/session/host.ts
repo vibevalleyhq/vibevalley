@@ -322,7 +322,7 @@ export class AgentHost<R> {
           tools: this.o.tools(() => this.current().route),
           noSkills: true,
           noSubagents: true,
-          recurrences: false,
+          reminders: false,
           ...(this.o.wakeSoon ? { wakeSoon: this.o.wakeSoon } : {}),
         },
         this.life.signal,

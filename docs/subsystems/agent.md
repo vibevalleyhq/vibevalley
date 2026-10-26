@@ -111,14 +111,14 @@
 - **oar（`@botiverse/oar`）**：适配器的安装、`listModels`、账户用量、清单（技能、MCP、工具）、`refusedSessionOptions`。
 - **处理函数（`handlers.ts`）**：`agent.*`、`skill.*`、`runtime.*` 只转发；`agent.check` 逐个调 `Runtimes.check`。
 
-## 自己的任务图
+## 自己的任务
 
-`agent/brain/taskGraph.ts` 是 VibeValley 自己的 agent（`agent/brain`）在会话里给自己记的图：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。
+`agent/brain/agentTask.ts` 是 VibeValley 自己的 agent（`agent/brain`）在会话里给自己记的任务（`AgentTask`，和计划里的一件不是一回事）：每件写明做什么（`brief`）、等哪几件（`after`）、谁做（`self` 或交给帮手的 `subagent`）、状态（`waiting`、`working`、`done`、`failed`、`skipped`）和结果。
 
 - 一张图最多 30 件（`maxTasks`）；`add` 整批收或整批不收，回给模型的问题说清是哪一条；改只让没开始和没做成的改正文和先后。交给帮手的件在依赖做完后自动派，最多三个同时做，结果交回这个 agent；失败后重来 1 次（`retries`）；叫回或进程没了，在做的退回等着。
-- 存储（`agent/brain/taskStore.ts`）是一个主人没做完的那张图：库里的存在表 `agent_task`，按会话 id 分开，做完的盖上 `finished_at` 留着；内存里的给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个库里的存储。
+- 存储（`agent/brain/agentTaskStore.ts`）是一个会话还没做完的那些任务：库里的存在表 `agent_task`，按记着它们的会话（`keeper`）分开，做完的盖上 `finished_at` 留着；内存里的给命令行，进程退出就没了。服务端给农机 `vibevalley` 的每个会话一个库里的存储。
 - 它不进工单、不进核心状态、没有分支和检查，和计划不相通。
-- 测试在 `agent/brain/taskGraph.test.ts`：加进来的件等着、第一件能开工；一批里有问题就整批不收；做完或跳过让下一件开工；一件能变成什么；给模型看的图；交给帮手的件出去再回来；存储留着图、把做完的收起来；一个主人的图不是另一个的。
+- 测试在 `agent/brain/agentTask.test.ts`：加进来的件等着、第一件能开工；一批里有问题就整批不收；做完或跳过让下一件开工；一件能变成什么；给模型看的图；交给帮手的件出去再回来；存储留着图、把做完的收起来；一个会话的任务不是另一个的。
 
 ## 为什么这样
 

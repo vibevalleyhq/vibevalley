@@ -7,8 +7,8 @@
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type Tool, toToolDeclaration, type ToolCall, type Usage } from "@earendil-works/pi-ai";
 import { join } from "node:path";
-import { finished, type Task } from "./taskGraph.ts";
-import type { TaskStore } from "./taskStore.ts";
+import { finished, type AgentTask } from "./agentTask.ts";
+import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction } from "./compaction.ts";
 import type { LLM, McpServer } from "./config.ts";
 import { connectAll, type McpConnections } from "./mcp.ts";
@@ -16,11 +16,11 @@ import { memoryFileLines, readMemory } from "./memory.ts";
 import { type CompactionSummaryMessage, customMessage, kept, messageText, userMessage, withPrefix } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
 import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
-import { Recurrences } from "./recurrences.ts";
+import { Reminders } from "./reminders.ts";
 import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
-import { TaskRunner, taskTools, watchedStore } from "./tasks.ts";
+import { AgentTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
 import { stopped } from "./tool.ts";
 import type { Time } from "../../base/time.ts";
 
@@ -38,8 +38,8 @@ export type BrainEvent =
     }
   /** The parts of the prompt's start that changed since the request before, with no compaction between. */
   | { readonly type: "prefix_changed"; readonly parts: string[] }
-  /** The task graph after a change, whoever made it; empty once finished. */
-  | { readonly type: "tasks_changed"; readonly tasks: Task[] };
+  /** Its own tasks after a change, whoever made it; empty once finished. */
+  | { readonly type: "tasks_changed"; readonly tasks: AgentTask[] };
 
 export type FoldReason = "threshold" | "idle";
 
@@ -76,17 +76,17 @@ export interface BrainOptions {
   readonly noSession?: boolean;
   /** A subagent never can. */
   readonly noSubagents?: boolean;
-  /** Its own task graph and the tools to task and mark it; absent, none. */
-  readonly tasks?: TaskStore;
+  /** Its own tasks and the tools to task and mark it; absent, none. */
+  readonly tasks?: AgentTaskStore;
   /** Subagents out on its tasks at once; 3 when absent. */
   readonly maxSubagents?: number;
   /** Times a run that stops with its own tasks ready is reminded of them while the graph stays the same; 3 when absent. */
   readonly maxNudges?: number;
   /** Absent: when it keeps a session. */
-  readonly recurrences?: boolean;
+  readonly reminders?: boolean;
   /** Default later. */
   readonly wake?: (text: string) => void;
-  /** Its clock (base/time.ts): message times, the recurrence ticks, the idle fold, a resumed run's age. A subagent it
+  /** Its clock (base/time.ts): message times, the reminder ticks, the idle fold, a resumed run's age. A subagent it
    * sends out shares it. */
   readonly time: Time;
 }
@@ -96,8 +96,8 @@ export interface McpStatus {
   readonly failed: string[];
 }
 
-/** How often the recurrences are looked at: a due one is woken within this. */
-const recurrenceTickMs = 20_000;
+/** How often the reminders are looked at: a due one is woken within this. */
+const reminderTickMs = 20_000;
 
 export const resumedUnknown = "服务端在这个工具做完之前重启了，不知道它做没做成：先查一下现状，再决定要不要再做一遍。";
 
@@ -156,7 +156,7 @@ export class Brain {
   private readonly listeners = new Set<(e: BrainEvent) => void>();
   private readonly accounting = new RunAccounting();
   private readonly maxSteps: number;
-  private readonly tasks: TaskRunner | undefined;
+  private readonly tasks: AgentTaskRunner | undefined;
   private waiters: ((r: RunResult) => void)[] = [];
   private steps = 0;
   private stopping = false;
@@ -173,7 +173,7 @@ export class Brain {
   private requestTools: Tool[] = [];
   /** The lines of MEMORY.md the model knows: the snapshot's, then as memoryNews told it. */
   private knownMemory: string[] = [];
-  /** What cancels the pending idle fold and the next recurrence tick. */
+  /** What cancels the pending idle fold and the next reminder tick. */
   private idle: (() => void) | undefined;
   private scheduleTimer: (() => void) | undefined;
 
@@ -237,7 +237,7 @@ export class Brain {
             maxSteps: 30,
             noSession: true,
             noSubagents: true,
-            recurrences: false,
+            reminders: false,
             time: options.time,
           },
           signal,
@@ -253,7 +253,7 @@ export class Brain {
     }
     if (options.tasks) {
       const store = watchedStore(options.tasks, (g) => this.publish({ type: "tasks_changed", tasks: finished(g) ? [] : g }));
-      this.tasks = new TaskRunner(
+      this.tasks = new AgentTaskRunner(
         store,
         subagent,
         this.life.signal,
@@ -269,11 +269,11 @@ export class Brain {
 
     this.refreshPrefix();
     let tools = allowed([...hostTools, ...own], options.disallowedTools);
-    const recurrences = options.recurrences ?? this.session !== undefined;
-    let jobs: Recurrences | undefined;
-    if (recurrences) {
-      jobs = new Recurrences(options.home, options.wake ?? ((text) => this.later(customMessage("recurrence", text, options.time.now()))), options.time);
-      tools = allowed([...tools, ...jobs.tools], options.disallowedTools);
+    const reminding = options.reminders ?? this.session !== undefined;
+    let reminders: Reminders | undefined;
+    if (reminding) {
+      reminders = new Reminders(options.home, options.wake ?? ((text) => this.later(customMessage("reminder", text, options.time.now()))), options.time);
+      tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
     }
     this.core = new Agent({
       initialState: {
@@ -320,11 +320,11 @@ export class Brain {
       if (e.type === "agent_end") void this.core.waitForIdle().then(() => this.ended());
     });
 
-    if (jobs) {
-      const s = jobs;
+    if (reminders) {
+      const s = reminders;
       // The first look is at once: what came due while it was away runs now, once.
       s.tick();
-      const every = recurrenceTickMs;
+      const every = reminderTickMs;
       const next = () => {
         this.scheduleTimer = options.time.after(every, () => {
           s.tick();

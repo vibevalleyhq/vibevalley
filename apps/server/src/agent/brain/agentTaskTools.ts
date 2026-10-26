@@ -1,4 +1,4 @@
-// The agent's own task graph (taskGraph.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
+// The agent's own tasks (agentTask.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
 // the whole graph back after each call. The runner moves it along: a subagent's task whose waits are settled goes to a
 // subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
 // own tasks are its to do; nothing here does them.
@@ -6,8 +6,8 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect } from "effect";
 import { head } from "../../base/text.ts";
-import * as engine from "./taskGraph.ts";
-import type { TaskStore } from "./taskStore.ts";
+import * as engine from "./agentTask.ts";
+import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
 import { objectSchema, type Schema, stringSchema, textTool } from "./tool.ts";
 
@@ -16,7 +16,7 @@ const unchanged = Symbol("unchanged");
 const run = <A>(e: Effect.Effect<A, unknown>) => Effect.runPromise(e);
 
 /** Every change, whoever makes it, is told to changed. */
-export function watchedStore(store: TaskStore, changed: (g: engine.Task[]) => void): TaskStore {
+export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => void): AgentTaskStore {
   return {
     load: store.load,
     change: (f) => Effect.tap(store.change(f), (g) => Effect.sync(() => changed(g))),
@@ -24,7 +24,7 @@ export function watchedStore(store: TaskStore, changed: (g: engine.Task[]) => vo
 }
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
-export function taskTools(store: TaskStore, canHelp: boolean, changed: () => void): AgentTool[] {
+export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () => void): AgentTool[] {
   const ids: Schema = { type: "array", items: stringSchema() };
   const task = textTool<{
     tasks: { id: string; title?: string; brief: string; after?: string[]; by?: engine.By }[];
@@ -111,7 +111,7 @@ export function taskTools(store: TaskStore, canHelp: boolean, changed: () => voi
   return [task, update, list];
 }
 
-export class TaskRunner {
+export class AgentTaskRunner {
   /** The subagents out now, by task id. */
   private readonly out = new Map<string, AbortController>();
   private readonly running = new Set<Promise<void>>();
@@ -120,7 +120,7 @@ export class TaskRunner {
   private nudges = 0;
 
   constructor(
-    private readonly store: TaskStore,
+    private readonly store: AgentTaskStore,
     /** Undefined: this agent cannot send subagents (a subagent itself, or the orchestrator). */
     private readonly subagent: Subagent | undefined,
     private readonly life: AbortSignal,
@@ -132,7 +132,7 @@ export class TaskRunner {
   /** Sends out what is ready and fits. Called after the graph changes and when a subagent comes back. */
   async advance() {
     if (!this.subagent || this.life.aborted) return;
-    let picked: engine.Task[] = [];
+    let picked: engine.AgentTask[] = [];
     try {
       await run(
         this.store.change((g) => {
@@ -150,7 +150,7 @@ export class TaskRunner {
         }),
       );
     } catch (e) {
-      if (e !== unchanged && !isUnchanged(e)) console.error("agent: cannot move the task graph:", e);
+      if (e !== unchanged && !isUnchanged(e)) console.error("agent: cannot move its tasks:", e);
       return;
     }
     for (const t of picked) {
@@ -161,7 +161,7 @@ export class TaskRunner {
     }
   }
 
-  private async send(c: AbortController, t: engine.Task) {
+  private async send(c: AbortController, t: engine.AgentTask) {
     const stop = () => c.abort();
     this.life.addEventListener("abort", stop);
     let said = "";
@@ -177,7 +177,7 @@ export class TaskRunner {
     }
     // Stopped: stop puts it back to waiting.
     if (c.signal.aborted) return;
-    let g: engine.Task[];
+    let g: engine.AgentTask[];
     try {
       g = await run(this.store.change((g) => Effect.succeed(engine.settle(g, t.id, said, failed))));
     } catch (e) {
@@ -223,7 +223,7 @@ export class TaskRunner {
       );
     } catch (e) {
       if (!isUnchanged(e)) {
-        console.error("agent: cannot read the task graph:", e);
+        console.error("agent: cannot read its tasks:", e);
         return;
       }
     }
@@ -243,7 +243,7 @@ export class TaskRunner {
   /** What to remind a run that stopped of: its own tasks that are ready, unless the graph has not moved through
    * maxNudges reminders already (it is stuck; the owner or another input will move it). "" for nothing. */
   async nudge(): Promise<string> {
-    let g: engine.Task[];
+    let g: engine.AgentTask[];
     try {
       g = await run(this.store.load);
     } catch {
