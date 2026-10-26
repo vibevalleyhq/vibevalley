@@ -485,7 +485,8 @@ export const make = (options: SessionOptionsIn = {}) =>
         }),
       );
 
-    const ended = (id: string, closed: SessionClose) => logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: Date.now(), closed, id }));
+    const ended = (id: string, closed: SessionClose) =>
+      logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id }));
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
 
@@ -494,13 +495,13 @@ export const make = (options: SessionOptionsIn = {}) =>
     // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
     const runs = {
       start: (id: string, session: string, issue: string, trigger: RunTrigger) =>
-        tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: Date.now() })),
+        tried(qr.startRun({ id, session, issue: issue || null, triggered_by: JSON.stringify(trigger), started_at: clock.currentTimeMillisUnsafe() })),
       /** A run that takes several issues (the in-process agent's) is linked to each; session_run.issue is its first. */
       link: (r: string, issue: string) => tried(qi.linkRunIssue({ run: r, issue })),
       heard: (r: string, heard: readonly string[]) => tried(qr.heardInRun({ heard: JSON.stringify(heard), id: r })),
       issues: (r: string) => Effect.map(tried(qi.runIssues({ run: r })), (rows) => rows.map((x) => issueId(x.issue))),
       finish: (id: string, outcome: Outcome, summary: string, spent?: Spent) =>
-        tried(qr.endRun({ ended_at: Date.now(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
+        tried(qr.endRun({ ended_at: clock.currentTimeMillisUnsafe(), outcome, summary: summary || null, spent: spent ? JSON.stringify(spent) : null, id })),
     };
     /** A helper's run is recorded beside its work: a write that fails is logged, and the run goes on. */
     const keptRun = (what: string, e: Effect.Effect<unknown, Error>) =>

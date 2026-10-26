@@ -5,7 +5,7 @@
 
 import { PGlite } from "@electric-sql/pglite";
 import { PgliteClient, PgliteMigrator } from "@effect/sql-pglite";
-import { type Cause, Context, Effect, Layer, Option } from "effect";
+import { type Cause, Clock, Context, Effect, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -19,7 +19,7 @@ export const baselineHash = () => createHash("sha256").update(baselineSql()).dig
 /** A folder's database made from another baseline is moved aside, whole, to <folder>.<hash>-<time>: it is not
  * upgraded (AGENTS.md: no compatibility) and never deleted. The baseline it was made from is in <folder>.schema; a
  * folder without one is taken to be today's. Returns where the old one went, if it moved. */
-export function setAsideStale(where: string, hash: string, now = Date.now()): string | undefined {
+export function setAsideStale(where: string, hash: string, now: number): string | undefined {
   const mark = where + ".schema";
   if (!existsSync(where) || !existsSync(mark)) return undefined;
   const was = readFileSync(mark, "utf8").trim();
@@ -76,7 +76,7 @@ export const Database = PgliteClient.layerFrom(
     const memory = where === "memory";
     const hash = baselineHash();
     if (!memory) {
-      const aside = setAsideStale(where, hash);
+      const aside = setAsideStale(where, hash, yield* Clock.currentTimeMillis);
       if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
     }
     const base = memory ? memoryBase : undefined;

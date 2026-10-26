@@ -58,7 +58,7 @@ export function changesText(c: Changes): string {
 }
 
 /** How a session reads to the orchestrator, in its situation as in roster; number is its issue's. */
-export function sessionLine(w: Roster, now = Date.now(), number?: number): string {
+export function sessionLine(w: Roster, now: number, number?: number): string {
   const h = w.session;
   let last = "";
   if (h.lastRun) {

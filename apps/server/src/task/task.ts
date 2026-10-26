@@ -156,6 +156,7 @@ interface Verification {
 
 export const make = (options: TaskOptions = {}) =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const core = yield* Core;
     const issues = yield* Issues;
     const store = yield* Agents;
@@ -211,7 +212,7 @@ export const make = (options: TaskOptions = {}) =>
               kind: c.kind,
               actor,
               payload: JSON.stringify(payload),
-              created_at: Date.now(),
+              created_at: clock.currentTimeMillisUnsafe(),
             }),
             SqlClient.SqlClient,
             sql,

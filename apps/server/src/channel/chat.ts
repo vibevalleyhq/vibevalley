@@ -338,6 +338,7 @@ export interface Helpers {
 }
 
 export const make = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
   const config = yield* Settings;
   const core = yield* Core;
   let helpers: Helpers | undefined;
@@ -778,7 +779,9 @@ export const make = Effect.gen(function* () {
 
   /** Reading a digest only proposes context; the execution acknowledges what it actually took. */
   const consumed = (input: InputConsumed) =>
-    Effect.forEach(input.messages, (id) => db(qd.seenOne({ seen_at: Date.now(), recipient_id: input.session, message_id: id })), { discard: true });
+    Effect.forEach(input.messages, (id) => db(qd.seenOne({ seen_at: clock.currentTimeMillisUnsafe(), recipient_id: input.session, message_id: id })), {
+      discard: true,
+    });
 
   // ── sessions coming and going ──
 

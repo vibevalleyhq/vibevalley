@@ -47,6 +47,7 @@ export default defineConfig({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
+      { name: "vibevalley", specifier: "./scripts/oxlint-plugin.ts" },
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
@@ -73,7 +74,36 @@ export default defineConfig({
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
         // command line prints, and the brain and the journal are plain classes outside Effect.
         files: ["apps/server/src/**"],
-        rules: { "no-console": "error" },
+        rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
+      },
+      {
+        // base/time.ts is where the wall clock is allowed (wallTime, the real-time deadlines); tests drive time as they
+        // need.
+        files: ["apps/server/src/base/time.ts", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**", "apps/server/src/agent/brain/testing.ts"],
+        rules: { "vibevalley/no-wall-clock": "off" },
+      },
+      {
+        // Still reading the wall clock on their own: each takes a Time when it is converted, and leaves this list
+        // (.agents/notes/proposed/testing/2026-10-26-fast-testable-server.md, step 7). Nothing is added to it.
+        files: [
+          "apps/server/src/agent/brain/agent.ts",
+          "apps/server/src/agent/brain/compaction.ts",
+          "apps/server/src/agent/brain/memory.ts",
+          "apps/server/src/agent/brain/messages.ts",
+          "apps/server/src/agent/brain/openai.ts",
+          "apps/server/src/agent/brain/recurrences.ts",
+          "apps/server/src/agent/brain/taskStore.ts",
+          "apps/server/src/connector/connector.ts",
+          "apps/server/src/connector/qq.ts",
+          "apps/server/src/connector/wait.ts",
+          "apps/server/src/memory/everos.ts",
+          "apps/server/src/memory/nowledge.ts",
+          "apps/server/src/memory/sources.ts",
+          "apps/server/src/session/host.ts",
+          "apps/server/src/session/journal.ts",
+          "apps/server/src/voice/voice.ts",
+        ],
+        rules: { "vibevalley/no-wall-clock": "off" },
       },
       {
         files: [

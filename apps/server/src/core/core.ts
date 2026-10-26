@@ -120,6 +120,7 @@ const isFact = (e: SideEvent): e is Fact => {
 };
 
 export const make = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
   const config = yield* Settings;
   const { reduce, effects: effectsOf, frame: frameOf, restore } = yield* Projection;
   const file = join(config.home, "state.json");
@@ -173,7 +174,7 @@ export const make = Effect.gen(function* () {
       const done: Transition[] = [];
       const made: GameEffect[] = [];
       for (const fact of facts) {
-        const f = { ...fact, at: Date.now() };
+        const f = { ...fact, at: clock.currentTimeMillisUnsafe() };
         const [after, changed] = reduce(next, f);
         if (!changed) continue;
         done.push({ before: next, fact: f, after });
@@ -217,9 +218,9 @@ export const make = Effect.gen(function* () {
     setOrchestrator: (orchestrator) => apply({ type: "orchestrator", state: orchestrator }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" }))),
-    sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: Date.now(), id, activity })),
-    notice: (level, text) => Effect.suspend(() => side({ type: "notice", at: Date.now(), level, text })),
-    runtime: (info) => Effect.suspend(() => side({ type: "runtime", at: Date.now(), info })),
+    sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity })),
+    notice: (level, text) => Effect.suspend(() => side({ type: "notice", at: clock.currentTimeMillisUnsafe(), level, text })),
+    runtime: (info) => Effect.suspend(() => side({ type: "runtime", at: clock.currentTimeMillisUnsafe(), info })),
     did: (d) => Effect.asVoid(PubSub.publish(owner, d)),
     transitions: Effect.gen(function* () {
       const sub = yield* PubSub.subscribe(transitions);

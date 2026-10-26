@@ -25,7 +25,7 @@ import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
 import { inboxLines } from "../channel/rules.ts";
-import { Context, Effect, FiberSet, Layer } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { textTool } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
@@ -153,6 +153,7 @@ const spaces = /\s+/g;
 const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
 
 export const make = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
   const agents = yield* Agents;
   const projects = yield* Projects;
   const memory = yield* Memories;
@@ -245,16 +246,16 @@ export const make = Effect.gen(function* () {
 
   const roster = tool<object>("roster", "列出在场的所有帮工：在做什么、上一轮的结果。", () => {
     const all = run.roster();
-    return all.length === 0 ? "现在没有在场的帮工。" : all.map((w) => sessionLine(w, Date.now(), numberOf(w))).join("\n");
+    return all.length === 0 ? "现在没有在场的帮工。" : all.map((w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w))).join("\n");
   });
 
   const check = issueTool("check", "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。", async (t) => {
     const w = workerOf(t);
     const timeline = await go(issue.timeline(t.id)).catch(() => undefined);
-    const lines = [issueDetail(t, whoOf(t), timeline, Date.now())];
+    const lines = [issueDetail(t, whoOf(t), timeline, clock.currentTimeMillisUnsafe())];
     if (w)
       lines.push(
-        sessionLine(w, Date.now(), t.number),
+        sessionLine(w, clock.currentTimeMillisUnsafe(), t.number),
         "目录：" + w.place.cwd,
         "上一轮完整汇报（结尾部分）：\n" + (w.lastText ? tail(w.lastText, 2000) : "还没有"),
       );
@@ -277,7 +278,9 @@ export const make = Effect.gen(function* () {
     // Listed without @: an @ wakes someone, and models copy what they read.
     const lines = ["在场的有主人、管家，和这些帮工："];
     for (const h of run.presentSessions())
-      lines.push(`- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, Date.now())}）工单：${head(h.brief.replace(spaces, " "), 60)}`);
+      lines.push(
+        `- ${h.id} ${h.name}（${h.runtime}，在 ${h.project ?? "?"}；${phaseText(h, clock.currentTimeMillisUnsafe())}）工单：${head(h.brief.replace(spaces, " "), 60)}`,
+      );
     lines.push("要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。");
     return lines.join("\n");
   });
@@ -415,11 +418,14 @@ export const make = Effect.gen(function* () {
     "issues",
     "找工单、看一批工单：主人问「哪些在等我」（wants_owner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；填 issue 是看一张的全部。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
     async (p) => {
-      if (p.issue) return withIssue(p.issue, async (t) => issueDetail(t, whoOf(t), await go(issue.timeline(t.id)).catch(() => undefined), Date.now()));
+      if (p.issue)
+        return withIssue(p.issue, async (t) =>
+          issueDetail(t, whoOf(t), await go(issue.timeline(t.id)).catch(() => undefined), clock.currentTimeMillisUnsafe()),
+        );
       const status = p.status ? statusOf(p.status) : undefined;
       if (p.status && !status) return noSuchStatus(p.status, IssueStatusValues);
       const words = (p.text ?? "").split(spaces).filter(Boolean);
-      const now = Date.now();
+      const now = clock.currentTimeMillisUnsafe();
       let found = (await go(issue.list())).filter(
         (t) =>
           (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
@@ -550,7 +556,7 @@ export const make = Effect.gen(function* () {
                 ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
               }),
             );
-            return "改好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
+            return "改好了：" + issueLine(done, whoOf(done), clock.currentTimeMillisUnsafe()).slice(2);
           } catch (e) {
             return "没改：" + toError(e).message;
           }
@@ -582,7 +588,7 @@ export const make = Effect.gen(function* () {
             // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
             if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
             if (to === "done" && done.pullRequest?.state === "open") return `#${done.number} 的 PR 开着：${done.pullRequest.url}，合了才算完成`;
-            return "挪好了：" + issueLine(done, whoOf(done), Date.now()).slice(2);
+            return "挪好了：" + issueLine(done, whoOf(done), clock.currentTimeMillisUnsafe()).slice(2);
           } catch (e) {
             return "没挪：" + toError(e).message;
           }
@@ -909,7 +915,7 @@ export const make = Effect.gen(function* () {
       issueSplit(who),
     ],
     start: toolStart,
-    sessionLine: (w) => sessionLine(w, Date.now(), numberOf(w)),
+    sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),
   });
 });
 

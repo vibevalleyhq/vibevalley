@@ -216,6 +216,7 @@ export interface IssueOptions {
 
 export const make = (options: IssueOptions = {}) =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const config = yield* Settings;
     const core = yield* Core;
     const store = yield* Agents;
@@ -374,9 +375,11 @@ export const make = (options: IssueOptions = {}) =>
     });
 
     /** Done, with what it delivered. */
-    const complete = (id: string, delivered: Delivery) => Effect.andThen(db(q.completeIssue({ closed_at: Date.now(), delivered, id })), publish(id));
+    const complete = (id: string, delivered: Delivery) =>
+      Effect.andThen(db(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
     /** Not done, and why. */
-    const cancelAs = (id: string, canceled: IssueCanceled) => Effect.andThen(db(q.cancelIssue({ closed_at: Date.now(), canceled, id })), publish(id));
+    const cancelAs = (id: string, canceled: IssueCanceled) =>
+      Effect.andThen(db(q.cancelIssue({ closed_at: clock.currentTimeMillisUnsafe(), canceled, id })), publish(id));
 
     /** A run no session carries (an in-process agent's, the orchestrator's) ended on the issue: the issue keeps how. */
     const endRun = Effect.fn("Issues.endRun")(function* (id: string, outcome: Outcome) {

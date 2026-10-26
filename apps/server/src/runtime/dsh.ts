@@ -19,6 +19,7 @@ import {
   type StartSession,
 } from "@botiverse/oar";
 import { Predicate } from "effect";
+import { afterRealTime } from "../base/time.ts";
 
 const dist = new URL(".", import.meta.resolve("@botiverse/oar"));
 const internal = <T>(path: string) => import(new URL(path, dist).href) as Promise<T>;
@@ -176,10 +177,10 @@ async function readNewSession(command: string, cwd: string, timeoutMs: number): 
   const request = (method: string, params: Rec) =>
     new Promise<Rec>((resolve, reject) => {
       const id = ++next;
-      const timer = setTimeout(() => reject(new Error(`${method} timed out`)), timeoutMs);
+      const cancel = afterRealTime(timeoutMs, () => reject(new Error(`${method} timed out`)));
       waiting.set(id, {
-        resolve: (v) => (clearTimeout(timer), resolve(v)),
-        reject: (e) => (clearTimeout(timer), reject(e)),
+        resolve: (v) => (cancel(), resolve(v)),
+        reject: (e) => (cancel(), reject(e)),
       });
       child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
     });

@@ -50,6 +50,7 @@ const fadingSoon = 10;
 const recutBatch = 100;
 
 export const makeMemories = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
   const sql = yield* SqlClient.SqlClient;
   const { attempt: db } = yield* Db;
 
@@ -123,7 +124,7 @@ export const makeMemories = Effect.gen(function* () {
   );
 
   const markRecalled = (ids: readonly string[]) =>
-    Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: Date.now(), id })), { discard: true }).pipe(
+    Effect.forEach(ids, (id) => db(q.recalled({ recalled_at: clock.currentTimeMillisUnsafe(), id })), { discard: true }).pipe(
       Effect.catch((e) => Effect.logWarning(`a memory was recalled but not marked: ${String(e)}`)),
     );
 
