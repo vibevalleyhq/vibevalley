@@ -1,6 +1,5 @@
-// Which sessions worked each issue, oldest first, as the issues keep it in memory: read from issue_session when they
-// start, told each session added once its transaction commits, and read again after an issue is removed (the rows go
-// with it and with its children's, by cascade). Only the issues write issue_session.
+// Oldest first, kept in memory: read from issue_session at start and again after an issue is removed (its rows and its
+// children's go by cascade), and told each session added once its transaction commits. Only the issues write issue_session.
 
 export class IssueSessions {
   private issueOfSession = new Map<string, string>();
@@ -13,7 +12,7 @@ export class IssueSessions {
     for (const r of rows) this.added(r.session, r.issue);
   }
 
-  /** AddSession: a session already there stays where it was. */
+  /** As AddSession: a session already there stays where it was. */
   added(session: string, issue: string) {
     if (this.issueOfSession.has(session)) return;
     this.issueOfSession.set(session, issue);
