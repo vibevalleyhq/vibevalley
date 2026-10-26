@@ -1,0 +1,11 @@
+# Pull requests that move the actions CI pins by commit (.github/workflows/ci.yml) to their new releases, commit and
+# version comment together. npm dependencies are not here: their versions live in pnpm-workspace.yaml's catalog.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
