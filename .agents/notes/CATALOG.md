@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（22 篇）
 
 ### feature
 
@@ -34,10 +34,6 @@
 ### process
 
 - 2026-10-18 [用 VibeValley 开发 VibeValley](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)
-
-### testing
-
-- 2026-10-26 [贵的东西藏在模块后面，测试分层、有预算](.agents/notes/proposed/testing/2026-10-26-cheap-modules-layered-tests.md)
 
 ## rejected（2 篇）
 

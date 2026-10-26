@@ -530,9 +530,15 @@ export const make = (hooks: ProjectHooks = {}) =>
         changes.branch = branch;
         const range = `${base}...${branch}`;
         const log = yield* git(path, "log", "--format=%h%x09%ct%x09%s", `${base}..${branch}`);
-        const names = yield* git(path, "diff", "--no-renames", "--name-status", range);
-        const numbers = yield* gitQuiet(path, "diff", "--no-renames", "--numstat", range);
-        const patch = (yield* gitRun(path, "diff", "--no-renames", "--no-color", range)).stdout.trim();
+        // One diff for all three: the raw lines (":<modes> <ids> <letter>\t<path>") and the numstat lines come first, then
+        // the patch from its first "diff --git".
+        const diff = yield* git(path, "diff", "--no-renames", "--no-color", "--raw", "--numstat", "-p", range);
+        const first = diff.startsWith("diff --git ") ? 0 : diff.indexOf("\ndiff --git ");
+        const at = first < 0 ? diff.length : first === 0 ? 0 : first + 1;
+        const head = diff.slice(0, at).split("\n");
+        const names = head.flatMap((l) => (l.startsWith(":") ? [l.slice(l.lastIndexOf(" ", l.indexOf("\t")) + 1)] : [])).join("\n");
+        const numbers = head.filter((l) => !l.startsWith(":")).join("\n");
+        const patch = diff.slice(at).trim();
         const conflicts = yield* conflictsOf(path, base, branch);
         const behind = yield* gitQuiet(path, "rev-list", "--count", `${branch}..${base}`);
         const counts = new Map<string, { added: number; removed: number }>();

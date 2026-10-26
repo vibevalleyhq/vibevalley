@@ -123,6 +123,41 @@ describe("projects", () => {
     );
   });
 
+  it.effect("a branch's changes: each file's letter, its lines and its patch, a binary one with none", () => {
+    const root = projectsDir();
+    const path = join(root, "described");
+    repo(path, 1, 0);
+    writeFileSync(join(path, "keep.txt"), "a\nb\n");
+    writeFileSync(join(path, "gone.txt"), "x\n");
+    gitSync(path, "add", ".");
+    gitSync(path, "commit", "-qm", "base");
+    return projects(
+      root,
+      Effect.gen(function* () {
+        const p = yield* Projects;
+        const place = yield* p.workplace("described", 1, true, "");
+        writeFileSync(join(place.cwd, "keep.txt"), "a\nB\nc\n");
+        writeFileSync(join(place.cwd, "b.bin"), Buffer.from([0, 1, 2]));
+        writeFileSync(join(place.cwd, "sp ace.txt"), "new\n");
+        gitSync(place.cwd, "rm", "-q", "gone.txt");
+        gitSync(place.cwd, "add", "-A");
+        gitSync(place.cwd, "commit", "-qm", "work");
+        const changes = (yield* p.branchChanges("described", place.branch!))!;
+        expect(changes.files.map((f) => [f.path, f.status, f.added, f.removed, f.patch !== undefined])).toEqual([
+          ["b.bin", "A", -1, -1, false],
+          ["gone.txt", "D", 0, 1, true],
+          ["keep.txt", "M", 2, 1, true],
+          ["sp ace.txt", "A", 1, 0, true],
+        ]);
+        expect(changes.files[2]!.patch).toBe(
+          "diff --git a/keep.txt b/keep.txt\nindex 422c2b7..7be73ce 100644\n--- a/keep.txt\n+++ b/keep.txt\n@@ -1,2 +1,3 @@\n a\n-b\n+B\n+c\n",
+        );
+        expect(changes.files[3]!.patch).toMatch(/^diff --git a\/sp ace.txt b\/sp ace.txt\n[\s\S]*\+new$/);
+        expect(changes.commits.map((c) => c.subject)).toEqual(["work"]);
+      }),
+    );
+  });
+
   it.effect("a branch opens where another stands", () => {
     const root = projectsDir();
     return projects(
