@@ -32,7 +32,8 @@ import {
   type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
-import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
+import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
+import { jsonOf } from "../base/json.ts";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { stackOf } from "./stack.ts";
@@ -221,6 +222,11 @@ const noTokei = "统计代码要用 tokei，这台机器上没找到：装一个
 
 /** 53 weeks, so a whole year of weeks shows whatever day it is. */
 const yearDays = 53 * 7;
+
+// What the gh commands below print with --json; anything else is not taken as their answer.
+const repoView = jsonOf(Schema.Struct({ viewerPermission: Schema.optional(Schema.NullOr(Schema.String)) }));
+const openPullRequests = jsonOf(Schema.Array(Schema.Struct({ url: Schema.String, number: Schema.Int })));
+const pullRequestView = jsonOf(Schema.Struct({ state: Schema.String, mergedAt: Schema.optional(Schema.NullOr(Schema.String)) }));
 
 /** Close to JavaScript's localeCompare for names, as the Go has it: case ignored first, then by bytes. */
 const localeCompare = (a: string, b: string) => {
@@ -981,16 +987,16 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (!p.git || origin.code !== 0 || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
             else {
               const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
-              let permission: string | undefined;
+              let permission: string | null | undefined;
               try {
-                permission = view.ok ? (JSON.parse(view.out) as { viewerPermission?: string }).viewerPermission : undefined;
+                permission = view.ok ? repoView(view.out).viewerPermission : undefined;
               } catch {
                 permission = undefined;
               }
               c =
                 permission === undefined
                   ? { available: false, reason: "无法检测 GitHub 仓库权限" }
-                  : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission)
+                  : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
                     ? { available: true, reason: "" }
                     : { available: false, reason: "没有写权限" };
             }
@@ -1026,9 +1032,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
             if (!listed.ok) return yield* fail("查询已有 PR 失败；分支已推送，可重试");
-            let existing: PullRequest[];
+            let existing: readonly { url: string; number: number }[];
             try {
-              existing = JSON.parse(listed.out) as PullRequest[];
+              existing = openPullRequests(listed.out);
             } catch {
               return yield* fail("无法读取已有 PR");
             }
@@ -1062,9 +1068,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         if (repo === "") return yield* fail("不是 GitHub 仓库");
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
         if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
-        let result: { state?: string; mergedAt?: string | null };
+        let result: { readonly state: string; readonly mergedAt?: string | null | undefined };
         try {
-          result = JSON.parse(viewed.out) as typeof result;
+          result = pullRequestView(viewed.out);
         } catch {
           return yield* fail(`无法读取 PR #${n} 状态`);
         }
