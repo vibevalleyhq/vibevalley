@@ -1,0 +1,5 @@
+# site/ is a project of its own, apart from the repository's workspace: its Astro brings its own Vite.
+
+# Install scripts: esbuild fetches its binary in its.
+allowBuilds:
+  esbuild: true
