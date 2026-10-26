@@ -66,6 +66,8 @@ class FakeNowledge {
   addResult: unknown;
 
   private server() {
+    // A fake server listing plain JSON Schema tools, as mcp.ts serves them.
+    // oxlint-disable-next-line typescript/no-deprecated
     const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
     const object = { type: "object" as const };
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
