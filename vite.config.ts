@@ -61,6 +61,10 @@ export default defineConfig({
       // thrown from a catch without { cause } loses the one that happened.
       "typescript/no-unnecessary-type-assertion": "error",
       "eslint/preserve-caught-error": "error",
+      // A promise nobody awaits loses its failure, a thrown non-Error loses its stack, and any turns the type checker off.
+      "typescript/no-floating-promises": "error",
+      "typescript/only-throw-error": "error",
+      "typescript/no-explicit-any": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -152,6 +156,7 @@ export default defineConfig({
         },
       },
     ],
-    options: { typeAware: true, typeCheck: true },
+    // A disable comment whose rule no longer fires there is an error, so none outlives its reason.
+    options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: "error" },
   },
 });

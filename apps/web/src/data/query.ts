@@ -1,6 +1,5 @@
 // QueryObserver owns cache, fetching and retry policy; this adapter publishes its settled snapshots without suspending
 // the state stream's updates while a REST read is in flight.
-// oxlint-disable-next-line no-restricted-imports
 import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions, type QueryObserverResult } from "@tanstack/solid-query";
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
 import { api } from "./api";
