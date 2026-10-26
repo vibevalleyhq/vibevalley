@@ -2,6 +2,7 @@
 // requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
 // here, for the board, the command line and the orchestrator's tool alike.
 
+import { issueWording } from "./words.ts";
 import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@vibevalley/protocol";
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
@@ -45,7 +46,7 @@ export function merging(d: MergeDeps) {
     if (n.fix) {
       const told = yield* Effect.result(chat.tellSession(ownerId, id, n.fix, ""));
       if (told._tag === "Failure")
-        [owner, line] = [owner + "\n给帮工带话失败：" + reasonOf(told.failure), line + "\n给帮工带话失败：" + reasonOf(told.failure)];
+        [owner, line] = [owner + issueWording().merge.tellFailed(reasonOf(told.failure)), line + issueWording().merge.tellFailed(reasonOf(told.failure))];
     }
     yield* core.notice("warn", line);
     return refused(owner);
@@ -56,9 +57,9 @@ export function merging(d: MergeDeps) {
 
   const mergeSession = Effect.fn("Issues.mergeSession")(function* (id: string) {
     const session = sessions.sessionOf(id);
-    if (!session) return yield* Effect.fail(missing("帮工 " + id, [lookIn.session]));
+    if (!session) return yield* Effect.fail(missing(issueWording().helperRef(id), [lookIn.session]));
     const merged = yield* handedOver(id, (place) => projects.merge(place));
-    yield* core.notice("info", `${session.name} 的活合进去了：${merged.text}`);
+    yield* core.notice("info", issueWording().merge.merged(session.name, merged.text));
     return merged.text;
   });
 
@@ -121,7 +122,7 @@ export function merging(d: MergeDeps) {
         const done = state._tag === "Failure" ? state : state.success === "open" ? undefined : yield* Effect.result(finishPullRequest(issue, state.success));
         if (done?._tag === "Failure")
           yield* Effect.logWarning(
-            `vibevalley: refresh pull requests: 工单 #${issue.number}: ${done.failure instanceof Error ? done.failure.message : reasonOf(done.failure)}`,
+            `vibevalley: refresh pull requests: issue #${issue.number}: ${done.failure instanceof Error ? done.failure.message : reasonOf(done.failure)}`,
           );
       }
     }),

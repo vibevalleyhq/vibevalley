@@ -2,6 +2,8 @@
 // and how what it hands back is read into the issue; the refiner's worktree goes back to main after, and goes away with
 // the issue.
 
+import { issueWording } from "./words.ts";
+import { draftMatch, refinementBrief } from "./prompts.ts";
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
@@ -17,7 +19,7 @@ import { chooseAgent } from "../runtime/rules.ts";
 import type { RuntimeShape } from "../runtime/runtime.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
 import { isForOrchestrator } from "./state.ts";
-import { refinementBrief, refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
+import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
 
 /** What drafting needs of the issues around it. */
 export interface RefinementDeps {
@@ -47,14 +49,14 @@ export function refinement(d: RefinementDeps) {
     const candidates = yield* runtimes.candidates;
     let named = "";
     if (t.assignee) {
-      if (!store.agent(t.assignee)) return yield* Effect.fail(refused("帮工档案 " + t.assignee + " 不在了"));
+      if (!store.agent(t.assignee)) return yield* Effect.fail(refused(issueWording().profileGone(t.assignee)));
       named = t.assignee;
     } else if (t.project) {
       const last = (yield* one(qs.lastAssigneeIn({ project: t.project })))?.assignee;
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
-    const chosen = chooseAgent(candidates, "起草 " + t.title, named, "");
-    if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来起草", [lookIn.agent]));
+    const chosen = chooseAgent(candidates, draftMatch(t.title), named, "");
+    if (!chosen) return yield* Effect.fail(refused(issueWording().draft.noDrafter, [lookIn.agent]));
     return chosen;
   });
 
@@ -101,12 +103,12 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issues.draft")(
     function* (id: string, word: string, channel: string) {
       const t = yield* unsent(id);
-      if (isForOrchestrator(t)) return yield* Effect.fail(refused("这是派给管家的工单：管家自己会看"));
-      if (t.status !== "backlog") return yield* Effect.fail(refused("只有备选里的工单能起草：先挪回备选"));
-      if (t.refining) return yield* Effect.fail(refused(t.refining.name + " 正在起草：等它交回来"));
+      if (isForOrchestrator(t)) return yield* Effect.fail(refused(issueWording().draft.orchestrator));
+      if (t.status !== "backlog") return yield* Effect.fail(refused(issueWording().draft.onlyBacklog));
+      if (t.refining) return yield* Effect.fail(refused(issueWording().draft.drafting(t.refining.name)));
       const chosen = yield* refiner(t);
       const where = t.project ?? (chosen.workdir ?? "").trim();
-      if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：先选一个项目"));
+      if (!where) return yield* Effect.fail(refused(issueWording().draft.noProject));
       const said = word.trim();
       const brief = refinementBrief(t, said, where);
       yield* beforeRefinement(t, said, chosen.id, where);
@@ -115,7 +117,7 @@ export function refinement(d: RefinementDeps) {
       if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${t.id}: before its draft: ${kept.reason}`);
       // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
-      if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? "派不出去"));
+      if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? issueWording().sendFailed));
       // Its moves no longer hold todo while it drafts.
       yield* publish(id);
       return yield* get(id);
@@ -134,9 +136,9 @@ export function refinement(d: RefinementDeps) {
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
-      if (!d) yield* tell(`${h.name} 交回来的草稿读不出来（${problem}），工单没动：再起草一次`);
+      if (!d) yield* tell(issueWording().draft.unread(h.name, problem));
       else yield* refined(id, d, f.questions);
-    } else yield* tell(`${h.name} 没起草完（${f.summary}），工单没动：再起草一次`);
+    } else yield* tell(issueWording().draft.unfinished(h.name, f.summary));
     yield* sessions.dismiss(f.id, "discard");
     yield* publish(id);
   });
@@ -146,7 +148,7 @@ export function refinement(d: RefinementDeps) {
     if (t.refining) yield* sessions.dismiss(t.refining.session, "discard");
     if (t.project) {
       const kept = yield* sessions.clearWorkplace(t.id, t.project, t.number);
-      if (kept.kept) yield* core.notice("warn", `「${cut(t.title, 40)}」取消了：${kept.reason}`);
+      if (kept.kept) yield* core.notice("warn", issueWording().draft.canceled(cut(t.title, 40), kept.reason));
       return kept;
     }
     return { kept: false };

@@ -2,6 +2,7 @@
 // id, its draft (what the drafting session is told and how what it hands back is read), where its status may move, and
 // the sowing form's templates filled for a project.
 
+import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { reportVerdict } from "../session/rules.ts";
 import type {
@@ -23,11 +24,9 @@ import type {
 import { closedText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
+import { answerFormat, answerOpening, criteriaHead } from "./prompts.ts";
 
 export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
-
-export const criteriaHead =
-  "验收标准（主人照这几条验收；做完逐条对照，在结论前面每条写一行「标准 N：做到了」「标准 N：没做到」或「标准 N：不确定」，后面接凭据：跑了什么命令、结果如何，或改了哪个文件）：";
 
 /** The criteria go last, so whoever works it checks each one before it hands the work back. An answer issue is read
  * only, and its job ends with the block its conclusion comes back in (parseAnswer). */
@@ -38,26 +37,8 @@ export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & 
   return t.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
 }
 
-export const answerOpening =
-  "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
-
-const answerExample = {
-  conclusion: "看板拖卡还在调旧的 start 接口，所以挪到已完成时没反应。",
-  evidence: ["apps/web/src/pages/issues/Board.tsx:120 拖放调的是 api.issue.start", "rg 'issue.start' 只在 Board.tsx 里出现一次"],
-  unsure: ["不确定命令行有没有走同一条路"],
-  next: ["把拖放改成 issue.status"],
-};
-
-const answerFormat = [
-  "汇报的最后，用一个 json 代码块交结论，格式照这个：",
-  "```json",
-  JSON.stringify(answerExample, null, 2),
-  "```",
-  "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
-].join("\n");
-
 /** 接着修 for an answer that could not be read: what was wrong with it, and the format again. */
-export const answerCureWords = (problem: string) => `接着修：上一轮交回的结论读不出来（${problem}）。接着查清楚，最后照这个格式交：\n${answerFormat}`;
+export const answerCureWords = (problem: string) => issueWording().job.answerUnread(problem) + "\n" + answerFormat;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
  * short title (shortTitle) and the whole job is the description. */
@@ -112,13 +93,13 @@ function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v];
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-  throw new Error(`${field}：要是字符串或字符串的数组`);
+  throw new Error(issueWording().draft.lines(field));
 }
 
 function textOf(v: unknown, field: string): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v;
-  throw new Error(`${field}：要是字符串`);
+  throw new Error(issueWording().draft.text(field));
 }
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
@@ -126,13 +107,13 @@ const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
   const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: "没找到草稿：要用一个 json 代码块给出" };
+  if (blocks.length === 0) return { problem: issueWording().draft.noBlock };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("要是一个对象");
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(issueWording().draft.notObject);
       d = {
         title: textOf(raw.title, "title"),
         why: textOf(raw.why, "why"),
@@ -142,12 +123,12 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
         files: linesOf(raw.files, "files"),
       };
     } catch (e) {
-      problem = "json 读不了：" + (e instanceof Error ? e.message : String(e));
+      problem = issueWording().draft.unreadable(e instanceof Error ? e.message : String(e));
       continue;
     }
     const title = clip(d.title, 80);
     if (!title) {
-      problem = "草稿没有标题";
+      problem = issueWording().draft.noTitle;
       continue;
     }
     return { draft: { ...d, title }, problem: "" };
@@ -157,68 +138,17 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
 
 /** The issue's description from a draft, under the same headings every time; a heading with nothing under it is left out. */
 export function refinementDescription(d: IssueRefinement): string {
+  const w = issueWording().draft;
   const parts: string[] = [];
   const why = d.why.trim();
-  if (why) parts.push("为什么：\n" + why);
+  if (why) parts.push(w.why + "\n" + why);
   for (const [head, lines] of [
-    ["要做的：", kept(d.todo)],
-    ["不做的：", kept(d.notDoing)],
-    ["可能涉及：", kept(d.files)],
+    [w.todo, kept(d.todo)],
+    [w.notDoing, kept(d.notDoing)],
+    [w.files, kept(d.files)],
   ] as const)
     if (lines.length > 0) parts.push(head + "\n- " + lines.join("\n- "));
   return parts.join("\n\n");
-}
-
-export const refinementOpening =
-  "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
-
-/** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
-export function refinementBrief(
-  t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
-  word: string,
-  project: string,
-): string {
-  word = word.trim();
-  const questions = t.questions ?? [];
-  const criteria = t.criteria ?? [];
-  const answering = word !== "" && questions.length > 0;
-  const redraft = !!t.description || criteria.length > 0;
-  const example = {
-    title: "看板拖卡改用 issue.status",
-    why: "看板拖卡片还在调旧的 start 接口，挪到已完成时收不了。",
-    todo: ["board.dart 的拖放改调 issue.status", "删掉旧接口的调用"],
-    criteria: ["把一张备选拖到待办，它开工", "flutter test test/workbench/issues_test.dart 通过"],
-    notDoing: ["不改看板的样子"],
-    files: ["app/lib/workbench/issues/board.dart"],
-  };
-  const lines = [refinementOpening, "", `项目：${project}（你现在就在它的目录里）`, "主人想做的：" + (word !== "" && !redraft ? word : t.title)];
-  if (redraft) {
-    lines.push("", "上一版草稿（主人可能改过，以这一版为准）：", "标题：" + t.title);
-    if (t.description) lines.push(t.description);
-    if (criteria.length > 0) lines.push("验收标准：", "- " + criteria.join("\n- "));
-  }
-  if (answering)
-    lines.push("", "你上一版问主人的：", "- " + questions.map((a) => a.question).join("\n- "), "主人的回答：" + word, "", "照主人的回答再起草一版，整张重写。");
-  else if (redraft && word) lines.push("", "主人这次说：" + word, "", "照主人说的再起草一版，整张重写。");
-  else if (redraft) lines.push("", "再起草一版，整张重写。");
-  lines.push(
-    "",
-    "先读代码，弄清现状，再写。写的规矩：",
-    "- title：短标题，说做什么，不超过 20 个字；细节写在 why、todo 里，不写进标题。",
-    "- why：为什么要做，一两句。",
-    "- todo：要做的几件事，一件一条，写到改哪里。",
-    "- criteria：怎么算做完，一条一个主人能照着验的点（跑什么命令、看到什么结果、页面上是什么样）。",
-    "- notDoing：这张工单不做的，免得做多了；没有就给空数组。",
-    "- files：可能涉及的文件或目录。",
-    "- 拿不准、要主人定的，写在代码块前面，每行以「要问主人：」开头，一行问一件事，想得到的几种回答写在句末「（选项：A｜B）」；能自己查到的不要问。问了也照你最好的猜测把草稿写完整。",
-    "",
-    "汇报的最后，用一个 json 代码块给出草稿，格式照这个：",
-    "```json",
-    JSON.stringify(example, null, 2),
-    "```",
-    "代码块之后写一句结论：草稿写好了没有，还要问主人什么。",
-  );
-  return lines.join("\n");
 }
 
 const recentTitles = 5;
@@ -244,13 +174,14 @@ export function sentTitles(all: readonly Issue[], project: string): string[] {
 }
 
 const commandHoles = /\s?\{(test|lint|build)\}\s?/g;
-const words: Record<string, string> = { test: "测试", lint: "代码检查", build: "构建" };
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
 export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): IssueTemplate {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
-  const done = s.done.replace(commandHoles, (hole, name: string) => (commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : words[name]!));
-  const text = s.title + "\n做到什么程度算完：" + done;
+  const done = s.done.replace(commandHoles, (hole, name: string) =>
+    commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : issueWording().template.commands[name]!,
+  );
+  const text = issueWording().template.done(s.title, done);
   const blank = firstBlank(text);
   const { blank: _, ...rest } = s;
   return { ...rest, done, text, ...(blank ? { blank } : {}) };
@@ -267,26 +198,28 @@ function firstBlank(text: string): TemplateBlank | undefined {
 }
 
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
+  const w = issueWording().timeline;
   switch (t.kind) {
     case "refine":
-      return ["started", "开始起草"];
+      return ["started", w.refine];
     case "comment":
-      return ["told", "你带了话，接着做一轮"];
+      return ["told", w.told];
     case "issue":
-      return ["started", first ? "开工" : "重开，接着做"];
+      return ["started", first ? w.start : w.restart];
     case "task":
-      return ["started", "照计划开工"];
+      return ["started", w.plan];
     case "recurrence":
-      return ["started", t.missed ? "定时开工（补跑）" : "定时开工"];
+      return ["started", w.recurrence(t.missed ?? false)];
     case "runtime":
-      return ["started", "农机自己接着做"];
+      return ["started", w.runtime];
   }
 }
 
 /** The issue's milestones out of what is kept: its runs (oldest first), the findings it was sent back with, its
  * acceptance and its close; newest first. The questions it waits on now go with its last run. names: a session's name. */
 export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
-  const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: "开单" }];
+  const w = issueWording().timeline;
+  const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: w.opened }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
   runs.forEach((r, i) => {
     const who = names.get(r.session);
@@ -295,12 +228,11 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
     const [kind, text] = startWords(r.triggeredBy, !runs.slice(0, i).some((x) => x.triggeredBy.kind !== "refine"));
     out.push({ at: r.startedAt, kind, ...by, text });
     if (r.endedAt === undefined || r.outcome === undefined) return;
-    const said = r.summary ? `：${r.summary}` : "";
+    const said = r.summary ? w.said(r.summary) : "";
     switch (r.outcome) {
       case "completed":
-        if (i === lastDone && t.questions.length > 0)
-          out.push({ at: r.endedAt, kind: "asked", ...by, text: "问你：" + t.questions.map((a) => a.question).join(" / ") });
-        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
+        if (i === lastDone && t.questions.length > 0) out.push({ at: r.endedAt, kind: "asked", ...by, text: w.asked(t.questions.map((a) => a.question)) });
+        else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? w.refined : w.reported) + said });
         break;
       case "failed":
         out.push({ at: r.endedAt, kind: "failed", ...by, text: wording().outcome.failed + said });
@@ -312,8 +244,8 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   });
   const sentBack = new Map<number, string[]>();
   for (const f of t.findings) sentBack.set(f.at, [...(sentBack.get(f.at) ?? []), f.text]);
-  for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: "打回：" + lines.join("；") });
-  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: "验收通过" });
+  for (const [at, lines] of sentBack) out.push({ at, kind: "rejected", text: w.rejected(lines) });
+  if (t.reviewedAt !== undefined) out.push({ at: t.reviewedAt, kind: "accepted", text: w.accepted });
   if (t.closedAt !== undefined) out.push({ at: t.closedAt, kind: "closed", text: closedText(t) });
   // Newest first; at the same moment, the later step of the story first.
   const milestones = out
@@ -329,12 +261,15 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
 }
 
 /** 接着做: a round that stopped halfway goes on. */
-export const resumeWords = "上一轮停在了半路，接着把它做完。";
+export const resumeWords = () => issueWording().job.resume;
 
 /** 接着修: the job once, with what to do about the failure; a job that was told this before is not told it twice. */
 export function cureWords(job: string): string {
-  const original = job.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
-  return `接着修：${original}。看一下报错，修好再跑一遍测试`;
+  const w = issueWording().job;
+  let original = job;
+  if (original.startsWith(w.cureHead)) original = original.slice(w.cureHead.length);
+  if (original.endsWith(w.cureTail)) original = original.slice(0, -w.cureTail.length);
+  return w.cure(original);
 }
 
 /** 打回: one finding a line. */
