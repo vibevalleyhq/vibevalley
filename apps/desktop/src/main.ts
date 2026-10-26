@@ -83,9 +83,14 @@ const loaded = (load: Promise<void>) =>
     if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
   });
 
+/** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
+ * the window without a page for a moment, and a server that fails at once would do that every time. */
+let bar: Promise<void> = Promise.resolve();
+
 /** The bar while the server comes up (apps/web public/opening.html, from the app's files), or why it did not. */
 function opening(problem?: string) {
-  void loaded(windowNow().loadFile(join(files().web, "opening.html"), { query: { locale: currentLocale(), ...(problem ? { problem } : {}) } }));
+  const load = () => loaded(windowNow().loadFile(join(files().web, "opening.html"), { query: { locale: currentLocale(), ...(problem ? { problem } : {}) } }));
+  bar = problem ? bar.then(load) : load();
 }
 
 function open(url: string) {
