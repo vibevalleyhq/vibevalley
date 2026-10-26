@@ -2,6 +2,7 @@
 // ones, and says when 田头 has something new while the phone is not unfolded to it. The phone itself is Phone.tsx, over
 // the button.
 
+import { phoneWording } from "./words";
 import { Show } from "solid-js";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
@@ -25,8 +26,16 @@ export function PhoneButton(props: { height: number }) {
   return (
     <button
       type="button"
-      title="手机"
-      aria-label={ringing() ? "手机：来电" : count() > 0 ? `手机，${count()} 个未接来电` : unread() > 0 ? `手机，田头 ${unread()} 条新消息` : "手机"}
+      title={phoneWording().phone}
+      aria-label={
+        ringing()
+          ? phoneWording().phoneRinging
+          : count() > 0
+            ? phoneWording().phoneMissed(count())
+            : unread() > 0
+              ? phoneWording().phoneUnread(unread())
+              : phoneWording().phone
+      }
       aria-expanded={aria(open())}
       class={["pointer-events-auto relative cursor-pointer", { "phone-shake": ringing() }]}
       onClick={() => {
@@ -39,7 +48,7 @@ export function PhoneButton(props: { height: number }) {
         rows={[
           [
             { kind: "glyph", cells: phoneCells(ringing()), px: 20, grid: { w: 10, h: 16 } },
-            { kind: "words", text: ringing() ? "来电" : "手机" },
+            { kind: "words", text: ringing() ? phoneWording().ring : phoneWording().phone },
           ],
         ]}
       />
@@ -47,7 +56,7 @@ export function PhoneButton(props: { height: number }) {
         <span class="absolute -top-1.5 -right-1.5 bg-[#c84a3a] px-1 font-pixel text-[10px] leading-[14px] text-[#f7e8c4]">{count()}</span>
       </Show>
       <Show when={count() === 0 && unread() > 0}>
-        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">新</span>
+        <span class="absolute -top-1.5 -right-1.5 bg-berry px-1 font-pixel text-[10px] leading-[14px] text-cream-50">{phoneWording().new}</span>
       </Show>
     </button>
   );

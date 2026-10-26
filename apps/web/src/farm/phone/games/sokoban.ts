@@ -1,3 +1,4 @@
+import { phoneWording } from "../words";
 // 推箱子: push the crates of harvest onto the marks; every step can be taken back.
 
 export interface Warehouse {
@@ -7,11 +8,11 @@ export interface Warehouse {
 }
 
 export const warehouses: readonly Warehouse[] = [
-  { name: "第一箱种子", rows: ["######", "#    #", "#@$. #", "#    #", "######"] },
-  { name: "绕到后面", rows: ["#######", "#     #", "# .$  #", "#  #@ #", "#     #", "#######"] },
-  { name: "两箱收成", rows: ["#######", "# . . #", "# $ $ #", "#  @  #", "#     #", "#######"] },
-  { name: "仓库拐角", rows: ["#######", "# .   #", "# $   #", "#   $ #", "# # . #", "#  @  #", "#######"] },
-  { name: "丰收入仓", rows: ["########", "# . . .#", "# $ $ $#", "#      #", "#  @   #", "########"] },
+  { name: phoneWording().sokoban.levels[0]!, rows: ["######", "#    #", "#@$. #", "#    #", "######"] },
+  { name: phoneWording().sokoban.levels[1]!, rows: ["#######", "#     #", "# .$  #", "#  #@ #", "#     #", "#######"] },
+  { name: phoneWording().sokoban.levels[2]!, rows: ["#######", "# . . #", "# $ $ #", "#  @  #", "#     #", "#######"] },
+  { name: phoneWording().sokoban.levels[3]!, rows: ["#######", "# .   #", "# $   #", "#   $ #", "# # . #", "#  @  #", "#######"] },
+  { name: phoneWording().sokoban.levels[4]!, rows: ["########", "# . . .#", "# $ $ $#", "#      #", "#  @   #", "########"] },
 ];
 
 export type WarehouseDirection = "left" | "right" | "up" | "down";

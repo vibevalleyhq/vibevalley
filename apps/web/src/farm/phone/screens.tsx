@@ -1,6 +1,7 @@
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
 // the orchestrator's line. The web has no voice yet, so calling the orchestrator says so and points to 田头 instead of dialing.
 
+import { phoneWording } from "./words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
@@ -79,7 +80,7 @@ const SmallFace = (props: { children: JSX.Element }) => (
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
-      <span class="phone-blink">来电…</span>
+      <span class="phone-blink">{phoneWording().ringing}</span>
       <span class="mt-3">
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
@@ -91,8 +92,8 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
       </p>
       <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
       <div class="mt-auto mb-5 flex gap-8">
-        <RoundKey answer={false} label="挂断" onClick={() => props.onDecline()} />
-        <RoundKey answer label="接听" onClick={() => props.onAnswer()} />
+        <RoundKey answer={false} label={phoneWording().decline} onClick={() => props.onDecline()} />
+        <RoundKey answer label={phoneWording().answer} onClick={() => props.onAnswer()} />
       </div>
     </div>
   );
@@ -131,7 +132,7 @@ function CallOrchestrator(props: { onCall: () => void }) {
       style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
     >
       <PhoneGlyph size={14} lit />
-      打给管家
+      {phoneWording().callManager}
     </button>
   );
 }
@@ -158,7 +159,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               class={["flex-1 cursor-pointer py-1", { "hover:bg-[#b9cf8c]": props.screen !== s }]}
               style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
             >
-              {s === "missed" ? `未接 ${missed().length}` : "记录"}
+              {s === "missed" ? phoneWording().missed(missed().length) : phoneWording().log}
             </button>
           )}
         </For>
@@ -167,7 +168,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
         <Show
           when={props.screen === "missed"}
           fallback={
-            <Show when={phone().log.length > 0} fallback={empty("还没有通话。")}>
+            <Show when={phone().log.length > 0} fallback={empty(phoneWording().noCalls)}>
               <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
                 {(e) => (
                   <li class={row} style={rule}>
@@ -177,14 +178,14 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     <span class="min-w-0 flex-1 truncate">
                       {e().call.who} · {e().call.words.label}
                     </span>
-                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>{e().answered ? "接了" : "挂了"}</span>
+                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>{e().answered ? phoneWording().answered : phoneWording().declined}</span>
                   </li>
                 )}
               </For>
             </Show>
           }
         >
-          <Show when={missed().length > 0} fallback={empty("没有未接来电。地里都好好的。")}>
+          <Show when={missed().length > 0} fallback={empty(phoneWording().noMissed)}>
             <For each={missed()} keyed={(c) => c.id}>
               {(c) => (
                 <li style={rule}>
@@ -228,13 +229,13 @@ export function OrchestratorScreen() {
   const line = () => {
     switch (phase()) {
       case "connecting":
-        return "正在接通……";
+        return phoneWording().phase.connecting;
       case "live":
-        return call().agentHere ? "通话中：说吧，管家在听" : "通话中：管家在路上";
+        return call().agentHere ? phoneWording().phase.live : phoneWording().phase.coming;
       case "ending":
-        return "挂断中……";
+        return phoneWording().phase.ending;
       case "idle":
-        return call().problem ? "没接通：" + call().problem : "有事直接说，工单交回来、卡住了，管家也会打过来。";
+        return call().problem ? phoneWording().phase.failed(call().problem ?? "") : phoneWording().phase.idle;
     }
   };
   const on = () => phase() === "live" || phase() === "connecting";
@@ -243,12 +244,16 @@ export function OrchestratorScreen() {
       <BigFace shake={phase() === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
-      <p class="mt-2 text-[24px] leading-none">管家</p>
+      <p class="mt-2 text-[24px] leading-none">{phoneWording().manager}</p>
       <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
         {line()}
       </p>
       <div class="mt-auto mb-5">
-        <RoundKey answer={!on()} label={on() ? "挂断" : "打给管家"} onClick={() => void (on() ? voiceCall.end() : voiceCall.start())} />
+        <RoundKey
+          answer={!on()}
+          label={on() ? phoneWording().hangUp : phoneWording().callManager}
+          onClick={() => void (on() ? voiceCall.end() : voiceCall.start())}
+        />
       </div>
     </div>
   );
@@ -269,11 +274,11 @@ const SokobanIcon = () => (
 
 /** The games, in one folder on the home screen. */
 const games = (open: (app: PhoneApp) => void): App[] => [
-  { label: "方块", icon: () => <BlocksIcon />, go: () => open("blocks") },
-  { label: "推箱子", icon: SokobanIcon, go: () => open("sokoban") },
-  { label: "小恐龙", icon: () => <DinoIcon />, go: () => open("dino") },
-  { label: "贪吃虫", icon: () => <BugSnakeIcon />, go: () => open("bugs") },
-  { label: "种田 2048", icon: () => <MergeIcon />, go: () => open("merge") },
+  { label: phoneWording().game.blocks, icon: () => <BlocksIcon />, go: () => open("blocks") },
+  { label: phoneWording().game.sokoban, icon: SokobanIcon, go: () => open("sokoban") },
+  { label: phoneWording().game.dino, icon: () => <DinoIcon />, go: () => open("dino") },
+  { label: phoneWording().game.bugs, icon: () => <BugSnakeIcon />, go: () => open("bugs") },
+  { label: phoneWording().game.merge, icon: () => <MergeIcon />, go: () => open("merge") },
 ];
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
@@ -295,12 +300,17 @@ export function HomeScreen(props: {
   onTaskBoard: () => void;
 }) {
   const apps: App[] = [
-    { label: "未接", icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />, badge: () => props.missed, go: () => props.onOpen("missed") },
-    { label: "记录", icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: "管家", icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
-    { label: "频道", icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { label: "计划", icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
-    { label: "游戏", icon: GamesIcon, go: () => props.onOpen("games") },
+    {
+      label: phoneWording().app.missed,
+      icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />,
+      badge: () => props.missed,
+      go: () => props.onOpen("missed"),
+    },
+    { label: phoneWording().log, icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
+    { label: phoneWording().manager, icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
+    { label: phoneWording().app.channels, icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
+    { label: phoneWording().app.plans, icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { label: phoneWording().app.games, icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;
 }

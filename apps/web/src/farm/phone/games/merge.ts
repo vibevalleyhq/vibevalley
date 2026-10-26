@@ -1,12 +1,13 @@
 // 合成: 2048 with crops. Slide the field; two of a stage grow into the next; a seed is sown
 // on an empty cell after every slide that moves something. One slide back can be taken.
 
+import { phoneWording } from "../words";
 import { nextRandom } from "./random";
 
 export const mergeSize = 4;
 
-/** A stage is worth 2^stage, as the tiles of 2048 are. Past the last, 丰收 counts on. */
-export const mergeStages = ["种子", "芽", "叶", "花", "麦子", "胡萝卜", "麦捆", "一筐", "一车", "粮仓", "丰收"];
+/** A stage is worth 2^stage, as the tiles of 2048 are. Past the last, the last stage counts on. */
+export const mergeStages = phoneWording().merge.stage;
 
 export const mergeGoal = 11;
 
@@ -27,7 +28,7 @@ export interface Merge {
   readonly previous: Merge | null;
 }
 
-export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : `丰收${stage - mergeGoal + 1}`);
+export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : phoneWording().merge.past(stage - mergeGoal + 1));
 
 export const mergeTop = (g: Merge) => Math.max(0, ...g.board);
 

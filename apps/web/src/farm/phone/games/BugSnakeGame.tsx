@@ -1,6 +1,7 @@
 // 贪吃虫 on the phone: the rules are farm/phone/games/bugSnake.ts; here the clock, the pad and the drawing, each cell
 // six of the game's pixels, zoomed whole. Leaving the game (or putting the phone away) pauses it.
 
+import { phoneWording } from "../words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {
   type BugSnake,
@@ -50,7 +51,7 @@ const turned = (rows: readonly string[]) =>
   );
 const heads: Record<SnakeHeading, readonly string[]> = { right: head, down: turned(head), left: turned(turned(head)), up: turned(turned(turned(head))) };
 
-const ended: Record<BugSnakeEnd, string> = { wall: "撞到田埂了", self: "咬到自己了", full: "田里爬满了" };
+const ended: Record<BugSnakeEnd, string> = { wall: phoneWording().bugs.ended.wall, self: phoneWording().bugs.ended.self, full: phoneWording().bugs.ended.full };
 
 const five = (n: number) => String(n).padStart(5, "0");
 
@@ -121,13 +122,13 @@ export function BugSnakeGame() {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
       <div class="flex w-full px-2">
-        <span>贪吃虫</span>
-        <span class="ml-auto tabular-nums">最好 {five(Math.max(top(), score()))}</span>
+        <span>{phoneWording().game.bugs}</span>
+        <span class="ml-auto tabular-nums">
+          {phoneWording().blocks.best} {five(Math.max(top(), score()))}
+        </span>
       </div>
       <div class="mt-1 flex w-full px-2 tabular-nums">
-        <span>
-          种子 {g()?.eaten ?? 0} · 虫 {g()?.bugs ?? 0}
-        </span>
+        <span>{phoneWording().bugs.tally(g()?.eaten ?? 0, g()?.bugs ?? 0)}</span>
         <span class="ml-auto">{five(score())}</span>
       </div>
       <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
@@ -136,24 +137,26 @@ export function BugSnakeGame() {
           width={width}
           height={height}
           role="img"
-          aria-label="贪吃虫的田"
+          aria-label={phoneWording().bugs.field}
           class="block [image-rendering:pixelated]"
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
         <Show when={!g() || g()!.over !== null || !playing()}>
           <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
             <span>
-              {g()?.over ? ended[g()!.over!] : g() ? "暂停" : "贪吃虫"}
+              {g()?.over ? ended[g()!.over!] : g() ? phoneWording().paused : phoneWording().game.bugs}
               <br />
-              <span class="phone-blink">按 A {g() && g()!.over === null ? "继续" : g() ? "再来" : "开始"}</span>
+              <span class="phone-blink">
+                {phoneWording().pressA(g() && g()!.over === null ? phoneWording().resume : g() ? phoneWording().again : phoneWording().start)}
+              </span>
             </span>
           </div>
         </Show>
       </div>
       <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
-        方向键转弯，B 暂停
+        {phoneWording().bugs.help}
         <br />
-        吃种子长一节，虫子飞走前吃掉多得分
+        {phoneWording().bugs.help2}
       </p>
     </div>
   );
