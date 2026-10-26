@@ -439,14 +439,15 @@ export interface Recurrence {
   enabled: boolean;
   created: number;
   lastRun?: number;
-  by: RecurrenceBy;
+  by: ActorKind;
   pending?: boolean;
   whenText?: string;
   nextText?: string;
 }
 
-export const RecurrenceByValues = ["owner", "orchestrator"] as const;
-export type RecurrenceBy = (typeof RecurrenceByValues)[number];
+/** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself. */
+export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
+export type ActorKind = (typeof ActorKindValues)[number];
 
 export interface OwnerMention {
   message: ChatMessage;
@@ -692,9 +693,6 @@ export const GraphEventKindValues = [
 ] as const;
 export type GraphEventKind = (typeof GraphEventKindValues)[number];
 
-export const GraphActorValues = ["user", "orchestrator", "system", "session"] as const;
-export type GraphActor = (typeof GraphActorValues)[number];
-
 export interface TaskFieldChange {
   field: string;
   from: string;
@@ -706,7 +704,7 @@ export interface GraphEvent {
   graph: string;
   task?: string;
   kind: GraphEventKind;
-  actor: GraphActor;
+  actor: ActorKind;
   session?: SessionId;
   detail?: string;
   changes?: TaskFieldChange[];
@@ -926,7 +924,7 @@ export interface Memory {
   agent: string;
   kind: MemoryKind;
   text: string;
-  author?: MemoryAuthor;
+  author?: ActorKind;
   project?: string;
   session?: SessionId;
   at: number;
@@ -935,9 +933,6 @@ export interface Memory {
   fading?: boolean;
   source?: string;
 }
-
-export const MemoryAuthorValues = ["owner", "agent", "orchestrator", "system"] as const;
-export type MemoryAuthor = (typeof MemoryAuthorValues)[number];
 
 export const MemoryKindValues = ["note", "issue"] as const;
 export type MemoryKind = (typeof MemoryKindValues)[number];

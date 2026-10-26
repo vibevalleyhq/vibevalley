@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { orchestrator } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Fact, Session } from "@vibevalley/protocol";
@@ -205,7 +206,7 @@ describe("a session's work", () => {
       const sessions = yield* Sessions;
       const session = mustHire(yield* issues.hire(lab(), "写打卡并提交", "preview"));
       yield* w.nextReport;
-      const changes = yield* issues.changes(session.issue!, "orchestrator");
+      const changes = yield* issues.changes(session.issue!, orchestrator(true));
       yield* sessions.dismiss(session.id);
       expect(changes.base).toBe("main");
       expect(changes.commits.map((c) => c.subject)).toEqual(["加上打卡"]);
@@ -227,7 +228,7 @@ describe("a session's work", () => {
       yield* w.nextReport;
       yield* w.nextReport;
       expect(yield* issues.merge(a.issue!)).toMatch(/个提交合进了 clash 的 main/);
-      expect((yield* issues.changes(b.issue!, "orchestrator")).conflicts).toEqual(["same.ts"]);
+      expect((yield* issues.changes(b.issue!, orchestrator(true))).conflicts).toEqual(["same.ts"]);
       const failed = yield* Effect.flip(issues.merge(b.issue!));
       expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
       const stayed = sessions.find(b.id)!;

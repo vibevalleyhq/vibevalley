@@ -1,4 +1,5 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import { type AssistantMessage, fauxAssistantMessage, type FauxResponseFactory, fauxToolCall, type Message } from "@earendil-works/pi-ai";
 import { orchestratorAgent } from "@vibevalley/protocol";
@@ -392,7 +393,7 @@ describe("the orchestrator", () => {
         () => messagesIn(core.state().chat, thread).find((m) => m.from === orchestratorAgent && m.final && m.text.startsWith("合并：")),
         "the completion refused",
       );
-      expect(refused.text).toBe("合并：没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
+      expect(refused.text).toBe("合并：没挪：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
       const merged = yield* until(async () => {
@@ -461,7 +462,7 @@ describe("the orchestrator", () => {
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       // Woken by a recurrence, not the owner: what it sets to come back daily waits.
-      yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
+      yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
       offset = 100;
       yield* recurrences.tick;
@@ -482,7 +483,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const recurrences = yield* Recurrences;
       const issues = yield* Issues;
-      const s = yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
+      const s = yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, owner);
       // The farm's clock, not a wait, brings it due.
       offset = 100;
       yield* recurrences.tick;
@@ -494,7 +495,7 @@ describe("the orchestrator", () => {
       expect(handed.attention).toMatchObject({ state: "reviewing", lead: "acknowledge" });
       // One table whoever did the work: asked again (todo), taken (done), or put away (canceled).
       expect(handed.moves).toEqual(["todo", "done", "canceled"]);
-      const done = yield* issues.setStatus(id, "done", "", "");
+      const done = yield* issues.setStatus(id, "done", "", "", owner);
       expect([done.status, done.delivered]).toEqual(["done", "none"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

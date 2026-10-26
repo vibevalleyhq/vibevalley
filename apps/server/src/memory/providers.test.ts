@@ -8,6 +8,7 @@ import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { whenTrue } from "../testing/until.ts";
+import { owner as ownerActor } from "../base/actor.ts";
 import { type BuildSource, type FinishedRun, foundText, type Found, Memories, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source } from "./sources.ts";
@@ -76,7 +77,7 @@ const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Eff
     return yield* body(yield* Memories);
   }).pipe(Effect.provide(world(() => fake)));
 
-const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: "owner" });
+const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: ownerActor });
 
 const until = (ok: () => boolean) => whenTrue(ok, "it");
 

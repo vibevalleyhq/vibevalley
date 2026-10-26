@@ -1,4 +1,5 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
+import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
 import { messagesIn } from "../channel/state.ts";
@@ -136,7 +137,7 @@ describe("mcp", () => {
       const mcp = yield* Mcp;
       const memory = yield* Memories;
       yield* hired(core, { id: sessionId("w1"), name: "一号", agent: "lab", project: "demo" });
-      yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: "owner" });
+      yield* memory.write({ agent: "scout", text: "这个项目测试用 make check", project: "demo", by: owner });
       const c = client(mcp, "w1");
       const tool = (name: string, args: Record<string, unknown>) => Effect.promise(() => c.tool(name, args));
       expect(yield* tool("memory_add", { text: "这个项目测试用 pnpm test" })).toContain("记下了（项目 demo）");
@@ -144,7 +145,7 @@ describe("mcp", () => {
       expect(yield* tool("memory_add", { text: "冒名记一条", agent: "scout" })).toContain("只能记进你自己的档案");
       expect((yield* memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
       // What it wrote is its own, not the owner's: the 记性 tab says which helper wrote it.
-      for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["agent", "w1"]);
+      for (const m of yield* memory.list("lab")) expect([m.author, m.session]).toEqual(["session", "w1"]);
       const found = yield* tool("memory_search", { query: "测试" });
       expect(found).toContain("pnpm test");
       expect(found).not.toContain("make check");

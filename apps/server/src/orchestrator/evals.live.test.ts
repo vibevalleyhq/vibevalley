@@ -3,6 +3,7 @@
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
 
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
+import { orchestrator } from "../base/actor.ts";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -29,7 +30,7 @@ const orchestratorTools = () =>
     Effect.scoped(
       Effect.gen(function* () {
         const t = yield* Tools;
-        return t.orchestrator(() => ({ agent: orchestratorAgent, session: "", project: "", here: "", picked: "", owner: true }));
+        return t.orchestrator(() => ({ agent: orchestratorAgent, session: "", project: "", here: "", picked: "", actor: orchestrator(true) }));
       }).pipe(Effect.provide(world())),
     ),
   );

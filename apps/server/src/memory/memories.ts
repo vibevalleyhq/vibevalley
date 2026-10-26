@@ -3,7 +3,8 @@
 // stops a run: it is logged, and the run goes on without it.
 
 import { sessionId } from "@vibevalley/protocol/schema";
-import { type Memory, MemoryKindValues, type MemoryAuthor, type Outcome } from "@vibevalley/protocol";
+import { type ActorKind, type Memory, MemoryKindValues, type Outcome } from "@vibevalley/protocol";
+import type { Actor } from "../base/actor.ts";
 import { Clock, Data, Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { Db } from "../base/db.ts";
@@ -33,13 +34,13 @@ export interface RecallCue {
   readonly peek?: boolean;
 }
 
-/** A memory written outside a run: the owner's, from the 记性 tab, or an agent's (session is the one writing it). */
+/** A memory written outside a run: the owner's, from the 记性 tab, the orchestrator's for a profile, or a session's own. */
 export interface Note {
   readonly agent: string;
   readonly text: string;
   readonly project: string;
-  readonly by: MemoryAuthor;
-  readonly session?: string;
+  /** Who writes it: a session's note is kept with the session. */
+  readonly by: Actor;
 }
 
 export class MemoryRefused extends Data.TaggedError("MemoryRefused")<{ readonly message: string }> {}
@@ -65,7 +66,7 @@ export const makeMemories = Effect.gen(function* () {
             agent,
             kind: r.kind as Memory["kind"],
             text: r.body,
-            author: r.author as MemoryAuthor,
+            author: r.author as ActorKind,
             at: r.created_at,
             recalled: r.recalled,
             ...(r.project !== null ? { project: r.project } : {}),
@@ -75,7 +76,7 @@ export const makeMemories = Effect.gen(function* () {
       ),
     );
 
-  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: MemoryAuthor) {
+  const insertNote = Effect.fnUntraced(function* (agent: string, body: string, project: string | undefined, session: string | undefined, author: ActorKind) {
     const at = yield* Clock.currentTimeMillis;
     const id = newId();
     yield* db(
@@ -139,7 +140,7 @@ export const makeMemories = Effect.gen(function* () {
               for (const note of memoryNotesOf(run.said)) {
                 const project = note.everywhere ? undefined : run.project;
                 if (!memoryIsNewNote(known, note.text, project)) continue;
-                yield* insertNote(run.agent, note.text, project, run.session, "agent");
+                yield* insertNote(run.agent, note.text, project, run.session, "session");
                 known = [...known, { kind: "note", text: note.text, project } as Memory];
               }
               const job = memoryJobText(run.job, run.summary, run.outcome);
@@ -173,8 +174,8 @@ export const makeMemories = Effect.gen(function* () {
     const body = clip(n.text, noteMaxChars);
     if (body === "") return yield* new MemoryRefused({ message: "要记的话是空的" });
     const project = n.project.trim() || undefined;
-    const session = n.session || undefined;
-    const { id, at } = yield* insertNote(n.agent, body, project, session, n.by).pipe(
+    const session = n.by.kind === "session" ? n.by.id || undefined : undefined;
+    const { id, at } = yield* insertNote(n.agent, body, project, session, n.by.kind).pipe(
       Effect.catchTag("SqlError", (e) =>
         Effect.andThen(Effect.logWarning(`a note for ${n.agent}: ${String(e)}`), Effect.fail(new MemoryRefused({ message: "没记下来：数据库写不进去" }))),
       ),
@@ -184,7 +185,7 @@ export const makeMemories = Effect.gen(function* () {
       agent: n.agent,
       kind: "note",
       text: body,
-      author: n.by,
+      author: n.by.kind,
       at,
       recalled: 0,
       ...(project ? { project } : {}),

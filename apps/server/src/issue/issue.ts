@@ -84,6 +84,7 @@ import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
 import { IssueSessions } from "./sessions.ts";
+import { actsForOwner, type Actor } from "../base/actor.ts";
 import { conflictBrief, conflictOf, parseAnswer } from "../session/rules.ts";
 
 /** An issue for the orchestrator, handed to it. */
@@ -97,8 +98,8 @@ export interface OrchestratorWork {
   readonly said?: string;
 }
 
-/** Who looked at changes: the owner's look counts for the game, the orchestrator's does not. */
-export type Caller = "owner" | "orchestrator";
+/** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself. */
+const needsOwner = "改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
 
 export interface IssueShape {
   readonly list: () => Effect.Effect<Issue[]>;
@@ -106,7 +107,8 @@ export interface IssueShape {
   readonly onBoard: () => readonly Issue[];
   readonly get: (id: string) => Effect.Effect<Issue, ApiError>;
   readonly add: (req: IssueRequest) => Effect.Effect<Issue, ApiError>;
-  readonly edit: (id: string, upd: IssueUpdate) => Effect.Effect<Issue, ApiError>;
+  /** On the owner's word only (actsForOwner). */
+  readonly edit: (id: string, upd: IssueUpdate, by: Actor) => Effect.Effect<Issue, ApiError>;
   readonly remove: (id: string) => Effect.Effect<void, ApiError>;
   readonly move: (id: string, before: string) => Effect.Effect<Issue[], ApiError>;
   readonly queue: (id: string, queued: boolean) => Effect.Effect<Issue, ApiError>;
@@ -115,10 +117,11 @@ export interface IssueShape {
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
   /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. keepBranch: moving
    * to done, completed with its branch kept, not merged. */
-  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
+  /** On the owner's word only (actsForOwner). */
+  readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
   /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
    * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
-  readonly act: (id: string, req: IssueActRequest, channel: string) => Effect.Effect<Issue, ApiError>;
+  readonly act: (id: string, req: IssueActRequest, channel: string, by: Actor) => Effect.Effect<Issue, ApiError>;
   /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
    * fields, as the move would see them once saved. */
   readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
@@ -129,7 +132,8 @@ export interface IssueShape {
   /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
   readonly idOf: (ref: string) => Effect.Effect<string, ApiError>;
   readonly comment: (id: string, text: string, sendKey?: string) => Effect.Effect<void, ApiError>;
-  readonly changes: (id: string, by: Caller) => Effect.Effect<Changes, ApiError>;
+  /** The owner's look counts for the game; anyone else's does not. */
+  readonly changes: (id: string, by: Actor) => Effect.Effect<Changes, ApiError>;
   readonly merge: (id: string) => Effect.Effect<string, ApiError>;
   readonly resolve: (id: string) => Effect.Effect<void, ApiError>;
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
@@ -904,7 +908,8 @@ export const make = (options: IssueOptions = {}) =>
       add: (req) => add(req),
       /** The words and who does it only before it is sent; how it is accepted and what it delivers while it is open: the
        * next round goes by them. */
-      edit: Effect.fn("Issues.edit")(function* (id, upd) {
+      edit: Effect.fn("Issues.edit")(function* (id, upd, by) {
+        if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
         const whileOpen =
           upd.title === undefined &&
           upd.description === undefined &&
@@ -970,7 +975,7 @@ export const make = (options: IssueOptions = {}) =>
       }, trying.withPermits(1)),
       reopen: (id, text, channel) => reopen(id, text, channel),
       idOf,
-      act: Effect.fn("Issues.act")(function* (ref, req, channel) {
+      act: Effect.fn("Issues.act")(function* (ref, req, channel, by) {
         const t = yield* get(ref);
         const id = t.id;
         const name = actLabel[req.act];
@@ -980,7 +985,7 @@ export const make = (options: IssueOptions = {}) =>
         const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
         switch (req.act) {
           case "start":
-            yield* shape.setStatus(id, "todo", said, channel);
+            yield* shape.setStatus(id, "todo", said, channel, by);
             break;
           case "answer":
           case "tell":
@@ -997,17 +1002,17 @@ export const make = (options: IssueOptions = {}) =>
           }
           case "complete":
           case "acknowledge":
-            yield* shape.setStatus(id, "done", said, channel);
+            yield* shape.setStatus(id, "done", said, channel, by);
             break;
           case "keep":
-            yield* shape.setStatus(id, "done", said, channel, { keepBranch: true });
+            yield* shape.setStatus(id, "done", said, channel, by, { keepBranch: true });
             break;
           case "close":
-            yield* shape.setStatus(id, "canceled", said, channel);
+            yield* shape.setStatus(id, "canceled", said, channel, by);
             break;
           // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
           case "reopen":
-            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel) : shape.setStatus(id, "backlog", "", channel);
+            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel, by) : shape.setStatus(id, "backlog", "", channel, by);
             break;
           case "resolve":
             yield* shape.resolve(id);
@@ -1034,12 +1039,13 @@ export const make = (options: IssueOptions = {}) =>
         }
         return yield* get(id);
       }),
-      setStatus: Effect.fn("Issues.setStatus")(function* (id, to, text, channel, opt = {}) {
+      setStatus: Effect.fn("Issues.setStatus")(function* (id, to, text, channel, by, opt = {}) {
+        if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
         const t = yield* get(id);
         const { move, said, taker, delivery } = yield* settledMove(t, to, text, opt);
         switch (move) {
           case "start":
-            if (taker) yield* shape.edit(id, { assignee: taker.id });
+            if (taker) yield* shape.edit(id, { assignee: taker.id }, by);
             yield* start(id, channel);
             break;
           case "unqueue":
@@ -1155,7 +1161,7 @@ export const make = (options: IssueOptions = {}) =>
         const session = yield* liveSession(id);
         const changes = yield* sessions.changes(session);
         if (!changes) return yield* Effect.fail(missing("帮工 " + session, [lookIn.session]));
-        if (by === "owner") yield* core.did({ kind: "reviewed", session });
+        if (by.kind === "owner") yield* core.did({ kind: "reviewed", session });
         return changes;
       }),
       merge,

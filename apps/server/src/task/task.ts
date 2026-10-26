@@ -7,8 +7,8 @@ import {
   type Agent,
   type Changes,
   type GraphAction,
-  type GraphActor,
-  GraphActorValues,
+  ActorKindValues,
+  type ActorKind,
   type GraphEvent,
   type GraphEventKind,
   type Preview,
@@ -54,6 +54,12 @@ import {
   withTask,
 } from "./rules.ts";
 import { actorText, graphChanges, graphEventText } from "./changes.ts";
+import { actsForOwner, type Actor, session as sessionActor, system } from "../base/actor.ts";
+
+/** A task graph starts many helpers at once and spends for each, and words in a helper's report or a page it read can
+ * ask for a merge: only on the owner's word does a graph start or merge. */
+const startNeedsOwner = "计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";
+const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -92,13 +98,13 @@ const stepNext = (graph: TaskGraph, task: Task): Next[] =>
   }));
 
 export interface TaskShape {
-  readonly split: (goal: string, project: string, agent: string, by: GraphActor) => Effect.Effect<string, ApiError>;
+  readonly split: (goal: string, project: string, agent: string, by: Actor) => Effect.Effect<string, ApiError>;
   /** A helper finds its issue is several people's work: the issue becomes the graph, its steps the issues under it, and they start at once. */
   readonly splitIssue: (session: string, title: string, steps: readonly StepDraft[]) => Effect.Effect<string, ApiError>;
-  readonly act: (id: string, action: GraphAction, by: GraphActor) => Effect.Effect<string, ApiError>;
-  readonly taskAct: (id: string, task: string, action: TaskAction, by: GraphActor) => Effect.Effect<string, ApiError>;
-  readonly editTask: (id: string, task: string, edit: TaskEdit, by: GraphActor) => Effect.Effect<string, ApiError>;
-  readonly removeTask: (id: string, task: string, by: GraphActor) => Effect.Effect<string, ApiError>;
+  readonly act: (id: string, action: GraphAction, by: Actor) => Effect.Effect<string, ApiError>;
+  readonly taskAct: (id: string, task: string, action: TaskAction, by: Actor) => Effect.Effect<string, ApiError>;
+  readonly editTask: (id: string, task: string, edit: TaskEdit, by: Actor) => Effect.Effect<string, ApiError>;
+  readonly removeTask: (id: string, task: string, by: Actor) => Effect.Effect<string, ApiError>;
   /** What removeTask would do, refused as it would be; nothing changes. */
   readonly previewRemoveTask: (id: string, task: string) => Effect.Effect<Preview, ApiError>;
   readonly events: (id: string) => Effect.Effect<GraphEvent[]>;
@@ -194,7 +200,7 @@ export const make = (options: TaskOptions = {}) =>
     };
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
-    const record = (before: TaskGraph | undefined, after: TaskGraph, actor: GraphActor, why: string) =>
+    const record = (before: TaskGraph | undefined, after: TaskGraph, actor: ActorKind, why: string) =>
       Effect.forEach(
         graphChanges(before, after),
         (c) => {
@@ -222,15 +228,15 @@ export const make = (options: TaskOptions = {}) =>
         { discard: true },
       );
 
-    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: GraphActor, why = "") {
+    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: Actor, why = "") {
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
         .pipe(Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`)) : Effect.die(d))));
-      yield* record(before, graph, by, why);
+      yield* record(before, graph, by.kind, why);
     });
 
-    const putSystem = (graph: TaskGraph) => put(graph, "system");
+    const putSystem = (graph: TaskGraph) => put(graph, system);
 
     const giveUp = Effect.fn("Tasks.giveUp")(function* (graph: TaskGraph, why: string) {
       const splitter = splitters.get(graph.id);
@@ -326,7 +332,7 @@ export const make = (options: TaskOptions = {}) =>
       if (task.tries >= autoRetries) return yield* taskFailed(graph, task, why);
       yield* put(
         withTask(graph, task.id, (n) => ({ ...n, tries: n.tries + 1 })),
-        "system",
+        system,
         why,
       );
       yield* tell(session, text);
@@ -465,7 +471,7 @@ export const make = (options: TaskOptions = {}) =>
       return branch;
     });
 
-    const edited = Effect.fn("Tasks.edited")(function* (id: string, change: (g: TaskGraph) => EditResult, by: GraphActor) {
+    const edited = Effect.fn("Tasks.edited")(function* (id: string, change: (g: TaskGraph) => EditResult, by: Actor) {
       const result = change(yield* need(id));
       if (!result.ok) return yield* Effect.fail(refused(result.problem));
       yield* put(result.graph, by);
@@ -550,7 +556,7 @@ export const make = (options: TaskOptions = {}) =>
         };
         const branch = yield* openBranch(graph, session!.branch ?? "");
         graph = { ...graph, branch };
-        yield* put(graph, "session", session!.name + " 拆的").pipe(
+        yield* put(graph, sessionActor(session!.id), session!.name + " 拆的").pipe(
           Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但拆好的工单没能保存：${reasonOf(e)}`)),
         );
         yield* recurrence(graph.id);
@@ -563,6 +569,7 @@ export const make = (options: TaskOptions = {}) =>
         const not = () => Effect.fail(refused(`计划「${graph.title}」${graphStateText[graph.state]}，不能${graphActionText[action]}`, graphNext(graph)));
         switch (action) {
           case "start": {
+            if (!actsForOwner(by)) return yield* Effect.fail(refused(startNeedsOwner));
             if (graph.state !== "draft") return yield* not();
             const problems = graphProblems(graph.tasks);
             if (problems.length > 0) return yield* Effect.fail(refused(problems[0]!));
@@ -599,6 +606,7 @@ export const make = (options: TaskOptions = {}) =>
             return "计划「" + graph.title + "」放弃了" + (graph.branch ? "，分支 " + graph.branch + " 留着" : "");
           }
           case "merge": {
+            if (!actsForOwner(by)) return yield* Effect.fail(refused(mergeNeedsOwner));
             if (graph.state !== "ready" || !graph.branch) return yield* not();
             const merged = yield* Effect.result(projects.mergeBranch(graph.project, graph.branch));
             if (merged._tag === "Failure") {
@@ -675,14 +683,14 @@ export const make = (options: TaskOptions = {}) =>
         const titleOf = (node: string) => (graph ? (taskOf(graph, node)?.title ?? node) : node);
         return rows.flatMap((row): GraphEvent[] => {
           // A row this code no longer knows how to read is left out.
-          if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(GraphActorValues as readonly string[]).includes(row.actor)) return [];
+          if (!(GraphEventKindValues as readonly string[]).includes(row.kind) || !(ActorKindValues as readonly string[]).includes(row.actor)) return [];
           const p = jsonOrNone(EventPayloadSchema)(row.payload) ?? {};
           const e: GraphEvent = {
             id: row.id,
             graph: row.graph_id,
             ...(row.task_id ? { task: row.task_id } : {}),
             kind: row.kind as GraphEventKind,
-            actor: row.actor as GraphActor,
+            actor: row.actor as ActorKind,
             ...(p.session ? { session: p.session } : {}),
             ...(p.detail ? { detail: p.detail } : {}),
             ...(p.changes ? { changes: p.changes } : {}),

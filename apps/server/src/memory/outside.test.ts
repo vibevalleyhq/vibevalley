@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { owner, session } from "../base/actor.ts";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
@@ -269,7 +270,7 @@ describe("Nowledge Mem", () => {
       expect((yield* m.search(q)).found).toEqual([]);
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
       expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
-      yield* m.write({ agent: "lab", text: "不写进去", project: "", by: "owner" });
+      yield* m.write({ agent: "lab", text: "不写进去", project: "", by: owner });
       // A write would go out in the background; nothing to wait on shows that none does.
       // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(50);
@@ -282,7 +283,7 @@ describe("Nowledge Mem", () => {
       const url = yield* Effect.promise(() => listen(createServer(() => {})));
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false });
       const m = yield* Memories;
-      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", project: "demo", by: "owner" });
+      yield* m.write({ agent: "lab", text: "迁移文件放 db/migrations", project: "demo", by: owner });
       const start = Date.now();
       expect((yield* m.recall({ agent: "lab", project: "demo", text: "迁移" })).lines).toHaveLength(1);
       expect(Date.now() - start).toBeLessThan(1000);
@@ -311,7 +312,7 @@ describe("EverOS", () => {
     Effect.gen(function* () {
       const fake = new FakeNowledge();
       const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true }, wallTime.now);
-      const note = { agent: "lab", text: "记住：苹果", project: "", by: "agent" as const };
+      const note = { agent: "lab", text: "记住：苹果", project: "", by: session("w1") };
       fake.addResult = { title: "已经有了" };
       expect((yield* Effect.promise(() => source.add(note, new AbortController().signal)))?.id).toBe("");
       fake.addResult = { id: 42 };
@@ -436,7 +437,7 @@ describe("EverOS", () => {
       const fake = new FakeEveros();
       yield* save({ kind: "everos", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: true, write: true });
       const m = yield* Memories;
-      yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: "owner" });
+      yield* m.write({ agent: "lab", text: "提交信息写中文", project: "", by: owner });
       yield* until(() => fake.seen("flush").length === 1);
       const add = fake.seen("add")[0]!;
       expect(add.body.session_id).toBe(fake.seen("flush")[0]!.body.session_id);

@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
@@ -50,7 +51,7 @@ describe("a refined issue", () => {
       expect([got.status, got.title, got.assignee, got.sessions?.length ?? 0]).toEqual(["backlog", "慢慢看：看板拖卡还在调旧接口", "lab", 0]);
       expect(got.refining?.name).toBe(lab().name);
       expect(got.moves).toEqual(["canceled"]);
-      expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "")))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "", owner)))._tag).toBe("Refused");
       expect((yield* Effect.flip(issues.refine(issue.id, "再来", "")))._tag).toBe("Refused");
       yield* releaseHeld();
 
@@ -82,7 +83,7 @@ describe("a refined issue", () => {
       expect([issue.criteria, issue.questions?.length ?? 0]).toEqual([["拖到待办就开工", "端口是 8797"], 0]);
       yield* until(() => !drafting(core), "the second refiner left");
 
-      issue = yield* issues.setStatus(issue.id, "todo", "", "");
+      issue = yield* issues.setStatus(issue.id, "todo", "", "", owner);
       expect(issue.sessions).toHaveLength(1);
       const brief = sessions.find(issue.sessions[0]!)!.session.brief;
       for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
@@ -113,7 +114,7 @@ describe("a refined issue", () => {
       yield* issues.refine(canceled.id, "慢慢看：取消它", "");
       const tree = join(f.config.workRoot, "worktrees", `board.${canceled.number}`);
       expect(existsSync(tree)).toBe(true);
-      const got = yield* issues.setStatus(canceled.id, "canceled", "", "");
+      const got = yield* issues.setStatus(canceled.id, "canceled", "", "", owner);
       expect(got.status).toBe("canceled");
       yield* until(() => !drafting(core), "the refiner went home");
       yield* until(() => !existsSync(tree), "its worktree is gone");

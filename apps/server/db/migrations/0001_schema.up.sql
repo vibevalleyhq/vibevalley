@@ -146,7 +146,7 @@ CREATE TABLE task_event (
   graph_id    text not null,
   task_id     text,
   kind        text not null,
-  actor       text not null check (actor in ('user', 'orchestrator', 'system', 'session')),
+  actor       text not null check (actor in ('owner', 'orchestrator', 'session', 'system')),
   payload     text not null default '{}',
   created_at  double precision not null
 );
@@ -165,7 +165,7 @@ CREATE TABLE recurrence (
   last_run    double precision,
   -- Who set it, and whether it waits for the owner to say yes (recurrence/rules.go's needsOK): a waiting one stays off
   -- until the owner turns it on, which clears pending.
-  set_by      text not null default 'owner' check (set_by in ('owner', 'orchestrator')),
+  set_by      text not null default 'owner' check (set_by in ('owner', 'orchestrator', 'session', 'system')),
   pending     boolean not null default false
 );
 CREATE TABLE game_ledger (
@@ -187,7 +187,7 @@ CREATE TABLE memory (
   importance   integer not null default 0 check (importance between 0 and 3),
   project      text,                -- null: every project
   session      text,                -- the Session it came from
-  author       text not null check (author in ('owner', 'agent', 'orchestrator', 'system')),
+  author       text not null check (author in ('owner', 'orchestrator', 'session', 'system')),
   replaced_by  text,                -- the memory that superseded it; never recalled again
   created_at   double precision not null,
   updated_at   double precision not null,

@@ -23,6 +23,7 @@ import { deviceHeader, Lan } from "./lan/lan.ts";
 import { Voice } from "./voice/voice.ts";
 import { Connectors } from "./connector/connector.ts";
 import { HttpServerRequest } from "effect/http";
+import { owner } from "./base/actor.ts";
 
 export const handlers = Effect.gen(function* () {
   const config = yield* Settings;
@@ -44,7 +45,7 @@ export const handlers = Effect.gen(function* () {
   const voice = yield* Voice;
   const connectors = yield* Connectors;
   /** An issue's id, with the fields the owner changed beside an act saved first. */
-  const edited = (ref: string, edit: IssueUpdate | undefined) => Effect.tap(issues.idOf(ref), (id) => (edit ? issues.edit(id, edit) : Effect.void));
+  const edited = (ref: string, edit: IssueUpdate | undefined) => Effect.tap(issues.idOf(ref), (id) => (edit ? issues.edit(id, edit, owner) : Effect.void));
   const done: Handlers = {
     "server.health": () => Effect.succeed({ ok: true, version: config.version }),
     "orchestrator.open": () => core.open(),
@@ -120,7 +121,7 @@ export const handlers = Effect.gen(function* () {
     "skill.previewDelete": ({ id }) => agents.previewDeleteSkill(id),
     "memory.list": ({ agent }) => memory.memoriesOf(agent),
     "memory.recall": ({ agent, project, text }) => memory.recallOf(agent, project ?? "", text ?? ""),
-    "memory.create": ({ agent, body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: "owner" }),
+    "memory.create": ({ agent, body }) => memory.remember({ agent, text: body.text, project: body.project ?? "", by: owner }),
     "memory.delete": ({ agent, memory: id }) => memory.forgetOf(agent, id),
     "memory.previewDelete": ({ agent, memory: id }) => memory.previewForgetOf(agent, id),
     "orchestrator.listArchive": ({ q }) => Effect.sync(() => memory.archive(q ?? "")),
@@ -143,7 +144,7 @@ export const handlers = Effect.gen(function* () {
     "channel.update": ({ id, body }) => channels.updateChannel(id, body.description, body.project),
     "channel.history": ({ id, before, limit }) => channels.history(id, before, limit),
     "channel.markRead": ({ id, body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
-    "recurrence.create": ({ body }) => recurrences.add(body, "owner", true),
+    "recurrence.create": ({ body }) => recurrences.add(body, owner),
     "recurrence.list": () => Effect.sync(recurrences.list),
     "recurrence.update": ({ id, body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),
     "recurrence.delete": ({ id }) => Effect.asVoid(recurrences.remove(id)),
@@ -154,11 +155,11 @@ export const handlers = Effect.gen(function* () {
     "issue.runs": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => Effect.andThen(issues.get(id), sessions.runs(id))),
     "issue.timeline": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.timeline(id)),
     "issue.create": ({ body }) => issues.add(body),
-    "issue.update": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body)),
+    "issue.update": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.edit(id, body, owner)),
     "issue.move": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.move(id, body.before ?? "")),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.previewDelete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.previewRemove(id)),
-    "issue.act": ({ id, body }) => issues.act(id, body, channels.general()),
+    "issue.act": ({ id, body }) => issues.act(id, body, channels.general(), owner),
     "issue.previewAct": ({ id, body }) => issues.previewAct(id, body),
     "issue.previewStatus": ({ id: ref, body }) =>
       Effect.flatMap(issues.idOf(ref), (id) =>
@@ -174,20 +175,20 @@ export const handlers = Effect.gen(function* () {
     "issue.dispatch": ({ id: ref, body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.dispatchQueued(id)),
     "issue.status": ({ id: ref, body }) =>
       Effect.flatMap(edited(ref, body.edit), (id) =>
-        issues.setStatus(id, body.status, body.text ?? "", channels.general(), {
+        issues.setStatus(id, body.status, body.text ?? "", channels.general(), owner, {
           ...(body.agent ? { agent: body.agent } : {}),
           ...(body.keepBranch ? { keepBranch: true } : {}),
         }),
       ),
     "issue.comment": ({ id: ref, body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.comment(id, body.text, body.sendKey ?? "")),
-    "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, "owner")),
+    "issue.changes": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.changes(id, owner)),
     "project.templates": ({ id }) => issues.templates(id),
-    "graph.split": ({ body }) => tasks.split(body.goal, body.project, body.agent ?? "", "user"),
-    "graph.updateTask": ({ id, task, body }) => tasks.editTask(id, task, body, "user"),
-    "graph.deleteTask": ({ id, task }) => tasks.removeTask(id, task, "user"),
+    "graph.split": ({ body }) => tasks.split(body.goal, body.project, body.agent ?? "", owner),
+    "graph.updateTask": ({ id, task, body }) => tasks.editTask(id, task, body, owner),
+    "graph.deleteTask": ({ id, task }) => tasks.removeTask(id, task, owner),
     "graph.previewDeleteTask": ({ id, task }) => tasks.previewRemoveTask(id, task),
-    "graph.act": ({ id, body }) => tasks.act(id, body.action, "user"),
-    "graph.taskAct": ({ id, task, body }) => tasks.taskAct(id, task, body.action, "user"),
+    "graph.act": ({ id, body }) => tasks.act(id, body.action, owner),
+    "graph.taskAct": ({ id, task, body }) => tasks.taskAct(id, task, body.action, owner),
     "graph.changes": ({ id }) => tasks.changes(id),
     "graph.events": ({ id }) => tasks.events(id),
     "doc.list": () => docs.list(),
