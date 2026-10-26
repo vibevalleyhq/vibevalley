@@ -15,7 +15,7 @@ import { ready, useAgents, useRuntimes } from "../../data/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
-import { HudCard } from "./Hud";
+import { HudCard } from "./HudCard";
 import { setPick, usePrefs } from "../../data/prefs";
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {

@@ -44,6 +44,8 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],
+    // oxlint's defaults, and import for no-cycle; listing plugins replaces the defaults.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
@@ -67,6 +69,8 @@ export default defineConfig({
       "typescript/no-explicit-any": "error",
       // A type imported as a value says the module is needed at run time when it is not.
       "typescript/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      // Modules that import each other have no order to read, test or start them in.
+      "import/no-cycle": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
