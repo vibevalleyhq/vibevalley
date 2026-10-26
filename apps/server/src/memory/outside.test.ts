@@ -14,7 +14,7 @@ import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import { testConfig } from "../testing/layers.ts";
 import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
-import { nowledgeLabels } from "./nowledge.ts";
+import { nowledge, nowledgeLabels } from "./nowledge.ts";
 import { until } from "../testing/until.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
@@ -60,6 +60,8 @@ class FakeNowledge {
   others: string[] = [];
   details: string[] = [];
   searchResult: unknown;
+  /** What memory_add answers instead of the memory it made, when set. */
+  addResult: unknown;
 
   private server() {
     const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
@@ -92,6 +94,7 @@ class FakeNowledge {
         }
         case "memory_add": {
           this.adds.push(a);
+          if (this.addResult !== undefined) return text(this.addResult);
           const m = { id: `nm-${this.memories.length + 1}`, title: a.title as string, content: a.content as string, labels: (a.labels as string).split(",") };
           this.memories.push(m);
           return text({ id: m.id, title: m.title });
@@ -299,6 +302,25 @@ describe("Nowledge Mem", () => {
 });
 
 describe("EverOS", () => {
+  it.live("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
+    Effect.gen(function* () {
+      const fake = new FakeNowledge();
+      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true });
+      const note = { agent: "lab", text: "记住：苹果", project: "", by: "agent" as const };
+      fake.addResult = { title: "已经有了" };
+      expect((yield* Effect.promise(() => source.add(note, new AbortController().signal)))?.id).toBe("");
+      fake.addResult = { id: 42 };
+      const failed = yield* Effect.promise(() =>
+        source.add(note, new AbortController().signal).then(
+          () => "",
+          (e: Error) => e.message,
+        ),
+      );
+      expect(failed).toContain("memory_add answered what it should not");
+      yield* Effect.promise(() => source.stop());
+    }),
+  );
+
   it.live("a project query asks the farm's project and global scopes and does not claim cross-project coverage", () =>
     Effect.gen(function* () {
       const fake = new FakeEveros();
