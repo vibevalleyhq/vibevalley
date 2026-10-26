@@ -1,6 +1,7 @@
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
 
+import { pagesWording } from "./words";
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "../app/A";
@@ -110,10 +111,10 @@ export function SecretInput(props: JSX.InputHTMLAttributes<HTMLInputElement>) {
       <button
         type="button"
         class="absolute inset-y-0 right-1 my-auto h-6 cursor-pointer rounded px-1.5 text-xs text-muted hover:bg-hover"
-        aria-label={shown() ? "藏起来" : "看一眼"}
+        aria-label={shown() ? pagesWording().secret.hide : pagesWording().secret.peek}
         onClick={() => setShown(!shown())}
       >
-        {shown() ? "藏" : "看"}
+        {shown() ? pagesWording().secret.hideShort : pagesWording().secret.peekShort}
       </button>
     </span>
   );

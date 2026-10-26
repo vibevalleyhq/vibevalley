@@ -1,6 +1,7 @@
 // What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
 
+import { pagesWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -94,31 +95,28 @@ export function MemoryPanel(props: { agent: string }) {
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
   const whose = (m: Memory) =>
     m.author === "owner"
-      ? "你记的"
+      ? pagesWording().memory.yours
       : m.author === "orchestrator"
-        ? "管家替它记的"
+        ? pagesWording().memory.orchestrators
         : m.session
-          ? `${sessions().get(m.session) ?? m.session} 记的`
-          : "它自己记的";
+          ? pagesWording().memory.sessions(sessions().get(m.session) ?? m.session)
+          : pagesWording().memory.own;
   return (
     <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted">
-        这个 agent
-        派出去的帮工共用一份记性。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。
-      </p>
+      <p class="text-sm text-muted">{pagesWording().memory.intro}</p>
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
-      <Section title="手上的活" count={jobs().length}>
-        <Show when={jobs().length > 0} fallback={<Quiet>它的帮工还没做完过一轮。</Quiet>}>
+      <Section title={pagesWording().memory.jobs} count={jobs().length}>
+        <Show when={jobs().length > 0} fallback={<Quiet>{pagesWording().memory.noJobs}</Quiet>}>
           <For each={jobs()} keyed={(m) => m.id}>
             {(m) => (
               <div class={[item, "flex overflow-hidden"]}>
                 <span class="w-[3px] shrink-0 bg-leaf" />
                 <div class="flex flex-col gap-0.5 px-3 py-2">
                   <span class="flex flex-wrap gap-2 text-xs text-muted">
-                    <span class="font-medium text-ink">{m().session ? (sessions().get(m().session!) ?? m().session) : "帮工"}</span>
-                    <span>{m().project ?? "所有项目"}</span>
+                    <span class="font-medium text-ink">{m().session ? (sessions().get(m().session!) ?? m().session) : pagesWording().memory.helper}</span>
+                    <span>{m().project ?? pagesWording().memory.allProjects}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
                   <span class="text-sm">{m().text}</span>
@@ -130,18 +128,21 @@ export function MemoryPanel(props: { agent: string }) {
       </Section>
       <RecallPreview agent={props.agent} />
       <WriteNote onWrite={(text, project) => act().write(text, project)} withProject />
-      <Section title="记下的" count={notes().length}>
+      <Section title={pagesWording().memory.notes} count={notes().length}>
         <Show when={projects().length > 0}>
           <div class="flex flex-wrap gap-1">
-            <For each={[["", "全部"] as const, [everywhere, "所有项目"] as const, ...projects().map((p) => [p, p] as const)]}>
+            <For
+              each={[
+                ["", pagesWording().memory.all] as const,
+                [everywhere, pagesWording().memory.allProjects] as const,
+                ...projects().map((p) => [p, p] as const),
+              ]}
+            >
               {([value, label]) => <Pill label={label} on={shown() === value} onClick={() => setShown(value)} />}
             </For>
           </div>
         </Show>
-        <Show
-          when={filtered().length > 0}
-          fallback={<Quiet>{notes().length > 0 ? "这一栏没有。" : "还没记下什么。帮工在汇报里写「记住：」，或者你在上面替它记。"}</Quiet>}
-        >
+        <Show when={filtered().length > 0} fallback={<Quiet>{notes().length > 0 ? pagesWording().memory.emptyHere : pagesWording().memory.nothing}</Quiet>}>
           <For each={filtered()} keyed={(m) => m.id}>
             {(m) => {
               const src = () => (m().source ? sources().get(m().source!) : undefined);
@@ -154,14 +155,14 @@ export function MemoryPanel(props: { agent: string }) {
                       faded={m().fading === true}
                       onForget={() => void act().forget(m().id)}
                       meta={[
-                        m().project ?? "所有项目",
+                        m().project ?? pagesWording().memory.allProjects,
                         whose(m()),
                         ago(m().at, now()),
                         m().recalled > 0
-                          ? `想起过 ${Math.round(m().recalled)} 次${m().recalledAt ? `，上次 ${ago(m().recalledAt!, now())}` : ""}`
-                          : "还没想起过",
+                          ? pagesWording().memory.recalled(Math.round(m().recalled), m().recalledAt ? ago(m().recalledAt!, now()) : undefined)
+                          : pagesWording().memory.neverRecalled,
                       ]}
-                      warning={m().fading ? `快忘了：记满 ${memoryKeep} 条时最先丢` : undefined}
+                      warning={m().fading ? pagesWording().memory.fading(memoryKeep) : undefined}
                     />
                   }
                 >
@@ -169,7 +170,7 @@ export function MemoryPanel(props: { agent: string }) {
                     <MemoryItem
                       memory={m()}
                       onForget={s().canForget ? () => void act().forget(m().id) : undefined}
-                      meta={[`在 ${s().label} 里`, ...(s().canForget ? [] : [`要删到 ${s().label} 里删`])]}
+                      meta={[pagesWording().memory.inSource(s().label), ...(s().canForget ? [] : [pagesWording().memory.forgetThere(s().label)])]}
                     />
                   )}
                 </Show>
@@ -185,23 +186,23 @@ export function MemoryPanel(props: { agent: string }) {
 /** Where its memories live besides the farm's own, and what each lets the panel do. */
 function Sources(props: { sources: MemorySourceInfo[] }) {
   return (
-    <Section title="记性从哪来" count={props.sources.filter((s) => s.on).length}>
+    <Section title={pagesWording().memory.sources} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
           <div class={[item, "flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-xs text-muted"]}>
             <span class="text-sm font-medium text-ink">{s.label}</span>
-            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? "在用" : `没接上：${s.off ?? ""}`}</span>
+            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? pagesWording().memory.on : pagesWording().memory.off(s.off ?? "")}</span>
             <Show when={s.on}>
-              <span>{s.canList ? "记下的列在下面" : "不在这里列出"}</span>
-              <span>{s.canForget ? "能在这里忘掉" : "要删到它那里删"}</span>
+              <span>{s.canList ? pagesWording().memory.listed : pagesWording().memory.unlisted}</span>
+              <span>{s.canForget ? pagesWording().memory.forgettable : pagesWording().memory.forgetElsewhere}</span>
               <Show when={s.transcripts}>
-                <span>收整段干活的对话</span>
+                <span>{pagesWording().memory.transcripts}</span>
               </Show>
             </Show>
           </div>
         )}
       </For>
-      <p class="text-xs text-muted">在开头的「设置」里接上、关掉，或改读写。</p>
+      <p class="text-xs text-muted">{pagesWording().memory.sourcesNote}</p>
     </Section>
   );
 }
@@ -222,19 +223,27 @@ function RecallPreview(props: { agent: string }) {
   const preview = () => ready(previewQuery, undefined);
   const lines = () => preview()?.lines ?? [];
   return (
-    <Section title="下回开工会想起" aside={lines().length > 0 && preview() ? `${lines().length} 条 · ${preview()!.chars} / ${preview()!.limit} 字` : undefined}>
+    <Section
+      title={pagesWording().memory.next}
+      aside={lines().length > 0 && preview() ? pagesWording().memory.preview(lines().length, preview()!.chars, preview()!.limit) : undefined}
+    >
       <div class="flex flex-col gap-1.5 sm:flex-row">
         <Select
           class="sm:w-40"
-          label="在哪个项目开工"
-          placeholder="选项目"
+          label={pagesWording().memory.where}
+          placeholder={pagesWording().memory.pick}
           value={where()}
           options={projects().map((p) => ({ value: p, label: p }))}
           onChange={setProject}
         />
-        <TextInput aria-label="这一轮的话" placeholder="这一轮的话（可以不填）" value={text()} onInput={(e) => setText(e.currentTarget.value)} />
+        <TextInput
+          aria-label={pagesWording().memory.words}
+          placeholder={pagesWording().memory.wordsHint}
+          value={text()}
+          onInput={(e) => setText(e.currentTarget.value)}
+        />
       </div>
-      <Show when={lines().length > 0} fallback={<Quiet>{where() ? "在这个项目里开工，什么也想不起来。" : "还没有项目。"}</Quiet>}>
+      <Show when={lines().length > 0} fallback={<Quiet>{where() ? pagesWording().memory.blank : pagesWording().memory.noProjects}</Quiet>}>
         <p class={[item, "px-3 py-2 text-sm whitespace-pre-wrap"]}>{lines().join("\n")}</p>
       </Show>
     </Section>
@@ -247,23 +256,23 @@ export function OrchestratorMemoryPanel() {
   const act = memoryActions(orchestratorAgent);
   const now = useNow();
   return (
-    <Show when={view()} fallback={<Quiet>在读管家的记性……</Quiet>}>
+    <Show when={view()} fallback={<Quiet>{pagesWording().memory.orchestratorReading}</Quiet>}>
       {(v) => {
         const carried = () => v().carried ?? v().memories.length;
         return (
           <div class="flex flex-col gap-4">
-            <p class="text-sm text-muted">管家开工时和每次压缩后读一遍记性；中间记下、忘掉的，它下一句就知道。</p>
+            <p class="text-sm text-muted">{pagesWording().memory.orchestratorIntro}</p>
             <WriteNote onWrite={(text) => act.write(text)} />
-            <Section title="记下的" count={v().memories.length}>
-              <Show when={v().memories.length > 0} fallback={<Quiet>还没记下什么。跟管家说「记住……」，或者你在上面替它记。</Quiet>}>
+            <Section title={pagesWording().memory.notes} count={v().memories.length}>
+              <Show when={v().memories.length > 0} fallback={<Quiet>{pagesWording().memory.orchestratorNothing}</Quiet>}>
                 <For each={v().memories} keyed={(m) => m.id}>
                   {(m, i) => (
                     <MemoryItem
                       memory={m()}
                       faded={i() >= carried()}
                       onForget={() => void act.forget(m().id)}
-                      meta={[m().session === orchestratorAgent ? "管家自己记的" : "你交代的", ago(m().at, now())]}
-                      warning={i() >= carried() ? "太旧了，带不进系统提示" : undefined}
+                      meta={[m().session === orchestratorAgent ? pagesWording().memory.orchestratorOwn : pagesWording().memory.told, ago(m().at, now())]}
+                      warning={i() >= carried() ? pagesWording().memory.tooOld : undefined}
                     />
                   )}
                 </For>
@@ -299,9 +308,7 @@ export function ArchivePanel() {
   const hits = () => data()?.hits ?? [];
   return (
     <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted">
-        对话太长时，管家把前面的部分压成一段摘要，原文一字不改地存在这里。摘要里缺了细节，它自己会用 search_archive 来翻；你也可以在这里翻。
-      </p>
+      <p class="text-sm text-muted">{pagesWording().memory.archiveIntro}</p>
       <form
         class="flex gap-2"
         onSubmit={(e) => {
@@ -309,13 +316,18 @@ export function ArchivePanel() {
           if (query().trim()) setAsked(query().trim());
         }}
       >
-        <TextInput aria-label="在旧账里搜" placeholder="搜一个词" value={query()} onInput={(e) => setQuery(e.currentTarget.value)} />
+        <TextInput
+          aria-label={pagesWording().memory.search}
+          placeholder={pagesWording().memory.searchHint}
+          value={query()}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+        />
         <Button type="submit" icon="button-search" disabled={!query().trim()}>
-          搜
+          {pagesWording().memory.find}
         </Button>
       </form>
       <Show when={hits().length > 0}>
-        <Section title="搜到的" count={hits().length}>
+        <Section title={pagesWording().memory.found} count={hits().length}>
           <For each={hits()}>
             {(h) => (
               <div class={[item, "flex flex-col gap-0.5 px-3 py-2"]}>
@@ -328,10 +340,10 @@ export function ArchivePanel() {
           </For>
         </Section>
       </Show>
-      <Section title="压掉的对话" count={data()?.files.length ?? 0}>
-        <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : "在读……"}</Quiet>}>
+      <Section title={pagesWording().memory.compacted} count={data()?.files.length ?? 0}>
+        <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : pagesWording().reading}</Quiet>}>
           {(files) => (
-            <Show when={files().length > 0} fallback={<Quiet>还没有：管家的对话还没长到要压缩。</Quiet>}>
+            <Show when={files().length > 0} fallback={<Quiet>{pagesWording().memory.noArchive}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
                   <div class={[item, "overflow-hidden"]}>
@@ -343,7 +355,7 @@ export function ArchivePanel() {
                     >
                       <span class="min-w-0 flex-1 truncate font-mono text-sm">{f().name}</span>
                       <span class="text-xs text-muted">
-                        {ago(f().at, now())} · {Math.round(f().chars)} 字
+                        {ago(f().at, now())} · {pagesWording().memory.chars(Math.round(f().chars))}
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
@@ -372,20 +384,20 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
   };
   return (
     <div class="flex flex-col gap-1">
-      <span class="text-xs font-medium text-muted">替它记一条</span>
+      <span class="text-xs font-medium text-muted">{pagesWording().memory.note}</span>
       <TextArea
-        aria-label="替它记一条"
+        aria-label={pagesWording().memory.note}
         rows={2}
-        placeholder={props.withProject ? "比如：clock-in 的测试用 pnpm test，别用 npm" : "比如：提交信息写中文；周末别派夜班"}
+        placeholder={props.withProject ? pagesWording().memory.noteProject : pagesWording().memory.noteOrchestrator}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex items-center gap-2 pt-1">
         <Show when={props.withProject} fallback={<span class="flex-1" />}>
           <TextInput
-            aria-label="项目"
+            aria-label={pagesWording().memory.project}
             class="font-mono"
-            placeholder="项目（可以不填）"
+            placeholder={pagesWording().memory.projectHint}
             list="memory-projects"
             value={project()}
             onInput={(e) => setProject(e.currentTarget.value)}
@@ -395,16 +407,12 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
           </datalist>
         </Show>
         <Button tone="primary" disabled={!text().trim()} onClick={() => void write()}>
-          记下
+          {pagesWording().write}
         </Button>
       </div>
       <Show
         when={error()}
-        fallback={
-          <span class="text-xs text-faint">
-            {props.withProject ? "写成下次一看就懂的一句话。项目留空就是所有项目都用得上。" : "写成下次一看就懂的一句话。"}
-          </span>
-        }
+        fallback={<span class="text-xs text-faint">{props.withProject ? pagesWording().memory.noteHintProject : pagesWording().memory.noteHint}</span>}
       >
         <span class="text-xs text-berry">{error()}</span>
       </Show>
@@ -430,7 +438,7 @@ function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string
           onClick={() => props.onForget?.()}
           class="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-xs text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-berry focus-visible:opacity-100"
         >
-          忘掉
+          {pagesWording().memory.forget}
         </button>
       </Show>
     </div>
