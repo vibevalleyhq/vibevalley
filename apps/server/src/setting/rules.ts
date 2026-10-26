@@ -137,7 +137,7 @@ export const defaultVoice = (): VoiceSettings => ({
   // The farm's own orchestrator answers: the call is its mouth, with the same conversation as 田头 (voice/voice.ts, the line).
   answer: { vendor: "orchestrator" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
-  persona: voiceOrchestratorPersona,
+  persona: voiceOrchestratorPersona(),
   greeting: wording().greeting,
   failureMessage: settingWording().defaults.failureMessage,
   silenceMs: 480,

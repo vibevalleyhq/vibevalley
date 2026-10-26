@@ -1,6 +1,7 @@
 // What a helper is told about the farm: the rules it works by, what it remembers, and the word that the farm restarted.
-// Said to models, in Chinese whatever the owner's locale: the helper answers in the owner's.
+// Said to models, in Chinese whatever the owner's locale: the helper answers in the owner's (ownersLanguage).
 
+import { ownersLanguage } from "../prompts.ts";
 import type { Workplace } from "../project/shapes.ts";
 
 export function workplaceRules(place: Workplace, house: string, id: string): string {
@@ -10,7 +11,8 @@ export function workplaceRules(place: Workplace, house: string, id: string): str
   const lines = [
     "## 在码农场物语干活的规矩",
     "- " + where,
-    "- 做完一轮：git add 你改的文件，git commit。提交信息照项目的约定写（看它的 AGENTS.md 和 git log）；项目没约定的，用一句中文说清楚做了什么；主人这一轮另有说法的，照主人说的。",
+    `- 汇报、提问都用${ownersLanguage()}写，那是主人的语言；下面说的「结论：」「要问主人：」「记住：」这几个开头照原样写。`,
+    `- 做完一轮：git add 你改的文件，git commit。提交信息照项目的约定写（看它的 AGENTS.md 和 git log）；项目没约定的，用一句${ownersLanguage()}说清楚做了什么；主人这一轮另有说法的，照主人说的。`,
     "- 汇报时写上 commit 号，以及你是怎么验证的（跑了什么命令、结果如何）。",
     "- 你做的是一张工单，读完代码觉得它一个人做太大、能分成几件各自提交和验证的事：先提交已经做的，用 issue_split 把它拆成几张子工单，交给几个帮工分头做；拆完不再改代码，汇报拆成了哪几步就结束。",
     "- 汇报的最后一段以「结论：」开头，一两句话说清做成了什么（或卡在哪、需要主人定什么）；有提交就带上 commit 号。补充说明写在结论前面。",

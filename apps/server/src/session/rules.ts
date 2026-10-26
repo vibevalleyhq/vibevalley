@@ -25,8 +25,9 @@ export function failureText(f: FailedTurn): string {
   return out;
 }
 
-/** The line the farm rules ask every report to end on: 「结论：…」, perhaps bold or in a list. */
-const verdict = /(?:^|\n)[\s>*#_-]*(?:\*\*)?结论(?:\*\*)?\s*[:：]\s*(?:\*\*)?/g;
+/** The line the farm rules ask every report to end on: 「结论：…」, perhaps bold or in a list. The markers are asked for in
+ * Chinese whatever the owner's language; a model writing English may put them in English, which counts too. */
+const verdict = /(?:^|\n)[\s>*#_-]*(?:\*\*)?(?:结论|Conclusion)(?:\*\*)?\s*[:：]\s*(?:\*\*)?/gi;
 
 function conclusion(text: string, min: number): string {
   const blocks = text.trim().split(/\n{2,}/);
@@ -110,10 +111,10 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
 }
 
 /** A line the session wrote to ask the owner (the farm's rules tell it to): 「要问主人：…」, with markdown around it allowed. */
-const questionLine = /^[\s>*#_-]*(?:\*\*)?要问主人(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/;
+const questionLine = /^[\s>*#_-]*(?:\*\*)?(?:要问主人|Ask the owner|Question for the owner)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/i;
 
 /** The answers it thought of, at the end of the question: 「（选项：A｜B）」. */
-const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/;
+const optionsTail = /\s*[（(]\s*(?:选项|Options)\s*[:：]\s*(.+?)\s*[)）]\s*$/i;
 
 export function questionsOf(said: string): Question[] {
   return said
@@ -134,8 +135,17 @@ export function questionsOf(said: string): Question[] {
 }
 
 /** A line on one criterion (the issue's brief asks for them): 「标准 2：做到了 —— bun test 通过」. */
-const checkLine = /^[\s>*#_-]*(?:\*\*)?标准\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定)(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/;
-const checkWords: Record<string, CheckResult> = { 做到了: "met", 没做到: "unmet", 不确定: "unsure" };
+const checkLine =
+  /^[\s>*#_-]*(?:\*\*)?(?:标准|Criterion)\s*(\d+)(?:\*\*)?\s*[:：]\s*(?:\*\*)?(做到了|没做到|不确定|not met|unmet|unsure|met)(?![a-z])(?:\*\*)?\s*[，,。.;；:：—–-]*\s*(.*)$/i;
+const checkWords: Record<string, CheckResult> = {
+  做到了: "met",
+  没做到: "unmet",
+  不确定: "unsure",
+  met: "met",
+  "not met": "unmet",
+  unmet: "unmet",
+  unsure: "unsure",
+};
 
 /** Numbered from 1 as the brief lists them; the last word on a criterion stands. */
 export function checksOf(said: string): CriterionCheck[] {
@@ -146,7 +156,7 @@ export function checksOf(said: string): CriterionCheck[] {
     const criterion = Number(m[1]) - 1;
     if (criterion < 0) continue;
     const proof = m[3]!.trim().replace(/\*\*$/, "").trim();
-    out.set(criterion, { criterion, result: checkWords[m[2]!]!, ...(proof ? { proof } : {}) });
+    out.set(criterion, { criterion, result: checkWords[m[2]!.toLowerCase()]!, ...(proof ? { proof } : {}) });
   }
   return [...out.values()].sort((a, b) => a.criterion - b.criterion);
 }

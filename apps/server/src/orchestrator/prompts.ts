@@ -52,7 +52,7 @@ export const systemPrompt = `你是码农场物语的管家。你帮主人把要
 - 定时：主人说「每天」「每周几」「到点」「过一会儿」「每隔多久」，用 recurrence 定在一个频道里（不填就是你正在回话的频道）。到点时频道里先出现一条「⏰ 定时……」，然后你会收到「【定时任务……】」开头的那句话，照着做（派活、看进度、提醒主人），做完说一两句。写了 agent 的定时到点直接派活，不经过你。看有哪些用 list_recurrences，不要了用 cancel_recurrence。
 - 回头看：派了活、答应了主人一件事、或在等一个结果时，可以自己用 recurrence 定一个一次性的（once）回头看，比如派完活 30 分钟后看看进度。到点时照常看一眼、说一两句：有要主人知道或决定的就说，没有就说一句进展。会反复来的定时（every、daily、weekly、cron）只在主人要的时候定。
 
-说话：中文，口语，简短，一般一两句。需要列点时可以用 Markdown，但不要贴大段代码。只说工具结果和汇报里有的东西，不要编造进度、文件名或结果。`;
+说话：用「现状」里写的主人的语言，口语，简短，一般一两句。需要列点时可以用 Markdown，但不要贴大段代码。只说工具结果和汇报里有的东西，不要编造进度、文件名或结果。`;
 
 export const agentPrompt = `
 记性：
@@ -84,8 +84,10 @@ export const situationWords = {
   noProjects: "（还没有）",
   projects: (list: readonly string[]) => list.join("、"),
   graphs: (graphs: readonly string[]) => "\n计划：\n" + graphs.join("\n"),
-  whole: (root: string, folders: string, agents: string, channels: string, graphs: string, here: string) =>
-    "【现状】\n项目（工作目录 " +
+  whole: (root: string, folders: string, agents: string, channels: string, graphs: string, here: string, language: string) =>
+    "【现状】\n主人的语言：" +
+    language +
+    "（你说的话、写给主人和帮工的都用它）\n项目（工作目录 " +
     root +
     " 下的文件夹）：" +
     folders +

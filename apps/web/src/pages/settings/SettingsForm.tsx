@@ -1,4 +1,5 @@
-// The keys and the memory sources (setting.load, setting.save), a part at a time; and what the server found of gh.
+// The keys, the language and the memory sources (setting.load, setting.save), a part at a time; and what the server
+// found of gh.
 
 import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
@@ -8,6 +9,8 @@ import {
   type GitHubStatus,
   type KeySource,
   type KeyStatus,
+  type Locale,
+  LocaleValues,
   type MemorySource,
   type MemorySourceKind,
   MemorySourceKindValues,
@@ -18,6 +21,8 @@ import { api, reasonOf } from "../../data/api";
 import { queries, ready, useQuery, useSettings } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
+import { Segmented } from "../../ui/Segmented";
+import { currentLocale } from "@vibevalley/protocol/words";
 import { Quiet, SecretInput, TextLink, Toggle } from "../kit";
 
 const from: Record<KeySource, string> = { settings: settingsWording().from.settings, config: settingsWording().from.config };
@@ -380,6 +385,41 @@ export function GitHub() {
           {settingsWording().github.recheck}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps.
+ * Saved, the page opens again in it: its words are read once, when it loads (protocol words/locale.ts). */
+export function LanguageForm() {
+  const [error, setError] = createSignal<string>();
+  const [busy, setBusy] = createSignal(false);
+  const choose = async (locale: Locale) => {
+    if (locale === currentLocale() || busy()) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await saveSettings({ locale });
+      location.reload();
+    } catch (e) {
+      setError(reasonOf(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="flex flex-col gap-3">
+      <p class="text-sm text-muted">{settingsWording().language.line}</p>
+      <div>
+        <Segmented
+          label={settingsWording().language.label}
+          value={currentLocale()}
+          options={LocaleValues.map((l) => ({ value: l, label: settingsWording().language[l], disabled: busy() }))}
+          onChange={(l) => void choose(l)}
+        />
+      </div>
+      <Show when={error()}>
+        <p class="text-sm text-berry">{error()}</p>
+      </Show>
     </div>
   );
 }

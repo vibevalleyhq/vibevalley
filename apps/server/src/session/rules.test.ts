@@ -16,6 +16,7 @@ import {
   parseAnswer,
   questionsOf,
   readReport,
+  reportVerdict,
   sessionName,
   summaryOf,
   whoMakesRoom,
@@ -256,6 +257,17 @@ describe("a run's report", () => {
       { criterion: 1, result: "unmet", proof: "还差文档" },
       { criterion: 2, result: "unsure" },
     ]);
+  });
+
+  it("a report in English may write its markers in English", () => {
+    const said =
+      "Added paging.\n\nAsk the owner: page size 20 or 50? (Options: 20 | 50)\nCriterion 1: met — bun test passes\n**Criterion 2**: not met, docs missing\n\n**Conclusion:** paging added (3f2a1bc).";
+    expect(questionsOf(said)).toEqual([{ question: "page size 20 or 50?", options: ["20", "50"] }]);
+    expect(checksOf(said)).toEqual([
+      { criterion: 0, result: "met", proof: "bun test passes" },
+      { criterion: 1, result: "unmet", proof: "docs missing" },
+    ]);
+    expect(reportVerdict(said)).toBe("paging added (3f2a1bc).");
   });
 });
 

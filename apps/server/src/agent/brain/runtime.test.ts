@@ -75,7 +75,7 @@ describe("VibeValley's runtime", () => {
     expect(ended(r)[0]!.kind).toBe("completed");
     expect(text(r)).toBe("我来写写好了 hello.txt");
     const prompt = systemPrompt(r.requests[0]!);
-    expect(prompt.startsWith(helperInstructions)).toBe(true);
+    expect(prompt.startsWith(helperInstructions())).toBe(true);
     expect(prompt).toContain("你是后端老周。");
   });
 

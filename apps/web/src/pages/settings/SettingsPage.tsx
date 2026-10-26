@@ -1,5 +1,5 @@
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
-// first four are the server's settings in a card, the rest whole pages of their own.
+// first five are the server's settings in a card, the rest whole pages of their own.
 
 import { settingsWording } from "./words";
 import { For, Match, Show, Switch } from "solid-js";
@@ -8,12 +8,13 @@ import { Keyed } from "../../app/util";
 import { Card, ListCard, ListRow } from "../kit";
 import { ConnectorsPage } from "./ConnectorsPage";
 import { LanPage } from "./LanPage";
-import { GitHub, SettingsForm } from "./SettingsForm";
+import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
 import { SkillsPage } from "./SkillsPage";
 import { VoiceForm } from "./VoiceForm";
 
 export const sections = [
   { id: "deepseek", label: "DeepSeek", line: settingsWording().sections.deepseek.line },
+  { id: "language", label: settingsWording().sections.language.label, line: settingsWording().sections.language.line },
   { id: "agora", label: settingsWording().sections.agora.label, line: settingsWording().sections.agora.line },
   { id: "memory", label: settingsWording().sections.memory.label, line: "Nowledge Mem、EverOS" },
   { id: "github", label: "GitHub", line: settingsWording().sections.github.line },
@@ -42,6 +43,11 @@ export function SettingsPage(props: { rest: string }) {
               <Match when={section().id === "deepseek" || section().id === "agora" || section().id === "memory"}>
                 <Card title={section().label} class="max-w-3xl">
                   <Keyed key={section().id}>{() => <SettingsForm part={section().id as "deepseek" | "agora" | "memory"} />}</Keyed>
+                </Card>
+              </Match>
+              <Match when={section().id === "language"}>
+                <Card title={section().label} class="max-w-3xl">
+                  <LanguageForm />
                 </Card>
               </Match>
               <Match when={section().id === "github"}>

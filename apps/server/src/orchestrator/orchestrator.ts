@@ -5,6 +5,7 @@
 // answer goes. Running the agent (starting it, queuing inputs, streaming words, recording runs, going on after a restart)
 // is the host's (session/host.ts).
 
+import { ownersLanguage } from "../prompts.ts";
 import { orchestratorWording } from "./words.ts";
 import { agentPrompt, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestrator } from "../base/actor.ts";
@@ -209,7 +210,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const folders = all.length > 0 ? situationWords.projects(all.map((p) => p.name)) : situationWords.noProjects;
       const open = tasks.graphs().filter(isOpen).map(graphText);
       const graphs = open.length > 0 ? situationWords.graphs(open) : "";
-      return situationWords.whole(projects.root, folders, sessions.join("\n"), byChannel.join("\n"), graphs, here.name);
+      return situationWords.whole(projects.root, folders, sessions.join("\n"), byChannel.join("\n"), graphs, here.name, ownersLanguage());
     };
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while

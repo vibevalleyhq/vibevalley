@@ -104,17 +104,18 @@ export const make = Effect.gen(function* () {
   const disk = new FileWriter(file, 0o600);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // 恢复默认 goes back to these.
-  let defaults = defaultVoice();
-  if (config.voice.id) {
-    const tts = defaultVoice().tts;
-    defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
-  }
+  // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
+  const defaults = (): VoiceSettings => {
+    const base = defaultVoice();
+    if (!config.voice.id) return base;
+    return { ...base, tts: { vendor: "minimax", model: base.tts.vendor === "minimax" ? base.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
+  };
   let stored: Stored = (yield* readOrSetAside(file, jsonOf(Stored), "the settings start empty")) ?? {};
   setLocale(stored.locale ?? "zh");
 
   const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
     saved ? [saved, "settings"] : given ? [given, "config"] : undefined;
-  const voiceOf = (s: Stored) => (s.voice ? voiceSettingsOver(defaults, s.voice) : defaults);
+  const voiceOf = (s: Stored) => (s.voice ? voiceSettingsOver(defaults(), s.voice) : defaults());
 
   const status = (): SettingsStatus => {
     const s = stored;
@@ -128,7 +129,7 @@ export const make = Effect.gen(function* () {
       agoraAppId: appId ? { source: appId[1], value: appId[0] } : {},
       agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : {},
       voice: voiceOf(s),
-      voiceDefaults: defaults,
+      voiceDefaults: defaults(),
       asrKey: secret(s.asrKey, "settings"),
       llmKey: secret(s.llmKey, "settings"),
       ttsKey: secret(s.ttsKey, "settings"),
@@ -158,7 +159,7 @@ export const make = Effect.gen(function* () {
       next.dictation = d.url === "" && d.model === "" ? undefined : d;
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
-    if (u.voice) next.voice = voiceOverrides(defaults, voiceSettingsOver(defaults, u.voice));
+    if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = compact(next) as Stored;
