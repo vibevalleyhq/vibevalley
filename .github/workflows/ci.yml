@@ -49,7 +49,8 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
         run: vpx scripts/commit-msg.ts --title "$TITLE"
       - name: pull request body and branch
-        if: github.event_name == 'pull_request'
+        # Dependabot writes its own body (release notes) and branch name; its titles pass the title check above.
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
         # The body becomes the squashed commit's message. Editing the title or body does not run CI again: vv-pr checks
         # them once more before merging.
         env:
