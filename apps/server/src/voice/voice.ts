@@ -414,6 +414,7 @@ export const make = (options: VoiceOptions = {}) =>
       answerer: orchestrator.answerer("phone"),
       misheard: lineMisheard,
       log: (l) => logs.info(l),
+      now: () => clock.currentTimeMillisUnsafe(),
     });
     const route = /^\/llm\/([\w-]+)\/chat\/completions$/;
     yield* Effect.addFinalizer(() =>

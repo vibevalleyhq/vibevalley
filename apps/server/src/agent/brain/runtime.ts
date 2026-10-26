@@ -12,6 +12,7 @@ import { Brain, type BrainEvent } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import { deepseek, defaultModel, type LLM, type McpServer } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
+import type { Time } from "../../base/time.ts";
 
 export const vibevalleyRuntime = "vibevalley";
 
@@ -31,6 +32,8 @@ export interface RuntimeOptions {
   readonly llm?: (model: string) => LLM;
   /** Where a session keeps its task graph; absent, it keeps none. */
   readonly tasks?: (session: string) => TaskStore;
+  /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
+  readonly time: Time;
 }
 
 const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
@@ -50,7 +53,7 @@ const refusedOptions = {
   serviceTier: "DeepSeek 没有服务档位",
 } as const;
 
-export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
+export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   const home = options.home ?? defaultHome;
   const llmOf = options.llm ?? ((model: string) => deepseek(model, process.env.DEEPSEEK_API_KEY ?? ""));
 
@@ -64,6 +67,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
     const instructions = o.systemPrompt ?? [helperInstructions, ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
     const tasks = options.tasks?.(kernel.sessionId);
     const agent = await Brain.start({
+      time: options.time,
       name: "worker",
       instructions,
       llm,
@@ -84,7 +88,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
     const frame = (type: string, native: unknown, events: Parameters<typeof kernel.frame>[0]["events"] = []) => kernel.frame({ type, native, events });
     const begin = (input: string) => {
       active = true;
-      agent.send(userMessage(input));
+      agent.send(userMessage(input, options.time.now()));
     };
     const end = (outcome: TurnOutcome) => {
       if (!active) return;
@@ -193,7 +197,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions = {}) {
           if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
           const refused = inputImagesRefusal(capabilities, inputOptions?.images);
           if (refused !== null) return refused;
-          agent.send(userMessage(input));
+          agent.send(userMessage(input, options.time.now()));
           return { kind: "accepted" };
         }),
       queue: (input, inputOptions) =>

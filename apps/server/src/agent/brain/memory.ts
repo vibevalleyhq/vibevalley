@@ -40,7 +40,8 @@ function memoryLine(line: string): MemoryLine | undefined {
   return m ? { id: lineID(text), date: m[1]!, text: m[2]! } : { id: lineID(text), text: text.replace(bulletHead, "") };
 }
 
-function snapshotOf(file: string, raw: string, updatedAt = Date.now()): MemorySnapshot {
+/** updatedAt: the file's modification time, 0 when there is none. */
+function snapshotOf(file: string, raw: string, updatedAt: number): MemorySnapshot {
   const text = raw.trim();
   const runes = [...text];
   const cutoff = Math.max(0, runes.length - memoryPromptChars);
@@ -68,7 +69,7 @@ function snapshotOf(file: string, raw: string, updatedAt = Date.now()): MemorySn
 
 export function readMemory(home: string): MemorySnapshot {
   const file = memoryFile(home);
-  if (!existsSync(file)) return snapshotOf(file, "");
+  if (!existsSync(file)) return snapshotOf(file, "", 0);
   return snapshotOf(file, readFileSync(file, "utf8"), statSync(file).mtimeMs);
 }
 
@@ -93,7 +94,7 @@ export function forgetLine(home: string, id: string) {
 
 const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-export function remember(home: string, note: string, now = new Date()): MemoryLine {
+export function remember(home: string, note: string, now: Date): MemoryLine {
   mkdirSync(home, { recursive: true });
   const line = `- ${localDate(now)} ${note.replace(/\s*\n\s*/g, " ").trim()}`;
   appendFileSync(memoryFile(home), line + "\n");
@@ -104,7 +105,7 @@ export function rewriteMemory(home: string, text: string): MemorySnapshot {
   mkdirSync(home, { recursive: true });
   const body = text.endsWith("\n") ? text : text + "\n";
   writeFileSync(memoryFile(home), body);
-  return snapshotOf(memoryFile(home), body);
+  return snapshotOf(memoryFile(home), body, statSync(memoryFile(home)).mtimeMs);
 }
 
 const archiveDir = (home: string) => join(home, "archive");
@@ -112,7 +113,7 @@ const archiveDir = (home: string) => join(home, "archive");
 /** Date.toISOString with its colons and dot made dashes. */
 const isoStamp = (now: Date) => now.toISOString().replace(/[:.]/g, "-");
 
-export function archive(home: string, session: string, text: string, now = new Date()): string {
+export function archive(home: string, session: string, text: string, now: Date): string {
   mkdirSync(archiveDir(home), { recursive: true });
   const path = join(archiveDir(home), `${session}-${isoStamp(now)}.md`);
   writeFileSync(path, text);

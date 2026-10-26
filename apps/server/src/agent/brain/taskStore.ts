@@ -27,7 +27,8 @@ const fromRow = (r: q.OpenGraphTasksResult): Task => ({
 });
 
 /** The farm's database (agent_task). A finished graph stays, stamped finished_at. */
-export const dbStore = (sql: SqlClient.SqlClient, owner: string): TaskStore => {
+/** now: the service's Clock, for when a graph changed and finished. */
+export const dbStore = (sql: SqlClient.SqlClient, owner: string, now: () => number): TaskStore => {
   const db = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.provideService(e, SqlClient.SqlClient, sql).pipe(Effect.orDie);
   return {
     load: Effect.map(db(q.openGraphTasks({ owner })), (rows) => rows.map(fromRow)),
@@ -40,7 +41,7 @@ export const dbStore = (sql: SqlClient.SqlClient, owner: string): TaskStore => {
             // The graph keeps its id while it is open; a new one starts when the owner had none.
             const graph = rows[0]?.graph ?? newId();
             yield* db(q.clearOpenGraphTasks({ owner }));
-            const now = Date.now();
+            const at = now();
             for (const [position, t] of g.entries())
               yield* db(
                 q.addGraphTask({
@@ -55,10 +56,10 @@ export const dbStore = (sql: SqlClient.SqlClient, owner: string): TaskStore => {
                   state: t.state,
                   result: t.result ?? "",
                   tries: t.tries ?? 0,
-                  updated_at: now,
+                  updated_at: at,
                 }),
               );
-            if (finished(g)) yield* db(q.finishGraphTasks({ finished_at: now, owner }));
+            if (finished(g)) yield* db(q.finishGraphTasks({ finished_at: at, owner }));
             return g;
           }),
         )

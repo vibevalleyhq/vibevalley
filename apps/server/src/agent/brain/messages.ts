@@ -31,19 +31,19 @@ export interface CompactionSummaryMessage {
 // pi-coding-agent (through oar) already adds `custom` and `compactionSummary` to pi-agent-core's AgentMessage, in
 // shapes these extend: a compactionSummary read from the transcript is this file's once it is known to be the agent's.
 
-export const customMessage = (customType: string, content: UserContent, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
+export const customMessage = (customType: string, content: UserContent, now: number, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
   role: "custom",
   customType,
   content,
   display: !options.hidden,
   ...(options.details === undefined ? {} : { details: options.details }),
-  timestamp: Date.now(),
+  timestamp: now,
 });
 
-export const userMessage = (text: string): UserMessage => ({
+export const userMessage = (text: string, now: number): UserMessage => ({
   role: "user",
   content: text,
-  timestamp: Date.now(),
+  timestamp: now,
 });
 
 export function summaryText(m: { readonly summary: string; readonly archive?: string }): string {

@@ -15,6 +15,8 @@ export interface ChatCompletions {
   /** Said when a request has no user text; absent: such a request is refused. */
   readonly misheard?: string;
   readonly log?: (line: string) => void;
+  /** The service's Clock: a completion's created time and how long its first words took. */
+  readonly now: () => number;
 }
 
 const ContentPart = Schema.Struct({
@@ -75,7 +77,7 @@ async function* once(text: string) {
 export function chatCompletions(c: ChatCompletions) {
   return async (request: Request): Promise<Response> => {
     if (request.method !== "POST") return refuse(405, "invalid_request_error", "method_not_allowed", "only POST");
-    const asked = Date.now();
+    const asked = c.now();
     let req: ChatRequest;
     try {
       req = Schema.decodeUnknownSync(ChatRequest)(await request.json());
@@ -94,7 +96,7 @@ export function chatCompletions(c: ChatCompletions) {
     const words = text ? answer(text, ended.signal) : once(c.misheard!);
     const id = "chatcmpl-" + randomBytes(6).toString("hex");
     const created = Math.floor(asked / 1000);
-    const firstWords = () => c.log?.(`vibevalley: ${model}'s first words ${Date.now() - asked}ms after it was asked`);
+    const firstWords = () => c.log?.(`vibevalley: ${model}'s first words ${c.now() - asked}ms after it was asked`);
     if (!req.stream) {
       let all = "";
       for await (const w of words) {

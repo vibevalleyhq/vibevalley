@@ -130,8 +130,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (text: string) {
       const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
       if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
-      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body), catch: () => refused("没记下来：MEMORY.md 写不进去") });
-      return lineMemory(written, yield* Clock.currentTimeMillis);
+      const at = yield* Clock.currentTimeMillis;
+      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body, new Date(at)), catch: () => refused("没记下来：MEMORY.md 写不进去") });
+      return lineMemory(written, at);
     });
 
     const orchestrator = (): MemoryList => {

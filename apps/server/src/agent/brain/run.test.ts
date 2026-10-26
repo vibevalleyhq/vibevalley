@@ -19,6 +19,7 @@ import { SessionFile } from "./session.ts";
 import { TaskRunner } from "./tasks.ts";
 import { answered, fauxLLM, lastUser, type Request, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { objectSchema, textTool } from "./tool.ts";
+import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -78,6 +79,7 @@ async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptio
   const llm = scripted(steps);
   const dir = home();
   const agent = await Brain.start({
+    time: wallTime,
     name: "receipt",
     instructions: "",
     llm,
@@ -104,7 +106,7 @@ describe("a run's receipt", () => {
       [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
       { tools: [echo] },
     );
-    expect(await agent.ask(userMessage("one"))).toBe("first");
+    expect(await agent.ask(userMessage("one", wallTime.now()))).toBe("first");
     await until(() => receipts.length === 1);
     expect(receipts[0]).toMatchObject({
       id: 1,
@@ -112,7 +114,7 @@ describe("a run's receipt", () => {
       usage: { input: 60, output: 12, cacheRead: 15 },
       contextTokens: 43,
     });
-    expect(await agent.ask(userMessage("two"))).toBe("second");
+    expect(await agent.ask(userMessage("two", wallTime.now()))).toBe("second");
     await until(() => receipts.length === 2);
     expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
     expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
@@ -126,10 +128,10 @@ describe("a run's receipt", () => {
       errorMessage: "broken",
     };
     const { agent, receipts } = await receiptAgent([failed, billed("recovered", 3, 1, 0)]);
-    expect(await agent.ask(userMessage("fail"))).toBe("failed words");
+    expect(await agent.ask(userMessage("fail", wallTime.now()))).toBe("failed words");
     await until(() => receipts.length === 1);
     expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
-    await agent.ask(userMessage("retry"));
+    await agent.ask(userMessage("retry", wallTime.now()));
     await until(() => receipts.length === 2);
     expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
     await agent.close();
@@ -164,9 +166,9 @@ describe("a run's receipt", () => {
         maxSteps: 3,
       },
     );
-    const answer = agent.ask(userMessage("A"));
+    const answer = agent.ask(userMessage("A", wallTime.now()));
     await until(() => entered);
-    agent.later(userMessage("B"));
+    agent.later(userMessage("B", wallTime.now()));
     release();
     expect(await answer).toBe("");
     await until(() => receipts.length === 1);
@@ -191,6 +193,7 @@ describe("a run's receipt", () => {
     const llm = scripted([billed("partial", 7, 3, 2)], true);
     const dir = home();
     const agent = await Brain.start({
+      time: wallTime,
       name: "partial",
       instructions: "",
       llm,
@@ -204,7 +207,7 @@ describe("a run's receipt", () => {
     });
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
-    agent.send(userMessage("start"));
+    agent.send(userMessage("start", wallTime.now()));
     await until(() => events.some((e) => e.type === "message_update"));
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
@@ -224,9 +227,9 @@ describe("a compaction", () => {
   it("replays its whole kept tail", () => {
     const dir = home();
     const messages: AgentMessage[] = [
-      userMessage("old"),
+      userMessage("old", wallTime.now()),
       fauxAssistantMessage("old answer"),
-      userMessage("keep"),
+      userMessage("keep", wallTime.now()),
       fauxAssistantMessage("a"),
       fauxAssistantMessage("b"),
       fauxAssistantMessage("c"),

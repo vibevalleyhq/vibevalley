@@ -10,6 +10,7 @@ import { type CompactionSummaryMessage, messageText, userMessage } from "./messa
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
 import { objectSchema, stopped, textTool } from "./tool.ts";
+import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -43,7 +44,7 @@ describe("the agent", () => {
     await withAgent(dir, [], async (r) => {
       const ended = new AbortController();
       ended.abort();
-      await expect(r.agent.ask(userMessage("不该开始"), ended.signal)).rejects.toThrow("aborted");
+      await expect(r.agent.ask(userMessage("不该开始", wallTime.now()), ended.signal)).rejects.toThrow("aborted");
       expect(r.requests).toHaveLength(0);
       let runs = 0;
       const tool = textTool({
@@ -147,10 +148,10 @@ describe("the agent", () => {
         step((c) => fauxAssistantMessage("第三次听到：" + lastUser(c))),
       ],
       async (r) => {
-        r.agent.send(userMessage("开始"));
+        r.agent.send(userMessage("开始", wallTime.now()));
         await sleep(10);
-        r.agent.later(userMessage("完了再说这个"));
-        r.agent.send(userMessage("顺便"));
+        r.agent.later(userMessage("完了再说这个", wallTime.now()));
+        r.agent.send(userMessage("顺便", wallTime.now()));
         await until(() => r.agent.history().length >= 7);
         expect(said(r.agent.history())).toEqual([
           "user:开始",
@@ -313,7 +314,7 @@ describe("the agent", () => {
       repeat(12, long),
       async (r) => {
         await r.ask("第 1 件事");
-        remember(dir, "记在折叠之前");
+        remember(dir, "记在折叠之前", new Date());
         const folded = () => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined);
         for (let n = 2; n <= 5 && !folded(); n++) await r.ask(`第 ${n} 件事`);
         await until(folded);
@@ -333,7 +334,7 @@ describe("the agent", () => {
       dir,
       [fauxAssistantMessage([fauxText("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))])],
       async (r) => {
-        r.agent.send(userMessage("说"));
+        r.agent.send(userMessage("说", wallTime.now()));
         await until(() => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"));
         await r.agent.stop();
         await until(() => r.has("agent_settled"));
@@ -349,7 +350,7 @@ describe("the agent", () => {
   it("is stopped while a tool runs", async () => {
     const dir = home();
     await withAgent(dir, [fauxAssistantMessage([fauxToolCall("bash", { command: "sleep 5" })])], async (r) => {
-      r.agent.send(userMessage("睡"));
+      r.agent.send(userMessage("睡", wallTime.now()));
       await until(() => r.has("tool_execution_start"));
       await r.agent.stop();
       await until(() => r.has("agent_settled"));
@@ -469,7 +470,7 @@ describe("the agent", () => {
   });
 
   it("cuts where the last words stay", () => {
-    const u = (text: string) => userMessage(text);
+    const u = (text: string) => userMessage(text, wallTime.now());
     const a = (text: string) => fauxAssistantMessage(text);
     const call = fauxAssistantMessage([fauxToolCall("x", {})]);
     const result: AgentMessage = {

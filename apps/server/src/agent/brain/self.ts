@@ -7,6 +7,8 @@ import { objectSchema, stringSchema, textTool } from "./tool.ts";
 
 export interface SelfOptions {
   readonly home: string;
+  /** The brain's Time: the day a remembered line is dated. */
+  readonly now: () => number;
   /** Scanned each time it asks. */
   readonly skills: () => SkillInfo[];
   readonly memory: boolean;
@@ -34,7 +36,7 @@ export function selfTools(o: SelfOptions): AgentTool[] {
     parameters: objectSchema({ note: stringSchema() }, "note"),
     run: (p) => {
       if (!p.note?.trim()) throw new Error("note 是空的。");
-      remember(o.home, p.note);
+      remember(o.home, p.note, new Date(o.now()));
       return "记下了。";
     },
   });

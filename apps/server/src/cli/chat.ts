@@ -16,6 +16,7 @@ import { loadConfig } from "../base/config.ts";
 import { dshRuntime } from "../runtime/dsh.ts";
 import { registryOf } from "../runtime/runtime.ts";
 import { memoryStore } from "../agent/brain/taskStore.ts";
+import { wallTime } from "../base/time.ts";
 
 const instructions = `你是 VibeValley，一个在用户电脑上干活的助手：读写代码、跑命令、查资料、记住用户交代的事、按时做定好的事。
 - 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
@@ -96,6 +97,8 @@ export async function ownChat(values: OwnChat) {
   const asked = values.p !== undefined;
   // A one-off question keeps no recurrences running.
   const agent = await Brain.start({
+    // The command line has no service to ask: the wall clock.
+    time: wallTime,
     name: values.name,
     instructions,
     llm,
@@ -111,7 +114,7 @@ export async function ownChat(values: OwnChat) {
   agent.subscribe((e) => show(e, () => prompt()));
   try {
     if (asked) {
-      await agent.ask(userMessage(values.p));
+      await agent.ask(userMessage(values.p, wallTime.now()));
       return;
     }
     console.log(
@@ -131,7 +134,7 @@ export async function ownChat(values: OwnChat) {
           console.log(dim("忘掉了。"));
           return prompt();
         }
-        if (text) agent.send(userMessage(text));
+        if (text) agent.send(userMessage(text, wallTime.now()));
         else prompt();
       },
       () => {
@@ -181,7 +184,10 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
   const config = loadConfig();
-  const registry = registryOf([vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey) }), dshRuntime]);
+  const registry = registryOf([
+    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey), time: wallTime }),
+    dshRuntime,
+  ]);
   const runtime = registry.get(id);
   if (!runtime) throw new Error(`没有 ${id} 这个农机`);
   if (!runtime.installation) throw new Error(`${id} 看不出装没装`);

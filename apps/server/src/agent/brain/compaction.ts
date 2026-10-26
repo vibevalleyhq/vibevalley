@@ -42,6 +42,8 @@ export interface CompactionOptions {
   readonly keepSaid: number;
   /** Written after the summary, as it stands when the fold is made (the open task graph); "" for none. */
   readonly append?: () => Promise<string>;
+  /** The brain's Time: the summary's and the asked messages' times, the archive's name. */
+  readonly now: () => number;
 }
 
 export interface CompactionPlan {
@@ -82,7 +84,7 @@ async function summaryOf(plan: CompactionPlan, said: string, where: string, opti
     role: "compactionSummary",
     summary,
     tokensBefore: plan.tokens,
-    timestamp: Date.now(),
+    timestamp: options.now(),
     ...(where ? { archive: where } : {}),
     kept: plan.messages.length - plan.cut,
   };
@@ -90,7 +92,7 @@ async function summaryOf(plan: CompactionPlan, said: string, where: string, opti
 
 function archived(options: CompactionOptions, text: string): string {
   try {
-    return archive(options.home, options.session, text);
+    return archive(options.home, options.session, text, new Date(options.now()));
   } catch {
     return "";
   }
@@ -111,7 +113,7 @@ export async function compactInPlace(
   tools: readonly Tool[],
   signal?: AbortSignal,
 ): Promise<Summarized> {
-  const messages = [...withPrefix(prefix, tools, plan.messages), { role: "user" as const, content: summaryInPlace, timestamp: Date.now() }];
+  const messages = [...withPrefix(prefix, tools, plan.messages), { role: "user" as const, content: summaryInPlace, timestamp: options.now() }];
   const answer = await complete(options.llm, messages, {
     toolChoice: "none",
     ...(signal ? { signal } : {}),
@@ -130,7 +132,7 @@ async function compact(plan: CompactionPlan, options: CompactionOptions, signal?
     options.llm,
     [
       { role: "system", content: summaryInstructions, timestamp: 0 },
-      { role: "user", content: text, timestamp: Date.now() },
+      { role: "user", content: text, timestamp: options.now() },
     ],
     signal ? { signal } : {},
   );

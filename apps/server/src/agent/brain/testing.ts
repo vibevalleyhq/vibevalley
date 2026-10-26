@@ -16,6 +16,7 @@ import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import type { LLM } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
+import { wallTime } from "../../base/time.ts";
 
 export interface Request {
   readonly messages: Message[];
@@ -86,6 +87,7 @@ export async function withAgent(
   const { faux, llm, requests } = fauxLLM(fauxOptions);
   faux.appendResponses(steps);
   const agent = await Brain.start({
+    time: wallTime,
     name: "test",
     instructions: "你是测试用的助手。",
     llm,
@@ -104,7 +106,7 @@ export async function withAgent(
       requests,
       faux,
       has: (type) => events.some((e) => e.type === type),
-      ask: (text) => agent.ask(userMessage(text)),
+      ask: (text) => agent.ask(userMessage(text, wallTime.now())),
     });
   } finally {
     await agent.close();

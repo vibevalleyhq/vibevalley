@@ -5,6 +5,7 @@ import { testDatabase } from "../../testing/layers.ts";
 import { add, begin, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
 import { dbStore, memoryStore } from "./taskStore.ts";
 import * as q from "../../../db/generated/agent_task.sql.ts";
+import { wallTime } from "../../base/time.ts";
 
 const ids = (g: readonly Task[]) => g.map((t) => t.id);
 
@@ -107,7 +108,7 @@ describe("an agent's task graph", () => {
   });
 
   const stores = Effect.map(SqlClient.SqlClient, (sql) => ({
-    database: (owner: string) => dbStore(sql, owner),
+    database: (owner: string) => dbStore(sql, owner, wallTime.now),
     memory: (_: string) => memoryStore(),
   }));
 
@@ -156,7 +157,7 @@ describe("an agent's task graph", () => {
             updated_at: 0,
           }),
         );
-      const got = yield* dbStore(sql, "s1").load;
+      const got = yield* dbStore(sql, "s1", wallTime.now).load;
       expect(got.map((t) => [t.id, t.after])).toEqual([
         ["bad", []],
         ["good", ["bad"]],

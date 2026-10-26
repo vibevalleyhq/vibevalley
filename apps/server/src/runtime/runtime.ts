@@ -9,7 +9,6 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { withinRealTime } from "../base/time.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -27,6 +26,7 @@ import { piBalance } from "./pi.ts";
 import { inCny, price, type Rate } from "./price.ts";
 import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
+import { timeHere, withinRealTime } from "../base/time.ts";
 
 /** Past this a probe counts as unknown. */
 const probeTimeoutMs = 10_000;
@@ -545,11 +545,14 @@ export const layer = (options: RuntimeOptions = {}) =>
       const config = yield* Settings;
       const sql = yield* SqlClient.SqlClient;
       const keys = yield* Setting;
+      const clock = yield* Clock.Clock;
+      const time = yield* timeHere;
       // It reads the DeepSeek key each session, so one saved meanwhile is used.
       const own = vibevalleyRuntimeOf({
         home: () => config.home,
         llm: (model) => deepseek(model, keys.deepseekApiKey),
-        tasks: (session) => dbStore(sql, session),
+        time,
+        tasks: (session) => dbStore(sql, session, () => clock.currentTimeMillisUnsafe()),
       });
       return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
     }),

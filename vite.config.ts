@@ -86,13 +86,6 @@ export default defineConfig({
         // Still reading the wall clock on their own: each takes a Time when it is converted, and leaves this list
         // (.agents/notes/proposed/testing/2026-10-26-fast-testable-server.md, step 7). Nothing is added to it.
         files: [
-          "apps/server/src/agent/brain/agent.ts",
-          "apps/server/src/agent/brain/compaction.ts",
-          "apps/server/src/agent/brain/memory.ts",
-          "apps/server/src/agent/brain/messages.ts",
-          "apps/server/src/agent/brain/openai.ts",
-          "apps/server/src/agent/brain/recurrences.ts",
-          "apps/server/src/agent/brain/taskStore.ts",
           "apps/server/src/connector/connector.ts",
           "apps/server/src/connector/qq.ts",
           "apps/server/src/connector/wait.ts",
