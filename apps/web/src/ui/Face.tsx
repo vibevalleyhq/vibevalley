@@ -1,5 +1,6 @@
 // Faces cut from the pixel drawings (public/pixel/sprites.json).
 
+import { appWording } from "../app/words";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
 import { castPrefix } from "../rules/cast";
@@ -82,7 +83,7 @@ export function OwnerFace(props: { size?: number }) {
       style={{ width: `${props.size ?? 24}px`, height: `${props.size ?? 24}px` }}
       aria-hidden="true"
     >
-      主
+      {appWording().owner}
     </span>
   );
 }

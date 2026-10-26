@@ -1,5 +1,6 @@
 // The dictation button every input row has.
 
+import { appWording } from "../app/words";
 import { onSettled } from "solid-js";
 import { dictation, insertDictated } from "./dictation";
 import { createExternal } from "../data/external";
@@ -24,16 +25,16 @@ export function DictationButton(props: {
   const off = () => ready(settings, undefined)?.dictation.url === "";
   const look = (): [string, string] =>
     off()
-      ? ["button-record", "听写还没配：在「声音」页的「听写」里填地址和模型"]
+      ? ["button-record", appWording().dictation.unset]
       : phase() === "recording"
-        ? ["button-stop", "在听…再点一下停"]
+        ? ["button-stop", appWording().dictation.recording]
         : phase() === "transcribing"
-          ? ["button-wait", "在认字…"]
-          : ["button-record", problem() ? `上次没认出来：${problem()}` : "听写：点一下开始说，再点一下停"];
+          ? ["button-wait", appWording().dictation.transcribing]
+          : ["button-record", problem() ? appWording().dictation.failed(problem() ?? "") : appWording().dictation.start];
   return (
     <button
       type="button"
-      aria-label={phase() === "recording" ? "停下听写" : "听写"}
+      aria-label={phase() === "recording" ? appWording().dictation.stop : appWording().dictation.label}
       title={look()[1]}
       disabled={off() || phase() === "transcribing"}
       onClick={() =>
