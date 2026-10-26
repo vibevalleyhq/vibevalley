@@ -9,14 +9,12 @@ import {
   type BlockAttrs,
   DeliverableValues,
   generalName,
-  type GraphAction,
   type Issue,
   IssueStatusValues,
   type Memory,
   orchestratorAgent,
   type RecurrenceWhen,
   type Review,
-  type TaskAction,
   type TaskEdit,
 } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
@@ -25,10 +23,10 @@ import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/rules.ts";
 import { inboxLines } from "../channel/rules.ts";
-import { Clock, Context, Data, Effect, FiberSet, Layer } from "effect";
+import { Clock, Context, Data, Effect, FiberSet, Layer, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
 import type { Actor } from "../base/actor.ts";
-import { effectTool, type Schema } from "../agent/brain/tool.ts";
+import { effectTool, type Schema as JsonSchema } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
 import { Docs } from "../doc/doc.ts";
 import { type ApiError, reasonOf } from "../errors.ts";
@@ -54,7 +52,13 @@ import {
   statusOf,
   tail,
 } from "./words.ts";
-import { schemas, sessionSchemas } from "./schemas.ts";
+import { parameters, schemas, sessionParameters, sessionSchemas } from "./schemas.ts";
+
+/** A tool's arguments as its Schema reads them. */
+type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
+type Session<K extends keyof typeof sessionParameters> = (typeof sessionParameters)[K]["Type"];
+/** The tools that name an issue and nothing else. */
+type IssueTool = "check" | "changes" | "stop" | "dismiss";
 
 /** Who is calling, at the moment of the call. */
 export interface Caller {
@@ -177,12 +181,18 @@ export const make = Effect.gen(function* () {
   /** An answer, or "没成：" and why. */
   const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed("没成：" + said(err)));
 
+  // A tool's arguments are read by its Schema before it runs; the model's JSON Schema is made from the same one.
   const toolOf =
-    (all: Record<string, Schema>) =>
-    <P>(name: string, description: string, body: (p: P) => Effect.Effect<string, unknown>) =>
-      effectTool<P>({ name, label: labels[name] ?? name, description, parameters: all[name]!, run: (p) => Effect.mapError(body(p), toError) }, runHere);
-  const tool = toolOf(schemas);
-  const sessionSchemaTool = toolOf(sessionSchemas);
+    <All extends { readonly [name: string]: Schema.Codec<unknown, unknown, never, never> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
+    <K extends keyof All & string>(name: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
+      const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[name]);
+      return effectTool<unknown>(
+        { name, label: labels[name] ?? name, description, parameters: shown[name], run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError) },
+        runHere,
+      );
+    };
+  const tool = toolOf(parameters, schemas);
+  const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas);
 
   // The orchestrator may name a session by its id, its name, or words that contain its name.
   const findSession = (key: string) => {
@@ -203,8 +213,8 @@ export const make = Effect.gen(function* () {
   });
   const withIssue = <E>(key: string, f: (t: Issue) => Effect.Effect<string, E>) =>
     Effect.flatMap(findIssue(key), (t) => (typeof t === "string" ? Effect.succeed(t) : f(t)));
-  const issueTool = <E>(name: string, description: string, f: (t: Issue) => Effect.Effect<string, E>) =>
-    tool(name, description, (p: { issue: string }) => withIssue(p.issue, f));
+  const issueTool = <E>(name: IssueTool, description: string, f: (t: Issue) => Effect.Effect<string, E>) =>
+    tool(name, description, (p) => withIssue(p.issue, f));
   /** The helper on the farm working the issue now, if any: its newest session. */
   const workerOf = (t: Issue) => {
     const last = t.sessions.at(-1);
@@ -334,7 +344,7 @@ export const make = Effect.gen(function* () {
       "在群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" +
         generalName +
         " 是默认的频道田头）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
-      Effect.fn("Tools.channel_say")(function* (p: { text: string; target?: string; anyway?: boolean; confirm?: boolean }) {
+      Effect.fn("Tools.channel_say")(function* (p: Session<"channel_say">) {
         const c = yield* callerOf(who);
         return spokenText(
           yield* chat.speak(participant(c), p.text, {
@@ -350,7 +360,7 @@ export const make = Effect.gen(function* () {
     tool(
       "read_chat",
       "读一个频道或一个串里说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
-      Effect.fn("Tools.read_chat")(function* (p: { target?: string; unread?: boolean; before?: number; limit?: number }) {
+      Effect.fn("Tools.read_chat")(function* (p: Orchestrator<"read_chat">) {
         const c = yield* callerOf(who);
         let where = p.target ?? "";
         // A session's default is its own thread, which the channel service fills in.
@@ -390,7 +400,7 @@ export const make = Effect.gen(function* () {
   const accept = tool(
     "accept",
     "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能完成；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
-    Effect.fn("Tools.accept")(function* (p: { issue: string; pass: boolean; findings?: string[]; text?: string }) {
+    Effect.fn("Tools.accept")(function* (p: Orchestrator<"accept">) {
       return yield* withIssue(p.issue, (t) =>
         issue.review(t.id, { pass: p.pass, ...(p.findings ? { findings: p.findings } : {}), ...(p.text ? { text: p.text } : {}) }).pipe(
           Effect.map((done) => (p.pass ? `#${done.number} 验收过了，等主人点完成` : `#${done.number} 没过验收，${openFindings(done)} 处要修，已经交回给帮工`)),
@@ -404,7 +414,7 @@ export const make = Effect.gen(function* () {
     tool(
       "tell",
       "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
-      Effect.fn("Tools.tell")(function* (p: { issue: string; message: string }) {
+      Effect.fn("Tools.tell")(function* (p: Orchestrator<"tell">) {
         const c = yield* callerOf(who);
         return yield* withIssue(p.issue, (t) => {
           const w = workerOf(t);
@@ -444,15 +454,7 @@ export const make = Effect.gen(function* () {
   const issuesTool = tool(
     "issues",
     "找工单、看一批工单：主人问「哪些在等我」（wants_owner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；填 issue 是看一张的全部。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
-    Effect.fn("Tools.issues")(function* (p: {
-      issue?: string;
-      status?: string;
-      wants_owner?: boolean;
-      project?: string;
-      text?: string;
-      closed?: boolean;
-      limit?: number;
-    }) {
+    Effect.fn("Tools.issues")(function* (p: Orchestrator<"issues">) {
       if (p.issue)
         return yield* withIssue(p.issue, (t) =>
           Effect.map(
@@ -488,17 +490,7 @@ export const make = Effect.gen(function* () {
     tool(
       "issue_create",
       "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
-      Effect.fn("Tools.issue_create")(function* (p: {
-        title: string;
-        description?: string;
-        project?: string;
-        agent?: string;
-        priority?: string;
-        draft?: boolean;
-        start?: boolean;
-        channel?: string;
-        deliver?: string;
-      }) {
+      Effect.fn("Tools.issue_create")(function* (p: Orchestrator<"issue_create">) {
         const c = yield* callerOf(who);
         if (p.draft && p.start) return "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。";
         let channel: Info;
@@ -555,16 +547,7 @@ export const make = Effect.gen(function* () {
     tool(
       "issue_update",
       "改一张工单：优先级、验收方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
-      Effect.fn("Tools.issue_update")(function* (p: {
-        issue: string;
-        title?: string;
-        description?: string;
-        project?: string;
-        agent?: string;
-        priority?: string;
-        acceptance?: string;
-        criteria?: string[];
-      }) {
+      Effect.fn("Tools.issue_update")(function* (p: Orchestrator<"issue_update">) {
         const c = yield* callerOf(who);
         return yield* withIssue(p.issue, (t) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
@@ -602,7 +585,7 @@ export const make = Effect.gen(function* () {
     tool(
       "issue_status",
       "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成：照工单交付，有提交就合进主分支或开 PR，没有改动不碰 git，keep_branch 是完成但分支留着不合；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
-      Effect.fn("Tools.issue_status")(function* (p: { issue: string; to: string; text?: string; agent?: string; keep_branch?: boolean }) {
+      Effect.fn("Tools.issue_status")(function* (p: Orchestrator<"issue_status">) {
         const c = yield* callerOf(who);
         const to = statusOf(p.to);
         if (!to) return noSuchStatus(p.to, ["backlog", "todo", "done", "canceled"]);
@@ -637,20 +620,7 @@ export const make = Effect.gen(function* () {
       "recurrence",
       "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
       Effect.fn("Tools.recurrence")(
-        function* (p: {
-          name: string;
-          text: string;
-          kind: string;
-          at?: string;
-          minutes?: number;
-          time?: string;
-          days?: number[];
-          cron?: string;
-          channel?: string;
-          agent?: string;
-          project?: string;
-          tz?: string;
-        }) {
+        function* (p: Orchestrator<"recurrence">) {
           const c = yield* callerOf(who);
           let channel = yield* chat.channelOf(c.here);
           if (p.channel) {
@@ -713,14 +683,14 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  const cancelRecurrence = tool("cancel_recurrence", "删掉一个定时（编号从 list_recurrences 看）。", (p: { id: string }) =>
+  const cancelRecurrence = tool("cancel_recurrence", "删掉一个定时（编号从 list_recurrences 看）。", (p: Orchestrator<"cancel_recurrence">) =>
     answered(Effect.map(recurrence.remove(p.id), (s) => "删掉了「" + s.name + "」。")),
   );
 
   const openChannel = tool(
     "open_channel",
     "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
-    Effect.fn("Tools.open_channel")(function* (p: { name: string; description?: string; project?: string }) {
+    Effect.fn("Tools.open_channel")(function* (p: Orchestrator<"open_channel">) {
       const c = yield* chat.openChannel(p.name, p.description ?? "", p.project ?? "");
       return "开好了 #" + c.name + (c.project ? "，默认项目 " + c.project : "") + "。";
     }),
@@ -729,7 +699,7 @@ export const make = Effect.gen(function* () {
   const channelSettings = tool(
     "channel_settings",
     "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
-    Effect.fn("Tools.channel_settings")(function* (p: { channel: string; description?: string; project?: string }) {
+    Effect.fn("Tools.channel_settings")(function* (p: Orchestrator<"channel_settings">) {
       const c = yield* chat.channelByName(p.channel);
       if (!c) return yield* refuse("没有 " + p.channel + " 这个频道");
       yield* chat.updateChannel(c.id, p.description, p.project);
@@ -741,13 +711,13 @@ export const make = Effect.gen(function* () {
     tool(
       "graph_split",
       "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-      Effect.fn("Tools.graph_split")(function* (p: { goal: string; project: string; agent?: string }) {
+      Effect.fn("Tools.graph_split")(function* (p: Orchestrator<"graph_split">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.split(p.goal, p.project, p.agent ?? "", c.actor));
       }),
     );
 
-  const graphsTool = tool("graphs", "列出计划：每件的状态、谁在做、结论。", (p: { id?: string }) =>
+  const graphsTool = tool("graphs", "列出计划：每件的状态、谁在做、结论。", (p: Orchestrator<"graphs">) =>
     Effect.sync(() => {
       const texts = tasks
         .graphs()
@@ -762,16 +732,7 @@ export const make = Effect.gen(function* () {
     tool(
       "task_edit",
       "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
-      Effect.fn("Tools.task_edit")(function* (p: {
-        graph: string;
-        task: string;
-        title?: string;
-        brief?: string;
-        needs?: string[];
-        agent?: string;
-        check?: string;
-        remove?: boolean;
-      }) {
+      Effect.fn("Tools.task_edit")(function* (p: Orchestrator<"task_edit">) {
         const by = (yield* callerOf(who)).actor;
         if (p.remove) return yield* answered(tasks.removeTask(p.graph, p.task, by));
         const edit: TaskEdit = {
@@ -789,7 +750,7 @@ export const make = Effect.gen(function* () {
     tool(
       "graph_action",
       "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 合进主分支（都做完以后，把计划的分支合进主分支）。",
-      Effect.fn("Tools.graph_action")(function* (p: { graph: string; action: GraphAction }) {
+      Effect.fn("Tools.graph_action")(function* (p: Orchestrator<"graph_action">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.act(p.graph, p.action, c.actor));
       }),
@@ -799,7 +760,7 @@ export const make = Effect.gen(function* () {
     tool(
       "task_action",
       "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
-      Effect.fn("Tools.task_action")(function* (p: { graph: string; task: string; action: TaskAction }) {
+      Effect.fn("Tools.task_action")(function* (p: Orchestrator<"task_action">) {
         const c = yield* callerOf(who);
         return yield* answered(tasks.taskAct(p.graph, p.task, p.action, c.actor));
       }),
@@ -809,10 +770,7 @@ export const make = Effect.gen(function* () {
     sessionSchemaTool(
       "issue_split",
       `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
-      Effect.fn("Tools.issue_split")(function* (p: {
-        title?: string;
-        tasks: { id: string; title?: string; brief: string; needs?: string[]; agent?: string; check?: string; scope?: string[]; acceptance?: boolean }[];
-      }) {
+      Effect.fn("Tools.issue_split")(function* (p: Session<"issue_split">) {
         const c = yield* callerOf(who);
         const steps = (p.tasks ?? []).map((t) => ({
           id: t.id,
@@ -833,7 +791,7 @@ export const make = Effect.gen(function* () {
       ? tool(
           "memory_search",
           "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
-          Effect.fn("Tools.memory_search")(function* (p: { query?: string; agent?: string; project?: string }) {
+          Effect.fn("Tools.memory_search")(function* (p: Orchestrator<"memory_search">) {
             const agent = (p.agent ?? "").trim() ? yield* profile(p.agent!) : "";
             const q = query({ text: p.query ?? "", project: (p.project ?? "").trim(), ...(agent ? { agent } : {}) });
             return foundText(yield* memory.search(q), q);
@@ -842,7 +800,7 @@ export const make = Effect.gen(function* () {
       : sessionSchemaTool(
           "memory_search",
           "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。只找这个项目的和所有项目都用的；all_projects 也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
-          Effect.fn("Tools.memory_search")(function* (p: { query?: string; all_projects?: boolean }) {
+          Effect.fn("Tools.memory_search")(function* (p: Session<"memory_search">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
             const q = query({ agent: c.agent, project: p.all_projects ? "" : c.project, text: p.query ?? "" });
@@ -855,7 +813,7 @@ export const make = Effect.gen(function* () {
       ? tool(
           "memory_add",
           "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
-          Effect.fn("Tools.memory_add")(function* (p: { agent: string; text: string; project?: string }) {
+          Effect.fn("Tools.memory_add")(function* (p: Orchestrator<"memory_add">) {
             const id = yield* profile(p.agent);
             const c = yield* callerOf(who);
             const m = yield* memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: c.actor });
@@ -865,7 +823,7 @@ export const make = Effect.gen(function* () {
       : sessionSchemaTool(
           "memory_add",
           "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。记这个项目的；all_projects 记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
-          Effect.fn("Tools.memory_add")(function* (p: { text: string; all_projects?: boolean; agent?: string }) {
+          Effect.fn("Tools.memory_add")(function* (p: Session<"memory_add">) {
             const c = yield* callerOf(who);
             if (!c.agent) return yield* refuse(notWorking);
             if (p.agent && p.agent !== c.agent) return yield* refuse("只能记进你自己的档案（" + c.agent + "），" + p.agent + " 的记性不归你写");
@@ -882,7 +840,7 @@ export const make = Effect.gen(function* () {
     sessionSchemaTool(
       "doc_read",
       "读一篇文档：每一块的 id、第几版、类型和字。改一块之前先读，doc_update 要用这里的 id 和版本。",
-      Effect.fn("Tools.doc_read")(function* (p: { doc: string }) {
+      Effect.fn("Tools.doc_read")(function* (p: Session<"doc_read">) {
         yield* callerOf(who);
         const snap = yield* docs.get(p.doc.trim());
         return ["《" + snap.doc.title + "》，" + snap.blocks.length + " 块：", ...snap.blocks.map(blockLine)].join("\n");
@@ -893,7 +851,7 @@ export const make = Effect.gen(function* () {
     sessionSchemaTool(
       "doc_append",
       "在文档末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 doc_update。",
-      Effect.fn("Tools.doc_append")(function* (p: { doc: string; text: string; type?: string; level?: number }) {
+      Effect.fn("Tools.doc_append")(function* (p: Session<"doc_append">) {
         const c = yield* callerOf(who);
         const type = (p.type ?? "").trim() || "paragraph";
         if (!appendTypes.includes(type)) return yield* refuse("块的类型只能是 " + appendTypes.join("、"));
@@ -909,7 +867,7 @@ export const make = Effect.gen(function* () {
     sessionSchemaTool(
       "doc_update",
       "把一块的字整段换成新的。base_rev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
-      Effect.fn("Tools.doc_update")(function* (p: { doc: string; block: string; base_rev: number; text: string }) {
+      Effect.fn("Tools.doc_update")(function* (p: Session<"doc_update">) {
         const c = yield* callerOf(who);
         const [, r] = yield* docs.updateText(p.doc.trim(), writer(c), p.block.trim(), Math.trunc(p.base_rev ?? 0), p.text);
         if (r?.status === "applied") return `改好了〔${r.blockId}〕，现在是第 ${r.rev} 版。`;

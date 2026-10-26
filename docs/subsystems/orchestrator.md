@@ -19,7 +19,7 @@
 ## 在哪
 
 - **`apps/server/src/orchestrator`**（`Orchestrator`）：`orchestrator.ts` 只放编排：每条输入经 `take` 进来，带着来源和路由（回答发到哪个对话、主人选的档案、是不是主人的原话、是哪张工单）；现状、频道的汇报、听巡查和计划的消息；向 `Sessions.host` 要一个 `AgentHost`，配上提示、工具和「话发到哪」。提示词是 `systemPrompt`、`agentPrompt`。`rules.ts` 是纯规则：意图表 `intake`（每种来源的开头、马上还是排队、记成什么触发）、现状的差异（`situationDelta`）、截长汇报（`orchestratorInboxLines`）、巡查的话（`patrolText`）；`evals.ts` 样例和评判。
-- **`apps/server/src/tool`**（`Tools`）：管家的 26 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`，参数的 Schema 在 `schemas.ts`），管家那张表的顺序是提示开头的一部分；`testdata/tool_schemas.json` 守着每个工具的参数。
+- **`apps/server/src/tool`**（`Tools`）：管家的 26 个工具和帮工经 `/mcp` 的 6 个各定义一次（`tool.ts`），参数在 `schemas.ts` 写成 Effect 的 Schema：工具的参数类型由它推出，模型拿到的参数先由它读，给模型看的 JSON Schema 也由它生成；管家那张表的顺序和每个工具参数的字节是提示开头的一部分，`testdata/parameters.json` 守着它们（`requiredOrder` 只为保住原来的次序）。
 - **`apps/server/src/agent/brain`**：自己的 agent（`agent.ts` 的 `Brain`，搭在 pi-agent-core 的 `Agent` 上；`session.ts` 对话文件、`compaction.ts` 压缩、`prefix.ts` 提示开头、`skills.ts`、`memory.ts`、`mcp.ts`、`reminders.ts` 提醒、`agentTask.ts`、`agentTaskStore.ts`、`agentTaskTools.ts` 帮手和自己的任务、`coding.ts` 编码工具、`self.ts`）；`runtime.ts` 把它包成 oar 的农机 `vibevalley`；`openai.ts` 是 OpenAI `chat/completions` 的协议。同一个包当帮工用时，`coding.ts` 提供读写和编辑文件、列目录、ripgrep、跑命令、抓网页，`self.ts` 提供 `spawn_agent`、`load_skill`，`agentTaskTools.ts` 提供自己的任务工具；管家不带编码工具和帮手。模型表和价格在 `apps/server/src/ai/models.ts`，流式和工具调用用 pi-ai。命令行 `apps/server/src/cli.ts` 不带命令时就是它。
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/orchestrator/`**（`orchestratorHome`）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
@@ -139,7 +139,7 @@
 - `apps/server/src/orchestrator/orchestrator.test.ts`（pi-ai 的假模型）：只接 DeepSeek 的模型；派活、在田头听主人的话（电话里的也是）；输入带着从哪来；字流给电话；起不来的原因只说一次；同一个 `sendKey` 只听一次；听到播种袋选的档案；长汇报截了再听；只在主人开口时合并；自己定的定时等主人同意；巡查只报一次；主人标做错的一轮存成样例。
 - `orchestrator/rules.test.ts`：现状的差异（大半变了就给全文）；截别人的长话、不截主人的；用量那一行字；每个来源的开头；巡查的说法和黄金数据。
 - 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter vibevalley-server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。
-- `tool/tool.test.ts`：管家每个工具的参数对照 `testdata/tool_schemas.json`；钱的说法；轨迹里工具的名字和说法。
+- `tool/tool.test.ts`：管家和帮工每个工具生成的参数逐字节对照 `testdata/parameters.json`；钱的说法；轨迹里工具的名字和说法。
 - `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束、照 OpenAI 的样子拒绝）、`tools.test.ts`。
 - `session/host.test.ts`：Caller 的监听器随 push、end、abort 清理；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 共享清理结果。
 - `agent/agent.test.ts`：管家是内置的档案。
