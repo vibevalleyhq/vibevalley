@@ -16,6 +16,7 @@ import { testConfig } from "../testing/layers.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
+import { TestClock } from "effect/testing";
 
 const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {}) =>
   defineRuntime({
@@ -170,7 +171,8 @@ describe("runtime", () => {
       );
     });
 
-  it.live("a usage read keeps its answer when a spend rebuilds what is shown meanwhile, and a late older one does not undo a newer", () => {
+  // The spend push waits spendPushAfterMs on the service's Clock: moved through, not waited for.
+  it.effect("a usage read keeps its answer when a spend rebuilds what is shown meanwhile, and a late older one does not undo a newer", () => {
     const out: ((u: AccountUsage) => void)[] = [];
     const used = (usedPercent: number) =>
       ({
@@ -195,6 +197,7 @@ describe("runtime", () => {
       yield* Effect.promise(() => until(() => out.length === 1));
       const shown = r.cached.get("pi");
       r.spend("pi", 1);
+      yield* TestClock.adjust(3_000);
       yield* Effect.promise(() => until(() => r.cached.get("pi") !== shown));
       out[0]!(used(40));
       yield* Effect.promise(() => read);
