@@ -83,64 +83,6 @@ export const updateChannel = Effect.fn("UpdateChannel")(function* (params: Updat
   })(params)
 })
 
-export const ChannelByNameParams = Schema.Struct({
-  ["name"]: Schema.NullOr(Schema.String),
-})
-export type ChannelByNameParams = typeof ChannelByNameParams.Type
-
-
-export const ChannelByNameResult = Schema.Struct({
-  ["id"]: Schema.String,
-})
-export type ChannelByNameResult = typeof ChannelByNameResult.Type
-
-
-export const ChannelByNameSql = "-- name: ChannelByName :one\nselect id from channel_conversation where name = $1 and kind in ('general', 'channel');"
-
-export const channelByName = Effect.fn("ChannelByName")(function* (params: ChannelByNameParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: ChannelByNameParams,
-    Result: ChannelByNameResult,
-    execute: (p) => sql.unsafe(ChannelByNameSql, [p["name"]]),
-  })(params)
-})
-
-export const ChannelsParams = Schema.Struct({
-
-})
-export type ChannelsParams = typeof ChannelsParams.Type
-
-
-export const ChannelsResult = Schema.Struct({
-  ["id"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["parent_id"]: Schema.NullOr(Schema.String),
-  ["parent_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["subject_kind"]: Schema.NullOr(Schema.String),
-  ["subject_id"]: Schema.NullOr(Schema.String),
-  ["last_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
-  ["reply_count"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["created_at"]: Schema.Number,
-  ["name"]: Schema.NullOr(Schema.String),
-  ["description"]: Schema.NullOr(Schema.String),
-  ["project"]: Schema.NullOr(Schema.String),
-  ["channel_id"]: Schema.NullOr(Schema.String),
-})
-export type ChannelsResult = typeof ChannelsResult.Type
-
-
-export const ChannelsSql = "-- name: Channels :many\n-- The general channel first.\nselect \"channel_conversation\".\"id\", \"channel_conversation\".\"kind\", \"channel_conversation\".\"parent_id\", \"channel_conversation\".\"parent_number\", \"channel_conversation\".\"subject_kind\", \"channel_conversation\".\"subject_id\", \"channel_conversation\".\"last_number\", \"channel_conversation\".\"reply_count\", \"channel_conversation\".\"created_at\", \"channel_conversation\".\"name\", \"channel_conversation\".\"description\", \"channel_conversation\".\"project\", \"channel_conversation\".\"channel_id\" from channel_conversation where kind in ('general', 'channel') order by case when kind = 'general' then 0 else 1 end, id;"
-
-export const channels = Effect.fn("Channels")(function* () {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: ChannelsParams,
-    Result: ChannelsResult,
-    execute: () => sql.unsafe(ChannelsSql, []),
-  })({})
-})
-
 export const CreateThreadParams = Schema.Struct({
   ["id"]: Schema.String,
   ["parent_id"]: Schema.NullOr(Schema.String),
@@ -163,13 +105,13 @@ export const createThread = Effect.fn("CreateThread")(function* (params: CreateT
   })(params)
 })
 
-export const ConversationByIDParams = Schema.Struct({
-  ["id"]: Schema.String,
+export const AllConversationsParams = Schema.Struct({
+
 })
-export type ConversationByIDParams = typeof ConversationByIDParams.Type
+export type AllConversationsParams = typeof AllConversationsParams.Type
 
 
-export const ConversationByIDResult = Schema.Struct({
+export const AllConversationsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["kind"]: Schema.String,
   ["parent_id"]: Schema.NullOr(Schema.String),
@@ -184,65 +126,18 @@ export const ConversationByIDResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["channel_id"]: Schema.NullOr(Schema.String),
 })
-export type ConversationByIDResult = typeof ConversationByIDResult.Type
+export type AllConversationsResult = typeof AllConversationsResult.Type
 
 
-export const ConversationByIDSql = "-- name: ConversationByID :one\nselect \"channel_conversation\".\"id\", \"channel_conversation\".\"kind\", \"channel_conversation\".\"parent_id\", \"channel_conversation\".\"parent_number\", \"channel_conversation\".\"subject_kind\", \"channel_conversation\".\"subject_id\", \"channel_conversation\".\"last_number\", \"channel_conversation\".\"reply_count\", \"channel_conversation\".\"created_at\", \"channel_conversation\".\"name\", \"channel_conversation\".\"description\", \"channel_conversation\".\"project\", \"channel_conversation\".\"channel_id\" from channel_conversation where id = $1;"
+export const AllConversationsSql = "-- name: AllConversations :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel_conversation\".\"id\", \"channel_conversation\".\"kind\", \"channel_conversation\".\"parent_id\", \"channel_conversation\".\"parent_number\", \"channel_conversation\".\"subject_kind\", \"channel_conversation\".\"subject_id\", \"channel_conversation\".\"last_number\", \"channel_conversation\".\"reply_count\", \"channel_conversation\".\"created_at\", \"channel_conversation\".\"name\", \"channel_conversation\".\"description\", \"channel_conversation\".\"project\", \"channel_conversation\".\"channel_id\" from channel_conversation order by id;"
 
-export const conversationByID = Effect.fn("ConversationByID")(function* (params: ConversationByIDParams) {
+export const allConversations = Effect.fn("AllConversations")(function* () {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: ConversationByIDParams,
-    Result: ConversationByIDResult,
-    execute: (p) => sql.unsafe(ConversationByIDSql, [p["id"]]),
-  })(params)
-})
-
-export const ThreadByParentParams = Schema.Struct({
-  ["parent_id"]: Schema.NullOr(Schema.String),
-})
-export type ThreadByParentParams = typeof ThreadByParentParams.Type
-
-
-export const ThreadByParentResult = Schema.Struct({
-  ["id"]: Schema.String,
-})
-export type ThreadByParentResult = typeof ThreadByParentResult.Type
-
-
-export const ThreadByParentSql = "-- name: ThreadByParent :one\nselect id from channel_conversation where parent_id = $1;"
-
-export const threadByParent = Effect.fn("ThreadByParent")(function* (params: ThreadByParentParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: ThreadByParentParams,
-    Result: ThreadByParentResult,
-    execute: (p) => sql.unsafe(ThreadByParentSql, [p["parent_id"]]),
-  })(params)
-})
-
-export const ThreadOfSubjectParams = Schema.Struct({
-  ["subject_kind"]: Schema.NullOr(Schema.String),
-  ["subject_id"]: Schema.NullOr(Schema.String),
-})
-export type ThreadOfSubjectParams = typeof ThreadOfSubjectParams.Type
-
-
-export const ThreadOfSubjectResult = Schema.Struct({
-  ["id"]: Schema.String,
-})
-export type ThreadOfSubjectResult = typeof ThreadOfSubjectResult.Type
-
-
-export const ThreadOfSubjectSql = "-- name: ThreadOfSubject :one\nselect id from channel_conversation where subject_kind = $1 and subject_id = $2 order by id desc limit 1;"
-
-export const threadOfSubject = Effect.fn("ThreadOfSubject")(function* (params: ThreadOfSubjectParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: ThreadOfSubjectParams,
-    Result: ThreadOfSubjectResult,
-    execute: (p) => sql.unsafe(ThreadOfSubjectSql, [p["subject_kind"], p["subject_id"]]),
-  })(params)
+  return yield* SqlSchema.findAll({
+    Request: AllConversationsParams,
+    Result: AllConversationsResult,
+    execute: () => sql.unsafe(AllConversationsSql, []),
+  })({})
 })
 
 export const RecentConversationsParams = Schema.Struct({

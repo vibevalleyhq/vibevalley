@@ -7,3 +7,6 @@ on conflict (participant_id, conversation_id) do update set read_number = greate
 
 -- name: ReadCursor :one
 select read_number from channel_read_cursor where participant_id = sqlc.arg(participant_id) and conversation_id = sqlc.arg(conversation_id);
+
+-- name: ReadCursorsOf :many
+select conversation_id, read_number from channel_read_cursor where participant_id = sqlc.arg(participant_id);

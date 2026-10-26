@@ -568,11 +568,15 @@ describe("the chat", () => {
         expect(
           yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
         ).toEqual([]);
+        // Nor is it read in what the chat shows next: what it kept in memory is read again from the database.
+        yield* f.chat.notice(general, "动静", "test");
+        expect(f.conversation(general)?.read).toBeUndefined();
         yield* drop(f.sql, "fail_receipt", "channel_seen_mark");
         yield* f.chat.markRead(general, message!.number);
         expect(
           yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
         ).toEqual([{ read_number: message!.number }]);
+        expect(f.conversation(general)?.read).toBe(message!.number);
       }),
     ),
   );
