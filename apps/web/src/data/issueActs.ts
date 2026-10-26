@@ -3,6 +3,7 @@
 // which open the box first, which open a dialog, what a reopen tells, and keeps the box, its words and the busy flag.
 // A page only says how it runs an act its own way (the farm's commands with their effects) and how it shows a failure.
 
+import { issuesWording } from "../pages/issues/words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct } from "@vibevalley/protocol";
@@ -62,7 +63,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
       const helper = got.sessions.at(-1);
       if (helper) {
         setText("");
-        ways.told("工单重开了", `${helper} 接着做。`);
+        ways.told(issuesWording().acts.reopened, issuesWording().acts.goesOn(helper));
       }
     });
   };
@@ -106,7 +107,11 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     act,
     /** What a button says: with its box open, what pressing it again does. */
     label: (a: IssueAct) =>
-      a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : (ways.words?.[a] ?? wording().act[a]),
+      a === "reject" && box() === "reject"
+        ? issuesWording().acts.rejectWith
+        : a === "tell" && box() === "tell"
+          ? issuesWording().acts.carry
+          : (ways.words?.[a] ?? wording().act[a]),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),
     /** 打回 with its box open is the red one. */

@@ -1,3 +1,4 @@
+import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
@@ -45,7 +46,7 @@ const criteriaList = (text: string) =>
 
 /** Moved to todo: it is either worked already, or waits there for room. */
 export const dispatchedNotice = (open: (id: string | undefined) => void) => (got: Issue) => {
-  if (got.status === "todo") toast("排上队了：空位都满了，有空位就自动开工。");
+  if (got.status === "todo") toast(issuesWording().todo.queued);
   else open(got.id);
 };
 
@@ -119,12 +120,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const said = (): [string, string] => {
     const by = drafting();
     return by
-      ? [`${by.name}在起草`, "它在读代码，写好了会填进下面各栏。"]
+      ? [issuesWording().todo.refining(by.name), issuesWording().todo.refiningLine]
       : questions().length > 0
-        ? [`草稿写好了，它有 ${questions().length} 个问题要问你`, "在下面回答，它照你的回答再起草一版。"]
+        ? [issuesWording().todo.questions(questions().length), issuesWording().todo.questionsLine]
         : refined()
-          ? ["草稿写好了", "看一遍、改一改，没问题就开工。"]
-          : ["想做什么？", "写一句就行：帮工读过代码，替你写成工单。"];
+          ? [issuesWording().todo.drafted, issuesWording().todo.draftedLine]
+          : [issuesWording().todo.what, issuesWording().todo.whatLine];
   };
 
   const draft = () => {
@@ -179,8 +180,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <input
         value={d().title}
         onInput={(e) => edit({ title: e.currentTarget.value })}
-        placeholder="比如：给登录页加上记住我"
-        aria-label="标题"
+        placeholder={issuesWording().todo.titleHint}
+        aria-label={issuesWording().todo.title}
         class="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-xl font-semibold outline-none placeholder:text-faint hover:border-line focus:border-focus"
       />
     </div>
@@ -192,23 +193,27 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         value={d().description}
         onInput={(e) => edit({ description: e.currentTarget.value })}
         rows={6}
-        placeholder="说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）"
-        aria-label="说明"
+        placeholder={issuesWording().todo.descriptionHint}
+        aria-label={issuesWording().todo.description}
         class="w-full resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-faint hover:border-line focus:border-focus"
       />
       <div class="mt-3 border-t border-line">
-        <Fold label="验收标准" summary={criteria().length === 0 ? "还没写" : `${criteria().length} 条 · ${criteria()[0]}`} open={criteria().length === 0}>
+        <Fold
+          label={issuesWording().todo.criteria}
+          summary={criteria().length === 0 ? issuesWording().todo.noCriteria : issuesWording().todo.criteriaSummary(criteria().length, criteria()[0] ?? "")}
+          open={criteria().length === 0}
+        >
           <TextArea
             rows={3}
             value={d().criteria}
             onInput={(e) => edit({ criteria: e.currentTarget.value })}
-            placeholder="一行一条：你验收时照着看的点"
-            aria-label="验收标准"
+            placeholder={issuesWording().todo.criteriaHint}
+            aria-label={issuesWording().todo.criteria}
           />
         </Fold>
       </div>
       <Show when={backlog()}>
-        <SheetLabel>和帮工聊清楚</SheetLabel>
+        <SheetLabel>{issuesWording().todo.talk}</SheetLabel>
         <Note tone={drafting() ? "water" : "wheat"}>
           <div class="text-base font-semibold">{said()[0]}</div>
           <div class="mt-1">{said()[1]}</div>
@@ -217,7 +222,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               <div class="mt-1.5">
                 <div>· {a.question}</div>
                 <Show when={a.options?.length}>
-                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={`回答：${a.question}`}>
+                  <div class="mt-1 flex flex-wrap gap-1.5 pl-3" role="group" aria-label={issuesWording().todo.answerTo(a.question)}>
                     <For each={a.options}>
                       {(o) => (
                         <Button disabled={busy()} onClick={() => setWord(o)}>
@@ -242,12 +247,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
               void draft();
             }
           }}
-          placeholder={questions().length > 0 ? "回答它的问题" : refined() ? "再起草时要它改什么（可以不写）" : "想做什么，一句话就行"}
-          aria-label="想做什么"
+          placeholder={questions().length > 0 ? issuesWording().todo.answerHint : refined() ? issuesWording().todo.againHint : issuesWording().todo.whatHint}
+          aria-label={issuesWording().todo.whatLabel}
         />
         <div class="mt-2.5">
           <Button tone={refined() ? "plain" : "primary"} disabled={!canRefine()} onClick={() => void draft()}>
-            {refined() ? "再起草" : "起草"}
+            {refined() ? issuesWording().todo.redraft : issuesWording().todo.draft}
           </Button>
         </div>
       </Show>
@@ -256,44 +261,44 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
   const side = (
     <>
-      <Property label="状态">
+      <Property label={issuesWording().todo.status}>
         <span class="flex items-center gap-2">
           <span class={["size-2 rounded-full", backlog() ? "bg-wheat" : "bg-water"]} />
-          {backlog() ? "草稿" : "待办"}
+          {backlog() ? issuesWording().todo.draftStatus : issuesWording().todo.todoStatus}
         </span>
       </Property>
-      <Property label="帮工">
+      <Property label={issuesWording().detail.helper}>
         <Pick
-          label="帮工"
+          label={issuesWording().detail.helper}
           value={d().agent}
-          placeholder="起草时替你挑"
+          placeholder={issuesWording().todo.pickForMe}
           onChange={(v) => edit({ agent: v })}
           options={agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name }))}
         />
       </Property>
-      <Property label="项目">
+      <Property label={issuesWording().task.project}>
         <Pick
-          label="项目"
+          label={issuesWording().task.project}
           value={d().project}
-          placeholder="在哪个项目里做"
+          placeholder={issuesWording().todo.whichProject}
           onChange={(v) => edit({ project: v })}
           options={[...new Set([...projects(), ...(d().project ? [d().project] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
       <button type="button" onClick={() => setNewProject(true)} class="mb-1 ml-[76px] cursor-pointer self-start text-xs text-water hover:underline">
-        {projects().length === 0 ? "还没有项目：新建一个" : "＋ 新建项目"}
+        {projects().length === 0 ? issuesWording().todo.firstProject : issuesWording().todo.newProjectLink}
       </button>
-      <Property label="优先级">
+      <Property label={issuesWording().todo.priority}>
         <Pick
-          label="优先级"
+          label={issuesWording().todo.priority}
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
           options={PriorityValues.map((p) => ({ value: p, label: wording().priority[p] }))}
         />
       </Property>
-      <Property label="交付">
+      <Property label={issuesWording().detail.deliver}>
         <Pick
-          label="交付"
+          label={issuesWording().detail.deliver}
           value={d().deliver}
           onChange={(v) => edit({ deliver: v as Deliverable })}
           options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
@@ -301,38 +306,43 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </Property>
       <More>
         {/* Every issue has an acceptance; this is who must pass it before it is completed. */}
-        <Property label="验收">
+        <Property label={issuesWording().detail.review}>
           <Pick
-            label="验收"
+            label={issuesWording().detail.review}
             value={d().acceptance}
             onChange={(v) => edit({ acceptance: v as Review })}
             options={[
-              { value: "glance", label: "看一眼就算" },
-              { value: "required", label: "必须过验收" },
+              { value: "glance", label: issuesWording().detail.glance },
+              { value: "required", label: issuesWording().detail.required },
             ]}
           />
         </Property>
-        <Property label="写于">{wallClockText(props.item.createdAt)}</Property>
+        <Property label={issuesWording().task.written}>{wallClockText(props.item.createdAt)}</Property>
       </More>
       <Show when={queued()}>
         {(at) => (
           <Note tone="water" class="mt-2 !p-2.5">
-            <div>排队中：{ago(at(), Date.now())}排上的，有空位就按看板上的先后自动开工。</div>
+            <div>{issuesWording().todo.inQueue(ago(at(), Date.now()))}</div>
             <Button class="mt-1.5" disabled={busy()} onClick={() => void unqueue()}>
-              不排了
+              {issuesWording().todo.unqueue}
             </Button>
           </Note>
         )}
       </Show>
       <div class="mt-4 flex flex-col gap-2">
         <Show when={backlog()}>
-          <Button tone={refined() ? "primary" : "plain"} disabled={!startable()} title={d().agent ? undefined : "先选好帮工"} onClick={() => void start()}>
-            开工
+          <Button
+            tone={refined() ? "primary" : "plain"}
+            disabled={!startable()}
+            title={d().agent ? undefined : issuesWording().todo.pickHelper}
+            onClick={() => void start()}
+          >
+            {issuesWording().todo.start}
           </Button>
         </Show>
         <Show when={queued() !== undefined}>
           <Button tone="primary" disabled={!canSave() || !d().agent} onClick={() => void tryNow()}>
-            现在就试
+            {issuesWording().todo.tryNow}
           </Button>
         </Show>
         <Button
@@ -343,10 +353,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             if (edit) void busyWith(async () => saved(await api.issue.update({ id, body: edit })));
           }}
         >
-          存下改动
+          {issuesWording().todo.save}
         </Button>
         <Button tone="quiet" disabled={busy()} onClick={() => void remove()}>
-          删掉
+          {issuesWording().todo.remove}
         </Button>
       </div>
       <Show when={newProject()}>
@@ -373,19 +383,19 @@ function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) =
     props.onMade(made.name);
   };
   return (
-    <Dialog open onClose={props.onClose} title="新建项目">
+    <Dialog open onClose={props.onClose} title={issuesWording().todo.newProject}>
       <TextInput
         ref={autofocus()}
         value={name()}
         onInput={(e) => setName(e.currentTarget.value)}
         onKeyDown={(e) => e.key === "Enter" && name().trim() && void make()}
-        placeholder="项目名，也是工作目录下的文件夹名"
-        aria-label="项目名"
+        placeholder={issuesWording().todo.projectHint}
+        aria-label={issuesWording().todo.projectName}
       />
       <div class="mt-5 flex justify-end gap-2">
-        <Button onClick={() => props.onClose()}>算了</Button>
+        <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
         <Button tone="primary" disabled={!name().trim()} onClick={() => void make()}>
-          新建
+          {issuesWording().todo.create}
         </Button>
       </div>
     </Dialog>
