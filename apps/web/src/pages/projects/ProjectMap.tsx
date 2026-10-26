@@ -2,6 +2,7 @@
 // worktrees, its empty plots room for more and the sacks at its gate what waits; a click opens the project, a helper's
 // plot its issue, an empty plot a seed for the project.
 
+import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
@@ -86,19 +87,19 @@ export function ProjectMap() {
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <span class="text-sm font-medium">
           {[
-            `${islands().length} 座岛`,
-            `${tally().peopled} 座有人`,
-            `在做 ${tally().working}/${maxRunning} 张`,
-            ...(tally().queued > 0 ? [`排队 ${tally().queued}`] : []),
+            projectsWording().map.islands(islands().length),
+            projectsWording().map.peopled(tally().peopled),
+            projectsWording().map.working(tally().working, maxRunning),
+            ...(tally().queued > 0 ? [projectsWording().map.queued(tally().queued)] : []),
           ].join(" · ")}
         </span>
         <span class="flex flex-wrap gap-x-4 gap-y-1">
           <For
             each={
               [
-                ["map-stake", "空位，点了派活"],
-                ["plot-locked", "空位都占着"],
-                ["map-sack", "排队的活"],
+                ["map-stake", projectsWording().map.stake],
+                ["plot-locked", projectsWording().map.locked],
+                ["map-sack", projectsWording().map.sack],
               ] as const
             }
           >
@@ -132,7 +133,7 @@ export function ProjectMap() {
             }
           >
             <Match when={!atlas() || (loading() && islands().length === 0)}>
-              <Quiet>在找……</Quiet>
+              <Quiet>{projectsWording().finding}</Quiet>
             </Match>
             <Match when={islands().length === 0}>
               <NoProjects />
@@ -143,7 +144,7 @@ export function ProjectMap() {
           </Show>
         </div>
       </div>
-      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={`派一件活 · ${sowing() ?? ""}`}>
+      <Dialog open={sowing() !== undefined} onClose={() => setSowing(undefined)} title={projectsWording().map.send(sowing() ?? "")}>
         <Show when={sowing()}>{(p) => <SowHere project={p()} onDone={() => setSowing(undefined)} />}</Show>
       </Dialog>
     </div>
@@ -310,7 +311,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                     const visit = () => go(router.navigate, h().id);
                     return (
                       <>
-                        <Placed sp={bed()} foot={foot()} scale={s()} onClick={visit} tip={tip()} label={`${h().name}的地`}>
+                        <Placed sp={bed()} foot={foot()} scale={s()} onClick={visit} tip={tip()} label={projectsWording().map.plot(h().name)}>
                           <Art sp={bed()} scale={s()} />
                         </Placed>
                         <Placed
@@ -350,7 +351,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                     scale={s()}
                     onClick={props.onSow}
                     tip={tip()}
-                    label={`空位，派一件活到 ${props.island.project}`}
+                    label={projectsWording().map.open(props.island.project)}
                   >
                     <Art sp={props.atlas.get("plot-empty")} scale={s()} />
                   </Placed>
@@ -359,7 +360,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   </Placed>
                 </Match>
                 <Match when={spot().kind === "shut"}>
-                  <Placed sp={props.atlas.get("plot-locked")} foot={foot()} scale={s()} tip={tip()} label="等地">
+                  <Placed sp={props.atlas.get("plot-locked")} foot={foot()} scale={s()} tip={tip()} label={projectsWording().map.wait}>
                     <Art sp={props.atlas.get("plot-locked")} scale={s()} />
                   </Placed>
                 </Match>
@@ -378,8 +379,8 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
                   foot={foot()}
                   scale={s()}
                   onClick={() => go(router.navigate, item.id)}
-                  tip={`排队：${item.title}`}
-                  label={`排队的活：${item.title}`}
+                  tip={projectsWording().map.queuedTip(item.title)}
+                  label={projectsWording().map.queuedLabel(item.title)}
                 >
                   <Art sp={sack()} scale={s()} />
                 </Placed>
@@ -393,7 +394,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
           }}
         </For>
       </div>
-      <button type="button" onClick={enter} aria-label={`进${props.island.project}的农场`} class="group cursor-pointer">
+      <button type="button" onClick={enter} aria-label={projectsWording().map.enter(props.island.project)} class="group cursor-pointer">
         <PixelCard
           center
           maxWidth={pic().w * s() - 24}
@@ -402,7 +403,7 @@ function IslandView(props: { island: Island; atlas: SpriteAtlas; scale: number; 
             [{ kind: "words", text: props.island.project, size: 14 }],
             [{ kind: "words", text: islandText(props.island), color: CardColors.muted }],
             [
-              { kind: "words", text: "进岛", color: CardColors.good },
+              { kind: "words", text: projectsWording().map.enterWord, color: CardColors.good },
               ...(props.atlas.has("button-next") ? [{ kind: "icon" as const, sprite: props.atlas.get("button-next"), px: 12 }] : []),
             ],
           ]}
@@ -416,7 +417,7 @@ function Homeless(props: { sessions: Session[] }) {
   const router = useRouter();
   return (
     <div class="mx-auto mt-4 flex w-fit flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 py-2">
-      <span class="text-xs text-muted">不在哪个项目里：</span>
+      <span class="text-xs text-muted">{projectsWording().map.homeless}</span>
       <For each={props.sessions}>
         {(h) => (
           <button type="button" onClick={() => go(router.navigate, h.id)} class="flex cursor-pointer items-center gap-1 text-sm underline">
@@ -432,7 +433,7 @@ function Homeless(props: { sessions: Session[] }) {
 function NoProjects() {
   return (
     <div class="mx-auto flex w-fit flex-col items-center gap-3 rounded-lg border border-line bg-page p-4">
-      <p class="text-sm text-muted">工作目录下还没有项目，地图上还是一片海。</p>
+      <p class="text-sm text-muted">{projectsWording().map.sea}</p>
     </div>
   );
 }
@@ -459,7 +460,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
     setBusy(true);
     try {
       const got = await writeIssue(text(), "", project);
-      if (got.refused) toast(`先没起草：${got.refused}`);
+      if (got.refused) toast(projectsWording().map.notDrafted(got.refused));
       props.onDone();
       go(router.navigate, got.issue.id);
     } catch (e) {
@@ -470,21 +471,21 @@ function SowHere(props: { project: string; onDone: () => void }) {
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-sm text-muted">种在 {props.project}：写一句要做的事，管家派帮工来干；或者先写成待办，看过再开工。</p>
+      <p class="text-sm text-muted">{projectsWording().map.sowIntro(props.project)}</p>
       <TextArea
         ref={autofocus()}
-        aria-label="要做的事"
+        aria-label={projectsWording().map.job}
         rows={4}
-        placeholder="比如：登录页加一个「记住我」"
+        placeholder={projectsWording().map.jobExample}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex justify-end gap-2">
         <Button disabled={busy() || !text().trim()} onClick={() => void write()}>
-          先写成待办
+          {projectsWording().map.todo}
         </Button>
         <Button tone="primary" disabled={busy() || !text().trim()} onClick={() => void send()}>
-          种下
+          {projectsWording().map.sow}
         </Button>
       </div>
     </div>
@@ -506,13 +507,13 @@ export function IslandDetail(props: { island: Island }) {
         <Icon name={`plot-${growth().crop}`} size={36} />
         <p class="text-sm text-muted">
           {!props.island.summary
-            ? "工作目录里没有这个项目了，只剩还在岛上的帮工。"
-            : `长势 · ${growth().label}${last() !== undefined ? ` · 最近一次提交：${since(last()!, now())}` : ""}`}
+            ? projectsWording().map.gone
+            : projectsWording().map.growth(growth().label, last() !== undefined ? since(last()!, now()) : undefined)}
         </p>
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-semibold text-muted">worktree · {taken().length} 个</span>
-        <Show when={taken().length > 0} fallback={<Quiet>岛上还没有帮工：每派一件活来，就多一个 worktree。</Quiet>}>
+        <span class="text-xs font-semibold text-muted">{projectsWording().map.worktrees(taken().length)}</span>
+        <Show when={taken().length > 0} fallback={<Quiet>{projectsWording().map.noHelpers}</Quiet>}>
           <For each={taken()}>
             {(t) => (
               <button
@@ -542,17 +543,17 @@ export function IslandDetail(props: { island: Island }) {
         <Icon name={open() > 0 ? "map-stake" : "plot-locked"} size={24} />
         <p class="text-sm text-muted">
           {!props.island.summary
-            ? "不再往这里派活。"
+            ? projectsWording().map.noMore
             : open() > 0
-              ? `还能再派 ${open()} 件活，马上开工（这个项目最多同时 ${props.island.maxSessions} 个帮工）。`
+              ? projectsWording().map.canSend(open(), props.island.maxSessions)
               : shut() > 0
-                ? `已经有 ${maxRunning} 张工单在做，派来的活先排队。`
-                : `满了：${props.island.maxSessions} 个帮工都在干活，派来的活先排队。`}
+                ? projectsWording().map.shut(maxRunning)
+                : projectsWording().map.full(props.island.maxSessions)}
         </p>
       </div>
       <Show when={props.island.queued.length > 0}>
         <div class="flex flex-col gap-1">
-          <span class="text-xs font-semibold text-muted">排队 · {props.island.queued.length} 件</span>
+          <span class="text-xs font-semibold text-muted">{projectsWording().map.queue(props.island.queued.length)}</span>
           <For each={props.island.queued}>
             {(item) => (
               <div class="flex items-center gap-2">
@@ -560,8 +561,8 @@ export function IslandDetail(props: { island: Island }) {
                 <span class="min-w-0 flex-1 truncate text-sm">{item.title}</span>
                 <button
                   type="button"
-                  title="看这张工单"
-                  aria-label="看这张工单"
+                  title={projectsWording().map.see}
+                  aria-label={projectsWording().map.see}
                   onClick={() => go(router.navigate, item.id)}
                   class="cursor-pointer rounded p-1 hover:bg-hover"
                 >
