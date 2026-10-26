@@ -27,7 +27,7 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 6. **手写了 Effect 已经有的**：`forever` 加 `sleep`（用 `Schedule`）、自己管 fiber 的集合（`FiberSet`、`FiberMap`）、手写解析 JSON 再 `as`（`Schema`）、自己数时间（`Clock`）。照仓库里已有的写法，不引进新的。
 7. **状态多存了一份**：页面或服务端在核心状态以外另存了帮工、工单的状态（AGENTS.md「核心状态只有一份」）。
 8. **封闭联合的长 `if`/`else`**：换成穷尽的 `switch` 或 `Record<X, …>`，加新成员时编不过。
-9. **多余的注释**：复述代码、写历史、写概述的（[docs/style/code.md](docs/style/code.md)「不建议写」）。
+9. **多余的注释**：复述代码、写历史、写概述的（[docs/style/code.md](docs/style/code.md)「不建议写」）；整块清的话交给 [vv-comments](.agents/skills/vv-comments/SKILL.md)。
 
 不算简化，不要提：
 

@@ -10,6 +10,10 @@
  *   a while is held until the test lets it go (testing/helper.ts's releaseHeld). setTimeout, setInterval, Effect.sleep
  *   and Playwright's waitForTimeout in a test are a guess at how long something takes: slow when it is quick, flaky when
  *   it is slow.
+ *
+ *   no-comment-divider: a comment does not title or fence off a stretch of code (docs/style/code.md). Only the divider
+ *   is recognised (a run of ─ ━ ═, or a comment of nothing but -=*#~_/); the comments a pattern cannot judge are
+ *   scripts/comment-review.ts's.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
@@ -62,4 +66,19 @@ const noTestSleep = defineRule({
   },
 });
 
-export default definePlugin({ meta: { name: "vibevalley" }, rules: { "no-wall-clock": noWallClock, "no-test-sleep": noTestSleep } });
+const noCommentDivider = defineRule({
+  meta: { messages: { divider: "a comment does not title or fence off code (docs/style/code.md): say why where it is not obvious, or nothing" } },
+  create(context) {
+    return {
+      Program() {
+        for (const comment of context.sourceCode.getAllComments())
+          if (/[─━═]{2}/.test(comment.value) || /^[-=*#~_/\s]{4,}$/.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+      },
+    };
+  },
+});
+
+export default definePlugin({
+  meta: { name: "vibevalley" },
+  rules: { "no-wall-clock": noWallClock, "no-test-sleep": noTestSleep, "no-comment-divider": noCommentDivider },
+});

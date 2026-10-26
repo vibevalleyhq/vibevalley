@@ -83,8 +83,6 @@ const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: strin
 
 export const issueBranch = (n: number) => `vibevalley/issue-${n}`;
 
-// ── what the code is ──
-
 /** Not what a project is written in: gitignore patterns, as tokei's --exclude takes them. */
 const leftOut = [
   "pnpm-lock.yaml",
@@ -186,8 +184,6 @@ const secondsOf = (text: string) => {
   const n = Number(text.trim());
   return text.trim() === "" || !Number.isFinite(n) || n <= 0 ? 0 : Math.trunc(n * 1000);
 };
-
-// ── GitHub ──
 
 const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/m;
 const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/;

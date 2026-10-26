@@ -51,7 +51,7 @@ description: 给 VibeValley 开、改、合 PR：先定这次的改动该是几�
 
 ## 5. 开、等、合
 
-1. 推之前跑和改动有关的检查（AGENTS.md 的「命令」），改了文档跑 `vp run docs:verify`。
+1. 推之前跑和改动有关的检查（AGENTS.md 的「命令」），改了文档跑 `vp run docs:verify`；改了代码，照 [vv-comments](.agents/skills/vv-comments/SKILL.md) 审一遍这个分支新加的注释。
 2. 正文写进一个临时文件，开 PR：
 
    ```bash

@@ -37,8 +37,6 @@ export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & 
   return t.deliver === "answer" ? answerOpening + "\n\n" + job + "\n\n" + answerFormat : job;
 }
 
-// ── an answer issue ──
-
 export const answerOpening =
   "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
@@ -222,8 +220,6 @@ export function refinementBrief(
   return lines.join("\n");
 }
 
-// ── the sowing form's templates ──
-
 const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
@@ -268,8 +264,6 @@ function firstBlank(text: string): TemplateBlank | undefined {
   const end = text.indexOf("〕", start);
   return end < 0 ? undefined : { start, end: end + 1 };
 }
-
-// ── the issue's story ──
 
 function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   switch (t.kind) {
@@ -332,8 +326,6 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   }, undefined);
   return { milestones, ...(spent ? { spent } : {}) };
 }
-
-// ── what an act says to the helper ──
 
 /** 接着做: a round that stopped halfway goes on. */
 export const resumeWords = "上一轮停在了半路，接着把它做完。";

@@ -478,8 +478,7 @@ export const make = (options: TaskOptions = {}) =>
       return "改好了";
     }, lock.withPermits(1));
 
-    // ── coming back: run by the startup, after the sessions came back and marked the runs that stopped with the server ──
-
+    // Run by the startup, after the sessions came back and marked the runs that stopped with the server.
     const comeBack = lock.withPermits(1)(
       Effect.gen(function* () {
         for (const graph of graphsOf(core.state())) {

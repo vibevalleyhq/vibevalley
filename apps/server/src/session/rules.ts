@@ -275,8 +275,6 @@ export function recalledIn(input: string): string {
 
 export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });
 
-// ── the workplace's outcome ──
-
 /** What a session is told when merging its base in would conflict. */
 export const conflictBrief = (base: string, files: readonly string[]) =>
   `把 ${base} 合进你的分支时有冲突（${files.join("、")}）。请在你的分支上运行 git merge ${base}，把冲突解决掉，跑一遍测试，再提交。结论里说清楚每个冲突是怎么取舍的。`;

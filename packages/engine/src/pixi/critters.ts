@@ -38,8 +38,6 @@ function flapper(frames: Flap, color: number) {
   };
 }
 
-// ── Flutterers ───────────────────────────────────────────────────────────────
-
 export interface FluttererOptions {
   /** Where each one lives: one per home. */
   readonly homes: readonly Point[];
@@ -83,8 +81,6 @@ export function flutterers(layer: Container, { homes, colors, frames, range = 24
     },
   };
 }
-
-// ── A flock flying over ──────────────────────────────────────────────────────
 
 export interface FlockOptions {
   readonly frames: Flap;
@@ -142,8 +138,6 @@ export function flocks(layer: Container, o: FlockOptions): Flocks {
     },
   };
 }
-
-// ── Blinkers ─────────────────────────────────────────────────────────────────
 
 export interface BlinkerOptions {
   readonly homes: readonly Point[];

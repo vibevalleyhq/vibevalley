@@ -53,6 +53,7 @@ export default defineConfig({
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
+      "vibevalley/no-comment-divider": "error",
       // [...text] splits by code point, on purpose (docs/style/code.md).
       "typescript/no-misused-spread": "off",
       // A copy before changing what is iterated, on purpose.
