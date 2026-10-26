@@ -1,10 +1,11 @@
 import { expect, test, vi } from "vite-plus/test";
+import type * as solid from "solid-js";
 import { createRoot, createSignal, flush } from "solid-js";
 import { QueryClient, type QueryObserverResult } from "@tanstack/solid-query";
 import { ready, useQuery } from "./query";
 
 // These tests exercise the real client reactive runtime without a DOM. Node otherwise selects Solid's SSR runtime.
-vi.mock("solid-js", () => vi.importActual<typeof import("solid-js")>("../../node_modules/solid-js/dist/solid.js"));
+vi.mock("solid-js", () => vi.importActual<typeof solid>("../../node_modules/solid-js/dist/solid.js"));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

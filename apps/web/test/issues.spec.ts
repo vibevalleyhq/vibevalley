@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import type { Agent, VibeValleyApi } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
@@ -28,7 +29,7 @@ const issue = (
   more: { description?: string; priority?: "urgent" | "high" | "medium" | "low"; project?: string; assignee?: string } = {},
 ) => api.issue.create({ body: { title, ...more } });
 
-const lane = (page: import("@playwright/test").Page, name: string) => page.getByRole("region", { name, exact: true });
+const lane = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
 
 test("a quick add shows the new issue in 待办 without a reload", async ({ page }) => {
   await page.goto("/issues");

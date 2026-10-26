@@ -7,7 +7,7 @@ import { Config, Effect, FileSystem, Option, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
-import { eventsPath, IssueStatusValues, statePath } from "@vibevalley/protocol";
+import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
 import { ApiError, type Endpoint, endpoints, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";

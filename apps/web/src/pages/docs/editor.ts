@@ -15,7 +15,7 @@ import {
   type DocSnapshot,
   type DocSpan,
   type Document,
-  VibeValleyApi,
+  type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { reasonOf } from "../../data/api";

@@ -4,7 +4,7 @@ import { isBusy } from "@vibevalley/protocol/rules";
 import { conversationOf, generalOf, messagesIn } from "./state.ts";
 import { head } from "../base/text.ts";
 import { wakeBreaker } from "./rules.ts";
-import { Effect, Layer, PubSub, Stream } from "effect";
+import { Effect, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
@@ -197,10 +197,7 @@ const news = (f: Farm) =>
     };
   });
 
-const run = <A, E>(
-  body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | import("effect").Scope.Scope>,
-  config?: Config,
-) => {
+const run = <A, E>(body: (f: Farm, x: FakeSessions) => Effect.Effect<A, E, Core | Channels | SqlClient.SqlClient | Scope.Scope>, config?: Config) => {
   const x = new FakeSessions();
   return Effect.flatMap(farm, (f) => body(f, x)).pipe(Effect.scoped, Effect.provide(world(x, config)));
 };

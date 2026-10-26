@@ -65,6 +65,8 @@ export default defineConfig({
       "typescript/no-floating-promises": "error",
       "typescript/only-throw-error": "error",
       "typescript/no-explicit-any": "error",
+      // A type imported as a value says the module is needed at run time when it is not.
+      "typescript/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

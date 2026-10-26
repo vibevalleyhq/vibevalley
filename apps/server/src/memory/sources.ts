@@ -4,7 +4,7 @@
 // in the log; writes to one go in the background, in order.
 
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
-import { Effect } from "effect";
+import { type Effect } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabels } from "./recall.ts";

@@ -9,7 +9,7 @@ import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
 import { untilGot as until } from "../testing/until.ts";
 import { activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, Projects, layer, tokeiArgs } from "./project.ts";
-import { MergeFailure } from "./shapes.ts";
+import { type MergeFailure } from "./shapes.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
