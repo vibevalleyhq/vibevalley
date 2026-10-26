@@ -79,8 +79,9 @@ class FakeWork implements TaskWork {
       return ["interrupted", ""];
     }
     if (id === "b" || id === "c") {
-      // b and c wait (a few seconds at most) until both have started: run side by side, they always overlap.
-      await whenTrue(() => this.started.has("b") && this.started.has("c"), "b and c both started");
+      // b and c wait (a few seconds at most) until both have started: run side by side, they always overlap. Past that
+      // they go on, as a run outliving its test (its farm already gone) must, rather than fail in another test.
+      await whenTrue(() => this.started.has("b") && this.started.has("c"), "b and c both started").catch(() => undefined);
     }
     if (id === "repro" && n === 1) {
       this.written.add("fix");
