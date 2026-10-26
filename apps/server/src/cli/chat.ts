@@ -108,7 +108,6 @@ export async function ownChat(values: OwnChat) {
   const asked = values.p !== undefined;
   // A one-off question keeps no reminders running.
   const agent = await Brain.start({
-    // The command line has no service to ask: the wall clock, Effect's own logger.
     time: wallTime,
     log: plainLog,
     name: values.name,

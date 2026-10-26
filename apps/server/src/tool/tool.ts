@@ -75,7 +75,7 @@ export interface Caller {
   readonly actor: Actor;
 }
 
-/** Says who is calling; a throw is told to the model as the tool's failure. */
+/** A throw here is told to the model as the tool's failure. */
 export type Who = () => Caller;
 
 export interface ToolShape {
@@ -151,7 +151,7 @@ const memoryWhere = (m: Memory) => (m.project ? "项目 " + m.project : "所有�
 
 const spaces = /\s+/g;
 
-/** What a tool says when it will not do what it was asked: told to the model as a failed result. */
+/** Told to the model as the tool's failed result: the message is what it reads. */
 export class ToolRefusal extends Data.TaggedError("ToolRefusal")<{ readonly message: string }> {}
 
 const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
@@ -160,7 +160,7 @@ const refuse = (message: string) => Effect.fail(new ToolRefusal({ message }));
 const toError = (e: unknown): Error => (e instanceof Error ? e : new Error(reasonOf(e as ApiError)));
 const said = (e: unknown) => toError(e).message;
 
-/** Who is calling; who throws for a caller nobody knows, which the model reads as the tool's failure. */
+/** who throws for a caller nobody knows: the model reads it as the tool's failure. */
 const callerOf = (who: Who) => Effect.try({ try: who, catch: (e) => new ToolRefusal({ message: said(e) }) });
 
 export const make = Effect.gen(function* () {

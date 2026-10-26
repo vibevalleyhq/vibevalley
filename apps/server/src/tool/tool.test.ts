@@ -8,8 +8,7 @@ import { toolStart } from "./tool.ts";
 import { spentText } from "./words.ts";
 
 describe("the tools", () => {
-  // The orchestrator's parameters are its prompt's prefix: made from their Schemas, they are the bytes they always were
-  // (testdata/parameters.json), and a session's too.
+  // The orchestrator's parameters are its prompt's prefix: the bytes in testdata/parameters.json must not drift.
   it("keep their parameters to the byte", () => {
     const kept = readFileSync(resolve(import.meta.dirname, "testdata/parameters.json"), "utf8");
     expect(JSON.stringify({ orchestrator: schemas, session: sessionSchemas })).toBe(kept);

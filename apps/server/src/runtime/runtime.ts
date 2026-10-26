@@ -410,7 +410,6 @@ export const make = (options: RuntimeOptions = {}) =>
       remember({ ...now, info: { ...now.info, usage, checkedAt: clock.currentTimeMillisUnsafe() } }, now.read);
     });
 
-    /** At most four runtimes asked at once; one that fails does not stop the others. */
     const each = (f: (id: string) => Effect.Effect<unknown>) =>
       Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id)), { concurrency: 4, discard: true });
 

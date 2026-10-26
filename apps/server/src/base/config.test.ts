@@ -8,7 +8,6 @@ import { type Config, dbDir, loadConfig, serverAddress } from "./config.ts";
 
 const temp = () => mkdtempSync(join(tmpdir(), "vibevalley-config-"));
 const load = (file: string, env: Record<string, string>) => Effect.runPromise(loadConfig(file, env).pipe(Effect.provide(NodeServices.layer)));
-/** Why it was refused. */
 const refused = (file: string, env: Record<string, string>) =>
   Effect.runPromise(Effect.flip(loadConfig(file, env)).pipe(Effect.provide(NodeServices.layer))).then((e) => e.message);
 
@@ -35,7 +34,6 @@ test("the defaults, then the file, then the environment", async () => {
   expect(dbDir(c)).toBe("memory");
   expect(c.recurrence.tickMs).toBe(20_000);
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "c@x, d@x,e@x" })).gitEmails).toEqual(["c@x", "d@x", "e@x"]);
-  // The farm's own name wins over the service's, and a value set empty is that value.
   expect((await load("", { ...env, VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm" })).deepseek.apiKey).toBe("sk-farm");
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "" })).gitEmails).toEqual([]);
 });

@@ -61,7 +61,6 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
       return yield* HttpClient.HttpClient;
     }).pipe(Effect.provide(FetchHttpClient.layer)),
   );
-  // The stub is the fetch the requests go through.
   const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
   const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
   const turn = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };

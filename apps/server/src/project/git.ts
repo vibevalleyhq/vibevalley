@@ -81,7 +81,6 @@ export const run = (command: string, args: readonly string[], options: RunOption
     return Effect.sync(killGroup);
   });
 
-/** git exited with code; the message is what it said on stderr. */
 export class GitError extends Data.TaggedError("GitError")<{ readonly code: number; readonly stderr: string; readonly message: string }> {
   static of(code: number, stderr: string) {
     return new GitError({ code, stderr, message: stderr.trim() || `git exited ${code}` });

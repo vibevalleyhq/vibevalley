@@ -14,7 +14,6 @@ import { type BuildSource, type FinishedRun, foundText, type Found, Memories, ma
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source, sourceError } from "./sources.ts";
 
-/** A source outside the farm, played: what it gives and what it was given, as a library would, in promises. */
 class Fake {
   available = true;
   lines: RecalledLine[] = [];
@@ -58,7 +57,7 @@ class Fake {
   };
 }
 
-/** The fake as the farm sees it: each call a request that interrupting aborts. */
+/** Interrupting the operation aborts the fake's request through the signal it was given. */
 const sourceOf = (f: Fake): Source => ({
   name: f.name,
   unavailable: () => f.unavailable(),

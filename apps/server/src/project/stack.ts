@@ -9,7 +9,6 @@ const empty: ProjectStack = { name: "", label: "" };
 const withCommands = (s: ProjectStack): ProjectStack =>
   Object.fromEntries(Object.entries(s).filter(([k, v]) => v !== "" || k === "name" || k === "label")) as ProjectStack;
 
-/** The files at a project's root that stackOf looks at. */
 export const stackFiles = [
   "go.mod",
   "Cargo.toml",

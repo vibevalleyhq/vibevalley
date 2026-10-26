@@ -79,6 +79,5 @@ export interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
 /** Runs an Effect to its answer on fibers someone owns; the signal interrupts it. */
 export type Runner = (effect: Effect.Effect<string, Error>, options: { readonly signal: AbortSignal }) => Promise<string>;
 
-/** A tool whose work is an Effect: the run's stop interrupts it, wherever it is. */
 export const effectTool = <P>(spec: EffectToolSpec<P>, runner: Runner): AgentTool =>
   textTool<P>({ ...spec, run: (params, tc) => runner(spec.run(params), { signal: tc.signal }) });

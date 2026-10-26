@@ -446,7 +446,6 @@ export const make = (options: ConnectorOptions = {}) =>
         return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.conversation.id;
       });
 
-      /** The app's send; a send that throws is a failure like the ones it says. */
       const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
         Effect.tryPromise({
           try: (signal) => adapter.send(signal, secrets, to, text, reply),
@@ -776,7 +775,7 @@ export const make = (options: ConnectorOptions = {}) =>
               return attempt;
             }),
           );
-          // Up to a moment for the code to show.
+          // The answer carries the code when it shows within a moment.
           const shown = Deferred.makeUnsafe<void>();
           const done = () => {
             if (attempt !== started || !progress || progress.qr) Deferred.doneUnsafe(shown, Effect.void);

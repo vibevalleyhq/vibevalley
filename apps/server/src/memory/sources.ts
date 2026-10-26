@@ -30,12 +30,12 @@ export interface EndedSession {
   readonly project: string;
 }
 
-/** Why a source did not answer: a service down, a bad answer, stopped. The caller logs it and goes on. */
+/** Why a source did not answer: a service down, a bad answer, stopped. */
 export class SourceError extends Data.TaggedError("SourceError")<{ readonly message: string }> {}
 
 export const sourceError = (e: unknown) => new SourceError({ message: e instanceof Error ? e.message : String(e) });
 
-/** A source. Interrupting one of its operations ends it: a source outside the farm aborts its request. */
+/** Interrupting one of its operations ends it: a source outside the farm aborts its request. */
 export interface Source {
   /** Prefixes the ids of the memories it gives, except the local one's. */
   readonly name: string;
@@ -312,7 +312,6 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         ),
       );
 
-    /** A failure, or a bug, as the line in the log that stands for it. */
     const logged =
       (line: (why: string) => string) =>
       <A, B>(e: Effect.Effect<A, SourceError>, otherwise: B): Effect.Effect<A | B> =>
@@ -321,7 +320,6 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
           Effect.catchCause((cause) => Effect.as(Effect.logWarning(line(Cause.pretty(cause))), otherwise)),
         );
 
-    /** Every source asked at once; one outside the farm that fails or takes past timeoutMs gives nothing, with a line in the log. */
     const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) =>
       Effect.forEach(
         all,

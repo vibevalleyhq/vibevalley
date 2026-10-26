@@ -1,6 +1,4 @@
-// Where one keeper's open tasks live, for the brain, which is Promise code. change applies f to the open graph and
-// keeps what it returns, all at once; a finished graph is put away and the keeper's open graph is empty again. It answers
-// the graph as kept, before putting it away, so the caller can still say how it ended.
+// change answers the graph as kept, then puts a finished one away: the caller can still say how it ended.
 
 import { Clock, Effect, FiberSet, Schema, type Scope } from "effect";
 import * as q from "../../../db/generated/agent_task.sql.ts";
@@ -28,8 +26,7 @@ const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({
   ...(r.tries ? { tries: r.tries } : {}),
 });
 
-/** The farm's database (agent_task), on fibers of the service that asks: they end with it, and its Clock stamps when a
- * graph changed and finished. A finished graph stays, stamped finished_at. */
+/** A finished graph stays, stamped finished_at: putting it away only empties the keeper's open graph. */
 export const dbStores: Effect.Effect<(keeper: string) => AgentTaskStore, never, Db | Scope.Scope> = Effect.gen(function* () {
   const db = yield* Db;
   const run = yield* FiberSet.makeRuntimePromise<never>();

@@ -1,10 +1,7 @@
-// The tools' parameters: each one's Schema, which types and reads the arguments a tool is given, and the JSON Schema the
-// model is shown, made from it. The orchestrator's are its prompt's prefix: change one only on purpose, with the
-// orchestrator's evals replayed; schemas.test.ts holds every one to the bytes it has always had. Unknown fields are let through.
-//
-// Two annotations keep those bytes where a Schema alone would say them otherwise: requiredOrder, the order the required
-// fields have always been listed in; and a struct that refuses fields it does not know (parseOptions) says so in the
-// JSON Schema too (additionalProperties false).
+// The model is shown these bytes: change a Schema only on purpose, with the orchestrator's evals replayed; tool.test.ts
+// holds every one to the bytes it has always had. Unknown fields are let through. requiredOrder is the order the required
+// fields have always been listed in, and a struct that refuses fields it does not know (parseOptions) says so in the JSON
+// Schema too (additionalProperties false).
 
 import { Schema } from "effect";
 import type { Schema as JsonSchema } from "../agent/brain/tool.ts";
@@ -222,8 +219,7 @@ export type Parameters = typeof sessionParameters;
 
 const safe = Number.MAX_SAFE_INTEGER;
 
-/** Effect's JSON Schema as the tools have always been written: keys in order but each object's properties, an integer
- * with no bounds, a nullable value as a type list, the annotations above applied. */
+/** Effect's JSON Schema, reshaped to the bytes the tools have always been written as. */
 const written = (node: unknown): unknown => {
   if (Array.isArray(node)) return node.map(written);
   if (typeof node !== "object" || node === null) return node;
@@ -260,7 +256,6 @@ const written = (node: unknown): unknown => {
   return out;
 };
 
-/** What the model is shown of a tool's parameters. */
 export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema =>
   Object.keys(parameters.fields).length === 0
     ? { additionalProperties: true, properties: {}, type: "object" }
@@ -271,7 +266,6 @@ export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>):
 const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(all: A): Record<keyof A & string, JsonSchema> =>
   Object.fromEntries(Object.entries(all).map(([name, p]) => [name, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
 
-/** The orchestrator's, by name. */
 export const schemas = shown(parameters);
 
 /** A session's: the orchestrator's, but where its own differs. */

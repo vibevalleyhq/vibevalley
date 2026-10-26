@@ -157,7 +157,6 @@ export class AgentHost<R> {
     runs: RunStore,
     /** The service's Clock: the streaming window and an eval case's time. */
     private readonly time: Time,
-    /** The service's logger, for the brain it starts. */
     private readonly log: CallbackLog,
   ) {
     this.journal = journal;
