@@ -18,6 +18,8 @@ export const ownerId = "owner";
 export const everyone = "everyone";
 
 /** The channel everyone is in. */
+// The general channel's stored name, which models and chat grammar also use; the owner reads wording().general.
+// oxlint-disable-next-line vibevalley/no-cjk-literal
 export const generalName = "田头";
 
 /** Sessions working at once; also the beds on the farm. */

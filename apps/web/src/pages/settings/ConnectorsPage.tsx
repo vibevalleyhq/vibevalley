@@ -1,9 +1,10 @@
 // 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
 // phone moves a login on without a reload.
 
+import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
+import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { channelLabel, channelsOf } from "../../rules/chat";
 import { momentText, wallClockText } from "../../rules/time";
@@ -16,38 +17,34 @@ import { Icon } from "../../ui/Icon";
 import { Qr } from "../../ui/Qr";
 import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../kit";
 
-export const connectorLabel: Record<ConnectorID, string> = { weixin: "微信", feishu: "飞书", qq: "QQ" };
-
-const connectorHow: Record<ConnectorID, string> = { weixin: "扫码登录，私聊机器人", feishu: "扫码自动建机器人", qq: "填 QQ 机器人的 AppID" };
-
-const connectorNotes: Record<ConnectorID, string[]> = {
-  weixin: [
-    "只认扫码的那个微信：别人给这个机器人发的话进不来。",
-    "帮工干完活，汇报马上发到微信上，不用等你先说话。微信偶尔不收时，汇报先攒着，隔一会儿再试（越隔越久，最多半小时），你下次说一句也会一起发过来（多了合成一条）。",
-    "用的是腾讯官方给机器人用的接口（和 OpenClaw 的微信插件一样）。",
-  ],
-  feishu: [
-    "扫码后，飞书会替你建一个只属于你的机器人应用，不用去开放平台手动配。",
-    "建好后在飞书里找到这个机器人，私聊它发配对码：发了码的人就是主人，只有主人的话进得来。只收私聊，群里的不收。",
-    "飞书的机器人可以随时给你发消息，汇报不用等你先说话。",
-  ],
-  qq: [
-    "QQ 没有扫码建机器人：先在 QQ 开放平台（q.qq.com）建一个机器人，打开「单聊」消息，把 AppID 和 AppSecret 填在这里。",
-    "用你自己的 QQ 加这个机器人，私聊它发配对码：发了码的人就是主人。只收私聊。",
-    "QQ 只让机器人在你说话后的一小段时间里回复。过了时间的汇报先攒着，隔一会儿再试，你下次说一句就一起发过来。",
-  ],
+export const connectorLabel: Record<ConnectorID, string> = {
+  weixin: settingsWording().connectors.label.weixin,
+  feishu: settingsWording().connectors.label.feishu,
+  qq: "QQ",
 };
 
-const connectorsAlways = "帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。VibeValley 只往外连，不开端口。";
+const connectorHow: Record<ConnectorID, string> = {
+  weixin: settingsWording().connectors.how.weixin,
+  feishu: settingsWording().connectors.how.feishu,
+  qq: settingsWording().connectors.how.qq,
+};
+
+const connectorNotes: Record<ConnectorID, string[]> = {
+  weixin: settingsWording().connectors.notes.weixin,
+  feishu: settingsWording().connectors.notes.feishu,
+  qq: settingsWording().connectors.notes.qq,
+};
+
+const connectorsAlways = settingsWording().connectors.always;
 
 export const stateLabel: Record<ConnectorState, string> = {
-  off: "没连接",
-  waiting: "等你扫码",
-  scanned: "已扫码，等手机确认",
-  verify: "要输入手机上的数字",
-  pairing: "等你发配对码",
-  connected: "已连接",
-  paused: "暂停中",
+  off: settingsWording().connectors.state.off,
+  waiting: settingsWording().connectors.state.waiting,
+  scanned: settingsWording().connectors.state.scanned,
+  verify: settingsWording().connectors.state.verify,
+  pairing: settingsWording().connectors.state.pairing,
+  connected: settingsWording().connectors.state.connected,
+  paused: settingsWording().connectors.state.paused,
 };
 
 const dot = (s: ConnectorState | undefined) => (s === "connected" ? "bg-leaf" : s === "pairing" || s === "paused" ? "bg-wheat" : "bg-cream-300");
@@ -70,8 +67,8 @@ export function ConnectorsPage(props: { id?: string }) {
   return (
     <Split
       list={
-        <ListCard title="连接器" label="连接器列表">
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">在聊天软件里和管家说话：派活、问进度、收汇报。</li>
+        <ListCard title={settingsWording().sections.connectors.label} label={settingsWording().connectors.list}>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{settingsWording().connectors.intro}</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
@@ -92,13 +89,13 @@ export function ConnectorsPage(props: { id?: string }) {
           when={list()}
           fallback={
             <Card title={connectorLabel[selected()]}>
-              <Quiet>在问服务端……</Quiet>
+              <Quiet>{settingsWording().asking}</Quiet>
             </Card>
           }
         >
           <Keyed key={selected()}>{() => <ConnectorCard id={selected()} status={of(selected()) ?? { id: selected(), state: "off", pending: 0 }} />}</Keyed>
         </Show>
-        <Card title="要知道的">
+        <Card title={settingsWording().connectors.know}>
           <ul class="flex flex-col gap-1.5">
             <For each={[...connectorNotes[selected()], connectorsAlways]}>
               {(n) => (
@@ -150,7 +147,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const disconnect = () => (
     <div>
       <Button tone="danger" disabled={busy()} onClick={() => void logout()}>
-        断开
+        {settingsWording().connectors.disconnect}
       </Button>
     </div>
   );
@@ -160,14 +157,10 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
       <Switch>
         <Match when={state() === "off"}>
           <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
-            <p class="text-sm">
-              {props.id === "weixin"
-                ? "用手机微信扫一个码，就能在微信里和管家说话：派活、问进度，帮工的汇报和提问也会发到微信上。"
-                : "用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和管家说话。"}
-            </p>
+            <p class="text-sm">{props.id === "weixin" ? settingsWording().connectors.weixinIntro : settingsWording().connectors.feishuIntro}</p>
             <div>
               <Button tone="primary" disabled={busy()} onClick={() => void login()}>
-                {label()}扫码登录
+                {settingsWording().connectors.scan(label())}
               </Button>
             </div>
           </Show>
@@ -176,25 +169,29 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
           <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => void login({ force: true })} onVerify={(code) => void verify(code)} />
         </Match>
         <Match when={state() === "pairing"}>
-          <p class="text-sm">机器人连上了。最后一步：用你自己的{label()}，私聊这个机器人，发：</p>
+          <p class="text-sm">{settingsWording().connectors.pairing(label())}</p>
           <div>
             <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">
               {props.status.pairCode ?? ""}
             </span>
           </div>
-          <p class="text-xs text-muted">发了这个码的人就是主人：以后只有这个人的话进得来。码只能用一次。</p>
+          <p class="text-xs text-muted">{settingsWording().connectors.pairingNote}</p>
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
-          <Row label="主人">{props.status.owner ?? ""}</Row>
-          <Row label="接在">
-            <ChannelPick id={props.id} current={props.status.channel ?? "田头"} />
+          <Row label={settingsWording().connectors.owner}>{props.status.owner ?? ""}</Row>
+          <Row label={settingsWording().connectors.channel}>
+            <ChannelPick id={props.id} current={props.status.channel ?? generalName} />
           </Row>
-          <Show when={props.status.since}>{(since) => <Row label="连上的时间">{momentText(since())}</Row>}</Show>
-          <Row label="上次收到你的话">{props.status.lastInbound !== undefined ? momentText(props.status.lastInbound) : "还没有"}</Row>
-          <Row label="等着发给你的">{props.status.pending > 0 ? `${Math.round(props.status.pending)} 条：你下次说话时一起发` : "没有"}</Row>
+          <Show when={props.status.since}>{(since) => <Row label={settingsWording().connectors.since}>{momentText(since())}</Row>}</Show>
+          <Row label={settingsWording().connectors.lastInbound}>
+            {props.status.lastInbound !== undefined ? momentText(props.status.lastInbound) : settingsWording().none}
+          </Row>
+          <Row label={settingsWording().connectors.pending}>
+            {props.status.pending > 0 ? settingsWording().connectors.pendingCount(Math.round(props.status.pending)) : settingsWording().connectors.noPending}
+          </Row>
           <Show when={state() === "paused" ? props.status.pausedUntil : undefined}>
-            {(until) => <p class="text-sm text-berry">登录过期了，{wallClockText(until())} 后再试；也可以断开重新连。</p>}
+            {(until) => <p class="text-sm text-berry">{settingsWording().connectors.paused(wallClockText(until()))}</p>}
           </Show>
           {disconnect()}
         </Match>
@@ -210,7 +207,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const [error, setError] = createSignal<string>();
   const options = () => {
-    const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? "田头", label: channelLabel(c) }));
+    const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? generalName, label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
     if (!all.some((o) => o.value === props.current)) all.push({ value: props.current, label: props.current });
     return all;
@@ -227,7 +224,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   };
   return (
     <span class="flex flex-wrap items-center gap-2">
-      <Select class="w-50" label="接在哪个频道" value={props.current} options={options()} onChange={(v) => void move(v)} />
+      <Select class="w-50" label={settingsWording().connectors.whichChannel} value={props.current} options={options()} onChange={(v) => void move(v)} />
       <Show when={error()}>
         <span class="text-xs text-berry">{error()}</span>
       </Show>
@@ -248,21 +245,26 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
       }}
     >
       <p class="text-sm">
-        在{" "}
+        {settingsWording().connectors.qqBefore}{" "}
         <a class="underline" href="https://q.qq.com/" target="_blank" rel="noreferrer">
-          QQ 开放平台
+          {settingsWording().connectors.qqPlatform}
         </a>{" "}
-        建一个机器人，打开单聊消息，把它的 AppID 和 AppSecret 填在这里。
+        {settingsWording().connectors.qqAfter}
       </p>
       <Field label="AppID">
         <TextInput aria-label="AppID" class="font-mono" placeholder="102xxxxxx" value={appId()} onInput={(e) => setAppId(e.currentTarget.value)} />
       </Field>
-      <Field label="AppSecret" hint="只存在这台电脑的数据库里，不会再显示。">
-        <SecretInput aria-label="AppSecret" placeholder="机器人密钥" value={secret()} onInput={(e) => setSecret(e.currentTarget.value)} />
+      <Field label="AppSecret" hint={settingsWording().connectors.secretHint}>
+        <SecretInput
+          aria-label="AppSecret"
+          placeholder={settingsWording().connectors.secret}
+          value={secret()}
+          onInput={(e) => setSecret(e.currentTarget.value)}
+        />
       </Field>
       <div>
         <Button type="submit" tone="primary" disabled={!canLogin()}>
-          连接 QQ 机器人
+          {settingsWording().connectors.connectQq}
         </Button>
       </div>
     </form>
@@ -273,17 +275,17 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
   const [code, setCode] = createSignal("");
   const say = () =>
     props.status.state === "waiting"
-      ? `用手机${props.app}扫这个码。`
+      ? settingsWording().connectors.scanWith(props.app)
       : props.status.state === "scanned"
-        ? "扫好了，在手机上点确认。"
+        ? settingsWording().connectors.scanned
         : props.status.state === "verify"
-          ? "输入手机上显示的数字："
+          ? settingsWording().connectors.digits
           : "";
   return (
     <div class="flex flex-wrap gap-5">
       <div class="flex size-56 items-center justify-center rounded-md border border-line bg-white p-2">
-        <Show when={props.status.qr} fallback={<span class="text-xs text-muted">在拿二维码……</span>}>
-          {(qr) => <Qr text={qr()} label={`${props.app}登录二维码`} />}
+        <Show when={props.status.qr} fallback={<span class="text-xs text-muted">{settingsWording().connectors.gettingQr}</span>}>
+          {(qr) => <Qr text={qr()} label={settingsWording().connectors.qr(props.app)} />}
         </Show>
       </div>
       <div class="flex max-w-md min-w-50 flex-col gap-3">
@@ -296,22 +298,28 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
               if (!props.busy && code().trim()) props.onVerify(code().trim());
             }}
           >
-            <TextInput aria-label="手机上的数字" placeholder="手机上的数字" value={code()} onInput={(e) => setCode(e.currentTarget.value)} />
+            <TextInput
+              aria-label={settingsWording().connectors.phoneDigits}
+              placeholder={settingsWording().connectors.phoneDigits}
+              value={code()}
+              onInput={(e) => setCode(e.currentTarget.value)}
+            />
             <Button type="submit" tone="primary" disabled={props.busy || !code().trim()}>
-              确定
+              {settingsWording().connectors.ok}
             </Button>
           </form>
         </Show>
         <Show when={props.status.qr}>
           {(qr) => (
             <p class="text-xs text-muted">
-              扫不了？在手机上打开这个链接：<TextLink href={qr()}>{qr()}</TextLink>
+              {settingsWording().connectors.cannotScan}
+              <TextLink href={qr()}>{qr()}</TextLink>
             </p>
           )}
         </Show>
         <div>
           <Button disabled={props.busy} onClick={() => props.onRefresh()}>
-            换一个码
+            {settingsWording().connectors.newCode}
           </Button>
         </div>
       </div>

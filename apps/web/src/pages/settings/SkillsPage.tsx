@@ -1,6 +1,7 @@
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
+import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
@@ -44,18 +45,26 @@ export function SkillsPage(props: { id?: string }) {
 
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <nav aria-label="技能书" class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto">
-        <h2 class="px-2 pt-1.5 text-base font-semibold">技能书</h2>
-        <TextInput aria-label="搜索技能" placeholder="搜名字、说明、农机……" value={query()} onInput={(e) => setQuery(e.currentTarget.value)} />
+      <nav aria-label={settingsWording().skills.book} class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto">
+        <h2 class="px-2 pt-1.5 text-base font-semibold">{settingsWording().skills.book}</h2>
+        <TextInput
+          aria-label={settingsWording().skills.search}
+          placeholder={settingsWording().skills.searchHint}
+          value={query()}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+        />
         <Show when={runtimes.error}>
-          <p class="px-2 text-xs text-berry">读不到农机：{reasonOf(runtimes.error)}</p>
+          <p class="px-2 text-xs text-berry">
+            {settingsWording().skills.noRuntimes}
+            {reasonOf(runtimes.error)}
+          </p>
         </Show>
-        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">这台电脑上装的 · {count(list().length, installed().length)}</h3>
+        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">{settingsWording().skills.installed(count(list().length, installed().length))}</h3>
         <Show when={installed().length === 0}>
-          <p class="px-2 text-xs text-muted">农机还没报告装了哪些技能（或者还在读）。</p>
+          <p class="px-2 text-xs text-muted">{settingsWording().skills.noneReported}</p>
         </Show>
         <Show when={installed().length > 0 && list().length === 0}>
-          <p class="px-2 text-xs text-muted">没有对得上的。</p>
+          <p class="px-2 text-xs text-muted">{settingsWording().skills.noMatch}</p>
         </Show>
         <ul class="flex flex-col gap-0.5">
           <For each={list()}>
@@ -70,9 +79,9 @@ export function SkillsPage(props: { id?: string }) {
           </For>
         </ul>
         <div class="flex items-center gap-2 px-2 pt-3">
-          <h3 class="flex-1 text-xs font-semibold text-muted">VibeValley 自己的 · {count(ownShown().length, own().length)}</h3>
+          <h3 class="flex-1 text-xs font-semibold text-muted">{settingsWording().skills.own(count(ownShown().length, own().length))}</h3>
           <A href={skillPath("new")} class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-leaf">
-            新技能
+            {settingsWording().skills.newSkill}
           </A>
         </div>
         <ul class="flex flex-col gap-0.5">
@@ -80,7 +89,7 @@ export function SkillsPage(props: { id?: string }) {
         </ul>
       </nav>
       <div class="min-w-0 flex-1 lg:overflow-y-auto">
-        <Switch fallback={<Quiet>还没有技能。</Quiet>}>
+        <Switch fallback={<Quiet>{settingsWording().skills.noSkills}</Quiet>}>
           <Match when={creating()}>
             <Keyed key="new">{() => <SkillEditor />}</Keyed>
           </Match>
@@ -113,12 +122,12 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
 function InstalledCard(props: { skill: InstalledSkill; catalog: readonly RuntimeInfo[] }) {
   return (
     <Card title={props.skill.name} class="max-w-3xl">
-      <p class="text-xs text-muted">装在农机上的技能：用这些农机的帮工会自己按需加载，不用在档案里勾。要改它，去它的文件里改。</p>
+      <p class="text-xs text-muted">{settingsWording().skills.installedNote}</p>
       <Show when={props.skill.description}>
         <p class="text-sm whitespace-pre-wrap">{props.skill.description}</p>
       </Show>
       <div class="flex flex-col gap-1.5">
-        <h3 class="text-xs font-semibold text-muted">哪些农机有它</h3>
+        <h3 class="text-xs font-semibold text-muted">{settingsWording().skills.where}</h3>
         <For each={props.skill.runtimes}>
           {(x) => (
             <div class="flex items-center gap-2.5 rounded-md bg-hover px-3 py-2">
@@ -179,55 +188,57 @@ function SkillEditor(props: { skill?: Skill }) {
 
   return (
     <Card
-      title={draft().name || "新技能"}
+      title={draft().name || settingsWording().skills.newSkill}
       class="max-w-3xl"
       action={
         <div class="flex flex-wrap items-center gap-2">
           <Show when={skill}>
             {(s) => (
-              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>删除</Button>}>
-                <span class="text-xs text-muted">{agents().length > 0 ? `${agents().length} 个 agent 在用，删掉会从它们身上去掉。` : "删掉？"}</span>
+              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{settingsWording().remove}</Button>}>
+                <span class="text-xs text-muted">
+                  {agents().length > 0 ? settingsWording().skills.inUse(agents().length) : settingsWording().skills.removeIt}
+                </span>
                 <Button tone="danger" disabled={busy()} onClick={() => void remove(s())}>
-                  删除
+                  {settingsWording().remove}
                 </Button>
-                <Button onClick={() => setSure(false)}>算了</Button>
+                <Button onClick={() => setSure(false)}>{settingsWording().never}</Button>
               </Show>
             )}
           </Show>
           <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
-            保存
+            {settingsWording().save}
           </Button>
         </div>
       }
     >
-      <Field label="名字">
+      <Field label={settingsWording().skills.name}>
         <TextInput
-          aria-label="技能名字"
-          placeholder="比如：先写测试"
+          aria-label={settingsWording().skills.nameLabel}
+          placeholder={settingsWording().skills.nameHint}
           value={draft().name}
           onInput={(e) => setDraft({ ...draft(), name: e.currentTarget.value })}
         />
       </Field>
-      <Field label="什么时候用" hint="一句话。按需加载技能的 runtime 先读这句，再决定要不要读正文。">
+      <Field label={settingsWording().skills.when} hint={settingsWording().skills.whenHint}>
         <TextInput
-          aria-label="技能说明"
-          placeholder="改行为之前，先补一个会失败的测试。"
+          aria-label={settingsWording().skills.description}
+          placeholder={settingsWording().skills.descriptionHint}
           value={draft().description}
           onInput={(e) => setDraft({ ...draft(), description: e.currentTarget.value })}
         />
       </Field>
-      <Field label="正文" hint="写成给 agent 看的指令（SKILL.md 的正文）。">
+      <Field label={settingsWording().skills.body} hint={settingsWording().skills.bodyHint}>
         <TextArea
-          aria-label="正文"
+          aria-label={settingsWording().skills.body}
           rows={14}
-          placeholder="改任何行为之前，先写一个能复现问题的测试……"
+          placeholder={settingsWording().skills.bodyExample}
           value={draft().body}
           onInput={(e) => setDraft({ ...draft(), body: e.currentTarget.value })}
         />
       </Field>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted">谁在用</span>
-        <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。</p>}>
+        <span class="text-xs font-medium text-muted">{settingsWording().skills.who}</span>
+        <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{settingsWording().skills.nobody}</p>}>
           <div class="flex flex-wrap gap-2">
             <For each={agents()}>
               {(a) => (
