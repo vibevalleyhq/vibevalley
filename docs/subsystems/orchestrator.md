@@ -63,7 +63,7 @@
 
 - 交给管家的话里，不是主人说的超过 800 字（UTF-16，`orchestratorLineMax`）只给前 800 字，后面写明这条有多少字、用 `read_chat` 读哪里（`#频道` 或 `#频道:消息号`）；主人的话照原样给。`read_chat` 给全文，`check` 给帮工上一轮汇报的结尾 2000 字。
 - 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`answerer("phone")`）带一句口语、一两句、先说结论的提示，回答边长边念。
-- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。MCP 和 OpenAI 的入口由 `HttpEffect.fromWebHandler` 适配，平台转发请求的中断和 typed failure；客户端断开时，等待中的请求处理器收到取消。MCP SDK 已启动的工作能否随之取消由 SDK 的取消接口决定。
+- **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。MCP 和 OpenAI 的入口由 `HttpEffect.fromWebHandler` 适配，平台转发请求的中断和 typed failure；客户端断开时，等待中的请求处理器收到取消；在管家开工前就已经断开的请求（电话线同样）不开工，什么都不交给模型。MCP SDK 已启动的工作能否随之取消由 SDK 的取消接口决定。
 
 **说话**：管家说的字边长边进它回话的那个频道（至多每 120 毫秒推一次），一句说完写成定稿；空的不发。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
 
