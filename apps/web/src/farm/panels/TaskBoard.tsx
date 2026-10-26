@@ -557,7 +557,7 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
 }
 
 const actorTone: Record<GraphEvent["actor"], [fill: string, ink: string]> = {
-  user: ["#74a046", "#f7e8c4"],
+  owner: ["#74a046", "#f7e8c4"],
   orchestrator: ["#efd08f", "#2f1f13"],
   session: ["#bfd7ea", "#2f1f13"],
   system: ["#e2c995", "#2f1f13"],

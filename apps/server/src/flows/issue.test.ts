@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
+import { owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
@@ -53,7 +54,7 @@ describe("an issue", () => {
       const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
       yield* w.nextReport;
       const before = mainLog();
-      yield* issues.setStatus(looked.issue!, "done", "", "");
+      yield* issues.setStatus(looked.issue!, "done", "", "", owner);
       const nothing = yield* closed(looked.issue!);
       expect([nothing.status, nothing.delivered, nothing.canceled]).toEqual(["done", "none", undefined]);
       const gone = yield* left(looked.id);
@@ -63,7 +64,7 @@ describe("an issue", () => {
       const kept = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const keptIssue = yield* issues.get(kept.issue!);
-      yield* issues.act(kept.issue!, { act: "keep" }, "");
+      yield* issues.act(kept.issue!, { act: "keep" }, "", owner);
       expect((yield* closed(kept.issue!)).delivered).toBe("kept");
       yield* left(kept.id);
       expect(mainLog()).toBe(before);
@@ -71,7 +72,7 @@ describe("an issue", () => {
 
       const completed = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
-      yield* issues.setStatus(completed.issue!, "done", "", "");
+      yield* issues.setStatus(completed.issue!, "done", "", "", owner);
       expect((yield* closed(completed.issue!)).delivered).toBe("merged");
       expect(mainLog()).not.toBe(before);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -136,10 +137,10 @@ describe("an issue", () => {
       const me = { ...lab(), workdir: "board" };
       yield* (yield* Agents).saveAgent(me);
       const issue = yield* issues.add({ title: "看看", assignee: me.id });
-      yield* issues.setStatus(issue.id, "todo", "", "");
+      yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       expect((yield* issues.get(issue.id)).project ?? "").toBe("");
-      yield* issues.setStatus(issue.id, "canceled", "", "");
+      yield* issues.setStatus(issue.id, "canceled", "", "", owner);
       const again = yield* Effect.result(issues.reopen(issue.id, "再看看", ""));
       expect(again._tag).toBe("Success");
       yield* w.nextReport;
@@ -160,7 +161,7 @@ describe("an issue", () => {
       const inState = (id: string) => core.state().issues?.find((x) => x.id === id);
       expect(inState(issue.id)?.title).toBe("写打卡并提交");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
-      issue = yield* issues.edit(issue.id, { project: "backlog", assignee: "lab" });
+      issue = yield* issues.edit(issue.id, { project: "backlog", assignee: "lab" }, owner);
       expect([issue.project, issue.assignee]).toEqual(["backlog", "lab"]);
       const got = yield* issues.start(issue.id, "");
       expect(got.session).toBeDefined();
@@ -170,7 +171,7 @@ describe("an issue", () => {
       expect([started.sessions, started.status]).toEqual([[got.session], "in_review"]);
       yield* until(() => inState(issue.id)?.sessions?.length === 1 && inState(issue.id)?.status === "in_review", "the core state follows its run");
       refusedWith(yield* Effect.flip(issues.start(issue.id, "")));
-      refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" })));
+      refusedWith(yield* Effect.flip(issues.edit(issue.id, { title: "改不了了" }, owner)));
 
       const unsent = (all: Issue[]) => all.filter((i) => (i.sessions ?? []).length === 0).map((i) => i.title);
       const a = yield* issues.add({ title: "一" });
@@ -260,8 +261,7 @@ describe("an issue", () => {
           project: "every",
           when: { kind: "every", minutes: 5 },
         },
-        "owner",
-        true,
+        owner,
       );
       const due = () => {
         now += 5 * 60_000 + 1;
@@ -303,9 +303,9 @@ describe("an issue", () => {
         assignee: "lab",
         priority: "high",
       });
-      issue = yield* issues.edit(issue.id, { title: "写打卡并提交" });
+      issue = yield* issues.edit(issue.id, { title: "写打卡并提交" }, owner);
       expect([issue.title, issue.description, issue.project, issue.assignee, issue.priority]).toEqual(["写打卡并提交", "每天一次", "demo", "lab", "high"]);
-      issue = yield* issues.edit(issue.id, { project: "" });
+      issue = yield* issues.edit(issue.id, { project: "" }, owner);
       expect([issue.project, issue.assignee]).toEqual([undefined, "lab"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -317,7 +317,7 @@ describe("an issue", () => {
       const w = yield* watch;
       const issues = yield* Issues;
       yield* (yield* Agents).saveAgent(lab());
-      const move = (id: string, to: Issue["status"], text = "") => issues.setStatus(id, to, text, "");
+      const move = (id: string, to: Issue["status"], text = "") => issues.setStatus(id, to, text, "", owner);
       let issue = yield* issues.add({ title: "写打卡并提交", project: "clock", assignee: "lab" });
       expect(issue.moves).toEqual(["todo", "canceled"]);
       refusedWith(yield* Effect.flip(move(issue.id, "in_progress")));
@@ -355,7 +355,7 @@ describe("an issue", () => {
       write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\necho merge-check-failed\nexit 1\n", 0o755);
       const project = join(f.config.workRoot, "projects", "clock");
       const before = git(project, "rev-parse", "main");
-      refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "")), "merge-check-failed");
+      refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "", owner)), "merge-check-failed");
       // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
       expect((yield* issues.get(helper.issue!)).status).not.toBe("done");
       yield* until(() => {
@@ -420,23 +420,23 @@ describe("an issue", () => {
       const chat = yield* Channels;
       yield* (yield* Agents).saveAgent(lab());
       const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
-      refusedWith(yield* Effect.flip(issues.act(drop.id, { act: "cure" }, "")), "现在不能「接着修」");
-      const dropped = yield* issues.act(drop.id, { act: "close" }, "");
+      refusedWith(yield* Effect.flip(issues.act(drop.id, { act: "cure" }, "", owner)), "现在不能「接着修」");
+      const dropped = yield* issues.act(drop.id, { act: "close" }, "", owner);
       expect(dropped.status).toBe("canceled");
       // Never sent: a reopen is back to the backlog, with nothing to tell.
-      expect((yield* issues.act("#" + drop.number, { act: "reopen" }, "")).status).toBe("backlog");
+      expect((yield* issues.act("#" + drop.number, { act: "reopen" }, "", owner)).status).toBe("backlog");
 
       const issue = yield* issues.add({ title: "这一单必败", project: "acts", assignee: "lab" });
-      yield* issues.act(String(issue.number), { act: "start" }, "");
+      yield* issues.act(String(issue.number), { act: "start" }, "", owner);
       yield* w.nextReport;
       yield* await_(
         () => issues.get(issue.id),
         (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
-      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "complete" }, "")), "现在不能「完成」");
-      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "")), "「带话」要说一句");
-      yield* issues.act("#" + issue.number, { act: "cure" }, "");
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "complete" }, "", owner)), "现在不能「完成」");
+      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "", owner)), "「带话」要说一句");
+      yield* issues.act("#" + issue.number, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
         () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
@@ -463,7 +463,7 @@ describe("an issue", () => {
       });
       expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/);
       expect([git(project, "log", "--format=%s", "main"), (yield* issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
-      yield* issues.setStatus(committed.issue!, "done", "", "");
+      yield* issues.setStatus(committed.issue!, "done", "", "", owner);
       const done = yield* await_(
         () => issues.get(committed.issue!),
         (i) => i.closedAt !== undefined,
@@ -497,7 +497,7 @@ describe("an issue", () => {
         deliver: "answer",
       });
       expect(asked.deliver).toBe("answer");
-      yield* issues.setStatus(asked.id, "todo", "", "");
+      yield* issues.setStatus(asked.id, "todo", "", "", owner);
       yield* w.nextReport;
       const answered = yield* await_(
         () => issues.get(asked.id),
@@ -513,7 +513,7 @@ describe("an issue", () => {
       expect(answered.attention.acts).toEqual(["acknowledge", "reject", "tell", "close"]);
       const branch = `vibevalley/issue-${answered.number}`;
       yield* until(() => git(project, "rev-parse", branch) === git(project, "rev-parse", "main"), "what it committed gone");
-      yield* issues.act(asked.id, { act: "acknowledge" }, "");
+      yield* issues.act(asked.id, { act: "acknowledge" }, "", owner);
       const done = yield* await_(
         () => issues.get(asked.id),
         (i) => i.closedAt !== undefined,
@@ -527,7 +527,7 @@ describe("an issue", () => {
         assignee: "lab",
         deliver: "answer",
       });
-      yield* issues.setStatus(garbled.id, "todo", "", "");
+      yield* issues.setStatus(garbled.id, "todo", "", "", owner);
       yield* w.nextReport;
       const stuck = yield* await_(
         () => issues.get(garbled.id),
@@ -535,8 +535,8 @@ describe("an issue", () => {
         "stuck: no answer read",
       );
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
-      refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "")), "这一轮没做成");
-      yield* issues.act(garbled.id, { act: "cure" }, "");
+      refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
+      yield* issues.act(garbled.id, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
       yield* until(
         () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
@@ -559,7 +559,7 @@ describe("an issue", () => {
       const issues = yield* Issues;
       yield* (yield* Agents).saveAgent(lab());
       const issue = yield* issues.add({ title: "这一单必败", project: "fails", assignee: "lab" });
-      yield* issues.setStatus(issue.id, "todo", "", "");
+      yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       const failed = yield* await_(
         () => issues.get(issue.id),
@@ -568,7 +568,7 @@ describe("an issue", () => {
       );
       expect(failed.status).toBe("in_review");
       expect(failed.moves).toEqual(["todo", "canceled"]);
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")), "这一轮没做成");
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
       refusedWith(yield* Effect.flip(issues.merge(issue.id)), "这一轮没做成");
       expect((yield* issues.get(issue.id)).closedAt).toBeUndefined();
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -590,7 +590,7 @@ describe("an issue", () => {
         review: "required",
       });
       expect(issue.review).toBe("required");
-      yield* issues.setStatus(issue.id, "todo", "", "");
+      yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       issue = yield* await_(
         () => issues.get(issue.id),
@@ -614,7 +614,7 @@ describe("an issue", () => {
         "handed back",
       );
       yield* until(() => crop() === "flowering", "抽穗：等验收");
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "")));
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)));
 
       yield* issues.review(issue.id, { pass: false, findings: ["再写版本B"] });
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
@@ -630,7 +630,7 @@ describe("an issue", () => {
 
       issue = yield* issues.review(issue.id, { pass: true });
       expect([issue.reviewedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
-      issue = yield* issues.setStatus(issue.id, "done", "", "");
+      issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
       expect(issue.status).toBe("done");
       expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

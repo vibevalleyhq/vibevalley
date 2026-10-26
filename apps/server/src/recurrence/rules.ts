@@ -1,7 +1,8 @@
 // When a recurrence runs: what is due, whether it was missed, what a run leaves, and
 // whether a recurrence waits for the owner's yes.
 
-import type { Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
+import type { Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
+import { actsForOwner, type Actor } from "../base/actor.ts";
 import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, recurrenceTime } from "./when.ts";
 import { Cron, DateTime } from "effect";
 
@@ -21,17 +22,12 @@ export const isMissed = (s: Recurrence, now: number) => now - (nextRun(s) ?? now
 export const afterRun = (s: Recurrence, now: number): Recurrence => ({ ...s, lastRun: now, enabled: s.when.kind === "once" ? false : s.enabled });
 
 /**
- * Whether a recurrence waits for the owner's yes before it can come due. The owner's own never waits, nor the orchestrator's when
- * the owner asked in this run. Without the owner, the orchestrator may only set itself a one-off follow-up: one that comes back
- * again, or sends a helper (who spends money) straight away, waits.
+ * Whether a recurrence waits for the owner's yes before it can come due. One set on the owner's word never waits. Without
+ * it, only a one-off follow-up for the asker itself goes ahead: one that comes back again, or sends a helper (who spends
+ * money) straight away, waits.
  */
-export function needsOK(req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean): boolean {
-  switch (by) {
-    case "owner":
-      return false;
-    case "orchestrator":
-      return ownerInRun ? false : req.when.kind !== "once" || (req.agent ?? "").trim() !== "";
-  }
+export function needsOK(req: RecurrenceRequest, by: Actor): boolean {
+  return !actsForOwner(by) && (req.when.kind !== "once" || (req.agent ?? "").trim() !== "");
 }
 
 export function recurrenceProblem(req: RecurrenceRequest, now: number): string {

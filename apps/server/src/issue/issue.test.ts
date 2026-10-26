@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { owner } from "../base/actor.ts";
 import { existsSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
@@ -227,7 +228,7 @@ describe("issues", () => {
       const kept = yield* issues.list();
       expect(kept).toHaveLength(1);
       expect(kept[0]).toMatchObject({ number: 1, title: "first work", sessions: [] });
-      expect((yield* Effect.result(issues.edit(kept[0]!.id, { project: "elsewhere" })))._tag).toBe("Failure");
+      expect((yield* Effect.result(issues.edit(kept[0]!.id, { project: "elsewhere" }, owner)))._tag).toBe("Failure");
       expect((yield* issues.get(kept[0]!.id)).project).toBe("demo");
       expect((yield* Effect.result(issues.remove(kept[0]!.id)))._tag).toBe("Failure");
       expect((yield* issues.list()).map((i) => i.id)).toEqual([kept[0]!.id]);
@@ -284,7 +285,7 @@ describe("issues", () => {
       const id = (yield* issues.get(issue.id)).refining!.session;
       const cwd = sessions.find(id)!.place.cwd;
       for (let n = 0; n < 2; n++) {
-        const result = yield* Effect.result(issues.setStatus(issue.id, "canceled", "", ""));
+        const result = yield* Effect.result(issues.setStatus(issue.id, "canceled", "", "", owner));
         expect(result._tag).toBe("Failure");
         expect(JSON.stringify(result)).toContain("did not stop");
         expect(sessions.sessionOf(id)).toBeDefined();
@@ -318,7 +319,7 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "draft", project: "demo", assignee: "lab" });
       yield* issues.refine(issue.id, "read the project", "");
       yield* until(() => started, "the drafting writer");
-      yield* issues.setStatus(issue.id, "canceled", "", "");
+      yield* issues.setStatus(issue.id, "canceled", "", "", owner);
       noWorktree(f.config.workRoot);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -513,7 +514,7 @@ describe("issues", () => {
       const repo = join(f.config.workRoot, "projects", "demo");
       renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
       expect((yield* Effect.flip(issues.previewStatus(hired.session!.issue!, "done", "")))._tag).toBe("Refused");
-      expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.general())))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.general(), owner)))._tag).toBe("Refused");
       const after = yield* issues.get(hired.session!.issue!);
       expect([after.status, after.delivered]).toEqual(["in_review", undefined]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -529,12 +530,12 @@ describe("issues", () => {
       yield* sessions.dismiss(first.session!.id);
       const second = yield* issues.hire(lab(), "second", "demo", { issue: id });
       expect(second.session).toBeDefined();
-      yield* issues.changes(id, "owner");
+      yield* issues.changes(id, owner);
       expect((yield* Effect.exit(issues.merge(id)))._tag).toBe("Failure");
       expect(sessions.find(second.session!.id)).toBeDefined();
       yield* issues.cancel(id);
       expect(sessions.find(second.session!.id)).toBeUndefined();
-      expect((yield* Effect.exit(issues.changes(id, "owner")))._tag).toBe("Failure");
+      expect((yield* Effect.exit(issues.changes(id, owner)))._tag).toBe("Failure");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -579,11 +580,7 @@ describe("issues", () => {
       yield* (yield* Agents).saveAgent(lab());
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
-      const sc = yield* recurrences.add(
-        { name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } },
-        "owner",
-        true,
-      );
+      const sc = yield* recurrences.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
       // Ten minutes on, the tick finds it due, and missed.
       clock.now += 10 * 60_000;
       yield* recurrences.tick;
@@ -632,14 +629,15 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "write hello", assignee: "lab", project: "demo" });
       const inReview = (n: number) =>
         until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
-      yield* issues.setStatus(issue.id, "todo", "", chat.general());
+      yield* issues.setStatus(issue.id, "todo", "", chat.general(), owner);
       yield* inReview(1);
       const [first] = (yield* issues.get(issue.id)).sessions;
-      const refused = (to: "done" | "todo", agent: string) => Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.general(), { agent })), reasonOf);
+      const refused = (to: "done" | "todo", agent: string) =>
+        Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.general(), owner, { agent })), reasonOf);
       expect(yield* refused("done", "lab2")).toContain("换人是挪到待办时的事");
       expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的帮工档案");
 
-      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), { agent: "Lab Two" });
+      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), owner, { agent: "Lab Two" });
       expect([handed.assignee, handed.sessions.length, handed.closedAt]).toEqual(["lab2", 2, undefined]);
       expect(sessions.find(first!)).toBeUndefined();
       const second = (yield* sessions.get(handed.sessions[1]!))!;
@@ -658,9 +656,11 @@ describe("issues", () => {
       yield* agents.saveAgent(lab());
       yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "work on", assignee: "lab", project: "demo" });
-      yield* issues.setStatus(issue.id, "todo", "", chat.general());
+      yield* issues.setStatus(issue.id, "todo", "", chat.general(), owner);
       yield* until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");
-      expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.general(), { agent: "lab2" })))).toContain("先叫停，等它停下再换人");
+      expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.general(), owner, { agent: "lab2" })))).toContain(
+        "先叫停，等它停下再换人",
+      );
       expect((yield* issues.get(issue.id)).sessions).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

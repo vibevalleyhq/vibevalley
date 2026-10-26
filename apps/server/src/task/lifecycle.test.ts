@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { owner } from "../base/actor.ts";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { scriptedRuntime } from "@botiverse/oar/testing";
@@ -46,7 +47,7 @@ describe("a task's workplace", () => {
         createdAt: Date.now(),
         tasks: [{ id: "only", title: "one step", brief: "write fixed work", needs: [], state: "waiting", tries: 0, agent: "lab", check: "test -f fixed.txt" }],
       });
-      yield* tasks.act("p1", "start", "user");
+      yield* tasks.act("p1", "start", owner);
       yield* until(() => tasks.graphs()[0]?.state === "ready", "the same session fixing its rejected work");
       expect(turns).toBe(2);
       expect(tasks.graphs()[0]!.tasks[0]).toMatchObject({ state: "merged", tries: 1 });
@@ -105,7 +106,7 @@ describe("a task's workplace", () => {
         ],
       });
       yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(release, "release\n")));
-      yield* tasks.act("p1", "start", "user");
+      yield* tasks.act("p1", "start", owner);
       yield* until(() => existsSync(started), "acceptance checking the worktree");
       const session = tasks.graphs()[0]!.tasks[0]!.session!;
       const delivery = yield* Effect.forkScoped(sessions.deliver(session, "unverified followup", { kind: "comment" }));

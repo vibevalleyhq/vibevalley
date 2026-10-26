@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { orchestrator, owner } from "../base/actor.ts";
 import type { Recurrence, RecurrenceRequest, RecurrenceWhen } from "@vibevalley/protocol";
 import { RecurrenceWhenWeekly } from "@vibevalley/protocol/schema";
 import { nextText } from "./when.ts";
@@ -53,12 +54,12 @@ test("what waits for the owner's yes", () => {
   const once: RecurrenceWhen = { kind: "once", at: at("2026-10-12T12:00:00") };
   const daily: RecurrenceWhen = { kind: "daily", time: "09:00" };
   const req = (when: RecurrenceWhen, agent?: string) => ({ name: "", text: "", when, ...(agent !== undefined ? { agent } : {}) }) as RecurrenceRequest;
-  expect(needsOK(req(daily, "lab"), "owner", false)).toBe(false);
-  expect(needsOK(req(daily, "lab"), "orchestrator", true)).toBe(false);
-  expect(needsOK(req(once), "orchestrator", false)).toBe(false);
-  expect(needsOK(req(daily), "orchestrator", false)).toBe(true);
-  expect(needsOK(req(once, "lab"), "orchestrator", false)).toBe(true);
-  expect(needsOK(req(once, " "), "orchestrator", false)).toBe(false);
+  expect(needsOK(req(daily, "lab"), owner)).toBe(false);
+  expect(needsOK(req(daily, "lab"), orchestrator(true))).toBe(false);
+  expect(needsOK(req(once), orchestrator(false))).toBe(false);
+  expect(needsOK(req(daily), orchestrator(false))).toBe(true);
+  expect(needsOK(req(once, "lab"), orchestrator(false))).toBe(true);
+  expect(needsOK(req(once, " "), orchestrator(false))).toBe(false);
 });
 
 /** The farm with recurrences on a clock turned by hand. */
@@ -87,7 +88,7 @@ describe("recurrences", () => {
         const chat = yield* Channels;
         const due = yield* collect;
         const general = chat.general();
-        const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), "owner", true);
+        const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), owner);
         expect([made.channel, made.name, made.enabled, made.tz !== ""]).toEqual([general, "看进度", true, true]);
         expect(core.state().recurrences?.map((x) => x.id)).toEqual([made.id]);
         yield* s.tick;
@@ -101,16 +102,16 @@ describe("recurrences", () => {
         expect([last.kind, last.text]).toEqual(["notice", "⏰ 定时「看进度」到点了：看看帮工们的进度"]);
         expect(s.list()[0]!.enabled).toBe(false);
         yield* s.tick;
-        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), "owner", true))).toMatchObject({
+        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "lab" }), owner))).toMatchObject({
           reason: expect.stringContaining("默认项目"),
         });
-        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), "owner", true))).toMatchObject({
+        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { agent: "nobody" }), owner))).toMatchObject({
           reason: expect.stringContaining("没有叫 nobody"),
         });
-        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { channel: "elsewhere" }), "owner", true))).toMatchObject({
+        expect(yield* Effect.flip(s.add(req("x", "y", { kind: "every", minutes: 5 }, { channel: "elsewhere" }), owner))).toMatchObject({
           reason: expect.stringContaining("elsewhere"),
         });
-        const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", project: "demo" }), "owner", true);
+        const every = yield* s.add(req("巡检", "跑一遍检查", { kind: "every", minutes: 5 }, { agent: "lab", project: "demo" }), owner);
         expect([every.agent, every.project]).toEqual(["lab", "demo"]);
         everyId = every.id;
         yield* s.setEnabled(every.id, false);
@@ -143,7 +144,7 @@ describe("recurrences", () => {
       const s = yield* Recurrences;
       const core = yield* Core;
       const sql = yield* SqlClient.SqlClient;
-      const made = yield* s.add(req("retry", "work", { kind: "once", at: clock.now + 1 }), "owner", true);
+      const made = yield* s.add(req("retry", "work", { kind: "once", at: clock.now + 1 }), owner);
       const due = yield* collect;
       yield* sql.unsafe(`create function fail_run() returns trigger language plpgsql as $$ begin raise exception 'write failed'; end $$`).pipe(Effect.orDie);
       yield* sql.unsafe(`create trigger fail_run before update of last_run on recurrence for each row execute function fail_run()`).pipe(Effect.orDie);
@@ -164,10 +165,10 @@ describe("recurrences", () => {
     return Effect.gen(function* () {
       const s = yield* Recurrences;
       const bad = req(" fractional ", "work", { kind: "weekly", days: [1.5], time: "09:00" });
-      expect((yield* Effect.flip(s.add(bad, "owner", true)))._tag).toBe("Refused");
+      expect((yield* Effect.flip(s.add(bad, owner)))._tag).toBe("Refused");
       expect(s.list()).toEqual([]);
       expect(Schema.decodeUnknownExit(RecurrenceWhenWeekly)(bad.when)._tag).toBe("Failure");
-      expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), "owner", true)).when).toEqual({
+      expect((yield* s.add(req("weekly", "work", { kind: "weekly", days: [0, 6], time: "09:00" }), owner)).when).toEqual({
         kind: "weekly",
         days: [0, 6],
         time: "09:00",
@@ -182,8 +183,8 @@ describe("recurrences", () => {
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const s = yield* Recurrences;
-        id = (yield* s.add(req("早会", "看看昨天的活", { kind: "cron", expr: "0 9 * * 1-5" }, { tz: "Asia/Shanghai" }), "owner", true)).id;
-        expect((yield* Effect.flip(s.add(req("坏的", "t", { kind: "cron", expr: "0 9 * *" }), "owner", true)))._tag).toBe("Refused");
+        id = (yield* s.add(req("早会", "看看昨天的活", { kind: "cron", expr: "0 9 * * 1-5" }, { tz: "Asia/Shanghai" }), owner)).id;
+        expect((yield* Effect.flip(s.add(req("坏的", "t", { kind: "cron", expr: "0 9 * *" }), owner)))._tag).toBe("Refused");
       }).pipe(Effect.scoped, Effect.provide(farm(config, clock)));
       yield* Effect.gen(function* () {
         expect((yield* Recurrences).list().map((x) => [x.id, x.when])).toEqual([[id, { kind: "cron", expr: "0 9 * * 1-5" }]]);
@@ -230,7 +231,7 @@ describe("recurrences", () => {
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const s = yield* Recurrences;
-        const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), "orchestrator", false);
+        const made = yield* s.add(req("每五分钟", "看看", { kind: "every", minutes: 5 }), orchestrator(false));
         expect([made.enabled, made.pending, made.by, nextText(made)]).toEqual([false, true, "orchestrator", "等主人同意"]);
         id = made.id;
         const due = yield* collect;

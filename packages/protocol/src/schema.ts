@@ -476,7 +476,7 @@ export const RecurrenceWhen: Codec<T.RecurrenceWhen> = Schema.Union([
   RecurrenceWhenCron,
 ]);
 
-export const RecurrenceBy: Codec<T.RecurrenceBy> = Schema.Literals(T.RecurrenceByValues);
+export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const Recurrence: Codec<T.Recurrence> = Schema.Struct({
   id: Schema.String,
@@ -490,7 +490,7 @@ export const Recurrence: Codec<T.Recurrence> = Schema.Struct({
   enabled: Schema.Boolean,
   created: Schema.Number,
   lastRun: Schema.optionalKey(Schema.Number),
-  by: RecurrenceBy,
+  by: ActorKind,
   pending: Schema.optionalKey(Schema.Boolean),
   whenText: Schema.optionalKey(Schema.String),
   nextText: Schema.optionalKey(Schema.String),
@@ -1020,8 +1020,6 @@ export const LedgerEntry: Codec<T.LedgerEntry> = Schema.Union([
 
 export const GraphEventKind: Codec<T.GraphEventKind> = Schema.Literals(T.GraphEventKindValues);
 
-export const GraphActor: Codec<T.GraphActor> = Schema.Literals(T.GraphActorValues);
-
 export const TaskFieldChange: Codec<T.TaskFieldChange> = Schema.Struct({
   field: Schema.String,
   from: Schema.String,
@@ -1033,7 +1031,7 @@ export const GraphEvent: Codec<T.GraphEvent> = Schema.Struct({
   graph: Schema.String,
   task: Schema.optionalKey(Schema.String),
   kind: GraphEventKind,
-  actor: GraphActor,
+  actor: ActorKind,
   session: Schema.optionalKey(SessionId),
   detail: Schema.optionalKey(Schema.String),
   changes: Schema.optionalKey(Schema.mutable(Schema.Array(TaskFieldChange))),
@@ -1234,14 +1232,12 @@ export const ArchiveListing: Codec<T.ArchiveListing> = Schema.Struct({
 
 export const MemoryKind: Codec<T.MemoryKind> = Schema.Literals(T.MemoryKindValues);
 
-export const MemoryAuthor: Codec<T.MemoryAuthor> = Schema.Literals(T.MemoryAuthorValues);
-
 export const Memory: Codec<T.Memory> = Schema.Struct({
   id: Schema.String,
   agent: Schema.String,
   kind: MemoryKind,
   text: Schema.String,
-  author: Schema.optionalKey(MemoryAuthor),
+  author: Schema.optionalKey(ActorKind),
   project: Schema.optionalKey(Schema.String),
   session: Schema.optionalKey(SessionId),
   at: Schema.Number,

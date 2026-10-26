@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { orchestrator, owner } from "../base/actor.ts";
 import type { Agent, Changes, Session, TaskGraph } from "@vibevalley/protocol";
 import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { inbox } from "../notice/inbox.ts";
@@ -222,7 +223,7 @@ const farm = Effect.gen(function* () {
       () => `task ${id} to get there: ${JSON.stringify(graphOf(core.state(), id))}`,
       8_000,
     );
-  const split = (goal: string, project: string) => Effect.map(tasks.split(goal, project, "", "user"), (said) => /（(p\d+)）/.exec(said)![1]!);
+  const split = (goal: string, project: string) => Effect.map(tasks.split(goal, project, "", owner), (said) => /（(p\d+)）/.exec(said)![1]!);
   return { core, issues, tasks, work, git, states, news, until, split };
 });
 
@@ -273,14 +274,14 @@ describe("task graphs", () => {
         expect(preview.does).toEqual([`从计划「${draft.title}」删掉「${taskOf(draft, "b")!.title}」这一步`, `「${taskOf(draft, "d")!.title}」不再等它`]);
         expect((yield* f.until(id, () => true)).tasks.map((n) => n.id)).toEqual(["a", "b", "c", "d"]);
         // An act the draft does not allow is refused with the ones it does, as commands.
-        expect(yield* Effect.flip(f.tasks.act(id, "pause", "user"))).toMatchObject({
+        expect(yield* Effect.flip(f.tasks.act(id, "pause", owner))).toMatchObject({
           next: [
             { say: "开工", run: ["graph", "act", id, "--json", '{"action":"start"}'] },
             { say: "放弃", run: ["graph", "act", id, "--json", '{"action":"abandon"}'] },
           ],
         });
-        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, "orchestrator");
-        expect(yield* f.tasks.act(id, "start", "user")).toContain("开工了，分支 vibevalley/task-" + id + "-");
+        yield* f.tasks.editTask(id, "d", { check: "test -f steps/b.txt && test -f steps/c.txt && test -f steps/d.txt" }, orchestrator(true));
+        expect(yield* f.tasks.act(id, "start", owner)).toContain("开工了，分支 vibevalley/task-" + id + "-");
         const ready = yield* f.until(id, (g) => g.state === "ready");
         const mine = f.states.filter((g) => g.id === id);
         expect(mine.some((g) => state(g, "b") === "working" && state(g, "c") === "working")).toBe(true);
@@ -288,7 +289,7 @@ describe("task graphs", () => {
         expect([state(d, "b"), state(d, "c")]).toEqual(["merged", "merged"]);
         for (const n of ready.tasks)
           expect([n.state, (n.commits ?? []).length > 0, n.conclusion, n.session]).toEqual(["merged", true, "写好了 steps/" + n.id + ".txt", undefined]);
-        expect(yield* f.tasks.act(id, "merge", "user")).toContain("合进了 diamond 的 main");
+        expect(yield* f.tasks.act(id, "merge", owner)).toContain("合进了 diamond 的 main");
         yield* f.until(id, (g) => g.state === "done");
         const history = yield* f.tasks.events(id);
         expect(
@@ -296,7 +297,7 @@ describe("task graphs", () => {
             .filter((e) => !e.task)
             .map((e) => e.kind + "/" + e.actor)
             .join(" "),
-        ).toBe("splitting/user drafted/system started/user ready/system merged/user");
+        ).toBe("splitting/owner drafted/system started/owner ready/system merged/owner");
         const edit = history.find((e) => e.kind === "task_edited")!;
         expect([edit.task, edit.actor, edit.actorText, edit.changes?.length, edit.changes?.[0]?.field]).toEqual(["d", "orchestrator", "管家", 1, "检查"]);
         expect(edit.text).toMatch(/^改了「.+」的检查$/);
@@ -320,7 +321,7 @@ describe("task graphs", () => {
         const id = yield* f.split("验收先行", "bug");
         const draft = yield* f.until(id, (g) => g.state === "draft");
         expect([isAcceptance(taskOf(draft, "repro")!), isAcceptance(taskOf(draft, "fix")!)]).toEqual([true, false]);
-        yield* f.tasks.act(id, "start", "user");
+        yield* f.tasks.act(id, "start", owner);
         const ready = yield* f.until(id, (g) => g.state === "ready");
         const repro = taskOf(ready, "repro")!;
         const fix = taskOf(ready, "fix")!;
@@ -345,7 +346,7 @@ describe("task graphs", () => {
       Effect.gen(function* () {
         const id = yield* f.split("有坏步", "shaky");
         yield* f.until(id, (g) => g.state === "draft");
-        yield* f.tasks.act(id, "start", "user");
+        yield* f.tasks.act(id, "start", owner);
         let stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && state(g, "flaky") === "merged");
         expect([taskOf(stuck, "boom")!.tries, taskOf(stuck, "flaky")!.tries, taskOf(stuck, "boom")!.failures]).toEqual([2, 1, 1]);
         expect(
@@ -353,22 +354,22 @@ describe("task graphs", () => {
             (e) => e.kind === "task_sent_back" && e.task === "flaky" && e.actor === "system" && (e.detail ?? "").includes("没通过"),
           ),
         ).toBe(true);
-        yield* f.tasks.taskAct(id, "boom", "retry", "user");
+        yield* f.tasks.taskAct(id, "boom", "retry", owner);
         stuck = yield* f.until(id, (g) => state(g, "boom") === "failed" && taskOf(g, "boom")!.failures === 2);
         expect(inbox(f.core.state()).map((c) => c.id)).toContain(id + ":failed:boom:2");
         const after = taskOf(stuck, "after")!;
         expect([after.state, blockedBy(stuck, after), stuck.state]).toEqual(["waiting", ["boom"], "running"]);
-        expect(yield* Effect.flip(f.tasks.taskAct(id, "nope", "skip", "user"))).toMatchObject({
+        expect(yield* Effect.flip(f.tasks.taskAct(id, "nope", "skip", owner))).toMatchObject({
           _tag: "Missing",
           what: expect.stringContaining("没有「nope」"),
         });
-        expect(yield* f.tasks.taskAct(id, "boom", "skip", "user")).toContain("跳过了");
+        expect(yield* f.tasks.taskAct(id, "boom", "skip", owner)).toContain("跳过了");
         const ready = yield* f.until(id, (g) => g.state === "ready");
         expect(ready.tasks.map((n) => n.state)).toEqual(["skipped", "merged", "merged"]);
-        const said = yield* f.tasks.act(id, "abandon", "user");
+        const said = yield* f.tasks.act(id, "abandon", owner);
         const gone = yield* f.until(id, (g) => g.state === "abandoned");
         expect(said).toContain("分支 " + gone.branch + " 留着");
-        expect(yield* Effect.flip(f.tasks.act(id, "merge", "user"))).toMatchObject({ reason: expect.stringContaining("不能合进主分支") });
+        expect(yield* Effect.flip(f.tasks.act(id, "merge", owner))).toMatchObject({ reason: expect.stringContaining("不能合进主分支") });
       }),
     ),
   );
@@ -379,12 +380,12 @@ describe("task graphs", () => {
         const id = yield* f.split("先给个圈", "circle");
         const draft = yield* f.until(id, (g) => g.state === "draft");
         expect([draft.title, draft.tasks.map((n) => n.id)]).toEqual(["改好了", ["fixed"]]);
-        expect(yield* Effect.flip(f.tasks.editTask(id, "fixed", { needs: ["fixed"] }, "user"))).toMatchObject({
+        expect(yield* Effect.flip(f.tasks.editTask(id, "fixed", { needs: ["fixed"] }, owner))).toMatchObject({
           reason: expect.stringContaining("不能等自己"),
         });
         expect(yield* Effect.flip(f.tasks.changes(id))).toMatchObject({ reason: expect.stringContaining("没有分支") });
-        yield* f.tasks.act(id, "abandon", "user");
-        expect((yield* Effect.flip(f.tasks.split(" ", "x", "", "user")))._tag).toBe("Refused");
+        yield* f.tasks.act(id, "abandon", owner);
+        expect((yield* Effect.flip(f.tasks.split(" ", "x", "", owner)))._tag).toBe("Refused");
       }),
     ),
   );
@@ -399,7 +400,7 @@ describe("task graphs", () => {
           Effect.gen(function* () {
             id = yield* f.split("慢", "slowpoke");
             yield* f.until(id, (g) => g.state === "draft");
-            yield* f.tasks.act(id, "start", "user");
+            yield* f.tasks.act(id, "start", owner);
             session = taskOf(yield* f.until(id, (g) => state(g, "slow") === "working"), "slow")!.session!;
           }),
         config,
@@ -414,7 +415,7 @@ describe("task graphs", () => {
             // What the sessions do as the farm comes back: the run cut off is reported.
             yield* f.core.apply({ type: "report", id: sessionId(session), outcome: "interrupted", summary: "VibeValley 重启了", runs: 1 });
             f.work.release();
-            yield* f.tasks.act(id, "resume", "user");
+            yield* f.tasks.act(id, "resume", owner);
             const ready = yield* f.until(id, (g) => g.state === "ready");
             expect(state(ready, "slow")).toBe("merged");
             expect((yield* f.tasks.events(id))[0]!.kind).toBe("splitting");
@@ -457,15 +458,15 @@ describe("task graphs", () => {
         expect([parent.graph !== undefined, parent.title, parent.sessions.length, parent.status]).toEqual([true, "菱形", 1, "in_review"]);
         const d = yield* f.issues.get(taskIssueID(id, "d"));
         expect([d.parent, d.blockedBy, d.status]).toEqual([id, [id + ".b", id + ".c"], "backlog"]);
-        expect((yield* Effect.flip(f.issues.edit(d.id, { title: "改" })))._tag).toBe("Refused");
+        expect((yield* Effect.flip(f.issues.edit(d.id, { title: "改" }, owner)))._tag).toBe("Refused");
         expect((yield* Effect.flip(f.issues.start(d.id, "")))._tag).toBe("Refused");
-        yield* f.tasks.act(id, "start", "user");
+        yield* f.tasks.act(id, "start", owner);
         yield* f.until(id, (g) => g.state === "ready");
         const a = yield* f.issues.get(taskIssueID(id, "a"));
         expect([a.sessions.length, a.delivered]).toEqual([1, "merged_into_parent"]);
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
-        yield* f.tasks.act(id, "merge", "user");
+        yield* f.tasks.act(id, "merge", owner);
         yield* untilGot(async () => (await Effect.runPromise(f.issues.get(id))).delivered === "merged", "the graph's issue closed as merged");
       }),
     ),
@@ -475,7 +476,7 @@ describe("task graphs", () => {
     run((f) =>
       Effect.gen(function* () {
         const issue = yield* f.issues.add({ title: "整个看板重做", description: "像 Linear 那样", project: "board", assignee: "lab" });
-        yield* f.issues.edit(issue.id, { criteria: ["卡片紧凑"] });
+        yield* f.issues.edit(issue.id, { criteria: ["卡片紧凑"] }, owner);
         const helper = {
           id: "h1",
           name: "小吴",
@@ -540,16 +541,16 @@ describe("task graphs", () => {
           const before = { told: f.work.told.size, hired: f.work.n, left: f.core.session("w900") !== undefined };
           const done =
             action === "retry" || action === "skip"
-              ? f.tasks.taskAct(graph.id, "a", action, "user")
+              ? f.tasks.taskAct(graph.id, "a", action, owner)
               : action === "edit"
-                ? f.tasks.editTask(graph.id, "a", { title: "changed" }, "user")
-                : f.tasks.act(graph.id, action, "user");
+                ? f.tasks.editTask(graph.id, "a", { title: "changed" }, owner)
+                : f.tasks.act(graph.id, action, owner);
           expect(yield* Effect.flip(done)).toMatchObject({ reason: expect.stringContaining("injected write failure") });
           expect({ told: f.work.told.size, hired: f.work.n, left: f.core.session("w900") !== undefined }).toEqual(before);
           const after = graphOf(f.core.state(), graph.id)!;
           expect([after.state, after.title, after.tasks[0]!.state]).toEqual([graph.state, graph.title, "failed"]);
           yield* sql.unsafe(`drop trigger fail_save on issue`).pipe(Effect.orDie);
-          if (action === "pause") yield* f.tasks.act(graph.id, "pause", "user");
+          if (action === "pause") yield* f.tasks.act(graph.id, "pause", owner);
         }),
       ),
     );

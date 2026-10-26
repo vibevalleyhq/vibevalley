@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Memory } from "@vibevalley/protocol";
 import { Effect } from "effect";
@@ -110,7 +111,7 @@ describe("memory", () => {
         agent: "scribe",
         text: "下班打卡也要有测试",
         project: "memo",
-        by: "owner",
+        by: owner,
       });
       expect((yield* sessions.deliver(second.id, "顺手把下班打卡的测试也补上", { kind: "comment" })).kind).toBe("run");
       [recalled, asked] = reminded(yield* nextPrompt(f, next, 2));

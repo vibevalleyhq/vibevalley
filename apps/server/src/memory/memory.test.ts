@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { memoryKeep } from "@vibevalley/protocol";
@@ -86,9 +87,9 @@ describe("memory", () => {
       expect(picked.ids).toHaveLength(3);
       expect(picked.lines[0]).toBe("- （这个项目）这个项目用 pnpm test 跑测试");
       for (const x of yield* m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
-      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", project: " clock ", by: "owner" });
+      const note = yield* m.write({ agent: "lab", text: "  周末别派夜班  ", project: " clock ", by: owner });
       expect([note.text, note.project, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
-      expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: "owner" }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
+      expect(yield* Effect.flip(m.write({ agent: "lab", text: "  ", project: "", by: owner }))).toMatchObject({ _tag: "Refused", reason: "要记的话是空的" });
       yield* m.forgetOf("lab", note.id);
       // One that is not there is missing, not silently passed over.
       expect((yield* Effect.flip(m.forgetOf("lab", "not-a-number")))._tag).toBe("Missing");
@@ -104,7 +105,7 @@ describe("memory", () => {
       const m = yield* Memories;
       expect((yield* m.memoriesOf("orchestrator")).memories).toEqual([]);
       remember(folder, "主人喜欢早上收到汇报", new Date(2026, 9, 12, 9));
-      const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: "owner" });
+      const written = yield* m.remember({ agent: "orchestrator", text: "  周末别派夜班\n真的  ", project: "", by: owner });
       expect([written.text, written.session]).toEqual(["周末别派夜班 真的", undefined]);
       expect(readFileSync(join(folder, "MEMORY.md"), "utf8")).toContain("主人交代：周末别派夜班 真的");
       const view = yield* m.memoriesOf("orchestrator");
@@ -116,7 +117,7 @@ describe("memory", () => {
       expect(view.carried).toBe(2);
       yield* m.forgetOf("orchestrator", view.memories[1]!.id);
       expect((yield* m.memoriesOf("orchestrator")).memories.map((x) => x.text)).toEqual(["周末别派夜班 真的"]);
-      expect(yield* Effect.flip(m.remember({ agent: "orchestrator", text: "  ", project: "", by: "owner" }))).toMatchObject({
+      expect(yield* Effect.flip(m.remember({ agent: "orchestrator", text: "  ", project: "", by: owner }))).toMatchObject({
         _tag: "Refused",
         reason: "要记的话是空的",
       });
@@ -148,14 +149,14 @@ describe("memory", () => {
   it.effect("a preview picks without counting, and the longest unused fade", () =>
     Effect.gen(function* () {
       const m = yield* Memories;
-      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: "owner" });
-      yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: "owner" });
+      yield* m.write({ agent: "lab", text: "clock 的测试用 pnpm test", project: "clock", by: owner });
+      yield* m.write({ agent: "lab", text: "提交前跑 lint", project: "", by: owner });
       const preview = yield* m.recallOf("lab", "clock", "");
       expect(preview.lines).toEqual(["- （这个项目）clock 的测试用 pnpm test", "- （所有项目）提交前跑 lint"]);
       expect(preview.limit).toBe(recallChars);
       for (const x of yield* m.list("lab")) expect([x.recalled, x.fading ?? false]).toEqual([0, false]);
       expect((yield* m.recallOf("lab", "", "")).lines).toEqual([]);
-      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, project: "", by: "owner" });
+      for (let i = 0; i < 300 - 10; i++) yield* m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, project: "", by: owner });
       expect((yield* m.list("lab")).filter((x) => x.fading)).toHaveLength(2);
     }).pipe(Effect.provide(world())),
   );
@@ -163,8 +164,8 @@ describe("memory", () => {
   it.effect("the search index follows the table", () =>
     Effect.gen(function* () {
       const m = yield* Memories;
-      const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: "owner" });
-      yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: "owner" });
+      const note = yield* m.write({ agent: "lab", text: "这个项目测试用 pnpm test", project: "demo", by: owner });
+      yield* m.write({ agent: "other", text: "测试前先装依赖", project: "demo", by: owner });
       const found = (yield* m.search({ agent: "lab", project: "", text: "跑一遍测试", kind: "", limit: 0 })).found;
       expect(found.map((f) => f.id)).toEqual([note.id]);
       expect(found[0]!.score).toBeGreaterThan(0.5);
@@ -216,7 +217,8 @@ describe("memory", () => {
       const m = yield* Memories;
       for (let i = 0; i < memoryKeep; i++) {
         const id = `old-${String(i).padStart(3, "0")}`;
-        if (i % 2 === 0) yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "agent", created_at: 1 });
+        if (i % 2 === 0)
+          yield* q.addNote({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: null, author: "session", created_at: 1 });
         else yield* q.keepJob({ id, agent: "lab", body: id, terms: "", terms_of: 0, project: null, session: id, created_at: 1 });
       }
       const before = yield* m.list("lab");

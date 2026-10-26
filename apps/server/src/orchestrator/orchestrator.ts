@@ -5,6 +5,7 @@
 // answer goes. Running the agent (starting it, queuing inputs, streaming words, recording runs, going on after a restart)
 // is the host's (session/host.ts).
 
+import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
@@ -193,7 +194,7 @@ export const make = (options: OrchestratorOptions = {}) =>
     const toolsFor = (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", owner: at.owner ?? false };
+        return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
 
     // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.

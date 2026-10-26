@@ -157,13 +157,3 @@ export function parseTime(s: string): number | undefined {
   const ms = new Date(t).getTime();
   return Number.isNaN(ms) ? undefined : ms;
 }
-
-/** Words in a helper's report or a page it read can ask for a merge; only the owner's can make one. The tool stays in the
- * list, so that the prompt's prefix does not change from round to round. */
-export const mergeNotAsked = "没合：合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
-
-/** Changing an issue or moving it is the owner's call: the orchestrator asks for what it saw itself, as with a merge. */
-export const changeNotAsked = "没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。";
-
-/** A task starts many helpers at once and spends for each: only the owner's words start one, as with a merge. */
-export const startNotAsked = "没开工：计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";

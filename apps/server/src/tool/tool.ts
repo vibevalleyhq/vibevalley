@@ -27,6 +27,7 @@ import { graphText } from "../task/rules.ts";
 import { inboxLines } from "../channel/rules.ts";
 import { Clock, Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
+import type { Actor } from "../base/actor.ts";
 import { textTool } from "../agent/brain/tool.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
 import { Docs } from "../doc/doc.ts";
@@ -40,19 +41,16 @@ import { Runtimes } from "../runtime/runtime.ts";
 import { type Roster, Sessions } from "../session/session.ts";
 import { Tasks } from "../task/task.ts";
 import {
-  changeNotAsked,
   changesText,
   channelLine,
   issueDetail,
   issueLine,
-  mergeNotAsked,
   noSuchPriority,
   noSuchStatus,
   parseTime,
   priorityOf,
   recurrenceLine,
   sessionLine,
-  startNotAsked,
   statusOf,
   tail,
 } from "./words.ts";
@@ -69,8 +67,8 @@ export interface Caller {
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
-  /** The owner's own words are in this input: only then may an issue be changed, moved or completed, or a task graph started or merged. */
-  readonly owner: boolean;
+  /** Who calls, and on whose word: the services judge what it may do by it. */
+  readonly actor: Actor;
 }
 
 /** Says who is calling; a throw is told to the model as the tool's answer. */
@@ -262,17 +260,18 @@ export const make = Effect.gen(function* () {
     return lines.join("\n");
   });
 
-  const changes = issueTool(
-    "changes",
-    "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
-    async (t) => {
-      try {
-        return changesText(await go(issue.changes(t.id, "orchestrator")));
-      } catch (e) {
-        return "看不了改动：" + toError(e).message;
-      }
-    },
-  );
+  const changes = (who: Who) =>
+    issueTool(
+      "changes",
+      "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
+      async (t) => {
+        try {
+          return changesText(await go(issue.changes(t.id, (await who()).actor)));
+        } catch (e) {
+          return "看不了改动：" + toError(e).message;
+        }
+      },
+    );
 
   const sessionList = sessionSchemaTool<object>("session_list", "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。", () => {
     // Listed without @: an @ wakes someone, and models copy what they read.
@@ -399,14 +398,15 @@ export const make = Effect.gen(function* () {
       },
     );
 
-  const stop = issueTool("stop", "叫停在做一张工单的帮工正在做的这一轮。", async (t) => {
-    try {
-      await go(issue.act(t.id, { act: "stop" }, ""));
-      return `#${t.number} 这一轮叫停了`;
-    } catch (e) {
-      return toError(e).message;
-    }
-  });
+  const stop = (who: Who) =>
+    issueTool("stop", "叫停在做一张工单的帮工正在做的这一轮。", async (t) => {
+      try {
+        await go(issue.act(t.id, { act: "stop" }, "", (await who()).actor));
+        return `#${t.number} 这一轮叫停了`;
+      } catch (e) {
+        return toError(e).message;
+      }
+    });
   const dismiss = issueTool("dismiss", "让在做一张工单的帮工收工离开，不收它的改动（分支留着）。", async (t) => {
     const w = workerOf(t);
     if (!w) return nobodyOn(t);
@@ -533,7 +533,6 @@ export const make = Effect.gen(function* () {
       "改一张工单：优先级、验收方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
       async (p) => {
         const c = await who();
-        if (!c.owner) return changeNotAsked;
         return withIssue(p.issue, async (t) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return noSuchPriority(p.priority);
@@ -546,15 +545,19 @@ export const make = Effect.gen(function* () {
           }
           try {
             const done = await go(
-              issue.edit(t.id, {
-                ...(p.title !== undefined ? { title: p.title } : {}),
-                ...(p.description !== undefined ? { description: p.description } : {}),
-                ...(p.project !== undefined ? { project: p.project } : {}),
-                ...(assignee ? { assignee } : {}),
-                ...(priority ? { priority } : {}),
-                ...(p.acceptance ? { review: p.acceptance as Review } : {}),
-                ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
-              }),
+              issue.edit(
+                t.id,
+                {
+                  ...(p.title !== undefined ? { title: p.title } : {}),
+                  ...(p.description !== undefined ? { description: p.description } : {}),
+                  ...(p.project !== undefined ? { project: p.project } : {}),
+                  ...(assignee ? { assignee } : {}),
+                  ...(priority ? { priority } : {}),
+                  ...(p.acceptance ? { review: p.acceptance as Review } : {}),
+                  ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
+                },
+                c.actor,
+              ),
             );
             return "改好了：" + issueLine(done, whoOf(done), clock.currentTimeMillisUnsafe()).slice(2);
           } catch (e) {
@@ -570,7 +573,6 @@ export const make = Effect.gen(function* () {
       "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成：照工单交付，有提交就合进主分支或开 PR，没有改动不碰 git，keep_branch 是完成但分支留着不合；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
       async (p) => {
         const c = await who();
-        if (!c.owner) return changeNotAsked;
         const to = statusOf(p.to);
         if (!to) return noSuchStatus(p.to, ["backlog", "todo", "done", "canceled"]);
         return withIssue(p.issue, async (t) => {
@@ -583,7 +585,7 @@ export const make = Effect.gen(function* () {
               agent = chosen.id;
             }
             const done = await go(
-              issue.setStatus(t.id, to, p.text ?? "", c.here, { ...(agent ? { agent } : {}), ...(p.keep_branch ? { keepBranch: true } : {}) }),
+              issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, { ...(agent ? { agent } : {}), ...(p.keep_branch ? { keepBranch: true } : {}) }),
             );
             // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
             if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
@@ -653,8 +655,7 @@ export const make = Effect.gen(function* () {
                 ...(p.project ? { project: p.project } : {}),
                 ...(p.tz ? { tz: p.tz } : {}),
               },
-              "orchestrator",
-              c.owner,
+              c.actor,
             ),
           );
           if (made.pending)
@@ -701,11 +702,12 @@ export const make = Effect.gen(function* () {
     },
   );
 
-  const graphSplit = tool<{ goal: string; project: string; agent?: string }>(
-    "graph_split",
-    "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-    (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", "orchestrator")),
-  );
+  const graphSplit = (who: Who) =>
+    tool<{ goal: string; project: string; agent?: string }>(
+      "graph_split",
+      "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
+      async (p) => answered(tasks.split(p.goal, p.project, p.agent ?? "", (await who()).actor)),
+    );
 
   const graphsTool = tool<{ id?: string }>("graphs", "列出计划：每件的状态、谁在做、结论。", (p) => {
     const texts = tasks
@@ -716,21 +718,23 @@ export const make = Effect.gen(function* () {
     return p.id ? "没有 " + p.id + " 这个计划" : "现在没有计划。";
   });
 
-  const taskEdit = tool<{ graph: string; task: string; title?: string; brief?: string; needs?: string[]; agent?: string; check?: string; remove?: boolean }>(
-    "task_edit",
-    "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
-    (p) => {
-      if (p.remove) return answered(tasks.removeTask(p.graph, p.task, "orchestrator"));
-      const edit: TaskEdit = {
-        ...(p.title !== undefined ? { title: p.title } : {}),
-        ...(p.brief !== undefined ? { brief: p.brief } : {}),
-        ...(p.needs !== undefined ? { needs: p.needs } : {}),
-        ...(p.agent !== undefined ? { agent: p.agent } : {}),
-        ...(p.check !== undefined ? { check: p.check } : {}),
-      };
-      return answered(tasks.editTask(p.graph, p.task, edit, "orchestrator"));
-    },
-  );
+  const taskEdit = (who: Who) =>
+    tool<{ graph: string; task: string; title?: string; brief?: string; needs?: string[]; agent?: string; check?: string; remove?: boolean }>(
+      "task_edit",
+      "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
+      async (p) => {
+        const by = (await who()).actor;
+        if (p.remove) return answered(tasks.removeTask(p.graph, p.task, by));
+        const edit: TaskEdit = {
+          ...(p.title !== undefined ? { title: p.title } : {}),
+          ...(p.brief !== undefined ? { brief: p.brief } : {}),
+          ...(p.needs !== undefined ? { needs: p.needs } : {}),
+          ...(p.agent !== undefined ? { agent: p.agent } : {}),
+          ...(p.check !== undefined ? { check: p.check } : {}),
+        };
+        return answered(tasks.editTask(p.graph, p.task, edit, by));
+      },
+    );
 
   const graphAction = (who: Who) =>
     tool<{ graph: string; action: GraphAction }>(
@@ -738,17 +742,14 @@ export const make = Effect.gen(function* () {
       "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 合进主分支（都做完以后，把计划的分支合进主分支）。",
       async (p) => {
         const c = await who();
-        if (p.action === "merge" && !c.owner) return mergeNotAsked;
-        if (p.action === "start" && !c.owner) return startNotAsked;
-        return answered(tasks.act(p.graph, p.action, "orchestrator"));
+        return answered(tasks.act(p.graph, p.action, c.actor));
       },
     );
 
-  const taskAction = tool<{ graph: string; task: string; action: TaskAction }>(
-    "task_action",
-    "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
-    (p) => answered(tasks.taskAct(p.graph, p.task, p.action, "orchestrator")),
-  );
+  const taskAction = (who: Who) =>
+    tool<{ graph: string; task: string; action: TaskAction }>("task_action", "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。", async (p) =>
+      answered(tasks.taskAct(p.graph, p.task, p.action, (await who()).actor)),
+    );
 
   const issueSplit = (who: Who) =>
     sessionSchemaTool<{
@@ -806,7 +807,7 @@ export const make = Effect.gen(function* () {
           async (p) => {
             try {
               const id = profile(p.agent);
-              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: "orchestrator" }));
+              const m = await go(memory.remember({ agent: id, text: p.text, project: p.project ?? "", by: (await who()).actor }));
               return "替 " + id + " 记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
             } catch (e) {
               return "没成：" + toError(e).message;
@@ -820,7 +821,7 @@ export const make = Effect.gen(function* () {
             const c = await who();
             if (!c.agent) throw new Error(notWorking);
             if (p.agent && p.agent !== c.agent) throw new Error("只能记进你自己的档案（" + c.agent + "），" + p.agent + " 的记性不归你写");
-            const m = await go(memory.remember({ agent: c.agent, text: p.text, project: p.all_projects ? "" : c.project, by: "agent", session: c.session }));
+            const m = await go(memory.remember({ agent: c.agent, text: p.text, project: p.all_projects ? "" : c.project, by: c.actor }));
             return "记下了（" + memoryWhere(m) + "）〔" + m.id + "〕";
           },
         );
@@ -883,22 +884,22 @@ export const make = Effect.gen(function* () {
       openChannel,
       channelSettings,
       accept,
-      changes,
+      changes(who),
       roster,
       check,
       tell(who),
       readChat(who),
-      stop,
+      stop(who),
       dismiss,
       issuesTool,
       issueCreate(who),
       issueUpdate(who),
       issueStatus(who),
-      graphSplit,
+      graphSplit(who),
       graphsTool,
-      taskEdit,
+      taskEdit(who),
       graphAction(who),
-      taskAction,
+      taskAction(who),
       memorySearch(who, true),
       memoryAdd(who, true),
     ],

@@ -1,6 +1,6 @@
 // What changed in a task graph, step by step, and how each change is said.
 
-import type { GraphActor, GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
+import type { ActorKind, GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
 import { taskOf } from "./graph.ts";
 
 /** A graph event before it is stored: no id, actor or time yet. */
@@ -112,7 +112,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
   return out;
 }
 
-export const actorText: Record<GraphActor, string> = { user: "主人", orchestrator: "管家", system: "VibeValley", session: "帮工" };
+export const actorText: Record<ActorKind, string> = { owner: "主人", orchestrator: "管家", session: "帮工", system: "VibeValley" };
 
 export function graphEventText(e: GraphChange, titleOf: (task: string) => string = (id) => id): string {
   const step = e.task ? "「" + titleOf(e.task) + "」" : "「」";

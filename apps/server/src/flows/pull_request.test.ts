@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { owner } from "../base/actor.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
@@ -84,7 +85,7 @@ describe("a pull request", () => {
           git(path, "remote", "set-url", "--push", "origin", bare);
           const main = git(path, "rev-parse", "main");
           yield* projects.refreshGitHub();
-          issue = yield* issues.setStatus(issue.id, "done", "", "");
+          issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect(issue.pullRequest).toMatchObject({
             number: 7,
             state: "open",
@@ -93,9 +94,9 @@ describe("a pull request", () => {
           expect(issue.status).toBe("in_review");
           expect(git(path, "rev-parse", "main")).toBe(main);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
-          yield* issues.setStatus(issue.id, "todo", "再写版本B", "");
+          yield* issues.setStatus(issue.id, "todo", "再写版本B", "", owner);
           yield* w.nextReport;
-          issue = yield* issues.setStatus(issue.id, "done", "", "");
+          issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
           expect([creates, pushes]).toEqual([1, 2]);
           expect(git(bare, "rev-parse", branch)).toBe(git(cwd, "rev-parse", "HEAD"));
         }).pipe(Effect.scoped, Effect.provide(before.layer));

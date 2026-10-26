@@ -3,6 +3,7 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
+import { session } from "../base/actor.ts";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -38,7 +39,7 @@ export const make = (options: McpOptions = {}) =>
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {
       const h = sessions.sessionOf(id);
-      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", owner: false };
+      return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", actor: session(id) };
     };
 
     const call = async (tool: AgentTool, args: unknown): Promise<string> => {

@@ -2,7 +2,8 @@
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
-import type { Preview, Recurrence, RecurrenceBy, RecurrenceRequest } from "@vibevalley/protocol";
+import type { Preview, Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
+import type { Actor } from "../base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { afterRun, dueRecurrences, dueText, isMissed, needsOK, recurrenceProblem } from "./rules.ts";
 import { Clock, Context, Effect, Layer, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
@@ -24,8 +25,8 @@ export interface Due {
 
 export interface RecurrenceShape {
   readonly list: () => Recurrence[];
-  /** by is who asks; ownerInRun, for the orchestrator, whether the owner's words are in the run it asks from (needsOK). */
-  readonly add: (req: RecurrenceRequest, by: RecurrenceBy, ownerInRun: boolean) => Effect.Effect<Recurrence, ApiError>;
+  /** by is who asks, and on whose word (needsOK). */
+  readonly add: (req: RecurrenceRequest, by: Actor) => Effect.Effect<Recurrence, ApiError>;
   /** Turned on is the owner's yes. */
   readonly setEnabled: (id: string, enabled: boolean) => Effect.Effect<Recurrence, ApiError>;
   readonly remove: (id: string) => Effect.Effect<Recurrence, ApiError>;
@@ -68,7 +69,7 @@ export const make = Effect.gen(function* () {
   for (const row of yield* db(q.recurrences())) {
     const when = jsonOrNone(S.RecurrenceWhen)(row.spec);
     // A recurrence whose time or owner this code cannot read any more is left out.
-    if (!when || !Schema.is(S.RecurrenceBy)(row.set_by)) continue;
+    if (!when || !Schema.is(S.ActorKind)(row.set_by)) continue;
     const s: Recurrence = {
       id: row.id,
       name: row.name,
@@ -117,7 +118,7 @@ export const make = Effect.gen(function* () {
 
   const shape: RecurrenceShape = {
     list: () => [...(core.state().recurrences ?? [])],
-    add: Effect.fn("Recurrences.add")(function* (req, by, ownerInRun) {
+    add: Effect.fn("Recurrences.add")(function* (req, by) {
       const at = now();
       const problem = recurrenceProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
@@ -131,7 +132,7 @@ export const make = Effect.gen(function* () {
       const project = (req.project ?? "").trim();
       if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
       const tz = req.tz ?? localZone();
-      const pending = needsOK(req, by, ownerInRun);
+      const pending = needsOK(req, by);
       const s: Recurrence = {
         id: newId(),
         name: req.name.trim(),
@@ -144,7 +145,7 @@ export const make = Effect.gen(function* () {
         // Counted from now, by the same clock that ticks.
         enabled: !pending,
         created: at,
-        by,
+        by: by.kind,
         ...(pending ? { pending: true } : {}),
       };
       yield* db(
@@ -157,7 +158,7 @@ export const make = Effect.gen(function* () {
           project: s.project ?? null,
           spec: JSON.stringify(s.when),
           tz,
-          set_by: by,
+          set_by: by.kind,
           pending,
           created_at: at,
         }),
