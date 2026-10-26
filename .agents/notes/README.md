@@ -14,7 +14,7 @@
 
 文件名里的日期是这个话题**第一次提出**的日子。Note 之间互相引用用 Markdown 链接，路径从仓库根写（`[题目](.agents/notes/implemented/architecture/2026-…-….md)`），不用裸文字或编号，这样能机器检查，挪目录后搜一个字符串就能修。
 
-清单是 [CATALOG.md](.agents/notes/CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `bun run notes:catalog`，过期了 `bun run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](docs/subsystems/process.md)）。
+清单是 [CATALOG.md](.agents/notes/CATALOG.md)：按生命周期和类别列出每篇 Note 的日期和标题，新的在前。它由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从路径和标题写成，不手改，也不另建手写的 `INDEX.md`：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错；合并时它冲突了不用手合，重新生成（[理由](docs/subsystems/process.md)）。
 
 ## 类别
 
@@ -39,7 +39,7 @@
 
 ## 文件格式
 
-每篇 Note 都用同一个格式，`bun run notes:verify` 检查（[scripts/agent-notes.ts](scripts/agent-notes.ts)）。
+每篇 Note 都用同一个格式，`vp run notes:verify` 检查（[scripts/agent-notes.ts](scripts/agent-notes.ts)）。
 
 ### 开头
 
