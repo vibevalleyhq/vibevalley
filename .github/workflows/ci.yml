@@ -31,6 +31,14 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: pnpm exec vpx scripts/commit-msg.ts --title "$TITLE"
+      - name: pull request body and branch
+        if: github.event_name == 'pull_request'
+        # The body becomes the squashed commit's message. Editing the title or body does not run CI again: vv-pr checks
+        # them once more before merging.
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.head_ref }}
+        run: pnpm exec vpx scripts/commit-msg.ts --body "$BODY" && pnpm exec vpx scripts/commit-msg.ts --branch "$BRANCH"
       - run: pnpm run check
       - run: pnpm run docs:verify
       - run: pnpm run scripts:test
