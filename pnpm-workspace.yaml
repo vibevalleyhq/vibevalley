@@ -7,6 +7,9 @@ packages:
 # Every version the workspace's packages use, written once: their package.json say "catalog:" (or "catalog:expo"). With
 # catalogMode strict, pnpm add puts a new version here and writes "catalog:" there; scripts/catalog.test.ts refuses a
 # version written by hand. vite is Vite+'s core everywhere: overrides below point every vite and vitest at these.
+# The root and apps/web also name vite themselves, though they import only vite-plus: that is what gives vitest's
+# @vitest/mocker and @vitest/browser (at the root) and the page's Solid plugin and its vitefu a vite for their peer.
+# Without it pnpm leaves those peers unresolved (the lockfile shows them losing @voidzero-dev/vite-plus-core).
 catalogMode: strict
 
 catalog:
