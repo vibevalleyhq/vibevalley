@@ -33,6 +33,35 @@ describe("the database", () => {
     }).pipe(Effect.provide(DbLayer.pipe(Layer.provideMerge(testDatabase())))),
   );
 
+  // In memory a farm's database is given back and kept for the next one (db.ts): it must be as good as new.
+  it.effect("a database given back is empty for the next farm, its identities from 1 again", () => {
+    const seqs = Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const rows = yield* sql<{ count: number }>`SELECT count(*)::int AS count FROM channel_participant`.pipe(Effect.orDie);
+      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'user', '主人', 1)`.pipe(Effect.orDie);
+      const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
+      return [rows[0]!.count, seq[0]!.seq];
+    });
+    return Effect.gen(function* () {
+      for (let farm = 0; farm < 3; farm++) expect(yield* seqs.pipe(Effect.provide(testDatabase()))).toEqual([0, 1]);
+    });
+  });
+
+  it.effect("a database whose schema a test changed is not given to the next farm", () =>
+    Effect.gen(function* () {
+      const functions = Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        return (yield* sql<{ n: number }>`SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'left_behind'`.pipe(Effect.orDie))[0]!.n;
+      });
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql.unsafe("create function left_behind() returns int language sql as 'select 1'").pipe(Effect.orDie);
+        expect(yield* functions).toBe(1);
+      }).pipe(Effect.provide(testDatabase()));
+      expect(yield* functions.pipe(Effect.provide(testDatabase()))).toBe(0);
+    }),
+  );
+
   it("a database from another baseline is set aside, not deleted; one without a mark is taken as today's", () => {
     const home = mkdtempSync(join(tmpdir(), "vibevalley-db-"));
     const db = join(home, "db");
