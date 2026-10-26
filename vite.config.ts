@@ -44,6 +44,8 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["site/**", "apps/server/db/generated/**"],
+    // oxlint's defaults, and import for no-cycle; listing plugins replaces the defaults.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "solid", specifier: "eslint-plugin-solid" },
@@ -61,6 +63,19 @@ export default defineConfig({
       // thrown from a catch without { cause } loses the one that happened.
       "typescript/no-unnecessary-type-assertion": "error",
       "eslint/preserve-caught-error": "error",
+      // A promise nobody awaits loses its failure, a thrown non-Error loses its stack, and any turns the type checker off.
+      "typescript/no-floating-promises": "error",
+      "typescript/only-throw-error": "error",
+      "typescript/no-explicit-any": "error",
+      // A type imported as a value says the module is needed at run time when it is not.
+      "typescript/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      // Modules that import each other have no order to read, test or start them in.
+      "import/no-cycle": "error",
+      // A promise handed where nothing awaits it (a callback, a condition) fails, or is always true, without anyone seeing.
+      "typescript/no-misused-promises": "error",
+      // A switch on a closed union covers every member, or says with default that the rest are left out on purpose: a
+      // member added later is then a compile error where it is not handled (AGENTS.md, 封闭的联合穷尽处理).
+      "typescript/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -152,6 +167,7 @@ export default defineConfig({
         },
       },
     ],
-    options: { typeAware: true, typeCheck: true },
+    // A disable comment whose rule no longer fires there is an error, so none outlives its reason.
+    options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: "error" },
   },
 });

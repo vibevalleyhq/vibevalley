@@ -11,7 +11,7 @@ import type { CoreShape } from "../core/core.ts";
 import { type ApiError, missing, lookIn, reasonOf, refused } from "../errors.ts";
 import { type ProjectShape } from "../project/project.ts";
 import { type Merged, MergeFailure, type Workplace } from "../project/shapes.ts";
-import { NotTakenIn, type SessionShape } from "../session/session.ts";
+import { type NotTakenIn, type SessionShape } from "../session/session.ts";
 import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 

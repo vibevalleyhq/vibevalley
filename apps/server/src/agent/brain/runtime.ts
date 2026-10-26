@@ -175,6 +175,8 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
         case "agent_settled":
           end(e.run.aborted ? { kind: "aborted" } : e.run.error ? { kind: "failed", failure: "unknown", reason: e.run.error } : { kind: "completed" });
           break;
+        default:
+          break;
       }
     });
     frame("vibevalley/model", { model: llm.model.id }, [{ kind: "model", model: llm.model.id }]);

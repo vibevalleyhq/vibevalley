@@ -1,4 +1,4 @@
-import { Cause, Effect, Queue, Stream } from "effect";
+import { type Cause, Effect, Queue, Stream } from "effect";
 
 export const bounded = <A>(source: Stream.Stream<A>, name: string, capacity = 64): Stream.Stream<A> =>
   Stream.unwrap(

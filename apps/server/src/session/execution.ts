@@ -144,6 +144,8 @@ export class AgentExecution {
           yield* self.begin({ by: { kind: "" } });
           self.journal.toolEnded(e.toolCallId, resultText(e.result), !e.isError);
           return;
+        default:
+          break;
       }
     });
   }

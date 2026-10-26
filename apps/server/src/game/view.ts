@@ -134,6 +134,8 @@ export function plotOfSession(h: Session): PlotView {
       return { crop: "withered", badge: badgeBugs };
     case "resting":
       return { crop: growth(h), badge: conflict ? badgeConflict : badgeRest };
+    case "closed":
+      break;
   }
   return { crop: "empty" };
 }
@@ -162,6 +164,8 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
     }
     case "report":
       return fact.outcome === "failed" && sessionOf(before, fact.id) ? [{ kind: "penalty", sessionId: fact.id }] : [];
+    default:
+      break;
   }
   return [];
 }

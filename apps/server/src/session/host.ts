@@ -453,6 +453,8 @@ export class AgentHost<R> {
         return;
       case "agent_settled":
         return this.settled(e.run.aborted);
+      default:
+        break;
     }
   }
 }

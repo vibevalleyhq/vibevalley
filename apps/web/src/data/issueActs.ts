@@ -88,6 +88,8 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
       case "cure":
       case "stop":
         return void send(a);
+      case "keep":
+        break;
     }
   };
 

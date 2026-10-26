@@ -453,32 +453,38 @@ export const make = (options: VoiceOptions = {}) =>
     yield* Effect.promise(
       () =>
         new Promise<void>((resolve) => {
-          const s = createServer(async (req, res) => {
-            const m = route.exec(new URL(req.url ?? "/", "http://line").pathname);
-            if (req.method !== "POST" || !m) {
-              res.writeHead(404);
-              return void res.end();
-            }
-            const key = keys.get(m[1]!);
-            if (!key || req.headers.authorization !== "Bearer " + key) {
-              res.writeHead(401, { "content-type": "application/json" });
-              return void res.end(`{"error":{"message":"unauthorized"}}`);
-            }
-            const ended = new AbortController();
-            res.on("close", () => ended.abort());
-            const body = await new Promise<Buffer>((r) => {
-              const parts: Buffer[] = [];
-              req.on("data", (p: Buffer) => parts.push(p));
-              req.on("end", () => r(Buffer.concat(parts)));
-            });
-            const got = await answer(new Request("http://line" + req.url, { method: "POST", body, signal: ended.signal }));
-            res.writeHead(got.status, Object.fromEntries(got.headers));
-            if (!got.body) return void res.end();
-            try {
-              for await (const chunk of got.body as unknown as AsyncIterable<Uint8Array>) res.write(chunk);
-            } finally {
+          const s = createServer((req, res) => {
+            const go = async () => {
+              const m = route.exec(new URL(req.url ?? "/", "http://line").pathname);
+              if (req.method !== "POST" || !m) {
+                res.writeHead(404);
+                return void res.end();
+              }
+              const key = keys.get(m[1]!);
+              if (!key || req.headers.authorization !== "Bearer " + key) {
+                res.writeHead(401, { "content-type": "application/json" });
+                return void res.end(`{"error":{"message":"unauthorized"}}`);
+              }
+              const ended = new AbortController();
+              res.on("close", () => ended.abort());
+              const body = await new Promise<Buffer>((r) => {
+                const parts: Buffer[] = [];
+                req.on("data", (p: Buffer) => parts.push(p));
+                req.on("end", () => r(Buffer.concat(parts)));
+              });
+              const got = await answer(new Request("http://line" + req.url, { method: "POST", body, signal: ended.signal }));
+              res.writeHead(got.status, Object.fromEntries(got.headers));
+              if (!got.body) return void res.end();
+              try {
+                for await (const chunk of got.body as unknown as AsyncIterable<Uint8Array>) res.write(chunk);
+              } finally {
+                res.end();
+              }
+            };
+            go().catch(() => {
+              if (!res.headersSent) res.writeHead(502);
               res.end();
-            }
+            });
           });
           s.once("error", (e) => {
             lineProblem = "语音线路开不起来：" + e.message;

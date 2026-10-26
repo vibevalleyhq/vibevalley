@@ -8,7 +8,7 @@
 // Normal maps come from the pictures (normals.ts); `normalTexture` makes one for a loaded texture. A sprite without
 // one, and anything that is not a sprite (shapes, particles), is lit as the ground behind it.
 
-import { Container, defaultFilterVert, Filter, GlProgram, Rectangle, RenderTexture, Sprite, Texture, UniformGroup, ViewContainer } from "pixi.js";
+import { type Container, defaultFilterVert, Filter, GlProgram, Rectangle, RenderTexture, Sprite, Texture, UniformGroup, ViewContainer } from "pixi.js";
 import type { PixelStage } from "./index";
 import { mirrorNormals, normalsOf, type NormalOptions } from "./normals";
 import type { Sky } from "./sky";

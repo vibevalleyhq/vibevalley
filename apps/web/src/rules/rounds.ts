@@ -273,6 +273,10 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
           close(e.time);
           waiting = e.time;
           break;
+        case "llm/retry":
+        case "run/end":
+        case "run/start":
+          break;
       }
       prev = e.time;
     });

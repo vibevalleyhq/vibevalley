@@ -9,7 +9,7 @@ import { aria, useClickAway } from "../../app/util";
 import { ready, useRuntimes } from "../../data/query";
 import { CardColors, PxButton, SpriteIcon } from "../kit";
 import { commands } from "../state";
-import { HudCard } from "./Hud";
+import { HudCard } from "./HudCard";
 import { RuntimeIcon } from "../kit/RuntimeIcon";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;

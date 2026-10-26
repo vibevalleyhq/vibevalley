@@ -70,7 +70,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, lookIn, missing, type Next, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { type ProjectShape, Projects } from "../project/project.ts";
-import { MergeFailure, ProjectError } from "../project/shapes.ts";
+import { MergeFailure, type ProjectError } from "../project/shapes.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { Runtimes } from "../runtime/runtime.ts";
 import { splitBrief } from "./rules.ts";

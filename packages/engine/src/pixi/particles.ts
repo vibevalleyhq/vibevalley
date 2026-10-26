@@ -3,7 +3,7 @@
 // a frame. Positions round to whole pixels and fading goes in steps, so it stays pixel art. Little pictures are
 // drawn from rows of '#' (`glyph`).
 
-import { Container, Graphics } from "pixi.js";
+import { type Container, Graphics } from "pixi.js";
 
 export interface BitSpec {
   readonly x: number;

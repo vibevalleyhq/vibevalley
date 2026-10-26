@@ -6,7 +6,7 @@
 
 import { dot, particles, type PointLight } from "@vibevalley/engine/pixi";
 import type { GameEffectReward, SessionId } from "@vibevalley/protocol";
-import { Container, Graphics, Sprite, type Texture } from "pixi.js";
+import { Container, type Graphics, Sprite, type Texture } from "pixi.js";
 import type { BedFx } from "../store";
 import type { BedFxKind } from "../tools";
 import type { Point } from "../world/level";

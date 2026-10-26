@@ -191,6 +191,9 @@ function hmmInternal(text: string): string[] {
         out.push(ch);
         next = i + 1;
         break;
+      case undefined:
+      case "M":
+        break;
     }
   });
   if (next < runes.length) out.push(runes.slice(next).join(""));

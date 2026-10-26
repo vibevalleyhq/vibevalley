@@ -256,6 +256,8 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
       if (level > was) out.push({ kind: "level", level });
       break;
     }
+    default:
+      break;
   }
   // Six beds busy: once for each time the farm fills up.
   if (working(before) < fullHouse && working(after) >= fullHouse) out.push({ kind: "busy6" });

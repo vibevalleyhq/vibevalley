@@ -10,10 +10,12 @@ export const webRtc: Rtc = async (grant, on) => {
   let gone = false;
   client.on("user-joined", () => !gone && on.joined());
   client.on("user-left", () => !gone && on.left());
-  client.on("user-published", async (user, media) => {
+  client.on("user-published", (user, media) => {
     if (gone || media !== "audio") return;
-    await client.subscribe(user, "audio");
-    user.audioTrack?.play();
+    client.subscribe(user, "audio").then(
+      () => user.audioTrack?.play(),
+      (e: unknown) => !gone && on.problem(`声网：听不到对面：${e instanceof Error ? e.message : String(e)}`),
+    );
   });
   client.on("stream-message", (_uid: unknown, payload: Uint8Array) => !gone && on.stream(new TextDecoder().decode(payload)));
   client.on("volume-indicator", (levels: { uid: string | number; level: number }[]) => {

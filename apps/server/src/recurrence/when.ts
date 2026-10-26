@@ -201,6 +201,8 @@ export function cronText(expr: string): string {
       case "6,7":
       case "6-7":
         return "周末 " + clock;
+      case undefined:
+        break;
     }
     const days: number[] = [];
     for (const d of f[4]!.split(",")) {

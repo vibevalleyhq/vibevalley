@@ -5,7 +5,7 @@ import { blockedBy, isAcceptance, taskOf } from "./graph.ts";
 import { inbox } from "../notice/inbox.ts";
 import { clip } from "../base/text.ts";
 import { graphOf, parseSplit, taskBrief, taskIssueID } from "./rules.ts";
-import { Effect, Stream } from "effect";
+import { Effect, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
@@ -229,10 +229,8 @@ const farm = Effect.gen(function* () {
 
 const state = (g: TaskGraph, id: string) => taskOf(g, id)?.state;
 
-const run = <A, E>(
-  body: (f: Effect.Success<typeof farm>) => Effect.Effect<A, E, Core | Issues | SqlClient.SqlClient | import("effect").Scope.Scope>,
-  config = testConfig(),
-) => Effect.flatMap(farm, body).pipe(Effect.scoped, Effect.provide(worldBelowTasks({ config })));
+const run = <A, E>(body: (f: Effect.Success<typeof farm>) => Effect.Effect<A, E, Core | Issues | SqlClient.SqlClient | Scope.Scope>, config = testConfig()) =>
+  Effect.flatMap(farm, body).pipe(Effect.scoped, Effect.provide(worldBelowTasks({ config })));
 
 describe("task graphs", () => {
   it.live("an event with malformed payload keeps its durable identity but no invented details", () =>

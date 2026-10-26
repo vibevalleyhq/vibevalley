@@ -12,6 +12,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
@@ -212,7 +213,7 @@ export const make = (options: LanOptions = {}) =>
       });
       res.writeHead(answer.status, Object.fromEntries(answer.headers));
       if (!answer.body) return void res.end();
-      await pipeline(Readable.fromWeb(answer.body as import("node:stream/web").ReadableStream<Uint8Array>), res, { signal });
+      await pipeline(Readable.fromWeb(answer.body as NodeReadableStream<Uint8Array>), res, { signal });
     };
 
     const guard = (req: IncomingMessage, res: ServerResponse) => {
