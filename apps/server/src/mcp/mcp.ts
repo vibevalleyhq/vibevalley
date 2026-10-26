@@ -60,6 +60,9 @@ export const make = (options: McpOptions = {}) =>
         if (!id) throw new Error(unknownCaller);
         return callerOf(id);
       });
+      // The tools come with pi's JSON Schema and McpServer.registerTool takes zod only: the low-level Server is the SDK's
+      // own exception for this.
+      // oxlint-disable-next-line typescript/no-deprecated
       const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });
       server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: list.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters as { type: "object" } })),
