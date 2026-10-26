@@ -3,16 +3,16 @@ import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { memoryStore } from "./taskStore.ts";
+import { memoryStore } from "./agentTaskStore.ts";
 import { Brain } from "./agent.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { readMcpConfig } from "./config.ts";
 import { connectAll, mcpContentText, mcpToolName } from "./mcp.ts";
 import { archive, forgetLine, readMemory } from "./memory.ts";
-import { describeJob, dueJobs, type Job, nextRun, parseCron, Recurrences } from "./recurrences.ts";
+import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Reminders } from "./reminders.ts";
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
-import { taskTools } from "./tasks.ts";
+import { taskTools } from "./agentTaskTools.ts";
 import { fauxLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
 
@@ -141,55 +141,55 @@ describe("skills and memory", () => {
   });
 });
 
-describe("recurrences", () => {
+describe("reminders", () => {
   it("are due by their kind", () => {
     const created = "2026-10-12T00:00:00.000Z";
-    const at: Job = { id: "a", name: "a", message: "", at: "2026-10-12T01:00:00.000Z", created };
-    const every: Job = { id: "e", name: "e", message: "", everyMinutes: 30, created };
-    const cron: Job = { id: "c", name: "c", message: "", cron: "0 * * * *", created };
+    const at: Reminder = { id: "a", name: "a", message: "", at: "2026-10-12T01:00:00.000Z", created };
+    const every: Reminder = { id: "e", name: "e", message: "", everyMinutes: 30, created };
+    const cron: Reminder = { id: "c", name: "c", message: "", cron: "0 * * * *", created };
     expect(nextRun(at)!.toISOString()).toBe("2026-10-12T01:00:00.000Z");
     expect(nextRun({ ...at, lastRun: "2026-10-12T01:00:00.000Z" })).toBeUndefined();
     expect(nextRun(every)!.toISOString()).toBe("2026-10-12T00:30:00.000Z");
     expect(nextRun(cron)!.getUTCMinutes()).toBe(0);
-    expect(dueJobs([at, every, cron], new Date("2026-10-12T00:45:00.000Z")).map((j) => j.id)).toEqual(["e"]);
+    expect(dueReminders([at, every, cron], new Date("2026-10-12T00:45:00.000Z")).map((j) => j.id)).toEqual(["e"]);
     expect(() => parseCron("every day")).toThrow(/cron 写得不对/);
-    expect(describeJob(every)).toMatch(/^- e「e」每 30 分钟；下次 /);
+    expect(describeReminder(every)).toMatch(/^- e「e」每 30 分钟；下次 /);
   });
 
-  it("run a missed job once", async () => {
+  it("run a missed reminder once", async () => {
     const dir = home();
     const woke: string[] = [];
-    // Each job is made at a moment of its own: the clock moves on a millisecond each time it is read.
+    // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
     let at = wallTime.now();
-    const s = new Recurrences(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at });
-    expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m" }))).toMatch(/正好给一个/);
-    expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
-    await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
-    await call(s.tools, "recurrence", {
+    const s = new Reminders(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at });
+    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/);
+    expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
+    await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
+    await call(s.tools, "reminder", {
       name: "提醒",
       message: "开会",
       at: new Date(Date.now() + 60_000).toISOString(),
     });
-    expect(await call(s.tools, "list_recurrences", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
+    expect(await call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
     const later = new Date(Date.now() + 3_600_000);
     s.tick(later);
     expect(woke.length).toBe(2);
-    expect(woke[0]).toMatch(/^【定时任务「巡检」到点了/);
+    expect(woke[0]).toMatch(/^【提醒「巡检」到点了/);
     s.tick(later);
     expect(woke.length).toBe(2);
-    const left = JSON.parse(readFileSync(join(dir, "recurrences.json"), "utf8")) as Job[];
+    const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
     expect(left.map((j) => j.name)).toEqual(["巡检"]);
-    await call(s.tools, "cancel_recurrence", { id: left[0]!.id });
-    expect(await call(s.tools, "list_recurrences", {})).toBe("没有定好的事。");
+    await call(s.tools, "cancel_reminder", { id: left[0]!.id });
+    expect(await call(s.tools, "list_reminders", {})).toBe("没有定好的事。");
   });
 
   it("wake only once the claim is stored", () => {
     const dir = home();
     let wakes = 0;
-    const s = new Recurrences(dir, () => wakes++, wallTime);
+    const s = new Reminders(dir, () => wakes++, wallTime);
     const now = new Date();
     writeFileSync(
-      join(dir, "recurrences.json"),
+      join(dir, "reminders.json"),
       JSON.stringify([
         {
           id: "once",
@@ -201,20 +201,20 @@ describe("recurrences", () => {
       ]),
     );
     // A directory at the temporary file's path makes the atomic write fail.
-    mkdirSync(join(dir, "recurrences.json.tmp"));
+    mkdirSync(join(dir, "reminders.json.tmp"));
     s.tick(now);
     s.tick(now);
     expect(wakes).toBe(0);
-    rmdirSync(join(dir, "recurrences.json.tmp"));
+    rmdirSync(join(dir, "reminders.json.tmp"));
     s.tick(now);
     s.tick(now);
     expect(wakes).toBe(1);
   });
 
-  it("do not run a persisted job whose shape is wrong", () => {
+  it("do not run a persisted reminder whose shape is wrong", () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Recurrences(dir, (text) => woke.push(text), wallTime);
+    const s = new Reminders(dir, (text) => woke.push(text), wallTime);
     const damaged = JSON.stringify([
       {
         id: "important",
@@ -224,15 +224,15 @@ describe("recurrences", () => {
         created: new Date(0).toISOString(),
       },
     ]);
-    writeFileSync(join(dir, "recurrences.json"), damaged);
+    writeFileSync(join(dir, "reminders.json"), damaged);
     s.tick(new Date());
     expect(woke).toEqual([]);
-    expect(readFileSync(join(dir, "recurrences.json"), "utf8")).toBe(damaged);
+    expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
-    const s = new Recurrences(
+    const s = new Reminders(
       dir,
       () => {
         throw new Error("unexpected wake");
@@ -240,11 +240,11 @@ describe("recurrences", () => {
       wallTime,
     );
     const damaged = `[{"id":"important"`;
-    writeFileSync(join(dir, "recurrences.json"), damaged);
-    await fails(call(s.tools, "recurrence", { name: "new", message: "work", every_minutes: 5 }));
-    await fails(call(s.tools, "list_recurrences", {}));
+    writeFileSync(join(dir, "reminders.json"), damaged);
+    await fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
+    await fails(call(s.tools, "list_reminders", {}));
     s.tick();
-    expect(readFileSync(join(dir, "recurrences.json"), "utf8")).toBe(damaged);
+    expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 });
 

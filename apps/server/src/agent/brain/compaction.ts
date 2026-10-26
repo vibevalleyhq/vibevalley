@@ -40,7 +40,7 @@ export interface CompactionOptions {
   readonly keepRecent: number;
   /** The assistant's last words kept as they were, when that keeps the kept part under half the budget. */
   readonly keepSaid: number;
-  /** Written after the summary, as it stands when the fold is made (the open task graph); "" for none. */
+  /** Written after the summary, as it stands when the fold is made (its open tasks); "" for none. */
   readonly append?: () => Promise<string>;
   /** The brain's Time: the summary's and the asked messages' times, the archive's name. */
   readonly now: () => number;

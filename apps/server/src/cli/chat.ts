@@ -1,5 +1,5 @@
 // The conversations in a terminal: VibeValley's own agent (DeepSeek, with the coding tools, skills, memory, sessions,
-// recurrences and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
+// reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
 import { homedir } from "node:os";
@@ -15,14 +15,14 @@ import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
 import { loadConfig } from "../base/config.ts";
 import { dshRuntime } from "../runtime/dsh.ts";
 import { registryOf } from "../runtime/runtime.ts";
-import { memoryStore } from "../agent/brain/taskStore.ts";
+import { memoryStore } from "../agent/brain/agentTaskStore.ts";
 import { wallTime } from "../base/time.ts";
 
 const instructions = `你是 VibeValley，一个在用户电脑上干活的助手：读写代码、跑命令、查资料、记住用户交代的事、按时做定好的事。
 - 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
 - 能自己查到的不问；真正要用户拿主意的才问，一次问清。
 - 几件互不相干、各自要花工夫的事，用 spawn_agent 派帮手同时做。
-- 用户说「记住」「以后都」时用 remember；说「每天」「到点」「过一会儿」时用 recurrence。
+- 用户说「记住」「以后都」时用 remember；说「每天」「到点」「过一会儿」时用 reminder。
 - 回答用中文，简短，先说结论。`;
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
@@ -95,7 +95,7 @@ export async function ownChat(values: OwnChat) {
   const home = join(homedir(), ".vibevalley", "agent", values.name);
   const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
   const asked = values.p !== undefined;
-  // A one-off question keeps no recurrences running.
+  // A one-off question keeps no reminders running.
   const agent = await Brain.start({
     // The command line has no service to ask: the wall clock.
     time: wallTime,
@@ -106,7 +106,7 @@ export async function ownChat(values: OwnChat) {
     cwd,
     tools: codingTools({ cwd }),
     mcpServers: servers,
-    recurrences: !asked,
+    reminders: !asked,
     tasks: memoryStore(),
   });
   for (const why of agent.mcpStatus().failed) console.error(dim(why));

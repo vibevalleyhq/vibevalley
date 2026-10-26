@@ -16,7 +16,7 @@ import { deepseek } from "../agent/brain/config.ts";
 import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
-import { dbStore } from "../agent/brain/taskStore.ts";
+import { dbStore } from "../agent/brain/agentTaskStore.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";

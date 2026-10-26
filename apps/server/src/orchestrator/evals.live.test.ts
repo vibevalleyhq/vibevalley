@@ -67,7 +67,7 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
     tools: stubbed(tools, c.did),
     noSkills: true,
     noSubagents: true,
-    recurrences: false,
+    reminders: false,
   });
   try {
     const turn: AgentMessage[] = [];

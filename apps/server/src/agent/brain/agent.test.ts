@@ -276,35 +276,35 @@ describe("the agent", () => {
         expect(await r.ask("同时查 A 和 B")).toBe("查 A 做完了；查 B 做完了");
         expect(most).toBe(2);
       },
-      { tools: [nap], recurrences: false },
+      { tools: [nap], reminders: false },
     );
   });
 
-  it("is woken by a recurrence that comes due", async () => {
+  it("is woken by a reminder that comes due", async () => {
     const dir = home();
     writeFileSync(
-      join(dir, "recurrences.json"),
-      `[{"id":"job-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
+      join(dir, "reminders.json"),
+      `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
     );
     await withAgent(dir, [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))], async (r) => {
       await until(() => r.has("agent_settled"));
       const history = r.agent.history();
       expect(history[0]!.role).toBe("custom");
-      expect(messageText(history[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
+      expect(messageText(history[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
     });
-    expect(JSON.parse(readFileSync(join(dir, "recurrences.json"), "utf8"))).toEqual([]);
+    expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
   });
 
   // On the brain's Time (base/time.ts): an hour and its 20 s ticks are moved through, not waited for.
-  effectIt.effect("is woken when a recurrence comes due an hour later, at the next 20 s tick, not before", () =>
+  effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
       const time = yield* timeHere;
       const move = Effect.runPromiseWith(yield* Effect.context<never>());
       const dir = home();
       writeFileSync(
-        join(dir, "recurrences.json"),
-        `[{"id":"job-1","name":"早报","message":"汇总昨天的进展","at":"2026-03-01T09:00:00.000Z","created":"2026-03-01T08:00:00.000Z"}]`,
+        join(dir, "reminders.json"),
+        `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-03-01T09:00:00.000Z","created":"2026-03-01T08:00:00.000Z"}]`,
       );
       yield* Effect.promise(() =>
         withAgent(
@@ -315,7 +315,7 @@ describe("the agent", () => {
             expect(r.has("agent_start")).toBe(false);
             await move(TestClock.adjust(60_000 + 20_000));
             await until(() => r.has("agent_settled"));
-            expect(messageText(r.agent.history()[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
+            expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
           },
           { time },
         ),
@@ -581,7 +581,7 @@ describe("the agent", () => {
 
   it("drops the tools it is told not to have only after all are assembled", async () => {
     const dir = home();
-    const blocked = ["custom", "load_skill", "spawn_agent", "recurrence", "list_recurrences", "cancel_recurrence"];
+    const blocked = ["custom", "load_skill", "spawn_agent", "reminder", "list_reminders", "cancel_reminder"];
     await withAgent(
       dir,
       [],
@@ -593,7 +593,7 @@ describe("the agent", () => {
       },
       {
         noSession: true,
-        recurrences: true,
+        reminders: true,
         tools: [textTool({ name: "custom", description: "", parameters: objectSchema(), run: () => "" })],
         disallowedTools: blocked,
       },

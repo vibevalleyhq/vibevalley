@@ -2,12 +2,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { testDatabase } from "../../testing/layers.ts";
-import { add, begin, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
-import { dbStore, memoryStore } from "./taskStore.ts";
+import { add, begin, finished, readyTasks, requeue, settle, type AgentTask, AgentTaskError, text, update } from "./agentTask.ts";
+import { dbStore, memoryStore } from "./agentTaskStore.ts";
 import * as q from "../../../db/generated/agent_task.sql.ts";
 import { wallTime } from "../../base/time.ts";
 
-const ids = (g: readonly Task[]) => g.map((t) => t.id);
+const ids = (g: readonly AgentTask[]) => g.map((t) => t.id);
 
 const three = () => {
   const [g, problems] = add(
@@ -22,7 +22,7 @@ const three = () => {
   return g;
 };
 
-describe("an agent's task graph", () => {
+describe("an agent's own tasks", () => {
   it("added tasks wait, and the first is ready", () => {
     const g = three();
     expect(ids(readyTasks(g))).toEqual(["read"]);
@@ -69,8 +69,8 @@ describe("an agent's task graph", () => {
     expect([g[0]!.tries, g[0]!.brief]).toEqual([1, "用 sudo 读"]);
     g = update(g, "read", { state: "done" });
     expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/);
-    expect(() => update(g, "read", { state: "waiting" })).toThrow(TaskError);
-    expect(() => update(g, "nope", { state: "done" })).toThrow(TaskError);
+    expect(() => update(g, "read", { state: "waiting" })).toThrow(AgentTaskError);
+    expect(() => update(g, "nope", { state: "done" })).toThrow(AgentTaskError);
     expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/);
   });
 
@@ -108,7 +108,7 @@ describe("an agent's task graph", () => {
   });
 
   const stores = Effect.map(SqlClient.SqlClient, (sql) => ({
-    database: (owner: string) => dbStore(sql, owner, wallTime.now),
+    database: (keeper: string) => dbStore(sql, keeper, wallTime.now),
     memory: (_: string) => memoryStore(),
   }));
 
@@ -142,9 +142,9 @@ describe("an agent's task graph", () => {
         ["good", 1, `["bad"]`],
       ] as const)
         yield* Effect.orDie(
-          q.addGraphTask({
+          q.addAgentTask({
             graph: "g1",
-            owner: "s1",
+            keeper: "s1",
             id,
             position,
             title: "",
@@ -165,7 +165,7 @@ describe("an agent's task graph", () => {
     }).pipe(Effect.provide(testDatabase())),
   );
 
-  it.effect("one owner's graph is not another's", () =>
+  it.effect("one keeper's tasks are not another's", () =>
     Effect.gen(function* () {
       const open = (yield* stores).database;
       yield* open("s1").change((g) => Effect.succeed(add(g, [{ id: "a", brief: "b" }])[0]));

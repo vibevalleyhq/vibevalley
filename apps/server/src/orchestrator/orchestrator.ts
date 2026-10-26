@@ -15,7 +15,7 @@ import { graphText } from "../task/rules.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents, traitsOf } from "../agent/agent.ts";
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
-import { localeMinute } from "../agent/brain/recurrences.ts";
+import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { Channels, type OrchestratorNews } from "../channel/chat.ts";
