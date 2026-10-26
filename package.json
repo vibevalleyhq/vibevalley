@@ -15,9 +15,9 @@
     "notes:verify": "vpx scripts/agent-notes.ts",
     "notes:catalog": "vpx scripts/agent-notes.ts --write",
     "docs:verify": "vpx scripts/agent-notes.ts && vpx scripts/skills.ts && vpx scripts/doc-links.ts && vpx scripts/stale-names.ts && vpx scripts/capabilities.ts --check && vpx scripts/api-client.ts --check",
-    "site:check": "pnpm --dir site install --ignore-workspace && pnpm --dir site run check",
-    "site:build": "pnpm --dir site install --ignore-workspace && pnpm --dir site run build",
-    "site:deploy": "pnpm --dir site install --ignore-workspace && pnpm --dir site run deploy",
+    "site:check": "pnpm --dir site install && pnpm --dir site run check",
+    "site:build": "pnpm --dir site install && pnpm --dir site run build",
+    "site:deploy": "pnpm --dir site install && pnpm --dir site run deploy",
     "names:verify": "vpx scripts/stale-names.ts",
     "package:mac": "pnpm --filter vibevalley-desktop run package",
     "capabilities": "vpx scripts/capabilities.ts",
@@ -31,25 +31,5 @@
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },
-  "packageManager": "pnpm@9.15.9",
-  "pnpm": {
-    "overrides": {
-      "vite@*": "npm:@voidzero-dev/vite-plus-core@1.4.0",
-      "vitest@*": "5.0.5"
-    },
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild"
-    ],
-    "peerDependencyRules": {
-      "allowAny": [
-        "vite",
-        "vitest"
-      ],
-      "allowedVersions": {
-        "vite": "*",
-        "vitest": "*"
-      }
-    }
-  }
+  "packageManager": "pnpm@12.15.0"
 }

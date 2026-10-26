@@ -1,11 +1,32 @@
-# The workspace: the apps and the shared packages. site/ is a project of its own (its Astro brings its own Vite), installed
-# with --ignore-workspace.
+# The workspace: the apps and the shared packages. site/ is a project of its own (its Astro brings its own Vite), with its
+# own pnpm-workspace.yaml.
 packages:
   - apps/*
   - packages/*
 
-# vite is Vite+'s core everywhere (package.json's pnpm.overrides pins the same).
+# vite is Vite+'s core everywhere: overrides below point every vite and vitest at these.
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
   vitest: 5.0.5
   vite-plus: 1.4.0
+
+overrides:
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
+
+# Vite+'s core stands in for vite, so a package asking for vite or vitest takes it whatever range it asks.
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: "*"
+    vitest: "*"
+
+# Install scripts: esbuild fetches its binary in its; the others have never been run and are not needed. (Electron has
+# none: it downloads its binary the first time it runs.)
+allowBuilds:
+  esbuild: true
+  "@google/genai": false
+  electron-winstaller: false
+  protobufjs: false
