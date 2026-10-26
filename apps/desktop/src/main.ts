@@ -28,10 +28,17 @@ const notices: Notice[] = [];
 const trafficLights = { x: 12, y: 8 };
 
 let server: RunningServer | undefined;
+/** The server while it comes up: quitting then waits for it, to stop it rather than leave it running. */
+let starting: Promise<RunningServer> | undefined;
 let window: BrowserWindow | undefined;
 
-function open(url: string) {
-  window = new BrowserWindow({
+/** The page's ground (apps/web style.css): what the window is painted with between one page and the next. */
+const ground = "#2b3320";
+
+/** The one window, made when first asked for. */
+function windowNow(): BrowserWindow {
+  if (window) return window;
+  const made = new BrowserWindow({
     // The farm's proportions, so that it meets the window's edges (apps/web farm/world/framing.ts scales it by whole
     // steps only): three times its 384 × 256, and 3 : 2 however the window is sized.
     width: 1152,
@@ -41,26 +48,42 @@ function open(url: string) {
     minHeight: 512,
     title: "VibeValley",
     show: false,
+    backgroundColor: ground,
     // The page reaches the top edge; it leaves the strip the host says (preload titleBar) to drag the window by.
     ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: trafficLights } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
-  window.setAspectRatio(3 / 2);
-  const origin = new URL(url).origin;
+  made.setAspectRatio(3 / 2);
   // The page stays on the server's origin; any other link opens in the browser.
-  window.webContents.setWindowOpenHandler(({ url: to }) => {
+  made.webContents.setWindowOpenHandler(({ url: to }) => {
     void shell.openExternal(to);
     return { action: "deny" };
   });
-  window.webContents.on("will-navigate", (event, to) => {
-    if (new URL(to).origin !== origin) {
-      event.preventDefault();
-      void shell.openExternal(to);
-    }
+  made.webContents.on("will-navigate", (event, to) => {
+    const target = new URL(to);
+    if (server && target.origin === new URL(server.url).origin) return;
+    event.preventDefault();
+    if (target.protocol === "http:" || target.protocol === "https:") void shell.openExternal(to);
   });
-  window.once("ready-to-show", () => window?.show());
-  window.on("closed", () => (window = undefined));
-  void window.loadURL(url);
+  made.once("ready-to-show", () => made.show());
+  made.on("closed", () => (window = undefined));
+  window = made;
+  return made;
+}
+
+/** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
+const loaded = (load: Promise<void>) =>
+  load.catch((e: unknown) => {
+    if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
+  });
+
+/** The bar while the server comes up (apps/web public/opening.html, from the app's files), or why it did not. */
+function opening(problem?: string) {
+  void loaded(windowNow().loadFile(join(files().web, "opening.html"), problem ? { query: { problem } } : {}));
+}
+
+function open(url: string) {
+  void loaded(windowNow().loadURL(url));
 }
 
 ipcMain.handle("host:notify", (_event, notice: Notice) => {
@@ -109,14 +132,26 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(async () => {
     // A packaged app has its icon (resources/icon.icns); run from the repository, the Dock shows Electron's unless set.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(files().web, "icons", "app-256.png")));
+    // The window comes at once, on the bar: reading the login shell's PATH and starting the server take seconds.
+    opening();
     const path = await loginShellPath(process.env);
     const env = path ? { ...process.env, PATH: path } : process.env;
     try {
-      server = await startServer(files(), env);
+      starting = startServer(files(), env);
+      server = await starting;
     } catch (e) {
-      dialog.showErrorBox("VibeValley 起不来", e instanceof Error ? e.message : String(e));
-      app.exit(1);
+      const why = e instanceof Error ? e.message : String(e);
+      // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
+      if (!window) {
+        dialog.showErrorBox("VibeValley 起不来", why);
+        app.exit(1);
+        return;
+      }
+      opening(why);
+      window.once("closed", () => app.exit(1));
       return;
+    } finally {
+      starting = undefined;
     }
     open(server.url);
     if (!app.isPackaged && process.env.VIBEVALLEY_DEV === "1") {
@@ -153,9 +188,10 @@ if (!app.requestSingleInstanceLock()) {
   // The server gets its time to save before the app goes.
   let stopped = false;
   app.on("before-quit", (event) => {
-    if (stopped || !server) return;
+    if (stopped || (!server && !starting)) return;
     event.preventDefault();
-    void server.stop().finally(() => {
+    const coming = starting;
+    void (async () => (server ?? (await coming?.catch(() => undefined)))?.stop())().finally(() => {
       stopped = true;
       app.quit();
     });

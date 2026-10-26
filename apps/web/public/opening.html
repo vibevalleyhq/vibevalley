@@ -1,0 +1,106 @@
+<!doctype html>
+<!--
+  What a window shows before the server has answered: the desktop app opens it from its files (file://) the moment it
+  starts and the server is still coming up. The part between the opening markers is also written into index.html
+  when the page is built (vite.config.ts), so the served page starts on the same bar until it is mounted (app/Root.tsx);
+  the farm's own bar (farm/canvas/VillageCanvas.tsx, Entering) takes over in the same place. Colors are the page's
+  tokens (style.css): ground, bark-900, leaf-500, cream-100, cream-200.
+-->
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeValley</title>
+    <style>
+      @font-face {
+        font-family: "FusionPixel";
+        src: url("fonts/fusion-pixel-12px-proportional-zh_hans.otf");
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #2b3320;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- opening -->
+    <style>
+      #opening {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        background: #2b3320;
+        font: 12px "FusionPixel", "PingFang SC", sans-serif;
+        color: #eedcb2;
+        user-select: none;
+      }
+      #opening .column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        max-width: 80vw;
+      }
+      #opening .bar {
+        box-sizing: border-box;
+        position: relative;
+        overflow: hidden;
+        width: 256px;
+        height: 16px;
+        padding: 2px;
+        border: 2px solid #2f1f13;
+        background: #2f1f1399;
+        box-shadow: 2px 2px 0 0 #3a2a1899;
+      }
+      #opening .fill {
+        position: absolute;
+        top: 2px;
+        bottom: 2px;
+        width: 30%;
+        background: #74a046;
+        animation: opening-walk 1.4s steps(14) infinite;
+      }
+      #opening .problem {
+        color: #e2c995;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        text-align: center;
+      }
+      @keyframes opening-walk {
+        from {
+          left: -30%;
+        }
+        to {
+          left: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #opening .fill {
+          animation: none;
+          left: 2px;
+        }
+      }
+    </style>
+    <div id="opening">
+      <div class="column">
+        <div class="bar" role="progressbar" aria-label="叫醒农场"><div class="fill"></div></div>
+        <span class="words">叫醒农场……</span>
+      </div>
+    </div>
+    <!-- /opening -->
+    <script>
+      // The desktop app comes back here with ?problem= when the server could not start: it says why in place of the bar.
+      const problem = new URLSearchParams(location.search).get("problem");
+      if (problem) {
+        document.querySelector("#opening .bar").remove();
+        const words = document.querySelector("#opening .words");
+        words.className = "problem";
+        words.textContent = "农场起不来：" + problem;
+      }
+    </script>
+  </body>
+</html>
