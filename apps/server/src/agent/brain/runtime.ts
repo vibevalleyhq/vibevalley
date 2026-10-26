@@ -1,6 +1,7 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
+import { agentWording } from "../words.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import type { AgentToolResult, ThinkingLevel } from "@earendil-works/pi-agent-core";
@@ -48,20 +49,15 @@ const toMcp = (s: OarMcpServer): McpServer =>
         ...(s.env ? { env: { ...s.env } } : {}),
       };
 
-const refusedOptions = {
-  launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数",
-  serviceTier: "DeepSeek 没有服务档位",
-} as const;
-
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   const home = options.home ?? defaultHome;
   const llmOf = options.llm ?? ((model: string) => deepseek(model, process.env.DEEPSEEK_API_KEY ?? ""));
 
   const start = async (_installation: unknown, o: SessionOptions) => {
     // oar's refusableOrder, for these two.
-    for (const option of ["serviceTier", "launchArgs"] as const) if (o[option] !== undefined) throw new UnsupportedOptionError(option, refusedOptions[option]);
-    if (o.effort && !(efforts as readonly string[]).includes(o.effort))
-      throw new Error(`${vibevalleyRuntime} 只有 ${efforts.join("、")} 两档思考强度，没有「${o.effort}」`);
+    for (const option of ["serviceTier", "launchArgs"] as const)
+      if (o[option] !== undefined) throw new UnsupportedOptionError(option, agentWording().refused[option]);
+    if (o.effort && !(efforts as readonly string[]).includes(o.effort)) throw new Error(agentWording().efforts(vibevalleyRuntime, efforts, o.effort));
     const llm = llmOf(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
     const instructions = o.systemPrompt ?? [helperInstructions, ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
@@ -242,7 +238,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   return defineRuntime({
     id: vibevalleyRuntime,
     session: start,
-    refusedSessionOptions: refusedOptions,
+    refusedSessionOptions: agentWording().refused,
     installation: async () => {
       try {
         llmOf("");

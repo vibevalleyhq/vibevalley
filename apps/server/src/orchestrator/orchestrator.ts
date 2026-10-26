@@ -13,7 +13,8 @@ import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
-import { Agents, traitsOf } from "../agent/agent.ts";
+import { Agents } from "../agent/agent.ts";
+import { traitsOf } from "../agent/prompts.ts";
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
@@ -33,7 +34,7 @@ import { Sessions } from "../session/session.ts";
 import { Setting } from "../setting/setting.ts";
 import { Tasks } from "../task/task.ts";
 import { Tools } from "../tool/tool.ts";
-import { channelLine } from "../tool/words.ts";
+import { channelLine } from "../tool/prompts.ts";
 import { deepseekModel, intake, orchestratorInboxLines, orchestratorModel, patrolText, quotaText, situationDelta, type Source } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 
@@ -332,7 +333,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         return true;
       }
       const words =
-        taken.why === noDeepSeekKey
+        taken.why === noDeepSeekKey()
           ? "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。"
           : "我这边起不来：" + taken.why;
       const again = cannot.get(i.conversation) === words;

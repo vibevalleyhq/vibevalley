@@ -1,6 +1,7 @@
 // Notifications' rules: what of the farm's talk reaches the owner off the farm (forOwner), and the patrol (巡查), no model. Each inbox item waits out its kind's grace (a question may be answered
 // in a minute), is reported once, and again only after reportAgainMs if it still stands.
 
+import { patrolAgo } from "./prompts.ts";
 import { type ChatMessage, everyone, type InboxKind, ownerId, type WorkspaceState } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";
 
@@ -31,8 +32,6 @@ export interface PatrolMemory {
 }
 
 export const emptyPatrol = (): PatrolMemory => ({ firstSeen: {}, reported: {} });
-
-export const patrolAgo = (ms: number) => (ms >= 2 * 60 * 60_000 ? Math.round(ms / (60 * 60_000)) + " 小时" : Math.max(1, Math.round(ms / 60_000)) + " 分钟");
 
 /** Things no longer hanging are forgotten, so if they come back they are new. */
 export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMemory): [PatrolNote[], PatrolMemory] {

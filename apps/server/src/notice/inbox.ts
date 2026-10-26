@@ -3,12 +3,13 @@
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
 // questions in their place; a quiet one still questions.
 
-import { wording } from "@vibevalley/protocol/words";
-import type { Question, WorkspaceState, InboxFrom, InboxItem, InboxKind, InboxWords, Session } from "@vibevalley/protocol";
+import type { Question, WorkspaceState, InboxFrom, InboxItem, Session } from "@vibevalley/protocol";
 import { generalOf } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
+import { patrolBrief, patrolWho } from "./prompts.ts";
+import { noticeWording } from "./words.ts";
 
 /** channel undefined: the general channel; since undefined: from when the reader first saw it. brief is for the orchestrator, {ago} filled with how long it has waited. */
 export interface InboxEntry {
@@ -42,7 +43,7 @@ function gathered(state: WorkspaceState): Unworded[] {
     const target = { kind: "session", id: h.id } as const;
     const at = h.lastRun?.at ?? h.hiredAt;
     const summary = h.lastRun?.summary ? h.lastRun.summary : h.brief;
-    const who = h.name + "（" + h.id + "）";
+    const who = patrolWho(h.name, h.id);
     switch (want.kind) {
       case "ask": {
         const question = want.questions[0]?.question ?? "";
@@ -50,7 +51,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           item: { id: `${h.id}:ask:${h.runs}`, kind: "ask", from, text: cut(question, 40), at, target },
           channel,
           since: at,
-          brief: who + "问了主人 " + want.questions.length + " 个问题，{ago}没人回：「" + slice(question, 0, 60) + "」",
+          brief: patrolBrief.ask(who, want.questions.length, slice(question, 0, 60)),
         });
         break;
       }
@@ -59,7 +60,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           item: { id: `${h.id}:review:${h.runs}`, kind: "review", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
-          brief: who + "的活做完 {ago}了还没人看：「" + slice(h.brief, 0, 60) + "」",
+          brief: patrolBrief.review(who, slice(h.brief, 0, 60)),
         });
         break;
       case "fix":
@@ -67,7 +68,7 @@ function gathered(state: WorkspaceState): Unworded[] {
           item: { id: `${h.id}:fix:${h.runs}`, kind: "fix", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
-          brief: who + "这一轮没做成，{ago}没人管了：「" + slice(summary, 0, 60) + "」",
+          brief: patrolBrief.fix(who, slice(summary, 0, 60)),
         });
         break;
       case "interrupted":
@@ -75,26 +76,25 @@ function gathered(state: WorkspaceState): Unworded[] {
           item: { id: `${h.id}:interrupted:${h.runs}`, kind: "interrupted", from, text: cut(summary, 40), at, target },
           channel,
           since: at,
-          brief: who + "这一轮停在了半路，{ago}没人管了：「" + slice(h.brief, 0, 60) + "」",
+          brief: patrolBrief.interrupted(who, slice(h.brief, 0, 60)),
         });
         break;
       case "conflict": {
         const files = (h.conflict?.files ?? []).length;
         out.push({
-          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: `${files} 个文件和主分支冲突`, at, target },
+          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: noticeWording().conflictFiles(files), at, target },
           channel,
           since: at,
-          brief: who + `的活合进主分支会冲突（${files} 个文件），{ago}没人管了`,
+          brief: patrolBrief.conflict(who, files),
         });
         break;
       }
       case "quiet": {
-        const doing = h.phase._tag === "working" && h.phase.doing.label !== "" ? "「" + h.phase.doing.label + "」" : "想事情";
         out.push({
           item: { id: `${h.id}:quiet:${want.since}`, kind: "quiet", from, text: cut(h.brief, 40), at: want.since, target },
           channel,
           since: want.since,
-          brief: who + "在干活，{ago}没动静了，最后在" + doing,
+          brief: patrolBrief.quiet(who, h.phase._tag === "working" ? h.phase.doing.label : ""),
         });
         break;
       }
@@ -109,14 +109,14 @@ function gathered(state: WorkspaceState): Unworded[] {
         out.push({
           item: { id: graph.id + ":draft", kind: "graph-draft", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
-          brief: "计划「" + graph.title + "」（" + graph.id + "）拆好了，{ago}还没人看",
+          brief: patrolBrief.graphDraft(graph.title, graph.id),
         });
         break;
       case "ready":
         out.push({
           item: { id: graph.id + ":ready", kind: "graph-ready", from: orchestrator, text: cut(graph.title, 40), at: graph.createdAt, target },
           channel: general,
-          brief: "计划「" + graph.title + "」（" + graph.id + "）都做完了，{ago}还没合进主分支",
+          brief: patrolBrief.graphReady(graph.title, graph.id),
         });
         break;
       case "running":
@@ -126,11 +126,10 @@ function gathered(state: WorkspaceState): Unworded[] {
           // A step retried and failed again asks again: from its second failure the id counts them.
           const failures = task.failures ?? 0;
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
-          const why = task.conclusion ? "：" + slice(task.conclusion, 0, 80) : "";
           out.push({
-            item: { id, kind: "task-failed", from: orchestrator, text: cut(graph.title + "：" + task.title, 40), at: graph.createdAt, target },
+            item: { id, kind: "task-failed", from: orchestrator, text: cut(noticeWording().step(graph.title, task.title), 40), at: graph.createdAt, target },
             channel: general,
-            brief: "计划「" + graph.title + "」（" + graph.id + "）的步骤 " + task.id + "「" + task.title + "」没做成，{ago}没人管了" + why,
+            brief: patrolBrief.taskFailed(graph.title, graph.id, task.id, task.title, task.conclusion ? slice(task.conclusion, 0, 80) : ""),
           });
         }
         break;
@@ -154,7 +153,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       },
       channel: sc.channel,
       since: sc.created,
-      brief: "定时「" + sc.name + "」（" + sc.id + "）等主人同意，{ago}了",
+      brief: patrolBrief.recurrence(sc.name, sc.id),
     });
   }
 
@@ -164,7 +163,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: m.conversation } },
       channel,
       since: m.at,
-      brief: m.name + " 在 " + address + " 问主人的话，{ago}没人回：「" + slice(oneLine(m.text), 0, 80) + "」",
+      brief: patrolBrief.mention(m.name, address, slice(oneLine(m.text), 0, 80)),
     });
   }
   return out;
@@ -229,36 +228,7 @@ function clipLine(text: string, max = 140) {
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
 
-const words: Readonly<Record<InboxKind, (who: string, text: string) => InboxWords>> = {
-  review: (who, text) => ({ label: "等你看", title: `${who} 做完了`, body: text, tray: `${who} 做完了，等你看` }),
-  ask: (who, text) => ({ label: "有问题问你", title: `${who} 有问题问你`, body: text }),
-  fix: (who, text) => ({ label: "活没做成", title: `${who} 没做成`, body: text, tray: `${who} 没做成` }),
-  interrupted: (who, text) => ({ label: wording().stuck.interrupted, title: `${who} 停在了半路`, body: text }),
-  conflict: (who, text) => ({ label: "合不进去", title: `${who} 的活合进主分支会冲突`, body: text, tray: `${who} 的活会冲突` }),
-  quiet: (who) => ({
-    label: "好久没动静",
-    title: `${who} 好一阵没动静了`,
-    body: "可能在跑很久的命令，也可能卡住了：看看它的干活过程。",
-    tray: `${who} 好一阵没动静`,
-  }),
-  "graph-draft": (_, text) => ({ label: "计划拆好了", title: `计划「${text}」拆好了`, body: "看过再开工", tray: `计划「${text}」等你看` }),
-  "graph-ready": (_, text) => ({
-    label: "计划做完了",
-    title: `计划「${text}」都做完了`,
-    body: "看看改动，合进主分支",
-    tray: `计划「${text}」等你合进主分支`,
-  }),
-  "task-failed": (_, text) => ({ label: "计划卡住了", title: `计划卡住了：${text}`, body: "重试、改工单，或者跳过", tray: `计划「${text}」没做成` }),
-  mention: (who, text) => ({ label: "找你", title: `${who} 叫你`, body: text }),
-  "recurrence-ask": (_, text) => ({
-    label: "定时等你同意",
-    title: "管家想定一个定时",
-    body: `「${text}」：同意了才开始`,
-    tray: `定时「${text}」等你同意`,
-  }),
-};
-
 function worded(item: Omit<InboxItem, "who" | "words">): InboxItem {
-  const who = item.from.kind === "session" ? item.from.name : "管家";
-  return { ...item, who, words: words[item.kind](who, clipLine(item.text)) };
+  const who = item.from.kind === "session" ? item.from.name : noticeWording().orchestrator;
+  return { ...item, who, words: noticeWording().item[item.kind](who, clipLine(item.text)) };
 }

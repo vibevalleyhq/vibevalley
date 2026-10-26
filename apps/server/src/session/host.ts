@@ -6,6 +6,7 @@
 // go. An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so
 // they go to the route of the input taken last, and the tools read that route too.
 
+import { agentWording } from "../agent/words.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
@@ -437,7 +438,7 @@ export class AgentHost<R> {
         const m = e.message;
         this.noteUsage(m.usage);
         await this.done(messageText(m).trim());
-        if (m.stopReason === "error") this.o.notice("error", this.o.label + "出错了：" + (m.errorMessage || "模型出错了"));
+        if (m.stopReason === "error") this.o.notice("error", this.o.label + "出错了：" + (m.errorMessage || agentWording().modelFailed));
         return;
       }
       case "compaction_end":

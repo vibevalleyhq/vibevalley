@@ -53,7 +53,7 @@ import {
   sessionLine,
   statusOf,
   tail,
-} from "./words.ts";
+} from "./prompts.ts";
 import { schemas, sessionSchemas } from "./schemas.ts";
 
 /** Who is calling, at the moment of the call. */

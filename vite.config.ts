@@ -152,6 +152,10 @@ export default defineConfig({
           "**/*.test.tsx",
           "apps/server/src/testing/**",
           "apps/server/src/agent/brain/testing.ts",
+          // What speaks only to models: VibeValley's own agent (its prompts, its tools, its errors to the model) and the
+          // tools the orchestrator and the helpers call (their descriptions and results).
+          "apps/server/src/agent/brain/**",
+          "apps/server/src/tool/**",
         ],
         rules: { "vibevalley/no-cjk-literal": "off" },
       },
