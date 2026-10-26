@@ -46,8 +46,10 @@ export const wallTime: Time = {
       }
       signal?.addEventListener("abort", abort, { once: true });
     }),
+  // Kept alive by nothing: a command line's pending fold or tick does not hold it open.
   after: (ms, f) => {
     const timer = setTimeout(f, Math.max(0, ms));
+    timer.unref();
     return () => clearTimeout(timer);
   },
 };

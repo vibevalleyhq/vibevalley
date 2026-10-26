@@ -14,6 +14,7 @@ import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./tasks.ts";
 import { fauxLLM, tempHome } from "./testing.ts";
+import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -124,15 +125,15 @@ describe("skills and memory", () => {
 
   it("remember, rewrite and search the archive", async () => {
     const dir = home();
-    const tools = selfTools({ home: dir, skills: () => [], memory: true });
+    const tools = selfTools({ now: wallTime.now, home: dir, skills: () => [], memory: true });
     await call(tools, "remember", { note: "用户喜欢\n简短的回答" });
     expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/);
     await call(tools, "rewrite_memory", { content: "- 只说中文" });
     expect(readMemory(dir).prompt).toBe("- 只说中文");
     expect(await call(tools, "search_archive", { query: "端口" })).toBe("还没有归档的旧对话。");
-    archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好");
+    archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", new Date());
     expect(await call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/);
-    expect(selfTools({ home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
+    expect(selfTools({ now: wallTime.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
     const lines = readMemory(dir).lines;
     expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
     forgetLine(dir, lines[0]!.id);
@@ -158,7 +159,7 @@ describe("recurrences", () => {
   it("run a missed job once", async () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Recurrences(dir, (text) => woke.push(text));
+    const s = new Recurrences(dir, (text) => woke.push(text), wallTime);
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m" }))).toMatch(/正好给一个/);
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
@@ -184,7 +185,7 @@ describe("recurrences", () => {
   it("wake only once the claim is stored", () => {
     const dir = home();
     let wakes = 0;
-    const s = new Recurrences(dir, () => wakes++);
+    const s = new Recurrences(dir, () => wakes++, wallTime);
     const now = new Date();
     writeFileSync(
       join(dir, "recurrences.json"),
@@ -212,7 +213,7 @@ describe("recurrences", () => {
   it("do not run a persisted job whose shape is wrong", () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Recurrences(dir, (text) => woke.push(text));
+    const s = new Recurrences(dir, (text) => woke.push(text), wallTime);
     const damaged = JSON.stringify([
       {
         id: "important",
@@ -230,9 +231,13 @@ describe("recurrences", () => {
 
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
-    const s = new Recurrences(dir, () => {
-      throw new Error("unexpected wake");
-    });
+    const s = new Recurrences(
+      dir,
+      () => {
+        throw new Error("unexpected wake");
+      },
+      wallTime,
+    );
     const damaged = `[{"id":"important"`;
     writeFileSync(join(dir, "recurrences.json"), damaged);
     await fails(call(s.tools, "recurrence", { name: "new", message: "work", every_minutes: 5 }));
@@ -312,6 +317,7 @@ describe("MCP", () => {
     const dir = home();
     writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
     const agent = await Brain.start({
+      time: wallTime,
       name: "test",
       instructions: "",
       llm: fauxLLM().llm,

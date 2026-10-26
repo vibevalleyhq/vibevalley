@@ -22,6 +22,7 @@ import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
 import { TaskRunner, taskTools, watchedStore } from "./tasks.ts";
 import { stopped } from "./tool.ts";
+import type { Time } from "../../base/time.ts";
 
 /** A pi-agent-core event, or one of this agent's own. */
 export type BrainEvent =
@@ -87,6 +88,9 @@ export interface BrainOptions {
   readonly recurrenceTickMs?: number;
   /** Default later. */
   readonly wake?: (text: string) => void;
+  /** Its clock (base/time.ts): message times, the recurrence ticks, the idle fold, a resumed run's age. A helper it
+   * sends out shares it. */
+  readonly time: Time;
 }
 
 export interface McpStatus {
@@ -96,7 +100,7 @@ export interface McpStatus {
 
 export const resumedUnknown = "服务端在这个工具做完之前重启了，不知道它做没做成：先查一下现状，再决定要不要再做一遍。";
 
-const taskMessage = (text: string) => customMessage("task", text);
+const taskMessage = (text: string, now: number) => customMessage("task", text, now);
 
 const allowed = (tools: readonly AgentTool[], disallowed: readonly string[] = []) => tools.filter((t) => !disallowed.includes(t.name));
 
@@ -168,8 +172,9 @@ export class Brain {
   private requestTools: Tool[] = [];
   /** The lines of MEMORY.md the model knows: the snapshot's, then as memoryNews told it. */
   private knownMemory: string[] = [];
-  private idle: NodeJS.Timeout | undefined;
-  private scheduleTimer: NodeJS.Timeout | undefined;
+  /** What cancels the pending idle fold and the next recurrence tick. */
+  private idle: (() => void) | undefined;
+  private scheduleTimer: (() => void) | undefined;
 
   /** Connects to its MCP servers first; one that cannot be reached is left out (mcpStatus). */
   static async start(options: BrainOptions, signal?: AbortSignal): Promise<Brain> {
@@ -203,10 +208,12 @@ export class Brain {
       budget,
       keepRecent: options.keepRecent ?? 12,
       keepSaid: 3,
+      now: () => options.time.now(),
     };
 
     const hostTools = [...(options.tools ?? []), ...this.mcp.tools];
     const own = selfTools({
+      now: () => options.time.now(),
       home: options.home,
       skills: () => this.skills(),
       memory: !options.noMemory,
@@ -230,11 +237,12 @@ export class Brain {
             noSession: true,
             noSubagents: true,
             recurrences: false,
+            time: options.time,
           },
           signal,
         );
         try {
-          const said = await h.ask(userMessage(brief), AbortSignal.any([signal, this.life.signal]));
+          const said = await h.ask(userMessage(brief, options.time.now()), AbortSignal.any([signal, this.life.signal]));
           return said || "帮手「" + label + "」没有交回结果。";
         } finally {
           await h.close();
@@ -244,7 +252,14 @@ export class Brain {
     }
     if (options.tasks) {
       const store = watchedStore(options.tasks, (g) => this.publish({ type: "tasks_changed", tasks: finished(g) ? [] : g }));
-      this.tasks = new TaskRunner(store, helper, this.life.signal, (text) => this.later(taskMessage(text)), options.maxHelpers ?? 3, options.maxNudges ?? 3);
+      this.tasks = new TaskRunner(
+        store,
+        helper,
+        this.life.signal,
+        (text) => this.later(taskMessage(text, options.time.now())),
+        options.maxHelpers ?? 3,
+        options.maxNudges ?? 3,
+      );
       const runner = this.tasks;
       own.push(...taskTools(store, helper !== undefined, () => void runner.advance()));
       // A fold replaces the turns that showed the graph: the summary carries it on.
@@ -256,7 +271,7 @@ export class Brain {
     const recurrences = options.recurrences ?? this.session !== undefined;
     let jobs: Recurrences | undefined;
     if (recurrences) {
-      jobs = new Recurrences(options.home, options.wake ?? ((text) => this.later(customMessage("recurrence", text))));
+      jobs = new Recurrences(options.home, options.wake ?? ((text) => this.later(customMessage("recurrence", text, options.time.now()))), options.time);
       tools = allowed([...tools, ...jobs.tools], options.disallowedTools);
     }
     this.core = new Agent({
@@ -308,8 +323,14 @@ export class Brain {
       const s = jobs;
       // The first look is at once: what came due while it was away runs now, once.
       s.tick();
-      this.scheduleTimer = setInterval(() => s.tick(), options.recurrenceTickMs ?? 20_000);
-      this.scheduleTimer.unref();
+      const every = options.recurrenceTickMs ?? 20_000;
+      const next = () => {
+        this.scheduleTimer = options.time.after(every, () => {
+          s.tick();
+          next();
+        });
+      };
+      next();
     }
     // What a process that went left out goes out again, now that the agent can be told.
     void this.tasks?.recover();
@@ -465,7 +486,7 @@ export class Brain {
     for (const w of waiters) w(result);
     if (this.tasks && !result.aborted && !result.error && alive()) {
       const text = await this.tasks.nudge();
-      if (text) this.later(taskMessage(text));
+      if (text) this.later(taskMessage(text, this.options.time.now()));
     }
   }
 
@@ -559,7 +580,7 @@ export class Brain {
     if (!this.quiet()) return false;
     const messages = this.history();
     const { missing, ok } = unfinished(messages);
-    if (!ok || Date.now() - messages.at(-1)!.timestamp > maxAgeMs) return false;
+    if (!ok || this.options.time.now() - messages.at(-1)!.timestamp > maxAgeMs) return false;
     if (missing.length > 0) {
       const more: AgentMessage[] = missing.map((call) => ({
         role: "toolResult",
@@ -567,7 +588,7 @@ export class Brain {
         toolName: call.name,
         content: [{ type: "text", text: resumedUnknown }],
         isError: true,
-        timestamp: Date.now(),
+        timestamp: this.options.time.now(),
       }));
       for (const m of more) this.save(m);
       this.core.state.messages = [...this.core.state.messages, ...more];
@@ -591,7 +612,7 @@ export class Brain {
   }
 
   private stopIdle() {
-    if (this.idle) clearTimeout(this.idle);
+    this.idle?.();
     this.idle = undefined;
   }
 
@@ -601,8 +622,7 @@ export class Brain {
     const after = this.idleAfter();
     if (after < 0 || estimateTokens(this.history()) <= this.idleAt()) return;
     this.stopIdle();
-    this.idle = setTimeout(() => void this.foldIdle(), after);
-    this.idle.unref();
+    this.idle = this.options.time.after(after, () => void this.foldIdle());
   }
 
   private async foldIdle() {
@@ -636,7 +656,7 @@ export class Brain {
 
   private async closeOnce() {
     this.stopIdle();
-    if (this.scheduleTimer) clearInterval(this.scheduleTimer);
+    this.scheduleTimer?.();
     this.life.abort();
     this.core.abort();
     await this.core.waitForIdle();

@@ -488,7 +488,7 @@ export const make = (options: OrchestratorOptions = {}) =>
           on,
           want,
           modelId(),
-          [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true })].map((t) => t.name),
+          [...toolsFor(() => host.current().route), ...selfTools({ home, skills: () => [], memory: true, now: () => 0 })].map((t) => t.name),
         ),
     });
   });

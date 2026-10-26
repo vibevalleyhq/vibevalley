@@ -211,7 +211,7 @@ export class AgentHost<R> {
       if (this.closing) return this.closeInput(input);
       const { text, heard } = await build(b.busy() || b.core.hasQueuedMessages(), b.memoryNews());
       if (this.closing) return this.closeInput(input);
-      const message = customMessage(this.o.inputType, text, { details: input.route });
+      const message = customMessage(this.o.inputType, text, this.time.now(), { details: input.route });
       this.local.set(message, { ...input, run: { ...run, ...(heard ? { heard } : {}) } });
       if (now) b.send(message);
       else b.later(message);
@@ -313,6 +313,7 @@ export class AgentHost<R> {
       const llm = this.o.llm();
       const b = await Brain.start(
         {
+          time: this.time,
           name: this.o.name,
           instructions: this.o.instructions,
           llm,

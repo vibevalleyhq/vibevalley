@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import { jsonOf } from "../../base/json.ts";
 import { numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
+import type { Time } from "../../base/time.ts";
 
 export interface Job {
   readonly id: string;
@@ -85,6 +86,8 @@ export class Recurrences {
   constructor(
     private readonly home: string,
     private readonly wake: (text: string) => void,
+    /** The brain's Time: when a job is due. */
+    private readonly time: Time,
   ) {
     this.file = join(home, "recurrences.json");
     this.tools = this.makeTools();
@@ -102,7 +105,7 @@ export class Recurrences {
   }
 
   /** At most once each. */
-  tick(now = new Date()) {
+  tick(now = new Date(this.time.now())) {
     let due: Job[];
     try {
       const jobs = this.load();
@@ -148,7 +151,7 @@ export class Recurrences {
         }
         if (p.every_minutes != null && !(p.every_minutes >= 1)) throw new Error("every_minutes 至少是 1。");
         if (p.cron != null) parseCron(p.cron);
-        const now = new Date();
+        const now = new Date(this.time.now());
         const job: Job = {
           id: "job-" + now.getTime().toString(36),
           name: p.name,
