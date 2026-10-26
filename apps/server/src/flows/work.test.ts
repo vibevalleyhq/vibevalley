@@ -11,6 +11,7 @@ import { Issues } from "../issue/issue.ts";
 import { Sessions, type SessionsInside } from "../session/session.ts";
 import { testConfig } from "../testing/layers.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
+import { releaseHeld } from "../testing/helper.ts";
 
 const lastText = (sessions: Sessions["Service"], id: string, summary: string) => sessions.find(id)?.lastText ?? summary;
 
@@ -187,6 +188,7 @@ describe("a session's work", () => {
         const need = needOf(sessions.find(session.id)!.session);
         return need?.kind === "quiet" && Date.now() - need.since >= 500;
       }, "the orchestrator sees it has been quiet half a second");
+      yield* releaseHeld();
       yield* w.nextReport;
       const steps = sessions.events(session.id)!;
       yield* sessions.dismiss(session.id);
@@ -257,6 +259,7 @@ describe("a session's work", () => {
       yield* agents.saveSettings("pi", { ...settings, maxWorking: 3 });
       expect((yield* issues.hire(lab(), "发呆 5", "roomy")).refused).toMatch(/最多同时 3 个/);
       yield* agents.saveSettings("pi", settings);
+      yield* releaseHeld(3);
       for (let i = 0; i < 3; i++) yield* w.nextReport;
       const later = mustHire(yield* issues.hire(lab(), "随便做点什么", "crowded"));
       yield* w.nextReport;

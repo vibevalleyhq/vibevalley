@@ -19,10 +19,16 @@ import { until } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-/** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 takes a while, 「必败」 fails. */
+/** Sessions played: a turn takes its input, says it got it and reports; 「慢慢做」 is held until release (unless holds is
+ * off), 「必败」 fails. */
 class FakeSessions {
-  slow = 1500;
+  holds = true;
   stopped = false;
+  private held = new Set<() => void>();
+  /** Lets every held turn go on. */
+  release = () => {
+    for (const go of [...this.held]) go();
+  };
   inputs = new Map<string, string[]>();
   steers = new Map<string, string[]>();
   last = new Map<string, string>();
@@ -52,13 +58,14 @@ class FakeSessions {
   };
 
   private async run(id: string, launch: string, input: string) {
-    if (input.includes("慢慢做")) {
-      const until = Date.now() + this.slow;
-      while (Date.now() < until) {
-        if (this.stopped) return;
-        await new Promise((r) => setTimeout(r, 10));
-      }
-    }
+    if (input.includes("慢慢做") && this.holds)
+      await new Promise<void>((go) => {
+        const done = () => {
+          this.held.delete(done);
+          go();
+        };
+        this.held.add(done);
+      });
     if (this.stopped) return;
     const runs = this.runsOf(id).length;
     if (input.includes("必败")) {
@@ -83,7 +90,12 @@ const fakeHelpers = (x: FakeSessions) =>
       x.core = yield* Core;
       const chat = yield* Channels;
       x.launches = yield* PubSub.unbounded<LaunchActivity>();
-      yield* Effect.addFinalizer(() => Effect.sync(() => (x.stopped = true)));
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          x.stopped = true;
+          x.release();
+        }),
+      );
       chat.useHelpers({
         present: (id) => x.core.session(id) !== undefined,
         deliver: (id, text) => Effect.sync(() => x.deliver(id, text)),
@@ -297,6 +309,9 @@ describe("the chat", () => {
         expect(isBusy(f.core.session("w6")!)).toBe(true);
         yield* f.chat.say("补充：顺便写测试", thread.id, "");
         yield* f.chat.say("还有：写 README", thread.id, "");
+        // Still busy when the burst's one notice comes in; then the turn may finish.
+        yield* until(() => x.steersOf("w6").some((s) => s.startsWith("[田头提示]")), "the burst's notice");
+        x.release();
         yield* until(() => x.runsOf("w6").length >= 2, "a second turn");
         const notices = x.steersOf("w6").filter((s) => s.startsWith("[田头提示]"));
         expect(notices).toHaveLength(1);
@@ -454,7 +469,6 @@ describe("the chat", () => {
         (f, x) =>
           Effect.gen(function* () {
             thread = yield* hireAndRun(f, x, "w14", "写 hello", "chat-i");
-            x.slow = 60_000;
             said = (yield* f.chat.say("慢慢做：再加一个文件", thread.id, "")).message;
             yield* until(async () => (await f.deliveryOf("w14", said.id))?.state === "handed", "handed");
           }),
@@ -463,7 +477,7 @@ describe("the chat", () => {
       yield* run(
         (g, y) =>
           Effect.gen(function* () {
-            y.slow = 10;
+            y.holds = false;
             expect(g.core.session("w14")).toBeDefined();
             yield* g.core.apply({ type: "report", id: sessionId("w14"), outcome: "interrupted", summary: "重启了", runs: 1 });
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");

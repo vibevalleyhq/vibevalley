@@ -74,7 +74,7 @@
 **测试**
 
 - **不连网、不花钱**：帮工由 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演：同样的记录、折叠和控制，没有程序、登录和模型；项目用临时目录里真的 git 仓库；模型用 pi-ai 的假模型；声网和三家聊天软件是本地假服务；测试里不探测本机的农机，`gh` 回答它不在（`noGitHub`）。
-- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆` 不出声、`必败` 失败）。等会发生的事用 `testing/until.ts`（`until`、`untilGot`、`waitFor`：每 10 毫秒再问一次，到期限就带着在等什么失败），不用 `sleep` 赌时间。有时间窗口的（冷却、合并写、再提醒、定时到点、重试的退避）用 `TestClock` 拨过去断言，不真等、不改常量。
+- **测试跟着它测的模块走**：`<模块>/*.test.ts` 用 `@effect/vitest`，要整座农场的用 `testing/world.ts` 的 `world`，只要下面几层的用 `worldBelowTasks`；单个函数直接测。一路走过好几个模块的流程（起草、派活、验收、完成、重启、记性跨会话）在 `src/flows`：`flows/farm.ts` 搭一座开机就接回帮工、记账本的农场，帮工照工单里的字眼干活（`写版本A` 提交、`有冲突` 合并、`先问清楚` 问主人、`发呆`、`慢慢` 先挂住，测试做完它在忙时要做的再 `releaseHeld(n)` 放行（页面的测试放不了，1.5 秒后自己接着做）、`必败` 失败）。等会发生的事用 `testing/until.ts`（`until`、`untilGot`、`waitFor`：按真时间每毫秒再问一次，和农场的 Clock 无关，所以拨着 `TestClock` 的测试也能等真的工作；到期限就带着在等什么失败），不用 `sleep` 赌时间。有时间窗口的（冷却、合并写、再提醒、定时到点、重试的退避）用 `TestClock` 拨过去断言，不真等、不改常量。
 - **规则在它自己的接口上测**：搭整座农场的测试只断言要跨模块的那条主线；一条规则（重试的策略、窗口、退避）在它所在的函数上单独测，农场级的测试不为它付时间（语音：`retrying` 有自己的测试，停止失败的测试用不会重试的 403）。
 - **测试跑得便宜**：服务端的测试不逐文件隔离（`apps/server/vite.config.ts` 的 `isolate: false`），模块每个 worker 只加载一次，内存库的池和快照跨文件留着；成立的前提是没有测试靠别的测试的模块状态，打乱顺序跑（`vp test run --sequence.shuffle`）结果一样。测试用的 git 仓库每种只在每个进程里真建一次（`testing/git.ts` 的模板），之后复制；模板关掉 git 的后台维护（`maintenance.auto false`、`gc.auto 0`），它会在复制的时候改 `.git/objects`。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
