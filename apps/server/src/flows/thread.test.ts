@@ -101,7 +101,7 @@ describe("an issue's thread", () => {
       yield* channels.say("标题再短一点", thread, "");
       yield* await_(get, (i) => i.reviewedAt === undefined, "another round voids the pass");
 
-      const said = () => messagesIn(core.state().chat, thread).filter((m) => m.from === "user" && m.text === "顺手把注释删掉").length;
+      const said = () => messagesIn(core.state().chat, thread).filter((m) => m.from === "owner" && m.text === "顺手把注释删掉").length;
       for (let i = 0; i < 2; i++) yield* issues.comment(issue.id, "顺手把注释删掉", "k1");
       yield* until(() => said() > 0, "the comment in the thread");
       expect(said()).toBe(1);

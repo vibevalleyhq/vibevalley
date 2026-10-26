@@ -48,8 +48,8 @@ select m.conversation_id, count(*)::int as n from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 join channel_participant r on r.id = d.recipient_id
-where m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'user'), '')
-  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null
+where m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'owner'), '')
+  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null
 group by m.conversation_id;
 
 -- name: LastAgentWakes :many
@@ -57,7 +57,7 @@ group by m.conversation_id;
 select d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
-where s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null
+where s.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null
 group by d.recipient_id;
 
 -- name: AllOpenDeliveries :many

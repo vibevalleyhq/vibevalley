@@ -29,10 +29,10 @@ join channel_message m on m.id = n.message_id
 join channel_participant p on p.id = m.sender_id
 join channel_conversation c on c.id = m.conversation_id
 left join channel_conversation ch on ch.id = c.channel_id
-left join channel_read_cursor r on r.participant_id = 'user' and r.conversation_id = c.id
-where n.target_id = 'user' and m.sender_id <> 'user' and m.final
+left join channel_read_cursor r on r.participant_id = 'owner' and r.conversation_id = c.id
+where n.target_id = 'owner' and m.sender_id <> 'owner' and m.final
   and m.number > coalesce(r.read_number, 0)
-  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'user' and reply.number > m.number)
+  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)
 order by m.id;
 
 -- name: RecentMessages :many
@@ -66,7 +66,7 @@ update channel_message set final = true, updated_at = sqlc.arg(updated_at) where
 select m.sender_id
 from channel_message m
 join channel_mention n on n.message_id = m.id and n.target_id = sqlc.arg(speaker)
-join channel_participant p on p.id = m.sender_id and p.kind = 'agent'
+join channel_participant p on p.id = m.sender_id and p.kind = 'session'
 where m.conversation_id = sqlc.arg(conversation) and m.sender_id <> sqlc.arg(speaker) and m.id < sqlc.arg(before)
   and m.id > coalesce((select max(s.id) from channel_message s where s.conversation_id = sqlc.arg(conversation) and s.sender_id = sqlc.arg(speaker) and s.id < sqlc.arg(before)), '')
 order by m.id desc
@@ -83,7 +83,7 @@ order by m.number desc;
 -- name: HoldNoticeSinceUser :one
 select count(*)::int as n from channel_message m
 where m.conversation_id = sqlc.arg(conversation) and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'
-  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), '');
+  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'owner'), '');
 
 -- name: MessageByNumber :one
 select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
@@ -91,4 +91,4 @@ where m.conversation_id = sqlc.arg(conversation_id) and m.number = sqlc.arg(numb
 
 -- name: OwnerLastMessages :many
 -- The owner's last message in each conversation, from which agents waking agents are counted (channel/audience.ts).
-select conversation_id, max(id)::text as id from channel_message where sender_id = 'user' group by conversation_id;
+select conversation_id, max(id)::text as id from channel_message where sender_id = 'owner' group by conversation_id;

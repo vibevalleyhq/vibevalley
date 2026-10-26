@@ -3,9 +3,7 @@
 // participant was last woken by an agent. The chat tells it each follow and delivery as it writes them, and reloads it
 // with the model when a transaction fails.
 
-export type ParticipantKind = string;
-
-const agentLike = (kind: ParticipantKind) => kind === "agent" || kind === "orchestrator";
+const agentLike = (kind: string) => kind === "session" || kind === "orchestrator";
 
 export class Audience {
   private follows = new Map<string, Set<string>>();
@@ -63,8 +61,8 @@ export class Audience {
     conversation: string;
     message: string;
     recipient: string;
-    senderKind: ParticipantKind;
-    recipientKind: ParticipantKind;
+    senderKind: string;
+    recipientKind: string;
     wakes: boolean;
     held: boolean;
     at: number;

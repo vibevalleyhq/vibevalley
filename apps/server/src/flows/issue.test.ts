@@ -439,7 +439,7 @@ describe("an issue", () => {
       yield* issues.act("#" + issue.number, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
-        () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
+        () => messagesIn(core.state().chat, thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
         "the cure said once, by the server",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -539,7 +539,7 @@ describe("an issue", () => {
       yield* issues.act(garbled.id, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
       yield* until(
-        () => messagesIn(core.state().chat, thread).some((m) => m.from === "user" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
+        () => messagesIn(core.state().chat, thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
         "what was wrong with it, said",
       );
       yield* w.nextReport;

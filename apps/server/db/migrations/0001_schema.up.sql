@@ -5,7 +5,7 @@
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  kind       text not null check (kind in ('user', 'orchestrator', 'agent', 'system')),
+  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'system')),
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -13,7 +13,7 @@ CREATE TABLE channel_participant (
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond.
   seq        integer generated always as identity,
-  check ((kind = 'agent') = (agent_id is not null))
+  check ((kind = 'session') = (agent_id is not null))
 );
 CREATE TABLE channel_conversation (
   id            text primary key,

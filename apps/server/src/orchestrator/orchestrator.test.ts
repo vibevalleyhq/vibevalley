@@ -155,7 +155,7 @@ describe("the orchestrator", () => {
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       const answered = f.requests.length;
       yield* marked(f);
-      expect(messagesIn(core.state().chat, chat.general()).some((m) => m.from === "user" && m.text === "随便说一句" && m.spoken)).toBe(true);
+      expect(messagesIn(core.state().chat, chat.general()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
       expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -196,7 +196,7 @@ describe("the orchestrator", () => {
         messagesIn(core.state().chat, chat.general())
           .filter((m) => m.spoken || m.from === orchestratorAgent)
           .map((m) => m.from + "：" + m.text);
-      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["user：现在地里怎么样", "orchestrator：收到"]);
+      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

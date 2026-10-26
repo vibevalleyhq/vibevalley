@@ -216,7 +216,7 @@ describe("the chat", () => {
         expect(thread.parent).toBe(dispatch.id);
         expect(dispatch.text).toContain("派 @w1（帮工w1）去 chat-a：写 hello");
         const report = f.messagesOf(thread.id).findLast((m) => m.kind === "report")!;
-        expect([report.from, report.fromKind, report.outcome]).toEqual(["w1", "agent", "completed"]);
+        expect([report.from, report.fromKind, report.outcome]).toEqual(["w1", "session", "completed"]);
         expect(report.text).toContain("收到了");
         expect(report.text).not.toContain("结论");
         expect(yield* f.chat.jobThread("w1")).toBe(thread.id);
@@ -412,9 +412,9 @@ describe("the chat", () => {
         for (let i = 0; i < 5; i++) seqs.push((yield* f.chat.say(`第 ${i} 句`, general, "")).message.number);
         const got = yield* f.chat.history(general, seqs[4], 2);
         expect(got.map((m) => m.number)).toEqual([seqs[2], seqs[3]]);
-        const page = yield* f.chat.read("user", { target: "#田头", before: seqs[4], limit: 2 });
+        const page = yield* f.chat.read("owner", { target: "#田头", before: seqs[4], limit: 2 });
         expect([page.messages.map((m) => m.number), page.older]).toEqual([[seqs[2], seqs[3]], true]);
-        const older = yield* f.chat.read("user", { target: "#田头", before: page.messages[0]!.number, limit: 2 });
+        const older = yield* f.chat.read("owner", { target: "#田头", before: page.messages[0]!.number, limit: 2 });
         expect([older.messages.map((m) => m.number), older.older]).toEqual([[seqs[0], seqs[1]], false]);
         yield* f.chat.markRead(general, seqs[1]!);
         expect((yield* Effect.flip(f.chat.markRead("nope", 1)))._tag).toBe("Missing");
@@ -538,9 +538,9 @@ describe("the chat", () => {
         expect((yield* f.chat.say("早", undefined, "k2")).again).toBe(false);
         for (let i = 0; i < 2; i++) expect((yield* f.chat.say("晚", undefined, "")).again).toBe(false);
         expect(yield* Effect.flip(f.chat.say("早", undefined, "k".repeat(65)))).toMatchObject({ reason: "sendKey 太长" });
-        for (let i = 0; i < 2; i++) yield* f.chat.spoken("user", "电话里说的", "k3");
+        for (let i = 0; i < 2; i++) yield* f.chat.spoken("owner", "电话里说的", "k3");
         const said: Record<string, number> = {};
-        for (const m of f.messagesOf(f.chat.general())) if (m.from === "user") said[m.text] = (said[m.text] ?? 0) + 1;
+        for (const m of f.messagesOf(f.chat.general())) if (m.from === "owner") said[m.text] = (said[m.text] ?? 0) + 1;
         expect(said).toEqual({ 早: 2, 晚: 2, 电话里说的: 1 });
         expect(yield* Effect.promise(() => f.deliveries(orchestratorAgent))).toHaveLength(4);
       }),
@@ -564,11 +564,11 @@ describe("the chat", () => {
         const general = f.chat.general();
         yield* f.chat.orchestratorSays(general, "read", "hello", true, "");
         const [message] = yield* f.chat.history(general);
-        yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('user', ${message!.id})`.pipe(Effect.orDie);
+        yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('owner', ${message!.id})`.pipe(Effect.orDie);
         yield* trigger(f.sql, "fail_receipt", "before delete on channel_seen_mark");
         expect((yield* Effect.exit(f.chat.markRead(general, message!.number)))._tag).toBe("Failure");
         expect(
-          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
+          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'owner' and conversation_id = ${general}`.pipe(Effect.orDie),
         ).toEqual([]);
         // Nor is it read in what the chat shows next: what it kept in memory is read again from the database.
         yield* f.chat.notice(general, "动静", "test");
@@ -576,7 +576,7 @@ describe("the chat", () => {
         yield* drop(f.sql, "fail_receipt", "channel_seen_mark");
         yield* f.chat.markRead(general, message!.number);
         expect(
-          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'user' and conversation_id = ${general}`.pipe(Effect.orDie),
+          yield* f.sql`select read_number from channel_read_cursor where participant_id = 'owner' and conversation_id = ${general}`.pipe(Effect.orDie),
         ).toEqual([{ read_number: message!.number }]);
         expect(f.conversation(general)?.read).toBe(message!.number);
       }),

@@ -154,7 +154,7 @@ function gathered(state: WorkspaceState): Unworded[] {
   }
 
   for (const { message: m, channel, address } of chat?.ownerMentions ?? []) {
-    const from: InboxFrom = m.fromKind === "agent" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
+    const from: InboxFrom = m.fromKind === "session" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
     out.push({
       item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: m.conversation } },
       channel,

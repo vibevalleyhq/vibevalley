@@ -30,6 +30,7 @@ import {
   type IssueUpdate,
   type Preview,
   orchestratorAgent,
+  ownerId,
   type Priority,
   type ProjectTemplates,
   type RunTrigger,
@@ -666,7 +667,7 @@ export const make = (options: IssueOptions = {}) =>
       const issue = yield* get(id);
       if (isClosed(issue.status)) return yield* Effect.fail(refused("这张工单关上了：带一句话重开它"));
       const session = yield* liveSession(id);
-      const said = yield* chat.tellSession("user", session, text, sendKey);
+      const said = yield* chat.tellSession(ownerId, session, text, sendKey);
       // Said in its thread, the issue hears it from the message's fact (heard below); with no thread there is no fact.
       if (!said) yield* ownerSaid(id);
     });
@@ -1174,7 +1175,7 @@ export const make = (options: IssueOptions = {}) =>
         const changes = h.conflict ? undefined : yield* sessions.changes(session);
         const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
         if (!conflict) return yield* Effect.fail(refused(h.name + " 和主分支没有冲突"));
-        yield* chat.tellSession("user", session, conflictBrief(conflict.base, conflict.files), "");
+        yield* chat.tellSession(ownerId, session, conflictBrief(conflict.base, conflict.files), "");
       }),
       cancel,
       /** Only an issue in review has something to judge. */

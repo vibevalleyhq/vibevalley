@@ -24,7 +24,7 @@
 ## 模型和不变量
 
 - **记性的键是帮工档案的 id**，不是帮工：同一个档案的帮工共用一份；删了档案，记性还在库里，同 id 再建接着用。不进核心状态，页面打开时经接口读。
-- **本地的一条是两种之一**：`note`（记下的一句话：帮工汇报里的「记住：」、主人在页签上替它记的、`memory_add` 记的）和 `issue`（做过的活：工单前 100 字 + 「 → 」+ 最后一轮的结论前 200 字，没做成的写「没做成：」）。`project` 为空是所有项目的。每条记着谁写的（`author`）：`owner` 是主人在页签上记的，`agent` 是帮工自己（「记住：」或它的 `memory_add`，带着是哪个 Session），`orchestrator` 是管家替它记的，`system` 是服务端记下的做过的活；页签照它写「你记的」「某某 记的」「管家替它记的」。外面来源和管家的 `MEMORY.md` 不知道是谁写的，`author` 为空。做过的活一个 Session 一条，每轮改写（`memory_one_issue` 唯一索引）。表里的 `scope = owner`、`profile`、`episode`、`replaced_by`、`title`、`labels`、`importance` 是给[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)留的，代码现在只写 `scope = agent` 的 `note`、`issue`，读时跳过 `replaced_by` 不为空的和不认识的种类。
+- **本地的一条是两种之一**：`note`（记下的一句话：帮工汇报里的「记住：」、主人在页签上替它记的、`memory_add` 记的）和 `issue`（做过的活：工单前 100 字 + 「 → 」+ 最后一轮的结论前 200 字，没做成的写「没做成：」）。`project` 为空是所有项目的。每条记着谁写的（`author`）：`owner` 是主人在页签上记的，`session` 是帮工自己（「记住：」或它的 `memory_add`，带着是哪个 Session），`orchestrator` 是管家替它记的，`system` 是服务端记下的做过的活；页签照它写「你记的」「某某 记的」「管家替它记的」。外面来源和管家的 `MEMORY.md` 不知道是谁写的，`author` 为空。做过的活一个 Session 一条，每轮改写（`memory_one_issue` 唯一索引）。表里的 `scope = owner`、`profile`、`episode`、`replaced_by`、`title`、`labels`、`importance` 是给[记忆都存在 SQLite](.agents/notes/proposed/architecture/2026-10-18-memory-in-sqlite.md)留的，代码现在只写 `scope = agent` 的 `note`、`issue`，读时跳过 `replaced_by` 不为空的和不认识的种类。
 - **上限**：每个档案最多 300 条（`memoryKeep`），超了先删最久没用的（最后想起的时间，没想起过按写下的时间，`nextForgotten`）；页签上离上限不到 10 条时把最先会删的标成 `fading`，和真删的顺序是同一个函数。一句话最多 300 个字符（UTF-16），一轮最多读 5 条「记住：」。
 - **一轮的笔记、做过的活和超额的清理在一个事务里**，失败不留下半份。
 - **几乎一样的不重复记**：同一个范围（同项目或都是所有项目）里已有一样的，或词的重合度（`memoryLikeness`，交集比并集）≥ 0.8 的，就不记；提不出词的不同短句重合度是 0，分别留着。

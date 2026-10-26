@@ -2,7 +2,7 @@
 // requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
 // here, for the board, the command line and the orchestrator's tool alike.
 
-import type { Issue, PullRequest, PullRequestState } from "@vibevalley/protocol";
+import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@vibevalley/protocol";
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/issue.sql.ts";
@@ -43,7 +43,7 @@ export function merging(d: MergeDeps) {
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
-      const told = yield* Effect.result(chat.tellSession("user", id, n.fix, ""));
+      const told = yield* Effect.result(chat.tellSession(ownerId, id, n.fix, ""));
       if (told._tag === "Failure")
         [owner, line] = [owner + "\n给帮工带话失败：" + reasonOf(told.failure), line + "\n给帮工带话失败：" + reasonOf(told.failure)];
     }

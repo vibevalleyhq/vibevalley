@@ -61,7 +61,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
   const size = () => props.size ?? 30;
   return (
     <Switch fallback={<AgentFace agentId={agentId()} look={agent()?.look} runtime={session()?.runtime ?? agent()?.runtime} size={size()} />}>
-      <Match when={props.m.fromKind === "user"}>
+      <Match when={props.m.fromKind === "owner"}>
         <OwnerFace size={size()} />
       </Match>
       <Match when={props.m.fromKind === "orchestrator"}>
@@ -73,7 +73,7 @@ export function FaceOf(props: { m: ChatMessage; agents: ReadonlyMap<string, Agen
 
 export function SenderName(props: { m: ChatMessage }) {
   return (
-    <Show when={props.m.fromKind === "agent"} fallback={<>{props.m.name}</>}>
+    <Show when={props.m.fromKind === "session"} fallback={<>{props.m.name}</>}>
       {props.m.name} <span class="font-mono text-bark-500">@{props.m.from}</span>
     </Show>
   );

@@ -169,7 +169,7 @@ function Window() {
     if (c.phase !== "live" || here?.kind !== "general") return [];
     const spoken: SpokenLine[] = (chat()?.messages ?? [])
       .filter((m) => m.spoken && m.conversation === here.id)
-      .map((m) => ({ speaker: m.fromKind === "user" ? "you" : "orchestrator", text: m.text }));
+      .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, c.answeredBy, spoken, tick()).map((t) => ({ ...t }));
   });
   const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "orchestrator";
@@ -409,10 +409,10 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.final && props.m.fromKind === "agent" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.final && props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
-      <Match when={props.m.fromKind === "user"}>
+      <Match when={props.m.fromKind === "owner"}>
         <ChatBubble m={props.m} mine first={props.first} after={chip()} />
       </Match>
     </Switch>
