@@ -8,6 +8,7 @@
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
+import { connectorWording } from "./words.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
@@ -128,7 +129,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         if (signal.aborted) return undefined;
         const code = weixinFailed(updates.ret, updates.errcode);
         if (code !== undefined) {
-          if (code === staleToken) return { kind: "stale", reason: "微信说登录过期了" };
+          if (code === staleToken) return { kind: "stale", reason: connectorWording().staleLogin };
           return { kind: "failed", reason: "getupdates: " + (updates.errmsg || String(code)) };
         }
         if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
@@ -212,14 +213,14 @@ export function qqAdapter(api: QQApi): Adapter {
     login: async (signal, input) => {
       const appId = (input.appId ?? "").trim();
       const secret = (input.secret ?? "").trim();
-      if (!appId || !secret) throw new Error("要填 QQ 机器人的 AppID 和 AppSecret（在 q.qq.com 的机器人管理页里）。");
+      if (!appId || !secret) throw new Error(connectorWording().qqKeys);
       await api.check(signal, { appId, secret });
       return { secrets: { appId, secret }, owner: "" };
     },
     receive: async (signal, secrets, io) => {
       try {
         await api.listen(signal, appOf(secrets), (m) => {
-          const parts = [m.content.trim(), m.attachments > 0 ? "[附件]" : ""].filter(Boolean);
+          const parts = [m.content.trim(), m.attachments > 0 ? connectorWording().media.attachment : ""].filter(Boolean);
           return io.accept([{ id: m.id, from: m.from, text: parts.join("\n"), reply: m.id }], "");
         });
         return undefined;
@@ -353,7 +354,7 @@ export const make = (options: ConnectorOptions = {}) =>
         try {
           secrets = jsonOf(Schema.Record(Schema.String, Schema.String))(r.secrets);
         } catch (e) {
-          setErr("存着的登录信息读不出来，断开重新连一次");
+          setErr(connectorWording().unreadSecrets);
           logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
         }
         account = {
@@ -422,7 +423,7 @@ export const make = (options: ConnectorOptions = {}) =>
         try {
           await run(accountQ.pauseAccount({ paused_until: time.now() + stalePauseMs, connector: id }));
           await reload();
-          setErr("登录过期了，一小时后再试；也可以断开重新连。");
+          setErr(connectorWording().expired);
           return true;
         } catch (e) {
           setErr(message(e));
@@ -553,7 +554,7 @@ export const make = (options: ConnectorOptions = {}) =>
             }),
           );
           await reload();
-          await adapter.send(signal, a.secrets, m.from, "配对好了：以后在这里说的话，就是你在田头上说的。", m.reply ?? "");
+          await adapter.send(signal, a.secrets, m.from, connectorWording().paired, m.reply ?? "");
           return;
         }
         if (m.from !== a.owner) return;
@@ -598,7 +599,7 @@ export const make = (options: ConnectorOptions = {}) =>
           let m: Inbound;
           try {
             m = jsonOf(InboundSchema)(row.payload);
-            if (m.id !== row.ext_id) throw new Error("收件记录的编号不一致");
+            if (m.id !== row.ext_id) throw new Error(connectorWording().inboundMismatch);
           } catch (e) {
             // A malformed row can never be delivered; settle it explicitly so later valid messages are not blocked.
             logs.error(`vibevalley: ${id}: discarding malformed durable inbound ${row.ext_id}:`, message(e));
@@ -665,7 +666,7 @@ export const make = (options: ConnectorOptions = {}) =>
           try {
             stopped = (await receive(signal, a.secrets)) ?? {
               kind: "failed",
-              reason: "收消息停了",
+              reason: connectorWording().stopped,
             };
           } catch (e) {
             stopped = { kind: "failed", reason: message(e) };
@@ -732,7 +733,7 @@ export const make = (options: ConnectorOptions = {}) =>
                     connected_at: yield* Clock.currentTimeMillis,
                   });
                   yield* inboundQ.clearInbound({ connector: id });
-                  yield* retire("换了账号");
+                  yield* retire(connectorWording().switched);
                 }),
               );
               outboxChanged(() => 0);
@@ -824,7 +825,7 @@ export const make = (options: ConnectorOptions = {}) =>
                 Effect.gen(function* () {
                   yield* accountQ.disconnectAccount({ connector: id });
                   yield* inboundQ.clearInbound({ connector: id });
-                  yield* retire("断开了");
+                  yield* retire(connectorWording().disconnected);
                 }),
               );
               outboxChanged(() => 0);
@@ -886,13 +887,13 @@ export const make = (options: ConnectorOptions = {}) =>
         if (!b)
           return yield* Effect.fail<ApiError>({
             _tag: "ConnectorRefused",
-            reason: `没有 ${id} 这个连接`,
+            reason: connectorWording().noConnector(id),
           });
         const channel = yield* chat.channelByName(name);
         if (!channel)
           return yield* Effect.fail<ApiError>({
             _tag: "ConnectorRefused",
-            reason: `没有叫 ${name} 的频道`,
+            reason: connectorWording().noChannel(name),
           });
         return yield* Effect.tryPromise({
           try: () => b.setChannel(channel.id !== general ? channel.id : undefined),

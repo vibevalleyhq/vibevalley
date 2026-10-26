@@ -1,6 +1,7 @@
 // WeChat, written from the official client (@tencent-weixin/openclaw-weixin 2.4.10, MIT). Only
 // text: pictures, voice and files arrive as a word in brackets (voice with WeChat's own transcript).
 
+import { connectorWording } from "./words.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Schema } from "effect";
 import { sleep } from "./wait.ts";
@@ -236,7 +237,7 @@ export class WeixinClient implements WeixinApi {
       [code, show] = await this.qrCode(signal);
     } catch (e) {
       if (signal.aborted) throw e;
-      throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(connectorWording().weixin.noQr(e instanceof Error ? e.message : String(e)), { cause: e });
     }
     progress("waiting", show);
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(8 * 60_000)]);
@@ -258,20 +259,21 @@ export class WeixinClient implements WeixinApi {
           break;
         case "expired":
         case "verify_code_blocked":
-          if (++refreshes >= 3) throw new Error(status.status === "expired" ? "二维码过期了几次，请重新开始。" : "数字输错了几次，请重新开始。");
+          if (++refreshes >= 3)
+            throw new Error(status.status === "expired" ? connectorWording().weixin.qrExpiredTimes : connectorWording().weixin.codeWrongTimes);
           try {
             [code, show] = await this.qrCode(attempt);
           } catch (e) {
             if (attempt.aborted) break;
-            throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+            throw new Error(connectorWording().weixin.noQr(e instanceof Error ? e.message : String(e)), { cause: e });
           }
           progress("waiting", show);
           break;
         case "binded_redirect":
-          throw new Error("这个微信已经连过了：先在微信里删掉它，或者换一个微信扫。");
+          throw new Error(connectorWording().weixin.taken);
         case "confirmed": {
           const s = status;
-          if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error("微信确认了，但没给齐登录信息，请重试。");
+          if (!s.bot_token || !s.ilink_bot_id || !s.ilink_user_id) throw new Error(connectorWording().weixin.incomplete);
           return {
             account: { baseUrl: s.baseurl || base, token: s.bot_token },
             botId: s.ilink_bot_id,
@@ -283,7 +285,7 @@ export class WeixinClient implements WeixinApi {
       }
     }
     if (signal.aborted) throw signal.reason ?? new Error("aborted");
-    throw new Error("等太久没扫，二维码过期了。");
+    throw new Error(connectorWording().weixin.tooLong);
   }
 
   async getUpdates(signal: AbortSignal, account: Account, buf: string, timeoutMs: number): Promise<Updates> {
@@ -347,16 +349,16 @@ export function text(m: Message): string {
         part = item.text_item?.text ?? "";
         break;
       case 3:
-        part = item.voice_item?.text || "[语音]";
+        part = item.voice_item?.text || connectorWording().media.audio;
         break;
       case 2:
-        part = "[图片]";
+        part = connectorWording().media.image;
         break;
       case 4:
-        part = item.file_item?.file_name ? "[文件：" + item.file_item.file_name + "]" : "[文件]";
+        part = item.file_item?.file_name ? connectorWording().namedFile(item.file_item.file_name) : connectorWording().media.file;
         break;
       case 5:
-        part = "[视频]";
+        part = connectorWording().media.video;
         break;
       case undefined:
         break;

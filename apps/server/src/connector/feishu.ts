@@ -3,6 +3,7 @@
 // registration). Messages come over the official SDK's long connection, outbound only; replies go through the message
 // API to the owner's open_id, with no reply window.
 
+import { connectorWording } from "./words.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { sleep } from "./wait.ts";
 import { wallTime } from "../base/time.ts";
@@ -56,8 +57,8 @@ async function form(domain: Domain, body: Record<string, string>, signal: AbortS
     });
     return (await res.json()) as Record<string, unknown>;
   } catch (e) {
-    if (timed.aborted && !signal.aborted) throw new Error("飞书注册：超时了", { cause: e });
-    throw new Error("飞书注册：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+    if (timed.aborted && !signal.aborted) throw new Error(connectorWording().feishu.registerTimeout, { cause: e });
+    throw new Error(connectorWording().feishu.register(e instanceof Error ? e.message : String(e)), { cause: e });
   }
 }
 
@@ -70,7 +71,7 @@ export class FeishuClient implements FeishuApi {
   private async register(signal: AbortSignal) {
     const init = await form("feishu", { action: "init" }, signal);
     const methods = Array.isArray(init.supported_auth_methods) ? init.supported_auth_methods : [];
-    if (!methods.includes("client_secret")) throw new Error("飞书现在不支持扫码建应用，请稍后再试。");
+    if (!methods.includes("client_secret")) throw new Error(connectorWording().feishu.noQr);
     const begin = await form(
       "feishu",
       {
@@ -83,7 +84,7 @@ export class FeishuClient implements FeishuApi {
     );
     const deviceCode = str(begin, "device_code");
     let link = str(begin, "verification_uri_complete");
-    if (!deviceCode || !link) throw new Error("飞书没给二维码，请重试。");
+    if (!deviceCode || !link) throw new Error(connectorWording().feishu.noLink);
     // Personal-agent codes land on /page/cli (as nanobot does it); keep the query as it is.
     try {
       const parsed = new URL(link);
@@ -119,8 +120,8 @@ export class FeishuClient implements FeishuApi {
         app: { appId: res.client_id, appSecret: res.client_secret, domain: where },
         owner: str(user, "open_id"),
       };
-    if (res.error === "access_denied") return { status: "failed" as const, reason: "在飞书里拒绝了。" };
-    if (res.error === "expired_token") return { status: "failed" as const, reason: "二维码过期了。" };
+    if (res.error === "access_denied") return { status: "failed" as const, reason: connectorWording().feishu.denied };
+    if (res.error === "expired_token") return { status: "failed" as const, reason: connectorWording().feishu.qrExpired };
     return { status: "pending" as const, domain: where };
   }
 
@@ -134,14 +135,14 @@ export class FeishuClient implements FeishuApi {
       const p = await this.poll(reg.deviceCode, domain, attempt);
       if (attempt.aborted) break;
       if (p.status === "succeeded") {
-        if (!p.app.appId.trim() || !p.app.appSecret.trim()) throw new Error("飞书确认了，但没给齐登录信息，请重试。");
+        if (!p.app.appId.trim() || !p.app.appSecret.trim()) throw new Error(connectorWording().feishu.incomplete);
         return { app: p.app, owner: p.owner };
       }
       if (p.status === "failed") throw new Error(p.reason);
       domain = p.domain;
     }
     if (signal.aborted) throw signal.reason ?? new Error("aborted");
-    throw new Error("等太久没扫，二维码过期了。");
+    throw new Error(connectorWording().feishu.tooLong);
   }
 
   listen(signal: AbortSignal, app: App, got: (m: Message) => Promise<void>): Promise<void> {
@@ -154,7 +155,7 @@ export class FeishuClient implements FeishuApi {
         done = true;
         signal.removeEventListener("abort", abort);
         client.close({ force: true });
-        if (e && !signal.aborted) reject(new Error("飞书长连接断了：" + e.message));
+        if (e && !signal.aborted) reject(new Error(connectorWording().feishu.disconnected(e.message)));
         else resolve();
       };
       const client = new Lark.WSClient({
@@ -198,10 +199,10 @@ export class FeishuClient implements FeishuApi {
         data: { receive_id: openId, msg_type: "text", content: JSON.stringify({ text }) },
       });
     } catch (e) {
-      throw new Error("飞书发消息：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(connectorWording().feishu.send(e instanceof Error ? e.message : String(e)), { cause: e });
     }
-    if (res.code !== undefined && res.code !== 0) throw new Error(`飞书发消息：${res.code} ${res.msg ?? ""}`);
-    if (!res.data?.message_id) throw new Error("飞书发消息：没有确认消息编号");
+    if (res.code !== undefined && res.code !== 0) throw new Error(connectorWording().feishu.send(`${res.code} ${res.msg ?? ""}`));
+    if (!res.data?.message_id) throw new Error(connectorWording().feishu.noId);
     return res.data.message_id;
   }
 }
@@ -211,13 +212,13 @@ export function text(m: Message): string {
     return (
       (
         {
-          image: "[图片]",
-          file: "[文件]",
-          audio: "[语音]",
-          media: "[视频]",
-          sticker: "[表情]",
+          image: connectorWording().media.image,
+          file: connectorWording().media.file,
+          audio: connectorWording().media.audio,
+          media: connectorWording().media.video,
+          sticker: connectorWording().media.sticker,
         } as Record<string, string>
-      )[m.messageType] ?? "[消息]"
+      )[m.messageType] ?? connectorWording().media.message
     );
   try {
     return ((JSON.parse(m.content) as { text?: string }).text ?? "").trim();

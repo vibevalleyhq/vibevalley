@@ -1,6 +1,7 @@
 // QQ, written from Tencent's botpy (the official Python SDK). A reply is a passive one on the user's
 // message id, which QQ honours only for a while.
 
+import { connectorWording } from "./words.ts";
 import { Schema } from "effect";
 import { wallTime } from "../base/time.ts";
 
@@ -81,10 +82,10 @@ export class QQClient implements QQApi {
       });
       body = decodeTokenResponse(await res.json());
     } catch (e) {
-      if (timed.aborted && !signal.aborted) throw new Error("QQ 鉴权：超时了", { cause: e });
-      throw new Error("QQ 鉴权：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+      if (timed.aborted && !signal.aborted) throw new Error(connectorWording().qq.authTimeout, { cause: e });
+      throw new Error(connectorWording().qq.auth(e instanceof Error ? e.message : String(e)), { cause: e });
     }
-    if (!body.access_token) throw new Error("QQ 鉴权：" + (body.message || "AppID 或 AppSecret 不对"));
+    if (!body.access_token) throw new Error(connectorWording().qq.auth(body.message || connectorWording().qq.badKeys));
     const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
     this.tokens.set(key, { token: body.access_token, until: wallTime.now() + (seconds - 60) * 1000 });
     return body.access_token;
@@ -110,9 +111,9 @@ export class QQClient implements QQApi {
       gateway = decodeGatewayResponse(await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json());
     } catch (e) {
       if (signal.aborted) return;
-      throw new Error("QQ 网关：" + (e instanceof Error ? e.message : String(e)), { cause: e });
+      throw new Error(connectorWording().qq.gateway(e instanceof Error ? e.message : String(e)), { cause: e });
     }
-    if (!gateway.url) throw new Error("QQ 没给网关地址");
+    if (!gateway.url) throw new Error(connectorWording().qq.noGateway);
     if (signal.aborted) return;
     const ws = new WebSocket(gateway.url);
     return new Promise((resolve, reject) => {
@@ -148,7 +149,7 @@ export class QQClient implements QQApi {
             try {
               msg = decodeGatewayEvent(String(event.data));
             } catch {
-              return end(new Error("QQ 网关：连接出错"));
+              return end(new Error(connectorWording().qq.gatewayError));
             }
             if (typeof msg.s === "number") seq = msg.s;
             switch (msg.op) {
@@ -191,15 +192,15 @@ export class QQClient implements QQApi {
                 return;
               }
               case 7:
-                return end(new Error("QQ 网关：QQ 让重新连接"));
+                return end(new Error(connectorWording().qq.reconnect));
               case 9:
-                return end(new Error("QQ 网关：QQ 说会话无效"));
+                return end(new Error(connectorWording().qq.invalid));
             }
           })
           .catch((e: unknown) => end(e instanceof Error ? e : new Error(String(e))));
       });
-      ws.addEventListener("close", (event) => end(new Error(`QQ 网关：连接关了（${event.code}）`)));
-      ws.addEventListener("error", () => end(new Error("QQ 网关：连接出错")));
+      ws.addEventListener("close", (event) => end(new Error(connectorWording().qq.closed(event.code))));
+      ws.addEventListener("error", () => end(new Error(connectorWording().qq.gatewayError)));
     });
   }
 
@@ -226,7 +227,7 @@ export class QQClient implements QQApi {
         signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
       });
     } catch (e) {
-      throw new SendError("QQ 发消息：" + (e instanceof Error ? e.message : String(e)));
+      throw new SendError(connectorWording().qq.send(e instanceof Error ? e.message : String(e)));
     }
     let body: { id?: string; message?: string; code?: number } | undefined;
     let decodeError = "";
@@ -235,9 +236,10 @@ export class QQClient implements QQApi {
     } catch (e) {
       decodeError = e instanceof Error ? e.message : String(e);
     }
-    if (res.status < 200 || res.status > 299) throw new SendError("QQ 发消息：" + `${body?.code ?? res.status} ${body?.message ?? ""}`.trim(), res.status);
-    if (decodeError) throw new SendError("QQ 发消息：读不出发送结果：" + decodeError);
-    if (!body?.id || (body.code !== undefined && body.code !== 0)) throw new SendError("QQ 发消息：没有确认消息编号 " + (body?.message ?? ""));
+    if (res.status < 200 || res.status > 299)
+      throw new SendError(connectorWording().qq.send(`${body?.code ?? res.status} ${body?.message ?? ""}`.trim()), res.status);
+    if (decodeError) throw new SendError(connectorWording().qq.unread(decodeError));
+    if (!body?.id || (body.code !== undefined && body.code !== 0)) throw new SendError(connectorWording().qq.noId(body?.message ?? ""));
     return body.id;
   }
 }

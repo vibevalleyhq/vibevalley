@@ -1,6 +1,7 @@
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
+import { connectorWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { type ChatMessage, type ConnectorID, type Conversation } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
@@ -26,10 +27,11 @@ export function plainText(markdown: string): string {
 
 /** The owner sees one chat, the farm has many threads. */
 export function ownerLine(m: ChatMessage, where: Conversation | undefined): string {
-  const who = m.fromKind === "orchestrator" ? "管家" : m.name;
+  const w = connectorWording().line;
+  const who = m.fromKind === "orchestrator" ? w.orchestrator : m.name;
   const what =
-    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? "派活" : where?.kind === "thread" ? "在工单串里" : "";
-  return (what ? `【${who} · ${what}】` : `【${who}】`) + "\n" + plainText(m.text);
+    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? w.dispatch : where?.kind === "thread" ? w.thread : "";
+  return w.head(who, what) + "\n" + plainText(m.text);
 }
 
 export function splitText(text: string, max: number): string[] {
@@ -52,13 +54,14 @@ export function flushText(lines: readonly string[]): string[] {
     const [head = "", body = ""] = l.split("\n", 2);
     return head + " " + slice(body, 0, 60) + (body.length > 60 ? "…" : "");
   });
-  return [`你不在的时候有 ${lines.length} 条消息：\n${firstLines.join("\n")}\n\n完整的在田头里。`];
+  return [connectorWording().digest(lines.length, firstLines)];
 }
 
-/** Spaces and a 配对 in front allowed. */
+/** Spaces and the pairing word in front (配对, or pair) allowed, whatever the locale. */
 export const isPairing = (text: string, code: string) => {
   const flat = text.replace(/\s+/g, "");
-  return (flat.startsWith("配对") ? flat.slice(2) : flat) === code;
+  const word = /^(?:配对|pair)/i.exec(flat)?.[0] ?? "";
+  return flat.slice(word.length) === code;
 };
 
 /** Enough to recognise, not to copy. */
