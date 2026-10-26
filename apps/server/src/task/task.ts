@@ -69,9 +69,9 @@ import {
   graphText,
   issueSplitRefusal,
   mergeNeedsOwner,
-  planMatch,
-  planNews,
-  planTell,
+  graphMatch,
+  graphNews,
+  graphTell,
   retryText,
   splitBrief,
   startNeedsOwner,
@@ -192,7 +192,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, planNews.head + text));
+    const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, graphNews.head + text));
 
     const usableAs = options.usable;
     const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;
@@ -248,24 +248,24 @@ export const make = (options: TaskOptions = {}) =>
       splitters.delete(graph.id);
       if (splitter) yield* dismiss(splitter);
       yield* notice("warn", taskWording().notice.notSplit(graph.title, why));
-      yield* tellOrchestrator(planNews.notSplit(graph.id, graph.title, why));
+      yield* tellOrchestrator(graphNews.notSplit(graph.id, graph.title, why));
     });
 
     const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
-      if (outcome === "interrupted") return yield* giveUp(graph, taskWording().notice.planningStopped);
+      if (outcome === "interrupted") return yield* giveUp(graph, taskWording().notice.splitStopped);
       if (outcome === "failed") {
         if (tries >= 1) return yield* giveUp(graph, taskWording().notice.plannerFailed(summary));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, planTell.retrySplit);
+        yield* tell(session.id, graphTell.retrySplit);
         return;
       }
       const parsed = parseSplit(work.find(session.id)?.lastText ?? "");
       if (!parsed.ok) {
-        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.noPlan(parsed.problems[0] ?? ""));
+        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.noGraph(parsed.problems[0] ?? ""));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, planTell.fixPlan(parsed.problems));
+        yield* tell(session.id, graphTell.fixGraph(parsed.problems));
         return;
       }
       const draft = withNote({ ...graph, ...(parsed.title ? { title: parsed.title } : {}), tasks: parsed.tasks, state: "draft" }, "");
@@ -274,7 +274,7 @@ export const make = (options: TaskOptions = {}) =>
       splitterTries.delete(graph.id);
       yield* dismiss(session.id);
       yield* notice("info", taskWording().notice.drafted(draft.title, draft.tasks.length));
-      yield* tellOrchestrator(planNews.drafted(draft.id, graphText(draft)));
+      yield* tellOrchestrator(graphNews.drafted(draft.id, graphText(draft)));
     });
 
     const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
@@ -320,7 +320,7 @@ export const make = (options: TaskOptions = {}) =>
     const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
       yield* notice("warn", taskWording().notice.stepFailed(graph.title, task.title, why));
-      yield* tellOrchestrator(planNews.stepFailed(graph.id, graph.title, task.title, task.id, why));
+      yield* tellOrchestrator(graphNews.stepFailed(graph.id, graph.title, task.title, task.id, why));
     });
 
     const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
@@ -397,7 +397,7 @@ export const make = (options: TaskOptions = {}) =>
       yield* putSystem(next).pipe(Effect.mapError((e) => refused(taskWording().notice.stepNotSaved(task.title, reasonOf(e)))));
       if (next.state === "ready") {
         yield* notice("info", taskWording().notice.ready(next.title));
-        yield* tellOrchestrator(planNews.ready(next.id, next.title, graphText(next)));
+        yield* tellOrchestrator(graphNews.ready(next.id, next.title, graphText(next)));
       }
     });
 
@@ -454,7 +454,7 @@ export const make = (options: TaskOptions = {}) =>
         }
         if (isBusy(session)) continue;
         if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? taskWording().notice.done);
-        else yield* tell(session.id, planTell.carryOn(task.title));
+        else yield* tell(session.id, graphTell.carryOn(task.title));
       }
     });
 
@@ -495,8 +495,8 @@ export const make = (options: TaskOptions = {}) =>
         if (!goal.trim()) return yield* Effect.fail(refused(taskWording().act.noGoal));
         if (!where) return yield* Effect.fail(refused(taskWording().act.noProject));
         const all = yield* candidates;
-        const chosen = chooseAgent(all, planMatch(goal), agent, "");
-        if (!chosen) return yield* Effect.fail(refused(taskWording().act.noPlanner, [lookIn.agent]));
+        const chosen = chooseAgent(all, graphMatch(goal), agent, "");
+        if (!chosen) return yield* Effect.fail(refused(taskWording().act.noSplitter, [lookIn.agent]));
         const id = yield* issues.nextTaskId();
         const graph: TaskGraph = {
           id,
@@ -525,7 +525,7 @@ export const make = (options: TaskOptions = {}) =>
           return yield* Effect.fail(refused(reason));
         }
         splitters.set(graph.id, hired.session.id);
-        return taskWording().act.planning(hired.session.name, graph.id);
+        return taskWording().act.splittingBy(hired.session.name, graph.id);
       }, lock.withPermits(1)),
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
@@ -553,8 +553,8 @@ export const make = (options: TaskOptions = {}) =>
         );
         yield* recurrence(graph.id);
         yield* notice("info", taskWording().notice.split(session!.name, graph.title, tasks.length));
-        yield* tellOrchestrator(planNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
-        return planTell.split(graph.title, tasks.length, branch);
+        yield* tellOrchestrator(graphNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
+        return graphTell.split(graph.title, tasks.length, branch);
       }, lock.withPermits(1)),
       act: Effect.fn("Tasks.act")(function* (id, action, by) {
         const graph = yield* need(id);
@@ -633,7 +633,7 @@ export const make = (options: TaskOptions = {}) =>
                 withTask(graph, task.id, (n) => ({ ...n, state: "working", tries: 0 })),
                 by,
               );
-              yield* tell(session.id, planTell.retry(retryText(task), task.brief));
+              yield* tell(session.id, graphTell.retry(retryText(task), task.brief));
               return taskWording().act.retried(session.name, task.title);
             }
             yield* put(

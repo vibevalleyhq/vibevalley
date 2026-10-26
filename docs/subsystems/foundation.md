@@ -12,6 +12,7 @@
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
 | 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
 | 测试的地基：`src/testing`、黄金数据、oar 的 `scriptedRuntime`；旧名字和能力表的检查 | 接口的处理（`handlers.ts`）、页面的分层（[客户端](docs/subsystems/app.md)） |
+| 话放在哪：词表、`prompts.ts`、主人的语言怎么传到每个进程 | 某一句怎么说（说它的模块）；用哪个词（[用语表](docs/README.md#用语)） |
 
 ## 在哪
 
@@ -22,6 +23,7 @@
 - **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
+- **话**：两边都说的在 `packages/protocol/src/words`（`zh.ts`、`en.ts`，`localized`、`setLocale`、`currentLocale`），服务端每个模块的在它的 `words.ts`，对模型说的在它的 `prompts.ts`（主人的语言是 `src/prompts.ts` 的 `ownersLanguage`）；页面的按目录各一份 `words.ts`（`rules/`、`pages/<地方>/`、`farm/`、`farm/phone/`、`tree/`、`app/`），桌面壳、手机壳各一份；种子和工单模板是 `agent/seeds.json`、`template_catalog.json` 和各自的 `.en.json`。
 - **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`vp run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
 
 ## 模型和不变量
@@ -93,6 +95,15 @@
 - **测试跑得便宜**：服务端的测试不逐文件隔离（`apps/server/vite.config.ts` 的 `isolate: false`），模块每个 worker 只加载一次，内存库的池和快照跨文件留着；成立的前提是没有测试靠别的测试的模块状态，打乱顺序跑（`vp test run --sequence.shuffle`）结果一样。测试用的 git 仓库每种只在每个进程里真建一次（`testing/git.ts` 的模板），之后复制；模板关掉 git 的后台维护（`maintenance.auto false`、`gc.auto 0`），它会在复制的时候改 `.git/objects`。
 - **契约测试是页面的 Playwright**：`apps/web/test` 每个 worker 起一个真的服务端（临时家目录、环境里没有钥匙），点真的页面；`apps/desktop/test` 起整个 Electron 应用。
 
+### 话放在哪
+
+- **对主人的话进词表，对模型的话进 `prompts.ts`。** 主人看得到的（界面上的字、写进帧的说法、通知、拒绝的理由、田头里的系统消息、以主人的名义写进串里的话、命令行和连接器的输出）写在词表里，中英各一份；模型读的（系统提示、工具说明、交给帮工的活、巡查和管家的输入）写在模块的 `prompts.ts`，只有中文，另加一句用主人的语言说话。两边都读的照谁先读归：拒绝的理由主人和管家都读，进词表。日志是英文，不进词表。
+- **一张表的样子**：`const zh = {…}`，`const en: typeof zh = {…}`，`export const xWording = localized({ zh, en })`；键是概念（`attention.reviewing`），要填值的写成函数，参数由类型查；英文少一条或参数对不上就编不过。用的时候每次取（`xWording().…`），不在模块顶上存一份句子。
+- **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（田头的消息、时间线）是写下那时的语言，换了不回头翻。
+- **田头的名字不翻**：`generalName`（「田头」）是存盘的名字，模型和对话里的 @ 也用它；主人看到的是词表里的 `general`。
+- **模型写的记号不翻**：提示要帮工照原样写「结论：」「要问主人：」「标准 N：」「记住：」；读的时候英文的写法（Conclusion、Ask the owner、Criterion N、Remember）也认。
+- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；词表、`prompts.ts`、测试和测试数据、只对模型说话的 `agent/brain` 和 `tool`、记忆树的假数据不查；正则不查。
+
 ## 怎么走
 
 **加一个模块**
@@ -147,6 +158,9 @@
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
 - **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)、`acceptance/server.md`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。规则一条一条开、只开成 error：开之前在仓库上量一遍命中，一处不剩的直接开、锁住；几十处以内的同一个改动里改完再开；几百上千处的（非空断言、`strict-boolean-expressions`、没核过的 `as`）多半和这里的写法相冲，不开。整类（pedantic、style、restriction）不开：一开几千到几万处，真问题淹在里面。上线的代码不让 `any` 流过（`no-unsafe-*`，只在 `apps/*/src`、`packages/*/src`）：JSON、库、`getPrototypeOf` 给的在进来的地方定类型；测试和脚本读的是自己写的 JSON，不管。
+- **词表是普通的 TS 对象，不用 i18next。** 两种语言、一个主人、本机一个进程：它擅长的按需加载、识别浏览器语言、复数规则都用不上；它要的带类型的源头和进仓库的翻译，普通对象加 `typeof zh` 就有。放弃了 `{{var}}` 字符串插值（参数不查类型）和英文做源头（产品先是中文的，中文写得最准）。
+- **服务端写好话再发，页面不拼。** 帮工在干什么、工单等什么、通知怎么说由服务端写进帧，桌面的菜单栏、灵动岛、命令行、连接器也要同一句；放弃了只发结构、各处自己拼，那会每处各拼一遍。代价是语言跟着进程：服务端换了语言，新算的帧才是新语言，所以页面换语言时整页重开。
+- **提示词不翻。** 管家的行为和评测绑在中文提示上，写法是调出来的；模型读中文、用主人的语言回答没有问题。放弃了逐句翻译提示：要重调、重跑付费评测，换来的只是提示本身的语言。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 
 - **测试的层按依赖算，边界写成检查。** 层由一个文件经 import 一路碰得到什么算出来，加一个 import 就换了层，金字塔小结里看得见；放弃了按文件名声明层（`*.rules.test.ts`：要改二三十个名字，名字和内容还会对不上）、按层裁剪 `world`（农场搭起来中位数 10 毫秒，越层由依赖和预算挡住就够）、覆盖率门槛（说不出测在哪层、花多少）、超预算就失败（机器快慢不同，CI 会时好时坏）。按依赖算的第一回就找出一处越层：`session/rules.test.ts` 要用 `MergeFailure`，而它定义在会跑 git 的 `project.ts` 里，形状挪到了 `project/shapes.ts`。不靠时间等的 lint 改掉了 72 处写死的等待，顺带找出 `Core.owner` 是开机后才订上的流（开机后主人马上做的会漏），改成返回前就订上；只剩 8 处没有可等事件的否定断言，每处一行理由。
@@ -166,3 +180,4 @@
 - `vp run server:check`：`vp check`、protocol 的测试、`db:check`、服务端的 vitest。
 - `vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run desktop:test`：类型、各包的规则测试、页面能构建，Playwright 对着真的服务端和整个应用。
 - `vp run docs:verify`：旧名字、能力表是否最新。
+- 话：`vp check` 的 `vibevalley/no-cjk-literal`；`agent/seed.test.ts`（种子和模板的英文版只有字不同）；`session/rules.test.ts`、`memory/memory.test.ts`（英文的记号也认）；`apps/web/test/english.spec.ts`（换成 English，工作台和服务端的话都变）。

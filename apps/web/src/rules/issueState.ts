@@ -120,7 +120,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     project: issue.project ?? head.project,
     taskText: !graph
-      ? rulesWording().issue.inPlan
+      ? rulesWording().issue.inGraph
       : !node
         ? rulesWording().issue.splitting(graph.title)
         : rulesWording().issue.planStep(graph.title, node.title),

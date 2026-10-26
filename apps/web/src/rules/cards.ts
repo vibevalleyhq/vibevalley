@@ -215,7 +215,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     case "task":
       return {
         number: c.issue ? numberOf(c.issue) : undefined,
-        title: rulesWording().card.plan(c.graph.title),
+        title: rulesWording().card.graph(c.graph.title),
         status: c.issue?.status ?? laneStatus[c.lane],
         flags,
         detail: taskLine(c.graph),

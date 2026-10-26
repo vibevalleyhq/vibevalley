@@ -84,7 +84,7 @@ const zh = {
     orchestratorWorking: "管家在做",
     missingFlag: "记录缺失",
     missing: (what: readonly string[]) => `执行记录缺失：${what.join("、")}`,
-    plan: (title: string) => `计划：${title}`,
+    graph: (title: string) => `计划：${title}`,
   },
   issue: {
     asking: (who: string, n: number) => `${who}有 ${n} 个问题要问你`,
@@ -100,7 +100,7 @@ const zh = {
     stuck: "卡住了",
     canceled: "已取消",
     reopenLine: "要它接着做就重开：写一句这次要做什么。",
-    inPlan: "这是计划里的一步，跟着计划走。",
+    inGraph: "这是计划里的一步，跟着计划走。",
     splitting: (plan: string) => `在拆计划「${plan}」：只读代码，不改文件。`,
     planStep: (plan: string, step: string) => `计划「${plan}」的一步：${step}。做完自动合进计划的分支，整个计划合进主分支时才进主分支。`,
     doing: (action: string, label: string) => `正在${action}${label ? "：" + label : ""}`,
@@ -313,7 +313,7 @@ const en: typeof zh = {
     orchestratorWorking: "the manager is on it",
     missingFlag: "Record missing",
     missing: (what) => `The run's record is missing: ${what.join(", ")}`,
-    plan: (title) => `Plan: ${title}`,
+    graph: (title) => `Plan: ${title}`,
   },
   issue: {
     asking: (who, n) => (n === 1 ? `${who} has a question for you` : `${who} has ${n} questions for you`),
@@ -329,7 +329,7 @@ const en: typeof zh = {
     stuck: "Stuck",
     canceled: "Canceled",
     reopenLine: "To have it carry on, reopen it: write a line on what to do this time.",
-    inPlan: "This is a step of a plan, and goes with the plan.",
+    inGraph: "This is a step of a plan, and goes with the plan.",
     splitting: (plan) => `Splitting the plan "${plan}": reading code only, changing no files.`,
     planStep: (plan, step) =>
       `A step of the plan "${plan}": ${step}. When done it merges into the plan's branch by itself, and reaches main when the whole plan does.`,

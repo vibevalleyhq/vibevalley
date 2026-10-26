@@ -61,15 +61,15 @@ const zh = {
     history: "做过",
     took: "用时",
     thread: "看工单串",
-    plan: "看计划",
+    graph: "看计划",
     where: (plot: number, round: number) => `第 ${plot} 块地 · 第 ${round} 轮`,
     result: { met: "它说做到了", unmet: "它说没做到", unsure: "它说不确定" },
     ticked: "看过了",
     noRuns: "还没有干过。",
     runCount: (n: number) => `${n} 次`,
   },
-  plan: {
-    plans: "种植计划",
+  graph: {
+    name: "种植计划",
     new: "新计划",
     intro:
       "一件很长的活：先派一个帮工读代码，把它拆成几步，每步交给一个帮工，有先后。拆好了你看过、改过再开工；每步做完合进计划自己的分支，全做完你再一次收进主分支。",
@@ -205,7 +205,7 @@ const zh = {
     commits: "提交",
     files: "改了的文件",
     empty: "仓库还空着。收获进主分支的活会放在这里。",
-    plan: "种植计划",
+    graph: "种植计划",
     taken: (ago: string) => `${ago}收的`,
   },
   panel: {
@@ -597,15 +597,15 @@ const en: typeof zh = {
     history: "Worked by",
     took: "Took",
     thread: "See the ticket thread",
-    plan: "See the plan",
+    graph: "See the plan",
     where: (plot, round) => `Plot ${plot} · round ${round}`,
     result: { met: "It says this is met", unmet: "It says this is not met", unsure: "It is not sure" },
     ticked: "Checked",
     noRuns: "No work yet.",
     runCount: (n) => (n === 1 ? "1 round" : `${n} rounds`),
   },
-  plan: {
-    plans: "Planting plans",
+  graph: {
+    name: "Planting plans",
     new: "New plan",
     intro:
       "A long job: first a helper reads the code and splits it into steps, each for a helper, in order. You look over and edit the split before starting; each step merges into the plan's own branch when done, and when all are done you bring the whole into main at once.",
@@ -741,7 +741,7 @@ const en: typeof zh = {
     commits: "Commits",
     files: "Changed files",
     empty: "The warehouse is empty. Work harvested into main is kept here.",
-    plan: "Planting plan",
+    graph: "Planting plan",
     taken: (ago) => `harvested ${ago}`,
   },
   panel: {

@@ -1,5 +1,5 @@
-// What the task graphs say to models: the planner's brief, a step's job and what its helper is told when it is sent
-// back, the orchestrator's news of a plan and the lines it reads one by, and the refusals of the tools only models call.
+// What the task graphs say to models: the splitter's brief, a step's job and what its helper is told when it is sent
+// back, the orchestrator's news of a task graph and the lines it reads one by, and the refusals of the tools only models call.
 // In Chinese whatever the owner's locale: the models answer in the owner's.
 
 import type { Agent, Issue, Session, Task, TaskGraph } from "@vibevalley/protocol";
@@ -13,8 +13,8 @@ import { taskZh } from "./words.ts";
 export const startNeedsOwner = "计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";
 export const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 
-/** What the orchestrator hears of a plan, after its 【计划】. */
-export const planNews = {
+/** What the orchestrator hears of a task graph, after its 【计划】. */
+export const graphNews = {
   head: "【计划】",
   notSplit: (id: string, title: string, why: string) => id + "「" + title + "」没拆成：" + why + "。问主人要不要换个说法再拆。",
   drafted: (id: string, graph: string) => id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graph,
@@ -34,10 +34,10 @@ export const planNews = {
   split: (name: string, id: string, n: number, graph: string) => `${name} 把工单 ${id} 拆成了 ${n} 步，直接开工了。\n${graph}`,
 };
 
-/** What the planner and a step's helper are told along the way. */
-export const planTell = {
+/** What the splitter and a step's helper are told along the way. */
+export const graphTell = {
   retrySplit: "上一轮没做成。看一下报错，接着把计划拆完，最后用 json 代码块给出。",
-  fixPlan: (problems: readonly string[]) =>
+  fixGraph: (problems: readonly string[]) =>
     "计划有问题：\n" + problems.map((x) => "- " + x).join("\n") + "\n\n改好，在最后用一个 json 代码块重新给出整张计划。",
   carryOn: (title: string) => "接着把这一步做完：" + title,
   retry: (text: string, brief: string) => text + "\n\n这一步的工单：\n" + brief,
@@ -46,8 +46,8 @@ export const planTell = {
     `拆好了：工单「${title}」下面 ${n} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`,
 };
 
-/** What a planner's job is matched against the profiles' tags by (chooseAgent). */
-export const planMatch = (goal: string) => "规划 计划 拆分 " + goal;
+/** What a splitter's job is matched against the profiles' tags by (chooseAgent). */
+export const graphMatch = (goal: string) => "规划 计划 拆分 " + goal;
 
 /** What a step's session is told: the task graph, its job, what came before it, and how it is judged. */
 export function taskBrief(graph: TaskGraph, task: Task): string {

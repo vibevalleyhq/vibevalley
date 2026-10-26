@@ -1,4 +1,4 @@
-// What the orchestrator and the planner read about a profile: said to models, in Chinese whatever the owner's locale.
+// What the orchestrator and the splitter read about a profile: said to models, in Chinese whatever the owner's locale.
 
 import type { Agent } from "@vibevalley/protocol";
 

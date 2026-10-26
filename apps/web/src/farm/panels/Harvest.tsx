@@ -35,7 +35,7 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
           <div class="flex flex-col items-start gap-3">
             <Tinted color={tint("#c84a3a", 0.12)}>
               <p class="text-[13px] text-berry">
-                {farmWording().plan.unreadable}
+                {farmWording().graph.unreadable}
                 {reasonOf(error())}
               </p>
             </Tinted>
@@ -131,7 +131,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         <p class={["mt-2", xs]}>{farmWording().water.moved}</p>
       </Show>
       <Show when={props.changes.commits.length > 0}>
-        <FarmSection title={farmWording().plan.commits}>
+        <FarmSection title={farmWording().graph.commits}>
           <For each={props.changes.commits}>
             {(c) => (
               <div class="flex items-center gap-2 py-px">
@@ -182,7 +182,7 @@ export function Warehouse() {
                 <span class="line-clamp-2 text-[13px]">{issueTitle(i, graphs())}</span>
                 <span class={["mt-1 block", xs]}>
                   {[
-                    i.graph ? farmWording().harvest.plan : undefined,
+                    i.graph ? farmWording().harvest.graph : undefined,
                     i.assignee ? (agents().get(i.assignee)?.name ?? i.assignee) : undefined,
                     i.project,
                     i.closedAt !== undefined ? farmWording().harvest.taken(ago(i.closedAt, now())) : undefined,

@@ -207,7 +207,7 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
     case "issue":
       return ["started", first ? w.start : w.restart];
     case "task":
-      return ["started", w.plan];
+      return ["started", w.graph];
     case "recurrence":
       return ["started", w.recurrence(t.missed ?? false)];
     case "runtime":

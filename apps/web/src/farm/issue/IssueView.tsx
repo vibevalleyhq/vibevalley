@@ -438,7 +438,7 @@ function IssueBody(props: {
                 </Show>
                 <Show when={s().inTask && props.onTask}>
                   <PxButton size="sm" onClick={() => props.onTask?.()}>
-                    {farmWording().plot.plan}
+                    {farmWording().plot.graph}
                   </PxButton>
                 </Show>
               </div>

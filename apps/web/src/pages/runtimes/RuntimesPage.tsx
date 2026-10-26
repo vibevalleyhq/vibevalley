@@ -284,7 +284,7 @@ function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p class="text-sm text-muted">{runtimesWording().plan(u().subscription ?? "")}</p>
+                          <p class="text-sm text-muted">{runtimesWording().subscription(u().subscription ?? "")}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>

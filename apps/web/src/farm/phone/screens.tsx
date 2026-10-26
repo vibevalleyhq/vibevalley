@@ -132,7 +132,7 @@ function CallOrchestrator(props: { onCall: () => void }) {
       style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
     >
       <PhoneGlyph size={14} lit />
-      {phoneWording().callManager}
+      {phoneWording().callOrchestrator}
     </button>
   );
 }
@@ -251,7 +251,7 @@ export function OrchestratorScreen() {
       <div class="mt-auto mb-5">
         <RoundKey
           answer={!on()}
-          label={on() ? phoneWording().hangUp : phoneWording().callManager}
+          label={on() ? phoneWording().hangUp : phoneWording().callOrchestrator}
           onClick={() => void (on() ? voiceCall.end() : voiceCall.start())}
         />
       </div>
@@ -309,7 +309,7 @@ export function HomeScreen(props: {
     { label: phoneWording().log, icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
     { label: phoneWording().manager, icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
     { label: phoneWording().app.channels, icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { label: phoneWording().app.plans, icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { label: phoneWording().app.graphs, icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
     { label: phoneWording().app.games, icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;

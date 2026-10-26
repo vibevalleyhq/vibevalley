@@ -50,7 +50,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
       <div class="flex items-center gap-2 px-2">
         <span class="inline-flex items-center gap-1 rounded bg-leaf/30 px-1.5 py-0.5 text-xs">
           <Icon name="icon-tasks" size={12} />
-          {issuesWording().task.plan}
+          {issuesWording().task.label}
         </span>
         <span class="text-xs text-muted">{issuesWording().task.steps(total())}</span>
       </div>
@@ -75,7 +75,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
       </div>
       <Show when={g().asksForYou}>
         <Note tone="wheat" class="mt-2.5">
-          {issuesWording().task.asks}
+          {issuesWording().task.waitsForYou}
         </Note>
       </Show>
       <Show when={g().state === "splitting"}>
