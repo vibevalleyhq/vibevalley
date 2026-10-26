@@ -71,8 +71,6 @@ export function sessionLine(w: Roster, now: number, number?: number): string {
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-// ── issues, as the orchestrator reads them ──
-
 /** The words for a status: its label (statusLabel), a few the owner says for it, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
   ...Object.fromEntries(IssueStatusValues.map((s) => [statusLabel[s], s])),

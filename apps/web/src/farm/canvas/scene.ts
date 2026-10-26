@@ -279,7 +279,6 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
   let whereAt = 0;
   let strollAt = 0;
 
-  // ── Pointer: what is under it lights up; a press dips a plot; a click acts. ──
   let over: VillageHit | undefined;
   let downOn: VillageHit | undefined;
   let pointerAt: Point | undefined;

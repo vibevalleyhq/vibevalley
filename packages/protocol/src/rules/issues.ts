@@ -18,8 +18,6 @@ export function shortTitle(text: string): string {
   return chars.slice(0, titleMax - 1).join("") + "…";
 }
 
-// ── an issue's state in words: the one word list the board, the page, the tools and the orchestrator say ──
-
 export const statusLabel: Readonly<Record<IssueStatus, string>> = {
   backlog: "备选",
   todo: "待办",

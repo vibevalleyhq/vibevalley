@@ -296,8 +296,6 @@ export interface ChannelShape {
 
 export class Channels extends Context.Service<Channels, ChannelShape>()("vibevalley/Channel") {}
 
-// ── the helpers: the participants that work (Agent Sessions registers them) ──
-
 /** What came of handing a helper a message. */
 export interface Delivered {
   readonly kind: "run" | "steered" | "queued" | "refused";
@@ -400,8 +398,6 @@ export const make = Effect.gen(function* () {
       { onlyIfMissing: true },
     );
 
-  // ── the people and the channels ──
-
   for (const [id, kind, name] of [
     [ownerId, "owner", "主人"],
     [orchestratorAgent, "orchestrator", "管家"],
@@ -488,8 +484,6 @@ export const make = Effect.gen(function* () {
     yield* core.apply({ type: "message", message: toMessage(row), ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
   });
 
-  // ── threads ──
-
   const threadOf = (subject: ThreadSubject) => Effect.sync(() => model.threadOfSubject(subject.kind, subject.id));
 
   /** The one way from a session to its thread: through the issue it works, never by its own id, since the thread outlives it. */
@@ -526,8 +520,6 @@ export const make = Effect.gen(function* () {
     return id;
   });
 
-  // ── reading ──
-
   const setRead = (who: string, conversation: string, upto: number, now: number) =>
     Effect.andThen(
       db(qr.setReadCursor({ participant_id: who, conversation_id: conversation, read_number: upto, updated_at: now })),
@@ -558,8 +550,6 @@ export const make = Effect.gen(function* () {
     },
     (effect) => tx(effect),
   );
-
-  // ── writing ──
 
   const settle = Effect.fn("Channels.settle")(function* (inserted: MsgRow) {
     let row = inserted;
@@ -737,8 +727,6 @@ export const make = Effect.gen(function* () {
     for (const r of written.recipients) yield* kick(r);
   });
 
-  // ── delivering ──
-
   const deliveryTarget = (r: DeliveryRow) => targetOfRow(r.conversation_kind, r.parent_number, null, null, r.channel_name || null);
   const asInbox = (r: DeliveryRow): InboxMessage => ({
     id: r.message_id,
@@ -897,8 +885,6 @@ export const make = Effect.gen(function* () {
       { discard: true },
     );
 
-  // ── sessions coming and going ──
-
   const openJob = Effect.fn("Channels.openJob")(function* (h: Session) {
     const joined = { id: h.id, kind: "session", name: h.name, agent_id: h.agent, runtime: h.runtime, joined_at: yield* Clock.currentTimeMillis };
     yield* db(qp.upsertParticipant(joined));
@@ -972,8 +958,6 @@ export const make = Effect.gen(function* () {
     const meta: Meta = { outcome, ...(spent ? { spent } : {}), forTask: !!w.graph, ...(run ? { run } : {}) };
     yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), final: true, meta });
   });
-
-  // ── coming back ──
 
   yield* locked(
     Effect.gen(function* () {

@@ -122,8 +122,7 @@ function routesOf(runes: readonly string[]): { freq: number; index: number }[] {
   return routes;
 }
 
-// ── jieba's HMM, for a run of single characters the dictionary does not know ──
-
+// As jieba's HMM: it cuts a run of single characters the dictionary does not know.
 type State = "B" | "E" | "M" | "S";
 
 let emitTable: Record<State, Record<string, number>> | undefined;

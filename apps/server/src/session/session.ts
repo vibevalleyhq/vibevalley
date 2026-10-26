@@ -440,8 +440,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     let launches = 0;
     let closing = false;
 
-    // ── tokens: they tell sessions apart and guard nothing (sessions already run unsandboxed here), so memory only ──
-
+    // Tokens tell sessions apart and guard nothing (sessions already run unsandboxed here), so they are kept in memory only.
     const issueToken = (session: string) => {
       const token = "hb_" + session + "_" + randomBytes(18).toString("base64url");
       tokens.set(session, token);
@@ -449,8 +448,6 @@ export const make = (options: SessionOptionsIn = {}) =>
     };
     const revokeToken = (session: string) => void tokens.delete(session);
     const who = (token: string) => [...tokens.entries()].find(([, t]) => t === token)?.[0] ?? "";
-
-    // ── what is kept ──
 
     // A session's own row keeps what taking it up again needs, so it goes with the database: one made again from a new
     // schema brings back no session (and none on an issue the database no longer has).
@@ -493,8 +490,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       logged(`session ${id}'s end not kept`, qs.endSession({ ended_at: clock.currentTimeMillisUnsafe(), closed, id }));
 
     const logOf = (s: Session) => Effect.as(keep(s), trajectories.openLog(s.id));
-
-    // ── runs ──
 
     // A run's record, the helpers' and the in-process agent's alike (execution.ts): one way to open, hear, link and end it.
     const runs = {
@@ -541,8 +536,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       h.journal.runEnded(id, outcome);
       fire(keptRun(`run ${id}`, runs.finish(id, outcome, summary, spent)));
     };
-
-    // ── following a session ──
 
     const closedLaunch = (h: Hand) => {
       if (h.launch) signal({ kind: "closed", id: h.id, launch: h.launch });
@@ -966,8 +959,6 @@ export const make = (options: SessionOptionsIn = {}) =>
       const conflict = yield* projects.conflict(place, session.conflict?.base ?? "");
       if (!sameConflict(session.conflict, conflict)) yield* core.apply({ type: "conflict", id: session.id, ...(conflict ? { conflict } : {}) });
     });
-
-    // ── bringing the farm back ──
 
     const expireLogs = Effect.fn("Sessions.expireLogs")(function* (days: number) {
       if (days <= 0) return;

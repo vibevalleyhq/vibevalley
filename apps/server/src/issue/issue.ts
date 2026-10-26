@@ -241,8 +241,6 @@ export const make = (options: IssueOptions = {}) =>
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
 
-    // ── reading ──
-
     function issueOf(row: Row, runs: readonly string[] | undefined): Issue {
       const state = core.state();
       const graph = column.graph(row.graph);
@@ -341,8 +339,6 @@ export const make = (options: IssueOptions = {}) =>
 
     const liveSession = (id: string) =>
       Effect.flatMap(latest(id), (session) => (sessions.find(session) ? Effect.succeed(session) : Effect.fail(missing("帮工 " + session, [lookIn.session]))));
-
-    // ── writing ──
 
     const issueWords = (req: Pick<IssueRequest, "title" | "description">) => {
       const [title, rest] = splitJob(req.title);
@@ -481,8 +477,6 @@ export const make = (options: IssueOptions = {}) =>
       );
       yield* publish(id);
     });
-
-    // ── sending ──
 
     const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
       if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" };
@@ -647,8 +641,6 @@ export const make = (options: IssueOptions = {}) =>
       return Option.getOrUndefined(yield* Effect.option(get(row.id)));
     });
 
-    // ── merging ──
-
     const { merge, refreshPullRequests } = merging({
       core,
       sessions,
@@ -698,8 +690,6 @@ export const make = (options: IssueOptions = {}) =>
       if (last === undefined || !sessions.find(last)) return;
       if (!(yield* sessions.dismiss(last))) return yield* Effect.fail(missing("帮工 " + last, [lookIn.session]));
     });
-
-    // ── a move worked out before it is made ──
 
     /** The issue as a move would see it once the owner's unsaved fields are saved (issue.status saves them first);
      * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
@@ -780,8 +770,6 @@ export const make = (options: IssueOptions = {}) =>
       }
     });
 
-    // ── drafts ──
-
     const { draft, handedBack, clearRefinement } = refinement({
       core,
       store,
@@ -796,8 +784,6 @@ export const make = (options: IssueOptions = {}) =>
       hire,
       publish,
     });
-
-    // ── what happens to its sessions ──
 
     const onSessionNews = Effect.fn("Issues.onSessionNews")(function* (n: SessionNews) {
       switch (n._tag) {
@@ -841,8 +827,6 @@ export const make = (options: IssueOptions = {}) =>
       if (Option.isNone(issue) || isClosed(issue.value.status)) return;
       yield* ownerSaid(issue.value.id);
     });
-
-    // ── coming back ──
 
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });

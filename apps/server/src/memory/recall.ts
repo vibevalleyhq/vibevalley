@@ -82,8 +82,6 @@ export function nextForgotten(memories: readonly Memory[], coming: number): stri
     .map((m) => m.id);
 }
 
-// ── what a run leaves ──
-
 const noteMax = 300;
 const notesPerRun = 5;
 export const fromOwner = "主人交代：";
@@ -133,8 +131,6 @@ export function memoryIsNewNote(memories: readonly Memory[], text: string, proje
 }
 
 export const noteMaxChars = noteMax;
-
-// ── memory_search ──
 
 /** What memory_search questions. agent "": every profile (only the orchestrator may ask so); project "": every project; kind "": any. */
 export interface SearchQuery {

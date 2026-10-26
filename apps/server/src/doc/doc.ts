@@ -238,8 +238,6 @@ export const make = (options: DocOptions = {}) =>
       return yield* get(created.doc.id);
     });
 
-    // ── the demo ──
-
     let demoOn = false;
     /** About ticks of the tick, a bit more or less so the writers interleave. */
     const wait = (ticks: number) => Effect.sleep(ticks * (1 + demoJitter * (2 * Math.random() - 1)) * tick);

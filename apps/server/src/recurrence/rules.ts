@@ -57,7 +57,6 @@ export function dueText(s: Recurrence, missed: boolean): string {
   return "⏰ 定时「" + s.name + "」到点了" + (missed ? "（服务端没开着时错过的，补一次）" : "") + "：" + s.text;
 }
 
-// ── Cron ──
 // Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
 // Day of week is 0 to 7, both 0 and 7 Sunday. As in Vixie cron, when neither day field starts with *, a day matching
 // either one is due; otherwise it must match both.
