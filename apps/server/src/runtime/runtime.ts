@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
+import { withinRealTime } from "../base/time.ts";
+import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
@@ -116,13 +117,11 @@ const SpentSchema: Schema.Codec<Spent> = Schema.Struct({
   byRuntime: Schema.Record(Schema.String, Schema.Finite),
 });
 
-const today = () => {
-  const d = new Date();
+/** The local day of now, as the spend tally keys it. */
+const dayOf = (now: number) => {
+  const d = new Date(now);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-
-const within = <A>(p: Promise<A>, ms: number, fallback: A): Promise<A> =>
-  Promise.race([p.catch(() => fallback), new Promise<A>((resolve) => setTimeout(() => resolve(fallback), ms).unref())]);
 
 /**
  * oar's installation probes read the binary from OAR_<ID>_BIN as they start: it is set for that moment only, so two
@@ -165,7 +164,7 @@ async function inventory<T>(
   entry: (t: T) => InventoryEntry,
 ): Promise<InventoryEntry[] | null> {
   if (!read) return null;
-  const result = await within(read(found, { cwd, timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
+  const result = await withinRealTime(read(found, { cwd, timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
   return result?.kind === "ok" ? result.items.map(entry) : null;
 }
 
@@ -174,6 +173,7 @@ const optional = <K extends string>(key: K, v: string | undefined) => (v ? ({ [k
 
 export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
@@ -201,18 +201,18 @@ export const make = (options: RuntimeOptions = {}) =>
 
     const spendFile = join(config.home, "spend.json");
     const disk = new FileWriter(spendFile);
-    let spent: Spent = { day: today(), byRuntime: {} };
+    let spent: Spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
     if (existsSync(spendFile)) {
       try {
         const kept = jsonOf(SpentSchema)(readFileSync(spendFile, "utf8"));
-        if (kept.day === today() && kept.byRuntime) spent = kept;
+        if (kept.day === dayOf(clock.currentTimeMillisUnsafe()) && kept.byRuntime) spent = kept;
       } catch {
         // An unreadable tally starts the day again.
       }
     }
     /** A new day starts from nothing. */
     const tally = () => {
-      if (spent.day !== today()) spent = { day: today(), byRuntime: {} };
+      if (spent.day !== dayOf(clock.currentTimeMillisUnsafe())) spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
       return spent.byRuntime;
     };
 
@@ -278,14 +278,14 @@ export const make = (options: RuntimeOptions = {}) =>
         mcpServers: null,
         tools: null,
         settings,
-        checkedAt: Date.now(),
+        checkedAt: clock.currentTimeMillisUnsafe(),
       };
       const runtime = registry.get(id);
       if (!runtime) {
         const reason = id === "cursor" ? "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接" : "oar 不认识这个 runtime";
         return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
       }
-      const snapshot = await within(probeInstallation(runtime, settings.binPath), probeTimeoutMs, {
+      const snapshot = await withinRealTime(probeInstallation(runtime, settings.binPath), probeTimeoutMs, {
         kind: "not_found",
       });
       if (snapshot.kind !== "available") {
@@ -310,7 +310,7 @@ export const make = (options: RuntimeOptions = {}) =>
       const cwd = projectsDir(config);
       const [models, usage, skills, mcpServers, tools] = await Promise.all([
         runtime.listModels
-          ? within(runtime.listModels(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined).then((m) =>
+          ? withinRealTime(runtime.listModels(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined).then((m) =>
               m?.kind === "ok"
                 ? m.models
                     .filter((x) => !x.disabled)
@@ -352,7 +352,7 @@ export const make = (options: RuntimeOptions = {}) =>
     async function defaultUsageOf(id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings): Promise<AccountUsage | null> {
       if (id === "pi") return piBalance(settings);
       if (!runtime.accountUsage) return null;
-      const usage = await within(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
+      const usage = await withinRealTime(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
       return usage ? fromOar(usage) : null;
     }
 
@@ -391,7 +391,7 @@ export const make = (options: RuntimeOptions = {}) =>
       if (closed || !now || now.read !== before.read || (usageTaken.get(id) ?? 0) > asked) return;
       usageTaken.set(id, asked);
       if (JSON.stringify(usage) === JSON.stringify(now.info.usage)) return;
-      remember({ ...now, info: { ...now.info, usage, checkedAt: Date.now() } }, now.read);
+      remember({ ...now, info: { ...now.info, usage, checkedAt: clock.currentTimeMillisUnsafe() } }, now.read);
     }
 
     /** At most four runtimes asked at once. */

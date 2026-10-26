@@ -11,7 +11,7 @@ import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
-import { Context, Effect, FiberSet, Layer, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents, traitsOf } from "../agent/agent.ts";
 import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
 import { localeMinute } from "../agent/brain/recurrences.ts";
@@ -154,6 +154,7 @@ export interface OrchestratorOptions {
 
 export const make = (options: OrchestratorOptions = {}) =>
   Effect.gen(function* () {
+    const clock = yield* Clock.Clock;
     const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
@@ -197,7 +198,7 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
     const wakeSoon = (withinMs: number) => {
-      const by = Date.now() + withinMs;
+      const by = clock.currentTimeMillisUnsafe() + withinMs;
       return recurrence.list().some((s) => {
         const next = nextRun(s);
         return next !== undefined && (!s.agent || s.agent === orchestratorAgent) && next <= by;
@@ -311,7 +312,13 @@ export const make = (options: OrchestratorOptions = {}) =>
         async (busy, memoryNews) => {
           const [heard, ids] = await news();
           // The log shows the line; the model also gets the time, the farm and the news before it.
-          const text = ["【现在】" + localeMinute(new Date()), await situationNow(busy, i.conversation), memoryNews, heard, asked]
+          const text = [
+            "【现在】" + localeMinute(new Date(clock.currentTimeMillisUnsafe())),
+            await situationNow(busy, i.conversation),
+            memoryNews,
+            heard,
+            asked,
+          ]
             .filter((p) => p !== "")
             .join("\n\n");
           return { text, heard: ids };
@@ -329,7 +336,7 @@ export const make = (options: OrchestratorOptions = {}) =>
           : "我这边起不来：" + taken.why;
       const again = cannot.get(i.conversation) === words;
       cannot.set(i.conversation, words);
-      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${Date.now()}`, words, true, taken.run));
+      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${clock.currentTimeMillisUnsafe()}`, words, true, taken.run));
       return false;
     };
 

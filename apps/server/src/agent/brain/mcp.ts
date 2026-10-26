@@ -8,6 +8,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "./config.ts";
 import { type Schema, textTool } from "./tool.ts";
+import { afterRealTime } from "../../base/time.ts";
 
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;
@@ -62,11 +63,11 @@ const timeout = <A>(p: Promise<A>, ms: number, signal?: AbortSignal) =>
     const finish = (f: () => void) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cancelTimer();
       signal?.removeEventListener("abort", abort);
       f();
     };
-    const timer = setTimeout(() => finish(() => reject(new Error("timed out"))), ms);
+    const cancelTimer = afterRealTime(ms, () => finish(() => reject(new Error("timed out"))));
     const abort = () => finish(() => reject(new Error("canceled")));
     signal?.addEventListener("abort", abort, { once: true });
     p.then(

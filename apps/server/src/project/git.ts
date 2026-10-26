@@ -3,6 +3,7 @@
 
 import { spawn } from "node:child_process";
 import { Effect } from "effect";
+import { afterRealTime } from "../base/time.ts";
 
 export interface Ran {
   readonly stdout: string;
@@ -45,18 +46,18 @@ export const run = (command: string, args: readonly string[], options: RunOption
       }
     };
     let timedOut = false;
-    const timer =
+    const cancelTimer =
       options.timeoutMs && options.timeoutMs > 0
-        ? setTimeout(() => {
+        ? afterRealTime(options.timeoutMs, () => {
             timedOut = true;
             killGroup();
-          }, options.timeoutMs)
+          })
         : undefined;
     let done = false;
     const finish = (r: Ran) => {
       if (done) return;
       done = true;
-      clearTimeout(timer);
+      cancelTimer?.();
       resume(Effect.succeed(r));
     };
     child.on("error", (e: NodeJS.ErrnoException) =>

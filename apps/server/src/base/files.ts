@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { Clock, Effect } from "effect";
+import { randomUUID } from "node:crypto";
 
 /**
  * An owner's file (config.json, settings.json, state.json) read by read. One that does not read (not JSON, or not the
@@ -49,7 +50,7 @@ export class FileWriter {
 
   private save(data: string) {
     mkdirSync(dirname(this.path), { recursive: true });
-    const temp = join(dirname(this.path), `${basename(this.path)}.${process.pid}.${Date.now()}.tmp`);
+    const temp = join(dirname(this.path), `${basename(this.path)}.${randomUUID()}.tmp`);
     writeFileSync(temp, data, { mode: this.mode });
     renameSync(temp, this.path);
   }

@@ -8,6 +8,8 @@ import { randomBytes, randomInt } from "node:crypto";
 let lastMs = -1;
 let seq = 0;
 
+// An id's time only sorts rows; nothing reads it as a time, so the wall clock will do.
+// oxlint-disable-next-line vibevalley/no-wall-clock
 export function newId(now = Date.now()): string {
   let ms = Math.max(now, lastMs);
   if (ms === lastMs) {

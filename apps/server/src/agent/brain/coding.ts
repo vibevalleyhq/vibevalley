@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { booleanSchema, integerSchema, numberSchema, objectSchema, stopped, stringSchema, textTool } from "./tool.ts";
+import { afterRealTime } from "../../base/time.ts";
 
 export interface CodingOptions {
   readonly cwd: string;
@@ -60,7 +61,7 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     child.stdout.on("data", take);
     child.stderr.on("data", take);
     let timedOut = false;
-    let killer: NodeJS.Timeout | undefined;
+    let killer: (() => void) | undefined;
     const kill = (sig: NodeJS.Signals) => {
       try {
         if (child.pid) process.kill(-child.pid, sig);
@@ -70,16 +71,16 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     };
     const end = () => {
       kill("SIGTERM");
-      killer ??= setTimeout(() => kill("SIGKILL"), 2_000);
+      killer ??= afterRealTime(2_000, () => kill("SIGKILL"));
     };
-    const timer = setTimeout(() => {
+    const cancelTimer = afterRealTime(timeoutMs, () => {
       timedOut = true;
       end();
-    }, timeoutMs);
+    });
     signal?.addEventListener("abort", end, { once: true });
     const done = () => {
-      clearTimeout(timer);
-      if (killer) clearTimeout(killer);
+      cancelTimer();
+      killer?.();
       signal?.removeEventListener("abort", end);
     };
     child.on("error", (e) => {
@@ -99,7 +100,7 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     };
     child.on("exit", (code) => {
       exited = { code: code ?? -1 };
-      setTimeout(finish, 2_000).unref();
+      afterRealTime(2_000, finish, { unref: true });
     });
     child.on("close", finish);
   });

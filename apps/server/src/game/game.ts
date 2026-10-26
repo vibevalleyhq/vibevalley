@@ -39,6 +39,7 @@ export interface GameShape {
 export class Game extends Context.Service<Game, GameShape>()("vibevalley/Game") {}
 
 export const make = Effect.gen(function* () {
+  const clock = yield* Clock.Clock;
   const config = yield* Settings;
   const core = yield* Core;
   const projects = yield* Projects;
@@ -126,7 +127,7 @@ export const make = Effect.gen(function* () {
     achievements: achievementsInWords,
     chooseTitle: (achievement, tier) => record({ kind: "titled", ...(achievement ? { achievement } : {}), ...(tier ? { tier } : {}) }),
     want: (station) => {
-      wanted = { station, until: Date.now() + wantStationForMs };
+      wanted = { station, until: clock.currentTimeMillisUnsafe() + wantStationForMs };
     },
     record,
     count,
