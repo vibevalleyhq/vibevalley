@@ -3,7 +3,7 @@
 
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { AgentToolResult, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { models } from "../../ai/models.ts";
@@ -141,7 +141,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
             role: "toolResult",
             toolCallId: "",
             toolName: "",
-            content: e.result?.content ?? [],
+            content: (e.result as AgentToolResult | undefined)?.content ?? [],
             isError: false,
             timestamp: 0,
           });

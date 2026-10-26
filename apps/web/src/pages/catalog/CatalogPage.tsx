@@ -50,7 +50,11 @@ function Img(props: { p: Picture; scale: number }) {
 }
 
 const usePictures = () =>
-  useQuery(() => ({ queryKey: ["pictures"], queryFn: async () => picturesOf(await (await fetch("/pixel/sprites.json")).json()), staleTime: Infinity }));
+  useQuery(() => ({
+    queryKey: ["pictures"],
+    queryFn: async () => picturesOf((await (await fetch("/pixel/sprites.json")).json()) as Parameters<typeof picturesOf>[0]),
+    staleTime: Infinity,
+  }));
 
 const shelfTabs = [
   { id: "sprites", label: "图", to: "/catalog" },

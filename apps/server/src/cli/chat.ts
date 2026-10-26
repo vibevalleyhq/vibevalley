@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
+import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { Brain, type BrainEvent } from "../agent/brain/agent.ts";
 import { codingTools } from "../agent/brain/coding.ts";
@@ -50,7 +51,11 @@ function show(e: BrainEvent, prompt: () => void) {
       console.log(dim("→ " + e.toolName + " " + short(JSON.stringify(e.args ?? {}))));
       return;
     case "tool_execution_end":
-      console.log(dim((e.isError ? "✗ " : "✓ ") + short(((e.result?.content ?? []) as { type: string; text?: string }[]).map((c) => c.text ?? "").join(""))));
+      console.log(
+        dim(
+          (e.isError ? "✗ " : "✓ ") + short(((e.result as AgentToolResult | undefined)?.content ?? []).map((c) => (c.type === "text" ? c.text : "")).join("")),
+        ),
+      );
       return;
     case "compaction_end":
       if (e.compaction) console.log(dim("（前面的对话压成了摘要，原文在 " + (e.compaction.archive ?? "") + "）"));
@@ -58,6 +63,7 @@ function show(e: BrainEvent, prompt: () => void) {
     case "agent_settled":
       write(dim(`（${e.run.aborted ? "停下了，" : ""}输入 ${e.run.usage.input}，缓存 ${e.run.usage.cacheRead}，输出 ${e.run.usage.output}）\n`));
       prompt();
+      return;
     default:
       break;
   }

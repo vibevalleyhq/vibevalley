@@ -44,7 +44,7 @@ export const make = (options: McpOptions = {}) =>
 
     const call = async (tool: AgentTool, args: unknown): Promise<string> => {
       try {
-        const checked = validateToolArguments(tool, { type: "toolCall", id: "", name: tool.name, arguments: (args ?? {}) as never });
+        const checked: unknown = validateToolArguments(tool, { type: "toolCall", id: "", name: tool.name, arguments: (args ?? {}) as never });
         const r = await tool.execute("", checked);
         return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
       } catch (e) {

@@ -24,7 +24,7 @@ export class Deliveries {
   /** InsertDelivery: one already there stays as it is. */
   inserted(recipient: string, row: DeliveryRow) {
     let held = this.open.get(recipient);
-    if (!held) this.open.set(recipient, (held = new Map()));
+    if (!held) this.open.set(recipient, (held = new Map<string, DeliveryRow>()));
     if (!held.has(row.message_id)) held.set(row.message_id, row);
   }
 

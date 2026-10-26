@@ -228,7 +228,7 @@ export const make = (options: TaskOptions = {}) =>
         { discard: true },
       );
 
-    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: Actor, why = "") {
+    const put = Effect.fn("Tasks.put")(function* (graph: TaskGraph, by: Actor, why: string = "") {
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
@@ -465,7 +465,7 @@ export const make = (options: TaskOptions = {}) =>
       }
     });
 
-    const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from = "") {
+    const openBranch = Effect.fn("Tasks.openBranch")(function* (graph: TaskGraph, from: string = "") {
       const branch = "vibevalley/task-" + graph.id + "-" + (yield* Clock.currentTimeMillis).toString(36);
       yield* projects.openBranch(graph.project, branch, from).pipe(Effect.mapError((e) => refused(e.message)));
       return branch;

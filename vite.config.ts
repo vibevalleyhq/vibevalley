@@ -77,6 +77,13 @@ export default defineConfig({
       // A switch on a closed union covers every member, or says with default that the rest are left out on purpose: a
       // member added later is then a compile error where it is not handled (AGENTS.md, 封闭的联合穷尽处理).
       "typescript/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+      // == only against null, where it means null or undefined.
+      "eslint/eqeqeq": ["error", "always", { null: "ignore" }],
+      // A promise is rejected with an Error, or passes on what it was given (an abort's reason, a caught error).
+      "typescript/prefer-promise-reject-errors": ["error", { allowThrowingAny: true, allowThrowingUnknown: true }],
+      // Inside try, a promise returned without await escapes its catch and finally.
+      "typescript/return-await": "error",
+      "eslint/no-fallthrough": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -85,6 +92,28 @@ export default defineConfig({
         // Tests are vitest's, on Node.
         files: ["apps/**", "packages/**", "scripts/**"],
         rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
+      },
+      {
+        // Shipped code lets no any through: what JSON, a library or a cast gives untyped is typed where it comes in.
+        // Tests and scripts read JSON they wrote themselves.
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: {
+          "typescript/no-unsafe-argument": "error",
+          "typescript/no-unsafe-assignment": "error",
+          "typescript/no-unsafe-call": "error",
+          "typescript/no-unsafe-member-access": "error",
+          "typescript/no-unsafe-return": "error",
+        },
+      },
+      {
+        files: ["**/*.test.ts", "**/*.test.tsx", "apps/server/src/testing/**", "apps/server/src/agent/brain/testing.ts"],
+        rules: {
+          "typescript/no-unsafe-argument": "off",
+          "typescript/no-unsafe-assignment": "off",
+          "typescript/no-unsafe-call": "off",
+          "typescript/no-unsafe-member-access": "off",
+          "typescript/no-unsafe-return": "off",
+        },
       },
       {
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
