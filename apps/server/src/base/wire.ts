@@ -9,7 +9,7 @@ import { Schema } from "effect";
 export const wireOf = <A>(value: A): A => {
   if (Array.isArray(value)) return value.map(wireOf) as A;
   if (value === null || typeof value !== "object") return value;
-  const proto = Object.getPrototypeOf(value);
+  const proto: unknown = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return value;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value)) if (v !== undefined) out[k] = wireOf(v);

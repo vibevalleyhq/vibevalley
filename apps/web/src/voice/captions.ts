@@ -146,7 +146,7 @@ export class LiveCaptions {
     const n = total === "???" ? undefined : /^\d+$/.test(total) ? Number(total) : NaN;
     if (!(i >= 1) || (n !== undefined && (!(n >= 1) || i > n))) return undefined;
     let got = this.chunks.get(id);
-    if (!got) this.chunks.set(id, (got = new Map()));
+    if (!got) this.chunks.set(id, (got = new Map<number, string>()));
     got.set(i, data);
     if (n === undefined || got.size < n) return undefined;
     this.chunks.delete(id);

@@ -94,6 +94,28 @@ export default defineConfig({
         rules: { "no-restricted-imports": ["error", { paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }] }] },
       },
       {
+        // Shipped code lets no any through: what JSON, a library or a cast gives untyped is typed where it comes in.
+        // Tests and scripts read JSON they wrote themselves.
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: {
+          "typescript/no-unsafe-argument": "error",
+          "typescript/no-unsafe-assignment": "error",
+          "typescript/no-unsafe-call": "error",
+          "typescript/no-unsafe-member-access": "error",
+          "typescript/no-unsafe-return": "error",
+        },
+      },
+      {
+        files: ["**/*.test.ts", "**/*.test.tsx", "apps/server/src/testing/**", "apps/server/src/agent/brain/testing.ts"],
+        rules: {
+          "typescript/no-unsafe-argument": "off",
+          "typescript/no-unsafe-assignment": "off",
+          "typescript/no-unsafe-call": "off",
+          "typescript/no-unsafe-member-access": "off",
+          "typescript/no-unsafe-return": "off",
+        },
+      },
+      {
         // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
         // command line prints, and the brain and the journal are plain classes outside Effect.
         files: ["apps/server/src/**"],

@@ -42,8 +42,7 @@ export function newestUserText(req: ChatRequest): string {
   const m = (req.messages ?? []).findLast((x) => x.role === "user");
   if (!m) return "";
   if (typeof m.content === "string") return m.content.trim();
-  if (!Array.isArray(m.content)) return "";
-  return m.content
+  return (m.content ?? [])
     .filter((p) => p.type === "text")
     .map((p) => p.text ?? "")
     .join("")

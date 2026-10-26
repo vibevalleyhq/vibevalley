@@ -655,7 +655,7 @@ export const make = (options: IssueOptions = {}) =>
       publish,
     });
 
-    const comment = Effect.fn("Issues.comment")(function* (id: string, text: string, sendKey = "") {
+    const comment = Effect.fn("Issues.comment")(function* (id: string, text: string, sendKey: string = "") {
       const issue = yield* get(id);
       if (isClosed(issue.status)) return yield* Effect.fail(refused("这张工单关上了：带一句话重开它"));
       const session = yield* liveSession(id);
