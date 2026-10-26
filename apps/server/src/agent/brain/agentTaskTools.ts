@@ -4,22 +4,21 @@
 // own tasks are its to do; nothing here does them.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { Effect } from "effect";
 import { head } from "../../base/text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
 import { objectSchema, type Schema, stringSchema, textTool } from "./tool.ts";
 
-const unchanged = Symbol("unchanged");
-
-const run = <A>(e: Effect.Effect<A, unknown>) => Effect.runPromise(e);
-
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => void): AgentTaskStore {
   return {
     load: store.load,
-    change: (f) => Effect.tap(store.change(f), (g) => Effect.sync(() => changed(g))),
+    change: async (f) => {
+      const g = await store.change(f);
+      if (g !== undefined) changed(g);
+      return g;
+    },
   };
 }
 
@@ -54,15 +53,11 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
     ),
     run: async (p) => {
       let problems: string[] = [];
-      const g = await run(
-        store.change((g) =>
-          Effect.sync(() => {
-            const [next, bad] = engine.add(g, p.tasks ?? []);
-            problems = bad;
-            return next;
-          }),
-        ),
-      );
+      const g = await store.change((g) => {
+        const [next, bad] = engine.add(g, p.tasks ?? []);
+        problems = bad;
+        return next;
+      });
       if (problems.length > 0) return "没收：" + problems.join("；") + "\n\n" + engine.text(g);
       changed();
       return engine.text(g);
@@ -96,7 +91,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
         ...(p.brief != null ? { brief: p.brief } : {}),
         ...(p.after != null ? { after: p.after } : {}),
       };
-      const g = await run(store.change((g) => Effect.try({ try: () => engine.update(g, p.id, c), catch: (e) => e })));
+      const g = await store.change((g) => engine.update(g, p.id, c));
       if (engine.finished(g)) return engine.text(g) + "\n\n都做完了，这张图收起来了。";
       changed();
       return engine.text(g);
@@ -106,7 +101,7 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
     name: "task_graph",
     description: "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
     parameters: objectSchema(),
-    run: async () => engine.text(await run(store.load)),
+    run: async () => engine.text(await store.load()),
   });
   return [task, update, list];
 }
@@ -134,23 +129,21 @@ export class AgentTaskRunner {
     if (!this.subagent || this.life.aborted) return;
     let picked: engine.AgentTask[] = [];
     try {
-      await run(
-        this.store.change((g) => {
-          picked = [];
-          let room = this.max - this.out.size;
-          let next = g;
-          for (const t of engine.readyTasks(g)) {
-            if (room <= 0) break;
-            if (t.by !== "subagent" || this.out.has(t.id)) continue;
-            next = engine.begin(next, t.id);
-            picked.push(t);
-            room--;
-          }
-          return picked.length === 0 ? Effect.fail(unchanged) : Effect.succeed(next);
-        }),
-      );
+      await this.store.change((g) => {
+        picked = [];
+        let room = this.max - this.out.size;
+        let next = g;
+        for (const t of engine.readyTasks(g)) {
+          if (room <= 0) break;
+          if (t.by !== "subagent" || this.out.has(t.id)) continue;
+          next = engine.begin(next, t.id);
+          picked.push(t);
+          room--;
+        }
+        return picked.length === 0 ? undefined : next;
+      });
     } catch (e) {
-      if (e !== unchanged && !isUnchanged(e)) console.error("agent: cannot move its tasks:", e);
+      console.error("agent: cannot move its tasks:", e);
       return;
     }
     for (const t of picked) {
@@ -179,7 +172,7 @@ export class AgentTaskRunner {
     if (c.signal.aborted) return;
     let g: engine.AgentTask[];
     try {
-      g = await run(this.store.change((g) => Effect.succeed(engine.settle(g, t.id, said, failed))));
+      g = await this.store.change((g) => engine.settle(g, t.id, said, failed));
     } catch (e) {
       console.error(`agent: cannot record task ${t.id}:`, e);
       return;
@@ -201,7 +194,7 @@ export class AgentTaskRunner {
     await this.settled();
     if (ids.length === 0) return;
     try {
-      await run(this.store.change((g) => Effect.succeed(engine.requeue(g, ids))));
+      await this.store.change((g) => engine.requeue(g, ids));
     } catch (e) {
       console.error("agent: cannot put stopped tasks back:", e);
     }
@@ -215,17 +208,13 @@ export class AgentTaskRunner {
   /** At start: a task left working by a process that went is waiting again, and goes out once more. */
   async recover() {
     try {
-      await run(
-        this.store.change((g) => {
-          const next = engine.requeue(g);
-          return engine.states(next).join() === engine.states(g).join() ? Effect.fail(unchanged) : Effect.succeed(next);
-        }),
-      );
+      await this.store.change((g) => {
+        const next = engine.requeue(g);
+        return engine.states(next).join() === engine.states(g).join() ? undefined : next;
+      });
     } catch (e) {
-      if (!isUnchanged(e)) {
-        console.error("agent: cannot read its tasks:", e);
-        return;
-      }
+      console.error("agent: cannot read its tasks:", e);
+      return;
     }
     await this.advance();
   }
@@ -233,7 +222,7 @@ export class AgentTaskRunner {
   /** The open graph for a fold's summary: what the turns it replaces showed. */
   async summary(): Promise<string> {
     try {
-      const g = await run(this.store.load);
+      const g = await this.store.load();
       return g.length === 0 ? "" : "【整理对话时的任务，以 tasks 为准】\n" + engine.text(g);
     } catch {
       return "";
@@ -245,7 +234,7 @@ export class AgentTaskRunner {
   async nudge(): Promise<string> {
     let g: engine.AgentTask[];
     try {
-      g = await run(this.store.load);
+      g = await this.store.load();
     } catch {
       return "";
     }
@@ -267,11 +256,4 @@ export class AgentTaskRunner {
     this.nudges++;
     return `〔任务〕这一轮停了，还有 ${own.length} 件你可以做：${own.join("、")}。接着做；做不了的用 task_update 标 failed 或 skipped，写明原因。\n\n${seen}`;
   }
-}
-
-// Effect.runPromise wraps a failure in a FiberFailure whose cause holds it.
-function isUnchanged(e: unknown): boolean {
-  if (e === unchanged) return true;
-  const cause = (e as { cause?: unknown } | null)?.cause;
-  return cause !== undefined && cause !== e && isUnchanged(cause);
 }

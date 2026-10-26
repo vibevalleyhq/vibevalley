@@ -10,13 +10,12 @@ import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot,
 import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
-import { SqlClient } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
 import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
 import { dshRuntime } from "./dsh.ts";
 import { Setting } from "../setting/setting.ts";
-import { dbStore } from "../agent/brain/agentTaskStore.ts";
+import { dbStores } from "../agent/brain/agentTaskStore.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
 import { jsonOf } from "../base/json.ts";
@@ -543,16 +542,14 @@ export const layer = (options: RuntimeOptions = {}) =>
     Effect.gen(function* () {
       if (options.registry) return yield* make(options);
       const config = yield* Settings;
-      const sql = yield* SqlClient.SqlClient;
       const keys = yield* Setting;
-      const clock = yield* Clock.Clock;
       const time = yield* timeHere;
       // It reads the DeepSeek key each session, so one saved meanwhile is used.
       const own = vibevalleyRuntimeOf({
         home: () => config.home,
         llm: (model) => deepseek(model, keys.deepseekApiKey),
         time,
-        tasks: (session) => dbStore(sql, session, () => clock.currentTimeMillisUnsafe()),
+        tasks: yield* dbStores,
       });
       return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });
     }),

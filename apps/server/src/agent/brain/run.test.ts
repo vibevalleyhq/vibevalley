@@ -7,7 +7,6 @@ import {
   fauxText,
   fauxToolCall,
 } from "@earendil-works/pi-ai";
-import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
@@ -294,7 +293,7 @@ describe("the agent's own tasks", () => {
       async (r) => {
         await r.ask("查三样");
         await until(() => sent.length === 3 && told === 3);
-        expect(await Effect.runPromise(store.load)).toEqual([]);
+        expect(await store.load()).toEqual([]);
       },
       { tasks: store, reminders: false },
     );
@@ -327,7 +326,7 @@ describe("the agent's own tasks", () => {
         expect(await r.ask("查")).toBe("派好了");
         await until(() => started);
         await r.agent.stop();
-        const g = await Effect.runPromise(store.load);
+        const g = await store.load();
         expect(g[0]).toMatchObject({ state: "waiting" });
         expect(g[0]!.tries ?? 0).toBe(0);
       },
@@ -379,7 +378,7 @@ describe("the agent's own tasks", () => {
     const store = memoryStore();
     const runner = new AgentTaskRunner(store, undefined, new AbortController().signal, () => {});
     expect(await runner.summary()).toBe("");
-    await Effect.runPromise(store.change((g) => Effect.succeed(engine.add(g, [{ id: "a", brief: "读" }])[0])));
+    await store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
     expect(await runner.summary()).toBe("【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读");
   });
 });

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { SqlClient } from "effect/sql";
+import { Effect, Layer } from "effect";
+import { DbLayer } from "../../base/db.ts";
 import { testDatabase } from "../../testing/layers.ts";
 import { add, begin, finished, readyTasks, requeue, settle, type AgentTask, AgentTaskError, text, update } from "./agentTask.ts";
-import { dbStore, memoryStore } from "./agentTaskStore.ts";
+import { dbStores, memoryStore } from "./agentTaskStore.ts";
 import * as q from "../../../db/generated/agent_task.sql.ts";
-import { wallTime } from "../../base/time.ts";
 
 const ids = (g: readonly AgentTask[]) => g.map((t) => t.id);
 
@@ -107,36 +106,45 @@ describe("an agent's own tasks", () => {
     expect(requeue(begin(g, "b"), ["b"])[1]!.state).toBe("waiting");
   });
 
-  const stores = Effect.map(SqlClient.SqlClient, (sql) => ({
-    database: (keeper: string) => dbStore(sql, keeper, wallTime.now),
-    memory: (_: string) => memoryStore(),
-  }));
+  const database = Layer.provideMerge(DbLayer, testDatabase());
+  const stores = Effect.map(dbStores, (database) => ({ database, memory: (_: string) => memoryStore() }));
 
   it.effect("a store keeps the graph and puts a finished one away", () =>
     Effect.gen(function* () {
       for (const [name, open] of Object.entries(yield* stores)) {
         const s = open("s1");
-        const g = yield* s.change((g) =>
-          Effect.succeed(
-            add(g, [
-              { id: "a", brief: "b" },
-              { id: "c", brief: "d", after: ["a"], by: "subagent" },
-            ])[0],
+        const g = yield* Effect.promise(() =>
+          s.change(
+            (g) =>
+              add(g, [
+                { id: "a", brief: "b" },
+                { id: "c", brief: "d", after: ["a"], by: "subagent" },
+              ])[0],
           ),
         );
-        expect(yield* s.load, name).toEqual(g);
-        expect((yield* Effect.exit(s.change(() => Effect.fail("不改了"))))._tag, name).toBe("Failure");
-        expect(yield* s.load, name).toEqual(g);
-        const ended = yield* s.change((g) => Effect.succeed(update(update(g, "a", { state: "done" }), "c", { state: "skipped" })));
+        expect(yield* Effect.promise(s.load), name).toEqual(g);
+        const refused = yield* Effect.promise(() =>
+          s
+            .change(() => {
+              throw new AgentTaskError("不改了");
+            })
+            .then(
+              () => undefined,
+              (e: unknown) => e,
+            ),
+        );
+        expect(refused, name).toBeInstanceOf(AgentTaskError);
+        expect(yield* Effect.promise(() => s.change(() => undefined)), name).toBeUndefined();
+        expect(yield* Effect.promise(s.load), name).toEqual(g);
+        const ended = yield* Effect.promise(() => s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" })));
         expect(finished(ended), name).toBe(true);
-        expect(yield* s.load, name).toEqual([]);
+        expect(yield* Effect.promise(s.load), name).toEqual([]);
       }
-    }).pipe(Effect.provide(testDatabase())),
+    }).pipe(Effect.scoped, Effect.provide(database)),
   );
 
   it.effect("a database store decodes task dependencies before using them", () =>
     Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
       for (const [id, position, after] of [
         ["bad", 0, `{}`],
         ["good", 1, `["bad"]`],
@@ -157,19 +165,19 @@ describe("an agent's own tasks", () => {
             updated_at: 0,
           }),
         );
-      const got = yield* dbStore(sql, "s1", wallTime.now).load;
+      const got = yield* Effect.promise((yield* dbStores)("s1").load);
       expect(got.map((t) => [t.id, t.after])).toEqual([
         ["bad", []],
         ["good", ["bad"]],
       ]);
-    }).pipe(Effect.provide(testDatabase())),
+    }).pipe(Effect.scoped, Effect.provide(database)),
   );
 
   it.effect("one keeper's tasks are not another's", () =>
     Effect.gen(function* () {
-      const open = (yield* stores).database;
-      yield* open("s1").change((g) => Effect.succeed(add(g, [{ id: "a", brief: "b" }])[0]));
-      expect(yield* open("s2").load).toEqual([]);
-    }).pipe(Effect.provide(testDatabase())),
+      const open = yield* dbStores;
+      yield* Effect.promise(() => open("s1").change((g) => add(g, [{ id: "a", brief: "b" }])[0]));
+      expect(yield* Effect.promise(open("s2").load)).toEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(database)),
   );
 });
