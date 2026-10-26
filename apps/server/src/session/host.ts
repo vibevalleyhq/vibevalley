@@ -24,6 +24,7 @@ import type { ToolStart } from "./facts.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
+import type { Time } from "../base/time.ts";
 
 const streamEveryMs = 120;
 
@@ -153,6 +154,8 @@ export class AgentHost<R> {
     private readonly o: HostOptions<R>,
     journal: Journal,
     runs: RunStore,
+    /** The service's Clock: the streaming window and an eval case's time. */
+    private readonly time: Time,
   ) {
     this.journal = journal;
     this.execution = new AgentExecution(o.name, journal, o.toolStart, runs);
@@ -281,7 +284,7 @@ export class AgentHost<R> {
       const id = newId();
       const evalCase = {
         id,
-        created: Date.now(),
+        created: this.time.now(),
         model,
         want: w,
         memory: memoryText,
@@ -363,8 +366,8 @@ export class AgentHost<R> {
       this.toCaller = text.length;
     }
     const key = this.keyNow();
-    if (this.o.quiet(input.route) || Date.now() - this.lastPush < streamEveryMs) return;
-    this.lastPush = Date.now();
+    if (this.o.quiet(input.route) || this.time.now() - this.lastPush < streamEveryMs) return;
+    this.lastPush = this.time.now();
     await this.o.state("speaking");
     await this.o.say(input.route, key, text, false, this.execution.currentRun());
   }

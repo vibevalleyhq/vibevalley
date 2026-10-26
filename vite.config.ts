@@ -99,8 +99,6 @@ export default defineConfig({
           "apps/server/src/memory/everos.ts",
           "apps/server/src/memory/nowledge.ts",
           "apps/server/src/memory/sources.ts",
-          "apps/server/src/session/host.ts",
-          "apps/server/src/session/journal.ts",
           "apps/server/src/voice/voice.ts",
         ],
         rules: { "vibevalley/no-wall-clock": "off" },

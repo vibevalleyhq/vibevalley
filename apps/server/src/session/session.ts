@@ -77,6 +77,7 @@ import { sessionOnIssue } from "./state.ts";
 import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
+import { timeHere } from "../base/time.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -404,11 +405,13 @@ export const make = (options: SessionOptionsIn = {}) =>
     const logDir = join(config.home, "logs");
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     const clock = yield* Clock.Clock;
+    const time = yield* timeHere;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
     const trajectories = new Trajectories(
       config.home,
       (id, e) => Effect.runSync(core.sessionEvent(id, e)),
       (message) => fire(Effect.logWarning(message)),
+      time,
     );
     // A hand is acquired before admission; no path holding admission waits for a hand.
     const admission = yield* Semaphore.make(1);
@@ -1261,7 +1264,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore),
+      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time),
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.
