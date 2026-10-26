@@ -55,7 +55,8 @@ export const writeTimeoutMs = 30_000;
 const writeQueue = 256;
 
 /** The local source: the memory table, picked by recall.ts. Nothing is marked recalled here: the caller marks those it keeps. */
-export function localSource(m: Memories, profiles: () => string[], run: <A>(e: Effect.Effect<A, unknown>) => Promise<A>): Source {
+/** now: the memory service's Clock, for which memories are fresh. */
+export function localSource(m: Memories, profiles: () => string[], run: <A>(e: Effect.Effect<A, unknown>) => Promise<A>, now: () => number): Source {
   return {
     name: localName,
     unavailable: () => undefined,
@@ -65,7 +66,7 @@ export function localSource(m: Memories, profiles: () => string[], run: <A>(e: E
       if (cue.peek) {
         if (cue.project === "") return [];
         const all = await run(m.list(cue.agent));
-        picked = pick(all, { project: cue.project, text: cue.text, now: Date.now(), matches: await run(m.matches(cue.agent, cue.text)) });
+        picked = pick(all, { project: cue.project, text: cue.text, now: now(), matches: await run(m.matches(cue.agent, cue.text)) });
       } else picked = await run(m.recallable(cue));
       return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.project), score: picked.length - i }));
     },

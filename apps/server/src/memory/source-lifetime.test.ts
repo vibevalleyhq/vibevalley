@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { everos } from "./everos.ts";
 import { nowledge } from "./nowledge.ts";
+import { wallTime } from "../base/time.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -18,7 +19,7 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
     await held;
   });
   const call = vi.spyOn(Client.prototype, "callTool");
-  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
+  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true }, wallTime.now);
   const query = { agent: "lab", project: "", text: "query", kind: "" as const, limit: 1 };
   const pending = source.search(query, new AbortController().signal).then(
     () => "completed",
@@ -48,7 +49,7 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
     }
     return new Response("{}", { status: 200 });
   });
-  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true });
+  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, wallTime.now);
   const run = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };
   await source.syncTurn(run, new AbortController().signal);
   const pending = source.syncTurn({ ...run, session: "late" }, new AbortController().signal).then(

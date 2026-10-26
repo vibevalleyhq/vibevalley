@@ -1,6 +1,9 @@
+import type { Time } from "../base/time.ts";
+
 export type WaitResult = "timeout" | "wake" | "aborted";
 
-export const waitFor = (ms: number, signal: AbortSignal, register: (wake: () => void) => void): Promise<WaitResult> =>
+/** On time: the service's for the farm's own waits, the wall clock for a protocol's (a login's polling interval). */
+export const waitFor = (time: Time, ms: number, signal: AbortSignal, register: (wake: () => void) => void): Promise<WaitResult> =>
   new Promise<WaitResult>((resolve, reject) => {
     if (signal.aborted) {
       resolve("aborted");
@@ -10,7 +13,7 @@ export const waitFor = (ms: number, signal: AbortSignal, register: (wake: () => 
     const cleanup = () => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cancel();
       signal.removeEventListener("abort", abort);
     };
     const finish = (result: WaitResult) => {
@@ -18,7 +21,7 @@ export const waitFor = (ms: number, signal: AbortSignal, register: (wake: () => 
       cleanup();
       resolve(result);
     };
-    const timer = setTimeout(() => finish("timeout"), Math.max(0, ms));
+    const cancel = time.after(ms, () => finish("timeout"));
     const abort = () => finish("aborted");
     const wake = () => finish("wake");
     signal.addEventListener("abort", abort, { once: true });
@@ -32,4 +35,4 @@ export const waitFor = (ms: number, signal: AbortSignal, register: (wake: () => 
     if (signal.aborted) finish("aborted");
   });
 
-export const sleep = async (ms: number, signal: AbortSignal): Promise<boolean> => (await waitFor(ms, signal, () => undefined)) === "timeout";
+export const sleep = async (time: Time, ms: number, signal: AbortSignal): Promise<boolean> => (await waitFor(time, ms, signal, () => undefined)) === "timeout";

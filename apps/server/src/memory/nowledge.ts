@@ -81,7 +81,8 @@ function hitText(h: Hit): string {
   return !h.title || body.startsWith(h.title) ? body : `${h.title}：${body}`;
 }
 
-export function nowledge(c: MemorySourceConfig): Source {
+/** now: the memory service's Clock, for when a note was kept. */
+export function nowledge(c: MemorySourceConfig, now: () => number): Source {
   let closed = false;
   const life = new AbortController();
   let client: Promise<Client> | undefined;
@@ -230,7 +231,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (!c.write) return undefined;
       const project = n.project.trim();
       const id = await add(n.agent, n.text, project, signal);
-      return { id, agent: n.agent, kind: "note", text: n.text, at: Date.now(), recalled: 0, ...(project ? { project } : {}) };
+      return { id, agent: n.agent, kind: "note", text: n.text, at: now(), recalled: 0, ...(project ? { project } : {}) };
     },
     forget: async () => {
       throw new Error("Nowledge Mem 里的记忆到 Nowledge Mem 里删");

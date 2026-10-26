@@ -20,6 +20,7 @@ import { orchestratorModel } from "../orchestrator/rules.ts";
 import { Notices } from "../notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
 import { callbackLog } from "../base/log.ts";
+import { afterRealTime, timeHere, wallTime } from "../base/time.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 
@@ -215,7 +216,7 @@ const sign = (c: AgoraCredentials, channel: string, uid: string): AgoraGrant => 
 });
 
 /** prefix-<ms>-<6 random>: the quickstart's timestamp-plus-random shape. */
-const newChannel = () => `vibevalley-${Date.now()}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomInt(36)]).join("")}`;
+const newChannel = (now: number) => `vibevalley-${now}-${Array.from({ length: 6 }, () => "0123456789abcdefghijklmnopqrstuvwxyz"[randomInt(36)]).join("")}`;
 const newUid = () => String(randomInt(9_999_000) + 1000);
 
 interface Grant {
@@ -328,22 +329,23 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
       return reject(e);
     }
     const close = () => child.kill();
-    const timer = setTimeout(() => {
+    // A real process: its deadline is real time.
+    const cancel = afterRealTime(30_000, () => {
       close();
       reject(new Error("cloudflared 30 秒没给出地址"));
-    }, 30_000);
+    });
     // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
     const read = (b: Buffer) => {
       const url = quickTunnel.exec(b.toString())?.[0];
       if (url) {
-        clearTimeout(timer);
+        cancel();
         resolve({ url, close });
       }
     };
     child.stdout?.on("data", read);
     child.stderr?.on("data", read);
     child.on("error", (e) => {
-      clearTimeout(timer);
+      cancel();
       reject(
         (e as NodeJS.ErrnoException).code === "ENOENT"
           ? new Error("没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道")
@@ -351,15 +353,15 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
       );
     });
     child.on("exit", () => {
-      clearTimeout(timer);
+      cancel();
       reject(new Error("cloudflared 退出了，没给出地址"));
     });
   });
 }
 
-/** The line refusing a keyless request counts as an answer. */
+/** The line refusing a keyless request counts as an answer. Asked over the real network, on real time. */
 async function tunnelAnswers(url: string): Promise<boolean> {
-  for (const deadline = Date.now() + lineReadyMs; Date.now() < deadline;) {
+  for (const deadline = wallTime.now() + lineReadyMs; wallTime.now() < deadline;) {
     try {
       const res = await fetch(url + "/llm/ready/chat/completions", {
         method: "POST",
@@ -369,7 +371,7 @@ async function tunnelAnswers(url: string): Promise<boolean> {
     } catch {
       // Not yet.
     }
-    await new Promise((r) => setTimeout(r, 2_000));
+    await wallTime.sleep(2_000);
   }
   return false;
 }
@@ -385,6 +387,7 @@ export const make = (options: VoiceOptions = {}) =>
     const orchestrator = yield* Orchestrator;
     // Read in callbacks too: the Clock the service was built with.
     const clock = yield* Clock.Clock;
+    const time = yield* timeHere;
     const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();
@@ -409,7 +412,8 @@ export const make = (options: VoiceOptions = {}) =>
     let linePort = config.voice.line.port;
     let lineProblem = "";
     let tunnel: { url: string; close: () => void } | undefined;
-    let closing: NodeJS.Timeout | undefined;
+    /** What cancels closing the tunnel, lineLingerMs after the last call. */
+    let closing: (() => void) | undefined;
     const answer = chatCompletions({
       answerer: orchestrator.answerer("phone"),
       misheard: lineMisheard,
@@ -424,7 +428,7 @@ export const make = (options: VoiceOptions = {}) =>
         calls.clear();
         grants.clear();
         keys.clear();
-        if (closing) clearTimeout(closing);
+        closing?.();
         tunnel?.close();
         tunnel = undefined;
         line?.closeAllConnections();
@@ -492,7 +496,7 @@ export const make = (options: VoiceOptions = {}) =>
     let opening: Promise<string> | undefined;
     const base = async () => {
       if (config.voice.line.url) return config.voice.line.url.replace(/\/+$/, "");
-      if (closing) clearTimeout(closing);
+      closing?.();
       closing = undefined;
       if (!tunnel) {
         opening ??= openTunnel(linePort)
@@ -525,14 +529,13 @@ export const make = (options: VoiceOptions = {}) =>
     const closeLine = (id: string) => {
       keys.delete(id);
       if (keys.size > 0 || !tunnel) return;
-      if (closing) clearTimeout(closing);
-      closing = setTimeout(() => {
+      closing?.();
+      closing = time.after(lineLingerMs, () => {
         closing = undefined;
         if (keys.size > 0 || !tunnel) return;
         tunnel.close();
         tunnel = undefined;
-      }, lineLingerMs);
-      closing.unref();
+      });
     };
 
     const callOf = (agentId: string) => {
@@ -640,7 +643,7 @@ export const make = (options: VoiceOptions = {}) =>
     return Voice.of({
       session: Effect.fn("Voice.session")(function* () {
         const c = yield* creds();
-        const channel = newChannel();
+        const channel = newChannel(clock.currentTimeMillisUnsafe());
         const uid = newUid();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),

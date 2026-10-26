@@ -40,6 +40,7 @@ import {
 import { callbackLog } from "../base/log.ts";
 import { Notices } from "../notice/notice.ts";
 import { sleep, waitFor } from "./wait.ts";
+import { timeHere } from "../base/time.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -252,7 +253,7 @@ interface Account {
   channel?: string;
 }
 
-const paused = (a: Account) => a.pausedUntil !== 0 && a.pausedUntil > Date.now();
+const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
 interface Generation {
   readonly control: AbortController;
@@ -288,6 +289,8 @@ export interface ConnectorOptions {
 
 export const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
+    // The farm's own waits and times (a pause, a retry, when a message went out) on the service's Clock.
+    const time = yield* timeHere;
     const logs = yield* callbackLog;
     const sql = yield* SqlClient.SqlClient;
     const chat = yield* Channels;
@@ -369,8 +372,8 @@ export const make = (options: ConnectorOptions = {}) =>
           };
         return {
           ...s,
-          state: paused(a) ? "paused" : "connected",
-          ...(paused(a) ? { pausedUntil: a.pausedUntil } : {}),
+          state: paused(a, time.now()) ? "paused" : "connected",
+          ...(paused(a, time.now()) ? { pausedUntil: a.pausedUntil } : {}),
           owner: shortId(a.owner),
           since: a.connectedAt,
           ...(a.lastInbound ? { lastInbound: a.lastInbound } : {}),
@@ -379,7 +382,7 @@ export const make = (options: ConnectorOptions = {}) =>
 
       const pause = async () => {
         try {
-          await run(accountQ.pauseAccount({ paused_until: Date.now() + stalePauseMs, connector: id }));
+          await run(accountQ.pauseAccount({ paused_until: time.now() + stalePauseMs, connector: id }));
           await reload();
           err = "登录过期了，一小时后再试；也可以断开重新连。";
           return true;
@@ -405,7 +408,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const next = sending.then(async () => {
           if (signal.aborted) return false;
           const a = now();
-          if (!a || !a.owner || paused(a)) return true;
+          if (!a || !a.owner || paused(a, time.now())) return true;
           let pending: readonly { id: string; body: string }[];
           try {
             pending = await run(outboxQ.pendingOutbox({ connector: id }));
@@ -422,7 +425,7 @@ export const make = (options: ConnectorOptions = {}) =>
             const sent = await adapter.send(signal, a.secrets, a.owner, out.text, a.replyContext);
             if (!isFailure(sent)) {
               try {
-                await inTx(Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: Date.now(), ext_id: sent || null, id: oid }), { discard: true }));
+                await inTx(Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: time.now(), ext_id: sent || null, id: oid }), { discard: true }));
               } catch (e) {
                 err = message(e);
                 return false;
@@ -459,7 +462,7 @@ export const make = (options: ConnectorOptions = {}) =>
                   connector: id,
                   message_id: m.id,
                   body: piece,
-                  created_at: Date.now(),
+                  created_at: time.now(),
                 }),
               {
                 discard: true,
@@ -483,7 +486,7 @@ export const make = (options: ConnectorOptions = {}) =>
             wait = retryFirst;
             continue;
           }
-          const result = await waitFor(wait, signal, (wake) => {
+          const result = await waitFor(time, wait, signal, (wake) => {
             wakeOutbox = wake;
           });
           wakeOutbox = undefined;
@@ -498,7 +501,7 @@ export const make = (options: ConnectorOptions = {}) =>
         if (!a) return;
         if (!a.owner) {
           if (!a.pairCode || !isPairing(m.text, a.pairCode)) return;
-          const at = Date.now();
+          const at = time.now();
           await inTx(
             Effect.gen(function* () {
               yield* accountQ.accountOwner({ owner_id: m.from || null, connector: id });
@@ -511,7 +514,7 @@ export const make = (options: ConnectorOptions = {}) =>
           return;
         }
         if (m.from !== a.owner) return;
-        await run(accountQ.accountReply({ reply_context: m.reply || null, at: Date.now(), connector: id }));
+        await run(accountQ.accountReply({ reply_context: m.reply || null, at: time.now(), connector: id }));
         await reload();
         // A fresh reply opens the platform's delivery window; older messages precede its answer.
         await drain(signal, true);
@@ -570,7 +573,7 @@ export const make = (options: ConnectorOptions = {}) =>
           } catch (e) {
             if (!signal.aborted) err = message(e);
           }
-          await waitFor(1_000, signal, (wake) => {
+          await waitFor(time, 1_000, signal, (wake) => {
             wakeInbox = wake;
           });
           wakeInbox = undefined;
@@ -604,14 +607,14 @@ export const make = (options: ConnectorOptions = {}) =>
         while (!signal.aborted) {
           const a = now();
           if (!a) return;
-          if (paused(a)) {
-            if (!(await sleep(a.pausedUntil - Date.now(), signal))) return;
+          if (paused(a, time.now())) {
+            if (!(await sleep(time, a.pausedUntil - time.now(), signal))) return;
             try {
               await run(accountQ.pauseAccount({ paused_until: null, connector: id }));
               await reload();
             } catch (e) {
               err = message(e);
-              if (!(await sleep(Math.min(30_000, retryMost), signal))) return;
+              if (!(await sleep(time, Math.min(30_000, retryMost), signal))) return;
             }
             continue;
           }
@@ -626,7 +629,7 @@ export const make = (options: ConnectorOptions = {}) =>
           }
           if (signal.aborted) return;
           if (stopped.kind === "stale") {
-            if (!(await pause()) && !(await sleep(Math.min(30_000, retryMost), signal))) return;
+            if (!(await pause()) && !(await sleep(time, Math.min(30_000, retryMost), signal))) return;
             continue;
           }
           err = stopped.reason;
@@ -636,7 +639,7 @@ export const make = (options: ConnectorOptions = {}) =>
             wait = 30_000;
             failures = 0;
           }
-          if (!(await sleep(wait, signal))) return;
+          if (!(await sleep(time, wait, signal))) return;
         }
       };
 
@@ -749,11 +752,11 @@ export const make = (options: ConnectorOptions = {}) =>
               if (attempt !== started || !progress || progress.qr) finish();
             };
             const finish = () => {
-              clearTimeout(t);
+              cancel();
               progressed.delete(done);
               resolve();
             };
-            const t = setTimeout(finish, 1_500);
+            const cancel = time.after(1_500, finish);
             progressed.add(done);
             done();
           });
