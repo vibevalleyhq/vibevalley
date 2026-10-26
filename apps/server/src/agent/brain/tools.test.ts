@@ -52,7 +52,7 @@ describe("the task tools", () => {
   it("task and mark the agent's own tasks", async () => {
     const tools = taskTools(memoryStore(), false, () => {});
     expect(await call(tools, "task_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/);
-    expect(await fails(call(tools, "task_add", { tasks: [{ id: "x", brief: "查", by: "helper" }] }))).toMatch(/by/);
+    expect(await fails(call(tools, "task_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/);
     const added = await call(tools, "task_add", {
       tasks: [
         { id: "read", brief: "读代码" },

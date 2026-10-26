@@ -1,4 +1,4 @@
-// The tools every agent has on itself. They touch only the agent's own folder; a helper (spawn_agent) cannot send helpers.
+// The tools every agent has on itself. They touch only the agent's own folder; a subagent (spawn_agent) cannot send subagents.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
@@ -55,9 +55,9 @@ export function selfTools(o: SelfOptions): AgentTool[] {
   return [loadSkill, ...(o.memory ? [rememberTool, rewrite] : []), search];
 }
 
-export type Helper = (brief: string, label: string, signal: AbortSignal) => Promise<string>;
+export type Subagent = (brief: string, label: string, signal: AbortSignal) => Promise<string>;
 
-export const subagentTool = (spawn: Helper) =>
+export const subagentTool = (spawn: Subagent) =>
   textTool<{ brief: string; label?: string }>({
     name: "spawn_agent",
     description:

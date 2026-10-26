@@ -243,7 +243,7 @@ describe("the agent", () => {
     );
   });
 
-  it("sends helpers that work side by side", async () => {
+  it("sends subagents that work side by side", async () => {
     const dir = home();
     let running = 0;
     let most = 0;
@@ -254,12 +254,12 @@ describe("the agent", () => {
       run: async () => {
         most = Math.max(most, ++running);
         // Each waits for the other: side by side they both get here, one after the other they never would.
-        await whenTrue(() => most >= 2, "both helpers napping at once");
+        await whenTrue(() => most >= 2, "both subagents napping at once");
         running--;
         return "醒了";
       },
     });
-    const helperOrNot = step((c) => {
+    const subagentOrNot = step((c) => {
       if (systemPrompt(c).includes("派出去的帮手"))
         return answered(c) ? fauxAssistantMessage(messageText(c.messages[1]!) + " 做完了") : fauxAssistantMessage([fauxToolCall("nap", {})]);
       if (!answered(c)) return fauxAssistantMessage([fauxToolCall("spawn_agent", { brief: "查 A" }), fauxToolCall("spawn_agent", { brief: "查 B" })]);
@@ -271,7 +271,7 @@ describe("the agent", () => {
     });
     await withAgent(
       dir,
-      repeat(6, helperOrNot),
+      repeat(6, subagentOrNot),
       async (r) => {
         expect(await r.ask("同时查 A 和 B")).toBe("查 A 做完了；查 B 做完了");
         expect(most).toBe(2);

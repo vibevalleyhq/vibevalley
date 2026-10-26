@@ -100,7 +100,7 @@ export interface Handlers<R = never> {
   readonly "orchestrator.stop": () => Effect.Effect<void, ApiError, R>;
   readonly "setting.load": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
   /** The first thing Save would refuse in these settings, without saving them. */
-  readonly "setting.check": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.SettingsCheck, ApiError, R>;
+  readonly "setting.check": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.Check, ApiError, R>;
   readonly "setting.save": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.SettingsStatus, ApiError, R>;
   readonly "channel.say": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
   readonly "channel.create": (a: { readonly body: T.ChannelRequest }) => Effect.Effect<string, ApiError, R>;
@@ -199,7 +199,7 @@ export interface Handlers<R = never> {
   readonly "skill.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "project.list": () => Effect.Effect<T.ProjectSummary[], ApiError, R>;
   /** The first thing Create would refuse in this project, without making it. */
-  readonly "project.check": (a: { readonly body: T.NewProject }) => Effect.Effect<T.ProjectCheck, ApiError, R>;
+  readonly "project.check": (a: { readonly body: T.NewProject }) => Effect.Effect<T.Check, ApiError, R>;
   readonly "project.create": (a: { readonly body: T.NewProject }) => Effect.Effect<T.ProjectSummary, ApiError, R>;
   readonly "project.languages": (a: { readonly id: string }) => Effect.Effect<T.ProjectLanguages, ApiError, R>;
   /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
@@ -313,7 +313,7 @@ export const endpoints: readonly Endpoint[] = [
     pathParams: [],
     query: [],
     body: S.SettingsUpdate,
-    result: S.SettingsCheck,
+    result: S.Check,
     can: ["owner", "remote"],
   },
   {
@@ -1045,7 +1045,7 @@ export const endpoints: readonly Endpoint[] = [
     pathParams: [],
     query: [],
     body: S.NewProject,
-    result: S.ProjectCheck,
+    result: S.Check,
     can: ["owner", "remote"],
   },
   {

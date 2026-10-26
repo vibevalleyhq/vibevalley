@@ -16,7 +16,7 @@
 ## 在哪
 
 - 服务端 `apps/server/src/game`（`Game`）：`game.ts` 账本的存取、订阅、`chooseTitle`、什么时候数 commit、主人点的空地；`progress.ts` 账本的折法（`progressStep`、`progressFold`）和哪些事实记账（`entriesFor`、`catchUp`），只有 `game` 读。
-- 规则在 `apps/server/src/game`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`plotKey`、`viewOf`）、特效（`effectsOf`）、`viewOf` 里每个成就到了第几档、计数、下一档要多少；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`progress.ts` 成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）。成就单在 `apps/server/src/agent/seeds.json` 的 `achievements`（`seed.ts` 的 `achievements`），页面不另拿一份。
+- 规则在 `apps/server/src/game`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`viewOf`）、特效（`effectsOf`）、`viewOf` 里每个成就到了第几档、计数、下一档要多少；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`progress.ts` 成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）。成就单在 `apps/server/src/agent/seeds.json` 的 `achievements`（`seed.ts` 的 `achievements`），页面不另拿一份。
 - 核心状态里的游戏字段：`WorkspaceState.progress`、`commits`、`Session.play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `db/queries/game_ledger.sql`。
 - 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。

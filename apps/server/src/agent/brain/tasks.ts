@@ -1,6 +1,6 @@
 // The agent's own task graph (taskGraph.ts): it tasks the steps of one piece of work, marks them as it goes, and reads
-// the whole graph back after each call. The runner moves it along: a helper's task whose waits are settled goes to a
-// helper in the background, at most max at once; what the helper says comes back to the agent as an input. The agent's
+// the whole graph back after each call. The runner moves it along: a subagent's task whose waits are settled goes to a
+// subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
 // own tasks are its to do; nothing here does them.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { head } from "../../base/text.ts";
 import * as engine from "./taskGraph.ts";
 import type { TaskStore } from "./taskStore.ts";
-import type { Helper } from "./self.ts";
+import type { Subagent } from "./self.ts";
 import { objectSchema, type Schema, stringSchema, textTool } from "./tool.ts";
 
 const unchanged = Symbol("unchanged");
@@ -31,7 +31,7 @@ export function taskTools(store: TaskStore, canHelp: boolean, changed: () => voi
   }>({
     name: "task_add",
     description:
-      "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；helper 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
+      "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
       "可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
     parameters: objectSchema(
       {
@@ -43,7 +43,7 @@ export function taskTools(store: TaskStore, canHelp: boolean, changed: () => voi
               title: stringSchema(),
               brief: stringSchema(),
               after: ids,
-              by: { type: "string", enum: canHelp ? ["self", "helper"] : ["self"] },
+              by: { type: "string", enum: canHelp ? ["self", "subagent"] : ["self"] },
             },
             "id",
             "brief",
@@ -112,7 +112,7 @@ export function taskTools(store: TaskStore, canHelp: boolean, changed: () => voi
 }
 
 export class TaskRunner {
-  /** The helpers out now, by task id. */
+  /** The subagents out now, by task id. */
   private readonly out = new Map<string, AbortController>();
   private readonly running = new Set<Promise<void>>();
   /** The graph as last reminded of, and how many times running it stayed so. */
@@ -121,17 +121,17 @@ export class TaskRunner {
 
   constructor(
     private readonly store: TaskStore,
-    /** Undefined: this agent cannot send helpers (a helper itself, or the orchestrator). */
-    private readonly helper: Helper | undefined,
+    /** Undefined: this agent cannot send subagents (a subagent itself, or the orchestrator). */
+    private readonly subagent: Subagent | undefined,
     private readonly life: AbortSignal,
     private readonly tell: (text: string) => void,
     private readonly max = 3,
     private readonly maxNudges = 3,
   ) {}
 
-  /** Sends out what is ready and fits. Called after the graph changes and when a helper comes back. */
+  /** Sends out what is ready and fits. Called after the graph changes and when a subagent comes back. */
   async advance() {
-    if (!this.helper || this.life.aborted) return;
+    if (!this.subagent || this.life.aborted) return;
     let picked: engine.Task[] = [];
     try {
       await run(
@@ -141,7 +141,7 @@ export class TaskRunner {
           let next = g;
           for (const t of engine.readyTasks(g)) {
             if (room <= 0) break;
-            if (t.by !== "helper" || this.out.has(t.id)) continue;
+            if (t.by !== "subagent" || this.out.has(t.id)) continue;
             next = engine.begin(next, t.id);
             picked.push(t);
             room--;
@@ -167,7 +167,7 @@ export class TaskRunner {
     let said = "";
     let failed = false;
     try {
-      said = await this.helper!(t.brief, t.title, c.signal);
+      said = await this.subagent!(t.brief, t.title, c.signal);
     } catch (e) {
       said = e instanceof Error ? e.message : String(e);
       failed = true;
@@ -193,7 +193,7 @@ export class TaskRunner {
     await this.advance();
   }
 
-  /** Calls the helpers back; their tasks wait again. The graph stays as it is otherwise. */
+  /** Calls the subagents back; their tasks wait again. The graph stays as it is otherwise. */
   async stop() {
     const ids = [...this.out.keys()];
     for (const c of this.out.values()) c.abort();
@@ -207,7 +207,7 @@ export class TaskRunner {
     }
   }
 
-  /** Every helper out has come back. */
+  /** Every subagent out has come back. */
   async settled() {
     while (this.running.size > 0) await Promise.allSettled(this.running);
   }

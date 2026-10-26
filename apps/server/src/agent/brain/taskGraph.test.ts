@@ -87,12 +87,12 @@ describe("an agent's task graph", () => {
     expect(text([])).toBe("现在没有任务。");
   });
 
-  it("a helper's task goes out and comes back", () => {
+  it("a subagent's task goes out and comes back", () => {
     let [g] = add(
       [],
       [
-        { id: "a", brief: "查 A", by: "helper" },
-        { id: "b", brief: "查 B", by: "helper", after: ["a"] },
+        { id: "a", brief: "查 A", by: "subagent" },
+        { id: "b", brief: "查 B", by: "subagent", after: ["a"] },
       ],
     );
     g = begin(g, "a");
@@ -120,7 +120,7 @@ describe("an agent's task graph", () => {
           Effect.succeed(
             add(g, [
               { id: "a", brief: "b" },
-              { id: "c", brief: "d", after: ["a"], by: "helper" },
+              { id: "c", brief: "d", after: ["a"], by: "subagent" },
             ])[0],
           ),
         );

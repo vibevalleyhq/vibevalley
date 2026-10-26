@@ -104,11 +104,8 @@ export interface ServerReady {
   pid: number;
 }
 
-export interface SettingsCheck {
-  problem?: string;
-}
-
-export interface ProjectCheck {
+/** What checking a form before saving it found: the first thing that would be refused, if any. */
+export interface Check {
   problem?: string;
 }
 
@@ -118,11 +115,11 @@ export interface RuntimeQuota {
 }
 
 export const AgentIssueLevelValues = ["error", "warn"] as const;
-export type AgentIssueLevel = (typeof AgentIssueLevelValues)[number];
+export type AgentProblemLevel = (typeof AgentIssueLevelValues)[number];
 
-export interface AgentIssue {
+export interface AgentProblem {
   field: string;
-  level: AgentIssueLevel;
+  level: AgentProblemLevel;
   text: string;
 }
 
@@ -132,7 +129,7 @@ export interface AgentCheckRequest {
 
 export interface AgentCheck {
   id: string;
-  issues: AgentIssue[];
+  problems: AgentProblem[];
 }
 
 export interface RecallPreview {
@@ -640,6 +637,7 @@ export interface PlotView {
 
 export interface FarmView {
   level: FarmLevel;
+  /** Each session's plot, by the session's id. */
   plots: Record<string, PlotView>;
   achievements: AchievementStanding[];
 }

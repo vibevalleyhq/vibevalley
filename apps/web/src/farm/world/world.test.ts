@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { frameVillage, villageCutAcross, villageCutDown } from "./framing";
 import { Level } from "./level";
-import { beds, cropOfBed, plotKey } from "./plots";
+import { beds, cropOfBed } from "./plots";
 import { yardPlaces } from "./places";
 import { SpriteAtlas, levelWidth } from "./sprites";
 import { VillageWorld } from "./world";
@@ -70,12 +70,11 @@ describe("the atlas", () => {
 });
 
 describe("the plots", () => {
-  const view = { level: { level: 6, xp: 0, need: 60 }, plots: { i1: { crop: "leafy" as const } }, achievements: [] };
+  const view = { level: { level: 6, xp: 0, need: 60 }, plots: { s1: { crop: "leafy" as const } }, achievements: [] };
   const session = { id: "s1", issue: "i1", play: { station: 2 } } as never;
-  test("keyed by the issue; a bed shows its session's crop, a sprout before the view has it, cleared beds flower", () => {
-    expect(plotKey(session)).toBe("i1");
+  test("keyed by the session; a bed shows its session's crop, a sprout before the view has it, cleared beds flower", () => {
     expect(cropOfBed(beds[2]!, [session], view as never)).toBe("leafy");
-    expect(cropOfBed(beds[2]!, [{ ...(session as object), issue: "i2" } as never], view as never)).toBe("sprout");
+    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s2" } as never], view as never)).toBe("sprout");
     expect(cropOfBed(beds[0]!, [session], view as never)).toBe("empty");
     expect(cropOfBed(beds[6]!, [], view as never)).toBe("flowering");
     expect(cropOfBed(beds[7]!, [], view as never)).toBe("locked");

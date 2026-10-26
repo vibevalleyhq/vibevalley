@@ -1,7 +1,7 @@
 import type { AccountUsage, Agent, RuntimeInfo } from "@vibevalley/protocol";
 import { expect, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { agentIssues, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
+import { agentProblems, chooseAgent, moneyStop, quotaLeft, quotaOf, quotaText } from "./rules.ts";
 
 test("the recorded cases", () => {
   const cases = goldenCases("runtime");
@@ -15,9 +15,9 @@ test("the recorded cases", () => {
           left: quotaLeft(c.in as AccountUsage) ?? null,
           text: quotaText(c.in as AccountUsage),
         };
-      case "agentIssues": {
+      case "agentProblems": {
         const i = c.in as { agent: Agent; runtime: RuntimeInfo | null };
-        return agentIssues(i.agent, i.runtime);
+        return agentProblems(i.agent, i.runtime);
       }
       default:
         throw new Error(`line ${c.line}: no rule ${c.fn}`);

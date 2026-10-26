@@ -133,7 +133,7 @@ export function matchesQuery(query: string, fields: (string | undefined)[]) {
 
 export const closedShown = 15;
 
-export function runTriggerText(t: RunTrigger) {
+function runTriggerText(t: RunTrigger) {
   switch (t.kind) {
     case "issue":
       return "派出去";

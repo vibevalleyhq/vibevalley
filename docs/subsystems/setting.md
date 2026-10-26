@@ -18,7 +18,7 @@
 - 配置：`apps/server/src/base/config.ts`（`Config`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`、服务 `Settings`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
 - 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`rules.ts`（`settingsProblem`、`keyHint`、记性来源的校验和合并、语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
-- 接口：`setting.load`、`setting.check`、`setting.save`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`SettingsCheck`、`KeyStatus`。
+- 接口：`setting.load`、`setting.check`、`setting.save`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
 - 页面：`apps/web/src/pages/settings/SettingsPage.tsx`，表单 `SettingsForm.tsx`。
 
 ## 模型和不变量

@@ -314,7 +314,7 @@ describe("runtime", () => {
       const assessed = yield* r.assess(a);
       expect(assessed.blocking.map((i) => i.field)).toEqual(["effort", "env"]);
       expect(usable(assessed)).toBe(false);
-      expect(yield* r.check(a)).toEqual(assessed.issues);
+      expect(yield* r.check(a)).toEqual(assessed.problems);
       expect((yield* Effect.flip(r.resolve(a)))._tag).toBe("Refused");
     }).pipe(Effect.scoped, Effect.provide(world())),
   );
@@ -365,8 +365,8 @@ describe("runtime", () => {
           }),
         });
         const a = agent({ model: source === "profile" ? "missing" : "" });
-        const issues = yield* r.check(a);
-        expect(issues).toEqual([
+        const problems = yield* r.check(a);
+        expect(problems).toEqual([
           { field: "model", level: "warn", text: "pi 的模型列表里没有 missing" },
           {
             field: "effort",

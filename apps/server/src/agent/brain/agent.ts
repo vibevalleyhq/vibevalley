@@ -17,7 +17,7 @@ import { type CompactionSummaryMessage, customMessage, kept, messageText, userMe
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
 import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
 import { Recurrences } from "./recurrences.ts";
-import { type Helper, selfTools, subagentInstructions, subagentTool } from "./self.ts";
+import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./self.ts";
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
 import { TaskRunner, taskTools, watchedStore } from "./tasks.ts";
@@ -71,22 +71,22 @@ export interface BrainOptions {
   readonly idleFoldAfterMs?: number;
   /** Asked before an idle fold: true when the agent will be woken within that long anyway, and its first request folds if it must. */
   readonly wakeSoon?: (withinMs: number) => boolean;
-  /** Absent: name. noSession keeps nothing on disk (a helper). */
+  /** Absent: name. noSession keeps nothing on disk (a subagent). */
   readonly session?: string;
   readonly noSession?: boolean;
-  /** A helper never can. */
+  /** A subagent never can. */
   readonly noSubagents?: boolean;
   /** Its own task graph and the tools to task and mark it; absent, none. */
   readonly tasks?: TaskStore;
-  /** Helpers out on its tasks at once; 3 when absent. */
-  readonly maxHelpers?: number;
+  /** Subagents out on its tasks at once; 3 when absent. */
+  readonly maxSubagents?: number;
   /** Times a run that stops with its own tasks ready is reminded of them while the graph stays the same; 3 when absent. */
   readonly maxNudges?: number;
   /** Absent: when it keeps a session. */
   readonly recurrences?: boolean;
   /** Default later. */
   readonly wake?: (text: string) => void;
-  /** Its clock (base/time.ts): message times, the recurrence ticks, the idle fold, a resumed run's age. A helper it
+  /** Its clock (base/time.ts): message times, the recurrence ticks, the idle fold, a resumed run's age. A subagent it
    * sends out shares it. */
   readonly time: Time;
 }
@@ -219,9 +219,9 @@ export class Brain {
       skills: () => this.skills(),
       memory: !options.noMemory,
     });
-    let helper: Helper | undefined;
+    let subagent: Subagent | undefined;
     if (!options.noSubagents) {
-      helper = async (brief, label, signal) => {
+      subagent = async (brief, label, signal) => {
         const h = await Brain.start(
           {
             name: options.name + "-帮手",
@@ -249,20 +249,20 @@ export class Brain {
           await h.close();
         }
       };
-      own.push(subagentTool(helper));
+      own.push(subagentTool(subagent));
     }
     if (options.tasks) {
       const store = watchedStore(options.tasks, (g) => this.publish({ type: "tasks_changed", tasks: finished(g) ? [] : g }));
       this.tasks = new TaskRunner(
         store,
-        helper,
+        subagent,
         this.life.signal,
         (text) => this.later(taskMessage(text, options.time.now())),
-        options.maxHelpers ?? 3,
+        options.maxSubagents ?? 3,
         options.maxNudges ?? 3,
       );
       const runner = this.tasks;
-      own.push(...taskTools(store, helper !== undefined, () => void runner.advance()));
+      own.push(...taskTools(store, subagent !== undefined, () => void runner.advance()));
       // A fold replaces the turns that showed the graph: the summary carries it on.
       this.folding = { ...this.folding, append: () => runner.summary() };
     }
@@ -547,7 +547,7 @@ export class Brain {
     return this.accounting.snapshot();
   }
 
-  /** Stops the run under way and calls back the helpers out on its tasks. */
+  /** Stops the run under way and calls back the subagents out on its tasks. */
   async stop() {
     await this.tasks?.stop();
     this.core.clearAllQueues();

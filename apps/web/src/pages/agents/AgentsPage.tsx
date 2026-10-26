@@ -9,7 +9,7 @@ import { api, reasonOf } from "../../data/api";
 import { hexColor } from "../../rules/cast";
 import { toast } from "../../ui/toasts";
 import { A } from "../../app/A";
-import { useAgentIssues, useWorkAgents } from "../../data/agents";
+import { useAgentProblems, useWorkAgents } from "../../data/agents";
 import { useCore } from "../../data/frame";
 import { ready, useRuntimes } from "../../data/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
@@ -33,7 +33,7 @@ function AgentsPage() {
   const runtimes = useRuntimes();
   const allSkills = useSkills();
   const skills = createMemo(() => new Map(ready(allSkills, []).map((s) => [s.id, s.name])));
-  const issues = useAgentIssues(agents);
+  const problems = useAgentProblems(agents);
   return (
     <div class="h-full overflow-y-auto">
       <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
@@ -61,7 +61,7 @@ function AgentsPage() {
                 tally={core()?.progress?.agents?.[a.id]}
                 here={(core()?.sessions ?? []).filter((h) => h.agent === a.id).length}
                 skillName={skills()}
-                errors={(issues()[a.id] ?? []).filter((i) => i.level === "error").map((i) => i.text)}
+                errors={(problems()[a.id] ?? []).filter((i) => i.level === "error").map((i) => i.text)}
               />
             )}
           </For>

@@ -30,7 +30,7 @@ import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
 import type { Village } from "../world/load";
-import { bedOfStation, beds, cropOfBed, isRipe, plotKey, stationOfSession, type Bed } from "../world/plots";
+import { bedOfStation, beds, cropOfBed, isRipe, stationOfSession, type Bed } from "../world/plots";
 import {
   placeOfAction,
   plotCalls,
@@ -495,7 +495,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
     // What is under a still pointer is found again as things move under it.
     if (pointerAt && !downOn) setHover(hitAt(pointerAt));
     const hovered = store.hoverBed;
-    const cropOf = (s: Session): Crop => view.plots[plotKey(s)]?.crop ?? "sprout";
+    const cropOf = (s: Session): Crop => view.plots[s.id]?.crop ?? "sprout";
 
     for (const p of plots) {
       const { bed } = p;

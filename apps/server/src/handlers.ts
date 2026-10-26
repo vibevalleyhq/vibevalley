@@ -135,7 +135,7 @@ export const handlers = Effect.gen(function* () {
       Effect.flatMap(runtimes.refresh(id), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
     "runtime.update": ({ id, body }) =>
       Effect.flatMap(runtimes.update(id, body), (info) => (info ? Effect.succeed(info) : Effect.fail(missing("runtime " + id, [lookIn.runtime])))),
-    "agent.check": ({ body }) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.check(agent), (issues) => ({ id: agent.id, issues }))),
+    "agent.check": ({ body }) => Effect.forEach(body.agents, (agent) => Effect.map(runtimes.check(agent), (problems) => ({ id: agent.id, problems }))),
     "session.stop": ({ id }) => (sessions.find(id) ? Effect.asVoid(sessions.stop(id)) : Effect.fail(missing("帮工 " + id, [lookIn.session]))),
     "session.list": ({ agent }) => sessions.list(agent ?? ""),
     "session.get": ({ id }) => Effect.flatMap(sessions.get(id), (s) => (s ? Effect.succeed(s) : Effect.fail(missing("帮工 " + id, [lookIn.session])))),

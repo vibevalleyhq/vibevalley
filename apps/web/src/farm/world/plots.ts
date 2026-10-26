@@ -26,9 +26,6 @@ export const bedOfStation = (station: number): Bed | undefined => (station < 0 ?
 
 export const isRipe = (crop: Crop) => crop === "wheat" || crop === "carrot";
 
-/** A plot is an issue being worked: the farm view keys it by the issue (protocol.PlotKey; keep the two the same). */
-export const plotKey = (s: Session) => (s.issue ? s.issue : s.id);
-
 /** The issue a session works; every session the farm shows has one. */
 export const issueOf = (s: Session) => s.issue ?? s.id;
 
@@ -44,7 +41,7 @@ export const nextClearing = (level: number) => beds.find((b) => b.unlockLevel !=
 
 const emptyPlot: PlotView = { crop: "empty" };
 
-export const plotOf = (view: FarmView, s: Session | undefined): PlotView => (s ? (view.plots[plotKey(s)] ?? emptyPlot) : emptyPlot);
+export const plotOf = (view: FarmView, s: Session | undefined): PlotView => (s ? (view.plots[s.id] ?? emptyPlot) : emptyPlot);
 
 export const lockedPlot = (bed: Bed, level: number): PlotView => ({ crop: level >= (bed.unlockLevel ?? Infinity) ? "flowering" : "locked" });
 
@@ -56,7 +53,7 @@ export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView
   if (bed.unlockLevel !== undefined) return lockedPlot(bed, Math.round(view.level.level)).crop;
   const s = sessionAtStation(sessions, bed.station);
   if (!s) return leaving ? "harvested" : "empty";
-  return view.plots[plotKey(s)]?.crop ?? "sprout";
+  return view.plots[s.id]?.crop ?? "sprout";
 }
 
 export const cropLabel: Record<Crop, string> = {

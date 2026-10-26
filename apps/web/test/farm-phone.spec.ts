@@ -82,7 +82,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
   const base: StateFrame = {
     ...frame,
     state: { ...frame.state, sessions: [session], issues: [{ ...made, sessions: [sessionId("w1")], status: "in_review", moves: ["done", "canceled"] }] },
-    view: { ...frame.view, plots: { [made.id]: { crop: "wheat" } } },
+    view: { ...frame.view, plots: { w1: { crop: "wheat" } } },
   };
   let served = 0;
   await page.route("**/api/v1/state", (route) => {

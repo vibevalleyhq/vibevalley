@@ -34,7 +34,7 @@
 | 语音 | 麦克风 | `/settings/voice`（`pages/settings/VoiceForm.tsx`）、`src/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`WorkspaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievements` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
-| 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<项目>.<工单号>`，否则直接在项目目录且 `branch` 为空；`FarmView.plots` 按工单做键，服务端 `game/view.ts` 的 `plotKey`；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/say` 的 `station` |
+| 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<项目>.<工单号>`，否则直接在项目目录且 `branch` 为空；`FarmView.plots` 按帮工的 id 做键（服务端 `game/view.ts` 的 `viewOf`）；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/say` 的 `station` |
 
 ## 服务端以下
 

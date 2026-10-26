@@ -68,11 +68,11 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const tasks = options.tasks?.(kernel.sessionId);
     const agent = await Brain.start({
       time: options.time,
-      name: "worker",
+      name: "helper",
       instructions,
       llm,
       ...(o.effort ? { thinkingLevel: o.effort as ThinkingLevel } : {}),
-      home: join(home(), "workers"),
+      home: join(home(), "helpers"),
       cwd: o.cwd,
       tools: codingTools({ cwd: o.cwd, ...(o.env ? { env: { ...o.env } } : {}) }),
       ...(o.disallowedTools ? { disallowedTools: o.disallowedTools } : {}),

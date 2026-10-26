@@ -155,7 +155,7 @@
 - **计划（`task`）**：计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，跟着计划走，不归这里的转换表。
 - **管家（`tool`）**：派活、带话、验收、完成都是同一个服务的方法，完成要主人说一声。
 - **GitHub 检测（`setting`、`project`）**：开机查 `gh` 装没装、登没登录（`github.status`、`github.refresh`），项目查 origin 是不是 GitHub、有没有写权限，结果缓存在 `project.pullRequest`；完成只读缓存决定走哪条路。
-- **农场的皮（`plotOf`、`game`）**：工单的状态在农场里用种地的词说（「状态和用语」）；`FarmView.plots` 按工单做键（`plotKey`），地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是交付 `merged` 或 `pull_request` 的工单。游戏只读事实算画面和账本，不调工单。
+- **农场的皮（`plotOf`、`game`）**：工单的状态在农场里用种地的词说（「状态和用语」）；`FarmView.plots` 按帮工做键，地的样子看工单和地上帮工的阶段；农具直接调 `issue.status`、`issue.comment`、`issue.accept`，不经帮工找工单；仓库是交付 `merged` 或 `pull_request` 的工单。游戏只读事实算画面和账本，不调工单。
 
 ## 为什么这样
 
