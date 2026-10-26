@@ -118,8 +118,8 @@ export default defineConfig({
         },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
-        // command line prints, and the brain and the journal are plain classes outside Effect.
+        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; the brain
+        // is given its logger as it is given its clock. The command line prints.
         files: ["apps/server/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
@@ -140,13 +140,7 @@ export default defineConfig({
         rules: { "vibevalley/no-test-sleep": "off" },
       },
       {
-        files: [
-          "apps/server/src/cli.ts",
-          "apps/server/src/cli/**",
-          "apps/server/src/agent/brain/**",
-          "apps/server/src/**/*.test.ts",
-          "apps/server/src/testing/**",
-        ],
+        files: ["apps/server/src/cli.ts", "apps/server/src/cli/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "no-console": "off" },
       },
       {

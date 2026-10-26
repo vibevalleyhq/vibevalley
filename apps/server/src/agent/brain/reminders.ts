@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { jsonOf } from "../../base/json.ts";
 import { numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
 import type { Time } from "../../base/time.ts";
+import type { CallbackLog } from "../../base/log.ts";
 
 export interface Reminder {
   readonly id: string;
@@ -85,6 +86,7 @@ export class Reminders {
     private readonly wake: (text: string) => void,
     /** The brain's Time: when a reminder is due. */
     private readonly time: Time,
+    private readonly log: CallbackLog,
   ) {
     this.file = join(home, "reminders.json");
     this.tools = this.makeTools();
@@ -110,7 +112,7 @@ export class Reminders {
       const isDue = new Set(due.map((j) => j.id));
       this.store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
     } catch (e) {
-      console.error("agent: cannot claim due reminders:", e);
+      this.log.error("agent: cannot claim due reminders:", e);
       return;
     }
     for (const j of due) this.wake(dueMessage(j));

@@ -19,6 +19,7 @@ import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./orchestrator.ts";
 import { wallTime } from "../base/time.ts";
+import { plainLog } from "../base/log.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
 const key = process.env.DEEPSEEK_API_KEY ?? "";
@@ -59,6 +60,7 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
   writeFileSync(join(home, orchestratorAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
   const brain = await Brain.start({
     time: wallTime,
+    log: plainLog,
     name: orchestratorAgent,
     instructions: systemPrompt + agentPrompt,
     llm: deepseek(model, key),

@@ -2,7 +2,7 @@
 // that is not there is code -1.
 
 import { spawn } from "node:child_process";
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { afterRealTime } from "../base/time.ts";
 
 export interface Ran {
@@ -81,12 +81,9 @@ export const run = (command: string, args: readonly string[], options: RunOption
     return Effect.sync(killGroup);
   });
 
-export class GitError extends Error {
-  constructor(
-    readonly code: number,
-    readonly stderr: string,
-  ) {
-    super(stderr.trim() || `git exited ${code}`);
+export class GitError extends Data.TaggedError("GitError")<{ readonly code: number; readonly stderr: string; readonly message: string }> {
+  static of(code: number, stderr: string) {
+    return new GitError({ code, stderr, message: stderr.trim() || `git exited ${code}` });
   }
 }
 
@@ -94,7 +91,7 @@ export const gitRun = (cwd: string, ...args: string[]) => run("git", args, { cwd
 
 /** The output, trimmed; a failure is a GitError with what git said. */
 export const git = (cwd: string, ...args: string[]): Effect.Effect<string, GitError> =>
-  Effect.flatMap(gitRun(cwd, ...args), (r) => (r.code === 0 ? Effect.succeed(r.stdout.trim()) : Effect.fail(new GitError(r.code, r.stderr))));
+  Effect.flatMap(gitRun(cwd, ...args), (r) => (r.code === 0 ? Effect.succeed(r.stdout.trim()) : Effect.fail(GitError.of(r.code, r.stderr))));
 
 export const gitOk = (cwd: string, ...args: string[]) => Effect.map(gitRun(cwd, ...args), (r) => r.code === 0);
 

@@ -7,7 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
-import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
@@ -36,7 +36,7 @@ import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
 import { asFarm, repository } from "./repository.ts";
 import { type Merged, MergeFailure, type Project, ProjectError, type Workplace, type WorkplaceCleanup, type WorkplaceRelease } from "./shapes.ts";
-import { stackOf } from "./stack.ts";
+import { stackFiles, stackOf } from "./stack.ts";
 
 const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 
@@ -248,7 +248,7 @@ export interface ProjectShape {
   readonly clear: (project: string, issueNumber: number, work?: WorkplaceCleanup) => Effect.Effect<WorkplaceRelease>;
   readonly openBranch: (project: string, branch: string, from?: string) => Effect.Effect<void, ProjectError>;
   readonly run: (cwd: string, command: string) => Effect.Effect<{ readonly ok: boolean; readonly output: string }>;
-  readonly houseRules: () => string;
+  readonly houseRules: () => Effect.Effect<string>;
   readonly githubStatus: () => GitHubStatus;
   readonly refreshGitHub: () => Effect.Effect<GitHubStatus>;
   readonly usesPullRequests: (name: string) => boolean;
@@ -507,7 +507,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               return { name: req.name, path, git: true };
             });
             return yield* made.pipe(
-              Effect.tapError(() => Effect.sync(() => rmSync(path, { recursive: true, force: true }))),
+              Effect.tapError(() => Effect.ignore(fs.remove(path, { recursive: true }))),
               Effect.ensuring(Effect.sync(() => pending.delete(req.name))),
             );
           }),
@@ -515,7 +515,15 @@ export const make = (hooks: ProjectHooks = {}) =>
       list,
       summary,
       summaries: () => Effect.flatMap(list(), (all) => Effect.forEach(all, summary)),
-      stack: (name) => Effect.map(find(name), (p) => (p ? stackOf(p.path) : undefined)),
+      stack: (name) =>
+        Effect.flatMap(find(name), (p) =>
+          p
+            ? Effect.map(
+                Effect.forEach(stackFiles, (f) => Effect.map(Effect.option(fs.readFileString(join(p.path, f))), (body) => [f, body] as const)),
+                (read) => stackOf(new Map(read.flatMap(([f, body]) => (Option.isSome(body) ? [[f, body.value] as const] : [])))),
+              )
+            : Effect.succeed(undefined),
+        ),
       languages: Effect.fn("Projects.languages")(function* (name) {
         const p = yield* find(name);
         if (!p) return undefined;
@@ -782,13 +790,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           if (output.length > runOutput) output = "…" + slice(output, -runOutput);
           return { ok: r.code === 0, output };
         }),
-      houseRules: () => {
-        try {
-          return readFileSync(join(work, "AGENTS.md"), "utf8");
-        } catch {
-          return "";
-        }
-      },
+      houseRules: () => Effect.orElseSucceed(fs.readFileString(join(work, "AGENTS.md")), () => ""),
       githubStatus: () =>
         status?.checkedAt
           ? status

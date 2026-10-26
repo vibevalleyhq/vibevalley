@@ -25,6 +25,7 @@ import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
 import type { Time } from "../base/time.ts";
+import type { CallbackLog } from "../base/log.ts";
 
 const streamEveryMs = 120;
 
@@ -156,6 +157,7 @@ export class AgentHost<R> {
     runs: RunStore,
     /** The service's Clock: the streaming window and an eval case's time. */
     private readonly time: Time,
+    private readonly log: CallbackLog,
   ) {
     this.journal = journal;
     this.execution = new AgentExecution(o.name, journal, o.toolStart, runs);
@@ -314,6 +316,7 @@ export class AgentHost<R> {
       const b = await Brain.start(
         {
           time: this.time,
+          log: this.log,
           name: this.o.name,
           instructions: this.o.instructions,
           llm,

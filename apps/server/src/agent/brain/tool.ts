@@ -1,6 +1,7 @@
 // Tools that answer in words. A tool that fails throws; the model reads the error's message as a failed result.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Effect } from "effect";
 
 /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */
 export const stopped = "已停下";
@@ -57,9 +58,26 @@ export function textTool<P>(spec: TextToolSpec<P>): AgentTool {
     execute: async (callId, params, signal) => {
       const s = signal ?? never;
       if (s.aborted) throw new Error(stopped);
-      const text = await spec.run(params as P, { callId, signal: s });
+      let text: string;
+      try {
+        text = await spec.run(params as P, { callId, signal: s });
+      } catch (e) {
+        // A run that follows the signal fails when it is stopped: that is the stop, not the tool's failure.
+        throw s.aborted ? new Error(stopped) : e;
+      }
       if (s.aborted) throw new Error(stopped);
       return { content: [{ type: "text", text: clip(text) }], details: undefined };
     },
   };
 }
+
+export interface EffectToolSpec<P> extends Omit<TextToolSpec<P>, "run"> {
+  /** A failure's message is the failed result the model reads. */
+  readonly run: (params: P) => Effect.Effect<string, Error>;
+}
+
+/** Runs an Effect to its answer on fibers someone owns; the signal interrupts it. */
+export type Runner = (effect: Effect.Effect<string, Error>, options: { readonly signal: AbortSignal }) => Promise<string>;
+
+export const effectTool = <P>(spec: EffectToolSpec<P>, runner: Runner): AgentTool =>
+  textTool<P>({ ...spec, run: (params, tc) => runner(spec.run(params), { signal: tc.signal }) });

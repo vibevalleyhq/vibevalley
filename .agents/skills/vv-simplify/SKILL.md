@@ -33,7 +33,7 @@ description: 在 VibeValley 里找可以简化的地方：删掉以后什么都�
 
 - 为了少几行把清楚的代码写成难读的。
 - 新造一个通用的框架、基类、配置项，只为把两处相似的代码合起来（两处不一样的理由可能就在明天）。
-- 子系统文档「为什么这样」里已经否决过的（比如 foundation.md 记着不把 `ApiError` 换成 `TaggedError`、子进程和外部 HTTP 留在 Promise 一侧）。
+- 子系统文档「为什么这样」里已经否决过的（比如 foundation.md 记着不把 `ApiError` 换成 `TaggedError`、`project/git.ts` 的子进程留在 `Effect.callback`、外面的库的一次调用留在 Promise）。
 - 只是个人口味的写法。
 
 ## 3. 核实每一处

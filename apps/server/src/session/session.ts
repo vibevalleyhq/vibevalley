@@ -10,7 +10,6 @@
 // turns; each hand owns its input, handover and departure, so one worktree's checks do not hold the other sessions.
 
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { Event, Runtime, Session as RuntimeSession, SessionOptions } from "@botiverse/oar";
@@ -37,7 +36,7 @@ import {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { Clock, Context, Data, Effect, FiberMap, FiberSet, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
+import { Clock, Context, Data, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, PubSub, type Scope, Semaphore, Schema, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
 import { Channels, type Delivered, type InputConsumed, type LaunchActivity, type SessionNews } from "../channel/chat.ts";
@@ -79,6 +78,7 @@ import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
 import { timeHere } from "../base/time.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -373,6 +373,7 @@ export const make = (options: SessionOptionsIn = {}) =>
   Effect.gen(function* () {
     const config = yield* Settings;
     const core = yield* Core;
+    const fs = yield* FileSystem.FileSystem;
     const store = yield* Agents;
     const memories = yield* Memories;
     const chat = yield* Channels;
@@ -407,6 +408,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     const clock = yield* Clock.Clock;
     const time = yield* timeHere;
+    const logs = yield* callbackLog;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
     const trajectories = new Trajectories(
       config.home,
@@ -724,7 +726,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       const resolved = yield* Effect.result(runtimes.resolve(agent));
       if (resolved._tag === "Failure") return { refused: reasonOf(resolved.failure), retained: false };
       const r = resolved.success;
-      const text = [instructions(agent, store.skills()), workplaceRules(place, projects.houseRules(), id)].filter((s) => s !== "").join("\n\n");
+      const text = [instructions(agent, store.skills()), workplaceRules(place, yield* projects.houseRules(), id)].filter((s) => s !== "").join("\n\n");
       const mcp = [
         { name: "vibevalley", type: "http" as const, url: mcpUrl, headers: { authorization: "Bearer " + issueToken(id) } },
         ...(agent.mcpServers ?? []).map(toOarMcp),
@@ -981,7 +983,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       for (const session of core.state().sessions) {
         const row = kept.get(session.id);
         const place = row?.place ? placeOf(row.place) : undefined;
-        if (!row || !place || !existsSync(place.cwd)) {
+        if (!row || !place || !(yield* Effect.orElseSucceed(fs.exists(place.cwd), () => false))) {
           yield* core.apply({ type: "left", id: session.id, closed: "lost" });
           trajectories.finish(session.id);
           yield* ended(session.id, "lost");
@@ -1258,7 +1260,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time),
+      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time, logs),
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.

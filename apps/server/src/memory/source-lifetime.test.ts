@@ -1,13 +1,22 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Effect } from "effect";
+import { FetchHttpClient, HttpClient } from "effect/http";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { everos } from "./everos.ts";
 import { nowledge } from "./nowledge.ts";
-import { wallTime } from "../base/time.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
+
+/** What an operation came to: its message when it failed. */
+const ended = <A, E extends Error>(e: Effect.Effect<A, E>) =>
+  Effect.runPromise(
+    Effect.match(e, {
+      onFailure: (err) => err.message,
+      onSuccess: () => "completed",
+    }),
+  );
 
 test("a late Nowledge connection cannot issue a tool call or reopen after the source stopped", async () => {
   let release!: () => void;
@@ -19,17 +28,14 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
     await held;
   });
   const call = vi.spyOn(Client.prototype, "callTool");
-  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true }, wallTime.now);
+  const source = nowledge({ kind: "nowledge", url: "http://unused/mcp", enabled: true, read: true });
   const query = { agent: "lab", project: "", text: "query", kind: "" as const, limit: 1 };
-  const pending = source.search(query, new AbortController().signal).then(
-    () => "completed",
-    () => "canceled",
-  );
+  const pending = ended(source.search(query));
   await started;
-  await source.stop();
+  await Effect.runPromise(source.stop);
   release();
-  expect(await pending).toBe("canceled");
-  await expect(source.search(query, new AbortController().signal)).rejects.toThrow("stopped");
+  expect(await pending).toContain("stopped");
+  expect(await ended(source.search(query))).toContain("stopped");
   expect(call).not.toHaveBeenCalled();
   expect(connect).toHaveBeenCalledTimes(1);
 });
@@ -40,28 +46,32 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   let entered!: () => void;
   const held = new Promise<Response>((done) => (release = done));
   const started = new Promise<void>((done) => (entered = done));
-  vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-    const body = JSON.parse(init.body as string) as { session_id: string };
-    requests.push({ path: new URL(url).pathname, session: body.session_id });
-    if (body.session_id === "vibevalley-late" && url.endsWith("/add")) {
+  const fetch = async (url: string | URL | Request, init?: RequestInit) => {
+    const href = url instanceof Request ? url.url : url.toString();
+    const body = JSON.parse(new TextDecoder().decode(init?.body as Uint8Array)) as { session_id: string };
+    requests.push({ path: new URL(href).pathname, session: body.session_id });
+    if (body.session_id === "vibevalley-late" && href.endsWith("/add")) {
       entered();
       return held;
     }
     return new Response("{}", { status: 200 });
-  });
-  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, wallTime.now);
-  const run = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };
-  await source.syncTurn(run, new AbortController().signal);
-  const pending = source.syncTurn({ ...run, session: "late" }, new AbortController().signal).then(
-    () => "completed",
-    () => "canceled",
+  };
+  const http = Effect.runSync(
+    Effect.gen(function* () {
+      return yield* HttpClient.HttpClient;
+    }).pipe(Effect.provide(FetchHttpClient.layer)),
   );
+  const run = <A, E>(e: Effect.Effect<A, E>) => Effect.provideService(e, FetchHttpClient.Fetch, fetch);
+  const source = everos({ kind: "everos", url: "http://unused", enabled: true, write: true }, http);
+  const turn = { agent: "lab", session: "done", project: "demo", job: "job", outcome: "completed" as const, said: "done", summary: "done" };
+  expect(await ended(run(source.syncTurn(turn)))).toBe("completed");
+  const pending = ended(run(source.syncTurn({ ...turn, session: "late" })));
   await started;
-  await source.stop();
+  await Effect.runPromise(run(source.stop));
   release(new Response("{}", { status: 200 }));
-  expect(await pending).toBe("canceled");
-  await source.stop();
-  await expect(source.syncTurn({ ...run, session: "later" }, new AbortController().signal)).rejects.toThrow("stopped");
+  expect(await pending).toContain("stopped");
+  await Effect.runPromise(run(source.stop));
+  expect(await ended(run(source.syncTurn({ ...turn, session: "later" })))).toContain("stopped");
   expect(requests).toEqual([
     { path: "/api/v2/memory/add", session: "vibevalley-done" },
     { path: "/api/v2/memory/add", session: "vibevalley-late" },
