@@ -38,7 +38,7 @@ export const repository = (path: string) => {
   const conflicts = Effect.fnUntraced(function* (base: string, branch: string) {
     const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
     if (r.code === 0) return [] as string[];
-    if (r.code !== 1) return yield* Effect.fail(new GitError(r.code, r.code < 0 ? r.stderr : projectWording().mergeTree(r.code)));
+    if (r.code !== 1) return yield* Effect.fail(GitError.of(r.code, r.code < 0 ? r.stderr : projectWording().mergeTree(r.code)));
     // First line: the tree it would write; then each conflicted file.
     return [
       ...new Set(
@@ -58,7 +58,7 @@ export const repository = (path: string) => {
     /** Whether refs/heads/<branch> is there; a git that cannot tell fails. */
     hasBranch: (branch: string) =>
       Effect.flatMap(gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch), (r) =>
-        r.code === 0 ? Effect.succeed(true) : r.code === 1 ? Effect.succeed(false) : Effect.fail(new GitError(r.code, r.stderr)),
+        r.code === 0 ? Effect.succeed(true) : r.code === 1 ? Effect.succeed(false) : Effect.fail(GitError.of(r.code, r.stderr)),
       ),
     /** Where a branch points. */
     tip: (branch: string) => git(path, "rev-parse", "refs/heads/" + branch),

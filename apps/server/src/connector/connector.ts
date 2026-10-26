@@ -13,14 +13,14 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Clock, Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
+import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
 import * as outboxQ from "../../db/generated/connector_outbox.sql.ts";
 import { newId } from "../base/ids.ts";
-import { jsonOf } from "../base/json.ts";
-import { causeMessage } from "../base/db.ts";
+import { causeMessage, Db } from "../base/db.ts";
+import { reasonOf } from "../errors.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
@@ -39,10 +39,7 @@ import {
   WeixinClient,
   WeixinError,
 } from "./weixin.ts";
-import { callbackLog } from "../base/log.ts";
 import { Notices } from "../notice/notice.ts";
-import { sleep, waitFor } from "./wait.ts";
-import { timeHere } from "../base/time.ts";
 
 /** WeChat's official client rests this long too. */
 const stalePauseMs = 60 * 60_000;
@@ -95,7 +92,6 @@ export interface Adapter {
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const isFailure = (x: unknown): x is Failure => typeof x === "object" && x !== null && "kind" in x && "reason" in x;
 
 export function weixinAdapter(api: WeixinApi): Adapter {
   const accountOf = (s: Record<string, string>) => ({
@@ -257,16 +253,12 @@ interface Account {
 
 const paused = (a: Account, now: number) => a.pausedUntil !== 0 && a.pausedUntil > now;
 
-interface Generation {
-  readonly control: AbortController;
-  readonly done: Promise<unknown>;
-}
+/** Why a step of the bridge did not go through: the database, the orchestrator, or an app. Said as the status's error. */
+class BridgeError extends Data.TaggedError("BridgeError")<{ readonly message: string }> {}
 
-const stopGeneration = async (g: Generation | undefined) => {
-  if (!g) return;
-  g.control.abort();
-  await g.done;
-};
+const bridgeError = (e: unknown) => (e instanceof BridgeError ? e : new BridgeError({ message: causeMessage(e) }));
+
+const Secrets = Schema.Record(Schema.String, Schema.String);
 
 export interface ConnectorShape {
   readonly list: () => Effect.Effect<ConnectorStatus[]>;
@@ -289,25 +281,35 @@ export interface ConnectorOptions {
   readonly say?: (text: string, conversation: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
+/** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
+const sleepOrWake = (ms: number, register: (wake: () => void) => void) =>
+  Effect.suspend(() => {
+    const woke = Deferred.makeUnsafe<void>();
+    register(() => Deferred.doneUnsafe(woke, Effect.void));
+    return Effect.raceFirst(Effect.as(Deferred.await(woke), "wake" as const), Effect.as(Effect.sleep(Math.max(0, ms)), "timeout" as const));
+  });
+
 export const make = (options: ConnectorOptions = {}) =>
   Effect.gen(function* () {
     // The farm's own waits and times (a pause, a retry, when a message went out) on the service's Clock.
-    const time = yield* timeHere;
-    const logs = yield* callbackLog;
+    const clock = yield* Clock.Clock;
+    const now = () => clock.currentTimeMillisUnsafe();
     const sql = yield* SqlClient.SqlClient;
+    const { attempt: db } = yield* Db;
     const chat = yield* Channels;
     const core = yield* Core;
     const notices = yield* Notices;
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
     const retryMost = options.retryMostMs ?? 30 * 60_000;
-    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const runHere = yield* FiberSet.makeRuntimePromise<never>();
-    const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      runHere(Effect.mapError(Effect.provideService(e, SqlClient.SqlClient, sql), (err) => new Error(causeMessage(err))));
-    const inTx = <A>(f: Effect.Effect<A, unknown, SqlClient.SqlClient>) => run(sql.withTransaction(f));
+    // The bridges' fibers (each account's generation, the status said to the core) belong to this service: they end with
+    // it and keep its services (the logger, the Clock).
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    /** The database's own failures stay failures here: the status says them. */
+    const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
+    const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
     const general = chat.general();
-    const life = new AbortController();
+    let closing = false;
     const say = (text: string, conversation: string | undefined) =>
       options.say ? options.say(text, conversation, chat) : orchestrator.say(text, {}, conversation, "");
 
@@ -320,45 +322,42 @@ export const make = (options: ConnectorOptions = {}) =>
       let attempt = 0;
       let err = "";
       const progressed = new Set<() => void>();
+      // The coordinator: one command at a time; only it replaces the account, after all work of the old one has ended.
+      const commands = Semaphore.makeUnsafe(1);
+      /** The account's work now: receiving, the inbox and the outbox; or a login. */
+      let current: Fiber.Fiber<unknown> | undefined;
+
       // What the page and the tests see: the status, said to the core whenever a part of it may have changed (the error,
       // the account, the login's progress, what waits to go out); the core keeps it only when it differs. One at a time,
       // each read when its turn comes, so the last said is the latest.
-      let telling = Promise.resolve();
+      const telling = Semaphore.makeUnsafe(1);
       const told = () => {
-        telling = telling.then(async () => {
-          await runHere(core.apply({ type: "connector", status: await status() })).catch(() => {});
-        });
+        forkHere(telling.withPermits(1)(Effect.ignore(Effect.flatMap(status, (s) => core.apply({ type: "connector", status: s })))));
       };
       const setErr = (e: string) => {
         if (err === e) return;
         err = e;
         told();
       };
-      const signal = () => {
+      const changed = () => {
         for (const f of progressed) f();
         told();
       };
 
-      const reload = async () => {
-        await reloadAccount();
-        told();
-      };
-      const reloadAccount = async () => {
-        const row = await run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
+      const reloadAccount = Effect.gen(function* () {
+        const row = yield* run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
         if (Option.isNone(row)) {
           account = undefined;
           return;
         }
         const r = row.value;
-        let secrets: Record<string, string> = {};
-        try {
-          secrets = jsonOf(Schema.Record(Schema.String, Schema.String))(r.secrets);
-        } catch (e) {
+        const secrets = Schema.decodeUnknownOption(Schema.fromJsonString(Secrets))(r.secrets);
+        if (Option.isNone(secrets)) {
           setErr(connectorWording().unreadSecrets);
-          logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
+          yield* Effect.logError(`vibevalley: ${id}: the saved secrets cannot be read`);
         }
         account = {
-          secrets,
+          secrets: Option.getOrElse(secrets, () => ({})),
           owner: r.owner_id ?? "",
           pairCode: r.pair_code ?? "",
           cursor: r.cursor,
@@ -368,10 +367,11 @@ export const make = (options: ConnectorOptions = {}) =>
           connectedAt: r.connected_at,
           ...(r.channel_id ? { channel: r.channel_id } : {}),
         };
-      };
-      // A write the bridge goes on without.
-      const kept = (p: Promise<unknown>) => p.catch((e) => logs.error(`vibevalley: ${id}:`, message(e)));
-      const now = () => (account ? { ...account } : undefined);
+      });
+      const reload = Effect.andThen(reloadAccount, Effect.sync(told));
+      /** A write the bridge goes on without. */
+      const kept = <A>(e: Effect.Effect<A, BridgeError>) => Effect.catch(e, (x) => Effect.logError(`vibevalley: ${id}: ${x.message}`));
+      const snapshot = () => (account ? { ...account } : undefined);
 
       // How many wait to go out, as the status says it: counted in the database when not known, then moved by each change
       // that commits. A change that failed, or one made while it was being counted, leaves it unknown again.
@@ -382,16 +382,20 @@ export const make = (options: ConnectorOptions = {}) =>
         pendingOut = by && pendingOut !== undefined ? by(pendingOut) : undefined;
         told();
       };
-      const pendingNow = async () => {
-        if (pendingOut !== undefined) return pendingOut;
+      const pendingNow = Effect.suspend(() => {
+        if (pendingOut !== undefined) return Effect.succeed(pendingOut);
         const at = outChanges;
-        const n = await run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).catch(() => 0);
-        if (at === outChanges) pendingOut = n;
-        return n;
-      };
+        return run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).pipe(
+          Effect.tap((n) =>
+            Effect.sync(() => {
+              if (at === outChanges) pendingOut = n;
+            }),
+          ),
+          Effect.orElseSucceed(() => 0),
+        );
+      });
 
-      const status = async (): Promise<ConnectorStatus> => {
-        const pending = await pendingNow();
+      const status: Effect.Effect<ConnectorStatus> = Effect.map(pendingNow, (pending) => {
         const state = chat.now();
         const s: ConnectorStatus = { id, state: "off", pending };
         if (err) s.error = err;
@@ -409,271 +413,255 @@ export const make = (options: ConnectorOptions = {}) =>
             ...(a.pairCode ? { pairCode: a.pairCode } : {}),
             since: a.connectedAt,
           };
+        const stopped = paused(a, now());
         return {
           ...s,
-          state: paused(a, time.now()) ? "paused" : "connected",
-          ...(paused(a, time.now()) ? { pausedUntil: a.pausedUntil } : {}),
+          state: stopped ? "paused" : "connected",
+          ...(stopped ? { pausedUntil: a.pausedUntil } : {}),
           owner: shortId(a.owner),
           since: a.connectedAt,
           ...(a.lastInbound ? { lastInbound: a.lastInbound } : {}),
         };
-      };
+      });
 
-      const pause = async () => {
-        try {
-          await run(accountQ.pauseAccount({ paused_until: time.now() + stalePauseMs, connector: id }));
-          await reload();
-          setErr(connectorWording().expired);
-          return true;
-        } catch (e) {
-          setErr(message(e));
-          return false;
-        }
-      };
+      /** Whether the pause was kept. */
+      const pause = Effect.gen(function* () {
+        yield* run(accountQ.pauseAccount({ paused_until: now() + stalePauseMs, connector: id }));
+        yield* reload;
+        setErr(connectorWording().expired);
+        return true;
+      }).pipe(
+        Effect.catch((e) =>
+          Effect.as(
+            Effect.sync(() => setErr(e.message)),
+            false,
+          ),
+        ),
+      );
 
-      const quotedConversation = async (ext: string | undefined) => {
+      const quotedConversation = Effect.fnUntraced(function* (ext: string | undefined) {
         if (!ext) return undefined;
-        const rows = await run(outboxQ.messageOfExt({ connector: id, ext_id: ext }));
+        const rows = yield* run(outboxQ.messageOfExt({ connector: id, ext_id: ext }));
         const message = rows[0]?.message_id;
         if (!message) return undefined;
-        return (await runHere(chat.messageLocation(message)))?.conversation.id;
-      };
+        return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.conversation.id;
+      });
 
-      // The outbox: one drain at a time, in order.
-      let sending = Promise.resolve(true);
+      const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
+        Effect.tryPromise({
+          try: (signal) => adapter.send(signal, secrets, to, text, reply),
+          catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+        }).pipe(Effect.catch((f) => Effect.succeed(f)));
+
+      // The outbox: one drain at a time, in order. True when nothing is left that it could send now.
+      const draining = Semaphore.makeUnsafe(1);
       let wakeOutbox: (() => void) | undefined;
       let outboxDirty = false;
-      const drain = (signal: AbortSignal, late: boolean) => {
-        const next = sending.then(async () => {
-          if (signal.aborted) return false;
-          const a = now();
-          if (!a || !a.owner || paused(a, time.now())) return true;
-          let pending: readonly { id: string; body: string }[];
-          try {
-            pending = await run(outboxQ.pendingOutbox({ connector: id }));
-          } catch (e) {
-            logs.error(`vibevalley: ${id}:`, message(e));
-            return false;
-          }
-          if (pending.length === 0) return true;
-          const batches =
-            late && pending.length > digestOver
-              ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0]! }]
-              : pending.map((r) => ({ ids: [r.id], text: r.body }));
-          for (const out of batches) {
-            const sent = await adapter.send(signal, a.secrets, a.owner, out.text, a.replyContext);
-            if (!isFailure(sent)) {
-              try {
-                await inTx(Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: time.now(), ext_id: sent || null, id: oid }), { discard: true }));
-                outboxChanged((n) => n - out.ids.length);
-              } catch (e) {
-                outboxChanged();
-                setErr(message(e));
-                return false;
-              }
-              setErr("");
-              continue;
+      const drain = (late: boolean) =>
+        draining.withPermits(1)(
+          Effect.gen(function* () {
+            const a = snapshot();
+            if (!a || !a.owner || paused(a, now())) return true;
+            const listed = yield* Effect.result(run(outboxQ.pendingOutbox({ connector: id })));
+            if (listed._tag === "Failure") {
+              yield* Effect.logError(`vibevalley: ${id}: ${listed.failure.message}`);
+              return false;
             }
-            for (const oid of out.ids) await kept(run(outboxQ.outboxFailed({ error: sent.reason || null, id: oid })));
-            if (sent.kind === "stale") await pause();
-            // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
-            else if (sent.kind === "restricted") setErr("");
-            else setErr(sent.reason);
-            return false;
-          }
-          return true;
-        });
-        sending = next.catch(() => false);
-        return next;
-      };
-      const retire = (reason: string) => outboxQ.dropPendingOutbox({ error: reason, connector: id });
+            const pending = listed.success;
+            if (pending.length === 0) return true;
+            const batches =
+              late && pending.length > digestOver
+                ? [{ ids: pending.map((r) => r.id), text: flushText(pending.map((r) => r.body))[0]! }]
+                : pending.map((r) => ({ ids: [r.id], text: r.body }));
+            for (const out of batches) {
+              const sent = yield* send(a.secrets, a.owner, out.text, a.replyContext);
+              if (Predicate.isString(sent)) {
+                const marked = yield* Effect.result(
+                  inTx(Effect.forEach(out.ids, (oid) => db(outboxQ.outboxSent({ sent_at: now(), ext_id: sent || null, id: oid })), { discard: true })),
+                );
+                if (marked._tag === "Failure") {
+                  outboxChanged();
+                  setErr(marked.failure.message);
+                  return false;
+                }
+                outboxChanged((n) => n - out.ids.length);
+                setErr("");
+                continue;
+              }
+              for (const oid of out.ids) yield* kept(run(outboxQ.outboxFailed({ error: sent.reason || null, id: oid })));
+              if (sent.kind === "stale") yield* pause;
+              // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
+              else if (sent.kind === "restricted") setErr("");
+              else setErr(sent.reason);
+              return false;
+            }
+            return true;
+          }),
+        );
+      const retire = (reason: string) => db(outboxQ.dropPendingOutbox({ error: reason, connector: id }));
 
-      const offer = async (m: ChatMessage) => {
-        const a = now();
+      const offer = Effect.fnUntraced(function* (m: ChatMessage) {
+        const a = snapshot();
         if (!a || !a.owner) return;
-        try {
-          const place = await runHere(chat.messageLocation(m.id));
-          if (!place || place.channel !== (a.channel ?? general)) return;
-          const pieces = splitText(ownerLine(m, place.conversation), maxChars[id]);
-          await inTx(
-            Effect.forEach(
-              pieces,
-              (piece) =>
-                outboxQ.addOutbox({
-                  id: newId(),
-                  connector: id,
-                  message_id: m.id,
-                  body: piece,
-                  created_at: time.now(),
-                }),
-              {
+        const added = yield* Effect.result(
+          Effect.gen(function* () {
+            const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
+            if (!place || place.channel !== (a.channel ?? general)) return 0;
+            const pieces = splitText(ownerLine(m, place.conversation), maxChars[id]);
+            const at = now();
+            yield* inTx(
+              Effect.forEach(pieces, (piece) => db(outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: at })), {
                 discard: true,
-              },
-            ),
-          );
-          outboxChanged((n) => n + pieces.length);
-        } catch (e) {
+              }),
+            );
+            return pieces.length;
+          }),
+        );
+        if (added._tag === "Failure") {
           outboxChanged();
-          setErr(message(e));
+          setErr(added.failure.message);
           return;
         }
+        if (added.success === 0) return;
+        outboxChanged((n) => n + added.success);
         outboxDirty = true;
         wakeOutbox?.();
-      };
+      });
 
-      const outboxRun = async (signal: AbortSignal) => {
+      const outboxRun = Effect.gen(function* () {
         let wait = retryFirst;
-        while (!signal.aborted) {
+        for (;;) {
           if (outboxDirty) {
             outboxDirty = false;
-            await drain(signal, false);
+            yield* drain(false);
             wait = retryFirst;
             continue;
           }
-          const result = await waitFor(time, wait, signal, (wake) => {
-            wakeOutbox = wake;
-          });
-          wakeOutbox = undefined;
-          if (result === "aborted") return;
-          if (result === "timeout") wait = (await drain(signal, false)) ? retryFirst : Math.min(2 * wait, retryMost);
+          const result = yield* sleepOrWake(wait, (wake) => (wakeOutbox = wake)).pipe(Effect.ensuring(Effect.sync(() => (wakeOutbox = undefined))));
+          if (result === "timeout") wait = (yield* drain(false)) ? retryFirst : Math.min(2 * wait, retryMost);
         }
-      };
+      });
 
-      const got = async (signal: AbortSignal, m: Inbound) => {
-        if (signal.aborted) throw new Error("canceled");
-        const a = now();
+      const got = Effect.fnUntraced(function* (m: Inbound) {
+        const a = snapshot();
         if (!a) return;
         if (!a.owner) {
           if (!a.pairCode || !isPairing(m.text, a.pairCode)) return;
-          const at = time.now();
-          await inTx(
+          const at = now();
+          yield* inTx(
             Effect.gen(function* () {
-              yield* accountQ.accountOwner({ owner_id: m.from || null, connector: id });
-              yield* accountQ.accountReply({ reply_context: m.reply || null, at, connector: id });
-              if (m.id) yield* inboundQ.deliverInbound({ connector: id, ext_id: m.id });
+              yield* db(accountQ.accountOwner({ owner_id: m.from || null, connector: id }));
+              yield* db(accountQ.accountReply({ reply_context: m.reply || null, at, connector: id }));
+              if (m.id) yield* db(inboundQ.deliverInbound({ connector: id, ext_id: m.id }));
             }),
           );
-          await reload();
-          await adapter.send(signal, a.secrets, m.from, connectorWording().paired, m.reply ?? "");
+          // Told once the owner has the word: the status is not paired before the app's confirmation went out.
+          yield* reloadAccount;
+          yield* send(a.secrets, m.from, connectorWording().paired, m.reply ?? "");
+          told();
           return;
         }
         if (m.from !== a.owner) return;
-        await run(accountQ.accountReply({ reply_context: m.reply || null, at: time.now(), connector: id }));
-        await reload();
+        yield* run(accountQ.accountReply({ reply_context: m.reply || null, at: now(), connector: id }));
+        yield* reload;
         // A fresh reply opens the platform's delivery window; older messages precede its answer.
-        await drain(signal, true);
+        yield* drain(true);
         if (!m.text) return;
-        const conversation = (await quotedConversation(m.quoted)) ?? now()?.channel;
-        await runHere(Effect.mapError(say(m.text, conversation), (e) => new Error("reason" in e ? String(e.reason) : e._tag)));
-      };
+        const conversation = (yield* quotedConversation(m.quoted)) ?? snapshot()?.channel;
+        yield* Effect.mapError(say(m.text, conversation), (e) => new BridgeError({ message: reasonOf(e) }));
+      });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.
       let wakeInbox: (() => void) | undefined;
-      const accept = async (messages: readonly Inbound[], cursor: string) => {
-        try {
-          await inTx(
-            Effect.gen(function* () {
-              yield* accountQ.connectorAccount({ connector: id });
-              for (const m of messages) {
-                const withId = m.id ? m : { ...m, id: newId() };
-                yield* inboundQ.acceptInbound({
+      const accept = (messages: readonly Inbound[], cursor: string) =>
+        inTx(
+          Effect.gen(function* () {
+            yield* db(accountQ.connectorAccount({ connector: id }));
+            for (const m of messages) {
+              const withId = m.id ? m : { ...m, id: newId() };
+              yield* db(
+                inboundQ.acceptInbound({
                   connector: id,
                   ext_id: withId.id,
                   payload: JSON.stringify(withId),
                   created_at: yield* Clock.currentTimeMillis,
-                });
-              }
-              if (cursor) yield* accountQ.accountCursor({ connector: id, cursor });
-            }),
-          );
-        } catch (e) {
-          if (!life.signal.aborted) setErr(message(e));
-          throw e;
-        }
-        wakeInbox?.();
-      };
-      const drainInbox = async (signal: AbortSignal) => {
-        const rows = await run(inboundQ.pendingInbound({ connector: id }));
+                }),
+              );
+            }
+            if (cursor) yield* db(accountQ.accountCursor({ connector: id, cursor }));
+          }),
+        ).pipe(
+          Effect.tapError((e) => Effect.sync(() => (closing ? undefined : setErr(e.message)))),
+          Effect.tap(() => Effect.sync(() => wakeInbox?.())),
+        );
+      const drainInbox = Effect.gen(function* () {
+        const rows = yield* run(inboundQ.pendingInbound({ connector: id }));
         for (const row of rows) {
-          if (signal.aborted) return;
-          let m: Inbound;
-          try {
-            m = jsonOf(InboundSchema)(row.payload);
-            if (m.id !== row.ext_id) throw new Error(connectorWording().inboundMismatch);
-          } catch (e) {
+          const m = Schema.decodeUnknownOption(Schema.fromJsonString(InboundSchema))(row.payload);
+          if (Option.isNone(m) || m.value.id !== row.ext_id) {
             // A malformed row can never be delivered; settle it explicitly so later valid messages are not blocked.
-            logs.error(`vibevalley: ${id}: discarding malformed durable inbound ${row.ext_id}:`, message(e));
-            await run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
+            yield* Effect.logError(`vibevalley: ${id}: discarding malformed durable inbound ${row.ext_id}`);
+            yield* run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
             continue;
           }
-          await got(signal, m);
-          await run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
+          yield* got(m.value);
+          yield* run(inboundQ.deliverInbound({ connector: id, ext_id: row.ext_id }));
         }
-      };
-      const inboxRun = async (signal: AbortSignal) => {
-        while (!signal.aborted) {
-          try {
-            await drainInbox(signal);
-          } catch (e) {
-            if (!signal.aborted) setErr(message(e));
-          }
-          await waitFor(time, 1_000, signal, (wake) => {
-            wakeInbox = wake;
-          });
-          wakeInbox = undefined;
-        }
-      };
-      // An SDK handler may outlive receive: acceptance is sealed and in-flight writes joined before it returns.
-      const receive = async (signal: AbortSignal, secrets: Record<string, string>) => {
-        const row = await run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
-        const cursor = Option.match(row, { onNone: () => "", onSome: (a) => a.cursor });
-        let closed = false;
-        const pending = new Set<Promise<void>>();
-        let result: Failure | undefined;
-        try {
-          result = await adapter.receive(signal, secrets, {
-            cursor,
-            accept: (messages, c) => {
-              if (closed || signal.aborted) return Promise.reject(new Error("canceled"));
-              const p = accept(messages, c);
-              pending.add(p);
-              return p.finally(() => pending.delete(p));
-            },
-          });
-        } finally {
-          closed = true;
-          await Promise.allSettled(pending);
-        }
-        return result;
-      };
-      const receiving = async (signal: AbortSignal) => {
+      });
+      const inboxRun = Effect.forever(
+        Effect.andThen(
+          Effect.catch(drainInbox, (e) => Effect.sync(() => setErr(e.message))),
+          sleepOrWake(1_000, (wake) => (wakeInbox = wake)).pipe(Effect.ensuring(Effect.sync(() => (wakeInbox = undefined)))),
+        ),
+      );
+
+      // An SDK handler may outlive receive: acceptance is sealed and the writes it accepted joined before it returns.
+      const receive = (secrets: Record<string, string>) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const row = yield* run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
+            const cursor = Option.match(row, { onNone: () => "", onSome: (a) => a.cursor });
+            const accepting = yield* FiberSet.make<void, BridgeError>();
+            const acceptHere = yield* FiberSet.runtimePromise(accepting)<never>();
+            let sealed = false;
+            return yield* Effect.tryPromise({
+              try: (signal) =>
+                adapter.receive(signal, secrets, {
+                  cursor,
+                  accept: (messages, c) => (sealed || signal.aborted ? Promise.reject(new Error("canceled")) : acceptHere(accept(messages, c))),
+                }),
+              catch: (e): Failure => ({ kind: "failed", reason: message(e) }),
+            }).pipe(
+              Effect.catch((f) => Effect.succeed(f)),
+              Effect.ensuring(
+                Effect.suspend(() => {
+                  sealed = true;
+                  return FiberSet.awaitEmpty(accepting);
+                }),
+              ),
+            );
+          }),
+        );
+      const receiving = Effect.gen(function* () {
         let failures = 0;
-        while (!signal.aborted) {
-          const a = now();
+        for (;;) {
+          const a = snapshot();
           if (!a) return;
-          if (paused(a, time.now())) {
-            if (!(await sleep(time, a.pausedUntil - time.now(), signal))) return;
-            try {
-              await run(accountQ.pauseAccount({ paused_until: null, connector: id }));
-              await reload();
-            } catch (e) {
-              setErr(message(e));
-              if (!(await sleep(time, Math.min(30_000, retryMost), signal))) return;
+          if (paused(a, now())) {
+            yield* Effect.sleep(Math.max(0, a.pausedUntil - now()));
+            const resumed = yield* Effect.result(Effect.andThen(run(accountQ.pauseAccount({ paused_until: null, connector: id })), reload));
+            if (resumed._tag === "Failure") {
+              setErr(resumed.failure.message);
+              yield* Effect.sleep(Math.min(30_000, retryMost));
             }
             continue;
           }
-          let stopped: Failure;
-          try {
-            stopped = (await receive(signal, a.secrets)) ?? {
-              kind: "failed",
-              reason: connectorWording().stopped,
-            };
-          } catch (e) {
-            stopped = { kind: "failed", reason: message(e) };
-          }
-          if (signal.aborted) return;
+          const stopped = yield* receive(a.secrets).pipe(
+            Effect.map((f): Failure => f ?? { kind: "failed", reason: connectorWording().stopped }),
+            Effect.catch((e) => Effect.succeed<Failure>({ kind: "failed", reason: e.message })),
+          );
           if (stopped.kind === "stale") {
-            if (!(await pause()) && !(await sleep(time, Math.min(30_000, retryMost), signal))) return;
+            if (!(yield* pause)) yield* Effect.sleep(Math.min(30_000, retryMost));
             continue;
           }
           setErr(stopped.reason);
@@ -683,88 +671,84 @@ export const make = (options: ConnectorOptions = {}) =>
             wait = 30_000;
             failures = 0;
           }
-          if (!(await sleep(time, wait, signal))) return;
+          yield* Effect.sleep(wait);
         }
-      };
+      });
 
-      // The coordinator: one command at a time; only it replaces the account, after all work of the old one has ended.
-      let current: Generation | undefined;
-      let queue = Promise.resolve();
-      const serially = <A>(f: () => Promise<A>): Promise<A> => {
-        const next = queue.then(f);
-        queue = next.then(
-          () => undefined,
-          () => undefined,
+      /** Starts work as the account's generation, on the service's fibers: a failure is logged, an interruption is the stop. */
+      const generation = (work: Effect.Effect<unknown, unknown>) =>
+        forkHere(
+          work.pipe(
+            Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.logError(`vibevalley: ${id}: ${Cause.pretty(cause)}`))),
+          ),
         );
-        return next;
-      };
-      const generation = (work: (signal: AbortSignal) => Promise<unknown>): Generation => {
-        const control = new AbortController();
-        const stop = () => control.abort();
-        life.signal.addEventListener("abort", stop, { once: true });
-        const done = work(control.signal)
-          .catch((e) => logs.error(`vibevalley: ${id}:`, message(e)))
-          .finally(() => life.signal.removeEventListener("abort", stop));
-        return { control, done };
-      };
-      const connected = () => (account && !life.signal.aborted ? generation((s) => Promise.all([receiving(s), inboxRun(s), outboxRun(s)])) : undefined);
+      const stopGeneration = Effect.suspend(() => {
+        const g = current;
+        current = undefined;
+        return g ? Fiber.interrupt(g) : Effect.void;
+      });
+      const connected = () =>
+        account && !closing ? generation(Effect.all([receiving, inboxRun, outboxRun], { concurrency: "unbounded", discard: true })) : undefined;
       const resetProgress = () => {
         progress = undefined;
         verifyCode = "";
-        signal();
+        changed();
       };
-      const loginResult = (g: Generation, result: Linked | Error) =>
-        serially(async () => {
-          if (g !== current) return;
-          await stopGeneration(current);
-          current = undefined;
-          let failure = result instanceof Error ? result : undefined;
-          if (!failure && !life.signal.aborted) {
-            const linked = result as Linked;
-            try {
+      const loginResult = (g: Fiber.Fiber<unknown>, result: Linked | Error) =>
+        commands.withPermits(1)(
+          Effect.gen(function* () {
+            if (g !== current) return;
+            yield* stopGeneration;
+            let failure = result instanceof Error ? result.message : undefined;
+            if (failure === undefined && !closing) {
+              const linked = result as Linked;
               const pair = linked.owner ? null : String(100_000 + randomInt(900_000));
-              await inTx(
-                Effect.gen(function* () {
-                  yield* accountQ.connectAccount({
-                    connector: id,
-                    secrets: JSON.stringify(linked.secrets),
-                    owner_id: linked.owner || null,
-                    pair_code: pair,
-                    connected_at: yield* Clock.currentTimeMillis,
-                  });
-                  yield* inboundQ.clearInbound({ connector: id });
-                  yield* retire(connectorWording().switched);
-                }),
+              const at = yield* Clock.currentTimeMillis;
+              const connectedNow = yield* Effect.result(
+                inTx(
+                  Effect.gen(function* () {
+                    yield* db(
+                      accountQ.connectAccount({
+                        connector: id,
+                        secrets: JSON.stringify(linked.secrets),
+                        owner_id: linked.owner || null,
+                        pair_code: pair,
+                        connected_at: at,
+                      }),
+                    );
+                    yield* db(inboundQ.clearInbound({ connector: id }));
+                    yield* retire(connectorWording().switched);
+                  }),
+                ).pipe(Effect.andThen(Effect.sync(() => outboxChanged(() => 0))), Effect.andThen(reload)),
               );
-              outboxChanged(() => 0);
-              await reload();
-            } catch (e) {
-              outboxChanged();
-              failure = e instanceof Error ? e : new Error(String(e));
+              if (connectedNow._tag === "Failure") {
+                outboxChanged();
+                failure = connectedNow.failure.message;
+              }
             }
-          }
-          setErr(failure ? failure.message : "");
-          resetProgress();
-          current = connected();
-        });
+            setErr(failure ?? "");
+            resetProgress();
+            current = connected();
+          }),
+        );
       const loggingIn = (input: ConnectorLogin) => {
-        const g: Generation = generation(async (s) => {
-          let result: Linked | Error;
-          try {
-            result = await adapter.login(
-              s,
+        const login = Effect.tryPromise({
+          try: (signal) =>
+            adapter.login(
+              signal,
               input,
               (p) => {
-                if (!s.aborted) progress = p;
-                signal();
+                if (!signal.aborted) progress = p;
+                changed();
               },
               () => verifyCode,
-            );
-          } catch (e) {
-            result = e instanceof Error ? e : new Error(String(e));
-          }
-          if (!s.aborted) void loginResult(g, result);
+            ),
+          catch: (e) => (e instanceof Error ? e : new Error(String(e))),
         });
+        // The login's answer is taken by the coordinator, on its own fiber: replacing this generation must not cut it short.
+        const g: Fiber.Fiber<unknown> = generation(
+          Effect.flatMap(Effect.result(login), (r) => Effect.sync(() => void forkHere(loginResult(g, r._tag === "Success" ? r.success : r.failure)))),
+        );
         return g;
       };
 
@@ -772,86 +756,75 @@ export const make = (options: ConnectorOptions = {}) =>
         id,
         load: reload,
         status,
-        offer: (m: ChatMessage) =>
-          serially(async () => {
-            if (!life.signal.aborted) await offer(m);
-          }),
-        resume: () =>
-          serially(async () => {
+        offer: (m: ChatMessage) => commands.withPermits(1)(Effect.suspend(() => (closing ? Effect.void : offer(m)))),
+        resume: commands.withPermits(1)(
+          Effect.sync(() => {
             current ??= connected();
           }),
-        login: async (input: ConnectorLogin) => {
-          const started = await serially(async () => {
-            if (progress && !input.force) return attempt;
-            await stopGeneration(current);
-            current = undefined;
-            attempt++;
-            setErr("");
-            verifyCode = "";
-            progress = { state: "waiting" };
-            current = loggingIn(input);
-            told();
-            return attempt;
-          });
-          // Up to a moment for the code to show.
-          await new Promise<void>((resolve) => {
-            const done = () => {
-              if (attempt !== started || !progress || progress.qr) finish();
-            };
-            const finish = () => {
-              cancel();
-              progressed.delete(done);
-              resolve();
-            };
-            const cancel = time.after(1_500, finish);
-            progressed.add(done);
-            done();
-          });
-          return status();
-        },
-        verify: (code: string) => {
-          verifyCode = code.trim();
-          if (progress?.state === "verify") progress = { state: "scanned", ...(progress.qr ? { qr: progress.qr } : {}) };
-          told();
-          return status();
-        },
-        logout: async () => {
-          await serially(async () => {
-            await stopGeneration(current);
-            current = undefined;
-            let failure: unknown;
-            try {
-              await inTx(
-                Effect.gen(function* () {
-                  yield* accountQ.disconnectAccount({ connector: id });
-                  yield* inboundQ.clearInbound({ connector: id });
-                  yield* retire(connectorWording().disconnected);
-                }),
-              );
-              outboxChanged(() => 0);
-            } catch (e) {
-              outboxChanged();
-              failure = e;
-            }
-            resetProgress();
-            attempt++;
-            if (failure) {
-              setErr(message(failure));
-              current = connected();
-            } else {
-              account = undefined;
+        ),
+        login: Effect.fnUntraced(function* (input: ConnectorLogin) {
+          const started = yield* commands.withPermits(1)(
+            Effect.gen(function* () {
+              if (progress && !input.force) return attempt;
+              yield* stopGeneration;
+              attempt++;
               setErr("");
-            }
+              verifyCode = "";
+              progress = { state: "waiting" };
+              current = loggingIn(input);
+              told();
+              return attempt;
+            }),
+          );
+          // The answer carries the code when it shows within a moment.
+          const shown = Deferred.makeUnsafe<void>();
+          const done = () => {
+            if (attempt !== started || !progress || progress.qr) Deferred.doneUnsafe(shown, Effect.void);
+          };
+          progressed.add(done);
+          done();
+          yield* Effect.raceFirst(Deferred.await(shown), Effect.sleep(1_500)).pipe(Effect.ensuring(Effect.sync(() => progressed.delete(done))));
+          return yield* status;
+        }),
+        verify: (code: string) =>
+          Effect.suspend(() => {
+            verifyCode = code.trim();
+            if (progress?.state === "verify") progress = { state: "scanned", ...(progress.qr ? { qr: progress.qr } : {}) };
             told();
-          });
-          return status();
-        },
-        setChannel: async (to: string | undefined) => {
-          await run(accountQ.accountChannel({ channel_id: to ?? null, connector: id }));
-          await reload();
-          return status();
-        },
-        stop: () => serially(() => stopGeneration(current)),
+            return status;
+          }),
+        logout: Effect.andThen(
+          commands.withPermits(1)(
+            Effect.gen(function* () {
+              yield* stopGeneration;
+              const retired = yield* Effect.result(
+                inTx(
+                  Effect.gen(function* () {
+                    yield* db(accountQ.disconnectAccount({ connector: id }));
+                    yield* db(inboundQ.clearInbound({ connector: id }));
+                    yield* retire(connectorWording().disconnected);
+                  }),
+                ),
+              );
+              if (retired._tag === "Success") outboxChanged(() => 0);
+              else outboxChanged();
+              resetProgress();
+              attempt++;
+              if (retired._tag === "Failure") {
+                setErr(retired.failure.message);
+                current = connected();
+              } else {
+                account = undefined;
+                setErr("");
+              }
+              told();
+            }),
+          ),
+          status,
+        ),
+        setChannel: (to: string | undefined) =>
+          Effect.andThen(Effect.andThen(run(accountQ.accountChannel({ channel_id: to ?? null, connector: id })), reload), status),
+        stop: commands.withPermits(1)(stopGeneration),
         hasAccount: () => account !== undefined,
       };
     };
@@ -862,26 +835,28 @@ export const make = (options: ConnectorOptions = {}) =>
       qqAdapter(options.qq ?? new QQClient()),
     ];
     const bridges = adapters.map(bridgeOf);
-    for (const b of bridges) yield* Effect.promise(b.load);
+    for (const b of bridges) yield* Effect.orDie(b.load);
     const bridge = (id: ConnectorID) => bridges.find((b) => b.id === id);
 
     // What the owner hears off the farm (Notifications says what) goes out on every app the owner has, each checking it is
     // its owner's channel.
-    yield* Effect.forkScoped(Stream.runForEach(yield* notices.toOwner, (m) => Effect.promise(() => Promise.all(bridges.map((b) => b.offer(m))))));
-    for (const b of bridges) if (b.hasAccount()) void b.resume();
+    yield* Effect.forkScoped(
+      Stream.runForEach(yield* notices.toOwner, (m) => Effect.forEach(bridges, (b) => b.offer(m), { concurrency: "unbounded", discard: true })),
+    );
+    for (const b of bridges) if (b.hasAccount()) forkHere(b.resume);
     yield* Effect.addFinalizer(() =>
-      Effect.promise(async () => {
-        life.abort();
-        await Promise.all(bridges.map((b) => b.stop()));
+      Effect.suspend(() => {
+        closing = true;
+        return Effect.forEach(bridges, (b) => b.stop, { concurrency: "unbounded", discard: true });
       }),
     );
 
     const off = (id: ConnectorID): ConnectorStatus => ({ id, state: "off", pending: 0 });
     return Connectors.of({
-      list: () => Effect.promise(() => Promise.all(bridges.map((b) => b.status()))),
-      login: (id, input) => Effect.promise(async () => (bridge(id) ? bridge(id)!.login(input) : off(id))),
-      verify: (id, code) => Effect.promise(async () => (bridge(id) ? bridge(id)!.verify(code) : off(id))),
-      logout: (id) => Effect.promise(async () => (bridge(id) ? bridge(id)!.logout() : off(id))),
+      list: () => Effect.forEach(bridges, (b) => b.status),
+      login: (id, input) => bridge(id)?.login(input) ?? Effect.succeed(off(id)),
+      verify: (id, code) => bridge(id)?.verify(code) ?? Effect.succeed(off(id)),
+      logout: (id) => bridge(id)?.logout ?? Effect.succeed(off(id)),
       setChannel: Effect.fn("Connectors.setChannel")(function* (id, name) {
         const b = bridge(id);
         if (!b)
@@ -895,10 +870,10 @@ export const make = (options: ConnectorOptions = {}) =>
             _tag: "ConnectorRefused",
             reason: connectorWording().noChannel(name),
           });
-        return yield* Effect.tryPromise({
-          try: () => b.setChannel(channel.id !== general ? channel.id : undefined),
-          catch: (e): ApiError => ({ _tag: "ConnectorRefused", reason: message(e) }),
-        });
+        return yield* Effect.mapError(b.setChannel(channel.id !== general ? channel.id : undefined), (e): ApiError => ({
+          _tag: "ConnectorRefused",
+          reason: e.message,
+        }));
       }),
     });
   });

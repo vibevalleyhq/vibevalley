@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { memoryKeep } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 import { SqlClient } from "effect/sql";
 import * as q from "../../db/generated/memory.sql.ts";
@@ -22,6 +23,7 @@ const world = (config = testConfig()) =>
     Layer.provideMerge(settingLayer),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
+    Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(Settings, config)),
   );
 

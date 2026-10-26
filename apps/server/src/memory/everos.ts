@@ -7,13 +7,14 @@
 import { memoryWording } from "./words.ts";
 import { everosWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
-import { Schema } from "effect";
+import { Clock, Effect, Schema } from "effect";
+import { type HttpClient, HttpClientRequest } from "effect/http";
 import { createHash } from "node:crypto";
 import { newId } from "../base/ids.ts";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { clip, recallCount, type MemoryScope } from "./recall.ts";
-import { prefetchTimeoutMs, type Source } from "./sources.ts";
+import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 /** app_id on everything written, so its memories can be told from another app's. */
 const app = "vibevalley";
@@ -72,42 +73,41 @@ const scopeOf = (project: string) => (project ? "project-" + createHash("sha256"
 const sessionOf = (session: string) => `${app}-${session}`;
 const agentOf = (agent: string) => `${app}-${agent}`;
 
-/** now: the memory service's Clock, for the times the messages it writes carry. */
-export function everos(c: MemorySourceConfig, now: () => number): Source {
-  let closed = false;
-  const life = new AbortController();
+/** http: the farm's client; interrupting a call aborts its request. */
+export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Source {
+  const life = sourceLife("EverOS");
   const user = c.user || "owner";
   /** Sessions given messages and not yet told to extract; flushed when the session ends, or when the farm stops. */
   const pending = new Map<string, string>();
   /** Sessions whose job it was given already: a later run sends only what the helper said. */
   const told = new Set<string>();
 
-  const post = async (path: string, body: unknown, signal: AbortSignal, closing = false) => {
-    if (!closing) signal = AbortSignal.any([signal, life.signal]);
-    signal.throwIfAborted();
-    const res = await fetch(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(c.key ? { authorization: `Bearer ${c.key}` } : {}) },
-      body: JSON.stringify(body),
-      signal,
-    });
-    const text = (await res.text()).slice(0, 4 << 20);
-    signal.throwIfAborted();
-    if (!res.ok) throw new Error(`memory/${path}: ${res.status} ${text.slice(0, 300)}`);
-    return text;
+  /** The answer's text; closing: the flush as it stops, which its stop does not cut short. */
+  const post = (path: string, body: unknown, closing = false) => {
+    const request = HttpClientRequest.post(`${c.url.replace(/\/+$/, "")}/api/v2/memory/${path}`).pipe(
+      HttpClientRequest.bodyJsonUnsafe(body),
+      c.key ? HttpClientRequest.bearerToken(c.key) : (r) => r,
+    );
+    const answer = Effect.gen(function* () {
+      const res = yield* http.execute(request);
+      const text = (yield* res.text).slice(0, 4 << 20);
+      if (res.status < 200 || res.status >= 300) return yield* Effect.fail(new SourceError({ message: `memory/${path}: ${res.status} ${text.slice(0, 300)}` }));
+      return text;
+    }).pipe(Effect.catchTag("HttpClientError", (e) => Effect.fail(sourceError(e))));
+    return closing ? answer : life.alive(answer);
   };
 
-  const add = async (session: string, project: string, messages: Message[], signal: AbortSignal) => {
+  const add = Effect.fnUntraced(function* (session: string, project: string, messages: Message[]) {
     for (const m of messages) m.content = redact(m.content);
-    await post("add", { session_id: session, messages, app_id: app, project_id: scopeOf(project) }, signal);
+    yield* post("add", { session_id: session, messages, app_id: app, project_id: scopeOf(project) });
     pending.set(session, project);
-  };
+  });
 
-  const flush = (session: string, project: string, signal: AbortSignal, closing = false) =>
-    post("flush", { session_id: session, app_id: app, project_id: scopeOf(project) }, signal, closing);
+  const flush = (session: string, project: string, closing = false) =>
+    post("flush", { session_id: session, app_id: app, project_id: scopeOf(project) }, closing);
 
   /** A profile's cases, or with kind issue the owner's episodes. */
-  const findIn = async (agent: string, query: string, limit: number, kind: MemoryKind, project: string, signal: AbortSignal) => {
+  const findIn = Effect.fnUntraced(function* (agent: string, query: string, limit: number, kind: MemoryKind, project: string) {
     const scope = scopeOf(project);
     const body = {
       app_id: app,
@@ -116,13 +116,11 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
       top_k: Math.max(1, Math.min(limit, most)),
       ...(kind === "issue" ? { user_id: user } : { agent_id: agentOf(agent) }),
     };
-    const text = await post("search", body, signal);
-    let found: FoundBody;
-    try {
-      found = Schema.decodeUnknownSync(FoundBodySchema)(text);
-    } catch {
-      throw new Error("memory/search answered what it should not: " + text.slice(0, 200));
-    }
+    const text = yield* post("search", body);
+    const found = yield* Effect.mapError(
+      Schema.decodeUnknownEffect(FoundBodySchema)(text),
+      () => new SourceError({ message: "memory/search answered what it should not: " + text.slice(0, 200) }),
+    );
     const ownership = (hit: { app_id?: string; project_id?: string }): MemoryScope =>
       hit.app_id !== app || hit.project_id !== scope ? { kind: "unknown" } : project ? { kind: "project", project } : { kind: "global" };
     const hits: { id: string; text: string; score: number; scope: MemoryScope }[] = [];
@@ -141,94 +139,86 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
       hits.push({ id: `${scope}:${ep.id}`, text: ep.subject ? `${ep.subject}：${t}` : t, score: ep.score ?? 0, scope: ownership(ep) });
     }
     return hits;
-  };
+  });
 
-  const find = async (agent: string, query: string, limit: number, kind: MemoryKind, project: string, signal: AbortSignal) =>
-    (await Promise.all((project ? [project, ""] : [""]).map((p) => findIn(agent, query, limit, kind, p, signal)))).flat().sort((a, b) => b.score - a.score);
+  const find = (agent: string, query: string, limit: number, kind: MemoryKind, project: string) =>
+    Effect.map(
+      Effect.forEach(project ? [project, ""] : [""], (p) => findIn(agent, query, limit, kind, p), { concurrency: "unbounded" }),
+      (all) => all.flat().sort((a, b) => b.score - a.score),
+    );
 
   return {
     name: "everos",
     unavailable: () => (c.url ? undefined : memoryWording().noUrl),
     // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
-    stop: async () => {
-      if (closed) return;
-      closed = true;
-      life.abort(new Error("EverOS source has stopped"));
+    stop: Effect.gen(function* () {
+      if (!(yield* life.stop)) return;
       const all = [...pending];
       pending.clear();
       told.clear();
-      const signal = AbortSignal.timeout(prefetchTimeoutMs);
-      await Promise.allSettled(all.map(([session, project]) => flush(session, project, signal, true)));
-    },
-    prefetch: async (cue, signal) => {
+      yield* Effect.forEach(all, ([session, project]) => Effect.ignore(flush(session, project, true)), { concurrency: "unbounded", discard: true }).pipe(
+        Effect.timeoutOption(prefetchTimeoutMs),
+      );
+    }),
+    prefetch: Effect.fnUntraced(function* (cue) {
       if (!c.read || cue.text.trim() === "") return [];
-      const hits = await find(cue.agent, cue.text, recallCount, "note", cue.project, signal);
+      const hits = yield* find(cue.agent, cue.text, recallCount, "note", cue.project);
       return hits
         .filter((h) => !cue.skip?.has(h.id) && h.text !== "" && h.scope.kind !== "unknown")
         .slice(0, recallCount)
         .map((h) => ({ id: h.id, line: "- （EverOS）" + clip(h.text, lineMost), score: h.score }));
-    },
+    }),
     // A search over every profile has no one owner to ask with: it gives nothing here.
-    search: async (q, signal) => {
+    search: Effect.fnUntraced(function* (q) {
       if (!c.read || q.text.trim() === "") return { found: [] };
       if (q.project === "") return { found: [], coverage: memoryWording().coverage.everosAcross };
       if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: memoryWording().coverage.everosAgent };
       const kind: MemoryKind = q.kind || "note";
-      const hits = await find(q.agent, q.text, q.limit, kind, q.project, signal);
+      const hits = yield* find(q.agent, q.text, q.limit, kind, q.project);
       return {
         found: hits
           .filter((h) => h.text !== "")
           .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
       };
-    },
-    list: async () => {
-      throw new Error(memoryWording().everosList);
-    },
+    }),
+    list: () => Effect.fail(new SourceError({ message: memoryWording().everosList })),
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
-    syncTurn: async (run, signal) => {
+    syncTurn: Effect.fnUntraced(function* (run) {
       if (!c.write || run.outcome === "interrupted") return;
-      const at = now();
+      const at = yield* Clock.currentTimeMillis;
       const messages: Message[] = [];
       if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
       let said = run.said.trim() === "" ? run.summary : run.said;
       if (run.outcome === "failed") said = everosWords.failed + said;
       if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
       if (messages.length === 0) return;
-      await add(sessionOf(run.session), run.project, messages, signal);
+      yield* add(sessionOf(run.session), run.project, messages);
       told.add(run.session);
-    },
-    sessionEnded: async (s, signal) => {
+    }),
+    sessionEnded: Effect.fnUntraced(function* (s) {
       const session = sessionOf(s.session);
       const project = pending.get(session);
       pending.delete(session);
       told.delete(s.session);
-      if (project !== undefined) await flush(session, project, signal);
-    },
+      if (project !== undefined) yield* flush(session, project);
+    }),
     // A note written outside a run is a conversation of its own, extracted at once.
-    add: async (n, signal) => {
+    add: Effect.fnUntraced(function* (n) {
       if (!c.write) return undefined;
       const session = `vibevalley-note-${n.agent}-${newId()}`;
       const project = n.project.trim();
-      const at = now();
-      await add(
-        session,
-        project,
-        [
-          { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
-          { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
-        ],
-        signal,
+      const at = yield* Clock.currentTimeMillis;
+      yield* add(session, project, [
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
+        { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
+      ]);
+      yield* Effect.ensuring(
+        flush(session, project),
+        Effect.sync(() => pending.delete(session)),
       );
-      try {
-        await flush(session, project, signal);
-      } finally {
-        pending.delete(session);
-      }
       return undefined;
-    },
-    forget: async () => {
-      throw new Error(memoryWording().everosForget);
-    },
+    }),
+    forget: () => Effect.fail(new SourceError({ message: memoryWording().everosForget })),
     can: { list: false, forget: false, transcripts: true },
   };
 }

@@ -3,18 +3,17 @@
 // unknown endpoint stays a 404. index.html goes out with the farm's locale on its <html> (data-locale, lang): the page
 // takes its words from it before it draws (apps/web src/main.tsx).
 
-import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import { Effect } from "effect";
+import { Effect, FileSystem, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { currentLocale } from "@vibevalley/protocol/words";
 
 const htmlLang = { zh: "zh-Hans", en: "en" } as const;
 
 /** index.html with the locale on its <html>. */
-const indexOf = (dir: string) => {
+const withLocale = (html: string) => {
   const locale = currentLocale();
-  return readFileSync(join(dir, "index.html"), "utf8").replace(/<html[^>]*>/, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
+  return html.replace(/<html[^>]*>/, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
 };
 
 export const page = (dir: string) =>
@@ -27,11 +26,15 @@ export const page = (dir: string) =>
       if (path.startsWith("/api/v1/")) return HttpServerResponse.text("404 page not found\n", { status: 404 });
       const clean = normalize("/" + decodeURIComponent(path));
       const file = join(dir, clean);
-      if (clean !== "/index.html" && existsSync(file) && statSync(file).isFile()) return yield* HttpServerResponse.file(file);
+      const fs = yield* FileSystem.FileSystem;
+      const info = yield* Effect.option(fs.stat(file));
+      if (clean !== "/index.html" && Option.isSome(info) && info.value.type === "File") return yield* HttpServerResponse.file(file);
       // The page itself is asked again every time (its assets carry their hash): a server updated under a phone's or a
       // browser's cached page would otherwise keep showing the old one.
-      if (extname(clean) === "" || clean === "/index.html")
-        return HttpServerResponse.text(indexOf(dir), { contentType: "text/html; charset=utf-8", headers: { "cache-control": "no-cache" } });
+      if (extname(clean) === "" || clean === "/index.html") {
+        const html = yield* fs.readFileString(join(dir, "index.html"));
+        return HttpServerResponse.text(withLocale(html), { contentType: "text/html; charset=utf-8", headers: { "cache-control": "no-cache" } });
+      }
       return HttpServerResponse.text("404 page not found\n", { status: 404 });
     }).pipe(Effect.orElseSucceed(() => HttpServerResponse.text("404 page not found\n", { status: 404 }))),
   );

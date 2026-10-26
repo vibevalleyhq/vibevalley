@@ -1,7 +1,3 @@
-// Refinement: an issue in the backlog refined by a helper before anyone works it. Who drafts, what the refiner is told,
-// and how what it hands back is read into the issue; the refiner's worktree goes back to main after, and goes away with
-// the issue.
-
 import { issueWording } from "./words.ts";
 import { draftMatch, refinementBrief } from "./prompts.ts";
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
@@ -21,7 +17,6 @@ import type { Hired, HireOptions, SessionShape } from "../session/session.ts";
 import { isForOrchestrator } from "./state.ts";
 import { refinementDescription, type IssueRefinement, jsonOrNull, kept, nullText, openQuestions, parseRefinement, splitJob } from "./rules.ts";
 
-/** What drafting needs of the issues around it. */
 export interface RefinementDeps {
   readonly core: CoreShape;
   readonly store: AgentShape;
@@ -29,7 +24,6 @@ export interface RefinementDeps {
   readonly sessions: SessionShape;
   readonly chat: ChannelShape;
   readonly db: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A>;
-  /** One row, or none. */
   readonly one: <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.Effect<A | undefined>;
   readonly inTx: <A, E>(e: Effect.Effect<A, E>) => Effect.Effect<A, Exclude<E, { _tag: "SqlError" }>>;
   readonly get: (ref: string) => Effect.Effect<Issue, ApiError>;
@@ -60,7 +54,6 @@ export function refinement(d: RefinementDeps) {
     return chosen;
   });
 
-  /** Before its session is sent: the owner's first word is its title, the refiner and the project are its own unless it names them, and an answer clears what it asked. */
   const beforeRefinement = Effect.fnUntraced(function* (t: Issue, word: string, agent: string, where: string) {
     let [title, description] = [t.title, t.description ?? ""];
     if (word && t.questions.length === 0 && !description && (t.criteria ?? []).length === 0) [title, description] = splitJob(word);
@@ -125,7 +118,6 @@ export function refinement(d: RefinementDeps) {
     (effect) => drafting.withPermits(1)(effect),
   );
 
-  /** A draft's session reported: what it hands back is written into the issue, or the thread says why not; then its worktree goes back to main and it leaves. */
   const handedBack = Effect.fn("Issues.handedBack")(function* (f: { id: string; outcome: string; summary: string; questions?: readonly Question[] }) {
     const h = sessions.sessionOf(f.id);
     if (!h?.refining || !h.issue) return;
@@ -143,7 +135,6 @@ export function refinement(d: RefinementDeps) {
     yield* publish(id);
   });
 
-  /** An unsent issue going away takes its draft with it: whoever drafts it goes home, and what drafts left is removed. */
   const clearRefinement = Effect.fn("Issues.clearRefinement")(function* (t: Issue): Effect.fn.Return<WorkplaceRelease, ApiError> {
     if (t.refining) yield* sessions.dismiss(t.refining.session, "discard");
     if (t.project) {

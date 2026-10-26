@@ -1,6 +1,6 @@
 # 设置和配置
 
-服务端的值从三处来：配置（`base/config.ts` 的 `Config`，由 `loadConfig` 从 `vibevalley.yaml` 和环境变量读，开机读一次）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
+服务端的值从三处来：配置（`base/config.ts` 的 `Config`，由 `loadConfig` 用 Effect 的 `Config` 读，开机读一次：环境变量在前，`VIBEVALLEY_` 加键名，DeepSeek 和声网的三把钥匙也认它们自己的名字；再是 `vibevalley.yaml`，最后是默认值）、「设置」（`Setting`，主人在工作台「设置」页 `/settings` 填的钥匙、语音、听写、记性的来源，存在 `$VIBEVALLEY_HOME/settings.json`），和代码里的默认值（`defaults()`）。设置里的钥匙比配置优先，每次用时现取，存了不用重启。服务端写出的每一行过一遍 `redact`，钥匙不进日志。
 
 ## 管什么，不管什么
 

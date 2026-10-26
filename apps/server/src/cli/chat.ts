@@ -16,11 +16,14 @@ import { codingTools } from "../agent/brain/coding.ts";
 import { deepseek, readMcpConfig } from "../agent/brain/config.ts";
 import { userMessage } from "../agent/brain/messages.ts";
 import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
+import { NodeServices } from "@effect/platform-node";
+import { Effect } from "effect";
 import { loadConfig } from "../base/config.ts";
 import { dshRuntime } from "../runtime/dsh.ts";
 import { registryOf } from "../runtime/runtime.ts";
 import { memoryStore } from "../agent/brain/agentTaskStore.ts";
 import { wallTime } from "../base/time.ts";
+import { plainLog } from "../base/log.ts";
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
@@ -93,7 +96,7 @@ export interface OwnChat {
 
 /** The conversation with VibeValley's own agent. */
 export async function ownChat(values: OwnChat) {
-  const config = loadConfig();
+  const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
   const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey);
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homedir(), ".vibevalley", "agent", values.name);
@@ -101,8 +104,8 @@ export async function ownChat(values: OwnChat) {
   const asked = values.p !== undefined;
   // A one-off question keeps no reminders running.
   const agent = await Brain.start({
-    // The command line has no service to ask: the wall clock.
     time: wallTime,
+    log: plainLog,
     name: values.name,
     instructions: instructions(currentLocale()),
     llm,
@@ -185,9 +188,9 @@ export interface RuntimeChat {
 export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
-  const config = loadConfig();
+  const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
   const registry = registryOf([
-    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey), time: wallTime }),
+    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey), time: wallTime, log: plainLog }),
     dshRuntime,
   ]);
   const runtime = registry.get(id);

@@ -3,18 +3,15 @@ import { resolve } from "node:path";
 import type { Spent } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { schemas } from "./schemas.ts";
+import { schemas, sessionSchemas } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
 import { spentText } from "./prompts.ts";
 
 describe("the tools", () => {
-  // The orchestrator's parameters are its prompt's prefix: the contract kept (testdata/tool_schemas.json).
-  it("keep the orchestrator's parameters", () => {
-    const baseline = JSON.parse(readFileSync(resolve(import.meta.dirname, "testdata/tool_schemas.json"), "utf8")) as Record<string, Record<string, unknown>>;
-    expect(Object.keys(schemas).sort()).toEqual(Object.keys(baseline).sort());
-    // Omitted additionalProperties lets unknown fields through as true does.
-    for (const [name, want] of Object.entries(baseline))
-      expect({ name, schema: schemas[name] }).toEqual({ name, schema: { ...want, additionalProperties: true } });
+  // The orchestrator's parameters are its prompt's prefix: the bytes in testdata/parameters.json must not drift.
+  it("keep their parameters to the byte", () => {
+    const kept = readFileSync(resolve(import.meta.dirname, "testdata/parameters.json"), "utf8");
+    expect(JSON.stringify({ orchestrator: schemas, session: sessionSchemas })).toBe(kept);
   });
 
   it("word money", () => {

@@ -84,6 +84,8 @@ export default defineConfig({
       // Inside try, a promise returned without await escapes its catch and finally.
       "typescript/return-await": "error",
       "eslint/no-fallthrough": "error",
+      // A deprecated API is moved off when it is met; one kept on purpose says why at the call.
+      "typescript/no-deprecated": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
@@ -116,8 +118,8 @@ export default defineConfig({
         },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
-        // command line prints, and the brain and the journal are plain classes outside Effect.
+        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; the brain
+        // is given its logger as it is given its clock. The command line prints.
         files: ["apps/server/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
@@ -162,13 +164,7 @@ export default defineConfig({
         rules: { "vibevalley/no-cjk-literal": "off" },
       },
       {
-        files: [
-          "apps/server/src/cli.ts",
-          "apps/server/src/cli/**",
-          "apps/server/src/agent/brain/**",
-          "apps/server/src/**/*.test.ts",
-          "apps/server/src/testing/**",
-        ],
+        files: ["apps/server/src/cli.ts", "apps/server/src/cli/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "no-console": "off" },
       },
       {

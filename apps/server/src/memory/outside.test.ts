@@ -8,6 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
@@ -17,7 +18,6 @@ import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";
 import { until } from "../testing/until.ts";
-import { wallTime } from "../base/time.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
 const everosProject = (project: string) => "project-" + createHash("sha256").update(project).digest("hex");
@@ -66,6 +66,8 @@ class FakeNowledge {
   addResult: unknown;
 
   private server() {
+    // A fake server listing plain JSON Schema tools, as mcp.ts serves them.
+    // oxlint-disable-next-line typescript/no-deprecated
     const server = new McpServer({ name: "nowledge-mem", version: "0.10.103" }, { capabilities: { tools: {} } });
     const object = { type: "object" as const };
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -190,6 +192,7 @@ const world = (timeoutMs = 20_000) =>
     Layer.provideMerge(settingLayer),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
+    Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(Settings, testConfig())),
   );
 
@@ -317,19 +320,14 @@ describe("EverOS", () => {
   it.live("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true }, wallTime.now);
+      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true });
       const note = { agent: "lab", text: "记住：苹果", project: "", by: session("w1") };
       fake.addResult = { title: "已经有了" };
-      expect((yield* Effect.promise(() => source.add(note, new AbortController().signal)))?.id).toBe("");
+      expect((yield* source.add(note))?.id).toBe("");
       fake.addResult = { id: 42 };
-      const failed = yield* Effect.promise(() =>
-        source.add(note, new AbortController().signal).then(
-          () => "",
-          (e: Error) => e.message,
-        ),
-      );
-      expect(failed).toContain("memory_add answered what it should not");
-      yield* Effect.promise(() => source.stop());
+      const failed = yield* Effect.flip(source.add(note));
+      expect(failed.message).toContain("memory_add answered what it should not");
+      yield* source.stop;
     }),
   );
 

@@ -17,6 +17,7 @@ import { codingTools } from "./coding.ts";
 import type { LLM } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
 import { wallTime } from "../../base/time.ts";
+import { plainLog } from "../../base/log.ts";
 
 export interface Request {
   readonly messages: Message[];
@@ -88,6 +89,7 @@ export async function withAgent(
   faux.appendResponses(steps);
   const agent = await Brain.start({
     time: wallTime,
+    log: plainLog,
     name: "test",
     instructions: "你是测试用的助手。",
     llm,

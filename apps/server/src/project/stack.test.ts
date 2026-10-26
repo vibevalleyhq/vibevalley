@@ -1,6 +1,3 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { stackOf } from "./stack.ts";
 
@@ -34,12 +31,7 @@ test.each([
   ["unreadable package.json", { "package.json": "{" }, { name: "node", label: "Node（npm）" }],
   ["pyproject with ruff", { "pyproject.toml": "[tool.ruff]\n" }, { name: "python", label: "Python", test: "pytest", lint: "ruff check ." }],
   ["requirements.txt", { "requirements.txt": "requests\n" }, { name: "python", label: "Python", test: "pytest" }],
-  ["a marker in a subfolder only", { "server/go.mod": "module x" }, { name: "", label: "" }],
+  ["node whose scripts are not all text", { "package.json": `{"scripts":{"test":1}}` }, { name: "node", label: "Node（npm）" }],
 ])("the stack is read off the marker at the root: %s", (_name, files, want) => {
-  const dir = mkdtempSync(join(tmpdir(), "vibevalley-stack-"));
-  for (const [name, body] of Object.entries(files)) {
-    mkdirSync(dirname(join(dir, name)), { recursive: true });
-    writeFileSync(join(dir, name), body);
-  }
-  expect(stackOf(dir)).toEqual(want);
+  expect(stackOf(new Map(Object.entries(files)))).toEqual(want);
 });

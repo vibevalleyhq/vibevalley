@@ -84,6 +84,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
     failureMessage: voice.failureMessage,
     maxHistory: 15,
     params: { max_tokens: 512, temperature: 0.7, top_p: 0.95 },
+    ...(voice.persona ? { systemMessages: [{ role: "system", content: voice.persona }] } : {}),
   };
   try {
     let stt: Vendors["stt"];
@@ -185,8 +186,6 @@ export const clientOf = (c: AgoraCredentials, area: Area, time: Time, fetcher: t
 export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Vendors) {
   return new Agent({
     client,
-    instructions: voice.persona,
-    maxHistory: 50,
     turnDetection: {
       language: voice.language,
       config: {

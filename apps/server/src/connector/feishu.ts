@@ -5,7 +5,6 @@
 
 import { connectorWording } from "./words.ts";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { sleep } from "./wait.ts";
 import { wallTime } from "../base/time.ts";
 
 export type Domain = "feishu" | "lark";
@@ -131,7 +130,12 @@ export class FeishuClient implements FeishuApi {
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(reg.expiresMs)]);
     progress(reg.link);
     let domain: Domain = "feishu";
-    while (await sleep(wallTime, reg.intervalMs, attempt)) {
+    while (
+      await wallTime.sleep(reg.intervalMs, attempt).then(
+        () => true,
+        () => false,
+      )
+    ) {
       const p = await this.poll(reg.deviceCode, domain, attempt);
       if (attempt.aborted) break;
       if (p.status === "succeeded") {

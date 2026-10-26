@@ -9,6 +9,27 @@ export type DictationPhase = "idle" | "recording" | "transcribing";
 
 const rate = 16000;
 
+// An AudioWorklet's module, as a script of its own: it hands the microphone's samples on in runs of 4096, so the page
+// is not woken every 128.
+const capture = `registerProcessor("vibevalley-capture", class extends AudioWorkletProcessor {
+  run = new Float32Array(4096);
+  at = 0;
+  process(inputs) {
+    const samples = inputs[0]?.[0];
+    if (samples)
+      for (const s of samples) {
+        this.run[this.at++] = s;
+        if (this.at === this.run.length) {
+          this.port.postMessage(this.run);
+          this.run = new Float32Array(4096);
+          this.at = 0;
+        }
+      }
+    return true;
+  }
+});`;
+let captureUrl: string | undefined;
+
 /** Mono 16-bit PCM in a WAV file. */
 export function wavOf(samples: Float32Array, sampleRate = rate): Uint8Array {
   const out = new DataView(new ArrayBuffer(44 + samples.length * 2));
@@ -39,7 +60,7 @@ const base64Of = (bytes: Uint8Array) => {
 interface Recording {
   readonly stream: MediaStream;
   readonly context: AudioContext;
-  readonly node: ScriptProcessorNode;
+  readonly node: AudioWorkletNode;
   readonly chunks: Float32Array[];
   readonly onWords: (words: string) => void;
 }
@@ -71,21 +92,27 @@ export class Dictation {
     if (this.phase === "recording") return this.finish();
     this.owner = owner;
     this.set("recording", null);
+    let stream: MediaStream | undefined;
+    let context: AudioContext | undefined;
+    const drop = () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      void context?.close();
+    };
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-      if (this.owner !== owner) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      const context = new AudioContext({ sampleRate: rate });
-      const source = context.createMediaStreamSource(stream);
-      const node = context.createScriptProcessor(4096, 1, 1);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      context = new AudioContext({ sampleRate: rate });
+      await context.audioWorklet.addModule((captureUrl ??= URL.createObjectURL(new Blob([capture], { type: "text/javascript" }))));
+      // After every wait: the field may have been released, or another may have stopped it, meanwhile.
+      if (this.owner !== owner) return drop();
+      const node = new AudioWorkletNode(context, "vibevalley-capture", { channelCount: 1 });
       const chunks: Float32Array[] = [];
-      node.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-      source.connect(node);
+      node.port.onmessage = (e: MessageEvent<Float32Array>) => chunks.push(e.data);
+      context.createMediaStreamSource(stream).connect(node);
+      // Connected on to the output (it writes silence there), as a node nobody pulls may not be run.
       node.connect(context.destination);
       this.recording = { stream, context, node, chunks, onWords };
     } catch (e) {
+      drop();
       this.owner = undefined;
       this.set("idle", e instanceof Error && e.name === "NotAllowedError" ? appWording().dictation.noMic : appWording().dictation.cannot(reasonOf(e)));
     }

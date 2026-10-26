@@ -34,7 +34,7 @@ export const answerFormat = [
 export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
-/** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
+/** The draft so far goes in when there is one: the owner may have edited it. */
 export function refinementBrief(
   t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
   word: string,
