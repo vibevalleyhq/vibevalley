@@ -12,7 +12,7 @@ import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
 import { conversationOf, generalOf } from "../channel/state.ts";
-import { Clock, Context, Effect, FiberSet, Layer, Option, Schema, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Option, Predicate, Schema, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
 import * as inboundQ from "../../db/generated/connector_inbound.sql.ts";
@@ -94,7 +94,6 @@ export interface Adapter {
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const isFailure = (x: unknown): x is Failure => typeof x === "object" && x !== null && "kind" in x && "reason" in x;
 
 export function weixinAdapter(api: WeixinApi): Adapter {
   const accountOf = (s: Record<string, string>) => ({
@@ -461,7 +460,7 @@ export const make = (options: ConnectorOptions = {}) =>
               : pending.map((r) => ({ ids: [r.id], text: r.body }));
           for (const out of batches) {
             const sent = await adapter.send(signal, a.secrets, a.owner, out.text, a.replyContext);
-            if (!isFailure(sent)) {
+            if (Predicate.isString(sent)) {
               try {
                 await inTx(Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: time.now(), ext_id: sent || null, id: oid }), { discard: true }));
                 outboxChanged((n) => n - out.ids.length);
