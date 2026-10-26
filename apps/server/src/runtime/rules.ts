@@ -1,8 +1,8 @@
 // What a runtime's state says about dispatching to it: whether its money is
-// gone, what is left of its quota, and what stops a profile on it. agentIssues mirrors the checks oar makes when a session
+// gone, what is left of its quota, and what stops a profile on it. agentProblems mirrors the checks oar makes when a session
 // opens, so a profile that would be refused is shown so before it is sent.
 
-import type { AccountUsage, Agent, AgentIssue, AgentIssueLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
+import type { AccountUsage, Agent, AgentProblem, AgentProblemLevel, RuntimeInfo, RuntimeQuota, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, runtimeLabel } from "../agent/seed.ts";
 import { yuan } from "./money.ts";
 
@@ -75,8 +75,8 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
     env: { ...settings?.env, ...agent.env },
     missingModel,
   };
-  const issues: AgentIssue[] = [];
-  const add = (field: string, level: AgentIssueLevel, text: string) => issues.push({ field, level, text });
+  const problems: AgentProblem[] = [];
+  const add = (field: string, level: AgentProblemLevel, text: string) => problems.push({ field, level, text });
   // The probed facts; seeds.json's for a runtime not probed.
   const facts = runtime?.facts?.refused ? runtime.facts : factsOf(agent.runtime);
   const refused = facts.refused ?? {};
@@ -94,19 +94,19 @@ export function sessionOptions(agent: Agent, settings: RuntimeSettings | undefin
       add("effort", "error", name + " 没有 " + options.effort + " 这一档，可选：" + model.effortLevels.join("、"));
     }
   }
-  return { ...options, issues };
+  return { ...options, problems };
 }
 
-/** The profile's issues against its runtime as it is now; errors stop it being sent. */
-export function agentIssues(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentIssue[] {
-  const issues: AgentIssue[] = [];
-  const add = (text: string) => issues.push({ field: "runtime", level: "error", text });
+/** The profile's problems against its runtime as it is now; errors stop it being sent. */
+export function agentProblems(agent: Agent, runtime: RuntimeInfo | null | undefined): AgentProblem[] {
+  const problems: AgentProblem[] = [];
+  const add = (text: string) => problems.push({ field: "runtime", level: "error", text });
   if (!runtime) add("不认识的 runtime：" + agent.runtime);
   else if (runtime.installation.status !== "available") add("这台机器上找不到这个 runtime");
   else if (!runtime.settings.enabled) add("这个 runtime 在 Runtime 页面里被停用了");
   const broke = moneyStop(runtime);
   if (broke) add(broke);
-  return [...issues, ...sessionOptions(agent, runtime?.settings, runtime).issues];
+  return [...problems, ...sessionOptions(agent, runtime?.settings, runtime).problems];
 }
 
 export interface Candidate {

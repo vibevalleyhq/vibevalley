@@ -3,7 +3,7 @@
 // once; a page sees only where each comes from and its last characters; keys are never logged.
 
 import { join } from "node:path";
-import type { Dictation, KeySource, KeyStatus, SettingsCheck, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Check, Dictation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
@@ -65,7 +65,7 @@ export class SettingRefused extends Data.TaggedError("SettingRefused")<{ readonl
 
 export interface SettingShape {
   readonly status: () => SettingsStatus;
-  readonly check: (u: SettingsUpdate) => SettingsCheck;
+  readonly check: (u: SettingsUpdate) => Check;
   /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
   readonly save: (u: SettingsUpdate) => Effect.Effect<SettingsStatus, SettingRefused>;
   readonly deepseekApiKey: () => string;

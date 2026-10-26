@@ -7,7 +7,7 @@ import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import {
   type Agent,
-  type AgentIssue,
+  type AgentProblem,
   type InventoryEntry,
   type MCPServer,
   OutfitValues,
@@ -30,7 +30,7 @@ import { toast } from "../../ui/toasts";
 import { A } from "../../app/A";
 import { useRouter, useSearch } from "../../app/router";
 import { aria } from "../../app/util";
-import { useAgentIssues } from "../../data/agents";
+import { useAgentProblems } from "../../data/agents";
 import { ready, useAgents, useRuntimes, useSprites } from "../../data/query";
 import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
 import { Button } from "../../ui/Button";
@@ -113,8 +113,8 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   const client = useQueryClient();
   const runtimes = useRuntimes();
   const runtime = () => ready(runtimes, []).find((r) => r.id === draft().runtime);
-  const allIssues = useAgentIssues(() => [draft()]);
-  const issues = () => allIssues()[draft().id] ?? [];
+  const allProblems = useAgentProblems(() => [draft()]);
+  const problems = () => allProblems()[draft().id] ?? [];
   const dirty = () => isNew || !same(props.saved, draft());
   const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
 
@@ -220,7 +220,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
               isNew={isNew}
               onTrajectories={() => setTrajectories(true)}
             />
-            <Issues issues={issues()} />
+            <Problems problems={problems()} />
           </div>
         </div>
       </div>
@@ -255,10 +255,10 @@ function DeleteButton(props: { agent: Agent }) {
   );
 }
 
-function Issues(props: { issues: AgentIssue[] }) {
+function Problems(props: { problems: AgentProblem[] }) {
   return (
     <Show
-      when={props.issues.length > 0}
+      when={props.problems.length > 0}
       fallback={
         <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-[#3f6427]">
           <Icon name="mark-check" size={12} />
@@ -267,7 +267,7 @@ function Issues(props: { issues: AgentIssue[] }) {
       }
     >
       <ul aria-label="派不出去的原因" class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
-        <For each={props.issues}>
+        <For each={props.problems}>
           {(i) => (
             <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-[#b8682a]"]}>
               <Icon name={i.level === "error" ? "mark-cross" : "mark-warn"} size={12} class="mt-1" />

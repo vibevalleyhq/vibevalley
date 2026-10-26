@@ -28,11 +28,7 @@ export const GitHubStatus: Codec<T.GitHubStatus> = Schema.Struct({
   checkedAt: Schema.Number,
 });
 
-export const SettingsCheck: Codec<T.SettingsCheck> = Schema.Struct({
-  problem: Schema.optionalKey(Schema.String),
-});
-
-export const ProjectCheck: Codec<T.ProjectCheck> = Schema.Struct({
+export const Check: Codec<T.Check> = Schema.Struct({
   problem: Schema.optionalKey(Schema.String),
 });
 
@@ -41,11 +37,11 @@ export const RuntimeQuota: Codec<T.RuntimeQuota> = Schema.Struct({
   text: Schema.String,
 });
 
-export const AgentIssueLevel: Codec<T.AgentIssueLevel> = Schema.Literals(T.AgentIssueLevelValues);
+export const AgentProblemLevel: Codec<T.AgentProblemLevel> = Schema.Literals(T.AgentIssueLevelValues);
 
-export const AgentIssue: Codec<T.AgentIssue> = Schema.Struct({
+export const AgentProblem: Codec<T.AgentProblem> = Schema.Struct({
   field: Schema.String,
-  level: AgentIssueLevel,
+  level: AgentProblemLevel,
   text: Schema.String,
 });
 
@@ -113,7 +109,7 @@ export const AgentCheckRequest: Codec<T.AgentCheckRequest> = Schema.Struct({
 
 export const AgentCheck: Codec<T.AgentCheck> = Schema.Struct({
   id: Schema.String,
-  issues: Schema.mutable(Schema.Array(AgentIssue)),
+  problems: Schema.mutable(Schema.Array(AgentProblem)),
 });
 
 export const RecallPreview: Codec<T.RecallPreview> = Schema.Struct({

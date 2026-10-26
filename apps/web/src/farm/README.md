@@ -86,7 +86,7 @@ the API and then plays the bed's effect. A task graph's calls are `data/graphs.t
 ## Pieces to build with
 
 - `world/`: `loadVillage()`, and `useVillage()` in `support.ts` (the level and the atlas, fetched once); `VillageWorld` (plots, places,
-  props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `plotKey`, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
+  props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
   yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `sprites.ts` (`SpriteAtlas`: sizes and
   anchors in art pixels, `density` 2, `spriteUrl`); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
   density); `framing.ts`.

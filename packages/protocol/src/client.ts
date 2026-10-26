@@ -76,8 +76,7 @@ export class VibeValleyApi {
   readonly setting = {
     load: (): Promise<T.SettingsStatus> => this.call("GET", "/api/v1/settings", undefined, undefined) as Promise<T.SettingsStatus>,
     /** The first thing Save would refuse in these settings, without saving them. */
-    check: (a: { body: T.SettingsUpdate }): Promise<T.SettingsCheck> =>
-      this.call("POST", "/api/v1/settings/check", undefined, a.body) as Promise<T.SettingsCheck>,
+    check: (a: { body: T.SettingsUpdate }): Promise<T.Check> => this.call("POST", "/api/v1/settings/check", undefined, a.body) as Promise<T.Check>,
     save: (a: { body: T.SettingsUpdate }): Promise<T.SettingsStatus> => this.call("PUT", "/api/v1/settings", undefined, a.body) as Promise<T.SettingsStatus>,
   };
 
@@ -288,7 +287,7 @@ export class VibeValleyApi {
   readonly project = {
     list: (): Promise<T.ProjectSummary[]> => this.call("GET", "/api/v1/projects", undefined, undefined) as Promise<T.ProjectSummary[]>,
     /** The first thing Create would refuse in this project, without making it. */
-    check: (a: { body: T.NewProject }): Promise<T.ProjectCheck> => this.call("POST", "/api/v1/projects/check", undefined, a.body) as Promise<T.ProjectCheck>,
+    check: (a: { body: T.NewProject }): Promise<T.Check> => this.call("POST", "/api/v1/projects/check", undefined, a.body) as Promise<T.Check>,
     create: (a: { body: T.NewProject }): Promise<T.ProjectSummary> => this.call("POST", "/api/v1/projects", undefined, a.body) as Promise<T.ProjectSummary>,
     languages: (a: { id: string }): Promise<T.ProjectLanguages> =>
       this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/languages", undefined, undefined) as Promise<T.ProjectLanguages>,

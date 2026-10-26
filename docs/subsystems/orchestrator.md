@@ -9,7 +9,7 @@
 | 管家听到什么、一条输入怎么拼、话回到哪个频道 | 频道里谁该被叫醒、投递和回执（`channel`，[田头](docs/subsystems/channel.md)） |
 | 管家的对话、压缩、记性的快照、提示的开头 | 帮工档案的记性、想起和外面的来源（[记性](docs/subsystems/memory.md)）；管家的 `memory_search`、`memory_add` 只是那边的入口 |
 | 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `recurrence`（[定时](docs/subsystems/recurrence.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
-| 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentIssues`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
+| 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentProblems`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
 | 管家收什么、每种来源怎么进（意图表）、现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、边说边写、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
 | VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[界面清单](docs/reference/farm-ui.md#界面清单)） |
@@ -46,7 +46,7 @@
 - **管家以工单为单位。** 点名一件活的工具（`check`、`changes`、`accept`、`tell`、`stop`、`dismiss`、`issue_update`、`issue_status`）都收 `issue`：工单编号（`#41`、`41`）、工单 id，或在做它的帮工的名字（找它的工单）；要帮工的（`tell`、`stop`、`dismiss`）找工单最新的、还在地里的那个。现状和 `roster` 里每个帮工带它的工单号。`issues` 找工单、看一批（状态、项目、字、`wants_owner` 在等主人的按等了多久排），填编号就是一张的全部；`issue_create` 是唯一建工单的入口：不填 `start` 记进备选、不开工（填 `agent` 是指派，`draft` 让帮工起草），`start: true` 记下就开工，走和看板开工同一条路（`Issues.start`，满了排进待办；开不了工时工单留在备选，回答里有编号，再调一次不多建一张），`channel` 定工单串开在哪个频道；`issue_update` 改各栏；`issue_status` 照 `statusMove` 挪，备选挪到待办而没写谁来做时按下面「挑档案」挑一个，挪到待办时 `agent` 填另一个档案就是换人（[工单](docs/subsystems/issue.md)「换人」）。规则都在工单服务里，工具只转发、写成一句话（`tool/words.ts` 的 `issueLine`、`issueDetail`）。
 - **先认意图，再动工单。** 提示开头照主人的意图对到工单的动作：讨论、问现状不建工单；记下、指派不开工；只有主人要马上做才 `start`；叫停（`stop`）不是取消；接着做、换人、收尾都在原来那张上，不新建；收尾（「收下」「合进去」）是 `issue_status` 挪到已完成，交付照工单（有提交才合并或开 PR，没有改动不碰 git），「先别合」填 `keep_branch`，完成以后照工具的回答说交付了什么；停哪张、换哪张、收哪张不唯一时先问一句。对照表和理由见[管家以工单为单位](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)。
 - **完成工单、合进主分支、计划开工要这一轮最新那条输入有主人的话**：管家的工具带着 `Actor`（管家，`forOwner` 是这一轮有没有主人的话），由工单和计划自己判断（`actsForOwner`）：改工单和挪状态（`issue_update`、`issue_status`，完成也是挪状态）否则回「改工单、挪状态要主人说一声。……」；计划合进主分支回「合进主分支要主人说一声。……」，计划开工回「计划开工要主人点头。……」，要它在频道里问主人。主人的话后面接着进来的帮工的话会让它变回假。派活、带话、叫停、收工、验收不挡。管家定的定时要不要等主人同意，也看它（[定时](docs/subsystems/recurrence.md)的「等主人同意」）。
-- **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentIssues` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
+- **挑档案**（`Runtimes.choose`，`runtime/rules.ts` 的 `chooseAgent`；管家的 `issue_create`、`issue_status`、起草和计划共用；管家填的名字对不上任何档案和农机时拒绝，不落到「谁都行」）按这个顺序落到一个档案：填的是档案的名字或 id，就是它（派不派得出去由派活时的 `agentProblems` 说）；填的是农机，这台农机上第一个能派的档案；主人在对话框或帮工栏里选定的档案（「下一单派它」）；都没有，拿工单的字匹配每个能派的档案「适合的活」（`Agent.tags`），取命中最多的，一样多取靠前的。挑中以后的检查见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **管家的状态**在 `WorkspaceState.Orchestrator`：`listening`、`thinking`（一轮开始）、`speaking`（字开始长）；一轮停下回到 `listening`。
 - **自己的恢复数据按形状读**：`readMcpConfig` 只在文件不存在时返回空配置，文件读不了、JSON 解析不了或形状不对都会报错；`agent_task.after` 必须是字符串数组，坏值只回退这个字段；`recurrences.json` 的每项按 `Job` 解码，坏文件不被覆盖，也不触发任务。
 

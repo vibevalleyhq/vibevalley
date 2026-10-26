@@ -49,7 +49,7 @@ export interface RowFacts {
 }
 
 const rank: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-export const priorityRank = (p: Priority | undefined) => (p === undefined ? 4 : rank[p]);
+const priorityRank = (p: Priority | undefined) => (p === undefined ? 4 : rank[p]);
 
 /** Stable: rows that tie keep the order they came in. */
 export function orderRows<T>(rows: T[], ordering: Ordering, facts: (row: T) => RowFacts): T[] {

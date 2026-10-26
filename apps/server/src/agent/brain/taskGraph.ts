@@ -1,11 +1,11 @@
-// An agent's own task graph: tasks it does itself or hands to a helper, each waiting for
+// An agent's own task graph: tasks it does itself or hands to a subagent, each waiting for
 // others. The edges' rules are protocol's (dagProblems), shared with a task graph's steps; what a task's states mean is
 // this file's. Every function here is pure: a graph in, a new graph out.
 
 import { dagIDValid, dagProblems } from "../../base/dag.ts";
 import { head } from "../../base/text.ts";
 
-export type By = "self" | "helper";
+export type By = "self" | "subagent";
 export type State = "waiting" | "working" | "done" | "failed" | "skipped";
 
 export interface Task {
@@ -25,7 +25,7 @@ export interface Task {
 /** A graph past this is a project, not one piece of work: it belongs in issues. */
 export const maxTasks = 30;
 
-/** Retries a helper's task gets after its first failure. */
+/** Retries a subagent's task gets after its first failure. */
 export const retries = 1;
 
 /** Done or skipped: what lets the tasks after it start. */
@@ -137,7 +137,7 @@ export function text(g: readonly Task[]): string {
   for (const t of g) {
     const mark = t.state === "waiting" ? (ready(g, t) ? "可以做" : "等着") : stateWords[t.state];
     let line = "- [" + mark + "] " + t.id + " " + t.title;
-    if (t.by === "helper") line += "（帮手做）";
+    if (t.by === "subagent") line += "（帮手做）";
     if (t.after.length > 0 && !settled(t)) line += "（等 " + t.after.join("、") + "）";
     if (t.result) line += " → " + head(t.result.split(/\s+/).filter(Boolean).join(" "), 80);
     lines.push(line);
@@ -145,10 +145,10 @@ export function text(g: readonly Task[]): string {
   return lines.join("\n");
 }
 
-/** A helper takes it: waiting to working. */
+/** A subagent takes it: waiting to working. */
 export const begin = (g: readonly Task[], id: string) => g.map((t) => (t.id === id && t.state === "waiting" ? { ...t, state: "working" as const } : t));
 
-/** A helper came back: done with what it said, or failed with why. A failure within retries goes back to waiting. */
+/** A subagent came back: done with what it said, or failed with why. A failure within retries goes back to waiting. */
 export function settle(g: readonly Task[], id: string, result: string, failed: boolean): Task[] {
   return g.map((t) => {
     if (t.id !== id || t.state !== "working") return t;
@@ -158,6 +158,6 @@ export function settle(g: readonly Task[], id: string, result: string, failed: b
   });
 }
 
-/** Helpers that stopped before coming back (the agent was stopped, or the process went): their tasks wait again. */
+/** Subagents that stopped before coming back (the agent was stopped, or the process went): their tasks wait again. */
 export const requeue = (g: readonly Task[], ids?: readonly string[]) =>
   g.map((t) => (t.state === "working" && (!ids || ids.includes(t.id)) ? { ...t, state: "waiting" as const } : t));

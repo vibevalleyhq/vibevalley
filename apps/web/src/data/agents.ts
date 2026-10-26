@@ -1,5 +1,5 @@
 import { keepPreviousData } from "@tanstack/solid-query";
-import { type Agent, type AgentIssue, orchestratorAgent } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "./api";
 import { createSettled } from "../app/util";
 import { ready, useAgents, useQuery } from "./query";
@@ -20,12 +20,12 @@ export function useAgent(id: () => string | undefined) {
 }
 
 /** What the server says is wrong with each of these drafts (agent.check), by id; empty until it answers. */
-export function useAgentIssues(agents: () => readonly Agent[]) {
+export function useAgentProblems(agents: () => readonly Agent[]) {
   const json = createSettled(() => JSON.stringify(agents()));
   const got = useQuery(() => ({
     queryKey: ["agent-check", json()],
     queryFn: () => api.agent.check({ body: { agents: JSON.parse(json()) as Agent[] } }),
     placeholderData: keepPreviousData,
   }));
-  return (): Record<string, AgentIssue[]> => Object.fromEntries(ready(got, []).map((c) => [c.id, c.issues]));
+  return (): Record<string, AgentProblem[]> => Object.fromEntries(ready(got, []).map((c) => [c.id, c.problems]));
 }

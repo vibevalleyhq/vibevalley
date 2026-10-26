@@ -56,24 +56,7 @@ export function readJournal(file: string): SessionEvent[] | undefined {
 const callKey = (from: From | undefined, callId: string) => (from ?? []).join("/") + "|" + callId;
 const who = (from: From | undefined) => (from ?? []).join("/");
 
-export interface Journal {
-  events(): SessionEvent[];
-  asked(text: string, from?: From): void;
-  said(text: string, from?: From): void;
-  thought(text: string, from?: From): void;
-  toolStarted(callId: string, start: ToolStart, from?: From): void;
-  toolInput(callId: string, input: string, text: string, from?: From): void;
-  toolEnded(callId: string, output: string, ok: boolean, from?: From): void;
-  note(kind: SessionEventType, text: string, from?: From): void;
-  /** An llm/usage: one model answer's tokens, with text to show for them. */
-  usage(tokens: EventTokens, text: string, from?: From): void;
-  /** Opens run id: every event after it is the run's until runEnded closes it with how it ended. */
-  runStarted(id: string): void;
-  runEnded(id: string, outcome: Outcome): void;
-  close(): void;
-}
-
-class FileJournal implements Journal {
+export class Journal {
   private steps: SessionEvent[];
   private next = 0;
   /** Tool calls not yet returned; started is every call started (a sub-agent's steps go under the call that started it). */
@@ -189,6 +172,7 @@ class FileJournal implements Journal {
     this.changed(this.draft.seq);
   }
 
+  /** Opens run id: every event after it is the run's until runEnded closes it with how it ended. */
   runStarted(id: string) {
     this.run = id;
     this.add({ type: "run/start", text: "" });
@@ -270,6 +254,7 @@ class FileJournal implements Journal {
     this.add({ type: kind, text }, from);
   }
 
+  /** An llm/usage: one model answer's tokens, with text to show for them. */
   usage(tokens: EventTokens, text: string, from?: From) {
     this.add({ type: "llm/usage", text, tokens }, from);
   }
@@ -310,7 +295,7 @@ export class Trajectories {
 
   /** A session's log, carried on from what it kept: a session back from a restart goes on where it was. */
   openLog(id: string, keep = 0): Journal {
-    const j = new FileJournal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), this.warn, this.time, keep > 0 ? keep : keepEvents);
+    const j = new Journal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), this.warn, this.time, keep > 0 ? keep : keepEvents);
     this.open.set(id, j);
     return j;
   }

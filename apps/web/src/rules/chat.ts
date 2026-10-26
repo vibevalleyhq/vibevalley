@@ -192,7 +192,7 @@ export const waitingForOrchestrator = (orchestrator: string | undefined, convers
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-export function dayLabel(at: number, now = new Date()) {
+function dayLabel(at: number, now = new Date()) {
   const d = new Date(Math.round(at));
   if (sameDay(d, now)) return "今天";
   const yesterday = new Date(now);

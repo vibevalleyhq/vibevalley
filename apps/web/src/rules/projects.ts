@@ -60,7 +60,7 @@ export interface Language {
   readonly color: string;
 }
 
-export function languageOf(name: string): Language {
+function languageOf(name: string): Language {
   const id = byName.get(name.trim().toLowerCase()) ?? "other";
   const def = langs[id]!;
   return { id, label: id === "other" && name.trim() ? name.trim() : def.label, color: def.color };
@@ -104,7 +104,7 @@ export function languageShares(counts: readonly LanguageCount[], top: number | u
 const two = (n: number) => String(n).padStart(2, "0");
 
 /** The server counts commits by the same day. */
-export const dayKey = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+const dayKey = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
 export interface CalendarDay {
   readonly day: string;
@@ -246,13 +246,11 @@ export interface Island {
 }
 
 export const openOf = (i: Island) => i.spots.filter((s) => s.kind === "open").length;
-export const isFull = (i: Island) => i.working >= i.maxSessions;
+const isFull = (i: Island) => i.working >= i.maxSessions;
 
 /** The project's todos waiting for room, first queued first: the sacks at its gate. */
-export const queuedIn = (issues: readonly Issue[], project: string) =>
+const queuedIn = (issues: readonly Issue[], project: string) =>
   issues.filter((i) => i.project === project && i.status === "todo" && i.queuedAt !== undefined).sort((a, b) => a.queuedAt! - b.queuedAt!);
-
-const plotKey = (h: Session) => h.issue ?? h.id;
 
 /** Peopled or waited on first, then the newest commit, then by name. */
 export function islandsOf({
@@ -279,7 +277,7 @@ export function islandsOf({
     const room = Math.max(0, Math.min(maxSessions > 0 ? left.project : 0, maxRunning - mine.length));
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
-      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[plotKey(h)] ?? { crop: "seeded" } })),
+      ...mine.map((h): Spot => ({ kind: "taken", session: h, plot: plots[h.id] ?? { crop: "seeded" } })),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
       ...Array.from({ length: room - open }, (): Spot => ({ kind: "shut" })),
     ];

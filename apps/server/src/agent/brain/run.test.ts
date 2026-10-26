@@ -255,11 +255,11 @@ describe("a compaction", () => {
   });
 });
 
-const helperBrief = (c: Request) => messageText(c.messages[1]!);
+const subagentBrief = (c: Request) => messageText(c.messages[1]!);
 
 describe("the agent's task graph", () => {
   // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
-  it("sends a helper's tasks when ready, and they come back", async () => {
+  it("sends a subagent's tasks when ready, and they come back", async () => {
     const dir = home();
     const store = memoryStore();
     const sent: string[] = [];
@@ -267,7 +267,7 @@ describe("the agent's task graph", () => {
     const reply = (context: { messages: unknown[] }) => {
       const c = context as Request;
       if (systemPrompt(c).includes("派出去的帮手")) {
-        const brief = helperBrief(c);
+        const brief = subagentBrief(c);
         if (brief === "查 C") expect(sent).toEqual(expect.arrayContaining(["查 A", "查 B"]));
         sent.push(brief);
         return fauxAssistantMessage(brief + " 做完了");
@@ -280,9 +280,9 @@ describe("the agent's task graph", () => {
         return fauxAssistantMessage([
           fauxToolCall("task_add", {
             tasks: [
-              { id: "a", brief: "查 A", by: "helper" },
-              { id: "b", brief: "查 B", by: "helper" },
-              { id: "c", brief: "查 C", by: "helper", after: ["a", "b"] },
+              { id: "a", brief: "查 A", by: "subagent" },
+              { id: "b", brief: "查 B", by: "subagent" },
+              { id: "c", brief: "查 C", by: "subagent", after: ["a", "b"] },
             ],
           }),
         ]);
@@ -300,7 +300,7 @@ describe("the agent's task graph", () => {
     );
   });
 
-  it("calls the helpers back when the agent is stopped", async () => {
+  it("calls the subagents back when the agent is stopped", async () => {
     const dir = home();
     const store = memoryStore();
     let started = false;
@@ -317,7 +317,7 @@ describe("the agent's task graph", () => {
     const reply = (context: { messages: unknown[] }) => {
       const c = context as Request;
       if (systemPrompt(c).includes("派出去的帮手")) return fauxAssistantMessage([fauxToolCall("wait", {})]);
-      if (!answered(c)) return fauxAssistantMessage([fauxToolCall("task_add", { tasks: [{ id: "a", brief: "查 A", by: "helper" }] })]);
+      if (!answered(c)) return fauxAssistantMessage([fauxToolCall("task_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
       return fauxAssistantMessage("派好了");
     };
     await withAgent(

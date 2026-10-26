@@ -11,6 +11,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync } fr
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
+  type Check,
   type Conflict,
   type DayCount,
   type Author,
@@ -20,7 +21,6 @@ import {
   maxRunning,
   type NewProject,
   type ProjectActivity,
-  type ProjectCheck,
   type ProjectLanguages,
   type ProjectStack,
   type ProjectSummary,
@@ -230,7 +230,7 @@ export interface ProjectShape {
   readonly root: string;
   readonly limit: number;
   readonly maxSessions: () => number;
-  readonly check: (req: NewProject) => ProjectCheck;
+  readonly check: (req: NewProject) => Check;
   readonly create: (req: NewProject) => Effect.Effect<Project, ProjectError>;
   readonly list: () => Effect.Effect<Project[]>;
   readonly summary: (p: Project) => Effect.Effect<ProjectSummary>;

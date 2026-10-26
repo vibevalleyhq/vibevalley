@@ -166,15 +166,12 @@ export function effectsOf(before: WorkspaceState, fact: Fact): GameEffect[] {
   return [];
 }
 
-/** The issue a session works is its plot; a session with none (not sent for an issue) is its own. */
-export const plotKey = (h: Session) => (h.issue ? h.issue : h.id);
-
 export function viewOf(state: WorkspaceState): FarmView {
   const plots: Record<string, PlotView> = {};
   for (const h of state.sessions)
-    plots[plotKey(h)] = plotOf(
+    plots[h.id] = plotOf(
       h,
-      (state.issues ?? []).find((t) => t.id === plotKey(h)),
+      (state.issues ?? []).find((t) => t.id === h.issue),
     );
   return { level: farmLevelOf(state), plots, achievements: standingsOf(state.progress) };
 }

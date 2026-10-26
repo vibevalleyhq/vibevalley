@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
-import type { AccountUsage, Agent, AgentIssue, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
+import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
 import { SqlClient } from "effect/sql";
@@ -24,7 +24,7 @@ import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price, type Rate } from "./price.ts";
-import { agentIssues, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
+import { agentProblems, type Candidate, chooseAgent, moneyStop, quotaOf, sessionOptions } from "./rules.ts";
 import { callbackLog } from "../base/log.ts";
 import { timeHere, withinRealTime } from "../base/time.ts";
 
@@ -40,8 +40,8 @@ const spendPushAfterMs = 3_000;
 export interface Assessment {
   readonly agent: Agent;
   readonly info: RuntimeInfo | undefined;
-  readonly issues: AgentIssue[];
-  readonly blocking: AgentIssue[];
+  readonly problems: AgentProblem[];
+  readonly blocking: AgentProblem[];
 }
 
 export const usable = (a: Assessment) => a.agent.enabled && a.blocking.length === 0;
@@ -63,8 +63,8 @@ export interface RuntimeShape {
   readonly refresh: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
   readonly info: (id: string) => Effect.Effect<RuntimeInfo | undefined>;
   readonly update: (id: string, s: RuntimeSettings) => Effect.Effect<RuntimeInfo | undefined, ApiError>;
-  /** The profile's issues as it would be dispatched now. */
-  readonly check: (agent: Agent) => Effect.Effect<AgentIssue[]>;
+  /** The profile's problems as it would be dispatched now. */
+  readonly check: (agent: Agent) => Effect.Effect<AgentProblem[]>;
   readonly assess: (agent: Agent) => Effect.Effect<Assessment>;
   /** Every profile, and whether it can be sent now. */
   readonly candidates: Effect.Effect<Candidate[]>;
@@ -423,8 +423,8 @@ export const make = (options: RuntimeOptions = {}) =>
     const assess = (agent: Agent) =>
       Effect.promise(async (): Promise<Assessment> => {
         const { info: i } = await configuration(agent.runtime);
-        const issues = agentIssues(agent, i);
-        return { agent, info: i, issues, blocking: issues.filter((x) => x.level === "error") };
+        const problems = agentProblems(agent, i);
+        return { agent, info: i, problems, blocking: problems.filter((x) => x.level === "error") };
       });
 
     const candidates = Effect.suspend(() => Effect.forEach(store.agents(), (agent) => Effect.map(assess(agent), (a) => ({ agent, usable: usable(a) }))));
@@ -459,7 +459,7 @@ export const make = (options: RuntimeOptions = {}) =>
               Effect.promise(() => refresh(id)),
             )
           : Effect.succeed(undefined),
-      check: (agent) => Effect.map(assess(agent), (a) => a.issues),
+      check: (agent) => Effect.map(assess(agent), (a) => a.problems),
       assess,
       candidates,
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
@@ -467,8 +467,8 @@ export const make = (options: RuntimeOptions = {}) =>
         const runtime = registry.get(agent.runtime);
         if (!runtime) return yield* Effect.fail(refused(`oar 驱动不了 ${agent.runtime}`));
         const { info: i, settings } = yield* Effect.promise(() => configuration(agent.runtime));
-        const { model, effort, env, missingModel, issues } = sessionOptions(agent, settings, i);
-        const problem = issues.find((i) => i.level === "error");
+        const { model, effort, env, missingModel, problems } = sessionOptions(agent, settings, i);
+        const problem = problems.find((i) => i.level === "error");
         if (problem) return yield* Effect.fail(refused(`${agent.name} 派不出去：${problem.text}`));
         if (missingModel) yield* core.notice("warn", `${runtimeLabel(agent.runtime)} 没有 ${missingModel} 这个模型，${agent.name} 先用默认模型`);
         const observed = cache.get(agent.runtime);

@@ -48,7 +48,7 @@ function withHelpers(frame: StateFrame): StateFrame {
   return {
     ...frame,
     state: { ...frame.state, sessions: helpers.map((h) => h.session) },
-    view: { ...frame.view, plots: Object.fromEntries(helpers.map((h) => [`issue-${h.session.id}`, { crop: h.crop } as never])) },
+    view: { ...frame.view, plots: Object.fromEntries(helpers.map((h) => [h.session.id, { crop: h.crop } as never])) },
   };
 }
 
