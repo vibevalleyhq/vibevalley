@@ -24,7 +24,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收：起�
 
 ## 准备
 
-1. 先跑和改动有关的最窄的检查：服务端 `bun run server:check`，页面和手机壳 `bun run web:check`（它也构建出 `apps/web/dist`）。
+1. 先跑和改动有关的最窄的检查：服务端 `vp run server:check`，页面和手机壳 `vp run web:check`（它也构建出 `apps/web/dist`）。
 2. 照分册的「准备」做它要的事（生成代码、构建、起模拟器、钥匙）。
 
 ## 步骤
@@ -54,7 +54,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收：起�
 - **服务端起不来或健康检查超时**：看 `server.stdout.log`、`server.stderr.log`（类型错误、表结构对不上、端口）。脚本已经停掉它起的进程。
 - **子命令失败**：看 `command.stderr.log` 和 `command.stdout.log`；脚本不会把非零退出码改成成功。
 - **清理失败**：看 `result.json` 的 `cleanupErrors`；`stopped` 为 false 时临时目录会留着，不要当成已收拾。
-- **接口或形状对不上**：跑 `bun run server:check` 和 `bun run web:check`；服务端每次从源码起，没有旧的构建。
+- **接口或形状对不上**：跑 `vp run server:check` 和 `vp run web:check`；服务端每次从源码起，没有旧的构建。
 - 各块自己的失败在分册的「出错时」。
 
 ## 收拾

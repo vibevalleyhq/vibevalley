@@ -11,6 +11,5 @@ draws with it.
 | `@vibevalley/engine/clock` | `dayClock` (advanced by whoever owns the frame), `sunOf`, `duskOf`, `clockText` |
 
 ```bash
-bun run check   # types
-bun run test    # vitest: nav, clock, rhythm, light
+vp run test     # vitest: nav, clock, rhythm, light (types: vp check at the root)
 ```

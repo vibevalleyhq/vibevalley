@@ -5,9 +5,7 @@
   "scripts": {
     "start": "node --import tsx src/main.ts",
     "cli": "node --import tsx src/cli.ts",
-    "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/manager/evals.live.test.ts",
-    "check": "tsc --noEmit",
-    "test": "vp test run",
+    "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/orchestrator/evals.live.test.ts",
     "db:generate": "vpx scripts/db-generate.ts",
     "db:check": "vpx scripts/db-generate.ts --check"
   },

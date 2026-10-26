@@ -1,6 +1,6 @@
 # Skills
 
-这里放这个项目自己的 skill：要 agent 判断、写不成代码或检查的做法（[AGENTS.md](AGENTS.md#怎么让-agent-做对) 的第 3 层）。`.claude/skills` 是指向这里的链接，Claude Code 和 Codex 读同一份。`bun run docs:verify` 查每个 skill 的格式，也查下面的表和目录对得上（[scripts/skills.ts](scripts/skills.ts)）。
+这里放这个项目自己的 skill：要 agent 判断、写不成代码或检查的做法（[AGENTS.md](AGENTS.md#怎么让-agent-做对) 的第 3 层）。`.claude/skills` 是指向这里的链接，Claude Code 和 Codex 读同一份。`vp run docs:verify` 查每个 skill 的格式，也查下面的表和目录对得上（[scripts/skills.ts](scripts/skills.ts)）。
 
 验收（改完以后在真的程序上证明它对了）只有一个 skill：[acceptance](.agents/skills/acceptance/SKILL.md)。它的 `SKILL.md` 是入口，写共同的沙箱、证据和收拾，再按「改了什么」把 agent 指到同目录的一份分册（服务端、页面、手机壳、管家的评测），只读用得上的那份。新的一块照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 加一份分册。
 

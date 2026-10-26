@@ -79,7 +79,7 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
       page.on("console", (m) => {
         if (m.type() === "error") console.log(`[page] ${m.text()}`);
       });
-    // On Solid's development build (pnpm run test:dev), what it warns of goes to the run's output, each untracked read
+    // On Solid's development build (vp run e2e:dev), what it warns of goes to the run's output, each untracked read
     // with the stack that made it: the warning alone names no file.
     if (process.env.VIBEVALLEY_WEB_DEV === "1")
       await page.addInitScript(() => {

@@ -1,4 +1,4 @@
-// pnpm run golden:update [-- <where>…]: rewrites the golden data with what the rules answer now, then look at the diff.
+// vp run golden:update [-- <where>…]: rewrites the golden data with what the rules answer now, then look at the diff.
 // With no <where>, every golden file; with some, only theirs: a module name (core for the core state's reduce, rules
 // and play; setting, issue, tool…) the tests in apps/server/src/<module>.
 
@@ -15,10 +15,12 @@ function run(cwd: string, cmd: string[]) {
   if (done.status !== 0) process.exit(done.status ?? 1);
 }
 
-const wanted = process.argv.slice(2);
+// A "--" before the names (as vp run wanted) is not a name.
+const wanted = process.argv.slice(2).filter((a) => a !== "--");
 const unknown = wanted.filter((w) => !existsSync(join(root, "apps/server/src", w)));
 if (unknown.length > 0) {
   console.error(`golden:update: no such place: ${unknown.join(", ")} (a folder of apps/server/src)`);
   process.exit(2);
 }
-run("apps/server", ["pnpm", "run", "test", ...wanted.map((m) => `src/${m}/`)]);
+// vp test itself, not the cached test task: with VIBEVALLEY_GOLDEN set the run writes files, and a replay would not.
+run("apps/server", ["vp", "test", "run", ...wanted.map((m) => `src/${m}/`)]);

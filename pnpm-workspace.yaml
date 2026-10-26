@@ -51,7 +51,7 @@ catalog:
   vitest: "5.0.5"
   yaml: "^2.9.1"
 
-# What the Expo SDK pins for apps/mobile, moved together when the SDK moves: `pnpm exec expo install --check` in apps/mobile
+# What the Expo SDK pins for apps/mobile, moved together when the SDK moves: `vp exec expo install --check` in apps/mobile
 # says to what (its --fix would write the versions into package.json instead).
 catalogs:
   expo:

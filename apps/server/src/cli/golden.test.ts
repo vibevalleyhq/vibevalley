@@ -1,6 +1,6 @@
 // The command line's recorded answers (testdata/cli.jsonl.gz): the help of the root, every group and a few commands, and
 // what typical mistakes, refusals and dry runs print, exit code and all. A command added, renamed or reworded shows up
-// as a diff here; `bun run golden:update -- cli` writes the new answers back, to be read before kept.
+// as a diff here; `vp run golden:update cli` writes the new answers back, to be read before kept.
 
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";

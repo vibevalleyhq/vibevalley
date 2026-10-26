@@ -44,14 +44,14 @@ description: 给 VibeValley 开、改、合 PR：先定这次的改动该是几�
 照模板写三段，英文，正文就是 `main` 上那条提交的说明：
 
 - `## What changed`：现在的行为和为什么；一处问题一条，说清以前会怎样（输入、结果），现在怎样。链接 Agent Note 或 issue。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
-- `## Checks`：跑了的命令和它们打出的结果（`bun run check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [acceptance](.agents/skills/acceptance/SKILL.md) 要的证据。
+- `## Checks`：跑了的命令和它们打出的结果（`vp check`、`server:check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [acceptance](.agents/skills/acceptance/SKILL.md) 要的证据。
 - `## Not verified`：没验的和原因（真机、花钱的评测、真的厂商）。都验了写 `None.`。
 
 不写过程（「先试了 A 又改成 B」），不写 agent 的署名，不贴密钥和主人的私人数据。正文里引用中文的报错、界面上的话，用反引号或「」。
 
 ## 5. 开、等、合
 
-1. 推之前跑和改动有关的检查（AGENTS.md 的「命令」），改了文档跑 `bun run docs:verify`。
+1. 推之前跑和改动有关的检查（AGENTS.md 的「命令」），改了文档跑 `vp run docs:verify`。
 2. 正文写进一个临时文件，开 PR：
 
    ```bash

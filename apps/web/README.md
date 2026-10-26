@@ -1,7 +1,7 @@
 # apps/web
 
 The page, in Solid 2 (`solid-js`, `@solidjs/web`, pinned to one RC): the workbench every host shows (Electron in
-`apps/desktop`, a browser, the phone's WebView). The server serves it at `/` (`npm start -- --web ../web/dist` in
+`apps/desktop`, a browser, the phone's WebView). The server serves it at `/` (`vp run start --web ../web/dist` in
 `apps/server`), so the page and the API share one origin.
 
 ```
@@ -53,11 +53,11 @@ test/             Playwright against a real server per worker (fixtures.ts)
 ## Commands
 
 ```bash
-bun run check   # types (lint and format: bun run check at the root)
-bun run build   # dist/
-bun run test    # vitest for the rules, then Playwright: builds dist, one server per worker with a temporary home and no keys;
+vp run build    # dist/ (types, lint and format: vp check at the root)
+vp run test     # vitest for the rules
+vp run e2e      # builds dist, then Playwright: one server per worker with a temporary home and no keys;
                 # an error that escapes the page fails its test
-bun run test:dev  # the same on Solid's development build: its diagnostics (an untracked read, a primitive made where it
-                  # may not be, a computation tracking thousands of sources) go to the output, with the stack that made each
-bunx playwright test test/issues.spec.ts   # one file
+vp run e2e:dev  # the same on Solid's development build: its diagnostics (an untracked read, a primitive made where it
+                # may not be, a computation tracking thousands of sources) go to the output, with the stack that made each
+vp exec playwright test test/issues.spec.ts   # one file
 ```

@@ -1,4 +1,4 @@
-// Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: pnpm run api:client.
+// Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
 import type { ApiError } from "./api";
 import type * as T from "./shapes";

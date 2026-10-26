@@ -1,7 +1,7 @@
 # apps/server
 
 The farm's server: every service, the HTTP API, the three state streams, `/mcp` for the helpers, and the page at `/`.
-Effect v4 on Node 24, run from source with tsx (`npm start`); the database is PGlite. How it is built and why:
+Effect v4 on Node 24, run from source with tsx (`vp run start`); the database is PGlite. How it is built and why:
 [foundation](docs/subsystems/foundation.md); what each service does: [the subsystems](docs/subsystems/README.md).
 
 ```
@@ -35,10 +35,9 @@ db/                migrations/0001_schema.up.sql (the one schema), queries/<tabl
 ## Commands
 
 ```bash
-npm start -- --web ../web/dist    # 127.0.0.1:8787, the page at /
-npm run cli -- help               # the command line
-bun run check                     # types
-npm test                          # vp test（vitest，配置在 vite.config.ts）
-npm run db:generate               # after changing db/queries or db/migrations (db:check says whether it is stale)
-npm run evals                     # the orchestrator's evals on the real model: costs money, ask first
+vp run start --web ../web/dist    # 127.0.0.1:8787, the page at /
+vp run cli help                   # the command line
+vp run test                       # vp test（vitest，配置在 vite.config.ts）; types: vp check at the root
+vp run db:generate                # after changing db/queries or db/migrations (db:check says whether it is stale)
+vp run evals                      # the orchestrator's evals on the real model: costs money, ask first
 ```

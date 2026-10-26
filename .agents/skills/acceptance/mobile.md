@@ -12,7 +12,7 @@
 
 ## 准备
 
-1. `bun run web:check`（类型，宿主的桥和手机壳的规则，构建出 `apps/web/dist`：沙箱农场经「连接到本机」放出的就是它）。
+1. `vp run web:check`（类型，宿主的桥和手机壳的规则，构建出 `apps/web/dist`：沙箱农场经「连接到本机」放出的就是它）。
 2. 一个 JDK 17（`/usr/libexec/java_home -V` 看；JDK 27 太新）和安卓 SDK。模拟器和镜像没装就装：
 
    ```bash
@@ -33,7 +33,7 @@
 1. 生成安卓工程，带着端到端的开关构建（Gradle 的守护进程记着它开起来时的环境，先停掉它）：
 
    ```bash
-   cd apps/mobile && CI=1 bunx expo prebuild -p android --no-install
+   cd apps/mobile && CI=1 vp exec expo prebuild -p android --no-install
    cd android && ./gradlew --stop && EXPO_PUBLIC_VIBEVALLEY_E2E=1 ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
    ```
 
@@ -65,7 +65,7 @@
 iOS（Xcode 装好、跑过一次 `xcodebuild -runFirstLaunch`）：
 
 ```bash
-cd apps/mobile && CI=1 bunx expo prebuild -p ios --no-install && (cd ios && pod install)
+cd apps/mobile && CI=1 vp exec expo prebuild -p ios --no-install && (cd ios && pod install)
 cd ios && EXPO_PUBLIC_VIBEVALLEY_E2E=1 xcodebuild -workspace VibeValley.xcworkspace -scheme VibeValley -configuration Release \
   -sdk iphonesimulator -arch arm64 -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES
 vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios   # 在仓库根目录；默认 iPhone 17，VIBEVALLEY_SIMULATOR 换

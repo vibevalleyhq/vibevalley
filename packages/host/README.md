@@ -16,6 +16,5 @@ bridge (`src/mobile.ts`: what the page asks goes out as `ToNative` and is answer
 events cannot act on a later call, including a join that finishes after the page cancelled it.
 
 ```bash
-bun run check
-bun run test    # the phone's bridge
+vp run test     # the phone's bridge (types: vp check at the root)
 ```

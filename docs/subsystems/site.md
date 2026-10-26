@@ -14,7 +14,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 
 ## 在哪
 
-- **命令**：根目录 `bun run site:check`（`prepare.ts` 再 `astro check`）、`bun run site:build`（`prepare.ts` 再 `astro build` 到 `site/dist/`）、`bun run site:deploy`（构建再 `wrangler deploy`）。包约定和命令在 [site/README.md](site/README.md)。
+- **命令**：根目录 `vp run site:check`（`prepare.ts` 再 `astro check`）、`vp run site:build`（`prepare.ts` 再 `astro build` 到 `site/dist/`）、`vp run site:deploy`（构建再 `wrangler deploy`）。包约定和命令在 [site/README.md](site/README.md)。
 - **配置**：`site/astro.config.mjs`（`site`、i18n 的 `zh`/`en` 且中文不带前缀、sitemap、Tailwind 的 Vite 插件、`assetsInlineLimit: 0` 让每张像素图是自己的文件）；`site/wrangler.jsonc`（Worker、自定义域名、`not_found_handling: 404-page`、关掉 workers.dev 和预览地址）；`site/public/_headers`（`/_astro/*` 一年 immutable 缓存）。
 - **页面**：`src/pages/index.astro`、`en/index.astro` 都用 `src/components/Home.astro` 拼；`src/layouts/Base.astro` 是头（标题、描述、`og:image`、hreflang、预加载）；`src/pages/404.astro` 两种语言并排、`noindex`。
 - **island**（`src/components/*.tsx`）：`Bar` 顶栏、`Hero` 首页场景、`Parade` 帮工上工、`Harvest` 金色的收菜横幅、`How` 跟着滚动的故事、`Features` 数字和卡片、`Devices` Mac 和手机、`Screens` 截图、`Start` 怎么开始；`Foot.astro` 不带脚本。共用的 `useScrollLinked`、`useOffScreen`、`useReveal`、`CountUp`、`STILL` 在 `ui.tsx`。
@@ -60,7 +60,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 
 **下面几段**：`Parade` 帮工走过一排地（CSS），`Harvest` 是第二天清早的金色横幅「一觉醒过来，满园都是菜」，里面是「怎么玩」那件活的收成单；`How` 这一段停在屏幕上，镜头沿田横着走，帮工在四个地方各干一步（看工单、播种、敲锤子冒工具图标、收获冒金币和完成章），田下面画它的 git 分支（分出来、提交、合回 main，计数往上跳）；`Features` 数字一格一格往上数、卡片一张张进场；`Devices` 是 Mac 上的农场和两部手机（田头、工单），手机版正在换壳暂时用不了、「连接到本机」只在信得过的网络里开，照实写；`Screens` 点开截图从原处放大，焦点到关闭按钮，Esc、关闭按钮、点外面都能关，关后焦点回原处；`Start` 先给一条警告，再是构建命令和复制按钮。
 
-**发布**：主人在本机用握着域名的账号 `bunx wrangler login`，再 `bun run site:deploy`；Cloudflare 自己加解析和证书。乱写的地址给 `404.html` 和 404 状态，`_headers` 不对外。
+**发布**：主人在本机用握着域名的账号 `vpx wrangler login`，再 `vp run site:deploy`；Cloudflare 自己加解析和证书。乱写的地址给 `404.html` 和 404 状态，`_headers` 不对外。
 
 ## 和谁打交道
 
@@ -91,7 +91,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 
 官网没有单元测试。
 
-- `bun run site:check`：`astro check` 没有错误（含两份字典的类型对齐）。
-- `bun run site:build`：三页生成到 `site/dist/`；`SHOWN` 缺了导入、贴图改了名都在这里报错。
+- `vp run site:check`：`astro check` 没有错误（含两份字典的类型对齐）。
+- `vp run site:build`：三页生成到 `site/dist/`；`SHOWN` 缺了导入、贴图改了名都在这里报错。
 - 改了画面或动画，用无头 Chrome 在 1440 宽和 390 宽、开着和关着减少动画截图看：首页四个时辰和两屏的几个滚动位置、「怎么玩」的几个位置、截图放大后的焦点和 Esc；控制台没有报错和 hydration 报错。没有对应的验证 skill。
 - 发布后看 `/`、`/en/`、一个乱写的地址给 404，`/_headers` 打不开，带 hash 的文件一年缓存，图是 WebP。

@@ -1,4 +1,4 @@
-// Development only (bun run desktop:dev sets VIBEVALLEY_DEV=1, never a packaged app): the window reloads when the page
+// Development only (vp run desktop:dev sets VIBEVALLEY_DEV=1, never a packaged app): the window reloads when the page
 // is built again (vp build --watch writes apps/web/dist), and the server starts again, on the same port, when its code
 // or the protocol's changes; the window then comes back on the place it showed.
 

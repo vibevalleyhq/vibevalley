@@ -18,7 +18,7 @@ The desktop test passes Electron's `--user-data-dir` before the app starts. Its 
 and farm files belong to the temporary directories, so the owner's desktop app can stay open during the test.
 
 ```bash
-bun run dev       # from the repository root: bun run desktop:dev; builds the page, rebuilds it on change (the window reloads) and restarts the server when its code changes
-bun run test      # bun run desktop:test
-bun run package   # bun run package:mac
+vp run dev        # from the repository root: vp run desktop:dev; builds the page, rebuilds it on change (the window reloads) and restarts the server when its code changes
+vp run e2e        # from the root: vp run desktop:test; builds the page first (dependsOn), then Playwright on the whole app
+vp run package    # from the root: vp run package:mac
 ```
