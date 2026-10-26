@@ -84,8 +84,6 @@ export interface BrainOptions {
   readonly maxNudges?: number;
   /** Absent: when it keeps a session. */
   readonly recurrences?: boolean;
-  /** 20 s when absent. */
-  readonly recurrenceTickMs?: number;
   /** Default later. */
   readonly wake?: (text: string) => void;
   /** Its clock (base/time.ts): message times, the recurrence ticks, the idle fold, a resumed run's age. A helper it
@@ -97,6 +95,9 @@ export interface McpStatus {
   readonly toolCount: number;
   readonly failed: string[];
 }
+
+/** How often the recurrences are looked at: a due one is woken within this. */
+const recurrenceTickMs = 20_000;
 
 export const resumedUnknown = "服务端在这个工具做完之前重启了，不知道它做没做成：先查一下现状，再决定要不要再做一遍。";
 
@@ -323,7 +324,7 @@ export class Brain {
       const s = jobs;
       // The first look is at once: what came due while it was away runs now, once.
       s.tick();
-      const every = options.recurrenceTickMs ?? 20_000;
+      const every = recurrenceTickMs;
       const next = () => {
         this.scheduleTimer = options.time.after(every, () => {
           s.tick();

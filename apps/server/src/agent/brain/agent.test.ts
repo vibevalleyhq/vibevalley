@@ -3,6 +3,9 @@ import { type AssistantMessage, fauxAssistantMessage, type FauxResponseFactory, 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { it as effectIt } from "@effect/vitest";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import { resumedUnknown, sessionUnfinished } from "./agent.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
@@ -10,7 +13,7 @@ import { type CompactionSummaryMessage, messageText, userMessage } from "./messa
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
 import { objectSchema, stopped, textTool } from "./tool.ts";
-import { wallTime } from "../../base/time.ts";
+import { timeHere, wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -273,19 +276,42 @@ describe("the agent", () => {
       join(dir, "recurrences.json"),
       `[{"id":"job-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
     );
-    await withAgent(
-      dir,
-      [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))],
-      async (r) => {
-        await until(() => r.has("agent_settled"));
-        const history = r.agent.history();
-        expect(history[0]!.role).toBe("custom");
-        expect(messageText(history[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
-      },
-      { recurrenceTickMs: 10 },
-    );
+    await withAgent(dir, [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))], async (r) => {
+      await until(() => r.has("agent_settled"));
+      const history = r.agent.history();
+      expect(history[0]!.role).toBe("custom");
+      expect(messageText(history[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
+    });
     expect(JSON.parse(readFileSync(join(dir, "recurrences.json"), "utf8"))).toEqual([]);
   });
+
+  // On the brain's Time (base/time.ts): an hour and its 20 s ticks are moved through, not waited for.
+  effectIt.effect("is woken when a recurrence comes due an hour later, at the next 20 s tick, not before", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
+      const time = yield* timeHere;
+      const move = Effect.runPromiseWith(yield* Effect.context<never>());
+      const dir = home();
+      writeFileSync(
+        join(dir, "recurrences.json"),
+        `[{"id":"job-1","name":"早报","message":"汇总昨天的进展","at":"2026-03-01T09:00:00.000Z","created":"2026-03-01T08:00:00.000Z"}]`,
+      );
+      yield* Effect.promise(() =>
+        withAgent(
+          dir,
+          [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))],
+          async (r) => {
+            await move(TestClock.adjust(59 * 60_000));
+            expect(r.has("agent_start")).toBe(false);
+            await move(TestClock.adjust(60_000 + 20_000));
+            await until(() => r.has("agent_settled"));
+            expect(messageText(r.agent.history()[1]!)).toBe("收到：【定时任务「早报」到点了（job-1）】\n汇总昨天的进展");
+          },
+          { time },
+        ),
+      );
+    }),
+  );
 
   it("keeps the same system prompt between folds and tells memory news in the input", async () => {
     const dir = home();
