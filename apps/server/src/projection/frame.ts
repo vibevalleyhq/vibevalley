@@ -8,20 +8,21 @@ import { inbox } from "../notice/inbox.ts";
 import { phaseWords } from "@vibevalley/protocol/rules";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { graphsOf } from "../task/issues.ts";
-import { canEditTask, canRemoveTask, graphActions, graphActionText, graphStateTag, taskActions, taskActionText, taskStateText } from "../task/graph.ts";
+import { canEditTask, canRemoveTask, graphActions, taskActions } from "../task/graph.ts";
+import { taskWording } from "../task/words.ts";
 import { viewOf } from "../game/view.ts";
 
 export function frameOf(state: WorkspaceState, effects: GameEffect[] = []): StateFrame {
   const graphs = graphsOf(state).map((g) => {
-    const graph = { ...g, stateTag: graphStateTag[g.state], actionText: { ...graphActionText }, actions: graphActions(g) };
+    const graph = { ...g, stateTag: taskWording().graphTag[g.state], actionText: { ...taskWording().graphAction }, actions: graphActions(g) };
     if (graph.tasks.length === 0) return graph;
     graph.tasks = graph.tasks.map((n) => {
       const actions = taskActions(graph, n);
       return {
         ...n,
-        stateText: taskStateText[n.state],
+        stateText: taskWording().taskState[n.state],
         actions,
-        actionText: Object.fromEntries(actions.map((a) => [a, taskActionText[a]])),
+        actionText: Object.fromEntries(actions.map((a) => [a, taskWording().taskAction[a]])),
         canEdit: canEditTask(graph, n),
         canRemove: canRemoveTask(graph, n),
       };

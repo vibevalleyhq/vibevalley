@@ -1,5 +1,6 @@
 // A task graph's rules. Texts are measured as JavaScript does.
 
+import { taskWording } from "./words.ts";
 import type { GraphAction, GraphState, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../base/dag.ts";
 
@@ -39,35 +40,6 @@ export function graphSpent(graph: TaskGraph): Spent | undefined {
   return priced ? { tokens, cny } : { tokens };
 }
 
-export const graphStateText: Record<GraphState, string> = {
-  splitting: "在拆",
-  draft: "等你看过再开工",
-  running: "在做",
-  paused: "暂停了",
-  ready: "都做完了，等你合进主分支",
-  done: "合进了主分支",
-  abandoned: "放弃了",
-};
-
-/** What each graph action is called; the buttons and the refusals say the same word. */
-export const graphActionText: Record<GraphAction, string> = { start: "开工", pause: "暂停", resume: "继续", abandon: "放弃", merge: "合进主分支" };
-
-/** The short tag beside a graph's state in the list; graphStateText is the longer sentence. */
-export const graphStateTag: Record<GraphState, string> = {
-  splitting: "在拆",
-  draft: "等你看",
-  running: "在做",
-  paused: "暂停了",
-  ready: "等你合",
-  done: "合进了",
-  abandoned: "放弃了",
-};
-
-export const taskStateText: Record<TaskState, string> = { waiting: "等着", working: "在做", merged: "合进去了", failed: "没做成", skipped: "跳过了" };
-
-/** What each task action is called. */
-export const taskActionText: Record<TaskAction, string> = { retry: "重试", skip: "跳过" };
-
 export const isAcceptance = (n: Task) => n.acceptance === true;
 
 const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.id, after: n.needs ?? [] }));
@@ -75,26 +47,26 @@ const dagOf = (tasks: readonly Task[]): DagNode[] => tasks.map((n) => ({ id: n.i
 export function graphProblems(tasks: readonly Task[] | null | undefined): string[] {
   const all = tasks ?? [];
   const problems: string[] = [];
-  if (all.length === 0) problems.push("计划里一步都没有");
-  if (all.length > maxTasks) problems.push(`最多 ${maxTasks} 步，这里有 ${all.length} 步：把小的步骤合并`);
+  if (all.length === 0) problems.push(taskWording().problem.empty);
+  if (all.length > maxTasks) problems.push(taskWording().problem.tooMany(maxTasks, all.length));
   const ids = new Set<string>();
   for (const n of all) {
-    if (!dagIDValid(n.id)) problems.push("「" + n.id + "」不能当步骤 id：用简短的英文，比如 api");
-    if (ids.has(n.id)) problems.push("步骤 id「" + n.id + "」重复了");
+    if (!dagIDValid(n.id)) problems.push(taskWording().problem.badId(n.id));
+    if (ids.has(n.id)) problems.push(taskWording().problem.duplicate(n.id));
     ids.add(n.id);
-    if (n.brief.trim() === "") problems.push("「" + n.id + "」没有工单");
-    if (isAcceptance(n) && (n.check ?? "").trim() === "") problems.push("验收步骤「" + n.id + "」没有检查命令：验收就是这条命令");
+    if (n.brief.trim() === "") problems.push(taskWording().problem.noBrief(n.id));
+    if (isAcceptance(n) && (n.check ?? "").trim() === "") problems.push(taskWording().problem.noCheck(n.id));
   }
   for (const p of dagProblems(dagOf(all))) {
     switch (p.kind) {
       case "self":
-        problems.push("「" + p.id + "」不能等自己");
+        problems.push(taskWording().problem.self(p.id));
         break;
       case "missing":
-        problems.push("「" + p.id + "」要等的「" + p.other + "」不存在");
+        problems.push(taskWording().problem.missing(p.id, p.other));
         break;
       case "circle":
-        if (problems.length === 0) problems.push("这几步互相等，成了一个圈：" + p.circle.join("、"));
+        if (problems.length === 0) problems.push(taskWording().problem.circle(p.circle));
         break;
       case "duplicate":
         // Said above, in the step's own place.

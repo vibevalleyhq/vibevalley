@@ -24,42 +24,31 @@ import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
-import { graphActions, graphActionText, graphProblems, graphStateText, isAcceptance, isOpen, taskActions, taskActionText, taskOf } from "./graph.ts";
+import { graphActions, graphProblems, isAcceptance, isOpen, taskActions, taskOf } from "./graph.ts";
 import { graphsOf } from "./issues.ts";
 import { clip } from "../base/text.ts";
 import {
   acceptanceChecks,
-  acceptancePassedText,
   acceptancesOf,
   allSettled,
   autoRetries,
   changeOf,
-  checkFailedText,
   defaultParallel,
   type EditResult,
   editTask,
   freshTask,
   frozenTouched,
-  frozenTouchedText,
   graphOf,
-  graphText,
-  issueSplitRefusal,
   parseSplit,
   removeTask,
-  retryText,
   startable,
   type StepDraft,
-  taskBrief,
   taskIssueID,
   withTask,
 } from "./rules.ts";
-import { actorText, graphChanges, graphEventText } from "./changes.ts";
+import { graphChanges, graphEventText, renderedChanges } from "./changes.ts";
 import { actsForOwner, type Actor, session as sessionActor, system } from "../base/actor.ts";
 
-/** A task graph starts many helpers at once and spends for each, and words in a helper's report or a page it read can
- * ask for a merge: only on the owner's word does a graph start or merge. */
-const startNeedsOwner = "计划开工要主人点头。这一轮不是主人叫你的：把拆好的计划给主人看，问要不要开工。";
-const mergeNeedsOwner = "合进主分支要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要收。";
 import { Clock, Context, Effect, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { SqlClient, SqlError } from "effect/sql";
 import { Agents } from "../agent/agent.ts";
@@ -73,7 +62,22 @@ import { type ProjectShape, Projects } from "../project/project.ts";
 import { MergeFailure, type ProjectError } from "../project/shapes.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { Runtimes } from "../runtime/runtime.ts";
-import { splitBrief } from "./rules.ts";
+import {
+  acceptancePassedText,
+  checkFailedText,
+  frozenTouchedText,
+  graphText,
+  issueSplitRefusal,
+  mergeNeedsOwner,
+  planMatch,
+  planNews,
+  planTell,
+  retryText,
+  splitBrief,
+  startNeedsOwner,
+  taskBrief,
+} from "./prompts.ts";
+import { taskWording } from "./words.ts";
 import { type Hired, type HireOptions, NotTakenIn, type Roster, type SessionNews, type SessionShape, Sessions } from "../session/session.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 
@@ -88,12 +92,12 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
-  graphActions(graph).map((action) => ({ say: graphActionText[action], run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })] }));
+  graphActions(graph).map((action) => ({ say: taskWording().graphAction[action], run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })] }));
 
 /** What the step allows now, as commands. */
 const stepNext = (graph: TaskGraph, task: Task): Next[] =>
   taskActions(graph, task).map((action) => ({
-    say: `${taskActionText[action]}「${task.title}」`,
+    say: taskWording().act.stepAct(taskWording().taskAction[action], task.title),
     run: ["graph", "task-act", graph.id, task.id, "--json", JSON.stringify({ action })],
   }));
 
@@ -188,7 +192,7 @@ export const make = (options: TaskOptions = {}) =>
     const tell = (id: string, text: string) => work.tell(id, text);
     const dismiss = (id: string) => Effect.asVoid(work.dismiss(id));
     const notice = (level: "info" | "warn", text: string) => core.notice(level, text);
-    const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, "【计划】" + text));
+    const tellOrchestrator = (text: string) => Effect.asVoid(PubSub.publish(newsHub, planNews.head + text));
 
     const usableAs = options.usable;
     const candidates = usableAs ? Effect.sync(() => store.agents().map((agent) => ({ agent, usable: usableAs(agent) }))) : runtimes.candidates;
@@ -196,7 +200,7 @@ export const make = (options: TaskOptions = {}) =>
     const get = (id: string) => graphOf(core.state(), id);
     const need = (id: string) => {
       const g = get(id);
-      return g ? Effect.succeed(g) : Effect.fail(missing(`没有 ${id} 这个计划`, [lookIn.graph]));
+      return g ? Effect.succeed(g) : Effect.fail(missing(taskWording().noGraph(id), [lookIn.graph]));
     };
 
     /** The history must never stop the graph itself: what cannot be written is logged. */
@@ -232,7 +236,7 @@ export const make = (options: TaskOptions = {}) =>
       const before = get(graph.id);
       yield* issues
         .putTask(graph)
-        .pipe(Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(`计划「${graph.title}」没能保存：${causeMessage(d)}`)) : Effect.die(d))));
+        .pipe(Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(taskWording().notSaved(graph.title, causeMessage(d)))) : Effect.die(d))));
       yield* record(before, graph, by.kind, why);
     });
 
@@ -243,25 +247,25 @@ export const make = (options: TaskOptions = {}) =>
       yield* putSystem(withNote({ ...graph, state: "abandoned" }, why));
       splitters.delete(graph.id);
       if (splitter) yield* dismiss(splitter);
-      yield* notice("warn", "计划「" + graph.title + "」没拆成：" + why);
-      yield* tellOrchestrator(graph.id + "「" + graph.title + "」没拆成：" + why + "。问主人要不要换个说法再拆。");
+      yield* notice("warn", taskWording().notice.notSplit(graph.title, why));
+      yield* tellOrchestrator(planNews.notSplit(graph.id, graph.title, why));
     });
 
     const split = Effect.fn("Tasks.split")(function* (graph: TaskGraph, session: Session, outcome: string, summary: string) {
       if (graph.state !== "splitting") return;
       const tries = splitterTries.get(graph.id) ?? 0;
-      if (outcome === "interrupted") return yield* giveUp(graph, "规划被叫停了");
+      if (outcome === "interrupted") return yield* giveUp(graph, taskWording().notice.planningStopped);
       if (outcome === "failed") {
-        if (tries >= 1) return yield* giveUp(graph, "规划的帮工出错了：" + summary);
+        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.plannerFailed(summary));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, "上一轮没做成。看一下报错，接着把计划拆完，最后用 json 代码块给出。");
+        yield* tell(session.id, planTell.retrySplit);
         return;
       }
       const parsed = parseSplit(work.find(session.id)?.lastText ?? "");
       if (!parsed.ok) {
-        if (tries >= 1) return yield* giveUp(graph, "没给出能用的计划：" + (parsed.problems[0] ?? ""));
+        if (tries >= 1) return yield* giveUp(graph, taskWording().notice.noPlan(parsed.problems[0] ?? ""));
         splitterTries.set(graph.id, tries + 1);
-        yield* tell(session.id, "计划有问题：\n" + parsed.problems.map((x) => "- " + x).join("\n") + "\n\n改好，在最后用一个 json 代码块重新给出整张计划。");
+        yield* tell(session.id, planTell.fixPlan(parsed.problems));
         return;
       }
       const draft = withNote({ ...graph, ...(parsed.title ? { title: parsed.title } : {}), tasks: parsed.tasks, state: "draft" }, "");
@@ -269,8 +273,8 @@ export const make = (options: TaskOptions = {}) =>
       splitters.delete(graph.id);
       splitterTries.delete(graph.id);
       yield* dismiss(session.id);
-      yield* notice("info", `计划「${draft.title}」拆好了，${draft.tasks.length} 步：在「计划」里看过再开工`);
-      yield* tellOrchestrator(draft.id + " 拆好了，等主人看过再开工（graph_action start）。用一两句话告诉主人拆成了哪几步。\n" + graphText(draft));
+      yield* notice("info", taskWording().notice.drafted(draft.title, draft.tasks.length));
+      yield* tellOrchestrator(planNews.drafted(draft.id, graphText(draft)));
     });
 
     const recurrence = Effect.fnUntraced(function* (id: string): Effect.fn.Return<void, ApiError> {
@@ -278,7 +282,7 @@ export const make = (options: TaskOptions = {}) =>
       if (!graph || graph.state !== "running") return;
       for (const task of startable(graph)) {
         const agent = chooseAgent(yield* candidates, task.brief, task.agent ?? "", "");
-        let refusal = "没有能派的帮工";
+        let refusal = taskWording().notice.noHelper;
         let hired: Session | undefined;
         if (agent) {
           const tag: SessionGraph = { id: graph.id, task: task.id };
@@ -294,7 +298,7 @@ export const make = (options: TaskOptions = {}) =>
         }
         if (!hired) {
           // Not now: it waits, and is tried again when a session finishes or leaves.
-          const note = "「" + task.title + "」先等着：" + refusal;
+          const note = taskWording().notice.waits(task.title, refusal);
           if (graph.note !== note) yield* putSystem(withNote(graph, note));
           return;
         }
@@ -315,17 +319,8 @@ export const make = (options: TaskOptions = {}) =>
 
     const taskFailed = Effect.fn("Tasks.taskFailed")(function* (graph: TaskGraph, task: Task, why: string) {
       yield* putSystem(withTask(graph, task.id, (n) => ({ ...n, state: "failed", conclusion: why, failures: (n.failures ?? 0) + 1 })));
-      yield* notice("warn", "计划「" + graph.title + "」的「" + task.title + "」没做成：" + why);
-      yield* tellOrchestrator(
-        graph.id +
-          " 的「" +
-          task.title +
-          "」（" +
-          task.id +
-          "）没做成：" +
-          why +
-          "。它后面的步骤在等；问主人是重试（task_action retry）、改工单，还是跳过（task_action skip）。",
-      );
+      yield* notice("warn", taskWording().notice.stepFailed(graph.title, task.title, why));
+      yield* tellOrchestrator(planNews.stepFailed(graph.id, graph.title, task.title, task.id, why));
     });
 
     const sendBack = Effect.fn("Tasks.sendBack")(function* (graph: TaskGraph, task: Task, session: string, text: string, why: string) {
@@ -344,25 +339,25 @@ export const make = (options: TaskOptions = {}) =>
       let changed: string[] = [];
       if (graph.branch && (isAcceptance(task) || acceptancesOf(graph, task).length > 0)) {
         const files = yield* Effect.result(projects.changedFiles(cwd, graph.branch));
-        if (files._tag === "Failure") return rejected("看不出它改了哪些文件：" + files.failure.message);
+        if (files._tag === "Failure") return rejected(taskWording().notice.unknownFiles(files.failure.message));
         changed = files.success;
       }
       if (isAcceptance(task) && task.check) {
-        if ((yield* projects.run(cwd, task.check)).ok) return rejected("验收 " + task.check + " 现在就通过了", acceptancePassedText(task.check));
+        if ((yield* projects.run(cwd, task.check)).ok) return rejected(taskWording().notice.acceptancePassed(task.check), acceptancePassedText(task.check));
         return { frozen: changed };
       }
       const touched = frozenTouched(graph, task, changed);
-      if (touched.length > 0) return rejected("改了冻结的验收：" + touched.join("、"), frozenTouchedText(touched));
+      if (touched.length > 0) return rejected(taskWording().notice.frozenTouched(touched), frozenTouchedText(touched));
       for (const check of [...(task.check ? [task.check] : []), ...acceptanceChecks(graph, task)]) {
         const ran = yield* projects.run(cwd, check);
-        if (!ran.ok) return rejected("做完跑 " + check + " 没通过", checkFailedText(check, ran.output));
+        if (!ran.ok) return rejected(taskWording().notice.checkFailed(check), checkFailedText(check, ran.output));
       }
       return { frozen: [] };
     });
 
     const taskDone = Effect.fn("Tasks.taskDone")(function* (graph: TaskGraph, task: Task, sessionId: string, conclusion: string) {
       const session = live.sessionOf(sessionId);
-      if (!graph.branch) return yield* taskFailed(graph, task, "计划还没有分支");
+      if (!graph.branch) return yield* taskFailed(graph, task, taskWording().notice.noBranch);
       const target = graph.branch;
       let verification: Verification | undefined;
       const merged = yield* Effect.result(
@@ -399,12 +394,10 @@ export const make = (options: TaskOptions = {}) =>
         ...(session?.spent ? { spent: { ...session.spent } } : {}),
       }));
       if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
-      yield* putSystem(next).pipe(Effect.mapError((e) => refused(`步骤「${task.title}」已合进计划分支，但完成状态没能保存：${reasonOf(e)}`)));
+      yield* putSystem(next).pipe(Effect.mapError((e) => refused(taskWording().notice.stepNotSaved(task.title, reasonOf(e)))));
       if (next.state === "ready") {
-        yield* notice("info", "计划「" + next.title + "」都做完了：在「计划」里看看改动，合进主分支");
-        yield* tellOrchestrator(
-          next.id + "「" + next.title + "」都做完了，等主人合进主分支（graph_action merge）。用两三句话告诉主人做成了什么。\n" + graphText(next),
-        );
+        yield* notice("info", taskWording().notice.ready(next.title));
+        yield* tellOrchestrator(planNews.ready(next.id, next.title, graphText(next)));
       }
     });
 
@@ -412,7 +405,7 @@ export const make = (options: TaskOptions = {}) =>
       if (outcome === "completed") return yield* taskDone(graph, task, session.id, summary);
       if (outcome === "failed") return yield* sendBack(graph, task, session.id, retryText(task), summary);
       if (graph.state !== "running") return;
-      yield* putSystem(withNote({ ...graph, state: "paused" }, "「" + task.title + "」被叫停了，计划先暂停；点继续接着做"));
+      yield* putSystem(withNote({ ...graph, state: "paused" }, taskWording().notice.stepStopped(task.title)));
     });
 
     const follow = (n: SessionNews) =>
@@ -440,9 +433,9 @@ export const make = (options: TaskOptions = {}) =>
             // Sent home from outside the graph (a full farm, the person): its step did not get done.
             for (const graph of graphsOf(core.state())) {
               if (!isOpen(graph)) continue;
-              if (splitters.get(graph.id) === f.id && graph.state === "splitting") yield* giveUp(graph, "规划的帮工被请走了");
+              if (splitters.get(graph.id) === f.id && graph.state === "splitting") yield* giveUp(graph, taskWording().notice.plannerGone);
               const task = graph.tasks.find((n) => n.session === f.id && n.state === "working");
-              if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, "帮工被请走了，这一步没做完");
+              if (task) yield* taskFailed(withTask(graph, task.id, unmanned), task, taskWording().notice.helperGone);
             }
           } else return;
           for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
@@ -460,8 +453,8 @@ export const make = (options: TaskOptions = {}) =>
           continue;
         }
         if (isBusy(session)) continue;
-        if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? "做完了");
-        else yield* tell(session.id, "接着把这一步做完：" + task.title);
+        if (session.phase._tag === "done") yield* taskDone(graph, task, session.id, session.lastRun?.summary ?? taskWording().notice.done);
+        else yield* tell(session.id, planTell.carryOn(task.title));
       }
     });
 
@@ -475,7 +468,7 @@ export const make = (options: TaskOptions = {}) =>
       const result = change(yield* need(id));
       if (!result.ok) return yield* Effect.fail(refused(result.problem));
       yield* put(result.graph, by);
-      return "改好了";
+      return taskWording().act.edited;
     }, lock.withPermits(1));
 
     // Run by the startup, after the sessions came back and marked the runs that stopped with the server.
@@ -483,10 +476,10 @@ export const make = (options: TaskOptions = {}) =>
       Effect.gen(function* () {
         for (const graph of graphsOf(core.state())) {
           if (graph.state === "splitting") {
-            yield* putSystem(withNote({ ...graph, state: "abandoned" }, "VibeValley 重启了，规划停在了半路：再说一遍要做什么"));
+            yield* putSystem(withNote({ ...graph, state: "abandoned" }, taskWording().notice.restartedSplitting));
             for (const h of live.presentSessions()) if (h.graph?.id === graph.id && h.graph.task === undefined) yield* dismiss(h.id);
           } else if (graph.state === "running" && graph.tasks.some((n) => n.state === "working")) {
-            yield* putSystem(withNote({ ...graph, state: "paused" }, "VibeValley 重启过，计划先暂停了；点继续接着做"));
+            yield* putSystem(withNote({ ...graph, state: "paused" }, taskWording().notice.restarted));
           }
         }
         for (const graph of graphsOf(core.state())) if (graph.state === "running") yield* recurrence(graph.id);
@@ -499,11 +492,11 @@ export const make = (options: TaskOptions = {}) =>
       comeBack,
       split: Effect.fn("Tasks.split")(function* (goal, project, agent, by) {
         const where = project.trim();
-        if (!goal.trim()) return yield* Effect.fail(refused("没说要做什么"));
-        if (!where) return yield* Effect.fail(refused("没说在哪个项目里做：项目是工作目录下的一个文件夹"));
+        if (!goal.trim()) return yield* Effect.fail(refused(taskWording().act.noGoal));
+        if (!where) return yield* Effect.fail(refused(taskWording().act.noProject));
         const all = yield* candidates;
-        const chosen = chooseAgent(all, "规划 计划 拆分 " + goal, agent, "");
-        if (!chosen) return yield* Effect.fail(refused("没有能派的帮工来拆计划", [lookIn.agent]));
+        const chosen = chooseAgent(all, planMatch(goal), agent, "");
+        if (!chosen) return yield* Effect.fail(refused(taskWording().act.noPlanner, [lookIn.agent]));
         const id = yield* issues.nextTaskId();
         const graph: TaskGraph = {
           id,
@@ -527,12 +520,12 @@ export const make = (options: TaskOptions = {}) =>
           { worktree: true, taskGraph: { id: graph.id }, issue: graph.id, trigger: { kind: "task" } },
         );
         if (!hired.session) {
-          const reason = hired.refused || "没派出去";
-          yield* put(withNote({ ...graph, state: "abandoned" }, "规划的帮工派不出去：" + reason), by);
+          const reason = hired.refused || taskWording().act.notSent;
+          yield* put(withNote({ ...graph, state: "abandoned" }, taskWording().act.plannerNotSent(reason)), by);
           return yield* Effect.fail(refused(reason));
         }
         splitters.set(graph.id, hired.session.id);
-        return `${hired.session.name} 去看代码、拆计划了（${graph.id}）。拆好了会放在「计划」里，你看过再开工。`;
+        return taskWording().act.planning(hired.session.name, graph.id);
       }, lock.withPermits(1)),
       splitIssue: Effect.fn("Tasks.splitIssue")(function* (sessionId, title, steps) {
         const state = core.state();
@@ -542,7 +535,7 @@ export const make = (options: TaskOptions = {}) =>
         if (why) return yield* Effect.fail(refused(why));
         const tasks = steps.map(freshTask);
         const problems = graphProblems(tasks);
-        if (problems.length > 0) return yield* Effect.fail(refused("步骤有问题，改好再拆：\n- " + problems.join("\n- ")));
+        if (problems.length > 0) return yield* Effect.fail(refused(taskWording().act.stepsWrong(problems)));
         let graph: TaskGraph = {
           id: issue!.id,
           title: title.trim() || issue!.title,
@@ -555,17 +548,20 @@ export const make = (options: TaskOptions = {}) =>
         };
         const branch = yield* openBranch(graph, session!.branch ?? "");
         graph = { ...graph, branch };
-        yield* put(graph, sessionActor(session!.id), session!.name + " 拆的").pipe(
-          Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但拆好的工单没能保存：${reasonOf(e)}`)),
+        yield* put(graph, sessionActor(session!.id), taskWording().notice.splitBy(session!.name)).pipe(
+          Effect.mapError((e) => refused(taskWording().notice.splitNotSaved(branch, reasonOf(e)))),
         );
         yield* recurrence(graph.id);
-        yield* notice("info", `${session!.name} 把工单「${graph.title}」拆成了 ${tasks.length} 张子工单，开工了`);
-        yield* tellOrchestrator(`${session!.name} 把工单 ${graph.id} 拆成了 ${tasks.length} 步，直接开工了。\n${graphText(graph)}`);
-        return `拆好了：工单「${graph.title}」下面 ${tasks.length} 张子工单，在分支 ${branch} 上开工了，每一步派给一个帮工。你这张工单的活交给它们了：别再改代码，用一两句话汇报拆成了哪几步，这一轮就结束，汇报完你就收工。`;
+        yield* notice("info", taskWording().notice.split(session!.name, graph.title, tasks.length));
+        yield* tellOrchestrator(planNews.split(session!.name, graph.id, tasks.length, graphText(graph)));
+        return planTell.split(graph.title, tasks.length, branch);
       }, lock.withPermits(1)),
       act: Effect.fn("Tasks.act")(function* (id, action, by) {
         const graph = yield* need(id);
-        const not = () => Effect.fail(refused(`计划「${graph.title}」${graphStateText[graph.state]}，不能${graphActionText[action]}`, graphNext(graph)));
+        const not = () =>
+          Effect.fail(
+            refused(taskWording().act.cannot(graph.title, taskWording().graphState[graph.state], taskWording().graphAction[action]), graphNext(graph)),
+          );
         switch (action) {
           case "start": {
             if (!actsForOwner(by)) return yield* Effect.fail(refused(startNeedsOwner));
@@ -574,21 +570,21 @@ export const make = (options: TaskOptions = {}) =>
             if (problems.length > 0) return yield* Effect.fail(refused(problems[0]!));
             const branch = yield* openBranch(graph);
             yield* put(withNote({ ...graph, state: "running", branch }, ""), by).pipe(
-              Effect.mapError((e) => refused(`计划分支 ${branch} 已创建，但开工状态没能保存：${reasonOf(e)}`)),
+              Effect.mapError((e) => refused(taskWording().act.startNotSaved(branch, reasonOf(e)))),
             );
             yield* recurrence(graph.id);
-            return "计划「" + graph.title + "」开工了，分支 " + branch;
+            return taskWording().act.started(graph.title, branch);
           }
           case "pause":
             if (graph.state !== "running") return yield* not();
-            yield* put(withNote({ ...graph, state: "paused" }, "暂停了：正在做的做完，不开新的步骤"), by);
-            return "计划「" + graph.title + "」暂停了：正在做的步骤做完，不再开新的";
+            yield* put(withNote({ ...graph, state: "paused" }, taskWording().act.pausedNote), by);
+            return taskWording().act.paused(graph.title);
           case "resume":
             if (graph.state !== "paused") return yield* not();
             yield* put(withNote({ ...graph, state: "running" }, ""), by);
             yield* resumeWorking(graph.id);
             yield* recurrence(graph.id);
-            return "计划「" + graph.title + "」接着做了";
+            return taskWording().act.resumed(graph.title);
           case "abandon": {
             if (!isOpen(graph)) return yield* not();
             const next = {
@@ -596,13 +592,13 @@ export const make = (options: TaskOptions = {}) =>
               state: "abandoned" as const,
               tasks: graph.tasks.map((n) => (n.state === "working" ? { ...unmanned(n), state: "waiting" as const } : n)),
             };
-            const kept = graph.branch ? "；分支 " + graph.branch + " 留着" : "";
-            yield* put(withNote(next, "放弃了" + kept), by);
+            const kept = graph.branch ? taskWording().act.branchKeptNote(graph.branch) : "";
+            yield* put(withNote(next, taskWording().act.abandonedNote(kept)), by);
             const splitter = splitters.get(graph.id);
             splitters.delete(graph.id);
             if (splitter) yield* dismiss(splitter);
             for (const n of graph.tasks) if (n.state === "working" && n.session) yield* dismiss(n.session);
-            return "计划「" + graph.title + "」放弃了" + (graph.branch ? "，分支 " + graph.branch + " 留着" : "");
+            return taskWording().act.abandoned(graph.title, graph.branch);
           }
           case "merge": {
             if (!actsForOwner(by)) return yield* Effect.fail(refused(mergeNeedsOwner));
@@ -610,28 +606,26 @@ export const make = (options: TaskOptions = {}) =>
             const merged = yield* Effect.result(projects.mergeBranch(graph.project, graph.branch));
             if (merged._tag === "Failure") {
               const f = merged.failure;
-              const why =
-                f.kind === "conflict" ? "合进 " + f.base + " 会冲突（" + f.files.join("、") + "）：" + f.base + " 在这期间变了" : f.reasonText || f.message;
-              yield* put(withNote(graph, "没合进去：" + why), by);
-              return yield* Effect.fail(refused("没合进去：" + why + "。计划分支 " + graph.branch + " 留着"));
+              const why = f.kind === "conflict" ? taskWording().act.conflict(f.base, f.files) : f.reasonText || f.message;
+              yield* put(withNote(graph, taskWording().act.notMergedNote(why)), by);
+              return yield* Effect.fail(refused(taskWording().act.notMerged(why, graph.branch)));
             }
-            yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(
-              Effect.mapError((e) => refused(`计划分支已合进主分支，但完成状态没能保存：${reasonOf(e)}`)),
-            );
-            yield* notice("info", "计划「" + graph.title + "」合进去了：" + merged.success);
-            return "计划「" + graph.title + "」合进去了：" + merged.success;
+            yield* put(withNote({ ...graph, state: "done" }, ""), by).pipe(Effect.mapError((e) => refused(taskWording().act.mergeNotSaved(reasonOf(e)))));
+            yield* notice("info", taskWording().act.merged(graph.title, merged.success));
+            return taskWording().act.merged(graph.title, merged.success);
           }
         }
-        return yield* Effect.fail(refused(`不认识 ${String(action satisfies never)} 这个动作`));
+        return yield* Effect.fail(refused(taskWording().act.unknownAction(String(action satisfies never))));
       }, lock.withPermits(1)),
       taskAct: Effect.fn("Tasks.taskAct")(function* (id, taskId, action, by) {
         const graph = yield* need(id);
         const task = taskOf(graph, taskId);
-        if (!task) return yield* Effect.fail(missing(`计划里没有「${taskId}」这一步`, [lookIn.graph]));
-        if (graph.state !== "running" && graph.state !== "paused") return yield* Effect.fail(refused("计划" + graphStateText[graph.state], graphNext(graph)));
+        if (!task) return yield* Effect.fail(missing(taskWording().act.noStep(taskId), [lookIn.graph]));
+        if (graph.state !== "running" && graph.state !== "paused")
+          return yield* Effect.fail(refused(taskWording().act.graphIs(taskWording().graphState[graph.state]), graphNext(graph)));
         switch (action) {
           case "retry": {
-            if (task.state !== "failed") return yield* Effect.fail(refused("「" + task.title + "」没有失败，不用重试", stepNext(graph, task)));
+            if (task.state !== "failed") return yield* Effect.fail(refused(taskWording().act.notFailed(task.title), stepNext(graph, task)));
             const session = task.session ? live.sessionOf(task.session) : undefined;
             if (session && !isBusy(session)) {
               // Its session is still there: it goes on in the same session, with the (perhaps changed) job.
@@ -639,30 +633,30 @@ export const make = (options: TaskOptions = {}) =>
                 withTask(graph, task.id, (n) => ({ ...n, state: "working", tries: 0 })),
                 by,
               );
-              yield* tell(session.id, retryText(task) + "\n\n这一步的工单：\n" + task.brief);
-              return session.name + " 接着做「" + task.title + "」";
+              yield* tell(session.id, planTell.retry(retryText(task), task.brief));
+              return taskWording().act.retried(session.name, task.title);
             }
             yield* put(
               withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "waiting", tries: 0 })),
               by,
             );
             yield* recurrence(graph.id);
-            return "「" + task.title + "」重新排上了";
+            return taskWording().act.requeued(task.title);
           }
           case "skip": {
             if (task.state !== "waiting" && task.state !== "failed")
               return yield* Effect.fail(
-                refused(task.state === "working" ? "「" + task.title + "」正在做，先叫停" : "「" + task.title + "」已经做完了", stepNext(graph, task)),
+                refused(task.state === "working" ? taskWording().act.working(task.title) : taskWording().act.finished(task.title), stepNext(graph, task)),
               );
             let next = withTask(graph, task.id, (n) => ({ ...unmanned(n), state: "skipped" }));
             if (allSettled(next)) next = withNote({ ...next, state: "ready" }, "");
             yield* put(next, by);
             if (task.session) yield* dismiss(task.session);
             yield* recurrence(graph.id);
-            return "跳过了「" + task.title + "」，后面的步骤照常开工";
+            return taskWording().act.skipped(task.title);
           }
         }
-        return yield* Effect.fail(refused(`不认识 ${String(action satisfies never)} 这个动作`));
+        return yield* Effect.fail(refused(taskWording().act.unknownAction(String(action satisfies never))));
       }, lock.withPermits(1)),
       editTask: (id, task, edit, by) => edited(id, (g) => editTask(g, task, edit), by),
       removeTask: (id, task, by) => edited(id, (g) => removeTask(g, task), by),
@@ -671,9 +665,9 @@ export const make = (options: TaskOptions = {}) =>
         const result = removeTask(graph, task);
         if (!result.ok) return yield* Effect.fail(refused(result.problem));
         const gone = taskOf(graph, task)!;
-        const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => `「${n.title}」`);
+        const waiting = graph.tasks.filter((n) => n.needs.includes(task)).map((n) => taskWording().event.step(n.title));
         return {
-          does: [`从计划「${graph.title}」删掉「${gone.title}」这一步`, ...(waiting.length > 0 ? [`${waiting.join("、")}不再等它`] : [])],
+          does: [taskWording().edit.remove(graph.title, gone.title), ...(waiting.length > 0 ? [taskWording().edit.stopWaiting(waiting)] : [])],
         };
       }),
       events: Effect.fn("Tasks.events")(function* (id) {
@@ -696,14 +690,21 @@ export const make = (options: TaskOptions = {}) =>
             ...(p.commits ? { commits: p.commits } : {}),
             at: row.created_at,
           };
-          return [{ ...e, text: graphEventText(changeOf(e), titleOf), actorText: actorText[e.actor] }];
+          return [
+            {
+              ...e,
+              ...(e.changes ? { changes: renderedChanges(e.changes) } : {}),
+              text: graphEventText(changeOf(e), titleOf),
+              actorText: taskWording().actor[e.actor],
+            },
+          ];
         });
       }),
       changes: Effect.fn("Tasks.changes")(function* (id) {
         const graph = yield* need(id);
-        if (!graph.branch) return yield* Effect.fail(refused("计划「" + graph.title + "」还没开工，没有分支"));
+        if (!graph.branch) return yield* Effect.fail(refused(taskWording().act.notStarted(graph.title)));
         const changes = yield* projects.branchChanges(graph.project, graph.branch).pipe(Effect.mapError((e) => refused(e.message)));
-        if (!changes) return yield* Effect.fail(refused("计划「" + graph.title + "」的分支不在了：先确认它是不是被删掉了"));
+        if (!changes) return yield* Effect.fail(refused(taskWording().act.branchGone(graph.title)));
         return changes;
       }),
       news: Effect.map(PubSub.subscribe(newsHub), Stream.fromSubscription),

@@ -11,7 +11,7 @@ import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
-import { graphText } from "../task/rules.ts";
+import { graphText } from "../task/prompts.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { traitsOf } from "../agent/prompts.ts";

@@ -23,7 +23,7 @@ import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibeval
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
-import { graphText } from "../task/rules.ts";
+import { graphText } from "../task/prompts.ts";
 import { inboxLines } from "../channel/rules.ts";
 import { Clock, Context, Effect, FiberSet, Layer } from "effect";
 import { Agents } from "../agent/agent.ts";
