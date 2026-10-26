@@ -77,6 +77,13 @@ export default defineConfig({
       // A switch on a closed union covers every member, or says with default that the rest are left out on purpose: a
       // member added later is then a compile error where it is not handled (AGENTS.md, 封闭的联合穷尽处理).
       "typescript/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+      // == only against null, where it means null or undefined.
+      "eslint/eqeqeq": ["error", "always", { null: "ignore" }],
+      // A promise is rejected with an Error, or passes on what it was given (an abort's reason, a caught error).
+      "typescript/prefer-promise-reject-errors": ["error", { allowThrowingAny: true, allowThrowingUnknown: true }],
+      // Inside try, a promise returned without await escapes its catch and finally.
+      "typescript/return-await": "error",
+      "eslint/no-fallthrough": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

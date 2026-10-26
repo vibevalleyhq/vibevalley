@@ -58,6 +58,7 @@ function show(e: BrainEvent, prompt: () => void) {
     case "agent_settled":
       write(dim(`（${e.run.aborted ? "停下了，" : ""}输入 ${e.run.usage.input}，缓存 ${e.run.usage.cacheRead}，输出 ${e.run.usage.output}）\n`));
       prompt();
+      return;
     default:
       break;
   }

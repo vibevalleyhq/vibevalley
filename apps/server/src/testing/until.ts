@@ -24,7 +24,7 @@ export const waitFor = <A, E, R>(get: Effect.Effect<A, E, R>, ok: (a: A) => bool
 export const untilGot = <A>(get: () => A | undefined | false | Promise<A | undefined | false>, what: string | (() => string), ms = 5_000) =>
   Effect.map(
     waitFor(
-      Effect.promise(async () => await get()),
+      Effect.promise(async () => get()),
       (got) => !!got,
       what,
       ms,
@@ -36,7 +36,7 @@ export const untilGot = <A>(get: () => A | undefined | false | Promise<A | undef
 export const until = (ok: () => boolean | Promise<boolean>, what: string | (() => string) = "it", ms = 5_000) =>
   Effect.asVoid(
     waitFor(
-      Effect.promise(async () => await ok()),
+      Effect.promise(async () => ok()),
       (held) => held,
       what,
       ms,
