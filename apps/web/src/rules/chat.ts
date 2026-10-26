@@ -8,7 +8,6 @@ import {
   type ChatMessage,
   type Conversation,
   everyone,
-  generalName,
   type Issue,
   orchestratorAgent,
   ownerId,
@@ -39,10 +38,10 @@ export function channelOf(chat: Chat | undefined, c: Conversation | undefined) {
   return conversationOf(chat, c.channel) ?? generalOf(chat);
 }
 
-export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : generalName);
+export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : wording().general);
 
-/** A channel as it is said in a line: #name, the general one 田头. */
-export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : generalName);
+/** A channel as it is said in a line: #name, the general one by its label (田头, Farm chat). */
+export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : wording().general);
 
 /** Where the page shows a conversation: the general is /chat. */
 export const chatPath = (c: Conversation | undefined) => (!c || c.kind === "general" ? "/chat" : `/chat/${c.id}`);

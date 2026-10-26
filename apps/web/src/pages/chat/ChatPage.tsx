@@ -1,7 +1,8 @@
 import { chatWording } from "./words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Conversation, generalName, type OrchestratorState, type Session } from "@vibevalley/protocol";
+import { type Conversation, type OrchestratorState, type Session } from "@vibevalley/protocol";
+import { wording } from "@vibevalley/protocol/words";
 import {
   channelName,
   channelOf,
@@ -226,7 +227,7 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
         >
           {/* Before the first frame the general is not there yet: it is still where you talk. */}
           <Show when={channels().length === 0}>
-            <ChannelRow label={generalName} here unread={0} />
+            <ChannelRow label={wording().general} here unread={0} />
           </Show>
           <For each={channels()}>
             {(c) => <ChannelRow label={channelName(c)} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
