@@ -40,6 +40,10 @@ function made(dir: string, mine: number, others: number) {
   mkdirSync(dir, { recursive: true });
   gitSync(dir, "init", "-q", "-b", "main");
   gitSync(dir, "config", "user.email", "test@vibevalley.test");
+  // No maintenance in the background after a commit: it takes .git/objects/maintenance.lock in the template while it is
+  // being copied, and a copy (which inherits this config) would race the test's own git the same way.
+  gitSync(dir, "config", "maintenance.auto", "false");
+  gitSync(dir, "config", "gc.auto", "0");
   for (let i = 0; i < mine; i++) gitSync(dir, "commit", "-q", "--allow-empty", "-m", `mine ${i}`);
   for (let i = 0; i < others; i++)
     execFileSync("git", ["-c", "user.name=other", "-c", "user.email=other@x", "commit", "-q", "--allow-empty", "-m", `other ${i}`], { cwd: dir });
