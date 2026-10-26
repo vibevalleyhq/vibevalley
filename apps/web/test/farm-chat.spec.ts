@@ -5,7 +5,7 @@
 import type { Page } from "@playwright/test";
 import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import { expect, gate, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 test.use({ farm: "farm-chat" });
@@ -65,15 +65,18 @@ test("a sentence said in 田头 shows in the window, and the orchestrator answer
 test("a sentence shows at once while the server takes its time, and only once after", async ({ page }) => {
   await openFarm(page);
   const chat = await openChat(page);
+  // The server takes its time: until the test has seen the sentence shown before it.
+  const server = gate();
   await page.route("**/api/v1/say", async (route) => {
-    await new Promise((r) => setTimeout(r, 1500));
+    await server.opened;
     await route.continue();
   });
   const box = chat.getByRole("textbox", { name: "对管家说，@ 叫帮工…" });
   await box.fill("先别动数据库");
   await box.press("Enter");
-  await expect(chat.getByLabel("发送中")).toContainText("先别动数据库", { timeout: 500 });
+  await expect(chat.getByLabel("发送中")).toContainText("先别动数据库");
   await expect(box).toHaveValue("");
+  server.open();
   await expect(chat.getByLabel("发送中")).toHaveCount(0, { timeout: 10_000 });
   await expect(chat.getByText("先别动数据库", { exact: true })).toHaveCount(1);
 });

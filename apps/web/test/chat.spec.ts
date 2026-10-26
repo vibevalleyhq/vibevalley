@@ -1,5 +1,5 @@
 import { generalName, type StateFrame, type VibeValleyApi } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import { expect, settled, test } from "./fixtures";
 
 // The state as the stream sends it: its first frame.
 async function stateOf(baseURL: string) {
@@ -143,6 +143,6 @@ test("the chat page as it looks", async ({ page, api }) => {
   await page.setViewportSize({ width: 600, height: 800 });
   await page.getByRole("button", { name: "频道列表" }).click();
   await expect(page.getByRole("complementary", { name: "频道和帮工" })).toBeInViewport({ ratio: 1 });
-  await page.waitForTimeout(300);
+  await settled(page);
   await page.screenshot({ path: test.info().outputPath("chat-narrow.png") });
 });

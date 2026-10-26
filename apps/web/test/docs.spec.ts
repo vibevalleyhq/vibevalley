@@ -53,15 +53,3 @@ test("Backspace at a block's start joins it to the one before", async ({ page, a
   const id = (await api.doc.list()).find((d) => d.title === title)!.id;
   expect((await api.doc.get({ id })).blocks.filter((b) => !b.deleted).map((b) => b.text.map((s) => s.t).join(""))).toEqual(["前半后半"]);
 });
-
-test("文档 as it looks", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const title = `样子 ${Date.now() % 100000}`;
-  await page.goto("/docs");
-  await page.getByLabel("新文档的标题").fill(title);
-  await page.getByRole("button", { name: "新文档" }).click();
-  const doc = page.getByRole("article", { name: title });
-  await doc.getByRole("button", { name: "演示：几个帮工一起写" }).click();
-  await page.waitForTimeout(6000);
-  await page.screenshot({ path: test.info().outputPath("docs.png") });
-});

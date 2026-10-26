@@ -62,9 +62,11 @@ test("the village runs for a while without errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
+  // The page's clock is moved through: three seconds of the village without waiting them out.
+  await page.clock.install();
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await page.waitForTimeout(3000);
+  await page.clock.runFor(3000);
   expect(errors).toEqual([]);
 });
 
@@ -86,13 +88,15 @@ test("the cursor is the tool's, and says whether it can be used where it points"
 test("helpers walk in, work their plots and the library, and light lanterns at night", async ({ page, server }) => {
   const frame = withHelpers(await firstFrame(server.url));
   await serveFrame(page, frame);
+  await page.clock.install();
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  // From the gate to their places at 42 art pixels a second.
-  await page.waitForTimeout(9000);
+  // From the gate to their places at 42 art pixels a second: the page's clock jumps there (a frame takes the whole step),
+  // not drawn frame by frame and not waited out.
+  await page.clock.fastForward(9000);
   await page.screenshot({ path: test.info().outputPath("day.png") });
   await page.goto("/?tod=0.95");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await page.waitForTimeout(9000);
+  await page.clock.fastForward(9000);
   await page.screenshot({ path: test.info().outputPath("night.png") });
 });

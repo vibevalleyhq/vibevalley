@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, settled, test } from "./fixtures";
 
 test("a helper is made, edited, turned off and deleted", async ({ page }) => {
   await page.goto("/agents");
@@ -65,6 +65,6 @@ test("帮工 as it looks", async ({ page }) => {
   await page.screenshot({ path: test.info().outputPath("agents.png") });
   await page.goto("/agents/new");
   await expect(page.getByText("新的", { exact: true })).toBeVisible();
-  await page.waitForTimeout(500);
+  await settled(page);
   await page.screenshot({ path: test.info().outputPath("agent-new.png") });
 });
