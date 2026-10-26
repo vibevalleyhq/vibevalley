@@ -4,7 +4,7 @@ import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { inCny } from "../runtime/price.ts";
 import { eventFacts, type FactContext, near, since, type Tracking } from "./facts.ts";
-import { MergeFailure } from "../project/project.ts";
+import { MergeFailure } from "../project/shapes.ts";
 import {
   checksOf,
   conflictBrief,

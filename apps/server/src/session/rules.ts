@@ -7,7 +7,7 @@ import type { Agent, Question, CheckResult, Conflict, CriterionCheck, Doing, Iss
 import { isBusy, roomLeft } from "@vibevalley/protocol/rules";
 import { clip, slice } from "../base/text.ts";
 import { runtimeLabel } from "../agent/seed.ts";
-import type { MergeFailure, Workplace } from "../project/project.ts";
+import type { MergeFailure, Workplace } from "../project/shapes.ts";
 
 const summaryMax = 160;
 
