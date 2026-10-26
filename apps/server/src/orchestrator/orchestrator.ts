@@ -14,7 +14,8 @@ import { isOpen } from "../task/graph.ts";
 import { graphText } from "../task/rules.ts";
 import { Clock, Context, Effect, FiberSet, Layer, Stream } from "effect";
 import { Agents, traitsOf } from "../agent/agent.ts";
-import { deepseek, defaultModel, type LLM, noDeepSeekKey } from "../agent/brain/config.ts";
+import { deepseek, defaultModel, type LLM, llmStreamFn, noDeepSeekKey } from "../agent/brain/config.ts";
+import { Llm } from "../ai/llm.ts";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { projectsDir, Settings } from "../base/config.ts";
@@ -173,6 +174,7 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const go = yield* FiberSet.makeRuntimePromise<never>();
+    const stream = llmStreamFn(yield* Llm, go);
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
     const general = chat.general();
@@ -188,7 +190,7 @@ export const make = (options: OrchestratorOptions = {}) =>
     const llmOf = (): LLM => {
       if (options.llm) return options.llm();
       // The key saved in settings, asked before each request: one saved while the orchestrator runs is used at once.
-      return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined);
+      return deepseek(deepseekModel(store.agent(orchestratorAgent)?.model.trim() ?? "", defaultModel), () => settings.deepseekApiKey() || undefined, stream);
     };
 
     const toolsFor = (current: () => Route) =>

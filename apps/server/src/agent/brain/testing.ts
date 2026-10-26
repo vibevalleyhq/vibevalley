@@ -47,7 +47,8 @@ export function fauxLLM(options: RegisterFauxProviderOptions = {}) {
     requests.push({ messages: structuredClone(context.messages), options: o });
     return faux.provider.streamSimple(model, context, o);
   };
-  const llm: LLM = { model: faux.getModel(), stream };
+  // pi-ai's faux model in the farm's Model type, the same fields, until the tests' model is the farm's own.
+  const llm: LLM = { model: faux.getModel() as unknown as LLM["model"], stream };
   return {
     faux,
     llm,

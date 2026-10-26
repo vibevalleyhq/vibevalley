@@ -10,7 +10,7 @@ import { models } from "../../ai/models.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { Brain, type BrainEvent } from "./agent.ts";
 import { codingTools } from "./coding.ts";
-import { deepseek, defaultModel, type LLM, type McpServer } from "./config.ts";
+import { defaultModel, type LLM, type McpServer } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
 import type { Time } from "../../base/time.ts";
 import type { CallbackLog } from "../../base/log.ts";
@@ -30,7 +30,7 @@ export interface RuntimeOptions {
   /** $VIBEVALLEY_HOME, else ~/.vibevalley, when absent. */
   readonly home?: () => string;
   /** Asked each session, so a key saved meanwhile is used; "" is the default model. Throws when there is no model to use. */
-  readonly llm?: (model: string) => LLM;
+  readonly llm: (model: string) => LLM;
   /** Where a session keeps its own tasks; absent, it keeps none. */
   readonly tasks?: (session: string) => AgentTaskStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
@@ -58,7 +58,7 @@ const refusedOptions = {
 
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   const home = options.home ?? defaultHome;
-  const llmOf = options.llm ?? ((model: string) => deepseek(model, process.env.DEEPSEEK_API_KEY ?? ""));
+  const llmOf = options.llm;
 
   const start = async (_installation: unknown, o: SessionOptions) => {
     // oar's refusableOrder, for these two.
