@@ -129,7 +129,7 @@
 - **表按模块命名。** 一个库里十几个模块的表共用一个命名空间：频道占了 `message`，`delivery` 会撞。规矩写进 `schema.test.ts`，加一张不合的表测试就失败。
 - **一份表结构，不留兼容，不搬数据。** 每次改名都多一段搬旧数据的代码，都在每次启动的路上；项目还没有外部用户，搬数据的代码只让架构成形期的每一步更慢。放弃了「改表写迁移」和「开机看到旧文件顺手导入」。以后有了用户，改存盘要重新写迁移：在 `0001_schema.up.sql` 后面加文件，并改这一条。
 - **主键用 uuidv7。** 带时间、同一进程里单调，跨表、跨农场导数据也不会打架。代价是已读位置和投递按 id 比先后：系统时钟往回调时，重启后的新消息可能排在旧消息前面；只有一个人在本机用，接受这个风险。
-- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[verify-orchestrator-evals](.agents/skills/verify-orchestrator-evals/SKILL.md)、`verify-server`）。
+- **测试用脚本扮演帮工，用真的 git。** 真实的农机要联网、登录、花钱，慢而且结果不固定，留给手动验证。没把 oar 整个换成假的：测不到它的事件折叠和汇报时机，那正是最容易出错的地方。代价是脚本不是模型：模型会不会照规矩写「结论：」、会不会自己解决冲突，只能真跑时看（[acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)、`acceptance/server.md`）。
 - **一套工具管格式、lint、构建和测试。** Vite+ 把 Vite、Vitest、oxlint、oxfmt 收在一个 `vp` 里，设置写在一个 `vite.config.ts`；oxlint 的带类型规则（没处理的 promise、数字不带比较函数的 `sort`、没用上的组件）在落地前就报出来。放弃了各装一份 ESLint、Prettier：两份设置、两套插件，慢一个量级。几条规则关掉，因为这里是有意的写法：`[...text]` 按码点切字、改之前先拷一份再遍历、`Effect.gen` 前的 `const self = this`。
 - **改名靠编译器和护栏，不靠全局替换。** `turn`、`station`、`harvest` 在 oar、游戏和界面文字里都是对的，盲目 `sed` 要花更多时间找回来。标识符改名用编辑器的重命名和 `tsc`，字符串、SQL、Markdown 用 `rg` 逐处改；改掉的旧名写进 `scripts/stale-names.ts`，回来时 `docs:verify` 失败。
 

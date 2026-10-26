@@ -131,7 +131,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
     // node itself, so the receipt's pid is the child's; it logs to stdout.
-    // The built page, when there is one, so verify-app can look at it on the same server.
+    // The built page, when there is one, so acceptance can screenshot it on the same server.
     const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
     const spawned = spawn("node", ["--import", "tsx", "src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])], {

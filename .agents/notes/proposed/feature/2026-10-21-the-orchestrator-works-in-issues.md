@@ -122,7 +122,7 @@ Status: proposed
 
 - 管家的工具里没有 `dispatch`；`issue_create` 不填 `start` 不开工，填了 `start` 有空地就开工、满了排进待办；开不了工时工单在备选、回答里有编号，再调一次不多建一张。
 - `issue_status` 挪到待办填另一个档案：等你看的工单，上一个帮工收工、分支留着，新帮工在同一张工单、同一条分支上开工，`assignee` 是新档案；处理中的拒绝；计划的、管家的拒绝。`PUT /api/v1/issues/{id}/status` 带 `agent` 结果一样。
-- 提示照意图写，评测样例（`apps/server/src/orchestrator/testdata/evals`）覆盖：只讨论不建单、问现状直接答不建单、记下不开工、指派不开工、记下并开工、叫停不取消、换人不新建。真模型重放按 `verify-orchestrator-evals` 另经主人同意再跑。
+- 提示照意图写，评测样例（`apps/server/src/orchestrator/testdata/evals`）覆盖：只讨论不建单、问现状直接答不建单、记下不开工、指派不开工、记下并开工、叫停不取消、换人不新建。真模型重放按 `acceptance/orchestrator-evals.md` 另经主人同意再跑。
 - 第 3 步：管家的工具里没有 `merge`；「收下」对没有改动的工单不碰 git，对有提交的照工单默认合并或开 PR，「先别合」留着分支；「查一下」记成 `deliver: answer` 的工单。
 
 ## Risks

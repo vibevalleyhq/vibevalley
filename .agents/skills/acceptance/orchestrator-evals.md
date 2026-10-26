@@ -1,11 +1,6 @@
----
-name: verify-orchestrator-evals
-description: 改了管家的提示（apps/server/src/orchestrator/orchestrator.ts 的 systemPrompt、agentPrompt）、管家的工具和它们的描述（apps/server/src/tool）、或 apps/server/src/agent/brain 拼提示和压缩的办法之后，用真的 DeepSeek 模型把 apps/server/src/orchestrator/testdata/evals 里的样例各重放 5 次，证明以前修好的错没有回来、新修的错修好了。也用在：把主人标出的做错的一轮（家目录的 orchestrator/evals/）做成样例进仓库；主人说「跑一下管家的评测」「管家又犯这个错了」「改了提示看看有没有变坏」。
----
+# 验收管家的评测
 
-# 验证管家的评测
-
-管家的测试用 pi-ai 的假模型，只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用 pi-ai 的假模型，只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 

@@ -1,11 +1,6 @@
----
-name: verify-mobile
-description: 改了手机壳（apps/mobile/**）、宿主的桥（packages/host/src/mobile.ts）、「连接到本机」的配对或放行（apps/server/src/lan）、或页面里用到宿主的地方（apps/web/src/app/Follow.tsx、apps/web/src/voice/call.ts）之后，在安卓模拟器上装一个真的应用，对着沙箱里的农场走一遍：配对、经「连接到本机」打开页面、页面经桥让手机弹通知、重开应用直接回到农场。用在：主人说「手机上看看」「验证手机壳」「配对还能用吗」。
----
+# 验收手机壳
 
-# 验证手机壳
-
-`apps/mobile` 的规则和桥有单元测试，但配对、钥匙串、WebView 里的 cookie、桥两头对不对得上，只有装一个真的应用才看得出来。这个 skill 用安卓模拟器和 `scripts/verify-server.ts` 的沙箱农场做这件事。
+[验收](.agents/skills/acceptance/SKILL.md)的一份分册。`apps/mobile` 的规则和桥有单元测试，但配对、钥匙串、WebView 里的 cookie、桥两头对不对得上，只有装一个真的应用才看得出来。这份用安卓模拟器和 `scripts/verify-server.ts` 的沙箱农场做这件事。
 
 ## 什么时候用
 
