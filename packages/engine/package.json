@@ -13,10 +13,10 @@
     "test": "vp test run"
   },
   "dependencies": {
-    "pixi.js": "^8.22.0"
+    "pixi.js": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^7.0.2"
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }

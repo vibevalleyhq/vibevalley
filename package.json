@@ -24,10 +24,10 @@
     "api:client": "vpx scripts/api-client.ts"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "effect": "4.0.5",
-    "eslint-plugin-solid": "0.18.1",
-    "typescript": "^7.0.2",
+    "@types/node": "catalog:",
+    "effect": "catalog:",
+    "eslint-plugin-solid": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

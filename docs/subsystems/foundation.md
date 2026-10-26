@@ -15,7 +15,7 @@
 
 ## 在哪
 
-- **仓库**：根目录的 `package.json` 是 Bun workspaces（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次；`vite`、`vitest` 经 `catalog` 和 `overrides` 指到 Vite+ 带的那一份。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`，每个包的 `check` 是 `tsc --noEmit`。
+- **仓库**：根目录的 `package.json` 是 Bun workspaces（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次（pnpm 12，设置都在 `pnpm-workspace.yaml`）。依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog 里，各包的 `package.json` 写 `catalog:`（Expo SDK 定的那批写 `catalog:expo`），同一个依赖全仓库只有一个版本；`pnpm add` 照 `catalogMode: strict` 把版本放进 catalog，手写的版本由 `scripts/catalog.test.ts` 拦下；`vite`、`vitest` 再经 `overrides` 指到 Vite+ 带的那一份。`site/` 不在 workspace 里，有自己的 `pnpm-workspace.yaml` 和版本；桌面版打包时把 `catalog:` 换成 pnpm 装的确切版本再交给 npm（`apps/desktop/scripts/package.ts`）。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`，每个包的 `check` 是 `tsc --noEmit`。
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
 - **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
