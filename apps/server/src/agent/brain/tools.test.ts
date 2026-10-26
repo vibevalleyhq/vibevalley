@@ -159,11 +159,12 @@ describe("recurrences", () => {
   it("run a missed job once", async () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Recurrences(dir, (text) => woke.push(text), wallTime);
+    // Each job is made at a moment of its own: the clock moves on a millisecond each time it is read.
+    let at = wallTime.now();
+    const s = new Recurrences(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at });
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m" }))).toMatch(/正好给一个/);
     expect(await fails(call(s.tools, "recurrence", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "recurrence", { name: "巡检", message: "看看测试", every_minutes: 10 });
-    await new Promise((r) => setTimeout(r, 2));
     await call(s.tools, "recurrence", {
       name: "提醒",
       message: "开会",

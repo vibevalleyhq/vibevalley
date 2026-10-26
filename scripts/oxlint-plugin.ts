@@ -4,6 +4,12 @@
  *   no-wall-clock: in the server, time is read and waited on through Effect's Clock (or the Time a class was handed,
  *   base/time.ts), so that a test's TestClock moves all of it. Date.now(), new Date() with no arguments, setTimeout and
  *   setInterval read or wait on the wall clock behind its back.
+ *
+ *   no-test-sleep: a test does not wait by the clock. What it waits for in the background it asks after with until or
+ *   whenState (apps/server/src/testing/until.ts), a window is moved through with TestClock, and a fake that should take
+ *   a while is held until the test lets it go (testing/helper.ts's releaseHeld). setTimeout, setInterval, Effect.sleep
+ *   and Playwright's waitForTimeout in a test are a guess at how long something takes: slow when it is quick, flaky when
+ *   it is slow.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
@@ -33,4 +39,27 @@ const noWallClock = defineRule({
   },
 });
 
-export default definePlugin({ meta: { name: "vibevalley" }, rules: { "no-wall-clock": noWallClock } });
+const noTestSleep = defineRule({
+  meta: {
+    messages: {
+      sleep:
+        "a test does not wait by the clock: ask after what it waits for (until, whenState), move a window with TestClock, or hold a fake until the test lets it go",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type === "Identifier" && (c.name === "setTimeout" || c.name === "setInterval")) context.report({ node, messageId: "sleep" });
+        else if (
+          c.type === "MemberExpression" &&
+          c.property.type === "Identifier" &&
+          (c.property.name === "waitForTimeout" || (c.property.name === "sleep" && c.object.type === "Identifier" && c.object.name === "Effect"))
+        )
+          context.report({ node, messageId: "sleep" });
+      },
+    };
+  },
+});
+
+export default definePlugin({ meta: { name: "vibevalley" }, rules: { "no-wall-clock": noWallClock, "no-test-sleep": noTestSleep } });

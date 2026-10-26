@@ -117,6 +117,8 @@ describe("core", () => {
       const seen = yield* Effect.forkScoped(
         incoming.pipe(
           Stream.take(128),
+          // On the TestClock: a reader slower than the burst, not a wait.
+          // oxlint-disable-next-line vibevalley/no-test-sleep
           Stream.tap(() => Effect.sleep(1)),
           Stream.runCount,
         ),

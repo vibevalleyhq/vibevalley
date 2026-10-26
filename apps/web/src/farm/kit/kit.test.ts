@@ -1,12 +1,15 @@
-import { expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { splitChips } from "./chips";
 import { pickItems } from "./pick";
 import { plainText, withMentions } from "./markdown";
 import { ToastStore } from "./toasts";
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// The toasts' timeouts run on fake timers, moved through rather than waited out.
+afterEach(() => vi.useRealTimers());
+const wait = (ms: number) => vi.advanceTimersByTime(ms);
 
-test("toasts come newest first and close after their timeout", async () => {
+test("toasts come newest first and close after their timeout", () => {
+  vi.useFakeTimers();
   const store = new ToastStore();
   let heard = 0;
   store.subscribe(() => heard++);
@@ -14,21 +17,22 @@ test("toasts come newest first and close after their timeout", async () => {
   const b = store.add({ title: "二", type: "warn", timeout: 0 });
   expect(store.toasts.map((t) => t.id)).toEqual([b, a]);
   expect(store.toasts[1]?.type).toBe("info");
-  await wait(40);
+  wait(40);
   expect(store.toasts.map((t) => t.id)).toEqual([b]);
   store.close(b);
   expect(store.toasts).toEqual([]);
   expect(heard).toBe(4);
 });
 
-test("a paused toast keeps what was left of its timeout", async () => {
+test("a paused toast keeps what was left of its timeout", () => {
+  vi.useFakeTimers();
   const store = new ToastStore();
   store.add({ title: "一", timeout: 30 });
   store.pause();
-  await wait(50);
+  wait(50);
   expect(store.toasts).toHaveLength(1);
   store.resume();
-  await wait(50);
+  wait(50);
   expect(store.toasts).toHaveLength(0);
 });
 

@@ -2,6 +2,7 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
 import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside } from "./session.ts";
@@ -38,7 +39,6 @@ describe("the orchestrator's runs", () => {
       yield* issue("i2");
       const finished: RunFinished[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.finishedRuns, (r) => Effect.sync(() => finished.push(r))));
-      yield* Effect.sleep(5);
       const journal = sessions.trajectories.openLog("orchestrator");
       const x = new AgentExecution("orchestrator", journal, (tool) => ({ text: tool, action: "other", tool }), sessions.runStore);
 
@@ -50,6 +50,7 @@ describe("the orchestrator's runs", () => {
       yield* x.observe(said("看完了"));
       yield* x.observe(end());
       expect(sessions.currentRun("orchestrator")).toBe("");
+      yield* until(() => finished.length === 1, "the first run finished");
       expect(finished).toEqual([{ id: expect.any(String), issues: ["i1", "i2"], outcome: "completed" }]);
       const runs = yield* sessions.runs("i2");
       expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
@@ -67,10 +68,12 @@ describe("the orchestrator's runs", () => {
       yield* x.observe(user("再来"), { by: { kind: "comment" } });
       yield* x.observe(said("", "error", "429 太多了"));
       yield* x.observe(end());
+      yield* until(() => finished.length === 2, "the second run finished");
       expect(finished.at(-1)!.outcome).toBe("failed");
 
       yield* x.observe(user("停"), { by: { kind: "comment" } });
       yield* x.observe(end("aborted"));
+      yield* until(() => finished.length === 3, "the third run finished");
       expect(finished.at(-1)!.outcome).toBe("interrupted");
 
       const failed = yield* x.failedStart({ by: { kind: "issue" }, issue: "i1" }, "派不出去的", "钥匙没填");

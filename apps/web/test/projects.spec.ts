@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, settled, test } from "./fixtures";
 
 test("a new plot is opened, shows on the map and opens its deed", async ({ page }) => {
   const name = `patch-${Date.now() % 100000}`;
@@ -49,6 +49,6 @@ test("项目 as it looks", async ({ page, api }) => {
   await api.project.create({ body: { name: `look-${Date.now() % 100000}` } }).catch(() => undefined);
   await page.goto("/projects");
   await expect(page.getByText(/\d+ 座岛 · /)).toBeVisible();
-  await page.waitForTimeout(800);
+  await settled(page);
   await page.screenshot({ path: test.info().outputPath("map.png") });
 });

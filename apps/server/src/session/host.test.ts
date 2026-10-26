@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { testConfig } from "../testing/layers.ts";
+import { aTurn } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { fauxLLM } from "../agent/brain/testing.ts";
 import { Sessions } from "./session.ts";
@@ -95,7 +96,8 @@ describe("AgentHost", () => {
       void closing.then(() => {
         closed = true;
       });
-      yield* Effect.sleep(10);
+      // A close that did not wait for the build would have ended by the next turn.
+      yield* aTurn;
       expect(closed).toBe(false);
       release();
       const result = yield* Effect.promise(() => submitting);

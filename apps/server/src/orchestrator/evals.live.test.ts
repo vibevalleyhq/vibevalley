@@ -72,6 +72,8 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
     const turn: AgentMessage[] = [];
     let tokens = 0;
     await new Promise<void>((done, fail) => {
+      // A real model's turn: the deadline is the point.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
       const timer = setTimeout(() => fail(new Error("the turn took too long")), 5 * 60_000);
       brain.subscribe((e) => {
         if (e.type === "message_end" && !isInput(e.message)) {

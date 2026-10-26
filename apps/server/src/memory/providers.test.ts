@@ -7,6 +7,7 @@ import { Database, DbLayer } from "../base/db.ts";
 import { Setting, layer as settingLayer } from "../setting/setting.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { testConfig } from "../testing/layers.ts";
+import { whenTrue } from "../testing/until.ts";
 import { type BuildSource, type FinishedRun, foundText, type Found, Memories, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
 import { mergeRecalled, type RecalledLine, type Source } from "./sources.ts";
@@ -77,10 +78,7 @@ const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Eff
 
 const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: "owner" });
 
-const until = async (ok: () => boolean) => {
-  for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
-  expect(ok()).toBe(true);
-};
+const until = (ok: () => boolean) => whenTrue(ok, "it");
 
 describe("memory sources", () => {
   it.live("one source recalls as the preview shows", () =>

@@ -21,7 +21,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { layer, Orchestrator, type OrchestratorShape } from "./orchestrator.ts";
 import { deepseekModel, intake, orchestratorModel } from "./rules.ts";
-import { untilGot as until } from "../testing/until.ts";
+import { gate, untilGot as until, whenTrue, within } from "../testing/until.ts";
 
 /** Words said to the orchestrator on the phone, as the voice line asks them. */
 const onPhone = (o: OrchestratorShape, text: string) => o.answerer("phone")(orchestratorModel)!(text, new AbortController().signal);
@@ -85,7 +85,15 @@ const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = te
   return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
 
-const settle = Effect.sleep(100);
+/** Everything handed to the orchestrator before this is taken once this is: it takes one input at a time. So a test that
+ * says nothing more came of something waits for this, not for a while. */
+const marked = (f: { readonly requests: readonly Request[] }) =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator;
+    const before = f.requests.length;
+    yield* orchestrator.say("（标记）", {}, undefined, "");
+    yield* until(() => f.requests.slice(before).some((c) => lastLine(c).includes("（标记）")), "the marker taken");
+  });
 
 const enableLab = Effect.gen(function* () {
   const agents = yield* Agents;
@@ -143,11 +151,12 @@ describe("the orchestrator", () => {
       const before = f.requests.length;
       yield* orchestrator.heard("随便说一句", "", "");
       yield* until(() => f.requests.length > before, "the orchestrator asked");
-      yield* settle;
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
+      const answered = f.requests.length;
+      yield* marked(f);
       expect(messagesIn(core.state().chat, chat.general()).some((m) => m.from === "user" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
-      expect(lastLine(f.requests.at(-1)!)).toContain("语音那边已经回答了");
+      expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -192,25 +201,27 @@ describe("the orchestrator", () => {
 
   // A line joining the run ends the brief before it with the words it got: it does not wait for the run's end.
   it.live("ends a brief when another line joins its run", () => {
+    // The brief's first answer waits until the call's line has come, so the line joins a run under way.
+    const answer = gate();
     const f = farm((c) => {
       const line = lastLine(c);
       if (answeredWith(c) !== undefined) return fauxAssistantMessage("看过了");
-      // Slow, so the call's line comes while this run is under way.
       if (line.includes("要告诉主人"))
-        return new Promise<AssistantMessage>((r) =>
-          setTimeout(() => r(fauxAssistantMessage([{ type: "text", text: "#41 交回来了" }, fauxToolCall("roster", {})])), 300),
-        ) as never;
+        return answer.opened.then(() => fauxAssistantMessage([{ type: "text", text: "#41 交回来了" }, fauxToolCall("roster", {})])) as never;
       return respond(c);
     });
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const said = yield* Effect.promise(async () => {
         const brief = orchestrator.brief("【要告诉主人】\n- #41 交回来了");
-        await new Promise((r) => setTimeout(r, 100));
+        await whenTrue(() => f.requests.some((c) => lastLine(c).includes("要告诉主人")), "the brief's run asking");
         const joined = (async () => {
           for await (const _ of onPhone(orchestrator, "还有别的吗")) void _;
         })();
-        const out = await Promise.race([brief, new Promise<string>((_, no) => setTimeout(() => no(new Error("the brief never ended")), 4000))]);
+        // The call's line is taken in the next turn of the event loop; then the brief's answer may come.
+        await new Promise((r) => setImmediate(r));
+        answer.open();
+        const out = await within(brief, 4000, "the brief");
         await joined;
         return out;
       });
@@ -222,8 +233,8 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
+      // A caller already gone returns before the line is taken: nothing was started to wait for.
       expect(yield* Effect.promise(() => orchestrator.brief("【要告诉主人】\n- #41 交回来了", AbortSignal.abort()))).toBe("");
-      yield* settle;
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -238,8 +249,8 @@ describe("the orchestrator", () => {
         for await (const w of words) out += w;
         return out;
       });
+      // Asked with a signal already off, it takes nothing: there is nothing to wait for.
       expect(said).toBe("");
-      yield* settle;
       expect(f.requests).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -265,7 +276,7 @@ describe("the orchestrator", () => {
           for await (const _ of orchestrator.answerer("api")(orchestratorModel)!("在吗", new AbortController().signal)) void _;
           return "ended";
         })().catch((e: Error) => e.message);
-        return Promise.race([words, new Promise<string>((r) => setTimeout(() => r("still waiting"), 3000))]);
+        return within(words, 3000, "the answer");
       });
       expect(got).toContain("额度读不出来");
       expect(f.requests).toHaveLength(0);
@@ -293,7 +304,8 @@ describe("the orchestrator", () => {
       const refusal = () => messagesIn(core.state().chat, chat.general()).filter((m) => m.from === orchestratorAgent);
       expect((yield* until(() => refusal()[0], "the refusal on 田头")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
-      yield* settle;
+      // Taken one at a time: once a third is answered, the second's refusal was said or not.
+      yield* pieces("（标记）");
       expect(refusal().length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(layer().pipe(Layer.provideMerge(below))));
   });
@@ -306,7 +318,7 @@ describe("the orchestrator", () => {
       for (let i = 0; i < 2; i++) yield* orchestrator.say("地里怎么样", {}, undefined, "k1");
       for (let i = 0; i < 2; i++) yield* orchestrator.heard("电话里问一句", "", "k2");
       yield* until(() => words().length >= 2, "its words");
-      yield* settle;
+      yield* marked(f);
       const heard = { 地里怎么样: 0, 电话里问一句: 0 };
       for (const m of f.requests.at(-1)!.messages) {
         const text = userText(m);
@@ -383,14 +395,10 @@ describe("the orchestrator", () => {
       expect(refused.text).toBe("合并：没动：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
-      const merged = yield* Effect.promise(async () => {
-        for (let i = 0; i < 500; i++) {
-          const t = await Effect.runPromise(issues.get(hired.session!.issue!));
-          if (t.closedAt !== undefined) return t;
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        throw new Error("never merged");
-      });
+      const merged = yield* until(async () => {
+        const t = await Effect.runPromise(issues.get(hired.session!.issue!));
+        return t.closedAt !== undefined && t;
+      }, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
       const general = (yield* Channels).general();
@@ -427,13 +435,7 @@ describe("the orchestrator", () => {
       expect([issue.status, issue.sessions]).toEqual(["backlog", []]);
       yield* orchestrator.say(`#${number} 开工`, {}, undefined, "");
       yield* until(() => words().some((w) => w.startsWith("工单：挪好了")), "started");
-      yield* Effect.promise(async () => {
-        for (let i = 0; i < 500; i++) {
-          if ((await Effect.runPromise(issues.get(issue.id))).status === "in_review") return;
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        throw new Error("never handed back");
-      });
+      yield* until(async () => (await Effect.runPromise(issues.get(issue.id))).status === "in_review", "handed back");
       yield* orchestrator.say("哪些在等我？", {}, undefined, "");
       const waiting = yield* until(() => words().find((w) => w.startsWith("工单：- #")), "listed");
       expect(waiting).toContain(`#${number}「首页偶尔白屏」等你验收`);
@@ -442,20 +444,26 @@ describe("the orchestrator", () => {
 
   it.live("lets a recurrence it sets unasked wait for the owner", () => {
     const daily = { name: "每日测试", text: "跑一遍测试", kind: "daily", time: "09:00" };
-    const f = farm((c) => {
-      const result = answeredWith(c);
-      if (result !== undefined) return fauxAssistantMessage("定时：" + result);
-      const line = lastLine(c);
-      if (line.includes("每天九点") || line.includes("定时任务")) return fauxAssistantMessage(fauxToolCall("recurrence", daily));
-      return respond(c);
-    });
+    let offset = 0;
+    const f = farm(
+      (c) => {
+        const result = answeredWith(c);
+        if (result !== undefined) return fauxAssistantMessage("定时：" + result);
+        const line = lastLine(c);
+        if (line.includes("每天九点") || line.includes("定时任务")) return fauxAssistantMessage(fauxToolCall("recurrence", daily));
+        return respond(c);
+      },
+      testConfig(),
+      () => Date.now() + offset,
+    );
     return Effect.gen(function* () {
       const recurrences = yield* Recurrences;
       const orchestrator = yield* Orchestrator;
       const words = yield* said;
       // Woken by a recurrence, not the owner: what it sets to come back daily waits.
       yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
-      yield* Effect.sleep(80);
+      // The farm's clock, not a wait, brings it due.
+      offset = 100;
       yield* recurrences.tick;
       yield* until(() => words().some((w) => w.startsWith("定时：定好了，等主人同意才生效")), "the orchestrator told it waits");
       const mine = (enabled: boolean) => recurrences.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
@@ -469,12 +477,14 @@ describe("the orchestrator", () => {
 
   // However its turn ends, the orchestrator's issue waits on the owner: a turn that did not fail is not an answer taken.
   it.live("leaves its issue for the owner to take as done", () => {
-    const f = farm();
+    let offset = 0;
+    const f = farm(respond, testConfig(), () => Date.now() + offset);
     return Effect.gen(function* () {
       const recurrences = yield* Recurrences;
       const issues = yield* Issues;
       const s = yield* recurrences.add({ name: "看进度", text: "看看", when: { kind: "once", at: Date.now() + 50 } }, "owner", true);
-      yield* Effect.sleep(80);
+      // The farm's clock, not a wait, brings it due.
+      offset = 100;
       yield* recurrences.tick;
       const core = yield* Core;
       const handed = yield* until(() => core.state().issues?.find((t) => t.recurrence === s.id && t.status === "in_review"), "handed back");
@@ -501,7 +511,7 @@ describe("the orchestrator", () => {
       yield* until(() => sessions.roster().some((r) => r.session.brief === "加个 CHANGELOG" && r.session.phase._tag === "done"), "the work handed back");
       const patrolLine = /^\[来源：巡查\]\n【巡查】[\s\S]*「加个 CHANGELOG」/;
       yield* notices.patrol;
-      yield* settle;
+      yield* marked(f);
       expect(f.requests.some((c) => lastLine(c).includes("【巡查】"))).toBe(false);
       offset = 3 * 3_600_000;
       yield* notices.patrol;
@@ -509,7 +519,7 @@ describe("the orchestrator", () => {
       expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#田头 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/);
       offset = 3.5 * 3_600_000;
       yield* notices.patrol;
-      yield* settle;
+      yield* marked(f);
       // Each request carries the whole conversation: count this work's patrol lines in the latest.
       const latest = f.requests.at(-1)!;
       expect(latest.messages.filter((m) => patrolLine.test(words(userText(m) ?? ""))).length).toBe(1);

@@ -17,7 +17,7 @@ import { notTakenIn } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";
 import { make, type TaskGit, type TaskWork } from "./task.ts";
-import { untilGot } from "../testing/until.ts";
+import { nextTurn, untilGot, whenTrue } from "../testing/until.ts";
 import * as q from "../../db/generated/task_event.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -79,8 +79,9 @@ class FakeWork implements TaskWork {
       return ["interrupted", ""];
     }
     if (id === "b" || id === "c") {
-      // b and c wait (a few seconds at most) until both have started: run side by side, they always overlap.
-      for (let i = 0; i < 500 && !(this.started.has("b") && this.started.has("c")); i++) await new Promise((r) => setTimeout(r, 10));
+      // b and c wait (a few seconds at most) until both have started: run side by side, they always overlap. Past that
+      // they go on, as a run outliving its test (its farm already gone) must, rather than fail in another test.
+      await whenTrue(() => this.started.has("b") && this.started.has("c"), "b and c both started").catch(() => undefined);
     }
     if (id === "repro" && n === 1) {
       this.written.add("fix");
@@ -103,7 +104,7 @@ class FakeWork implements TaskWork {
   }
 
   private async run(id: string, input: string) {
-    await new Promise((r) => setTimeout(r, 0));
+    await nextTurn();
     const h = this.core.session(id);
     if (!h) return;
     const [outcome, said] = await this.work(h, input);
@@ -465,13 +466,7 @@ describe("task graphs", () => {
         expect((yield* f.issues.get(a.sessions[0]!)).id).toBe(a.id);
         expect((yield* Effect.flip(f.issues.reopen(a.id, "", "")))._tag).toBe("Refused");
         yield* f.tasks.act(id, "merge", "user");
-        yield* Effect.promise(async () => {
-          for (let i = 0; i < 300; i++) {
-            if ((await Effect.runPromise(f.issues.get(id))).delivered === "merged") return;
-            await new Promise((r) => setTimeout(r, 10));
-          }
-          throw new Error("the graph's issue never closed as merged");
-        });
+        yield* untilGot(async () => (await Effect.runPromise(f.issues.get(id))).delivered === "merged", "the graph's issue closed as merged");
       }),
     ),
   );
@@ -511,9 +506,7 @@ describe("task graphs", () => {
         expect((yield* f.issues.get(taskIssueID(issue.id, "c"))).parent).toBe(issue.id);
         expect((yield* Effect.exit(f.tasks.splitIssue("h1", "", steps)))._tag).toBe("Failure");
         yield* f.core.apply({ type: "report", id: sessionId("h1"), outcome: "completed", summary: "拆成了三步", runs: 1 });
-        yield* Effect.promise(async () => {
-          for (let i = 0; i < 300 && f.core.session("h1"); i++) await new Promise((r) => setTimeout(r, 10));
-        });
+        yield* untilGot(() => !f.core.session("h1"), "h1 gone");
         expect(f.core.session("h1")).toBeUndefined();
         expect((yield* f.issues.get(issue.id)).closedAt).toBeUndefined();
       }),

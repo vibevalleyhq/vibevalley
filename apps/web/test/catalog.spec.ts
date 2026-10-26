@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, settled, test } from "./fixtures";
 
 test("the drawings are on shelves, and one opens large with its frames and how to draw it again", async ({ page }) => {
   await page.goto("/catalog");
@@ -39,6 +39,6 @@ test("图鉴 as it looks", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/catalog/fox-rain-down");
   await expect(page.getByRole("heading", { name: "fox-rain-down" })).toBeVisible();
-  await page.waitForTimeout(500);
+  await settled(page);
   await page.screenshot({ path: test.info().outputPath("catalog.png") });
 });

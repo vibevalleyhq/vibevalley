@@ -79,7 +79,8 @@ export interface CoreShape {
   readonly subscribe: Effect.Effect<Stream.Stream<SideEvent>, never, Scope.Scope>;
   readonly facts: Stream.Stream<Fact>;
   readonly live: Stream.Stream<LiveEvent>;
-  readonly owner: Stream.Stream<OwnerDid>;
+  /** What the owner did from now on, subscribed before this returns: none said after it is missed. */
+  readonly owner: Effect.Effect<Stream.Stream<OwnerDid>, never, Scope.Scope>;
   /** For the page, which folds no facts: the frame now, then one per burst of facts and effects. */
   readonly states: Stream.Stream<StateFrame>;
 }
@@ -246,7 +247,7 @@ export const make = Effect.gen(function* () {
       Stream.map(liveOf),
       Stream.filter((e): e is LiveEvent => e !== undefined),
     ),
-    owner: Stream.fromPubSub(owner),
+    owner: Effect.map(PubSub.subscribe(owner), Stream.fromSubscription),
     states,
   };
   return shape;

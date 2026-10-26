@@ -51,7 +51,6 @@ const echo = textTool<object>({
   parameters: objectSchema(),
   run: () => "ok",
 });
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Answers as given, usage and all (the faux provider counts its own); hang: the last answer starts and never ends. */
 function scripted(steps: AssistantMessage[], hang = false) {
@@ -364,7 +363,7 @@ describe("the agent's task graph", () => {
       async (r) => {
         await r.ask("拆一下");
         await until(() => nudged >= 2);
-        await sleep(300);
+        await r.agent.core.waitForIdle();
         expect(nudged).toBe(2);
         events = [...r.events];
       },

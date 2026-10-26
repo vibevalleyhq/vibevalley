@@ -1,7 +1,7 @@
 // A real server per worker (apps/server) on a free port with a temporary home and work root, serving
 // dist/ at /. Tests drive the page with `page` (its baseURL is the server) and set things up with `api`.
 
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -98,3 +98,21 @@ export const test = base.extend<{ api: VibeValleyApi }, { server: Server; farm: 
 });
 
 export { expect };
+
+/** The page as a screenshot should catch it: fonts in, every image decoded, two frames drawn. What a picture waits for,
+ * not a while (the tests do not wait by the clock: scripts/oxlint-plugin.ts). A scene that moves on with time is moved
+ * through with page.clock instead. */
+export async function settled(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all([...document.images].map((i) => i.decode().catch(() => undefined)));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+}
+
+/** A gate a route waits at until the test opens it: a slow server is slow until the test has seen what it wanted. */
+export function gate() {
+  let open = () => {};
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  return { opened, open: () => open() };
+}

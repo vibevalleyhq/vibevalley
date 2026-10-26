@@ -1,9 +1,12 @@
-import { afterEach, expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { farm, farmState, overlayOf, resetFarm } from "./store";
 import { aimTool, farmKey } from "./tools";
 import { beds } from "./world/plots";
 
-afterEach(resetFarm);
+afterEach(() => {
+  vi.useRealTimers();
+  resetFarm();
+});
 
 test("overlays stack in their fixed order, one of each kind, and close from the top", () => {
   farm.panel("shop");
@@ -16,10 +19,11 @@ test("overlays stack in their fixed order, one of each kind, and close from the 
   expect(farm.closeTop()).toBe(false);
 });
 
-test("a bed's effect plays for a while, then goes", async () => {
+test("a bed's effect plays for a while, then goes", () => {
+  vi.useFakeTimers();
   farm.bedFx(2, "water");
   expect(farmState().bedFx).toMatchObject([{ bed: 2, kind: "water" }]);
-  await new Promise((r) => setTimeout(r, 2300));
+  vi.advanceTimersByTime(2300);
   expect(farmState().bedFx).toEqual([]);
 });
 

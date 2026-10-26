@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, settled, test } from "./fixtures";
 
 // The worker's server is shared by its tests: each puts back what it changed.
 
@@ -120,7 +120,7 @@ test("设置 as it looks", async ({ page }) => {
   for (const part of ["deepseek", "memory", "connectors", "skills", "voice", "lan"]) {
     await page.goto(`/settings/${part}`);
     await expect(page.getByRole("region", { name: "设置的分区" })).toBeVisible();
-    await page.waitForTimeout(300);
+    await settled(page);
     await page.screenshot({ path: test.info().outputPath(`settings-${part}.png`) });
   }
 });

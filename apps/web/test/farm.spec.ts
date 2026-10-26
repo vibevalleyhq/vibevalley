@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, gate, settled, test } from "./fixtures";
 
 // The title screen shows on a machine's first visit; these tests start past it.
 test.beforeEach(async ({ page }) => {
@@ -16,21 +16,24 @@ test("/ draws the farm on a canvas, without errors", async ({ page }) => {
   await expect(farm.locator("canvas")).toHaveCSS("width", "1152px");
   await expect(page.getByText(/在等农场|连不上农场/)).toHaveCount(0);
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await page.waitForTimeout(500);
+  await settled(page);
   await page.screenshot({ path: "test-results/farm.png" });
   expect(errors).toEqual([]);
 });
 
 test("while the village's pictures come in, a bar says how far; drawn, it goes", async ({ page }) => {
-  // Each picture a little late, so the bar is there to see.
+  // The pictures wait until the bar has been seen.
+  const pictures = gate();
   await page.route("**/pixel/*.png", async (route) => {
-    await new Promise((r) => setTimeout(r, 150));
+    await pictures.opened;
     await route.continue();
   });
-  await page.goto("/farm/");
+  // Not to "load": that waits for the pictures, which wait for the bar to be seen.
+  await page.goto("/farm/", { waitUntil: "domcontentloaded" });
   const bar = page.getByRole("progressbar", { name: "进村" });
   await expect(bar).toBeVisible();
   await expect(page.getByText(/搬东西进村 \d+\/\d+/)).toBeVisible();
+  pictures.open();
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect(bar).toHaveCount(0);
 });

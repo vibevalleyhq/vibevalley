@@ -67,7 +67,7 @@
 
 1. 订阅 `core.Transitions()`，先对当时的状态跑 `catchUp`。
 2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；田头的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`（流式更新的同一条消息只算一次）；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
-3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.OwnerDids` 记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
+3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.owner`（返回前就订上：开机后主人马上做的也不漏）记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
 4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `progress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
 
 **数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `report` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `commits` 事实。
@@ -76,7 +76,7 @@
 
 ## 和谁打交道
 
-- **核心状态（`core`）**：游戏只经 `core.Facts()`、`core.Transitions()`、`core.OwnerDids()` 听，经 `Core.apply` 施加 `progress`、`station`、`commits`。
+- **核心状态（`core`）**：游戏只经 `core.Facts()`、`core.Transitions()`、`core.owner` 听，经 `Core.apply` 施加 `progress`、`station`、`commits`。
 - **项目（`project`）**：`commits` 调 `project.Contributions`，带上配置的 `git_emails`。
 - **工单（`issue`）、语音（`voice`）**：只经 `core.Did` 说主人做了什么，不 import `game`。
 - **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievements`、`game.chooseTitle`、`channel.say` 的 `station`。
