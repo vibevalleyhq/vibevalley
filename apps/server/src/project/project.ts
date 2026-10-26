@@ -7,6 +7,7 @@
 // the branch. Two sessions sent to a new project at once must not both run git init, and two merges must not merge
 // into the same branch together: each project's git work runs one at a time.
 
+import { projectWording } from "./words.ts";
 import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
@@ -58,8 +59,8 @@ export function githubRepository(input: string): { name: string; url: string } |
 }
 
 export function projectProblem(req: NewProject): string {
-  if (!projectName.test(req.name)) return "项目名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符";
-  if (req.github !== undefined && !githubRepository(req.github)) return "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source";
+  if (!projectName.test(req.name)) return projectWording().badName;
+  if (req.github !== undefined && !githubRepository(req.github)) return projectWording().badGithub;
   return "";
 }
 
@@ -69,15 +70,15 @@ const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.D
 const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
-  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
+  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check(projectWording().branchMoved));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
 const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: string) {
   const removed = yield* repository(path).removeWorktree(place.cwd, true);
-  if (removed) return `改动已合并，worktree ${place.cwd} 和分支 ${place.branch} 尚未清理：${removed}`;
+  if (removed) return projectWording().mergedWorktreeLeft(place.cwd, place.branch, removed);
   const deleted = yield* repository(path).deleteBranch(place.branch!);
-  if (deleted) return `改动已合并，分支 ${place.branch} 尚未清理：${deleted}`;
+  if (deleted) return projectWording().mergedBranchLeft(place.branch, deleted);
   return "";
 });
 
@@ -114,7 +115,7 @@ const leftOut = [
 
 export const tokeiArgs = (path: string) => ["--output", "json", ...leftOut.flatMap((p) => ["--exclude", p]), path];
 
-const noTokei = "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计";
+const noTokei = () => projectWording().noTokei;
 
 /** 53 weeks, so a whole year of weeks shows whatever day it is. */
 const yearDays = 53 * 7;
@@ -172,7 +173,7 @@ export function activityOf(log: string, dayOf: (ms: number) => string = localDay
     if (!Number.isFinite(seconds) || seconds <= 0 || line.slice(0, tab).trim() === "") continue;
     const day = dayOf(Math.trunc(seconds * 1000));
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
-    const name = line.slice(tab + 1).trim() || "无名";
+    const name = line.slice(tab + 1).trim() || projectWording().noName;
     byAuthor.set(name, (byAuthor.get(name) ?? 0) + 1);
   }
   const days = [...byDay].map(([day, commits]) => ({ day, commits })).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
@@ -212,13 +213,13 @@ const runGitHub: GitHubRun = (...args) =>
 export const probeGitHub = Effect.fn("Projects.probeGitHub")(function* (gh: GitHubRun) {
   const s: GitHubStatus = { checkedAt: yield* Clock.currentTimeMillis, installed: false, loggedIn: false };
   const version = yield* gh("--version");
-  if (!version.ok) return { ...s, reason: version.missing ? "没装 gh" : "gh 检测失败" };
+  if (!version.ok) return { ...s, reason: version.missing ? projectWording().gh.missing : projectWording().gh.failed };
   const v = ghVersion.exec(version.out)?.[1];
   const installed: GitHubStatus = { ...s, installed: true, ...(v ? { version: v } : {}) };
   const auth = yield* gh("auth", "status", "--hostname", "github.com", "--active");
-  if (!auth.ok) return { ...installed, reason: "没登录 GitHub" };
+  if (!auth.ok) return { ...installed, reason: projectWording().gh.signedOut };
   const account = ghAccount.exec(auth.out)?.[1];
-  if (!account) return { ...installed, reason: "无法确认 GitHub 登录账号" };
+  if (!account) return { ...installed, reason: projectWording().gh.noAccount };
   return { ...installed, loggedIn: true, account };
 });
 
@@ -297,11 +298,11 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const ensure = Effect.fn("Projects.ensure")(
       function* (name: string) {
-        if (!projectName.test(name)) return yield* fail(`「${name}」不能当项目名：用一个简单的英文文件夹名，比如 clock-in`);
+        if (!projectName.test(name)) return yield* fail(projectWording().notProjectName(name));
         yield* Effect.orDie(fs.makeDirectory(join(root, name), { recursive: true }));
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
         const path = yield* Effect.orDie(fs.realPath(join(root, name)));
-        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail("项目必须在工作目录里面，不能链接到外面");
+        if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail(projectWording().outside);
         // A folder is a repository's top when it holds .git (a folder, or a file in a worktree): read, not asked of git,
         // which would cost a process each time a project is used.
         if (!(yield* exists(join(path, ".git")))) {
@@ -310,9 +311,11 @@ export const make = (hooks: ProjectHooks = {}) =>
           if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
             yield* Effect.orDie(fs.writeFileString(join(path, "README.md"), `# ${name}\n`));
           yield* git(path, "add", "-A");
-          yield* repository(path).commit("初始提交（VibeValley 建的项目）");
+          yield* repository(path).commit(projectWording().commit.initial);
         } else if (!(yield* gitOk(path, "rev-parse", "--verify", "HEAD"))) {
-          yield* git(path, "commit", "-q", "--allow-empty", "-m", "初始提交").pipe(Effect.catch(() => repository(path).commit("初始提交")));
+          yield* git(path, "commit", "-q", "--allow-empty", "-m", projectWording().commit.initialShort).pipe(
+            Effect.catch(() => repository(path).commit(projectWording().commit.initialShort)),
+          );
         }
         return path;
       },
@@ -342,8 +345,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const find = (name: string) => Effect.map(list(), (all) => all.find((p) => p.name === name));
 
     const capability = (name: string): PullRequestCapability =>
-      capabilities.get(name) ??
-      (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: "尚未检测项目，请刷新 GitHub 状态" });
+      capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: projectWording().notChecked });
 
     const maxSessions = () => (perProject <= 0 || perProject > maxRunning ? maxRunning : perProject);
 
@@ -373,7 +375,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       const path = join(root, name);
       const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
       const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* repository(path).mainOrNone;
-      const kept = Effect.as(Effect.logWarning(`project ${name}: 无法从 origin 快进主分支，保留本地主分支`), main);
+      const kept = Effect.as(Effect.logWarning(`project ${name}: could not fast-forward main from origin, keeping the local main`), main);
       if (main === "") return yield* kept;
       const fetched = hooks.fetch
         ? yield* hooks.fetch(path, main)
@@ -406,10 +408,10 @@ export const make = (hooks: ProjectHooks = {}) =>
       const r = yield* run(file, [], { cwd, timeoutMs: checkTimeoutMs });
       if (r.code === 0) return;
       const why = r.timedOut
-        ? `项目检查 .vibevalley/check 超时（${checkTimeoutMs / 1000}s）`
+        ? projectWording().check.timedOut(checkTimeoutMs / 1000)
         : r.code < 0
-          ? `项目检查 .vibevalley/check 没通过：${reason(r.stderr)}`
-          : `项目检查 .vibevalley/check 没通过：exit status ${r.code}`;
+          ? projectWording().check.failed(reason(r.stderr))
+          : projectWording().check.exited(r.code);
       const lines = (r.stdout + r.stderr)
         .slice(-64 * 1024)
         .trim()
@@ -420,7 +422,7 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
     const checkMerge = Effect.fn("Projects.checkMerge")(function* (place: Workplace, target: string) {
-      yield* repository(place.cwd).commitLeft("合并前把没提交的改动一并提交");
+      yield* repository(place.cwd).commitLeft(projectWording().commit.leftOver);
       const path = join(root, place.project);
       const into = target || (yield* repository(path).main);
       const checked = yield* repository(path).tip(place.branch!);
@@ -431,7 +433,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     });
 
     const checkLocalMerge = Effect.fn("Projects.checkLocalMerge")(function* (place: Workplace) {
-      yield* repository(place.cwd).commitLeft("合并前把没提交的改动一并提交");
+      yield* repository(place.cwd).commitLeft(projectWording().commit.leftOver);
       const path = join(root, place.project);
       const main = yield* serially(
         place.project,
@@ -457,11 +459,8 @@ export const make = (hooks: ProjectHooks = {}) =>
         const merged = yield* gitRun(path, "merge", "--no-edit", branch);
         if (merged.code !== 0) {
           const aborted = yield* gitRun(path, "merge", "--abort");
-          if (aborted.code !== 0)
-            return yield* fail(
-              `合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}；退出合并也没成功（${reason(aborted.stderr)}），${main} 停在合并到一半，要手动收拾`,
-            );
-          return yield* fail(`合并进 ${main} 没成功，${kept}：${reason(merged.stderr)}`);
+          if (aborted.code !== 0) return yield* fail(projectWording().mergeStuck(main, kept, reason(merged.stderr), reason(aborted.stderr)));
+          return yield* fail(projectWording().mergeFailed(main, kept, reason(merged.stderr)));
         }
       }
       return { main, ahead };
@@ -487,21 +486,21 @@ export const make = (hooks: ProjectHooks = {}) =>
             // Exclusive creation also refuses existing empty folders and symlinks.
             const madeDir = yield* Effect.result(fs.makeDirectory(path));
             if (madeDir._tag === "Failure")
-              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? `「${req.name}」已经存在，请换个项目名` : reason(madeDir.failure));
+              return yield* fail(madeDir.failure.reason._tag === "AlreadyExists" ? projectWording().exists(req.name) : reason(madeDir.failure));
             pending.add(req.name);
             const made = Effect.gen(function* () {
               if (req.github !== undefined) {
                 const { url } = githubRepository(req.github)!;
                 const known = status?.checkedAt ? status : yield* probeGitHub(gh);
                 if (known.loggedIn) {
-                  if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail("下载失败：请确认 GitHub 登录、仓库权限和网络后重试");
+                  if (!(yield* gh("repo", "clone", githubOrigin(url), path)).ok) return yield* fail(projectWording().cloneFailedGh);
                 } else {
                   const cloned = yield* run("git", ["-c", "credential.helper=", "-c", "core.askPass=", "clone", "--", url, path], {
                     cwd: root,
                     env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_LFS_SKIP_SMUDGE: "1" },
                     timeoutMs: cloneTimeoutMs,
                   });
-                  if (cloned.code !== 0) return yield* fail("下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试");
+                  if (cloned.code !== 0) return yield* fail(projectWording().cloneFailed);
                 }
               } else yield* ensure(req.name);
               return { name: req.name, path, git: true };
@@ -520,10 +519,10 @@ export const make = (hooks: ProjectHooks = {}) =>
         const p = yield* find(name);
         if (!p) return undefined;
         const r = yield* run(tokei, tokeiArgs(p.path), { timeoutMs: 60_000 });
-        if (r.missing) return yield* fail(noTokei);
-        if (r.code !== 0) return yield* fail("tokei 没数完：" + reason(r.stderr));
+        if (r.missing) return yield* fail(noTokei());
+        if (r.code !== 0) return yield* fail(projectWording().tokeiFailed(reason(r.stderr)));
         const languages = countsOf(r.stdout);
-        if (!languages) return yield* fail("tokei 的输出读不懂：换个新一点的 tokei 试试");
+        if (!languages) return yield* fail(projectWording().tokeiUnread);
         return { project: name, at: yield* Clock.currentTimeMillis, languages };
       }),
       activity: Effect.fn("Projects.activity")(function* (name) {
@@ -603,7 +602,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         if (!project) return undefined;
         const path = join(root, project);
         const present = yield* Effect.result(repository(path).hasBranch(branch));
-        if (present._tag === "Failure") return yield* fail(`没能读取分支 ${branch}：${reason(present.failure)}`);
+        if (present._tag === "Failure") return yield* fail(projectWording().noBranchRead(branch, reason(present.failure)));
         if (!present.success) return undefined;
         return yield* describe(project, "", branch);
       }),
@@ -629,7 +628,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       merge: (place) =>
         toMergeFailure(
           Effect.gen(function* () {
-            if (!place.branch) return { text: "它直接在项目里干活，没有要合并的分支", commits: 0 };
+            if (!place.branch) return { text: projectWording().inProjectNoBranch, commits: 0 };
             const path = join(root, place.project);
             const checked = yield* checkLocalMerge(place);
             return yield* serially(
@@ -637,12 +636,11 @@ export const make = (hooks: ProjectHooks = {}) =>
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
                 const head = yield* repository(path).main;
-                if (!(yield* repository(path).isAncestor(head, checked)))
-                  return yield* Effect.fail(MergeFailure.check("主分支在检查期间又变了，请重新检查再合"));
-                const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`, head);
+                if (!(yield* repository(path).isAncestor(head, checked))) return yield* Effect.fail(MergeFailure.check(projectWording().mainMoved));
+                const { main, ahead } = yield* mergeMain(path, place.branch!, projectWording().keptBoth(place.branch), head);
                 const warning = yield* cleanupMerged(place, path);
                 return {
-                  text: ahead > 0 ? `${ahead} 个提交合进了 ${place.project} 的 ${main}` : "这一单没有新的提交",
+                  text: ahead > 0 ? projectWording().merged(ahead, place.project, main) : projectWording().nothingNew,
                   commits: ahead,
                   ...(warning ? { warning } : {}),
                 };
@@ -654,7 +652,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         toMergeFailure(
           Effect.gen(function* () {
             const path = join(root, place.project);
-            if (!place.branch) return yield* Effect.fail(MergeFailure.error("它直接在项目里干活，没有分支可合"));
+            if (!place.branch) return yield* Effect.fail(MergeFailure.error(projectWording().inProjectNothing));
             const checked = yield* checkMerge(place, target);
             return yield* serially(
               place.project,
@@ -668,7 +666,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                   const theirs = yield* git(path, "rev-parse", place.branch!);
                   const next = (yield* repository(path).isAncestor(ours, theirs))
                     ? theirs
-                    : yield* repository(path).mergeCommit(ours, theirs, "合并 " + place.branch);
+                    : yield* repository(path).mergeCommit(ours, theirs, projectWording().commit.merge(place.branch));
                   // Only from where it was: a target moved meanwhile is not written over.
                   yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
                 }
@@ -689,10 +687,10 @@ export const make = (hooks: ProjectHooks = {}) =>
             project,
             Effect.gen(function* () {
               const path = join(root, project);
-              const { main, ahead } = yield* mergeMain(path, branch, `${branch} 分支留着`);
-              let said = ahead > 0 ? `${ahead} 个提交合进了 ${project} 的 ${main}` : "计划分支上没有新的提交";
+              const { main, ahead } = yield* mergeMain(path, branch, projectWording().keptBranch(branch));
+              let said = ahead > 0 ? projectWording().merged(ahead, project, main) : projectWording().nothingNewInPlan;
               const deleted = yield* repository(path).deleteBranch(branch);
-              if (deleted) said += `；改动已合并，分支 ${branch} 尚未清理：${deleted}`;
+              if (deleted) said += projectWording().branchLeft(branch, deleted);
               return said;
             }),
           ),
@@ -707,7 +705,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (yield* repository(path).removeWorktree(place.cwd, false))
               return {
                 kept: true,
-                reason: `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}`,
+                reason: projectWording().clear.uncommitted(place.branch, place.cwd),
               };
             // A branch with nothing new on it is clutter; one with commits is kept, so nothing is lost.
             const main = (yield* repository(path).mainOrNone) || "main";
@@ -717,16 +715,16 @@ export const make = (hooks: ProjectHooks = {}) =>
               .pipe(Effect.orElseSucceed(() => 1));
             if (ahead === 0) {
               const removed = yield* repository(path).deleteBranch(place.branch);
-              return removed ? { kept: true, reason: `${place.branch} 没清掉：${removed}` } : { kept: false };
+              return removed ? { kept: true, reason: projectWording().clear.branchLeft(place.branch, removed) } : { kept: false };
             }
             return {
               kept: true,
-              reason: `${place.branch} 上有 ${ahead} 个没合的提交，分支留着，worktree 清掉了`,
+              reason: projectWording().clear.unmerged(place.branch, ahead),
             };
           }),
         ),
       reset: Effect.fn("Projects.reset")(function* (place) {
-        if (!place.branch) return yield* fail("不是 worktree，不能重置：" + place.cwd);
+        if (!place.branch) return yield* fail(projectWording().clear.notWorktree(place.cwd));
         yield* serially(
           place.project,
           Effect.gen(function* () {
@@ -747,7 +745,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               if (removed)
                 return {
                   kept: true,
-                  reason: `worktree ${place.cwd} 没清掉：${removed}`,
+                  reason: projectWording().clear.worktreeLeft(place.cwd, removed),
                 };
             }
             const branch = yield* Effect.result(repository(path).hasBranch(place.branch!));
@@ -755,7 +753,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               if (!(yield* exists(path))) return { kept: false };
               return {
                 kept: true,
-                reason: `没能确认 ${place.branch} 已清掉：${reason(branch.failure)}`,
+                reason: projectWording().clear.unconfirmed(place.branch!, reason(branch.failure)),
               };
             }
             if (!branch.success) return { kept: false };
@@ -763,9 +761,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             const ahead = yield* repository(path)
               .ahead(main, place.branch!)
               .pipe(Effect.orElseSucceed(() => 1));
-            if (ahead !== 0) return { kept: true, reason: `${place.branch} 上有没合的提交，分支留着` };
+            if (ahead !== 0) return { kept: true, reason: projectWording().clear.unmergedKept(place.branch!) };
             const removed = yield* repository(path).deleteBranch(place.branch!);
-            return removed ? { kept: true, reason: `${place.branch} 没清掉：${removed}` } : { kept: false };
+            return removed ? { kept: true, reason: projectWording().clear.branchLeft(place.branch, removed) } : { kept: false };
           }),
         ),
       openBranch: (project, branch, from = "") =>
@@ -796,7 +794,7 @@ export const make = (hooks: ProjectHooks = {}) =>
               checkedAt: 0,
               installed: false,
               loggedIn: false,
-              reason: "尚未检测 GitHub",
+              reason: projectWording().github.unchecked,
             } satisfies GitHubStatus),
       refreshGitHub: Effect.fn("Projects.refreshGitHub")(function* () {
         const probed = yield* probeGitHub(gh);
@@ -805,7 +803,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
           if (probed.loggedIn) {
             const repo = githubOrigin(yield* repository(p.path).origin);
-            if (!p.git || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
+            if (!p.git || repo === "") c = { available: false, reason: projectWording().github.notGithub };
             else {
               const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
               let permission: string | null | undefined;
@@ -816,10 +814,10 @@ export const make = (hooks: ProjectHooks = {}) =>
               }
               c =
                 permission === undefined
-                  ? { available: false, reason: "无法检测 GitHub 仓库权限" }
+                  ? { available: false, reason: projectWording().github.noPermission }
                   : ["ADMIN", "MAINTAIN", "WRITE"].includes(permission ?? "")
                     ? { available: true, reason: "" }
-                    : { available: false, reason: "没有写权限" };
+                    : { available: false, reason: projectWording().github.readOnly };
             }
           }
           next.set(p.name, c);
@@ -830,7 +828,7 @@ export const make = (hooks: ProjectHooks = {}) =>
       }),
       usesPullRequests,
       submitPullRequest: Effect.fn("Projects.submitPullRequest")(function* (place, issue, conclusion) {
-        if (place.branch !== issueBranch(issue.number)) return yield* fail("工单分支不匹配");
+        if (place.branch !== issueBranch(issue.number)) return yield* fail(projectWording().github.wrongBranch);
         const checked = yield* toMergeFailure(checkMerge(place, ""));
         return yield* serially(
           place.project,
@@ -838,7 +836,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const path = join(root, place.project);
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
             const repo = githubOrigin(yield* repository(path).origin);
-            if (repo === "") return yield* fail("不是 GitHub 仓库");
+            if (repo === "") return yield* fail(projectWording().github.notGithub);
             const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
             const files = yield* repository(path)
               .conflicts(main, checked)
@@ -850,19 +848,19 @@ export const make = (hooks: ProjectHooks = {}) =>
                   cwd: place.cwd,
                   timeoutMs: cloneTimeoutMs,
                 })).code === 0;
-            if (!pushed) return yield* fail("推送工单分支失败，请检查 origin 和登录后重试");
+            if (!pushed) return yield* fail(projectWording().github.pushFailed);
             if (issue.pullRequest?.state === "open") return issue.pullRequest;
             // Recover a creation whose receipt was lost before it was saved.
             const listed = yield* gh("pr", "list", "--repo", repo, "--head", place.branch!, "--base", main, "--state", "open", "--json", "url,number");
-            if (!listed.ok) return yield* fail("查询已有 PR 失败；分支已推送，可重试");
+            if (!listed.ok) return yield* fail(projectWording().github.listFailed);
             let existing: readonly { url: string; number: number }[];
             try {
               existing = openPullRequests(listed.out);
             } catch {
-              return yield* fail("无法读取已有 PR");
+              return yield* fail(projectWording().github.listUnread);
             }
             if (existing.length > 0) return { ...existing[0]!, state: "open" as const };
-            const check = lexists(join(place.cwd, ".vibevalley/check")) ? ".vibevalley/check 通过。" : "这个项目没有 .vibevalley/check，没跑检查。";
+            const check = lexists(join(place.cwd, ".vibevalley/check")) ? projectWording().github.checked : projectWording().github.noCheck;
             const created = yield* gh(
               "pr",
               "create",
@@ -875,32 +873,32 @@ export const make = (hooks: ProjectHooks = {}) =>
               "--title",
               issue.title,
               "--body",
-              `工单 #${issue.number}\n\n${conclusion}\n\n${check}`,
+              projectWording().github.body(issue.number, conclusion, check),
             );
-            if (!created.ok) return yield* fail("创建 PR 失败；分支已推送，可重试");
+            if (!created.ok) return yield* fail(projectWording().github.createFailed);
             const url = created.out.trim();
             const prefix = `https://github.com/${repo}/pull/`;
             const number = Number(url.slice(prefix.length));
-            if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail("无法读取新建 PR 的地址；可重试查询");
+            if (!url.startsWith(prefix) || !Number.isSafeInteger(number) || number <= 0) return yield* fail(projectWording().github.urlUnread);
             return { url, number, state: "open" as const };
           }),
         );
       }),
       pullRequestState: Effect.fn("Projects.pullRequestState")(function* (name, n) {
         const repo = githubOrigin(yield* repository(join(root, name)).origin);
-        if (repo === "") return yield* fail("不是 GitHub 仓库");
+        if (repo === "") return yield* fail(projectWording().github.notGithub);
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
-        if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
+        if (!viewed.ok) return yield* fail(projectWording().github.viewFailed(n));
         let result: { readonly state: string; readonly mergedAt?: string | null | undefined };
         try {
           result = pullRequestView(viewed.out);
         } catch {
-          return yield* fail(`无法读取 PR #${n} 状态`);
+          return yield* fail(projectWording().github.stateUnread(n));
         }
         if (result.mergedAt || result.state === "MERGED") return "merged" as const;
         if (result.state === "OPEN") return "open" as const;
         if (result.state === "CLOSED") return "closed" as const;
-        return yield* fail(`无法识别 PR #${n} 状态`);
+        return yield* fail(projectWording().github.stateUnknown(n));
       }),
       finishPullRequest: (name, n) =>
         serially(
@@ -911,7 +909,7 @@ export const make = (hooks: ProjectHooks = {}) =>
             const path = join(root, name);
             if (yield* exists(place.cwd)) {
               const removed = yield* repository(path).removeWorktree(place.cwd, true);
-              if (removed) return yield* fail(`PR 已结束，清理 worktree 失败：${removed}`);
+              if (removed) return yield* fail(projectWording().github.worktreeLeft(removed));
             }
             if (
               yield* repository(path)
@@ -919,7 +917,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                 .pipe(Effect.orElseSucceed(() => false))
             ) {
               const deleted = yield* repository(path).deleteBranch(place.branch!);
-              if (deleted) return yield* fail(`PR 已结束，清理本地分支失败：${deleted}`);
+              if (deleted) return yield* fail(projectWording().github.branchLeft(deleted));
             }
             return { text: "", commits: 0 };
           }),
