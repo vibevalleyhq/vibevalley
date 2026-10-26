@@ -408,8 +408,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         // git answers with real paths (on macOS /tmp is /private/tmp): compare like with like.
         const path = yield* Effect.orDie(fs.realPath(join(root, name)));
         if (dirname(path) !== (yield* Effect.orDie(fs.realPath(root)))) return yield* fail("项目必须在工作目录里面，不能链接到外面");
-        const top = yield* gitQuiet(path, "rev-parse", "--show-toplevel");
-        if (top !== path) {
+        // A folder is a repository's top when it holds .git (a folder, or a file in a worktree): read, not asked of git,
+        // which would cost a process each time a project is used.
+        if (!(yield* exists(join(path, ".git")))) {
           yield* git(path, "init", "-q", "-b", "main");
           if (!(yield* exists(join(path, ".gitignore")))) yield* Effect.orDie(fs.writeFileString(join(path, ".gitignore"), gitignore));
           if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
@@ -436,7 +437,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         out.push({
           name: e.name,
           path,
-          git: (yield* gitQuiet(path, "rev-parse", "--show-toplevel")) === path,
+          // As ensure reads it: .git here, not a process per project on every listing (the orchestrator lists them on
+          // every input).
+          git: yield* exists(join(path, ".git")),
         });
       }
       return out;
@@ -634,8 +637,9 @@ export const make = (hooks: ProjectHooks = {}) =>
       return yield* checkMerge(place, main);
     });
 
-    const mergeMain = Effect.fn("Projects.mergeMain")(function* (path: string, branch: string, kept: string) {
-      const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
+    /** main: the branch checked out in the project, when the caller has just read it under the same turn. */
+    const mergeMain = Effect.fn("Projects.mergeMain")(function* (path: string, branch: string, kept: string, checkedOut?: string) {
+      const main = checkedOut ?? (yield* git(path, "symbolic-ref", "--short", "HEAD"));
       // A merge that would conflict is not tried: the session resolves it on its branch first.
       const conflicts = yield* conflictsOf(path, main, branch);
       if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, conflicts));
@@ -822,7 +826,7 @@ export const make = (hooks: ProjectHooks = {}) =>
                 const head = yield* git(path, "symbolic-ref", "--short", "HEAD");
                 if (!(yield* gitOk(path, "merge-base", "--is-ancestor", head, checked)))
                   return yield* Effect.fail(MergeFailure.check("主分支在检查期间又变了，请重新检查再合"));
-                const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`);
+                const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`, head);
                 const warning = yield* cleanupMerged(place, path);
                 return {
                   text: ahead > 0 ? `${ahead} 个提交合进了 ${place.project} 的 ${main}` : "这一单没有新的提交",
