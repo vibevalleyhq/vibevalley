@@ -15,7 +15,7 @@ import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
-import { until } from "../testing/until.ts";
+import { until, waitFor } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -128,8 +128,6 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
     Layer.provideMerge(Layer.succeed(Settings, c)),
   );
 };
-
-const settle = Effect.sleep(100);
 
 /** The services of a test, and its helpers. */
 const farm = Effect.gen(function* () {
@@ -261,7 +259,7 @@ describe("the chat", () => {
         const { message: said } = yield* f.chat.say("今天进度怎么样", undefined, "");
         const n = yield* heard.of(said.id);
         expect([n.messages.length, n.messages[0]!.text, n.target, n.conversation]).toEqual([1, "今天进度怎么样", "#田头", f.chat.general()]);
-        yield* settle;
+        // Who is handed what is settled before say returns: a session not woken by now is not woken by it.
         expect(x.runsOf("w3")).toHaveLength(before);
         expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toMatchObject({ reason: "general", wakes: false });
         expect(yield* Effect.promise(() => f.deliveryOf(orchestratorAgent, said.id))).toMatchObject({ state: "seen" });
@@ -399,7 +397,6 @@ describe("the chat", () => {
         expect(ours().map((m) => [m.final, m.mentions])).toEqual([[true, ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
         yield* f.chat.notice(general, "定时到了", "recurrence");
-        yield* settle;
         const last = f.messagesOf(general).at(-1)!;
         expect([last.kind, last.from]).toEqual(["notice", "system"]);
         expect((yield* Effect.promise(() => f.deliveries("w11"))).at(-1)?.message_id).not.toBe(last.id);
@@ -550,9 +547,13 @@ describe("the chat", () => {
     ),
   );
 
+  /** A trigger that refuses the write; each refusal moves the sequence <name>_tries on, which no rollback takes back. */
   const trigger = (sql: SqlClient.SqlClient, name: string, on: string, when = "") =>
     Effect.gen(function* () {
-      yield* sql.unsafe(`create function ${name}() returns trigger language plpgsql as $$ begin raise exception '${name}'; end $$`);
+      yield* sql.unsafe(`create sequence ${name}_tries`);
+      yield* sql.unsafe(
+        `create function ${name}() returns trigger language plpgsql as $$ begin perform nextval('${name}_tries'); raise exception '${name}'; end $$`,
+      );
       yield* sql.unsafe(`create trigger ${name} ${on} for each row ${when} execute function ${name}()`);
     }).pipe(Effect.orDie);
   const drop = (sql: SqlClient.SqlClient, name: string, table: string) => sql.unsafe(`drop trigger ${name} on ${table}`).pipe(Effect.orDie);
@@ -599,7 +600,11 @@ describe("the chat", () => {
             phase: { _tag: "resting" },
           } as Session,
         });
-        yield* settle;
+        yield* waitFor(
+          Effect.map(f.sql<{ n: string }>`select last_value::text as n from fail_owner_tries where is_called`.pipe(Effect.orDie), (rows) => rows.length),
+          (n) => n > 0,
+          "the job tried and refused",
+        );
         expect(yield* f.chat.history(f.chat.general())).toEqual([]);
         yield* drop(f.sql, "fail_owner", "channel_follow");
         // Another hire opens every job on the farm again.
