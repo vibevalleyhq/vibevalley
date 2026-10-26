@@ -40,7 +40,7 @@ describe("the HTTP contract", () => {
           seen.push(args);
           return Effect.succeed([]);
         },
-      } as unknown as Handlers,
+      },
       async (handler) => {
         const res = await handler(new Request("http://farm/api/v1/channels/general/messages?before=9007199254740993&limit=20"));
         expect(res.status).toBe(200);

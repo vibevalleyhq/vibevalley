@@ -131,7 +131,7 @@ export function voiceSettingsOver(defaults: VoiceSettings, overrides: SettingsUp
 export function voiceOverrides(defaults: VoiceSettings, settings: VoiceSettings): SettingsUpdateVoice {
   const out: Record<string, unknown> = {};
   for (const key of voiceKeys) if (!same(settings[key], defaults[key])) out[key] = settings[key];
-  return out as SettingsUpdateVoice;
+  return out;
 }
 
 // The voice line's defaults.

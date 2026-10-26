@@ -4,7 +4,6 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Memory } from "@vibevalley/protocol";
 import { Option, Schema } from "effect";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -219,7 +218,7 @@ export function nowledge(c: MemorySourceConfig): Source {
     list: async (agent, signal) => {
       if (!c.read) return [];
       const hits = await find(agent, "", most, false, signal);
-      return hits.map((h) => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0 }) as Memory);
+      return hits.map((h) => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0 }));
     },
     // The 「记住：」 lines; a stopped run leaves nothing here either.
     syncTurn: async (run, signal) => {
@@ -231,7 +230,7 @@ export function nowledge(c: MemorySourceConfig): Source {
       if (!c.write) return undefined;
       const project = n.project.trim();
       const id = await add(n.agent, n.text, project, signal);
-      return { id, agent: n.agent, kind: "note", text: n.text, at: Date.now(), recalled: 0, ...(project ? { project } : {}) } as Memory;
+      return { id, agent: n.agent, kind: "note", text: n.text, at: Date.now(), recalled: 0, ...(project ? { project } : {}) };
     },
     forget: async () => {
       throw new Error("Nowledge Mem 里的记忆到 Nowledge Mem 里删");

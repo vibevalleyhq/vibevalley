@@ -159,7 +159,7 @@ export class FarmConnection {
         try {
           await writeFarm(farm);
         } catch (e) {
-          throw new Error("保存配对失败：" + reason(e));
+          throw new Error("保存配对失败：" + reason(e), { cause: e });
         }
         if (!this.owns(revision)) {
           try {

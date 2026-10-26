@@ -180,7 +180,7 @@ describe("a session's events", () => {
     const exited = eventFacts(ev({ kind: "exited", code: 137 }), { ...working(thinking), runs: 2 }, none, ctx);
     expect(exited.facts).toEqual([{ type: "report", id: "w1", outcome: "failed", summary: "pi 进程退出了（退出码 137）", runs: 2 }]);
     expect(exited.warn).toBe("老周 的 pi 进程退出了（退出码 137）");
-    expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } } as Session, none, ctx).facts).toEqual([]);
+    expect(eventFacts(ev({ kind: "exited", code: 0 }), { ...base(), phase: { _tag: "done" } }, none, ctx).facts).toEqual([]);
   });
 
   it("near", () => {

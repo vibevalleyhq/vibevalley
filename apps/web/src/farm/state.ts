@@ -57,7 +57,7 @@ export function createFarmFrames(outer: Frames, project: Accessor<string>): Fram
     get frame() {
       return frame();
     },
-  } as Frames;
+  };
 }
 
 /** The farm's commands, over this farm's part of the frame the page has now. */

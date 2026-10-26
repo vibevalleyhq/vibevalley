@@ -79,8 +79,8 @@ export class QQClient implements QQApi {
       });
       body = decodeTokenResponse(await res.json());
     } catch (e) {
-      if (timed.aborted && !signal.aborted) throw new Error("QQ 鉴权：超时了");
-      throw new Error("QQ 鉴权：" + (e instanceof Error ? e.message : String(e)));
+      if (timed.aborted && !signal.aborted) throw new Error("QQ 鉴权：超时了", { cause: e });
+      throw new Error("QQ 鉴权：" + (e instanceof Error ? e.message : String(e)), { cause: e });
     }
     if (!body.access_token) throw new Error("QQ 鉴权：" + (body.message || "AppID 或 AppSecret 不对"));
     const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
@@ -108,7 +108,7 @@ export class QQClient implements QQApi {
       gateway = decodeGatewayResponse(await (await fetch(this.api + "/gateway", { headers: this.headers(app, token), signal })).json());
     } catch (e) {
       if (signal.aborted) return;
-      throw new Error("QQ 网关：" + (e instanceof Error ? e.message : String(e)));
+      throw new Error("QQ 网关：" + (e instanceof Error ? e.message : String(e)), { cause: e });
     }
     if (!gateway.url) throw new Error("QQ 没给网关地址");
     if (signal.aborted) return;

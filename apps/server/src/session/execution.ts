@@ -72,7 +72,7 @@ export class AgentExecution {
       let given = input;
       if (!given.issue && !given.by.kind && self.resuming) given = self.resuming;
       self.resuming = undefined;
-      const by: RunTrigger = given.by.kind ? (given.by as RunTrigger) : { kind: "runtime" };
+      const by: RunTrigger = given.by.kind ? given.by : { kind: "runtime" };
       const id = newId();
       yield* self.store.start(id, self.session, given.issue ?? "", by);
       if (given.issue) yield* self.store.link(id, given.issue);

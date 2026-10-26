@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import type { WorkspaceState, Session, SideEvent, StateFrame } from "@vibevalley/protocol";
+import type { WorkspaceState, Session, StateFrame } from "@vibevalley/protocol";
 import { Effect, Fiber, Layer, Logger, Queue, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { emptyProgress } from "../game/progress.ts";
@@ -79,7 +79,7 @@ describe("core", () => {
           yield* core.setOrchestrator("thinking");
           yield* core.apply({ type: "progress", progress: emptyProgress() });
           yield* core.setCommits({ total: 1, today: 0, week: 0 } as never);
-          const got = (yield* Fiber.join(seen)) as SideEvent[];
+          const got = yield* Fiber.join(seen);
           expect(got.map((e) => e.type)).toEqual(["snapshot", "hired", "orchestrator", "progress"]);
           expect(got[2]!.at).toBeGreaterThan(0);
         }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, config))))),

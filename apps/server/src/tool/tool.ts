@@ -534,7 +534,7 @@ export const make = Effect.gen(function* () {
           if (p.acceptance && p.acceptance !== "glance" && p.acceptance !== "required") return "验收方式只有 glance 和 required";
           let assignee: string | undefined;
           if (p.agent) {
-            const a = agents.named(p.agent!);
+            const a = agents.named(p.agent);
             if (!a) return "没有叫 " + p.agent + " 的帮工档案";
             assignee = a.id;
           }

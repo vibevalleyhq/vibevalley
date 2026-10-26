@@ -101,16 +101,15 @@ test("new projects: names and GitHub addresses", () => {
   expect(since(0, 3 * 3600000)).toBe("3 小时前");
 });
 
-const working: Phase = { _tag: "working", since: 0, doing: { action: "edit_file", label: "src/a.ts" } } as Phase;
-const project = (name: string, last?: number, maxSessions = 3): ProjectSummary =>
-  ({
-    name,
-    path: `/work/${name}`,
-    git: true,
-    maxSessions,
-    pullRequest: { available: false, reason: "尚未检测 GitHub" },
-    ...(last !== undefined ? { last } : {}),
-  }) as ProjectSummary;
+const working: Phase = { _tag: "working", since: 0, doing: { action: "edit_file", label: "src/a.ts" } };
+const project = (name: string, last?: number, maxSessions = 3): ProjectSummary => ({
+  name,
+  path: `/work/${name}`,
+  git: true,
+  maxSessions,
+  pullRequest: { available: false, reason: "尚未检测 GitHub" },
+  ...(last !== undefined ? { last } : {}),
+});
 const todo = (id: string, p: string, queuedAt?: number) =>
   ({ id, title: `活 ${id}`, project: p, status: queuedAt === undefined ? "backlog" : "todo", ...(queuedAt !== undefined ? { queuedAt } : {}) }) as Issue;
 const hired = (id: string, p: string | undefined, phase: Phase, at = 0, more: Partial<Session> = {}) =>
@@ -123,11 +122,11 @@ describe("islands", () => {
     const islands = islandsOf({
       projects,
       sessions: [
-        hired("w2", "clock-in", { _tag: "done" } as Phase, 2),
+        hired("w2", "clock-in", { _tag: "done" }, 2),
         hired("w1", "clock-in", working, 1),
-        hired("w4", "clock-in", { _tag: "resting" } as Phase, 4),
+        hired("w4", "clock-in", { _tag: "resting" }, 4),
         hired("w5", "docs", working),
-        hired("w3", undefined, { _tag: "failed" } as Phase),
+        hired("w3", undefined, { _tag: "failed" }),
       ],
       plots: { w1: { crop: "leafy" } },
       issues: [todo("b2", "docs", 8), todo("b1", "docs", 3), todo("b3", "clock-in")],
@@ -142,7 +141,7 @@ describe("islands", () => {
     expect(islands[1]!.queued.map((b) => b.id)).toEqual(["b1", "b2"]);
     expect(islandText(islands[1]!)).toBe("在干 1/3 · 排队 2");
     expect(kinds(islands[2]!)).toEqual(["open", "open", "open"]);
-    expect(homeless([hired("w3", undefined, { _tag: "failed" } as Phase)]).map((h) => h.id)).toEqual(["w3"]);
+    expect(homeless([hired("w3", undefined, { _tag: "failed" })]).map((h) => h.id)).toEqual(["w3"]);
     expect(mapTally(islands)).toEqual({ peopled: 2, working: 2, queued: 2 });
   });
 
@@ -160,7 +159,7 @@ describe("islands", () => {
   });
 
   test("a project gone from the list keeps its helpers and takes no more", () => {
-    const gone = islandsOf({ projects: [], sessions: [hired("w1", "old", { _tag: "done" } as Phase)], plots: {}, issues: [] });
+    const gone = islandsOf({ projects: [], sessions: [hired("w1", "old", { _tag: "done" })], plots: {}, issues: [] });
     expect(gone).toHaveLength(1);
     expect(gone[0]!.summary).toBeUndefined();
     expect(kinds(gone[0]!)).toEqual(["w1"]);
@@ -170,7 +169,7 @@ describe("islands", () => {
   test("a yard holds six plots at most", () => {
     const crowded = islandsOf({
       projects: [project("big", undefined, 6)],
-      sessions: Array.from({ length: 5 }, (_, i) => hired(`r${i}`, "big", { _tag: "resting" } as Phase)),
+      sessions: Array.from({ length: 5 }, (_, i) => hired(`r${i}`, "big", { _tag: "resting" })),
       plots: {},
       issues: [],
     })[0]!;
@@ -208,9 +207,9 @@ describe("the yard", () => {
 
   test("how a helper looks on its plot", () => {
     expect(mapPose(hired("a", "p", working))).toBe("work");
-    expect(mapPose(hired("a", "p", { _tag: "working", since: 0, doing: { action: "thinking", label: "" } } as Phase))).toBe("think");
-    expect(mapPose(hired("a", "p", { _tag: "done" } as Phase))).toBe("cheer");
-    expect(mapPose(hired("a", "p", { _tag: "failed" } as Phase))).toBe("worry");
-    expect(mapPose(hired("a", "p", { _tag: "resting" } as Phase, 0, { conflict: { base: "main", files: ["a.ts"] } } as Partial<Session>))).toBe("worry");
+    expect(mapPose(hired("a", "p", { _tag: "working", since: 0, doing: { action: "thinking", label: "" } }))).toBe("think");
+    expect(mapPose(hired("a", "p", { _tag: "done" }))).toBe("cheer");
+    expect(mapPose(hired("a", "p", { _tag: "failed" }))).toBe("worry");
+    expect(mapPose(hired("a", "p", { _tag: "resting" }, 0, { conflict: { base: "main", files: ["a.ts"] } }))).toBe("worry");
   });
 });

@@ -55,7 +55,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
       </div>
       <h1 class="mt-2 px-2 text-xl font-semibold">{g().title}</h1>
       <Show when={g().goal && g().goal !== g().title}>
-        <Markdown class="mt-2 px-2 text-sm" text={g().goal!} />
+        <Markdown class="mt-2 px-2 text-sm" text={g().goal} />
       </Show>
     </div>
   );
@@ -138,7 +138,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                           }
                         >
                           <Show when={task().brief}>
-                            <Markdown class="text-sm" text={task().brief!} />
+                            <Markdown class="text-sm" text={task().brief} />
                           </Show>
                           <Show when={task().check}>
                             <Property label="检查">

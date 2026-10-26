@@ -52,7 +52,7 @@ export function PxField(props: {
           <div class={[pxText.xs, "text-bark-500"]}>{props.aside}</div>
         </Show>
       </div>
-      {typeof props.children === "function" ? (props.children as (id: string) => JSX.Element)(target()) : props.children}
+      {typeof props.children === "function" ? props.children(target()) : props.children}
       <Show when={note() != null && note() !== ""}>
         <div class={[pxText.xs, "mt-1.5 leading-[1.625]", props.error ? "text-berry" : "text-bark-500"]} role={props.error ? "alert" : undefined}>
           {note()}

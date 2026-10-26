@@ -118,7 +118,7 @@ test("a dispatch note stays inside its column", async ({ page, api }) => {
     b.parentElement!.getBoundingClientRect().width,
     b.parentElement!.parentElement!.getBoundingClientRect().width,
   ]);
-  expect(bubble).toBeLessThanOrEqual(column!);
+  expect(bubble).toBeLessThanOrEqual(column);
   await page.screenshot({ path: test.info().outputPath("dispatch.png") });
 });
 
@@ -143,7 +143,7 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     phase: { _tag: "done" },
     issue: made.id,
     lastRun: { outcome: "completed", summary: "做完了，测试全过", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as never,
+    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   // What the server would say of an issue handed back: it may be completed (done) or canceled.
   const issue: Issue = {

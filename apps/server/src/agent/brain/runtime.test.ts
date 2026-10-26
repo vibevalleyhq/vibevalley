@@ -81,8 +81,8 @@ describe("VibeValley's runtime", () => {
   it("joins a steer, waits a queued input and drops a withdrawn one", async () => {
     const r = await open([
       fauxAssistantMessage([fauxToolCall("bash", { command: "sleep 0.2" })]),
-      (c) => fauxAssistantMessage("听到：" + lastUser(c as unknown as Request)),
-      (c) => fauxAssistantMessage("排到了：" + lastUser(c as unknown as Request)),
+      (c) => fauxAssistantMessage("听到：" + lastUser(c)),
+      (c) => fauxAssistantMessage("排到了：" + lastUser(c)),
     ]);
     await r.session.prompt("开始");
     await until(() => toolStarted(r));
@@ -164,14 +164,14 @@ rl.on('line', (line) => {
     const runtime = vibevalleyRuntimeOf({ llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels?.join(",") === "high,max" && m.default)).toBe(true);
-    expect(await runtime.installation!()).toEqual({ kind: "available", via: "bundled" });
+    expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/);
     const keyless = vibevalleyRuntimeOf({
       llm: () => {
         throw new Error("没有 DeepSeek 的密钥");
       },
     });
-    expect(await keyless.installation!()).toEqual({
+    expect(await keyless.installation()).toEqual({
       kind: "unsupported",
       reason: "没有 DeepSeek 的密钥",
     });

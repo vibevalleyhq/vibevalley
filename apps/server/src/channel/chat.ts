@@ -435,7 +435,7 @@ export const make = Effect.gen(function* () {
       replies: row.reply_count,
       ...(read ? { read: read.read_number } : {}),
       at: row.created_at,
-    } as Conversation;
+    };
   });
 
   const publishConversation = Effect.fn("Channels.publishConversation")(function* (id: string) {
@@ -595,7 +595,7 @@ export const make = Effect.gen(function* () {
       Effect.gen(function* () {
         if (!w.id && w.sendKey) {
           const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
-          if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true } as Written;
+          if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true };
         }
         let id = w.id ?? "";
         let number: number;
@@ -690,7 +690,7 @@ export const make = Effect.gen(function* () {
   });
 
   const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
-    helpers ? helpers.deliver(recipient, text, { kind: "comment", message } as RunTrigger) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
+    helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
   const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
     const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
@@ -984,11 +984,11 @@ export const make = Effect.gen(function* () {
           );
           if (again) {
             const m = yield* one(qm.messageByID({ id: again.id }));
-            if (m) return { kind: "sent", message: toMessage(m), target, absent: [] } as Spoken;
+            if (m) return { kind: "sent", message: toMessage(m), target, absent: [] };
           }
           // Posting on a channel right after reading a thread: confirm once.
           const last = lastRead.get(from) ?? "";
-          if (row.kind !== "thread" && !opt.confirm && last && last !== target) return { kind: "confirm", target, lastRead: last } as Spoken;
+          if (row.kind !== "thread" && !opt.confirm && last && last !== target) return { kind: "confirm", target, lastRead: last };
           // Newer messages it has not seen: show them instead of sending.
           const unseen = (yield* db(qm.unseenIn({ conversation, participant: from }))).map((r) => r.id);
           if (unseen.length > 0 && !opt.anyway) {
@@ -1003,7 +1003,7 @@ export const make = Effect.gen(function* () {
             }
             if (shown.length === unseen.length)
               yield* db(qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: shown.at(-1)!.number, updated_at: now }));
-            return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length } as Spoken;
+            return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
           }
           // calledBy finds only participants of kind agent, and those are sessions (their ids are session ids).
           const caller = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, conversation, before: afterAll })))?.sender_id : undefined;
@@ -1021,7 +1021,7 @@ export const make = Effect.gen(function* () {
           yield* db(
             qr.setReadCursor({ participant_id: from, conversation_id: conversation, read_number: written.number, updated_at: yield* Clock.currentTimeMillis }),
           );
-          return { kind: "sent", message: toMessage(yield* messageOrFail(written.id)), target, absent: written.absent } as Spoken;
+          return { kind: "sent", message: toMessage(yield* messageOrFail(written.id)), target, absent: written.absent };
         }),
       ),
     spoken: (from, text, sendKey) =>

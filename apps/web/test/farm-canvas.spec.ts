@@ -31,7 +31,7 @@ const helper = (id: string, station: number, phase: Session["phase"], crop: stri
     runs: 1,
     phase,
     issue: issueId(`issue-${id}`),
-    play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as unknown as Session["play"],
+    play: { station, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   },
   crop,
 });

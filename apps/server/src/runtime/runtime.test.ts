@@ -22,7 +22,7 @@ const fake = (id: string, more: Partial<Parameters<typeof defineRuntime>[0]> = {
     id,
     session: () => Promise.reject(new Error("no sessions here")),
     ...more,
-  } as Parameters<typeof defineRuntime>[0]);
+  });
 
 const notFound = async (id: string): Promise<RuntimeInfo> => ({
   id,
@@ -187,7 +187,7 @@ describe("runtime", () => {
           }),
         ]),
         background: false,
-        usageOf: (async () => (++calls === 1 ? null : new Promise<AccountUsage>((answer) => out.push(answer)))) as RuntimeOptions["usageOf"],
+        usageOf: async () => (++calls === 1 ? null : new Promise<AccountUsage>((answer) => out.push(answer))),
       });
       yield* r.refresh("pi");
       // A spend while the read is out pushes a new total, rebuilding the cached observation.

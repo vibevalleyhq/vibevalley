@@ -55,7 +55,7 @@ class Capture {
   body = `{"agent_id":"parity-agent"}`;
   before: ((call: string) => Promise<void> | undefined) | undefined;
   readonly fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const call = (init?.method ?? "GET") + " " + url;
     this.urls.push(call);
     this.auths.push(new Headers(init?.headers).get("authorization") ?? "");
@@ -218,7 +218,7 @@ const credentials = (voice?: Partial<VoiceSettings>) =>
       setting.save({
         agoraAppId: appId,
         agoraAppCertificate: cert,
-        ...(voice ? { voice: voice as never } : {}),
+        ...(voice ? { voice: voice } : {}),
       }),
     );
   });

@@ -141,7 +141,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
           signal: tc.signal,
         });
       } catch (e) {
-        throw new Error(`${server} 的 ${t.name} 出错：${e instanceof Error ? e.message : String(e)}`);
+        throw new Error(`${server} 的 ${t.name} 出错：${e instanceof Error ? e.message : String(e)}`, { cause: e });
       }
       let text = mcpContentText((r.content as Block[] | undefined) ?? []);
       if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : "（没有内容）";

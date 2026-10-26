@@ -841,11 +841,11 @@ export const make = (options: SessionOptionsIn = {}) =>
       return recallBlock(found.lines);
     });
 
-    const wake = Effect.fn("Sessions.wake")(function* (h: Hand, session: Session, input: string, recall: string) {
+    const wake = Effect.fn("Sessions.wake")(function* (h: Hand, session: Session, input: string, recall: string): Effect.fn.Return<Delivered> {
       const agent = store.agent(session.agent);
-      if (!agent) return { kind: "refused", reason: session.name + " 的 agent 已经删掉了，叫不醒" } as Delivered;
+      if (!agent) return { kind: "refused", reason: session.name + " 的 agent 已经删掉了，叫不醒" };
       const stopped = yield* Effect.result(rest(h));
-      if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) } as Delivered;
+      if (stopped._tag === "Failure") return { kind: "refused", reason: reasonOf(stopped.failure) };
       const resume = h.oarSessionId;
       let opened = yield* open(agent, session, h.place, withRecall(recall, input), resume);
       if (!opened.session && !opened.retained && resume) {
@@ -859,25 +859,25 @@ export const make = (options: SessionOptionsIn = {}) =>
           "",
         );
       }
-      if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` } as Delivered;
+      if (!opened.session) return { kind: "refused", reason: `${session.name} 叫不醒：${opened.refused}` };
       attach(h, opened.session, session.runtime);
-      return { kind: "run", launch: h.launch || h.id, woke: true } as Delivered;
+      return { kind: "run", launch: h.launch || h.id, woke: true };
     });
 
-    const deliver = Effect.fn("Sessions.deliver")(function* (id: string, text: string, by: RunTrigger) {
+    const deliver = Effect.fn("Sessions.deliver")(function* (id: string, text: string, by: RunTrigger): Effect.fn.Return<Delivered> {
       const h = hands.get(id);
-      if (!h) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
+      if (!h) return { kind: "refused", reason: `没有 ${id} 这个帮工` };
       return yield* h.access.withPermits(1)(
         admission.withPermits(1)(
-          Effect.gen(function* () {
+          Effect.gen(function* (): Effect.fn.Return<Delivered> {
             const session = core.session(id);
-            if (hands.get(id) !== h || !session) return { kind: "refused", reason: `没有 ${id} 这个帮工` } as Delivered;
-            if (h.sess?.closing) return { kind: "refused", reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮` } as Delivered;
+            if (hands.get(id) !== h || !session) return { kind: "refused", reason: `没有 ${id} 这个帮工` };
+            if (h.sess?.closing) return { kind: "refused", reason: `${session.name} 的农机没能停止：工作区留着，不能再开一轮` };
             const starts = !isBusy(session);
             let recall = "";
             if (starts) {
               const full = noRoom(capacity(), session.runtime, h.place.project, limits(session.runtime), id);
-              if (full) return { kind: "refused", reason: `${session.name} 先不接着干：${full}` } as Delivered;
+              if (full) return { kind: "refused", reason: `${session.name} 先不接着干：${full}` };
               recall = yield* remind(session.agent, id, h.place.project, text, h.recalled);
             }
             const s = h.sess;
@@ -894,15 +894,15 @@ export const make = (options: SessionOptionsIn = {}) =>
                 .send(withRecall(recall, text), "followup")
                 .catch((e: unknown) => ({ kind: "error" as const, reason: e instanceof Error ? e.message : String(e) })),
             );
-            if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch } as Delivered;
+            if (sent.kind === "accepted" && sent.landed === "prompted") return { kind: "run", launch };
             if (starts) unexpect(h);
-            if (sent.kind !== "accepted") return { kind: "refused", reason: `${session.name} 没收到：${sent.reason}` } as Delivered;
+            if (sent.kind !== "accepted") return { kind: "refused", reason: `${session.name} 没收到：${sent.reason}` };
             if (sent.landed === "queued") {
               expect(h, by);
-              return { kind: "queued", launch } as Delivered;
+              return { kind: "queued", launch };
             }
             if (by.message) heardInRun(h, by.message);
-            return { kind: "steered", launch } as Delivered;
+            return { kind: "steered", launch };
           }),
         ),
       );

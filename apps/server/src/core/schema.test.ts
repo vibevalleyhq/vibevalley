@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { Effect, Schema } from "effect";
 import { wireJson } from "../base/wire.ts";
-import type { WorkspaceState, Fact } from "@vibevalley/protocol";
+import type { WorkspaceState } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "./core.ts";
 import { reduce } from "../projection/reduce.ts";
 import { frameOf } from "../projection/frame.ts";
@@ -32,7 +32,7 @@ test("the golden runs and the frames made of them decode", async () => {
   let run = -1;
   for (const row of rows) {
     if (row.run !== run) [run, state] = [row.run as number, emptyWorkspaceState()];
-    const fact = decode.fact(row.fact) as Fact;
+    const fact = decode.fact(row.fact);
     expect(decode.state(row.state)).toEqual(row.state as WorkspaceState);
     decode.view(row.view);
     decode.inbox(row.inbox);

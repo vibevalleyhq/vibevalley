@@ -235,7 +235,7 @@ export class WeixinClient implements WeixinApi {
       [code, show] = await this.qrCode(signal);
     } catch (e) {
       if (signal.aborted) throw e;
-      throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)));
+      throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)), { cause: e });
     }
     progress("waiting", show);
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(8 * 60_000)]);
@@ -262,7 +262,7 @@ export class WeixinClient implements WeixinApi {
             [code, show] = await this.qrCode(attempt);
           } catch (e) {
             if (attempt.aborted) break;
-            throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)));
+            throw new Error("拿不到登录二维码：" + (e instanceof Error ? e.message : String(e)), { cause: e });
           }
           progress("waiting", show);
           break;

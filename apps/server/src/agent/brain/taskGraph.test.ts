@@ -2,8 +2,8 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
 import { testDatabase } from "../../testing/layers.ts";
-import { add, begin, type Change, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
-import { dbStore, memoryStore, type TaskStore } from "./taskStore.ts";
+import { add, begin, finished, readyTasks, requeue, settle, type Task, TaskError, text, update } from "./taskGraph.ts";
+import { dbStore, memoryStore } from "./taskStore.ts";
 import * as q from "../../../db/generated/agent_task.sql.ts";
 
 const ids = (g: readonly Task[]) => g.map((t) => t.id);
@@ -38,7 +38,7 @@ describe("an agent's task graph", () => {
       [[{ id: "x" }], "没有写要做什么"],
       [[], "一件任务都没有"],
     ] as const) {
-      const [next, problems] = add(g, more as never);
+      const [next, problems] = add(g, more);
       expect(problems.join("；")).toContain(want);
       expect(ids(next)).toEqual(ids(g));
     }
@@ -69,7 +69,7 @@ describe("an agent's task graph", () => {
     g = update(g, "read", { state: "done" });
     expect(() => update(g, "read", { brief: "再读" })).toThrow(/做完了/);
     expect(() => update(g, "read", { state: "waiting" })).toThrow(TaskError);
-    expect(() => update(g, "nope", { state: "done" } as Change)).toThrow(TaskError);
+    expect(() => update(g, "nope", { state: "done" })).toThrow(TaskError);
     expect(() => update(g, "fix", { after: ["test"] })).toThrow(/成了一个圈/);
   });
 
@@ -106,14 +106,10 @@ describe("an agent's task graph", () => {
     expect(requeue(begin(g, "b"), ["b"])[1]!.state).toBe("waiting");
   });
 
-  const stores = Effect.map(
-    SqlClient.SqlClient,
-    (sql) =>
-      ({
-        database: (owner: string) => dbStore(sql, owner),
-        memory: (_: string) => memoryStore(),
-      }) as Record<string, (owner: string) => TaskStore>,
-  );
+  const stores = Effect.map(SqlClient.SqlClient, (sql) => ({
+    database: (owner: string) => dbStore(sql, owner),
+    memory: (_: string) => memoryStore(),
+  }));
 
   it.effect("a store keeps the graph and puts a finished one away", () =>
     Effect.gen(function* () {
@@ -170,7 +166,7 @@ describe("an agent's task graph", () => {
 
   it.effect("one owner's graph is not another's", () =>
     Effect.gen(function* () {
-      const open = (yield* stores).database!;
+      const open = (yield* stores).database;
       yield* open("s1").change((g) => Effect.succeed(add(g, [{ id: "a", brief: "b" }])[0]));
       expect(yield* open("s2").load).toEqual([]);
     }).pipe(Effect.provide(testDatabase())),

@@ -146,7 +146,7 @@ export const make = Effect.gen(function* () {
         created: at,
         by,
         ...(pending ? { pending: true } : {}),
-      } as Recurrence;
+      };
       yield* db(
         q.addRecurrence({
           id: s.id,

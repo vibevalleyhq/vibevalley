@@ -132,7 +132,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       try {
         data = readFileSync(at(p.path), "utf8");
       } catch (e) {
-        throw new Error(`读不了 ${p.path}：${why(e)}`);
+        throw new Error(`读不了 ${p.path}：${why(e)}`, { cause: e });
       }
       const lines = data.split("\n");
       const from = Math.max(1, p.offset ?? 1);
@@ -154,7 +154,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, p.content);
       } catch (e) {
-        throw new Error(`写不了 ${p.path}：${why(e)}`);
+        throw new Error(`写不了 ${p.path}：${why(e)}`, { cause: e });
       }
       return `写好了 ${shown(file)}（${p.content.split("\n").length} 行）`;
     },
@@ -185,7 +185,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       try {
         text = readFileSync(file, "utf8");
       } catch (e) {
-        throw new Error(`读不了 ${p.path}：${why(e)}`);
+        throw new Error(`读不了 ${p.path}：${why(e)}`, { cause: e });
       }
       if (p.old_text === "") throw new Error("old_text 是空的：要新建文件用 write_file。");
       const count = text.split(p.old_text).length - 1;
@@ -195,7 +195,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       try {
         writeFileSync(file, next);
       } catch (e) {
-        throw new Error(`写不了 ${p.path}：${why(e)}`);
+        throw new Error(`写不了 ${p.path}：${why(e)}`, { cause: e });
       }
       return `改好了 ${shown(file)}（换了 ${p.replace_all ? count : 1} 处）`;
     },
@@ -222,7 +222,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       try {
         walk(at(path), 0);
       } catch (e) {
-        throw new Error(`列不了 ${path}：${why(e)}`);
+        throw new Error(`列不了 ${path}：${why(e)}`, { cause: e });
       }
       if (out.length === 0) return "（空的）";
       return out.join("\n") + (out.length >= 500 ? "\n…（太多了，只列了 500 个）" : "");
@@ -258,7 +258,7 @@ export function codingTools(o: CodingOptions): AgentTool[] {
       try {
         ran = await runCommand(argv, cwd, 30_000, runEnv, tc.signal);
       } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new Error("这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。");
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new Error("这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。", { cause: e });
         throw e;
       }
       if (ran.code === 1 || ran.output.trim() === "") return "没搜到。";
@@ -292,8 +292,8 @@ export function codingTools(o: CodingOptions): AgentTool[] {
           signal: AbortSignal.any([tc.signal, timeoutSignal]),
         });
       } catch (e) {
-        if (timeoutSignal.aborted) throw new Error(`打开 ${p.url} 超时了`);
-        throw new Error(`打不开 ${p.url}：${why(e)}`);
+        if (timeoutSignal.aborted) throw new Error(`打开 ${p.url} 超时了`, { cause: e });
+        throw new Error(`打不开 ${p.url}：${why(e)}`, { cause: e });
       }
       let text = await res.text();
       if ((res.headers.get("content-type") ?? "").includes("html")) text = htmlText(text);

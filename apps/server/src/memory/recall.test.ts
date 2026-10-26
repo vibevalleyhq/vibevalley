@@ -28,8 +28,15 @@ test("the recorded recalls: the terms, each memory's relevance, the pick", () =>
 });
 
 const now = 1_800_000_000_000;
-const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory =>
-  ({ id, agent: "lab", kind: "note", text, at: now - dayMs, recalled: 0, ...change }) as Memory;
+const memory = (id: string, text: string, change: Partial<Memory> = {}): Memory => ({
+  id,
+  agent: "lab",
+  kind: "note",
+  text,
+  at: now - dayMs,
+  recalled: 0,
+  ...change,
+});
 const cue = (text: string, change: Partial<PickCue> = {}): PickCue => ({ session: "w9", project: "clock", text, skip: new Set(), now, ...change });
 const ids = (ms: readonly Memory[]) => ms.map((m) => m.id);
 

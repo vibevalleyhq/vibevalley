@@ -27,7 +27,7 @@ export function deepseek(id: string, key: string | (() => string | undefined)): 
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const model = known ?? { ...models.find((m) => m.id === defaultModel)!, id: name, name };
-  return { model: model as Model<Api>, stream: streamSimple as unknown as StreamFn, apiKey };
+  return { model: model, stream: streamSimple as unknown as StreamFn, apiKey };
 }
 
 /** One answer, whole. */
@@ -78,7 +78,7 @@ export function readMcpConfig(path: string): McpServer[] {
   try {
     config = Schema.decodeUnknownSync(McpConfigSchema)(data);
   } catch (e) {
-    throw new Error(`${path} 不是 JSON 或配置形状不对：${String(e)}`);
+    throw new Error(`${path} 不是 JSON 或配置形状不对：${String(e)}`, { cause: e });
   }
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];

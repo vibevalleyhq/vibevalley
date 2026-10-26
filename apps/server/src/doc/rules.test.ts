@@ -215,7 +215,7 @@ describe("ops", () => {
   ];
   it.each(cases)("$name", (c) => {
     const p = new Page("d", "lab", 9, c.blocks);
-    p.base = (b, rev) => (c.history?.[b]?.[rev] !== undefined ? [span(c.history[b]![rev]!)] : undefined);
+    p.base = (b, rev) => (c.history?.[b]?.[rev] !== undefined ? [span(c.history[b][rev])] : undefined);
     c.ops.forEach((op, i) => expect(p.apply(op).status, `op ${i} (${op.op})`).toBe(c.status[i]));
     expect(
       ordered([...p.blocks.values()])

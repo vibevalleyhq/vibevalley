@@ -67,7 +67,7 @@ test("a new call rings the phone open; answering goes to the helper's plot and l
     phase: { _tag: "done" },
     issue: made.id,
     lastRun: { outcome: "completed", summary: "做完了，测试全过", at: Date.now() - 60_000 } as never,
-    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] } as never,
+    play: { station: 0, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] },
   };
   const call: InboxItem = {
     id: "merge-w1-1",

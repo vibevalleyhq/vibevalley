@@ -481,13 +481,13 @@ export const make = (options: IssueOptions = {}) =>
     // ── sending ──
 
     const hire = Effect.fn("Issues.hire")(function* (agent: Agent, task: string, project: string, opt: HireOptions = {}) {
-      if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" } as Hired;
-      if (!agent.enabled) return { refused: agent.name + " 被停用了" } as Hired;
-      for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` } as Hired;
+      if (agent.id === orchestratorAgent) return { refused: "管家不当帮工：派给一个帮工档案" };
+      if (!agent.enabled) return { refused: agent.name + " 被停用了" };
+      for (const i of yield* runtimes.check(agent)) if (i.level === "error") return { refused: `${agent.name} 派不出去：${i.text}` };
       const where = project.trim() || (agent.workdir ?? "").trim();
-      if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" } as Hired;
+      if (!where) return { refused: "没说在哪个项目里做：项目是工作目录下的一个文件夹" };
       const room = yield* sessions.makeRoom(agent.runtime, where);
-      if ("refused" in room) return { refused: room.refused } as Hired;
+      if ("refused" in room) return { refused: room.refused };
       const evicted = room.evicted ?? "";
       const prepared = yield* Effect.result(
         (opt.issue ? get(opt.issue) : add({ title: task, project: where, assignee: agent.id })).pipe(
@@ -495,7 +495,7 @@ export const make = (options: IssueOptions = {}) =>
           Effect.catchDefect((d) => (SqlError.isSqlError(d) ? Effect.fail(refused(causeMessage(d))) : Effect.die(d))),
         ),
       );
-      if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` } as Hired;
+      if (prepared._tag === "Failure") return { refused: `${agent.name} 的工单没记下来：${reasonOf(prepared.failure)}` };
       const issue = prepared.success;
       // A draft's session is not one of the issue's sessions: the issue stays unsent.
       const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
@@ -702,7 +702,7 @@ export const make = (options: IssueOptions = {}) =>
       if (!edit) return t;
       const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
       if (words) yield* unsent(t.id);
-      return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) } as Issue;
+      return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) };
     });
 
     /** The move and what it settles before anything changes; refused as the move itself would be. setStatus carries it out,

@@ -112,7 +112,7 @@ export const openQuestions = (questions: readonly Question[] | undefined): Quest
 function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v];
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v as string[];
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
   throw new Error(`${field}：要是字符串或字符串的数组`);
 }
 

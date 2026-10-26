@@ -42,7 +42,7 @@ export function fauxLLM(options: RegisterFauxProviderOptions = {}) {
   const faux = fauxProvider(options);
   const requests: Request[] = [];
   const stream: StreamFn = (model, context, o) => {
-    requests.push({ messages: structuredClone(context.messages as Message[]), options: o });
+    requests.push({ messages: structuredClone(context.messages), options: o });
     return faux.provider.streamSimple(model, context, o);
   };
   const llm: LLM = { model: faux.getModel(), stream };
