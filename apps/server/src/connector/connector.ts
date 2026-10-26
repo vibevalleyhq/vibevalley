@@ -351,8 +351,24 @@ export const make = (options: ConnectorOptions = {}) =>
       const kept = (p: Promise<unknown>) => p.catch((e) => logs.error(`vibevalley: ${id}:`, message(e)));
       const now = () => (account ? { ...account } : undefined);
 
+      // How many wait to go out, as the status says it: counted in the database when not known, then moved by each change
+      // that commits. A change that failed, or one made while it was being counted, leaves it unknown again.
+      let pendingOut: number | undefined;
+      let outChanges = 0;
+      const outboxChanged = (by?: (n: number) => number) => {
+        outChanges++;
+        pendingOut = by && pendingOut !== undefined ? by(pendingOut) : undefined;
+      };
+      const pendingNow = async () => {
+        if (pendingOut !== undefined) return pendingOut;
+        const at = outChanges;
+        const n = await run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).catch(() => 0);
+        if (at === outChanges) pendingOut = n;
+        return n;
+      };
+
       const status = async (): Promise<ConnectorStatus> => {
-        const pending = await run(Effect.map(outboxQ.countPendingOutbox({ connector: id }), (r) => r?.n ?? 0)).catch(() => 0);
+        const pending = await pendingNow();
         const state = chat.now();
         const s: ConnectorStatus = { id, state: "off", pending };
         if (err) s.error = err;
@@ -426,7 +442,9 @@ export const make = (options: ConnectorOptions = {}) =>
             if (!isFailure(sent)) {
               try {
                 await inTx(Effect.forEach(out.ids, (oid) => outboxQ.outboxSent({ sent_at: time.now(), ext_id: sent || null, id: oid }), { discard: true }));
+                outboxChanged((n) => n - out.ids.length);
               } catch (e) {
+                outboxChanged();
                 err = message(e);
                 return false;
               }
@@ -453,9 +471,10 @@ export const make = (options: ConnectorOptions = {}) =>
         try {
           const place = await runHere(chat.messageLocation(m.id));
           if (!place || place.channel !== (a.channel ?? general)) return;
+          const pieces = splitText(ownerLine(m, place.conversation), maxChars[id]);
           await inTx(
             Effect.forEach(
-              splitText(ownerLine(m, place.conversation), maxChars[id]),
+              pieces,
               (piece) =>
                 outboxQ.addOutbox({
                   id: newId(),
@@ -469,7 +488,9 @@ export const make = (options: ConnectorOptions = {}) =>
               },
             ),
           );
+          outboxChanged((n) => n + pieces.length);
         } catch (e) {
+          outboxChanged();
           err = message(e);
           return;
         }
@@ -692,8 +713,10 @@ export const make = (options: ConnectorOptions = {}) =>
                   yield* retire("换了账号");
                 }),
               );
+              outboxChanged(() => 0);
               await reload();
             } catch (e) {
+              outboxChanged();
               failure = e instanceof Error ? e : new Error(String(e));
             }
           }
@@ -780,7 +803,9 @@ export const make = (options: ConnectorOptions = {}) =>
                   yield* retire("断开了");
                 }),
               );
+              outboxChanged(() => 0);
             } catch (e) {
+              outboxChanged();
               failure = e;
             }
             resetProgress();

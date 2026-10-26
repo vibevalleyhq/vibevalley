@@ -175,7 +175,9 @@ class FakeEveros {
   }
 }
 
-const world = (timeoutMs?: number) =>
+// The fake source answers on this machine, but under a full parallel run it can take longer than the real 2 s: a test
+// about what a search finds is not one about its deadline (those give their own, like 100 ms).
+const world = (timeoutMs = 20_000) =>
   Layer.effect(Memories, make(undefined, timeoutMs)).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),

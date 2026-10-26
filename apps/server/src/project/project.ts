@@ -11,7 +11,6 @@ import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync } fr
 import { dirname, join, resolve } from "node:path";
 import {
   type Changes,
-  type ChangedFile,
   type Conflict,
   type DayCount,
   type Author,
@@ -29,13 +28,13 @@ import {
   type PullRequestCapability,
   type PullRequestState,
   type Repo,
-  type UncommittedItem,
 } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
 import { Clock, Context, Data, Effect, FileSystem, Layer, Option, Schema, Semaphore } from "effect";
 import { jsonOf } from "../base/json.ts";
 import { Settings } from "../base/config.ts";
 import { git, gitOk, gitQuiet, gitRun, reason, run } from "./git.ts";
+import { asFarm, repository } from "./repository.ts";
 import { stackOf } from "./stack.ts";
 
 export interface Workplace {
@@ -97,8 +96,6 @@ const fail = (message: string) => Effect.fail(new ProjectError({ message }));
 // The end of a check's output is kept: a test run's verdict is there.
 const runTimeoutMs = 10 * 60_000;
 const runOutput = 3000;
-const patchLines = 400;
-const patchesMax = 400_000;
 const cloneTimeoutMs = 3 * 60_000;
 
 const projectName = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
@@ -122,64 +119,18 @@ export function projectProblem(req: NewProject): string {
 /** What a fresh repository ignores, so a first commit of an existing folder does not take its dependencies. */
 const gitignore = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.DS_Store\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\n";
 
-/** What a session's left-over changes are committed without, whatever the project ignores (pathspecs for git add). */
-const neverCommitted = [
-  ":(exclude,glob)**/__pycache__/**",
-  ":(exclude,glob)**/*.pyc",
-  ":(exclude,glob)**/.pytest_cache/**",
-  ":(exclude,glob)**/node_modules/**",
-  ":(exclude,glob)**/.DS_Store",
-];
-
-const asFarm = ["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"];
-
-/** As vibevalley when the machine has no git user. */
-const commit = (cwd: string, message: string) =>
-  git(cwd, "commit", "-q", "-m", message).pipe(Effect.catch(() => git(cwd, ...asFarm, "commit", "-q", "-m", message)));
-
-const mergeCommit = Effect.fnUntraced(function* (path: string, ours: string, theirs: string, message: string) {
-  const tree = (yield* git(path, "merge-tree", "--write-tree", "--no-messages", ours, theirs)).split("\n")[0]!;
-  const args = ["commit-tree", tree, "-p", ours, "-p", theirs, "-m", message];
-  return yield* git(path, ...args).pipe(Effect.catch(() => git(path, ...asFarm, ...args)));
-});
-
-/** The files merging branch into base would conflict on; none when it merges cleanly. */
-const conflictsOf = Effect.fnUntraced(function* (path: string, base: string, branch: string) {
-  const r = yield* gitRun(path, "merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch);
-  if (r.code === 0) return [] as string[];
-  if (r.code !== 1) return yield* fail(r.code < 0 ? r.stderr : `git merge-tree 出错（${r.code}）`);
-  // First line: the tree it would write; then each conflicted file.
-  return [
-    ...new Set(
-      r.stdout
-        .trim()
-        .split("\n")
-        .slice(1)
-        .filter((l) => l !== ""),
-    ),
-  ];
-});
-
-const commitLeft = Effect.fnUntraced(function* (cwd: string, message: string) {
-  if ((yield* git(cwd, "status", "--porcelain")) === "") return;
-  yield* git(cwd, "add", "-A", "--", ".", ...neverCommitted);
-  if ((yield* git(cwd, "diff", "--cached", "--name-only")) === "") return;
-  yield* commit(cwd, message);
-});
-
 const failed = (e: unknown) => (e instanceof MergeFailure ? e : MergeFailure.error(reason(e)));
 
 const unchangedBranch = Effect.fnUntraced(function* (path: string, branch: string, checked: string) {
-  if ((yield* git(path, "rev-parse", "refs/heads/" + branch)) !== checked)
-    return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
+  if ((yield* repository(path).tip(branch)) !== checked) return yield* Effect.fail(MergeFailure.check("分支在检查以后又变了，请重新检查再合"));
 });
 
 /** Cleanup cannot undo publication: its warning travels with the receipt, it does not replace it with a failure. */
 const cleanupMerged = Effect.fnUntraced(function* (place: Workplace, path: string) {
-  const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
-  if (removed.code !== 0) return `改动已合并，worktree ${place.cwd} 和分支 ${place.branch} 尚未清理：${reason(removed.stderr)}`;
-  const deleted = yield* gitRun(path, "branch", "-D", place.branch!);
-  if (deleted.code !== 0) return `改动已合并，分支 ${place.branch} 尚未清理：${reason(deleted.stderr)}`;
+  const removed = yield* repository(path).removeWorktree(place.cwd, true);
+  if (removed) return `改动已合并，worktree ${place.cwd} 和分支 ${place.branch} 尚未清理：${removed}`;
+  const deleted = yield* repository(path).deleteBranch(place.branch!);
+  if (deleted) return `改动已合并，分支 ${place.branch} 尚未清理：${deleted}`;
   return "";
 });
 
@@ -416,9 +367,9 @@ export const make = (hooks: ProjectHooks = {}) =>
           if ((yield* Effect.orDie(fs.readDirectory(path))).filter((e) => e !== ".git").length <= 1)
             yield* Effect.orDie(fs.writeFileString(join(path, "README.md"), `# ${name}\n`));
           yield* git(path, "add", "-A");
-          yield* commit(path, "初始提交（VibeValley 建的项目）");
+          yield* repository(path).commit("初始提交（VibeValley 建的项目）");
         } else if (!(yield* gitOk(path, "rev-parse", "--verify", "HEAD"))) {
-          yield* git(path, "commit", "-q", "--allow-empty", "-m", "初始提交").pipe(Effect.catch(() => commit(path, "初始提交")));
+          yield* git(path, "commit", "-q", "--allow-empty", "-m", "初始提交").pipe(Effect.catch(() => repository(path).commit("初始提交")));
         }
         return path;
       },
@@ -478,7 +429,7 @@ export const make = (hooks: ProjectHooks = {}) =>
     const syncMain = Effect.fn("Projects.syncMain")(function* (name: string) {
       const path = join(root, name);
       const remoteHead = yield* gitRun(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD");
-      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
+      const main = remoteHead.code === 0 ? remoteHead.stdout.trim().replace(/^origin\//, "") : yield* repository(path).mainOrNone;
       const kept = Effect.as(Effect.logWarning(`project ${name}: 无法从 origin 快进主分支，保留本地主分支`), main);
       if (main === "") return yield* kept;
       const fetched = hooks.fetch
@@ -489,9 +440,8 @@ export const make = (hooks: ProjectHooks = {}) =>
       if (status.code !== 0 || status.stdout.trim() !== "") return yield* kept;
       const local = yield* gitRun(path, "rev-parse", "refs/heads/" + main);
       const remote = yield* gitRun(path, "rev-parse", "FETCH_HEAD");
-      if (local.code !== 0 || remote.code !== 0 || !(yield* gitOk(path, "merge-base", "--is-ancestor", local.stdout.trim(), remote.stdout.trim())))
-        return yield* kept;
-      const current = yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD");
+      if (local.code !== 0 || remote.code !== 0 || !(yield* repository(path).isAncestor(local.stdout.trim(), remote.stdout.trim()))) return yield* kept;
+      const current = yield* repository(path).mainOrNone;
       const moved =
         current === main
           ? yield* gitRun(path, "merge", "--ff-only", remote.stdout.trim())
@@ -501,100 +451,10 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     const usesPullRequests = (name: string) => prProjects.includes(name) && capability(name).available;
 
-    const describe = Effect.fn("Projects.describe")(
-      function* (project: string, cwd: string, branch: string | undefined) {
-        const path = join(root, project);
-        const base = yield* git(path, "symbolic-ref", "--short", "HEAD");
-        const uncommitted: UncommittedItem[] = [];
-        if (cwd !== "") {
-          const status = yield* gitRun(cwd, "status", "--porcelain=v1", "-uall");
-          for (const line of status.stdout.replace(/\n+$/, "").split("\n")) {
-            if (line.length < 4) continue;
-            const code = line.slice(0, 2).trim();
-            uncommitted.push({
-              path: line.slice(3),
-              status: code === "??" ? "A" : code === "" ? "" : code[0]!,
-            });
-          }
-        }
-        const changes: Changes = {
-          project,
-          base,
-          commits: [],
-          files: [],
-          uncommitted,
-          conflicts: [],
-          behind: 0,
-        };
-        if (!branch) return changes;
-        changes.branch = branch;
-        const range = `${base}...${branch}`;
-        const log = yield* git(path, "log", "--format=%h%x09%ct%x09%s", `${base}..${branch}`);
-        // One diff for all three: the raw lines (":<modes> <ids> <letter>\t<path>") and the numstat lines come first, then
-        // the patch from its first "diff --git".
-        const diff = yield* git(path, "diff", "--no-renames", "--no-color", "--raw", "--numstat", "-p", range);
-        const first = diff.startsWith("diff --git ") ? 0 : diff.indexOf("\ndiff --git ");
-        const at = first < 0 ? diff.length : first === 0 ? 0 : first + 1;
-        const head = diff.slice(0, at).split("\n");
-        const names = head.flatMap((l) => (l.startsWith(":") ? [l.slice(l.lastIndexOf(" ", l.indexOf("\t")) + 1)] : [])).join("\n");
-        const numbers = head.filter((l) => !l.startsWith(":")).join("\n");
-        const patch = diff.slice(at).trim();
-        const conflicts = yield* conflictsOf(path, base, branch);
-        const behind = yield* gitQuiet(path, "rev-list", "--count", `${branch}..${base}`);
-        const counts = new Map<string, { added: number; removed: number }>();
-        for (const line of numbers.split("\n")) {
-          const parts = line.split("\t");
-          if (line === "" || parts.length < 3) continue;
-          counts.set(parts.slice(2).join("\t"), {
-            added: parts[0] === "-" ? -1 : Number(parts[0]),
-            removed: parts[1] === "-" ? -1 : Number(parts[1]),
-          });
-        }
-        const chunks = patch === "" ? [] : patch.split("\ndiff --git ").map((c, i) => (i > 0 ? "diff --git " + c : c));
-        let budget = patchesMax;
-        for (const line of names.split("\n")) {
-          if (line === "") continue;
-          const tab = line.indexOf("\t");
-          const letter = tab < 0 ? line : line.slice(0, tab);
-          const file = tab < 0 ? "" : line.slice(tab + 1);
-          const n = counts.get(file) ?? { added: 0, removed: 0 };
-          const changed: ChangedFile = {
-            path: file,
-            status: letter.slice(0, 1),
-            added: n.added,
-            removed: n.removed,
-          };
-          if (n.added >= 0) {
-            const head = `diff --git a/${file} b/${file}\n`;
-            const i = chunks.findIndex((c) => c.startsWith(head));
-            if (i >= 0) {
-              // A chunk cut out of the middle of the diff lost its trailing newline to the split.
-              let chunk = i < chunks.length - 1 ? chunks[i]! + "\n" : chunks[i]!;
-              const lines = chunk.split("\n");
-              if (lines.length > patchLines) chunk = lines.slice(0, patchLines).join("\n") + `\n… 还有 ${lines.length - patchLines} 行没显示`;
-              if (chunk.length <= budget) {
-                budget -= chunk.length;
-                changed.patch = chunk;
-              }
-            }
-          }
-          changes.files.push(changed);
-        }
-        for (const line of log.split("\n")) {
-          if (line === "") continue;
-          const parts = line.split("\t");
-          changes.commits.push({
-            hash: parts[0]!,
-            at: (Number(parts[1]) || 0) * 1000,
-            subject: parts.slice(2).join("\t"),
-          });
-        }
-        changes.conflicts.push(...conflicts);
-        changes.behind = Number(behind) || 0;
-        return changes;
-      },
-      Effect.mapError((e) => (e instanceof ProjectError ? e : new ProjectError({ message: reason(e) }))),
-    );
+    const describe = (project: string, cwd: string, branch: string | undefined) =>
+      repository(join(root, project))
+        .describe(project, cwd, branch)
+        .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
 
     /** The project's own check: .vibevalley/check, run in the worktree, killed with everything it started when it runs too long. */
     const projectCheck = Effect.fn("Projects.projectCheck")(function* (cwd: string) {
@@ -617,24 +477,24 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     /** Commit and check outside the project's turn; publication rechecks the head and conflicts in it. */
     const checkMerge = Effect.fn("Projects.checkMerge")(function* (place: Workplace, target: string) {
-      yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
+      yield* repository(place.cwd).commitLeft("合并前把没提交的改动一并提交");
       const path = join(root, place.project);
-      const into = target || (yield* git(path, "symbolic-ref", "--short", "HEAD"));
-      const checked = yield* git(path, "rev-parse", "refs/heads/" + place.branch);
-      const conflicts = yield* conflictsOf(path, into, checked);
+      const into = target || (yield* repository(path).main);
+      const checked = yield* repository(path).tip(place.branch!);
+      const conflicts = yield* repository(path).conflicts(into, checked);
       if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(into, conflicts));
       yield* projectCheck(place.cwd);
       return checked;
     });
 
     const checkLocalMerge = Effect.fn("Projects.checkLocalMerge")(function* (place: Workplace) {
-      yield* commitLeft(place.cwd, "合并前把没提交的改动一并提交");
+      yield* repository(place.cwd).commitLeft("合并前把没提交的改动一并提交");
       const path = join(root, place.project);
       const main = yield* serially(
         place.project,
         Effect.gen(function* () {
-          const main = yield* git(path, "symbolic-ref", "--short", "HEAD");
-          const files = yield* conflictsOf(path, main, place.branch!);
+          const main = yield* repository(path).main;
+          const files = yield* repository(path).conflicts(main, place.branch!);
           if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
           yield* git(place.cwd, ...asFarm, "merge", "--no-edit", main);
           return main;
@@ -645,11 +505,11 @@ export const make = (hooks: ProjectHooks = {}) =>
 
     /** main: the branch checked out in the project, when the caller has just read it under the same turn. */
     const mergeMain = Effect.fn("Projects.mergeMain")(function* (path: string, branch: string, kept: string, checkedOut?: string) {
-      const main = checkedOut ?? (yield* git(path, "symbolic-ref", "--short", "HEAD"));
+      const main = checkedOut ?? (yield* repository(path).main);
       // A merge that would conflict is not tried: the session resolves it on its branch first.
-      const conflicts = yield* conflictsOf(path, main, branch);
+      const conflicts = yield* repository(path).conflicts(main, branch);
       if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, conflicts));
-      const ahead = Number(yield* git(path, "rev-list", "--count", `${main}..${branch}`)) || 0;
+      const ahead = yield* repository(path).ahead(main, branch);
       if (ahead > 0) {
         const merged = yield* gitRun(path, "merge", "--no-edit", branch);
         if (merged.code !== 0) {
@@ -781,7 +641,9 @@ export const make = (hooks: ProjectHooks = {}) =>
             const cwd = place.cwd;
             if (yield* exists(cwd)) return place;
             yield* Effect.orDie(fs.makeDirectory(trees, { recursive: true }));
-            const branchThere = yield* gitOk(path, "show-ref", "--verify", "refs/heads/" + branch);
+            const branchThere = yield* repository(path)
+              .hasBranch(branch)
+              .pipe(Effect.orElseSucceed(() => false));
             let from = baseBranch;
             if (!branchThere && usesPullRequests(project)) {
               const main = yield* syncMain(project);
@@ -797,9 +659,9 @@ export const make = (hooks: ProjectHooks = {}) =>
         // An issue worked in a profile's own folder has no project, and so no issue branch: none to read.
         if (!project) return undefined;
         const path = join(root, project);
-        const present = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + branch);
-        if (present.code === 1) return undefined;
-        if (present.code !== 0) return yield* fail(`没能读取分支 ${branch}：${reason(present.stderr)}`);
+        const present = yield* Effect.result(repository(path).hasBranch(branch));
+        if (present._tag === "Failure") return yield* fail(`没能读取分支 ${branch}：${reason(present.failure)}`);
+        if (!present.success) return undefined;
         return yield* describe(project, "", branch);
       }),
       changedFiles: Effect.fn("Projects.changedFiles")(
@@ -814,9 +676,11 @@ export const make = (hooks: ProjectHooks = {}) =>
       conflict: Effect.fn("Projects.conflict")(function* (place, baseBranch = "") {
         if (!place.branch) return undefined;
         const path = join(root, place.project);
-        const base = baseBranch || (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD"));
+        const base = baseBranch || (yield* repository(path).mainOrNone);
         if (!base) return undefined;
-        const files = yield* conflictsOf(path, base, place.branch).pipe(Effect.orElseSucceed(() => [] as string[]));
+        const files = yield* repository(path)
+          .conflicts(base, place.branch)
+          .pipe(Effect.orElseSucceed(() => [] as string[]));
         return files.length > 0 ? { base, files } : undefined;
       }),
       merge: (place) =>
@@ -829,8 +693,8 @@ export const make = (hooks: ProjectHooks = {}) =>
               place.project,
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
-                const head = yield* git(path, "symbolic-ref", "--short", "HEAD");
-                if (!(yield* gitOk(path, "merge-base", "--is-ancestor", head, checked)))
+                const head = yield* repository(path).main;
+                if (!(yield* repository(path).isAncestor(head, checked)))
                   return yield* Effect.fail(MergeFailure.check("主分支在检查期间又变了，请重新检查再合"));
                 const { main, ahead } = yield* mergeMain(path, place.branch!, `${place.branch} 分支和 worktree 都留着`, head);
                 const warning = yield* cleanupMerged(place, path);
@@ -853,15 +717,15 @@ export const make = (hooks: ProjectHooks = {}) =>
               place.project,
               Effect.gen(function* () {
                 yield* unchangedBranch(path, place.branch!, checked);
-                const conflicts = yield* conflictsOf(path, target, place.branch!);
+                const conflicts = yield* repository(path).conflicts(target, place.branch!);
                 if (conflicts.length > 0) return yield* Effect.fail(MergeFailure.conflict(target, conflicts));
                 const brought = (yield* git(path, "log", "--reverse", "--format=%h", `${target}..${place.branch}`)).split("\n").filter((s) => s !== "");
                 if (brought.length > 0) {
-                  const ours = yield* git(path, "rev-parse", "refs/heads/" + target);
+                  const ours = yield* repository(path).tip(target);
                   const theirs = yield* git(path, "rev-parse", place.branch!);
-                  const next = (yield* gitOk(path, "merge-base", "--is-ancestor", ours, theirs))
+                  const next = (yield* repository(path).isAncestor(ours, theirs))
                     ? theirs
-                    : yield* mergeCommit(path, ours, theirs, "合并 " + place.branch);
+                    : yield* repository(path).mergeCommit(ours, theirs, "合并 " + place.branch);
                   // Only from where it was: a target moved meanwhile is not written over.
                   yield* git(path, "update-ref", "refs/heads/" + target, next, ours);
                 }
@@ -884,8 +748,8 @@ export const make = (hooks: ProjectHooks = {}) =>
               const path = join(root, project);
               const { main, ahead } = yield* mergeMain(path, branch, `${branch} 分支留着`);
               let said = ahead > 0 ? `${ahead} 个提交合进了 ${project} 的 ${main}` : "计划分支上没有新的提交";
-              const deleted = yield* gitRun(path, "branch", "-D", branch);
-              if (deleted.code !== 0) said += `；改动已合并，分支 ${branch} 尚未清理：${reason(deleted.stderr)}`;
+              const deleted = yield* repository(path).deleteBranch(branch);
+              if (deleted) said += `；改动已合并，分支 ${branch} 尚未清理：${deleted}`;
               return said;
             }),
           ),
@@ -897,18 +761,20 @@ export const make = (hooks: ProjectHooks = {}) =>
             if (!place.branch) return { kept: false };
             const path = join(root, place.project);
             // A worktree with changes stays where it is: removing it would lose them.
-            if (!(yield* gitOk(path, "worktree", "remove", place.cwd)))
+            if (yield* repository(path).removeWorktree(place.cwd, false))
               return {
                 kept: true,
                 reason: `${place.branch} 还有没提交的改动，worktree 留在 ${place.cwd}`,
               };
             // A branch with nothing new on it is clutter; one with commits is kept, so nothing is lost.
-            const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
-            const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
-            const ahead = count.code === 0 ? Number(count.stdout.trim()) || 0 : 1;
+            const main = (yield* repository(path).mainOrNone) || "main";
+            // A count git cannot give is taken as commits on it: kept rather than lost.
+            const ahead = yield* repository(path)
+              .ahead(main, place.branch)
+              .pipe(Effect.orElseSucceed(() => 1));
             if (ahead === 0) {
-              const removed = yield* gitRun(path, "branch", "-D", place.branch);
-              return removed.code === 0 ? { kept: false } : { kept: true, reason: `${place.branch} 没清掉：${reason(removed.stderr)}` };
+              const removed = yield* repository(path).deleteBranch(place.branch);
+              return removed ? { kept: true, reason: `${place.branch} 没清掉：${removed}` } : { kept: false };
             }
             return {
               kept: true,
@@ -921,7 +787,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         yield* serially(
           place.project,
           Effect.gen(function* () {
-            const main = yield* git(join(root, place.project), "symbolic-ref", "--short", "HEAD");
+            const main = yield* repository(join(root, place.project)).main;
             yield* git(place.cwd, "checkout", "-q", "-f", "-B", place.branch!, main);
             yield* git(place.cwd, "clean", "-q", "-f", "-d");
           }).pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) }))),
@@ -934,26 +800,29 @@ export const make = (hooks: ProjectHooks = {}) =>
             const path = join(root, project);
             const place = issueWorkplace(project, issueNumber);
             if (yield* exists(place.cwd)) {
-              const removed = yield* gitRun(path, "worktree", "remove", ...(work === "discard" ? ["--force"] : []), place.cwd);
-              if (removed.code !== 0)
+              const removed = yield* repository(path).removeWorktree(place.cwd, work === "discard");
+              if (removed)
                 return {
                   kept: true,
-                  reason: `worktree ${place.cwd} 没清掉：${reason(removed.stderr)}`,
+                  reason: `worktree ${place.cwd} 没清掉：${removed}`,
                 };
             }
-            const branch = yield* gitRun(path, "show-ref", "--verify", "--quiet", "refs/heads/" + place.branch);
-            if (branch.code !== 0) {
-              if (branch.code === 1 || !(yield* exists(path))) return { kept: false };
+            const branch = yield* Effect.result(repository(path).hasBranch(place.branch!));
+            if (branch._tag === "Failure") {
+              if (!(yield* exists(path))) return { kept: false };
               return {
                 kept: true,
-                reason: `没能确认 ${place.branch} 已清掉：${reason(branch.stderr)}`,
+                reason: `没能确认 ${place.branch} 已清掉：${reason(branch.failure)}`,
               };
             }
-            const main = (yield* gitQuiet(path, "symbolic-ref", "--short", "HEAD")) || "main";
-            const count = yield* gitRun(path, "rev-list", "--count", `${main}..${place.branch}`);
-            if (count.code !== 0 || count.stdout.trim() !== "0") return { kept: true, reason: `${place.branch} 上有没合的提交，分支留着` };
-            const removed = yield* gitRun(path, "branch", "-D", place.branch!);
-            return removed.code === 0 ? { kept: false } : { kept: true, reason: `${place.branch} 没清掉：${reason(removed.stderr)}` };
+            if (!branch.success) return { kept: false };
+            const main = (yield* repository(path).mainOrNone) || "main";
+            const ahead = yield* repository(path)
+              .ahead(main, place.branch!)
+              .pipe(Effect.orElseSucceed(() => 1));
+            if (ahead !== 0) return { kept: true, reason: `${place.branch} 上有没合的提交，分支留着` };
+            const removed = yield* repository(path).deleteBranch(place.branch!);
+            return removed ? { kept: true, reason: `${place.branch} 没清掉：${removed}` } : { kept: false };
           }),
         ),
       openBranch: (project, branch, from = "") =>
@@ -992,9 +861,8 @@ export const make = (hooks: ProjectHooks = {}) =>
         for (const p of yield* list()) {
           let c: PullRequestCapability = { available: false, reason: probed.reason ?? "" };
           if (probed.loggedIn) {
-            const origin = yield* gitRun(p.path, "remote", "get-url", "origin");
-            const repo = githubOrigin(origin.stdout);
-            if (!p.git || origin.code !== 0 || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
+            const repo = githubOrigin(yield* repository(p.path).origin);
+            if (!p.git || repo === "") c = { available: false, reason: "不是 GitHub 仓库" };
             else {
               const view = yield* gh("repo", "view", repo, "--json", "viewerPermission");
               let permission: string | null | undefined;
@@ -1026,10 +894,12 @@ export const make = (hooks: ProjectHooks = {}) =>
           Effect.gen(function* () {
             const path = join(root, place.project);
             yield* toMergeFailure(unchangedBranch(path, place.branch!, checked));
-            const repo = githubOrigin((yield* gitRun(path, "remote", "get-url", "origin")).stdout);
+            const repo = githubOrigin(yield* repository(path).origin);
             if (repo === "") return yield* fail("不是 GitHub 仓库");
-            const main = yield* git(path, "symbolic-ref", "--short", "HEAD").pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
-            const files = yield* conflictsOf(path, main, checked);
+            const main = yield* repository(path).main.pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
+            const files = yield* repository(path)
+              .conflicts(main, checked)
+              .pipe(Effect.mapError((e) => new ProjectError({ message: reason(e) })));
             if (files.length > 0) return yield* Effect.fail(MergeFailure.conflict(main, files));
             const pushed = hooks.push
               ? yield* hooks.push(place.cwd, place.branch!)
@@ -1074,7 +944,7 @@ export const make = (hooks: ProjectHooks = {}) =>
         );
       }),
       pullRequestState: Effect.fn("Projects.pullRequestState")(function* (name, n) {
-        const repo = githubOrigin((yield* gitRun(join(root, name), "remote", "get-url", "origin")).stdout);
+        const repo = githubOrigin(yield* repository(join(root, name)).origin);
         if (repo === "") return yield* fail("不是 GitHub 仓库");
         const viewed = yield* gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
         if (!viewed.ok) return yield* fail(`查询 PR #${n} 失败`);
@@ -1097,12 +967,16 @@ export const make = (hooks: ProjectHooks = {}) =>
             const place = issueWorkplace(name, n);
             const path = join(root, name);
             if (yield* exists(place.cwd)) {
-              const removed = yield* gitRun(path, "worktree", "remove", "--force", place.cwd);
-              if (removed.code !== 0) return yield* fail(`PR 已结束，清理 worktree 失败：${reason(removed.stderr)}`);
+              const removed = yield* repository(path).removeWorktree(place.cwd, true);
+              if (removed) return yield* fail(`PR 已结束，清理 worktree 失败：${removed}`);
             }
-            if (yield* gitOk(path, "show-ref", "--verify", "refs/heads/" + place.branch)) {
-              const deleted = yield* gitRun(path, "branch", "-D", place.branch!);
-              if (deleted.code !== 0) return yield* fail(`PR 已结束，清理本地分支失败：${reason(deleted.stderr)}`);
+            if (
+              yield* repository(path)
+                .hasBranch(place.branch!)
+                .pipe(Effect.orElseSucceed(() => false))
+            ) {
+              const deleted = yield* repository(path).deleteBranch(place.branch!);
+              if (deleted) return yield* fail(`PR 已结束，清理本地分支失败：${deleted}`);
             }
             return { text: "", commits: 0 };
           }),

@@ -53,18 +53,21 @@ where recipient_id = sqlc.arg(recipient_id) and message_id = sqlc.arg(message_id
 update channel_delivery set state = 'dropped', dropped_why = sqlc.arg(dropped_why), launch = null
 where recipient_id = sqlc.arg(recipient_id) and state in ('pending', 'announced', 'handed');
 
--- name: AgentWakesSinceUser :one
--- Agents waking agents since the owner last spoke here, held ones not counted.
-select count(*)::int as n from channel_delivery d
+-- name: AgentWakesByConversation :many
+-- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat
+-- keeps in memory (channel/audience.ts) when it starts.
+select m.conversation_id, count(*)::int as n from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 join channel_participant r on r.id = d.recipient_id
-where m.conversation_id = sqlc.arg(conversation)
-  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'user'), '')
-  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;
+where m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'user'), '')
+  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null
+group by m.conversation_id;
 
--- name: LastAgentWake :one
-select coalesce(max(d.created_at), 0)::float8 as at from channel_delivery d
+-- name: LastAgentWakes :many
+-- When each recipient was last woken by an agent (channel/audience.ts).
+select d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
-where d.recipient_id = sqlc.arg(recipient_id) and s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;
+where s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null
+group by d.recipient_id;

@@ -88,3 +88,7 @@ where m.conversation_id = sqlc.arg(conversation) and m.sender_id = 'system' and 
 -- name: MessageByNumber :one
 select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.conversation_id = sqlc.arg(conversation_id) and m.number = sqlc.arg(number);
+
+-- name: OwnerLastMessages :many
+-- The owner's last message in each conversation, from which agents waking agents are counted (channel/audience.ts).
+select conversation_id, max(id)::text as id from channel_message where sender_id = 'user' group by conversation_id;

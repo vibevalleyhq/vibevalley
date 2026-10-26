@@ -45,29 +45,6 @@ export const lastAssigneeIn = Effect.fn("LastAssigneeIn")(function* (params: Las
   })(params)
 })
 
-export const IssueOfSessionParams = Schema.Struct({
-  ["session"]: Schema.String,
-})
-export type IssueOfSessionParams = typeof IssueOfSessionParams.Type
-
-
-export const IssueOfSessionResult = Schema.Struct({
-  ["issue"]: Schema.String,
-})
-export type IssueOfSessionResult = typeof IssueOfSessionResult.Type
-
-
-export const IssueOfSessionSql = "-- name: IssueOfSession :one\nselect issue from issue_session where session = $1;"
-
-export const issueOfSession = Effect.fn("IssueOfSession")(function* (params: IssueOfSessionParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: IssueOfSessionParams,
-    Result: IssueOfSessionResult,
-    execute: (p) => sql.unsafe(IssueOfSessionSql, [p["session"]]),
-  })(params)
-})
-
 export const AllSessionsParams = Schema.Struct({
 
 })
@@ -90,75 +67,4 @@ export const allSessions = Effect.fn("AllSessions")(function* () {
     Result: AllSessionsResult,
     execute: () => sql.unsafe(AllSessionsSql, []),
   })({})
-})
-
-export const SessionsOfParams = Schema.Struct({
-  ["issue"]: Schema.String,
-})
-export type SessionsOfParams = typeof SessionsOfParams.Type
-
-
-export const SessionsOfResult = Schema.Struct({
-  ["session"]: Schema.String,
-})
-export type SessionsOfResult = typeof SessionsOfResult.Type
-
-
-export const SessionsOfSql = "-- name: SessionsOf :many\nselect session from issue_session where issue = $1 order by started_at, session;"
-
-export const sessionsOf = Effect.fn("SessionsOf")(function* (params: SessionsOfParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: SessionsOfParams,
-    Result: SessionsOfResult,
-    execute: (p) => sql.unsafe(SessionsOfSql, [p["issue"]]),
-  })(params)
-})
-
-export const SessionsOfKeptParams = Schema.Struct({
-  ["closed"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-})
-export type SessionsOfKeptParams = typeof SessionsOfKeptParams.Type
-
-
-export const SessionsOfKeptResult = Schema.Struct({
-  ["issue"]: Schema.String,
-  ["session"]: Schema.String,
-})
-export type SessionsOfKeptResult = typeof SessionsOfKeptResult.Type
-
-
-export const SessionsOfKeptSql = "-- name: SessionsOfKept :many\nwith latest as (select id from issue where parent is null and closed_at is not null order by closed_at desc limit $1::int)\nselect issue_session.issue, issue_session.session from issue_session\nwhere issue_session.issue in (\n  select id from issue\n  where closed_at is null or id in (select id from latest) or parent in (select id from latest)\n     or parent in (select id from issue where closed_at is null))\norder by issue_session.started_at, issue_session.session;"
-
-export const sessionsOfKept = Effect.fn("SessionsOfKept")(function* (params: SessionsOfKeptParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: SessionsOfKeptParams,
-    Result: SessionsOfKeptResult,
-    execute: (p) => sql.unsafe(SessionsOfKeptSql, [p["closed"]]),
-  })(params)
-})
-
-export const SessionsOfFamilyParams = Schema.Struct({
-  ["id"]: Schema.String,
-})
-export type SessionsOfFamilyParams = typeof SessionsOfFamilyParams.Type
-
-
-export const SessionsOfFamilyResult = Schema.Struct({
-  ["issue"]: Schema.String,
-  ["session"]: Schema.String,
-})
-export type SessionsOfFamilyResult = typeof SessionsOfFamilyResult.Type
-
-
-export const SessionsOfFamilySql = "-- name: SessionsOfFamily :many\nselect issue_session.issue, issue_session.session from issue_session\nwhere issue_session.issue in (select id from issue where id = $1 or parent = $1)\norder by issue_session.started_at, issue_session.session;"
-
-export const sessionsOfFamily = Effect.fn("SessionsOfFamily")(function* (params: SessionsOfFamilyParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: SessionsOfFamilyParams,
-    Result: SessionsOfFamilyResult,
-    execute: (p) => sql.unsafe(SessionsOfFamilySql, [p["id"]]),
-  })(params)
 })

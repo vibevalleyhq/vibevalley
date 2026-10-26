@@ -677,12 +677,13 @@ describe("issues", () => {
       );
       const live = { id: "live", agent: "lab", name: "current", runtime: "pi", brief: "history", hiredAt: 3, runs: 0, phase: { _tag: "done" } } as Session;
       yield* core.apply({ type: "hired", session: live });
+      // Through the issues, as a send records them: they are the only writer of issue_session.
       for (const [id, at] of [
         ["ended", 1],
         ["live", 3],
         ["missing", 4],
       ] as const)
-        yield* sql`insert into issue_session (session, issue, started_at) values (${id}, ${issue.id}, ${at})`.pipe(Effect.orDie);
+        yield* issues.ran(issue.id, { ...live, id: sessionId(id), hiredAt: at });
       const [got] = yield* issues.history();
       expect(got!.sessions.map((s) => [s.id, s.phase._tag])).toEqual([
         ["ended", "closed"],

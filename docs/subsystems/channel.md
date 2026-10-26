@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置。
+- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置，`audience.ts` 是定一条消息给谁、叫不叫醒要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。
 - **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留哪些（`keepMessages` 300 条、`keepConversations` 100 个）。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
@@ -29,7 +29,7 @@
 - **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个对话、300 条消息，挤出去时频道不挤；更早的用 `channel.history` 取。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递只在库里。
 - **消息的去处由库里的身份决定**：连接器引用旧消息时回原对话，发件只送到原对话所属频道接的账号。两条路都由田头的 `messageLocation` 按消息 id 查出对话和频道；消息或串被最近状态挤出、服务端重启，都不改变去处。
 - **没处理的 @主人 留到读过或回复过**：田头从库里的 @、已读位置和主人在同一对话里的后续消息算出完整集合，经 `ownerMentions` 事实写进 `Chat.ownerMentions`；不受最近 300 条消息、100 个对话限制。写出 @主人、主人回复、标记已读和开机时刷新，每次用一条查询带回消息、频道和地址。通知只读这个结论，不再从聊天窗口推测完成条件。
-- **记着自己写过的，不再读回来**：田头开机时把全部对话、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找对话、找串、找频道、主人读到哪都问它；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有田头写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
+- **记着自己写过的，不再读回来**：田头开机时把全部对话、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找对话、找串、找频道、主人读到哪、谁跟着串、来回了几次、谁刚被叫醒过都问它们；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有田头写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
 - **写库一个一个来**：改田头的都在 `chat.ts` 的一把锁（`Semaphore`）里，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
 - **一个对话一列消息号**：主键是 uuidv7，`number` 在每个对话里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（田头是 `#田头`）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
 - **对话三种**：田头（全库唯一一行）、频道（可以带说明和默认项目）、串（挂在一条消息下，`subject_kind` 是 `issue`、`talk`）。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
@@ -97,7 +97,7 @@
 
 **送出去的话**：哪些话出农场归[通知](docs/subsystems/notice.md)（`notice/rules.ts` 的 `forOwner`，经 `Notices.toOwner` 交给每个连接器的协调器），挑出主人要看的：说完了的，不是主人自己的；汇报和派活，管家的话，@主人 或 @所有人 的话；提示不送。只送连接器接的那个频道（和它下面的串）里的。`ownerLine` 加上「【谁 · 做完了 / 没做成 / 派活 / 在工单串里】」，Markdown 转成纯文本，按 UTF-16 长度切开（微信 1800、飞书 4000、QQ 2000，尽量在空行或换行处切），写进 `connector_outbox`；网络发送不阻塞读核心事件。
 
-**发件表**（`voiceOutbox`）：每条马上发，按顺序，遇到发不出去的就停下。发送期间新来的消息留下 dirty 标记，当前这轮结束后立即再查，不丢掉那次唤醒。拒收的（微信、QQ 的回复窗口，`restricted`）留着，30 秒后重试，每失败一次等待翻倍，最多半小时；发出去一条就从 30 秒重来。主人下次说话时先补发，积了 3 条以上就合成一条摘要（「你不在的时候有 N 条消息」，每条留头 60 个字），整批一起确认。飞书、QQ 拿到平台的消息 id 才算发成功。登录过期（`stale`）就暂停这个账号一小时，暂停写库或解除暂停失败时等待 30 秒再试，不密集轮询。收消息断了先等 2 秒重连，连着断 3 次等 30 秒。等待、唤醒和中断共用 `waitFor` 收尾，移除对应的 abort listener。
+**发件表**（`voiceOutbox`）：每条马上发，按顺序，遇到发不出去的就停下。状态里的「还有几条没发」记在内存里：不知道时数一次库，此后加件、发出、作废的事务提交后跟着加减；事务失败或数的时候又变了，就回到不知道。发送期间新来的消息留下 dirty 标记，当前这轮结束后立即再查，不丢掉那次唤醒。拒收的（微信、QQ 的回复窗口，`restricted`）留着，30 秒后重试，每失败一次等待翻倍，最多半小时；发出去一条就从 30 秒重来。主人下次说话时先补发，积了 3 条以上就合成一条摘要（「你不在的时候有 N 条消息」，每条留头 60 个字），整批一起确认。飞书、QQ 拿到平台的消息 id 才算发成功。登录过期（`stale`）就暂停这个账号一小时，暂停写库或解除暂停失败时等待 30 秒再试，不密集轮询。收消息断了先等 2 秒重连，连着断 3 次等 30 秒。等待、唤醒和中断共用 `waitFor` 收尾，移除对应的 abort listener。
 
 **登录和换账号**：
 

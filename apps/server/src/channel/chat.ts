@@ -53,6 +53,7 @@ import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
+import { Audience } from "./audience.ts";
 import { ChatModel, type ConvRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing } from "../errors.ts";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
@@ -348,8 +349,15 @@ export const make = Effect.gen(function* () {
   let helpers: Helpers | undefined;
   const { run: db, one, inTx } = yield* Db;
   const model = new ChatModel();
+  const reach = new Audience();
+  const follow = (conversation: string, participant: string, reason: string, from: number) =>
+    Effect.andThen(
+      db(qf.follow({ conversation_id: conversation, participant_id: participant, reason, from_number: from })),
+      Effect.sync(() => reach.followed(conversation, participant)),
+    );
   const reload = Effect.gen(function* () {
     model.load(yield* db(qc.allConversations()), yield* db(qp.participants()), yield* db(qr.readCursorsOf({ participant_id: "user" })));
+    reach.load(yield* db(qf.allFollows()), yield* db(qd.agentWakesByConversation()), yield* db(qd.lastAgentWakes()), yield* db(qm.ownerLastMessages()));
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
@@ -511,7 +519,7 @@ export const make = Effect.gen(function* () {
     };
     yield* db(qc.createThread({ ...thread, created_at }));
     model.created({ ...thread, kind: "thread", last_number: null, reply_count: 0, created_at, name: null, description: null, project: null });
-    if (subject.owner) yield* db(qf.follow({ conversation_id: id, participant_id: subject.owner, reason: "owner", from_number: parent.number }));
+    if (subject.owner) yield* follow(id, subject.owner, "owner", parent.number);
     return id;
   });
 
@@ -569,18 +577,16 @@ export const make = Effect.gen(function* () {
     let followers: string[] = [];
     if (conv.kind === "thread") {
       // A dispatch handing the issue to its next session makes no one a follower: the orchestrator would be woken by every word in it.
-      if (row.sender_id !== "system" && row.kind !== "dispatch")
-        yield* db(qf.follow({ conversation_id: conv.id, participant_id: row.sender_id, reason: "replied", from_number: row.number }));
+      if (row.sender_id !== "system" && row.kind !== "dispatch") yield* follow(conv.id, row.sender_id, "replied", row.number);
       for (const m of named)
-        if (m.how === "delivered" && (m.id === orchestratorAgent || present.includes(m.id)))
-          yield* db(qf.follow({ conversation_id: conv.id, participant_id: m.id, reason: "mentioned", from_number: row.number - 1 }));
-      followers = (yield* db(qf.followers({ conversation_id: conv.id }))).map((f) => f.participant_id);
+        if (m.how === "delivered" && (m.id === orchestratorAgent || present.includes(m.id))) yield* follow(conv.id, m.id, "mentioned", row.number - 1);
+      followers = reach.followers(conv.id);
     }
-    const hops = (yield* db(qd.agentWakesSinceUser({ conversation: conv.id }))).n ?? 0;
+    const hops = reach.hops(conv.id);
     const now = yield* Clock.currentTimeMillis;
     const cooling: string[] = [];
     for (const h of sessionsNow) {
-      const last = (yield* db(qd.lastAgentWake({ recipient_id: h.id }))).at ?? 0;
+      const last = reach.lastWake(h.id);
       if (now - last < agentWakeCooldownMs) cooling.push(h.id);
     }
     const audience = sessionsNow.filter((h) => conv.kind === "thread" || channelOfSession(h) === conv.id).map((h) => h.id);
@@ -601,10 +607,21 @@ export const make = Effect.gen(function* () {
       forTask: !!meta.forTask,
       spoken: !!meta.spoken,
     });
-    for (const d of deliveries)
+    for (const d of deliveries) {
       yield* db(
         qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
       );
+      reach.delivered({
+        conversation: conv.id,
+        message: row.id,
+        recipient: d.recipient,
+        senderKind: row.sender_kind,
+        recipientKind: model.participant(d.recipient)?.kind ?? "",
+        wakes: d.wakes,
+        held: d.heldBy !== undefined && d.heldBy !== null,
+        at: now,
+      });
+    }
     const written: Written = { id: row.id, number: row.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
     written.ownerMentionsChanged = row.sender_id === "user" || mentions.includes("user");
     // The breaker is reset only after the message's transaction commits.
@@ -645,6 +662,7 @@ export const make = Effect.gen(function* () {
           );
           yield* db(qc.touchConversation({ number, id: w.conversation }));
           model.touched(w.conversation, number);
+          if (w.from === "user") reach.ownerSpoke(w.conversation, id);
           row = {
             id,
             conversation_id: w.conversation,
@@ -670,7 +688,7 @@ export const make = Effect.gen(function* () {
           ? yield* settle(row)
           : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
         if (w.readBy) yield* readUpTo(w.readBy, w.conversation, number);
-        if (w.follow) yield* db(qf.follow({ conversation_id: w.conversation, participant_id: w.follow, reason: "owner", from_number: number }));
+        if (w.follow) yield* follow(w.conversation, w.follow, "owner", number);
         if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
         return out;
       }),
@@ -863,7 +881,7 @@ export const make = Effect.gen(function* () {
    * it, in one transaction, so a restart neither says it twice nor leaves it out.
    */
   const handedOn = Effect.fn("Channels.handedOn")(function* (h: Session, thread: string) {
-    const followers = (yield* db(qf.followers({ conversation_id: thread }))).map((f) => f.participant_id);
+    const followers = reach.followers(thread);
     if (followers.includes(h.id)) return;
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;

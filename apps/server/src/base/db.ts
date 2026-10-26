@@ -36,29 +36,35 @@ export function setAsideStale(where: string, hash: string, now: number): string 
 let memoryBase: Promise<Blob> | undefined;
 
 /** In memory, a database given back is emptied and kept for the next farm: making a PGlite from the copy above takes
- * about 110 ms, emptying one about 13 ms. Each farm open at the same time has its own. Only one whose schema is still
- * the baseline's is kept (tests add triggers, drop or rename tables to make writes fail); any other is closed. The
- * migrations' own table is not emptied: a kept database has the baseline already. */
+ * about 110 ms, emptying one about 1 ms. Each farm open at the same time has its own. Only one whose schema nobody
+ * changed is kept (tests add triggers, drop or rename tables to make writes fail): an event trigger marks the session on
+ * any DDL, and a marked one is closed. The migrations' own table is not emptied: a kept database has the baseline. */
 const spare: PGlite[] = [];
-let baselineShape: string | undefined;
 let emptyAll: string | undefined;
-const shapeOf = async (pglite: PGlite) =>
-  (
-    await pglite.query<{ shape: string }>(`SELECT
-      (SELECT string_agg(table_name || '.' || column_name || ':' || data_type, ',' ORDER BY table_name, column_name)
-         FROM information_schema.columns WHERE table_schema = 'public')
-      || '|' || (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal)
-      || '|' || (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public')
-      || '|' || (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public') AS shape`)
-  ).rows[0]!.shape;
-/** Empties a database given back and keeps it, or closes it when its schema was changed. */
+const ddlMark = "vibevalley.ddl";
+const watchDdl = `CREATE FUNCTION vibevalley_ddl_mark() RETURNS event_trigger LANGUAGE plpgsql AS $$
+  BEGIN PERFORM set_config('${ddlMark}', '1', false); END $$;
+CREATE EVENT TRIGGER vibevalley_ddl ON ddl_command_end EXECUTE FUNCTION vibevalley_ddl_mark();`;
+const unmark = `SELECT set_config('${ddlMark}', '', false)`;
+const changed = async (pglite: PGlite) =>
+  (await pglite.query<{ mark: string | null }>(`SELECT current_setting('${ddlMark}', true) AS mark`)).rows[0]?.mark === "1";
+/** Empties a database given back and keeps it, or closes it when its schema was changed. Deleting with the foreign keys
+ * off is cheaper than TRUNCATE, which makes every table's files again; restarting the sequences is DDL itself, so the
+ * mark is cleared after. */
 const giveBack = async (pglite: PGlite) => {
-  if (baselineShape === undefined || (await shapeOf(pglite)) !== baselineShape) return pglite.close();
+  if (await changed(pglite)) return pglite.close();
   if (emptyAll === undefined) {
     const tables = await pglite.query<{ name: string }>(
       "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'effect_sql_migrations'",
     );
-    emptyAll = `TRUNCATE ${tables.rows.map((t) => `"${t.name}"`).join(", ")} RESTART IDENTITY CASCADE`;
+    const sequences = await pglite.query<{ name: string }>("SELECT sequencename AS name FROM pg_sequences WHERE schemaname = 'public'");
+    emptyAll = [
+      "SET session_replication_role = replica;",
+      ...tables.rows.map((t) => `DELETE FROM "${t.name}";`),
+      "SET session_replication_role = origin;",
+      ...sequences.rows.map((q) => `ALTER SEQUENCE "${q.name}" RESTART;`),
+      `${unmark};`,
+    ].join(" ");
   }
   await pglite.exec(emptyAll);
   spare.push(pglite);
@@ -90,7 +96,9 @@ export const Database = PgliteClient.layerFrom(
     );
     const client = yield* PgliteClient.fromClient({ liveClient: pglite });
     if (!kept) yield* migrate(pglite, client);
-    if (memory && baselineShape === undefined) baselineShape = yield* Effect.promise(() => shapeOf(pglite));
+    // The first in memory watches for DDL before the copy is taken, so every copy does too.
+    if (memory && !kept && !base) yield* Effect.promise(() => pglite.exec(watchDdl));
+    if (memory && !kept) yield* Effect.promise(() => pglite.exec(unmark));
     // Taken before anyone writes: the copy is the baseline alone.
     if (memory && !base) memoryBase ??= Promise.resolve(yield* Effect.promise(() => pglite.dumpDataDir("none")));
     if (!memory) writeFileSync(where + ".schema", hash + "\n");
