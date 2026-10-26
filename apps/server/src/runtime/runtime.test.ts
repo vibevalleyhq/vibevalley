@@ -7,6 +7,7 @@ import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@boti
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
+import { NodeServices } from "@effect/platform-node";
 import { Effect, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
 import { type Config, Settings } from "../base/config.ts";
@@ -41,7 +42,10 @@ const notFound = async (id: string): Promise<RuntimeInfo> => ({
 });
 
 const world = (config: Config = testConfig()) =>
-  Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(Layer.provideMerge(Layer.succeed(Settings, config)));
+  Layer.mergeAll(coreLayer.pipe(Layer.provide(projection)), agentLayer).pipe(
+    Layer.provideMerge(Layer.succeed(Settings, config)),
+    Layer.provideMerge(NodeServices.layer),
+  );
 
 /** A runtime service over the given runtimes, never asking this machine's. */
 const runtimes = (options: RuntimeOptions = {}) => make({ background: false, probe: notFound, usageOf: async () => null, ...options });

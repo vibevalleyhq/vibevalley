@@ -4,12 +4,11 @@
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
 
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
-import { Clock, Context, Effect, FiberMap, FiberSet, Layer, Schedule, Schema } from "effect";
+import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
 import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
@@ -18,7 +17,7 @@ import { Setting } from "../setting/setting.ts";
 import { dbStores } from "../agent/brain/agentTaskStore.ts";
 import { projectsDir, Settings } from "../base/config.ts";
 import { FileWriter } from "../base/files.ts";
-import { jsonOf } from "../base/json.ts";
+import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { type ApiError, refused } from "../errors.ts";
 import { piBalance } from "./pi.ts";
@@ -173,6 +172,7 @@ const optional = <K extends string>(key: K, v: string | undefined) => (v ? ({ [k
 export const make = (options: RuntimeOptions = {}) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
+    const fs = yield* FileSystem.FileSystem;
     const logs = yield* callbackLog;
     const config = yield* Settings;
     const core = yield* Core;
@@ -201,14 +201,9 @@ export const make = (options: RuntimeOptions = {}) =>
     const spendFile = join(config.home, "spend.json");
     const disk = new FileWriter(spendFile);
     let spent: Spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };
-    if (existsSync(spendFile)) {
-      try {
-        const kept = jsonOf(SpentSchema)(readFileSync(spendFile, "utf8"));
-        if (kept.day === dayOf(clock.currentTimeMillisUnsafe()) && kept.byRuntime) spent = kept;
-      } catch {
-        // An unreadable tally starts the day again.
-      }
-    }
+    // An unreadable tally, or yesterday's, starts the day again.
+    const kept = jsonOrNone(SpentSchema)(Option.getOrUndefined(yield* Effect.option(fs.readFileString(spendFile))));
+    if (kept && kept.day === spent.day) spent = kept;
     /** A new day starts from nothing. */
     const tally = () => {
       if (spent.day !== dayOf(clock.currentTimeMillisUnsafe())) spent = { day: dayOf(clock.currentTimeMillisUnsafe()), byRuntime: {} };

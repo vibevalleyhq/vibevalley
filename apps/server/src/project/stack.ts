@@ -1,8 +1,7 @@
 // What a project is built with, from the markers at its root, first one wins.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { ProjectStack } from "@vibevalley/protocol";
+import { Option, Schema } from "effect";
 
 const empty: ProjectStack = { name: "", label: "" };
 
@@ -10,15 +9,25 @@ const empty: ProjectStack = { name: "", label: "" };
 const withCommands = (s: ProjectStack): ProjectStack =>
   Object.fromEntries(Object.entries(s).filter(([k, v]) => v !== "" || k === "name" || k === "label")) as ProjectStack;
 
-export function stackOf(dir: string): ProjectStack {
-  const read = (name: string) => {
-    try {
-      return readFileSync(join(dir, name), "utf8");
-    } catch {
-      return undefined;
-    }
-  };
-  const has = (name: string) => read(name) !== undefined;
+/** The files at a project's root that stackOf looks at. */
+export const stackFiles = [
+  "go.mod",
+  "Cargo.toml",
+  "pubspec.yaml",
+  "package.json",
+  "pyproject.toml",
+  "requirements.txt",
+  "setup.py",
+  "bun.lock",
+  "bun.lockb",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+] as const;
+
+/** files: the ones of stackFiles that are there, by name, with what they say. */
+export function stackOf(files: ReadonlyMap<string, string>): ProjectStack {
+  const read = (name: (typeof stackFiles)[number]) => files.get(name);
+  const has = (name: (typeof stackFiles)[number]) => files.has(name);
   const stack = (s: Partial<ProjectStack>) => withCommands({ ...empty, ...s });
   if (has("go.mod"))
     return stack({
@@ -54,15 +63,15 @@ export function stackOf(dir: string): ProjectStack {
   return empty;
 }
 
+// An unreadable package.json, or one whose scripts are not all text, has none.
+const scriptsOf = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)) })),
+);
+
 /** The package orchestrator is the lockfile's; a command is there only when package.json has that script, always as `<pm> run <script>`. */
-function nodeStack(pkg: string, has: (name: string) => boolean): ProjectStack {
+function nodeStack(pkg: string, has: (name: (typeof stackFiles)[number]) => boolean): ProjectStack {
   const pm = has("bun.lock") || has("bun.lockb") ? "bun" : has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm";
-  let scripts: Record<string, string> = {};
-  try {
-    scripts = (JSON.parse(pkg) as { scripts?: Record<string, string> }).scripts ?? {};
-  } catch {
-    // An unreadable package.json has no scripts.
-  }
+  const scripts: Readonly<Record<string, string>> = Option.match(scriptsOf(pkg), { onNone: () => ({}), onSome: (p) => p.scripts ?? {} });
   const runScript = (s: string) => (scripts[s]?.trim() ? `${pm} run ${s}` : "");
   return withCommands({
     name: "node",

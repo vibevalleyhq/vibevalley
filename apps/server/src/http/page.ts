@@ -2,9 +2,8 @@
 // extension is a route of the page's own router and gets index.html, never cached; the API never falls back, so an
 // unknown endpoint stays a 404.
 
-import { existsSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import { Effect } from "effect";
+import { Effect, FileSystem, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 export const page = (dir: string) =>
@@ -17,7 +16,9 @@ export const page = (dir: string) =>
       if (path.startsWith("/api/v1/")) return HttpServerResponse.text("404 page not found\n", { status: 404 });
       const clean = normalize("/" + decodeURIComponent(path));
       const file = join(dir, clean);
-      if (clean !== "/index.html" && existsSync(file) && statSync(file).isFile()) return yield* HttpServerResponse.file(file);
+      const fs = yield* FileSystem.FileSystem;
+      const info = yield* Effect.option(fs.stat(file));
+      if (clean !== "/index.html" && Option.isSome(info) && info.value.type === "File") return yield* HttpServerResponse.file(file);
       // The page itself is asked again every time (its assets carry their hash): a server updated under a phone's or a
       // browser's cached page would otherwise keep showing the old one.
       if (extname(clean) === "" || clean === "/index.html")
