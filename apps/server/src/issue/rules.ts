@@ -2,6 +2,7 @@
 // id, its draft (what the drafting session is told and how what it hands back is read), where its status may move, and
 // the sowing form's templates filled for a project.
 
+import { wording } from "@vibevalley/protocol/words";
 import { reportVerdict } from "../session/rules.ts";
 import type {
   Deliverable,
@@ -19,7 +20,7 @@ import type {
   TemplateBlank,
   TemplateKind,
 } from "@vibevalley/protocol";
-import { closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
+import { closedText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator } from "./state.ts";
 import { clip } from "../base/text.ts";
 
@@ -302,10 +303,10 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
         else out.push({ at: r.endedAt, kind: draft ? "refined" : "reported", ...by, text: (draft ? "起草好了" : "交回来了") + said });
         break;
       case "failed":
-        out.push({ at: r.endedAt, kind: "failed", ...by, text: outcomeLabel.failed + said });
+        out.push({ at: r.endedAt, kind: "failed", ...by, text: wording().outcome.failed + said });
         break;
       case "interrupted":
-        out.push({ at: r.endedAt, kind: "stopped", ...by, text: outcomeLabel.interrupted + said });
+        out.push({ at: r.endedAt, kind: "stopped", ...by, text: wording().outcome.interrupted + said });
         break;
     }
   });

@@ -1,10 +1,10 @@
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
+import { wording } from "@vibevalley/protocol/words";
 import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
-import { outcomeLabel } from "@vibevalley/protocol/rules";
 import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
@@ -124,9 +124,9 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
 }
 
 const outcomeTag: Record<Outcome, [label: string, fill: string, ink: string]> = {
-  completed: [outcomeLabel.completed, "#e5a93c66", "#2f1f13"],
-  failed: [outcomeLabel.failed, "#c84a3a26", "#c84a3a"],
-  interrupted: [outcomeLabel.interrupted, "#e2c995", "#67482d"],
+  completed: [wording().outcome.completed, "#e5a93c66", "#2f1f13"],
+  failed: [wording().outcome.failed, "#c84a3a26", "#c84a3a"],
+  interrupted: [wording().outcome.interrupted, "#e2c995", "#67482d"],
 };
 
 export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.Element; steps?: JSX.Element }) {

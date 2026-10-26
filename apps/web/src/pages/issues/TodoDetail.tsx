@@ -1,6 +1,6 @@
+import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { type Deliverable, DeliverableValues, type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
-import { deliverableLabel, priorityLabel } from "@vibevalley/protocol/rules";
 import { api } from "../../data/api";
 import { rememberPick } from "./write";
 import { isRefined, newIssueTitle } from "../../rules/issues";
@@ -288,7 +288,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label="优先级"
           value={d().priority}
           onChange={(v) => edit({ priority: v as Priority })}
-          options={PriorityValues.map((p) => ({ value: p, label: priorityLabel[p] }))}
+          options={PriorityValues.map((p) => ({ value: p, label: wording().priority[p] }))}
         />
       </Property>
       <Property label="交付">
@@ -296,7 +296,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label="交付"
           value={d().deliver}
           onChange={(v) => edit({ deliver: v as Deliverable })}
-          options={DeliverableValues.map((v) => ({ value: v, label: deliverableLabel[v] }))}
+          options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
         />
       </Property>
       <More>

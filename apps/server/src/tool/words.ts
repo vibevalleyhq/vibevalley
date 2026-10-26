@@ -1,5 +1,6 @@
 // How the tools word what they found.
 
+import { wording } from "@vibevalley/protocol/words";
 import {
   type Changes,
   type Issue,
@@ -12,7 +13,7 @@ import {
   type Spent,
   type UncommittedItem,
 } from "@vibevalley/protocol";
-import { outcomeLabel, phaseText, priorityLabel, shortTitle, statusLabel, stuckLabel, attentionLabel, attentionWantsOwner } from "@vibevalley/protocol/rules";
+import { phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
@@ -62,7 +63,7 @@ export function sessionLine(w: Roster, now: number, number?: number): string {
   const h = w.session;
   let last = "";
   if (h.lastRun) {
-    last = "；上一轮" + outcomeLabel[h.lastRun.outcome] + "：" + head(h.lastRun.summary, 80);
+    last = "；上一轮" + wording().outcome[h.lastRun.outcome] + "：" + head(h.lastRun.summary, 80);
   }
   const where = w.place.branch ? "在 " + w.place.project + " 的 " + w.place.branch : "在 " + w.place.project;
   const task = h.graph ? (h.graph.task ? "，做计划 " + h.graph.id + " 的步骤 " + h.graph.task : "，在拆计划 " + h.graph.id) : "";
@@ -71,9 +72,9 @@ export function sessionLine(w: Roster, now: number, number?: number): string {
   return `- ${h.name}（${h.id}，${runtimeLabel(h.runtime)}，${where}${task}）工单 ${issue}「${head(h.brief, 60)}」，${phaseText(h, now)}${last}${spent}`;
 }
 
-/** The words for a status: its label (statusLabel), a few the owner says for it, and its own name. */
+/** The words for a status: its label (wording().status), a few the owner says for it, and its own name. */
 const statusNames: Readonly<Record<string, IssueStatus>> = {
-  ...Object.fromEntries(IssueStatusValues.map((s) => [statusLabel[s], s])),
+  ...Object.fromEntries(IssueStatusValues.map((s) => [wording().status[s], s])),
   草稿: "backlog",
   在做: "in_progress",
   等验收: "in_review",
@@ -93,8 +94,9 @@ const priorityNames: Readonly<Record<string, Priority>> = {
 };
 export const priorityOf = (word: string): Priority | undefined => priorityNames[word.trim()];
 
-export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) => "没有「" + word + "」这个状态：" + allowed.map((s) => statusLabel[s]).join("、");
-export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => priorityLabel[p]).join("、");
+export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) =>
+  "没有「" + word + "」这个状态：" + allowed.map((s) => wording().status[s]).join("、");
+export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => wording().priority[p]).join("、");
 
 /** A channel in one line: its name, what it is for, its default project. */
 export const channelLine = (c: { readonly name: string; readonly description?: string; readonly project?: string }) =>
@@ -111,11 +113,11 @@ export function spanWords(ms: number): string {
 /** One line: its number and short title first, so the orchestrator names it by them; who is the one doing it, when any. */
 export function issueLine(t: Issue, who: string, now: number): string {
   const st = t.attention;
-  const stuck = st.stuck ? "（" + stuckLabel[st.stuck] + "）" : "";
-  const parts = [`#${t.number}「${shortTitle(t.title)}」${attentionLabel[st.state]}${stuck}`];
+  const stuck = st.stuck ? "（" + wording().stuck[st.stuck] + "）" : "";
+  const parts = [`#${t.number}「${shortTitle(t.title)}」${wording().attention[st.state]}${stuck}`];
   if (t.project) parts.push(t.project);
   if (who) parts.push(who);
-  if (t.priority !== "medium") parts.push(priorityLabel[t.priority] + "优先级");
+  if (t.priority !== "medium") parts.push(wording().priority[t.priority] + "优先级");
   if (attentionWantsOwner(st.state) && st.since !== undefined) parts.push("等了 " + spanWords(now - st.since));
   return "- " + parts.join(" · ");
 }
@@ -136,7 +138,7 @@ export function issueDetail(t: Issue, who: string, timeline: IssueTimeline | und
   if (t.questions.length > 0) lines.push("在等主人回答：" + t.questions.map((a) => a.question).join("；"));
   const open = t.findings.filter((f) => !f.resolved);
   if (open.length > 0) lines.push("验收没过要修的：" + open.map((f) => f.text).join("；"));
-  if (t.lastRun?.outcome) lines.push("最后一轮" + outcomeLabel[t.lastRun.outcome] + "，在等主人点头");
+  if (t.lastRun?.outcome) lines.push("最后一轮" + wording().outcome[t.lastRun.outcome] + "，在等主人点头");
   if (t.pullRequest) lines.push(`PR #${t.pullRequest.number}（${t.pullRequest.state}）${t.pullRequest.url}`);
   for (const m of (timeline?.milestones ?? []).slice(0, 8)) lines.push(`  · ${spanWords(now - m.at)}前 ${m.who ? m.who + " " : ""}${head(m.text, 120)}`);
   return lines.join("\n");

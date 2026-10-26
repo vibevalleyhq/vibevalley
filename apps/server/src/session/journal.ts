@@ -3,11 +3,11 @@
 // tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
 // only follow it, and the step still being written (the draft) is on disk only once it is sealed.
 
+import { wording } from "@vibevalley/protocol/words";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
-import { actionText } from "@vibevalley/protocol/rules";
 import { Schema } from "effect";
 import { cut } from "../base/text.ts";
 import { FileWriter } from "../base/files.ts";
@@ -214,7 +214,7 @@ export class Journal {
       type: "tool/call",
       text: start.text,
       action: start.action,
-      actionText: actionText[start.action],
+      actionText: wording().action[start.action],
       tool: start.tool,
       ...(start.input ? { input: cut(start.input, inputMax) } : {}),
     };

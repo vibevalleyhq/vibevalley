@@ -1,8 +1,8 @@
 // The tools the owner holds over the plots, and what a click with one means. aimTool is the
 // rule: the screen shows it while pointing and follows it on a click.
 
+import { wording } from "@vibevalley/protocol/words";
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
-import { attentionLabel } from "@vibevalley/protocol/rules";
 import { type Bed, isRipe } from "./world/plots";
 
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
@@ -65,7 +65,7 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   if (unlock !== undefined) return { ok: false, text: level >= unlock ? "开垦好的花坛" : `Lv.${unlock} 开垦这块地` };
   const crop = plot.crop;
   const act = actForTool(tool, issue?.attention.acts ?? []);
-  const unavailable = issue ? `这张工单${attentionLabel[issue.attention.state]}，先打开地块看看` : "这块地的工单还没读到";
+  const unavailable = issue ? `这张工单${wording().attention[issue.attention.state]}，先打开地块看看` : "这块地的工单还没读到";
   switch (tool) {
     case "hand":
       return { ok: true, text: session ? "看看这块地" : "播种" };

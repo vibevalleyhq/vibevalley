@@ -1,11 +1,21 @@
 // The built React page (apps/web/dist) at /. A path that names no file and has no
 // extension is a route of the page's own router and gets index.html, never cached; the API never falls back, so an
-// unknown endpoint stays a 404.
+// unknown endpoint stays a 404. index.html goes out with the farm's locale on its <html> (data-locale, lang): the page
+// takes its words from it before it draws (apps/web src/main.tsx).
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { currentLocale } from "@vibevalley/protocol/words";
+
+const htmlLang = { zh: "zh-Hans", en: "en" } as const;
+
+/** index.html with the locale on its <html>. */
+const indexOf = (dir: string) => {
+  const locale = currentLocale();
+  return readFileSync(join(dir, "index.html"), "utf8").replace(/<html[^>]*>/, `<html lang="${htmlLang[locale]}" data-locale="${locale}">`);
+};
 
 export const page = (dir: string) =>
   HttpRouter.add(
@@ -21,7 +31,7 @@ export const page = (dir: string) =>
       // The page itself is asked again every time (its assets carry their hash): a server updated under a phone's or a
       // browser's cached page would otherwise keep showing the old one.
       if (extname(clean) === "" || clean === "/index.html")
-        return HttpServerResponse.setHeader(yield* HttpServerResponse.file(join(dir, "index.html")), "cache-control", "no-cache");
+        return HttpServerResponse.text(indexOf(dir), { contentType: "text/html; charset=utf-8", headers: { "cache-control": "no-cache" } });
       return HttpServerResponse.text("404 page not found\n", { status: 404 });
     }).pipe(Effect.orElseSucceed(() => HttpServerResponse.text("404 page not found\n", { status: 404 }))),
   );

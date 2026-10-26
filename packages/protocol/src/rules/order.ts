@@ -3,6 +3,8 @@
 // room before it), and siblings that got the same key sort by id. The server checks them; the page makes them for the
 // blocks it inserts.
 
+import { wording } from "../words";
+
 const keyDigits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 // Long keys come from inserting at one place again and again; past this a key is refused (rebalancing is not done yet).
@@ -14,8 +16,8 @@ export class KeyError extends Error {}
 
 /** A key after a and before b; "" for a is the start, "" for b the end. */
 export function keyBetween(a: string, b: string): string {
-  if ((a !== "" && !validKey(a)) || (b !== "" && !validKey(b))) throw new KeyError("不是有效的顺序键");
-  if (a !== "" && b !== "" && a >= b) throw new KeyError(`顺序键 ${a} 不在 ${b} 前面`);
+  if ((a !== "" && !validKey(a)) || (b !== "" && !validKey(b))) throw new KeyError(wording().order.invalid);
+  if (a !== "" && b !== "" && a >= b) throw new KeyError(wording().order.unordered(a, b));
   if (b === "") return after(a);
   if (a === "") return before(b);
   return midpoint(a, b);

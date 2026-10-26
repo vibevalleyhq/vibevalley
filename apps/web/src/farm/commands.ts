@@ -1,8 +1,8 @@
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
+import { wording } from "@vibevalley/protocol/words";
 import type { IssueActRequest, Session, StateFrame } from "@vibevalley/protocol";
-import { actLabel } from "@vibevalley/protocol/rules";
 import { api, newSendKey } from "../data/api";
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
@@ -41,7 +41,7 @@ export interface FarmCommands {
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
   const send = async (s: Session, body: IssueActRequest) => {
-    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(`这张工单现在不能「${actLabel[body.act]}」`);
+    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(`这张工单现在不能「${wording().act[body.act]}」`);
     await api.issue.act({ id: issueOf(s), body });
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {

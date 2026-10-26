@@ -1,10 +1,12 @@
 // The owner's settings: settings.json in the home, readable by the owner only
 // (0600). A key saved here wins over the configuration's. Keys are read each time they are used, so one saved is used at
-// once; a page sees only where each comes from and its last characters; keys are never logged.
+// once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
+// process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
 import { join } from "node:path";
 import type { Check, Dictation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
+import { setLocale } from "@vibevalley/protocol/words";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
@@ -25,6 +27,7 @@ type MemorySourceConfig = typeof MemorySourceConfig.Type;
 
 /** settings.json, in the order the file has it. */
 const Stored = Schema.Struct({
+  locale: Schema.optionalKey(S.Locale),
   deepseekApiKey: Schema.optionalKey(Schema.String),
   agoraAppId: Schema.optionalKey(Schema.String),
   agoraAppCertificate: Schema.optionalKey(Schema.String),
@@ -96,6 +99,7 @@ export const make = Effect.gen(function* () {
     defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
   }
   let stored: Stored = (yield* readOrSetAside(file, jsonOf(Stored), "the settings start empty")) ?? {};
+  setLocale(stored.locale ?? "zh");
 
   const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
     saved ? [saved, "settings"] : given ? [given, "config"] : undefined;
@@ -108,6 +112,7 @@ export const make = Effect.gen(function* () {
     const certificate = pick(s.agoraAppCertificate, fromConfig.certificate);
     return {
       file,
+      locale: s.locale ?? "zh",
       deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : {},
       agoraAppId: appId ? { source: appId[1], value: appId[0] } : {},
       agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : {},
@@ -136,6 +141,7 @@ export const make = Effect.gen(function* () {
       const given = u[key];
       if (given !== undefined) next[key] = given.trim();
     }
+    if (u.locale) next.locale = u.locale === "zh" ? undefined : u.locale;
     if (u.dictation) {
       const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
       next.dictation = d.url === "" && d.model === "" ? undefined : d;
@@ -151,6 +157,7 @@ export const make = Effect.gen(function* () {
       return yield* new SettingRefused({ message: `存不进 ${file}：${(e as Error).message}` });
     }
     stored = kept;
+    setLocale(kept.locale ?? "zh");
     return status();
   });
 

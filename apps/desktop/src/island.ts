@@ -2,11 +2,12 @@
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
+import { wording } from "@vibevalley/protocol/words";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
-import { attentionLabel, attentionWantsOwner, phaseText, stuckLabel } from "@vibevalley/protocol/rules";
+import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
 
 /** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's; keep the two the same. */
 export type Tone = "working" | "waiting" | "stuck";
@@ -47,7 +48,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     const tone = toneOf[state];
     if (!tone) continue;
     const head = frame.state.sessions.find((h) => h.id === issue.sessions.at(-1));
-    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? stuckLabel[stuck] : attentionLabel[state];
+    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? wording().stuck[stuck] : wording().attention[state];
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
   rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);

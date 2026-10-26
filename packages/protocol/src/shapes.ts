@@ -1370,8 +1370,13 @@ export interface ChannelRequest {
   project?: string;
 }
 
+/** The language the farm speaks to the owner in (words/locale.ts). */
+export const LocaleValues = ["zh", "en"] as const;
+export type Locale = (typeof LocaleValues)[number];
+
 export interface SettingsStatus {
   file: string;
+  locale: Locale;
   deepseekApiKey: KeyStatus;
   agoraAppId: AgoraAppID;
   agoraAppCertificate: KeyStatus;
@@ -1438,6 +1443,7 @@ export interface VoiceSettings {
 }
 
 export interface SettingsUpdate {
+  locale?: Locale;
   deepseekApiKey?: string;
   agoraAppId?: string;
   agoraAppCertificate?: string;

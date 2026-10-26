@@ -5,6 +5,7 @@
 // and waits on the owner once the orchestrator's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
 // with its branch and worktree, and the state says which files.
 
+import { wording } from "@vibevalley/protocol/words";
 import {
   type Agent,
   type Question,
@@ -39,7 +40,7 @@ import {
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
-import { actLabel, attentionLabel, closedText, outcomeLabel, shortTitle } from "@vibevalley/protocol/rules";
+import { closedText, shortTitle } from "@vibevalley/protocol/rules";
 import { isForOrchestrator, issueRefiningOf, issueOrder, issueStatusOf, keepClosedIssues } from "./state.ts";
 import { cut } from "../base/text.ts";
 import { templateCatalog } from "../agent/seed.ts";
@@ -200,7 +201,7 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   out += "\n这张工单原来是：" + cut(issueJob(issue), askedMax);
   if (issue.answer) out += "\n上一次的结论：" + cut(issue.answer.conclusion, askedMax);
   if (issue.closedAt !== undefined) out += "\n它是怎么关的：" + closedText(issue);
-  if (last.lastRun) out += `\n最后一轮${outcomeLabel[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
+  if (last.lastRun) out += `\n最后一轮${wording().outcome[last.lastRun.outcome]}：${cut(last.lastRun.summary.trim(), askedMax)}`;
   if (previous) out += "\n这条分支上已经有上次的提交，接着做。";
   return out + "\n先看看项目现在的样子，再接着做。";
 }
@@ -695,8 +696,8 @@ export const make = (options: IssueOptions = {}) =>
      * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
     const withEdit = Effect.fn("Issues.withEdit")(function* (t: Issue, edit: IssueUpdate | undefined) {
       if (!edit) return t;
-      const words = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
-      if (words) yield* unsent(t.id);
+      const reworded = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
+      if (reworded) yield* unsent(t.id);
       return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) };
     });
 
@@ -963,18 +964,18 @@ export const make = (options: IssueOptions = {}) =>
       act: Effect.fn("Issues.act")(function* (ref, req, channel, by) {
         const t = yield* get(ref);
         const id = t.id;
-        const name = actLabel[req.act];
+        const name = wording().act[req.act];
         if (!t.attention.acts.includes(req.act))
-          return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+          return yield* Effect.fail(refused(`#${t.number} 是「${wording().attention[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
         const said = (req.text ?? "").trim();
-        const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+        const saying = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
         switch (req.act) {
           case "start":
             yield* shape.setStatus(id, "todo", said, channel, by);
             break;
           case "answer":
           case "tell":
-            yield* comment(id, yield* words, req.sendKey ?? "");
+            yield* comment(id, yield* saying, req.sendKey ?? "");
             break;
           case "accept":
             yield* shape.review(id, { pass: true });
@@ -997,7 +998,7 @@ export const make = (options: IssueOptions = {}) =>
             break;
           // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
           case "reopen":
-            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* words, channel, by) : shape.setStatus(id, "backlog", "", channel, by);
+            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* saying, channel, by) : shape.setStatus(id, "backlog", "", channel, by);
             break;
           case "resolve":
             yield* shape.resolve(id);
@@ -1087,11 +1088,11 @@ export const make = (options: IssueOptions = {}) =>
       }),
       previewAct: Effect.fn("Issues.previewAct")(function* (ref, req) {
         const t = yield* get(ref);
-        const name = actLabel[req.act];
+        const name = wording().act[req.act];
         if (!t.attention.acts.includes(req.act))
-          return yield* Effect.fail(refused(`#${t.number} 是「${attentionLabel[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
+          return yield* Effect.fail(refused(`#${t.number} 是「${wording().attention[t.attention.state]}」，现在不能「${name}」`, nextSteps(t)));
         const said = (req.text ?? "").trim();
-        const words = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
+        const saying = said ? Effect.succeed(said) : Effect.fail(refused(`「${name}」要说一句`));
         const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
         const helper = helperName(t);
         const does: readonly string[] = yield* (() => {
@@ -1099,9 +1100,9 @@ export const make = (options: IssueOptions = {}) =>
             case "start":
               return asStatus("todo", said);
             case "answer":
-              return Effect.map(words, (w) => [`回答 ${helper} 问的：${w}`, "它的问题清掉，接着做"]);
+              return Effect.map(saying, (w) => [`回答 ${helper} 问的：${w}`, "它的问题清掉，接着做"]);
             case "tell":
-              return Effect.map(words, (w) => [`把这句话带给 ${helper}：${w}`]);
+              return Effect.map(saying, (w) => [`把这句话带给 ${helper}：${w}`]);
             case "accept":
               return Effect.succeed([`#${t.number} 验收通过`]);
             case "reject": {
@@ -1118,7 +1119,7 @@ export const make = (options: IssueOptions = {}) =>
             case "close":
               return asStatus("canceled", said);
             case "reopen":
-              return t.sessions.length > 0 ? Effect.flatMap(words, (w) => asStatus("todo", w)) : asStatus("backlog", "");
+              return t.sessions.length > 0 ? Effect.flatMap(saying, (w) => asStatus("todo", w)) : asStatus("backlog", "");
             case "resolve":
               return Effect.succeed([`让 ${helper} 把主分支合进它的分支、解决冲突，做完再交回来`]);
             case "resume":

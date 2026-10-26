@@ -2,9 +2,9 @@
 // the server's refusals all go by. Worked out with the issue's status and attention in reduce (withIssueStatuses), so a
 // round that ends changes what the issue may do at once, wherever it is read.
 
+import { wording } from "@vibevalley/protocol/words";
 import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import type { Next } from "@vibevalley/protocol/api";
-import { actLabel, statusLabel } from "@vibevalley/protocol/rules";
 
 /** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -61,7 +61,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       if (to === "backlog" && !sent) return ["revive", ""];
       return sent ? ["none", "关上的工单挪回待办，就是带一句话重开"] : ["none", "没开过工就取消的工单，挪回备选再说"];
   }
-  return ["none", "不能从" + statusLabel[from] + "挪到" + statusLabel[to]];
+  return ["none", "不能从" + wording().status[from] + "挪到" + wording().status[to]];
 }
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
@@ -74,13 +74,13 @@ const wordy: ReadonlySet<IssueAct> = new Set(["answer", "tell", "reject", "reope
 export function nextSteps(t: Issue): Next[] {
   const n = String(t.number);
   const acts = t.attention.acts.map((act): Next => {
-    const label = actLabel[act];
+    const label = wording().act[act];
     return wordy.has(act)
       ? { say: `${label}：issue act ${n}，--json 带 act「${act}」和要说的 text` }
       : { say: label, run: ["issue", "act", n, "--json", JSON.stringify({ act })] };
   });
   const moves = statusMoves(t).map((to): Next => {
-    const say = "挪到" + statusLabel[to];
+    const say = "挪到" + wording().status[to];
     return statusMove(t, to)[0] === "round"
       ? { say: `${say}：issue status ${n}，--json 带 status「${to}」和这一轮要它做什么的 text` }
       : { say, run: ["issue", "status", n, "--json", JSON.stringify({ status: to })] };

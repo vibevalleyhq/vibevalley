@@ -1,6 +1,7 @@
 // An issue's lane, title and status and priority words.
 
-import { closedText, outcomeLabel, statusLabel } from "@vibevalley/protocol/rules";
+import { wording } from "@vibevalley/protocol/words";
+import { closedText } from "@vibevalley/protocol/rules";
 import {
   type WorkspaceState,
   type Issue,
@@ -33,7 +34,7 @@ export function issueTag(issue: Issue): IssueTag {
 export const tagOpen = (t: IssueTag) => t !== "closed";
 
 /** The tag in words: the status while open, what its close says after. */
-export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? statusLabel[issue.status] : closedText(issue));
+export const tagText = (issue: Issue) => (tagOpen(issueTag(issue)) ? wording().status[issue.status] : closedText(issue));
 
 export const isForOrchestrator = (issue: Issue) => issue.assignee === orchestratorAgent;
 
@@ -154,7 +155,7 @@ function runTriggerText(t: RunTrigger) {
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),
-    r.outcome ? outcomeLabel[r.outcome] : "正在干",
+    r.outcome ? wording().outcome[r.outcome] : "正在干",
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
     ...(r.heard.length ? [`中途听到 ${r.heard.length} 句`] : []),

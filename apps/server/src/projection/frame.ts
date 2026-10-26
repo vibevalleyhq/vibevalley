@@ -2,9 +2,10 @@
 // whenText and nextText, the graphs' actions) are said here and only here, on a copy: reduce keeps the facts, so the
 // words never reach the saved state.
 
+import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, GameEffect, StateFrame } from "@vibevalley/protocol";
 import { inbox } from "../notice/inbox.ts";
-import { actionText, phaseWords } from "@vibevalley/protocol/rules";
+import { phaseWords } from "@vibevalley/protocol/rules";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { graphsOf } from "../task/issues.ts";
 import { canEditTask, canRemoveTask, graphActions, graphActionText, graphStateTag, taskActions, taskActionText, taskStateText } from "../task/graph.ts";
@@ -38,9 +39,9 @@ function withWords(state: WorkspaceState): WorkspaceState {
       sessions: state.sessions.map((h) => {
         const out = { ...h, phaseText: phaseWords(h) };
         // The phase and the play are the state's: changed on copies.
-        if (h.phase._tag === "working") out.phase = { ...h.phase, doing: { ...h.phase.doing, actionText: actionText[h.phase.doing.action] } };
+        if (h.phase._tag === "working") out.phase = { ...h.phase, doing: { ...h.phase.doing, actionText: wording().action[h.phase.doing.action] } };
         if (h.play && (h.play.history ?? []).length > 0)
-          out.play = { ...h.play, history: h.play.history.map((s) => ({ ...s, actionText: actionText[s.action] })) };
+          out.play = { ...h.play, history: h.play.history.map((s) => ({ ...s, actionText: wording().action[s.action] })) };
         return out;
       }),
     };

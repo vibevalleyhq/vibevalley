@@ -1,6 +1,7 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
+import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./board";
 import {
@@ -21,7 +22,7 @@ import {
   taskLine,
 } from "./issues";
 import { ago, tookText } from "./time";
-import { shortTitle, attentionLabel, attentionWantsOwner, stuckLabel } from "@vibevalley/protocol/rules";
+import { shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { attentionTone } from "./issueState";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
@@ -162,7 +163,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       // A stuck issue says why on the board as on its page (有冲突, 没做成…).
       const st = issue.attention;
       if (attentionWantsOwner(st.state))
-        flags.push({ text: attentionLabel[st.state] + (st.stuck ? "：" + stuckLabel[st.stuck] : ""), tone: attentionTone[st.state] });
+        flags.push({ text: wording().attention[st.state] + (st.stuck ? "：" + wording().stuck[st.stuck] : ""), tone: attentionTone[st.state] });
       if (issue.canceled === "lost") flags.push({ text: "丢了", tone: "berry" });
       if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
       lines.push(head.name);

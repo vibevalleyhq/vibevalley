@@ -1,3 +1,4 @@
+import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
@@ -17,7 +18,7 @@ import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
 import { issueTag, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
-import { actLabel, closedText, deliverableLabel, priorityLabel } from "@vibevalley/protocol/rules";
+import { closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready } from "../../data/query";
@@ -101,7 +102,7 @@ export function IssueDetail(props: {
           {s().title}
         </h1>
         <span class="shrink-0 text-xs text-muted @max-[560px]:basis-full">
-          {[s().project, priorityLabel[props.issue.priority]].filter(Boolean).join(" · ")}
+          {[s().project, wording().priority[props.issue.priority]].filter(Boolean).join(" · ")}
         </span>
       </div>
       <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label="现在怎样">
@@ -327,7 +328,7 @@ export function IssueDetail(props: {
               const id = props.issue.id;
               void act(() => api.issue.update({ id, body: { deliver: v as Deliverable } }));
             }}
-            options={DeliverableValues.map((v) => ({ value: v, label: deliverableLabel[v] }))}
+            options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
           />
         </Property>
         <Property label="验收">
@@ -568,7 +569,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           <For each={props.issue.attention.acts}>
             {(a) => (
               <Button tone={a === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
-                {actLabel[a]}
+                {wording().act[a]}
               </Button>
             )}
           </For>

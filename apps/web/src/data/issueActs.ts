@@ -3,9 +3,9 @@
 // which open the box first, which open a dialog, what a reopen tells, and keeps the box, its words and the busy flag.
 // A page only says how it runs an act its own way (the farm's commands with their effects) and how it shows a failure.
 
+import { wording } from "@vibevalley/protocol/words";
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct } from "@vibevalley/protocol";
-import { actLabel } from "@vibevalley/protocol/rules";
 import { api, newSendKey } from "./api";
 
 /** The box under an issue's ask: the findings of 打回, or a word to the helper. */
@@ -20,7 +20,7 @@ export interface ActWays {
   readonly complete: () => void;
   readonly close: () => unknown;
   readonly told: (title: string, description: string) => void;
-  /** A skin's own words for some acts (the farm's for complete); the rest are the issue's (actLabel). */
+  /** A skin's own words for some acts (the farm's for complete); the rest are the issue's (wording().act). */
   readonly words?: Partial<Record<IssueAct, string>>;
 }
 
@@ -106,7 +106,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     act,
     /** What a button says: with its box open, what pressing it again does. */
     label: (a: IssueAct) =>
-      a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : (ways.words?.[a] ?? actLabel[a]),
+      a === "reject" && box() === "reject" ? "打回，照上面修" : a === "tell" && box() === "tell" ? "带过去" : (ways.words?.[a] ?? wording().act[a]),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),
     /** 打回 with its box open is the red one. */

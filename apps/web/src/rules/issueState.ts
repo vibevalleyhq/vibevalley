@@ -2,8 +2,9 @@
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
+import { wording } from "@vibevalley/protocol/words";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
-import { shortTitle, attentionLabel } from "@vibevalley/protocol/rules";
+import { shortTitle } from "@vibevalley/protocol/rules";
 import { endedAt, issueInTask, issueTitle } from "./issues";
 import { tookText } from "./time";
 import type { Tone } from "./cards";
@@ -18,8 +19,6 @@ export const attentionTone: Record<Attention, Tone> = {
   done: "leaf",
   canceled: "faint",
 };
-
-export { attentionLabel };
 
 /** How long, in round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
 export function spanText(ms: number) {
@@ -142,7 +141,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
       const s = session ?? head;
       const turns = Math.round(s.runs);
       return [
-        attentionLabel[attention.state],
+        wording().attention[attention.state],
         ...(attention.since !== undefined ? [`已经 ${spanText(now - attention.since)}`] : []),
         head.name,
         ...(turns > 0 ? [`跑了 ${turns} 轮`] : []),

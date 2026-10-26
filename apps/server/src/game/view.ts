@@ -1,6 +1,7 @@
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
 
+import { wording } from "@vibevalley/protocol/words";
 import type {
   Achievement,
   AchievementDef,
@@ -19,7 +20,7 @@ import type {
   Progress,
   Session,
 } from "@vibevalley/protocol";
-import { needOf, attentionLabel, stuckLabel } from "@vibevalley/protocol/rules";
+import { needOf } from "@vibevalley/protocol/rules";
 import { playOf } from "./play.ts";
 import { achievements } from "../agent/seed.ts";
 import { sessionOf } from "../session/state.ts";
@@ -66,13 +67,13 @@ function growth(h: Session): Crop {
 
 const badgeRipe: Badge = { text: "可收获", tone: "ripe" };
 const badgeBugs: Badge = { text: "有虫", tone: "bug" };
-const badgeConflict: Badge = { text: stuckLabel.conflict, tone: "bug" };
-const badgeQuiet: Badge = { text: stuckLabel.quiet, tone: "stuck" };
-const badgeHalfway: Badge = { text: stuckLabel.interrupted, tone: "stuck" };
+const badgeConflict: Badge = { text: wording().stuck.conflict, tone: "bug" };
+const badgeQuiet: Badge = { text: wording().stuck.quiet, tone: "stuck" };
+const badgeHalfway: Badge = { text: wording().stuck.interrupted, tone: "stuck" };
 const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
 const badgeRest: Badge = { text: "歇着", tone: "rest" };
-const badgeReview: Badge = { text: attentionLabel.reviewing, tone: "wait" };
-const badgeQuestions: Badge = { text: attentionLabel.asking, tone: "wait" };
+const badgeReview: Badge = { text: wording().attention.reviewing, tone: "wait" };
+const badgeQuestions: Badge = { text: wording().attention.asking, tone: "wait" };
 
 /**
  * A plot is a picture of its issue's attention, never a second reading of it: the crop and the badge say where the

@@ -1,8 +1,8 @@
 // What the chat apps are sent: which farm messages reach the owner, as plain text, cut
 // to what each app takes; a digest of what waited; the pairing words.
 
+import { wording } from "@vibevalley/protocol/words";
 import { type ChatMessage, type ConnectorID, type Conversation } from "@vibevalley/protocol";
-import { outcomeLabel } from "@vibevalley/protocol/rules";
 import { slice } from "../base/text.ts";
 
 /** In UTF-16 units; longer ones are cut. */
@@ -27,7 +27,8 @@ export function plainText(markdown: string): string {
 /** The owner sees one chat, the farm has many threads. */
 export function ownerLine(m: ChatMessage, where: Conversation | undefined): string {
   const who = m.fromKind === "orchestrator" ? "管家" : m.name;
-  const what = m.kind === "report" ? outcomeLabel[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? "派活" : where?.kind === "thread" ? "在工单串里" : "";
+  const what =
+    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? "派活" : where?.kind === "thread" ? "在工单串里" : "";
   return (what ? `【${who} · ${what}】` : `【${who}】`) + "\n" + plainText(m.text);
 }
 
