@@ -1,4 +1,5 @@
 import type { Event } from "@botiverse/oar";
+import { recallHead } from "./prompts.ts";
 import type { Doing, Session } from "@vibevalley/protocol";
 import { clip } from "../base/text.ts";
 import { describe, expect, it } from "vite-plus/test";
@@ -15,7 +16,6 @@ import {
   parseAnswer,
   questionsOf,
   readReport,
-  recallHead,
   sessionName,
   summaryOf,
   whoMakesRoom,

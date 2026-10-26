@@ -3,6 +3,7 @@
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
+import { sessionWording } from "./words.ts";
 import { agentWording } from "../agent/words.ts";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { messageText } from "../agent/brain/messages.ts";
@@ -178,7 +179,7 @@ export class AgentExecution {
       this.closed = true;
       if (this.run && !this.ending) {
         this.outcome = "interrupted";
-        this.summary = "VibeValley 停下了，这一轮中断了";
+        this.summary = sessionWording().log.stopped;
       }
       return this.finish();
     });
