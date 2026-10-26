@@ -1,10 +1,3 @@
-// Issues: what the owner wants done, each worked by sessions one after another. An issue closes
-// when its last session leaves, as the fact that the session left says how, and opens again with another session; a
-// task's issues open and close as the task says. An issue may be refined first: a session reads the code and writes it in
-// the issue's format, then leaves, the issue still unsent. One for the orchestrator is handed to the orchestrator, not to a session,
-// and waits on the owner once the orchestrator's turn ends, however it ended: only the owner closes it. A branch that would conflict is not merged: the session stays
-// with its branch and worktree, and the state says which files.
-
 import {
   type Agent,
   type Question,
@@ -88,12 +81,10 @@ import { IssueSessions } from "./sessions.ts";
 import { actsForOwner, type Actor } from "../base/actor.ts";
 import { conflictBrief, conflictOf, parseAnswer } from "../session/rules.ts";
 
-/** An issue for the orchestrator, handed to it. */
 export interface OrchestratorWork {
   readonly issue: Issue;
   readonly channel: string;
   readonly by: RunTrigger;
-  /** The recurrence that came due, when one did. */
   readonly recurrence?: Recurrence;
   /** What the owner said with it, asking again (another round, a reopen). */
   readonly said?: string;
@@ -166,7 +157,7 @@ export class Issues extends Context.Service<Issues, IssueShape>()("vibevalley/Is
 
 type Row = q.GetIssueResult;
 
-// The issue's JSON columns, read by their Schemas; one that does not read is none, as it was when it would not parse.
+// The issue's JSON columns, read by their Schemas; one that does not read is none.
 const strings = Schema.mutable(Schema.Array(Schema.String));
 const column = {
   graph: jsonOrNone(S.IssueGraph),
@@ -181,19 +172,13 @@ const column = {
 };
 const triggerOf = jsonOf(S.RunTrigger);
 
-/** Empty is none. */
-
-/** What a session's leaving says of its issue, when the issue is still open then: its work merged is done, the rest is
- * canceled. A completion the owner chose (kept, none) is written before its session leaves, and a task graph's step
- * closes with its graph, so neither is this. */
+/** Only while the issue is still open: a completion the owner chose (kept, none) is written before its session leaves,
+ * and a task graph's step closes with its graph, so neither comes here. */
 const closingOf = (closed: SessionClose | undefined): { delivered: Delivery } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
-/** An issue not found: the list says which there are. */
-
 const reopenDefault = "接着把这张工单做完";
 
-/** handedOver: another profile takes it on from last. */
 export function reopenTask(issue: Issue, last: Session, text: string, previous: boolean, handedOver = false): string {
   const how = handedOver ? `这张工单换你接手了，之前是 ${last.name}（${last.id}）在做` : `这张工单重开了，上一次是 ${last.name}（${last.id}）做的`;
   let out = (text.trim() || reopenDefault) + `\n\n（${how}。）`;
@@ -205,7 +190,6 @@ export function reopenTask(issue: Issue, last: Session, text: string, previous: 
   return out + "\n先看看项目现在的样子，再接着做。";
 }
 
-/** The findings still attention, numbered, then the owner's own words. */
 function failedText(findings: readonly Finding[], text: string): string {
   let out = "验收没过，这几处要修：";
   let n = 0;
@@ -214,7 +198,6 @@ function failedText(findings: readonly Finding[], text: string): string {
   return out + "\n\n修好以后在结论里逐条说怎么修的。";
 }
 
-/** Tests make it shorter. */
 export interface IssueOptions {
   readonly tryEveryMs?: number;
   readonly background?: boolean;
@@ -310,7 +293,6 @@ export const make = (options: IssueOptions = {}) =>
       return worked.issueOf(r) ?? r;
     });
 
-    /** By any of what idOf reads. */
     const get = Effect.fn("Issues.get")(function* (ref: string): Effect.fn.Return<Issue, ApiError> {
       const issue = yield* idOf(ref);
       const row = yield* one(q.getIssue({ id: issue }));
@@ -370,14 +352,12 @@ export const make = (options: IssueOptions = {}) =>
       return yield* get(id);
     });
 
-    /** Done, with what it delivered. */
     const complete = (id: string, delivered: Delivery) =>
       Effect.andThen(db(q.completeIssue({ closed_at: clock.currentTimeMillisUnsafe(), delivered, id })), publish(id));
-    /** Not done, and why. */
     const cancelAs = (id: string, canceled: IssueCanceled) =>
       Effect.andThen(db(q.cancelIssue({ closed_at: clock.currentTimeMillisUnsafe(), canceled, id })), publish(id));
 
-    /** A run no session carries (an in-process agent's, the orchestrator's) ended on the issue: the issue keeps how. */
+    /** A run no session carries: an in-process agent's, the orchestrator's. */
     const endRun = Effect.fn("Issues.endRun")(function* (id: string, outcome: Outcome) {
       const t = yield* get(id);
       // A run cut off by a restart closed its issue as lost; the run it goes on in ends on it all the same.
@@ -400,8 +380,7 @@ export const make = (options: IssueOptions = {}) =>
     /** The helper's word on each criterion, from the newest report that gave one; a reopen clears it. */
     const checked = (id: string, checks: readonly CriterionCheck[]) => db(q.setIssueChecks({ id, checks: jsonOrNull(checks, checks.length > 0) }));
 
-    /** An answer issue's round reported: a round that got through gives its conclusion (none when none can be read, and
-     * the issue is stuck on it); whatever the round changed goes, so the issue never delivers a change. */
+    /** An answer issue's round: one that got through gives its conclusion (none readable leaves the issue stuck on it); whatever it changed goes, so the issue never delivers a change. */
     const answered = Effect.fn("Issues.answered")(function* (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) {
       const t = yield* get(id);
       if (t.deliver !== "answer" || t.sessions.at(-1) !== session) return;
@@ -460,7 +439,6 @@ export const make = (options: IssueOptions = {}) =>
         row ? Effect.succeed([row.channel, triggerOf(row.triggered_by)] as const) : Effect.fail(refused(`工单 ${id} 不在队里`)),
       );
 
-    /** Canceled before it was ever sent: out of the queue and closed as dismissed, in one write. */
     const drop = Effect.fn("Issues.drop")(function* (id: string) {
       yield* unsent(id);
       yield* inTx(
@@ -506,7 +484,7 @@ export const make = (options: IssueOptions = {}) =>
       return hired.session && evicted ? { ...hired, evicted } : hired;
     });
 
-    /** Who an unsent issue goes to and where, or why it cannot go: starting it and its dry run ask the same. */
+    /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
     const readyOf = Effect.fn("Issues.readyOf")(function* (issue: Issue) {
       if (issue.refining) return yield* Effect.fail(refused(issue.refining.name + " 正在起草：等它交回来再开工"));
       const pick = [lookIn.agent, { say: `挑好以后挪到待办时带上它：issue status ${issue.number}，--json 带 status「todo」和 agent（档案的 id）` }];
@@ -532,7 +510,7 @@ export const make = (options: IssueOptions = {}) =>
       PubSub.publishUnsafe(orchestratorHub, { issue, channel, by, ...(due ? { recurrence: due } : {}), ...(said ? { said } : {}) });
     });
 
-    /** by undefined: the issue sent out. said: the owner's words with it, when it is asked again. */
+    /** said: the owner's words with it, when it is asked again. */
     const start = Effect.fn("Issues.start")(function* (id: string, channel: string, by?: RunTrigger, said?: string): Effect.fn.Return<Dispatched, ApiError> {
       const mine = yield* Effect.option(get(id));
       if (Option.isSome(mine) && isForOrchestrator(mine.value)) {
@@ -551,7 +529,7 @@ export const make = (options: IssueOptions = {}) =>
       return { session: yield* send(issue, agent, project, where, trigger) };
     });
 
-    /** In the board's order; one that cannot go any more leaves the queue, said in a notice. */
+    /** In the board's order: one that cannot go any more leaves the queue. */
     const tryQueued = trying.withPermits(1)(
       Effect.gen(function* () {
         for (const issue of yield* list) {
@@ -709,7 +687,6 @@ export const make = (options: IssueOptions = {}) =>
       const said = text.trim();
       if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
       if (move === "round" && !taker && !said) return yield* Effect.fail(refused("再干一轮要说一句：这一轮要它做什么"));
-      // What a completion delivers follows the issue: nothing to take in, its branch kept, or merged (locally or by a PR).
       let delivery: "kept" | "none" | "merge" | undefined;
       let commits = 0;
       if (move === "complete") {
@@ -821,7 +798,6 @@ export const make = (options: IssueOptions = {}) =>
       }
     });
 
-    // Whatever path an owner's word took into an issue's thread, this is where the issue hears it.
     const onOwnerInThread = Effect.fn("Issues.onOwnerInThread")(function* (thread: string) {
       const issue = yield* Effect.option(get(thread));
       if (Option.isNone(issue) || isClosed(issue.value.status)) return;
@@ -844,7 +820,7 @@ export const make = (options: IssueOptions = {}) =>
       (what: string) =>
       <A, E>(e: Effect.Effect<A, E>) =>
         Effect.asVoid(e).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: ${what}: ${String(c)}`)));
-    // One at a time, as when they were one stream of facts: a report and the owner's word on it do not cross.
+    // One at a time: a report and the owner's word on it do not cross.
     yield* Effect.forkScoped(
       Stream.runForEach(
         Stream.merge(
@@ -948,7 +924,7 @@ export const make = (options: IssueOptions = {}) =>
       }),
       queue: (id, queued) => queueRow(id, queued, chat.general()),
       start: (id, channel) => start(id, channel),
-      /** Only a queued todo starts here, under the queue's lock; without room it keeps its place. */
+      /** Under the queue's lock; without room it keeps its place. */
       dispatchQueued: Effect.fn("Issues.dispatchQueued")(function* (id) {
         const issue = yield* get(id);
         if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
@@ -1162,7 +1138,6 @@ export const make = (options: IssueOptions = {}) =>
         yield* chat.tellSession(ownerId, session, conflictBrief(conflict.base, conflict.files), "");
       }),
       cancel,
-      /** Only an issue in review has something to judge. */
       review: Effect.fn("Issues.review")(function* (id, req) {
         const t = yield* get(id);
         const why = isForOrchestrator(t)
@@ -1192,7 +1167,7 @@ export const make = (options: IssueOptions = {}) =>
         return yield* get(id);
       }),
       refine: draft,
-      /** Every issue with its sessions, live and ended, once; a session with no record is named as missing, not given a phase. */
+      /** A session with no record is named as missing, not given a phase. */
       history: Effect.fn("Issues.history")(function* () {
         const all = yield* list;
         const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
@@ -1248,7 +1223,7 @@ export const make = (options: IssueOptions = {}) =>
           }),
         );
         if (gone.length > 0) yield* reloadSessions;
-        // Published as one commit once the transaction has succeeded.
+        // Published in one core.apply, once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (t) => get(t.id).pipe(Effect.orDie));
         yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
       }),
