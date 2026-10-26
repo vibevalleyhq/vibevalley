@@ -364,7 +364,7 @@ describe("sessions", () => {
       );
       emit();
       expect(waits).toHaveLength(1);
-      yield* Effect.forkChild(waits[0]!);
+      yield* Effect.forkChild(waits[0]);
       yield* TestClock.adjust(49);
       expect(seen).toEqual([]);
       yield* TestClock.adjust(1);

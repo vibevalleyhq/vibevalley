@@ -173,7 +173,7 @@ export const make = Effect.gen(function* () {
       const done: Transition[] = [];
       const made: GameEffect[] = [];
       for (const fact of facts) {
-        const f = { ...fact, at: Date.now() } as Fact;
+        const f = { ...fact, at: Date.now() };
         const [after, changed] = reduce(next, f);
         if (!changed) continue;
         done.push({ before: next, fact: f, after });

@@ -65,7 +65,7 @@ export const make = Effect.gen(function* () {
     one.withPermits(1)(
       Effect.gen(function* () {
         const at = yield* Clock.currentTimeMillis;
-        const entry = { ...input, at } as LedgerEntry;
+        const entry = { ...input, at };
         const { kind, at: _, ...payload } = entry;
         yield* db(q.addLedgerEntry({ id: newId(at), kind, at, payload: JSON.stringify(payload) }));
         const [next, news] = progressStep(folded, entry);

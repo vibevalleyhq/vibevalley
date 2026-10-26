@@ -7,8 +7,7 @@ const e = (
   time: number,
   type: SessionEventType,
   more: { text?: string; call?: number; tool?: string; input?: string; output?: string; ok?: boolean; tokens?: EventTokens } = {},
-): SessionEvent =>
-  ({ seq, revision: 0, time, type, text: more.text ?? "", ...more, ...(type === "tool/call" ? { action: "run_command" } : {}) }) as SessionEvent;
+): SessionEvent => ({ seq, revision: 0, time, type, text: more.text ?? "", ...more, ...(type === "tool/call" ? { action: "run_command" } : {}) });
 
 /** Two rounds: the first thinks, runs a test and answers; the second answers straight away. */
 const log = [
@@ -16,14 +15,14 @@ const log = [
   e(1, 0, "user/message", { text: "帮我跑测试" }),
   e(2, 1000, "assistant/thinking", { text: "想" }),
   e(3, 2000, "tool/call", { text: "pnpm test", tool: "Bash", input: '{"command": "pnpm test"}' }),
-  e(4, 3000, "llm/usage", { tokens: { input: 100, cacheRead: 300, output: 50 } as EventTokens }),
+  e(4, 3000, "llm/usage", { tokens: { input: 100, cacheRead: 300, output: 50 } }),
   e(5, 7000, "tool/result", { call: 3, output: "12 passed", ok: true }),
   e(6, 8000, "assistant/message", { text: "测试都过了。" }),
-  e(7, 9000, "llm/usage", { tokens: { input: 100, cacheRead: 500, output: 30 } as EventTokens }),
+  e(7, 9000, "llm/usage", { tokens: { input: 100, cacheRead: 500, output: 30 } }),
   e(8, 9000, "run/end", { text: "completed" }),
   e(9, 3600000, "user/message", { text: "再看看 lint" }),
   e(10, 3602000, "assistant/message", { text: "lint 也干净。" }),
-  e(11, 3603000, "llm/usage", { tokens: { input: 0, cacheRead: 0, output: 20 } as EventTokens }),
+  e(11, 3603000, "llm/usage", { tokens: { input: 0, cacheRead: 0, output: 20 } }),
 ];
 
 test("a step keeps its newest revision whichever of the snapshot or live copy arrives last", () => {

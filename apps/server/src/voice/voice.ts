@@ -193,7 +193,7 @@ export function agentFor(client: AgoraClient, voice: VoiceSettings, vendors: Ven
   })
     .withStt(vendors.stt)
     .withLlm(vendors.llm)
-    .withTts(vendors.tts as never);
+    .withTts(vendors.tts);
 }
 
 /** Already left or leaving counts as success, as the quickstart treats it. */

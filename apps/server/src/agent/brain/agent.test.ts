@@ -24,7 +24,7 @@ afterEach(() => {
 const step =
   (f: (r: Request) => AssistantMessage): FauxResponseFactory =>
   (context) =>
-    f({ messages: context.messages as Request["messages"], options: undefined });
+    f({ messages: context.messages, options: undefined });
 const roles = (text: string) =>
   text
     .trim()
@@ -396,7 +396,7 @@ describe("the agent", () => {
       const dir = home();
       const choices = new Map<number, unknown>();
       const answer: FauxResponseFactory = (context, options, state, model) => {
-        const c = { messages: context.messages as Request["messages"] };
+        const c = { messages: context.messages };
         if (summarizing(c)) {
           choices.set(state.callCount, options?.toolChoice);
           return summary(context, options, state, model);

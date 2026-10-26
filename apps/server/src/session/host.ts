@@ -9,7 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
+import type { Usage } from "@earendil-works/pi-ai";
 import type { OrchestratorState } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { Brain, type BrainEvent, sessionUnfinished } from "../agent/brain/agent.ts";
@@ -430,7 +430,7 @@ export class AgentHost<R> {
       }
       case "message_end": {
         if (e.message.role !== "assistant") return;
-        const m = e.message as AssistantMessage;
+        const m = e.message;
         this.noteUsage(m.usage);
         await this.done(messageText(m).trim());
         if (m.stopReason === "error") this.o.notice("error", this.o.label + "出错了：" + (m.errorMessage || "模型出错了"));

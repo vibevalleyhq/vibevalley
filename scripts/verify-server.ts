@@ -3,6 +3,7 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openS
 import { setTimeout as sleep } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { inspect } from "node:util";
 
 export interface VerificationResult {
   code: number;
@@ -172,7 +173,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     while (Date.now() < deadline) {
       if (interrupted) throw new Error("verification interrupted during startup");
       if (running.exitCode() !== null) throw new Error(`server exited ${running.exitCode()}; see ${log}`);
-      if (outputFailure) throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : String(outputFailure as string)}`);
+      if (outputFailure) throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : inspect(outputFailure)}`);
       if (address) {
         try {
           const response = await fetch(address + "/api/v1/health", { signal: AbortSignal.timeout(1_000) });
@@ -197,7 +198,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     return { code, evidence, address };
   } catch (error) {
     writeFileSync(join(evidence, "failure.txt"), String(error));
-    throw new Error(`${String(error)}\nevidence: ${evidence}`);
+    throw new Error(`${String(error)}\nevidence: ${evidence}`, { cause: error });
   } finally {
     const failures: unknown[] = [];
     for (const child of [...owned].reverse()) {

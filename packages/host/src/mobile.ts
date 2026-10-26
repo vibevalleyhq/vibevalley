@@ -36,7 +36,7 @@ export function mobileHost(post: (m: ToNative) => void) {
     new Promise<void>((resolve, reject) => {
       const id = next++;
       waiting.set(id, { resolve, reject });
-      post({ ...m, id } as ToNative);
+      post({ ...m, id });
     });
   const host: Host = {
     name: "mobile",

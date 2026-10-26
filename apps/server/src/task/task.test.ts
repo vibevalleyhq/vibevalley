@@ -133,7 +133,7 @@ class FakeWork implements TaskWork {
       yield* self.core.apply({ type: "hired", session: h });
       if (opt.issue) yield* self.issues.ran(opt.issue, h).pipe(Effect.orDie);
       void self.run(id, task);
-      return { session: h } as Hired;
+      return { session: h };
     });
   };
 

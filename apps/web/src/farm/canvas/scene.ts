@@ -24,7 +24,7 @@ import type { Agent, Crop, Session, StateFrame, SessionId } from "@vibevalley/pr
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { castPrefix } from "../../rules/cast";
 import { playSound } from "../sound";
-import { clock, farmState, type BedFx } from "../store";
+import { clock, farmState } from "../store";
 import { orchestratorLooks, orchestratorSprite } from "../kit/looks";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
@@ -589,7 +589,7 @@ export async function startScene(host: HTMLElement, village: Village, input: () 
       const s = present.get(id);
       return s ? bedOfStation(stationOfSession(s))?.index : undefined;
     };
-    fx.update(dt, store.bedFx as readonly BedFx[], store.rewards, bedOfSession);
+    fx.update(dt, store.bedFx, store.rewards, bedOfSession);
 
     // The orchestrator talks and listens; the pet wakes up for a call.
     const mood = state.orchestrator;

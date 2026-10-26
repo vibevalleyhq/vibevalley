@@ -82,7 +82,7 @@ describe("a refined issue", () => {
 
       issue = yield* issues.setStatus(issue.id, "todo", "", "");
       expect(issue.sessions).toHaveLength(1);
-      const brief = sessions.find(issue.sessions![0]!)!.session.brief;
+      const brief = sessions.find(issue.sessions[0]!)!.session.brief;
       for (const want of ["看板拖卡改用 8797 端口", "验收标准", "1. 拖到待办就开工\n2. 端口是 8797"]) expect(brief).toContain(want);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

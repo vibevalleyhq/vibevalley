@@ -76,7 +76,7 @@ describe("a pull request", () => {
           yield* issues.start(issue.id, "");
           yield* w.nextReport;
           issue = yield* issues.get(issue.id);
-          id = issue.sessions!.at(-1)!;
+          id = issue.sessions.at(-1)!;
           const place = (sessions as SessionsInside).place(id)!;
           [branch, cwd] = [place.branch!, place.cwd];
           git(work, "init", "--bare", bare);

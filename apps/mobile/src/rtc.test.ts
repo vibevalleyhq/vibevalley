@@ -95,13 +95,13 @@ test("late cleanup and native events from an old line cannot affect its successo
     await settle();
     sdk.handler?.onJoinChannelSuccess?.(connection("new"), 0);
     await settle();
-    page.receive(replies[1]!);
+    page.receive(replies[1]);
     const current = await next;
-    page.receive(replies[0]!);
+    page.receive(replies[0]);
     const late = await old;
     const cleaning = late.leave();
     await settle();
-    page.receive(replies[2]!);
+    page.receive(replies[2]);
     await cleaning;
     expect(sdk.release).toHaveBeenCalledTimes(1);
 
@@ -109,16 +109,16 @@ test("late cleanup and native events from an old line cannot affect its successo
     sdk.handler?.onUserJoined?.(connection("new"), 9, 0);
     await settle();
     expect(replies).toHaveLength(4);
-    page.receive(replies[3]!);
+    page.receive(replies[3]);
     expect(heard).toEqual(["new"]);
 
     const muted = current.mute(true);
     await settle();
-    page.receive(replies[4]!);
+    page.receive(replies[4]);
     await muted;
     const renewed = current.renew("fresh");
     await settle();
-    page.receive(replies[5]!);
+    page.receive(replies[5]);
     await renewed;
     expect(sdk.mute).toHaveBeenCalledWith(true);
     expect(sdk.renew).toHaveBeenCalledWith("fresh");

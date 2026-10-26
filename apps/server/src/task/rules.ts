@@ -79,7 +79,7 @@ function parseJson(body: string): unknown {
     return JSON.parse(body);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message);
+    throw new Error(body.trim() === "" || /end of JSON input/i.test(message) ? "unexpected end of JSON input" : message, { cause: e });
   }
 }
 

@@ -232,7 +232,7 @@ export const dshRuntime = defineRuntime({
       return { kind: "unsupported", reason: "dsh model listing requires the dsh executable" };
     let response: Rec;
     try {
-      response = await readNewSession(installation.command as string, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
+      response = await readNewSession(installation.command, listingCwd(options ?? {}), options?.timeoutMs ?? 30_000);
     } catch (e) {
       if ((e as { code?: number }).code === -32601) return { kind: "unsupported", reason: "this dsh build has no session/new method" };
       throw e;

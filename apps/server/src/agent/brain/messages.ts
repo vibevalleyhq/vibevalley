@@ -101,7 +101,7 @@ export function messageText(m: AgentMessage): string {
     case "custom":
     case "system":
     case "user":
-      return contentWords(m.content as UserContent);
+      return contentWords(m.content);
     case "assistant":
     case "toolResult":
       return blocksText(m.content);

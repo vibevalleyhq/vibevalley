@@ -76,7 +76,7 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
   let at = fileTime;
   if (line.date) {
     const [y, m, d] = line.date.split("-").map(Number);
-    at = new Date(y!, m! - 1, d!).getTime();
+    at = new Date(y!, m! - 1, d).getTime();
   }
   return {
     id: line.id,

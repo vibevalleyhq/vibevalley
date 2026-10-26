@@ -66,7 +66,7 @@ function Layer(props: { o: FarmOverlay }) {
           </FarmDialog>
         )}
       </Match>
-      <Match when={props.o.kind === "sow" ? (props.o as { station: number }) : undefined}>
+      <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
           <FarmDialog title={`播种 · 第 ${o().station + 1} 块地`} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
             <SowForm station={o().station} onDone={() => farm.sow(null)} />

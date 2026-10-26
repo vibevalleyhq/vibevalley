@@ -80,7 +80,7 @@ describe("DeepSeek Harness", () => {
 
   it("lists the models of a throwaway session", async () => {
     const fake = fakeDsh();
-    const listed = await dshRuntime.listModels!({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
+    const listed = await dshRuntime.listModels({ via: "executable", command: fake.script } as never, { cwd: fake.dir });
     expect(listed.kind === "ok" && listed.models.map((m) => m.id)).toEqual(["deepseek-official/deepseek-flash", "deepseek-official/deepseek-v4-pro"]);
   });
 

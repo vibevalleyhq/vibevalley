@@ -209,7 +209,7 @@ export const make = (options: LanOptions = {}) =>
         headers,
         ...(body ? { body, duplex: "half" } : {}),
         signal,
-      } as RequestInit);
+      });
       res.writeHead(answer.status, Object.fromEntries(answer.headers));
       if (!answer.body) return void res.end();
       await pipeline(Readable.fromWeb(answer.body as import("node:stream/web").ReadableStream<Uint8Array>), res, { signal });

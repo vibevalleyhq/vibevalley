@@ -1,7 +1,6 @@
 // Tools that answer in words. A tool that fails throws; the model reads the error's message as a failed result.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { TSchema } from "@earendil-works/pi-ai";
 
 /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */
 export const stopped = "已停下";
@@ -54,7 +53,7 @@ export function textTool<P>(spec: TextToolSpec<P>): AgentTool {
     name: spec.name,
     label: spec.label ?? spec.name,
     description: spec.description,
-    parameters: spec.parameters as unknown as TSchema,
+    parameters: spec.parameters,
     execute: async (callId, params, signal) => {
       const s = signal ?? never;
       if (s.aborted) throw new Error(stopped);

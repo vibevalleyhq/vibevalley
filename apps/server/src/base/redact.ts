@@ -30,9 +30,6 @@ export function redact(text: string): string {
  * secret split across two writes gets through; console writes a line at a time. */
 export function redactOutput(stream: NodeJS.WriteStream) {
   const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;
-  stream.write = ((chunk: unknown, ...rest: unknown[]) =>
-    write(
-      typeof chunk === "string" ? redact(chunk) : chunk instanceof Uint8Array ? redact(Buffer.from(chunk).toString("utf8")) : chunk,
-      ...rest,
-    )) as typeof stream.write;
+  stream.write = (chunk: unknown, ...rest: unknown[]) =>
+    write(typeof chunk === "string" ? redact(chunk) : chunk instanceof Uint8Array ? redact(Buffer.from(chunk).toString("utf8")) : chunk, ...rest);
 }

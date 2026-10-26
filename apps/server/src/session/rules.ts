@@ -89,7 +89,7 @@ const jsonBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 const answerLines = (v: unknown, field: string): string[] => {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v.trim()].filter(Boolean);
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return (v as string[]).map((l) => l.trim()).filter(Boolean);
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v.map((l) => l.trim()).filter(Boolean);
   throw new Error(`${field}：要是字符串或字符串的数组`);
 };
 

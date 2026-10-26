@@ -522,7 +522,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           uncommitted,
           conflicts: [],
           behind: 0,
-        } as unknown as Changes;
+        };
         if (!branch) return changes;
         changes.branch = branch;
         const range = `${base}...${branch}`;
@@ -723,7 +723,7 @@ export const make = (hooks: ProjectHooks = {}) =>
           days: [],
           authors: [],
           total: 0,
-        } as unknown as ProjectActivity;
+        };
         if (!p.git) return out;
         const since = new Date(now - yearDays * 86_400_000).toISOString();
         const log = yield* gitQuiet(p.path, "log", "--all", "--no-merges", "--since=" + since, "--format=%at%x09%aN");

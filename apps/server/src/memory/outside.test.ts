@@ -70,7 +70,7 @@ class FakeNowledge {
       tools: ["memory_search", "memory_add", "get_memory_by_id", "memory_delete"].map((name) => ({ name, inputSchema: object })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (req) => {
-      const a = (req.params.arguments ?? {}) as Record<string, unknown>;
+      const a = req.params.arguments ?? {};
       const text = (v: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(v) }] });
       switch (req.params.name) {
         case "get_memory_by_id": {

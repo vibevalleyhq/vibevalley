@@ -59,8 +59,7 @@ export function textFor(type: string, spans: readonly DocSpan[] | undefined): Do
 }
 
 /** The attributes as the wire has them: only those set. */
-export const attrsOf = (a: BlockAttrs | undefined): BlockAttrs =>
-  Object.fromEntries(Object.entries(a ?? {}).filter(([, v]) => v !== undefined && v !== null)) as BlockAttrs;
+export const attrsOf = (a: BlockAttrs | undefined): BlockAttrs => Object.fromEntries(Object.entries(a ?? {}).filter(([, v]) => v !== undefined && v !== null));
 
 const attrNames = ["level", "checked", "language", "src", "width", "height", "alt", "issueId", "memoryId"] as const;
 
@@ -72,7 +71,7 @@ export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly st
     if (!(attrNames as readonly string[]).includes(name)) throw new Error(`没有属性 ${name}`);
     delete out[name];
   }
-  return out as BlockAttrs;
+  return out;
 }
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);

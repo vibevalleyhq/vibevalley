@@ -56,6 +56,10 @@ export default defineConfig({
       "unicorn/no-useless-spread": "off",
       // const self = this before Effect.gen(function* () { … }).
       "typescript/no-this-alias": "off",
+      // Two of oxlint's suspicious rules: an `as` the type already is hides a real cast among the noise, and an error
+      // thrown from a catch without { cause } loses the one that happened.
+      "typescript/no-unnecessary-type-assertion": "error",
+      "eslint/preserve-caught-error": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

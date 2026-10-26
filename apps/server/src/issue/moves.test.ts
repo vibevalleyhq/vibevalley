@@ -73,7 +73,7 @@ describe("moves and the attention", () => {
       acts: ["acknowledge", "reject", "tell", "close"],
     });
     // A change issue's round needs no such block.
-    expect(attentionOf({ ...base, deliver: "change" } as Issue, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
+    expect(attentionOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
   });
   // One table: an act that takes the issue to done is offered exactly when the move is.
   it("agree on done, whatever the round came to", () => {
@@ -90,7 +90,7 @@ describe("moves and the attention", () => {
       [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "interrupted" } }, undefined],
     ];
     for (const [more, s] of cases) {
-      const t = { ...base, ...more } as Issue;
+      const t = { ...base, ...more };
       const attention = attentionOf(t, s);
       const offered = attention.acts.some((a) => a === "complete" || a === "acknowledge");
       expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, attention }).includes("done") });

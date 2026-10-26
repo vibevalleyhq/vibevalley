@@ -287,7 +287,7 @@ export const make = (options: RuntimeOptions = {}) =>
       }
       const snapshot = await within(probeInstallation(runtime, settings.binPath), probeTimeoutMs, {
         kind: "not_found",
-      } as InstallationSnapshot);
+      });
       if (snapshot.kind !== "available") {
         return {
           info: {

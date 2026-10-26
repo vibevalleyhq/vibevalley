@@ -144,10 +144,9 @@ function endpointCommand(e: Endpoint) {
   const name = kebab(op);
   const path = [group, name];
   const config: Record<string, Argument.Argument<unknown> | Flag.Flag<unknown>> = {};
-  for (const p of e.pathParams) config[p.name] = param(p.name, p.number) as Argument.Argument<unknown>;
-  for (const q of e.query) config[q.name] = queryFlag(q.name, q.number) as Flag.Flag<unknown>;
-  if (e.body)
-    config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription("请求体：JSON 文本，- 读标准输入，@文件 读文件")) as Flag.Flag<unknown>;
+  for (const p of e.pathParams) config[p.name] = param(p.name, p.number);
+  for (const q of e.query) config[q.name] = queryFlag(q.name, q.number);
+  if (e.body) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription("请求体：JSON 文本，- 读标准输入，@文件 读文件"));
   return Command.make(name, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
@@ -248,7 +247,7 @@ export function groupCommands(extra: Readonly<Record<string, readonly Command.Co
   const groups = new Map<string, Command.Command.Any[]>();
   for (const e of endpoints) {
     const group = e.op.split(".")[0]!;
-    groups.set(group, [...(groups.get(group) ?? []), endpointCommand(e) as Command.Command.Any]);
+    groups.set(group, [...(groups.get(group) ?? []), endpointCommand(e)]);
   }
   for (const [group, commands] of Object.entries(extra)) groups.set(group, [...(groups.get(group) ?? []), ...commands]);
   return [...groups].map(([group, commands]) =>

@@ -18,9 +18,9 @@ describe("the tools", () => {
   });
 
   it("word money", () => {
-    expect(spentText({ tokens: 26_000, cny: 0.03 } as Spent)).toBe("约 ¥0.03 · 2.6 万 token");
+    expect(spentText({ tokens: 26_000, cny: 0.03 })).toBe("约 ¥0.03 · 2.6 万 token");
     // toFixed rounds halves up.
-    expect(spentText({ tokens: 12_500 } as Spent)).toBe("1.3 万 token");
+    expect(spentText({ tokens: 12_500 })).toBe("1.3 万 token");
     const failed = checkCases(goldenCases("tool"), (c) => {
       if (c.fn !== "spentText") throw new Error(`unknown fn ${c.fn}`);
       return spentText(c.in as Spent);

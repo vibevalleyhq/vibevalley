@@ -31,7 +31,7 @@ const idle = (turn: ScriptedTurn, ms: number) =>
 async function draft(turn: ScriptedTurn, input: string) {
   if (input.includes("慢慢") && (await idle(turn, 1500))) return;
   if (input.includes("乱写")) return turn.say("看了一圈，不知道写什么。\n\n结论：没写出来");
-  const cwd = turn.options.cwd!;
+  const cwd = turn.options.cwd;
   if (input.includes("顺手提交")) {
     await turn.tool("bash", `{"command":"git commit"}`, () => {
       writeFileSync(join(cwd, "board.ts"), "export const drag = 1\n");
@@ -56,7 +56,7 @@ async function draft(turn: ScriptedTurn, input: string) {
 /** An answer issue's round (or 接着修 on one whose answer could not be read): 顺手提交 changes and commits what it should
  * not, 乱写 hands back no block; else a conclusion that rests on clock.ts. */
 async function answer(turn: ScriptedTurn, input: string) {
-  const cwd = turn.options.cwd!;
+  const cwd = turn.options.cwd;
   if (input.includes("顺手提交")) {
     await turn.tool("bash", `{"command":"git commit"}`, () => {
       writeFileSync(join(cwd, "probe.ts"), "export const probe = 1\n");
@@ -85,7 +85,7 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
       if (input.includes(answerOpening) || input.includes("结论读不出来")) return answer(turn, input);
       if (input.includes("必败")) throw new Error("provider said no");
       if (input.includes("发呆") && (await idle(turn, 1500))) return;
-      const cwd = turn.options.cwd!;
+      const cwd = turn.options.cwd;
       const v = version.exec(input)?.[1];
       if (v !== undefined) {
         await turn.tool("bash", `{"command":"git commit"}`, () => {

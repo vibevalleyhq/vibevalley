@@ -55,8 +55,8 @@ async function form(domain: Domain, body: Record<string, string>, signal: AbortS
     });
     return (await res.json()) as Record<string, unknown>;
   } catch (e) {
-    if (timed.aborted && !signal.aborted) throw new Error("飞书注册：超时了");
-    throw new Error("飞书注册：" + (e instanceof Error ? e.message : String(e)));
+    if (timed.aborted && !signal.aborted) throw new Error("飞书注册：超时了", { cause: e });
+    throw new Error("飞书注册：" + (e instanceof Error ? e.message : String(e)), { cause: e });
   }
 }
 
@@ -162,7 +162,7 @@ export class FeishuClient implements FeishuApi {
         domain: larkDomain(app.domain),
         loggerLevel: Lark.LoggerLevel.warn,
         onError: (e: Error) => end(e),
-      } as never);
+      });
       const dispatcher = new Lark.EventDispatcher({}).register({
         "im.message.receive_v1": async (data) => {
           const from = data.sender.sender_id?.open_id;
@@ -197,7 +197,7 @@ export class FeishuClient implements FeishuApi {
         data: { receive_id: openId, msg_type: "text", content: JSON.stringify({ text }) },
       });
     } catch (e) {
-      throw new Error("飞书发消息：" + (e instanceof Error ? e.message : String(e)));
+      throw new Error("飞书发消息：" + (e instanceof Error ? e.message : String(e)), { cause: e });
     }
     if (res.code !== undefined && res.code !== 0) throw new Error(`飞书发消息：${res.code} ${res.msg ?? ""}`);
     if (!res.data?.message_id) throw new Error("飞书发消息：没有确认消息编号");

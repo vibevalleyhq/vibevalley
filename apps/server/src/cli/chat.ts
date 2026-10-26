@@ -5,7 +5,7 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import type { Event, Runtime, Session } from "@botiverse/oar";
+import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { Brain, type BrainEvent } from "../agent/brain/agent.ts";
 import { codingTools } from "../agent/brain/coding.ts";
@@ -111,7 +111,7 @@ export async function ownChat(values: OwnChat) {
   agent.subscribe((e) => show(e, () => prompt()));
   try {
     if (asked) {
-      await agent.ask(userMessage(values.p!));
+      await agent.ask(userMessage(values.p));
       return;
     }
     console.log(
@@ -182,7 +182,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
   const config = loadConfig();
   const registry = registryOf([vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey) }), dshRuntime]);
-  const runtime = registry.get(id) as Runtime | undefined;
+  const runtime = registry.get(id);
   if (!runtime) throw new Error(`没有 ${id} 这个农机`);
   if (!runtime.installation) throw new Error(`${id} 看不出装没装`);
   const found = await runtime.installation();

@@ -488,7 +488,7 @@ export function TrajectoryList(props: { agent: string }) {
                           {ended() === undefined ? `${ago(h().hiredAt, now())}接活` : `${ago(h().hiredAt, now())}接活 · ${ago(ended()!, now())}走的`}
                         </span>
                         <Show when={h().brief}>
-                          <span class="truncate text-xs">{oneLine(h().brief!)}</span>
+                          <span class="truncate text-xs">{oneLine(h().brief)}</span>
                         </Show>
                       </button>
                     </li>
@@ -500,7 +500,7 @@ export function TrajectoryList(props: { agent: string }) {
               <Show when={open()} fallback={<Quiet>选一个帮工，看它的轨迹。</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>
-                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief!)}` : o().name} about={o().brief} />}
+                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief)}` : o().name} about={o().brief} />}
                   </Keyed>
                 )}
               </Show>

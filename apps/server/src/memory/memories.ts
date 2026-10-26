@@ -97,9 +97,9 @@ export const makeMemories = Effect.gen(function* () {
   const matches = Effect.fnUntraced(
     function* (agent: string, text: string) {
       const words = termsList(text);
-      if (words.length === 0) return {} as Record<string, number>;
+      if (words.length === 0) return {};
       const rows = yield* db(q.matchMemories({ words, agent }));
-      return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0])) as Record<string, number>;
+      return Object.fromEntries(rows.map((r) => [r.id, r.score ?? 0]));
     },
     (effect, agent) =>
       effect.pipe(Effect.catch((e) => Effect.as(Effect.logWarning(`searching ${agent}'s memories: ${String(e)}`), {} as Record<string, number>))),

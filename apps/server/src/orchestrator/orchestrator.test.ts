@@ -75,7 +75,7 @@ const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了
 /** The farm with a orchestrator on the faux model, answering with f; the patrol runs by hand. */
 const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), clock?: () => number) => {
   const { faux, llm, requests } = fauxLLM();
-  faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages as Message[], options: undefined })));
+  faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages, options: undefined })));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],

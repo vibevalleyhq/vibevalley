@@ -113,7 +113,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
     setBusy(true);
     setError(undefined);
     try {
-      const now = await saveSettings(update as SettingsUpdate);
+      const now = await saveSettings(update);
       setBase(now);
       setSecrets({});
       setCleared(new Set<Key>());
