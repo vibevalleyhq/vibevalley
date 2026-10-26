@@ -47,7 +47,7 @@ vpx scripts/comment-review.ts --all apps/server/src/issue
 ## 4. 改完
 
 - `vp check --fix`，再 `vp check`。只删、改了注释，不用跑测试；改了名字或类型，跑和那块有关的最窄的检查（`vp run server:check`、`vp run web:check`）。
-- 再跑一次第 2 节的命令：改写的注释是新加的，会再审一遍。第二轮还报的、你第 3 节已经判过要留的，不再改，不来回拉锯。
+- 再跑一次第 2 节的命令：改写的注释是新加的，会再审一遍；模型每次判的不一样，`--all` 的第二轮还会在第一轮留下的里报出新的，照第 3 节核实。第二轮还报的、你已经判过要留的，不再改，不来回拉锯。
 - 清一块已有的注释是机械改动，单独一个 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节），一块一个；标题说改完以后的样子（`Issue module comments say only what the code cannot`）。
 
 ## 5. 汇报

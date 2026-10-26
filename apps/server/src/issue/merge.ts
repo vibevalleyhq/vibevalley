@@ -1,7 +1,3 @@
-// Merging an issue's work: its session's commits taken into the main branch, by a local merge or a pull request, and the pull
-// requests followed until GitHub merges or closes them. What a failed merge says (a conflict, a failed check) is decided
-// here, for the board, the command line and the orchestrator's tool alike.
-
 import { type Issue, ownerId, type PullRequest, type PullRequestState } from "@vibevalley/protocol";
 import { Clock, Effect, Semaphore } from "effect";
 import type { SqlClient } from "effect/sql";
@@ -15,7 +11,6 @@ import { type NotTakenIn, type SessionShape } from "../session/session.ts";
 import { statusMove } from "./moves.ts";
 import { pullRequestConclusion } from "./rules.ts";
 
-/** What merging needs of the issues around it. */
 export interface MergeDeps {
   readonly core: CoreShape;
   readonly sessions: SessionShape;
@@ -29,7 +24,6 @@ export interface MergeDeps {
   readonly latest: (id: string) => Effect.Effect<string, ApiError>;
   /** The issue's latest session while it is on the farm. */
   readonly liveSession: (id: string) => Effect.Effect<string, ApiError>;
-  /** The issue read back and put on the board. */
   readonly publish: (id: string) => Effect.Effect<void>;
 }
 
@@ -38,8 +32,6 @@ export function merging(d: MergeDeps) {
   /** Merges by pull request and the poll of their states, one at a time. */
   const prLock = Semaphore.makeUnsafe(1);
 
-  /** Work that did not go in: the helper is sent back with what it is to fix, in the issue's thread as from the owner;
-   * the owner is told the rest. */
   const notTaken = Effect.fnUntraced(function* (id: string, n: NotTakenIn) {
     let [owner, line] = [n.owner, n.notice];
     if (n.fix) {
@@ -50,7 +42,6 @@ export function merging(d: MergeDeps) {
     yield* core.notice("warn", line);
     return refused(owner);
   });
-  /** The session's work taken in by use; what did not go in is said as above. */
   const handedOver = (id: string, use: (place: Workplace, said: string) => Effect.Effect<Merged, unknown>) =>
     sessions.handOver(id, "merged", use).pipe(Effect.catchTag("NotTakenIn", (e) => Effect.flatMap(notTaken(id, e), Effect.fail)));
 
@@ -64,7 +55,6 @@ export function merging(d: MergeDeps) {
 
   const savePullRequest = (id: string, pr: PullRequest) => Effect.andThen(db(q.setIssuePullRequest({ id, pull_request: JSON.stringify(pr) })), publish(id));
 
-  /** The merge as a pull request: opened (or the open one pushed to) with the session's conclusion, and kept on the issue. */
   const pullRequestOf = Effect.fnUntraced(function* (place: Workplace, issue: Issue, said: string) {
     const pr = yield* projects
       .submitPullRequest(place, issue, pullRequestConclusion(said))
@@ -76,8 +66,7 @@ export function merging(d: MergeDeps) {
   const merge = Effect.fn("Issues.merge")(
     function* (id: string) {
       const issue = yield* get(id);
-      // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table: a round that
-      // failed, or a required acceptance not passed, is not merged.
+      // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table.
       if (!issue.graph && !issue.task) {
         const [m, why] = statusMove(issue, "done");
         if (m === "none") return yield* Effect.fail(refused(why));
@@ -92,7 +81,6 @@ export function merging(d: MergeDeps) {
   );
 
   const finishPullRequest = Effect.fnUntraced(function* (issue: Issue, state: PullRequestState) {
-    // A pull request merged is the issue done, delivered by it; one closed unmerged is the issue not done.
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = yield* latest(issue.id);
     if (sessions.find(id))

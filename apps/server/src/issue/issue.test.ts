@@ -22,7 +22,6 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
 
-/** A helper that works until it is stopped. */
 const busy = scriptedRuntime({ id: "pi", turn: (turn) => new Promise<void>((resolve) => turn.signal.addEventListener("abort", () => resolve())) });
 
 const config = () => {
@@ -581,7 +580,6 @@ describe("issues", () => {
       const channel = yield* chat.openChannel("scheduled", "", "demo");
       yield* occupied(core, "pi");
       const sc = yield* recurrences.add({ name: "scheduled", text: "work", channel: channel.id, agent: "lab", when: { kind: "every", minutes: 1 } }, owner);
-      // Ten minutes on, the tick finds it due, and missed.
       clock.now += 10 * 60_000;
       yield* recurrences.tick;
       let issue = yield* issues.ofRecurrence(sc.id);
@@ -615,8 +613,6 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Handing an issue over is another round by another profile: the session on it leaves first (the farm has room for one),
-  // and the new one goes on in the same issue, told it takes over; one still working is refused until it is stopped.
   it.live("an issue handed over goes on in the same issue with another profile", () => {
     const f = farm([scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") })]);
     return Effect.gen(function* () {

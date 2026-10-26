@@ -1,12 +1,12 @@
-// Where an issue may be moved, and what each move does: the table the board, the command line, the orchestrator's tools and
-// the server's refusals all go by. Worked out with the issue's status and attention in reduce (withIssueStatuses), so a
-// round that ends changes what the issue may do at once, wherever it is read.
+// The one table the board, the command line, the orchestrator's tools and the server's refusals go by. reduce works it
+// out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
+// once, wherever it is read.
 
 import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import type { Next } from "@vibevalley/protocol/api";
 import { actLabel, statusLabel } from "@vibevalley/protocol/rules";
 
-/** What moving an issue to a status does. in_progress and in_review are the session's to reach, never the owner's. */
+/** in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
   | "none"
   /** backlog → todo: sent out now, or waits in todo for room */
@@ -47,8 +47,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       return to === "canceled" ? ["cancel", ""] : ["none", "还在干这一轮：等它交回来，或者挪到已取消"];
     case "in_review":
       if (to === "todo") return ["round", ""];
-      // Every issue has an acceptance; a glance one is passed by completing itself, so a round that failed is never
-      // completed: done is what was asked for, not how the round ended.
+      // A round that failed is never done, even with a glance acceptance: done is what was asked for, not how the round ended.
       if (to === "done") {
         if (t.attention.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
         return t.review === "required" && t.reviewedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能完成"] : ["complete", ""];
@@ -66,11 +65,10 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
 
-/** The acts that need the owner's words (a question's answer, a word to the helper, what failed, what to do again). */
+/** The acts that need the owner's words. */
 const wordy: ReadonlySet<IssueAct> = new Set(["answer", "tell", "reject", "reopen"]);
 
-/** What the issue can be asked for now, as next steps after a refusal: each of its acts (attention.acts) and moves, as the
- * command for it. One that needs the owner's words says which field takes them and has no command to run as it is. */
+/** Next steps after a refusal: each act and move as its command; one that needs the owner's words has no command and says which field takes them. */
 export function nextSteps(t: Issue): Next[] {
   const n = String(t.number);
   const acts = t.attention.acts.map((act): Next => {
