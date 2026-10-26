@@ -117,20 +117,27 @@ describe("a session's log", () => {
     ]);
   });
 
-  it("sends a grown step once, and writes it", async () => {
-    const home = mkdtempSync(join(tmpdir(), "journal-"));
-    const pushed: [string, SessionEvent][] = [];
-    const tr = trajectories(home, (id, e) => pushed.push([id, e]));
-    const j = tr.openLog("w9");
-    j.said("好");
-    j.said("的");
-    await new Promise((r) => setTimeout(r, 400));
-    expect(pushed.map(([id, e]) => [id, e.text])).toEqual([["w9", "好的"]]);
-    tr.finish("w9");
-    expect(readJournal(join(home, "events", "w9.json"))).toHaveLength(1);
-  });
+  it.effect("sends a grown step once, and writes it", () =>
+    Effect.gen(function* () {
+      const home = mkdtempSync(join(tmpdir(), "journal-"));
+      const pushed: [string, SessionEvent][] = [];
+      const tr = new Trajectories(
+        home,
+        (id, e) => pushed.push([id, e]),
+        (message) => warnings.push(message),
+        yield* timeHere,
+      );
+      open.push(tr);
+      const j = tr.openLog("w9");
+      j.said("好");
+      j.said("的");
+      yield* TestClock.adjust(400);
+      expect(pushed.map(([id, e]) => [id, e.text])).toEqual([["w9", "好的"]]);
+      tr.finish("w9");
+      expect(readJournal(join(home, "events", "w9.json"))).toHaveLength(1);
+    }),
+  );
 
-  // What is written stays as it was: later events only follow it. A draft is not on disk until it is done, and then under the seq it was pushed with.
   // On the service's Clock (base/time.ts): the push and save windows are moved, not waited for.
   it.effect("pushes a step 300 ms after it changes and saves 1.5 s after the last change, on the Clock it was given", () =>
     Effect.gen(function* () {
