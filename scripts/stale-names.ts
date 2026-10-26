@@ -122,6 +122,8 @@ const RULES: readonly Rule[] = [
     name: "a helper's question under the ask name",
     pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/,
     says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
+    // The marker a helper writing English may put before a question (要问主人：).
+    except: /^apps\/server\/src\/session\/rules\.ts$/,
   },
   {
     name: "the read model under the core name",
@@ -169,8 +171,8 @@ const RULES: readonly Rule[] = [
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|Attention|IssueAct|Delivery|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/,
-    says: "the word lists in packages/protocol/src/rules (statusLabel, attentionLabel, stuckLabel, actLabel, outcomeLabel, deliveredLabel, canceledLabel, deliverableLabel, priorityLabel): say a sentence with them, do not keep another list",
-    except: /^packages\/protocol\/src\/rules\//,
+    says: "the protocol's word tables (packages/protocol/src/words: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
+    except: /^packages\/protocol\/src\/(rules|words)\//,
   },
   {
     name: "the workbench leaning on the farm's state or rules",
@@ -209,6 +211,11 @@ const RULES: readonly Rule[] = [
   },
 ];
 
+// A word table (and the test that reads the English page) says what the owner reads, in the glossary's English column
+// (docs/README.md 用语: ticket, plan, manager…); only the rules about Chinese words look into it.
+const wordTable = /(?:^|\/)words(?:\.ts$|\/)|^apps\/web\/test\/english\.spec\.ts$/;
+const han = /\p{Script=Han}/u;
+
 const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).sort();
 const hits: string[] = [];
 for (const file of files) {
@@ -217,6 +224,7 @@ for (const file of files) {
     for (const rule of RULES) {
       if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
       if (rule.except?.test(file)) continue;
+      if (wordTable.test(file) && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${file}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }

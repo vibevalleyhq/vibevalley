@@ -1,6 +1,7 @@
 // An issue's title in one short line, and its state in words, as the board, the phone, the tools and the orchestrator say them.
 
-import type { Deliverable, Delivery, Issue, IssueCanceled, IssueStatus, Priority } from "../shapes";
+import type { Issue } from "../shapes";
+import { wording } from "../words";
 
 const titleMax = 40;
 
@@ -18,43 +19,8 @@ export function shortTitle(text: string): string {
   return chars.slice(0, titleMax - 1).join("") + "…";
 }
 
-export const statusLabel: Readonly<Record<IssueStatus, string>> = {
-  backlog: "备选",
-  todo: "待办",
-  in_progress: "处理中",
-  in_review: "等你看",
-  done: "已完成",
-  canceled: "已取消",
-};
-
-export const priorityLabel: Readonly<Record<Priority, string>> = {
-  urgent: "紧急",
-  high: "高",
-  medium: "普通",
-  low: "低",
-};
-
-/** What an issue is to deliver, as the owner picks it. */
-export const deliverableLabel: Readonly<Record<Deliverable, string>> = {
-  change: "改动，合进项目",
-  answer: "结论，只查不改代码",
-};
-
-/** What a done issue delivered. */
-export const deliveredLabel: Readonly<Record<Delivery, string>> = {
-  merged: "合进了主分支",
-  merged_into_parent: "合进了计划的分支",
-  pull_request: "PR 合进去了",
-  kept: "分支留着没合",
-  none: "没有改动要合",
-};
-
-/** Why a canceled issue was. dismissed is the owner's (a pull request closed unmerged too). */
-export const canceledLabel: Readonly<Record<IssueCanceled, string>> = {
-  dismissed: "取消了",
-  lost: "干活的目录丢了",
-};
-
 /** What its close says: done with what it delivered, or canceled and why. */
-export const closedText = (t: Pick<Issue, "status" | "delivered" | "canceled">): string =>
-  t.delivered ? "已完成，" + deliveredLabel[t.delivered] : t.canceled ? "已取消，" + canceledLabel[t.canceled] : statusLabel[t.status];
+export const closedText = (t: Pick<Issue, "status" | "delivered" | "canceled">): string => {
+  const w = wording();
+  return t.delivered ? w.doneWith(w.delivered[t.delivered]) : t.canceled ? w.canceledFor(w.canceled[t.canceled]) : w.status[t.status];
+};

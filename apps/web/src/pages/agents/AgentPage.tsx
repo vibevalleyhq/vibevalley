@@ -2,6 +2,7 @@
 // look on the left, the helper on its bed in the middle, what it is and runs on in tabs on the right; what would keep the
 // orchestrator from sending it, the server's answer (agent.check), under them.
 
+import { agentsWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -52,7 +53,7 @@ export function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agen
   const info = catalog.find((r) => r.id === runtime);
   return {
     id: "",
-    name: `新的 ${runtimeName(catalog, runtime)}`,
+    name: agentsWording().newName(runtimeName(catalog, runtime)),
     role: "",
     enabled: true,
     runtime,
@@ -83,15 +84,22 @@ export function AgentPage(props: { id: string }) {
   const saved = () => loaded()?.find((a) => a.id === props.id);
   return (
     <Switch>
-      <Match when={agents.error}>{(e) => <p class="p-8 text-sm text-muted">问不到服务端的档案：{reasonOf(e())}</p>}</Match>
+      <Match when={agents.error}>
+        {(e) => (
+          <p class="p-8 text-sm text-muted">
+            {agentsWording().noProfiles}
+            {reasonOf(e())}
+          </p>
+        )}
+      </Match>
       <Match when={!loaded() || (isNew() && !ready(runtimes, undefined))}>
-        <p class="p-8 text-sm text-muted">{isNew() && runtimes.error ? `读不到农机：${reasonOf(runtimes.error)}` : "读取配置…"}</p>
+        <p class="p-8 text-sm text-muted">{isNew() && runtimes.error ? agentsWording().noRuntimes(reasonOf(runtimes.error)) : agentsWording().loading}</p>
       </Match>
       <Match when={!isNew() && !saved()}>
         <p class="p-8 text-sm text-muted">
-          没有这个帮工。
+          {agentsWording().noSuch}
           <A href="/agents" class="underline">
-            回到全部帮工
+            {agentsWording().backToAll}
           </A>
         </p>
       </Match>
@@ -121,7 +129,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   const save = async () => {
     setSaving(true);
     const d = draft();
-    const body = { ...d, name: d.name.trim() || "无名 agent" };
+    const body = { ...d, name: d.name.trim() || agentsWording().unnamedAgent };
     try {
       const got = isNew ? await api.agent.create({ body }) : await api.agent.save({ id: d.id, body });
       client.setQueryData<Agent[]>(["agents"], (list) => (list ? [...list.filter((a) => a.id !== got.id), got] : list));
@@ -138,13 +146,13 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
   const bar = () => (
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
       <A href="/agents" class="text-sm text-muted hover:underline">
-        ← 全部帮工
+        {agentsWording().all}
       </A>
       <span class="text-sm text-faint">/</span>
       <span class="flex min-w-0 flex-1 items-center gap-3">
-        <span class="truncate text-lg font-semibold">{draft().name || "无名帮工"}</span>
+        <span class="truncate text-lg font-semibold">{draft().name || agentsWording().unnamed}</span>
         <span class={["shrink-0 rounded px-1.5 text-xs", isNew || dirty() ? "bg-hat text-bark-900" : "bg-hover text-muted"]}>
-          {isNew ? "新的" : dirty() ? "没保存" : "已保存"}
+          {isNew ? agentsWording().isNew : dirty() ? agentsWording().unsaved : agentsWording().saved}
         </span>
       </span>
       <span class="flex flex-wrap items-center gap-2">
@@ -153,13 +161,13 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
             <>
               <DeleteButton agent={saved()} />
               <Show when={dirty()}>
-                <Button onClick={() => setDraft(saved())}>放弃改动</Button>
+                <Button onClick={() => setDraft(saved())}>{agentsWording().discard}</Button>
               </Show>
             </>
           )}
         </Show>
         <Button tone="primary" disabled={!dirty() || saving() || nameTaken()} onClick={() => void save()}>
-          {saving() ? "保存中…" : isNew ? "捏好了，保存" : "保存"}
+          {saving() ? agentsWording().saving : isNew ? agentsWording().create : agentsWording().save}
         </Button>
       </span>
     </div>
@@ -173,13 +181,10 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
           {bar()}
           <div class="flex items-center gap-3">
             <button type="button" class="cursor-pointer text-sm text-muted hover:underline" onClick={() => setTrajectories(false)}>
-              ← 回到档案
+              {agentsWording().backToProfile}
             </button>
-            <span
-              class="text-sm font-semibold"
-              title="它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后步骤留 30 天，帮工本身一直列着。"
-            >
-              轨迹
+            <span class="text-sm font-semibold" title={agentsWording().trajectoriesHint}>
+              {agentsWording().trajectories}
             </span>
           </div>
           <div class="min-h-0 flex-1">
@@ -243,13 +248,13 @@ function DeleteButton(props: { agent: Agent }) {
     }
   };
   return (
-    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>删除</Button>}>
+    <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{agentsWording().remove}</Button>}>
       <span class="flex items-center gap-2">
-        <span class="text-sm text-muted">删掉 {props.agent.name}？</span>
+        <span class="text-sm text-muted">{agentsWording().removeWhich(props.agent.name)}</span>
         <Button tone="danger" onClick={() => void remove()}>
-          删除
+          {agentsWording().remove}
         </Button>
-        <Button onClick={() => setSure(false)}>算了</Button>
+        <Button onClick={() => setSure(false)}>{agentsWording().never}</Button>
       </span>
     </Show>
   );
@@ -262,16 +267,16 @@ function Problems(props: { problems: AgentProblem[] }) {
       fallback={
         <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-[#3f6427]">
           <Icon name="mark-check" size={12} />
-          配置没问题，可以派活。
+          {agentsWording().fine}
         </p>
       }
     >
-      <ul aria-label="派不出去的原因" class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
+      <ul aria-label={agentsWording().problems} class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
         <For each={props.problems}>
           {(i) => (
             <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-[#b8682a]"]}>
               <Icon name={i.level === "error" ? "mark-cross" : "mark-warn"} size={12} class="mt-1" />
-              {i.level === "error" ? "派不出去：" : ""}
+              {i.level === "error" ? agentsWording().cannot : ""}
               {i.text}
             </li>
           )}
@@ -288,10 +293,10 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
     <div class="flex flex-col gap-5">
       <div>
         <Button icon="button-replay" onClick={() => props.onChange(randomLook())}>
-          随机一个
+          {agentsWording().random}
         </Button>
       </div>
-      <Labeled label="在农场里是" hint="只是长相：同一个 runtime 可以是不同的动物。">
+      <Labeled label={agentsWording().looksAs} hint={agentsWording().looksHint}>
         <div class="grid grid-cols-4 gap-1.5">
           <For each={SpeciesValues}>
             {(species) => (
@@ -302,7 +307,7 @@ function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => voi
           </For>
         </div>
       </Labeled>
-      <Labeled label="穿什么">
+      <Labeled label={agentsWording().wears}>
         <div class="grid grid-cols-4 gap-1.5">
           <For each={OutfitValues}>
             {(outfit) => {
@@ -366,7 +371,7 @@ function Stage(props: { draft: Agent; pose: Pose }) {
         </div>
       </div>
       <div class="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1">
-        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || "无名 agent"}</span>
+        <span class="rounded-md bg-paper/92 px-3 py-0.5 text-lg">{props.draft.name || agentsWording().unnamedAgent}</span>
         <Show when={props.draft.role}>
           <span class="max-w-96 rounded bg-paper/75 px-2 py-px text-center text-xs">{props.draft.role}</span>
         </Show>
@@ -384,24 +389,24 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
   const [tab, setTab] = createSignal<Tab>("who");
   const facts = () => factsOf(props.runtime);
   const tabs = (): [Tab, string][] => [
-    ["who", "身份"],
-    ["runtime", "能力"],
-    ["persona", "人设"],
-    ["skills", "技能"],
-    ["tools", "工具"],
-    ["env", "环境"],
+    ["who", agentsWording().tab.who],
+    ["runtime", agentsWording().tab.runtime],
+    ["persona", agentsWording().tab.persona],
+    ["skills", agentsWording().tab.skills],
+    ["tools", agentsWording().tab.tools],
+    ["env", agentsWording().tab.env],
     ...(props.isNew
       ? []
       : ([
-          ["memory", "记性"],
-          ["trajectories", "轨迹"],
+          ["memory", agentsWording().tab.memory],
+          ["trajectories", agentsWording().trajectories],
         ] as [Tab, string][])),
   ];
   const envRefused = () => facts().refused[sessionEnv];
   const draft = () => props.draft;
   return (
     <div class="flex min-h-0 flex-1 flex-col">
-      <div role="tablist" aria-label="档案的" class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
+      <div role="tablist" aria-label={agentsWording().tabs} class="flex flex-wrap gap-0.5 border-b border-line px-3 py-2">
         <For each={tabs()}>
           {([t, label]) => (
             <button
@@ -419,23 +424,28 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
       <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <Switch>
           <Match when={tab() === "who"}>
-            <Labeled label="名字" tip="管家和字幕里都叫这个名字，说话时也可以直接点名。" error={props.nameTaken ? "已经有同名的 agent 了" : undefined}>
-              <TextInput aria-label="名字" value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
+            <Labeled label={agentsWording().name} tip={agentsWording().nameTip} error={props.nameTaken ? agentsWording().nameTaken : undefined}>
+              <TextInput aria-label={agentsWording().name} value={draft().name} onInput={(e) => props.patch({ ...draft(), name: e.currentTarget.value })} />
             </Labeled>
-            <Labeled label="职责" tip="一句话。管家挑人时会读。">
+            <Labeled label={agentsWording().role} tip={agentsWording().roleTip}>
               <TextInput
-                aria-label="职责"
-                placeholder="比如：写接口、改 server、跑 Go 测试"
+                aria-label={agentsWording().role}
+                placeholder={agentsWording().roleHint}
                 value={draft().role}
                 onInput={(e) => props.patch({ ...draft(), role: e.currentTarget.value })}
               />
             </Labeled>
-            <Labeled label="适合的活" tip="用户的话里出现这些词，管家选「自动」时就优先派它。回车添加。">
-              <ChipsInput label="适合的活" placeholder="前端、测试、文档…" value={draft().tags} onChange={(tags) => props.patch({ ...draft(), tags })} />
+            <Labeled label={agentsWording().tags} tip={agentsWording().tagsTip}>
+              <ChipsInput
+                label={agentsWording().tags}
+                placeholder={agentsWording().tagsHint}
+                value={draft().tags}
+                onChange={(tags) => props.patch({ ...draft(), tags })}
+              />
             </Labeled>
             <Toggle
-              label="启用"
-              hint="停用后管家不会派它，名字点到也会拒绝。"
+              label={agentsWording().enabled}
+              hint={agentsWording().enabledHint}
               checked={draft().enabled}
               onChange={(enabled) => props.patch({ ...draft(), enabled })}
             />
@@ -455,24 +465,24 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             <Tools draft={draft()} runtime={props.runtime} patch={props.patch} />
           </Match>
           <Match when={tab() === "env"}>
-            <Labeled label="默认项目" tip="工作目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。管家派活没说项目时用它；留空时派活必须说在哪个项目。">
+            <Labeled label={agentsWording().workdir} tip={agentsWording().workdirTip}>
               <TextInput
-                aria-label="默认项目"
+                aria-label={agentsWording().workdir}
                 class="font-mono"
-                placeholder="比如 clock-in"
+                placeholder={agentsWording().workdirHint}
                 value={draft().workdir}
                 onInput={(e) => props.patch({ ...draft(), workdir: e.currentTarget.value })}
               />
             </Labeled>
             <Toggle
-              label="每个帮工一个 git worktree"
-              hint="每个帮工在自己的分支上改，几个帮工不会互相覆盖；完成时合进项目。关掉就直接在项目里改，没有分支可合。"
+              label={agentsWording().worktree}
+              hint={agentsWording().worktreeHint}
               checked={draft().worktree}
               onChange={(worktree) => props.patch({ ...draft(), worktree })}
             />
             <Labeled
-              label="环境变量"
-              hint={envRefused() ?? "叠加在 runtime 设置的环境变量之上。"}
+              label={agentsWording().env}
+              hint={envRefused() ?? agentsWording().envHint}
               error={envRefused() && Object.keys(draft().env).length > 0 ? envRefused() : undefined}
             >
               <KeyValueEditor value={draft().env} disabled={!!envRefused()} onChange={(env) => props.patch({ ...draft(), env })} />
@@ -522,8 +532,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
     });
   };
   return (
-    <Labeled label="农机" tip="换农机会清掉模型和推理强度；长相（动物和衣服）不变。">
-      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">读取农机…</span>}>
+    <Labeled label={agentsWording().machine} tip={agentsWording().machineTip}>
+      <Show when={runtimes().length > 0} fallback={<span class="text-xs text-muted">{agentsWording().readingMachines}</span>}>
         <div class="grid gap-1.5 sm:grid-cols-2">
           <For each={runtimes()}>
             {(info) => {
@@ -534,11 +544,11 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                 const inst = info.installation;
                 return inst.status === "available"
                   ? info.settings.enabled
-                    ? (inst.version ?? "可用")
-                    : "已停用"
+                    ? (inst.version ?? agentsWording().available)
+                    : agentsWording().disabled
                   : inst.status === "checking"
-                    ? "检测中…"
-                    : "这台机器上没有";
+                    ? agentsWording().checking
+                    : agentsWording().notHere;
               };
               return (
                 <button
@@ -576,24 +586,27 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo; patch: Pat
   const levels = () => model()?.effortLevels ?? [];
   return (
     <>
-      <Labeled label="模型" hint={models().length === 0 ? "这个 runtime 现在报不出模型列表。" : undefined}>
+      <Labeled label={agentsWording().model} hint={models().length === 0 ? agentsWording().noModels : undefined}>
         <Select
-          label="模型"
+          label={agentsWording().model}
           value={props.draft.model}
-          placeholder={`runtime 默认${fallback() ? `（${fallback()}）` : ""}`}
-          options={models().map((m) => ({ value: m.id, label: m.effortLevels.length > 0 ? `${m.name}（${m.effortLevels.length} 档推理）` : m.name }))}
+          placeholder={agentsWording().runtimeDefault(fallback() ?? "")}
+          options={models().map((m) => ({
+            value: m.id,
+            label: m.effortLevels.length > 0 ? agentsWording().modelLevels(m.name, m.effortLevels.length) : m.name,
+          }))}
           onChange={(m) => props.patch({ ...props.draft, model: m, effort: "" })}
         />
       </Labeled>
       <Labeled
-        label="推理强度"
-        hint={refusedEffort() ?? (levels().length === 0 ? `${model()?.name ?? "这个模型"}没有推理强度可选。` : "默认由 runtime 决定。")}
+        label={agentsWording().effort}
+        hint={refusedEffort() ?? (levels().length === 0 ? agentsWording().noEffort(model()?.name) : agentsWording().effortDefault)}
       >
         <div>
           <Segmented
-            label="推理强度"
+            label={agentsWording().effort}
             value={props.draft.effort}
-            options={[{ value: "", label: "默认" }, ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
+            options={[{ value: "", label: agentsWording().defaultEffort }, ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
             onChange={(effort) => props.patch({ ...props.draft, effort })}
           />
         </div>
@@ -607,17 +620,20 @@ function Facts(props: { runtime: string; info?: RuntimeInfo }) {
   const facts = () => factsOf(props.info);
   return (
     <section class="flex flex-col gap-1.5 rounded-lg border border-line p-3">
-      <h3 class="text-sm font-semibold">{props.info ? props.info.preset.label : props.runtime} 能做什么</h3>
-      <Show when={props.info} fallback={<span class="text-sm">读取农机…</span>}>
+      <h3 class="text-sm font-semibold">{agentsWording().can(props.info ? props.info.preset.label : props.runtime)}</h3>
+      <Show when={props.info} fallback={<span class="text-sm">{agentsWording().readingMachines}</span>}>
         <span class="flex items-start gap-1.5 text-sm">
           <Icon name={facts().steer ? "mark-check" : "mark-cross"} size={12} class="mt-1" />
-          {facts().steer ? "能在干活时接话（steer）" : "干活时不能插话，话会排到这一轮之后"}
+          {facts().steer ? agentsWording().steer : agentsWording().noSteer}
         </span>
-        <span class="text-sm">{facts().inProcess ? "· 跑在 server 进程里（Node SDK）" : "· 作为单独的命令行进程运行"}</span>
+        <span class="text-sm">{facts().inProcess ? agentsWording().inProcess : agentsWording().ownProcess}</span>
         <For each={Object.entries(facts().refused)}>
           {([option, reason]) => (
             <span class="text-sm text-muted">
-              不接受 <span class="font-mono text-ink">{option}</span>：{reason}
+              {agentsWording().refuses}
+              <span class="font-mono text-ink">{option}</span>
+              {agentsWording().colon}
+              {reason}
             </span>
           )}
         </For>
@@ -627,28 +643,28 @@ function Facts(props: { runtime: string; info?: RuntimeInfo }) {
 }
 
 const personaModes: { value: PersonaMode; label: string; detail: string; option?: string }[] = [
-  { value: "append", label: "追加到系统提示", detail: "保留 runtime 自带的工作方式，在后面加上人设。大多数情况选这个。", option: sessionAppendSystemPrompt },
-  { value: "replace", label: "替换系统提示", detail: "整段换掉 runtime 自带的系统提示。只有你清楚自己在做什么时才用。", option: sessionSystemPrompt },
-  { value: "prompt", label: "写进工单开头", detail: "每张工单前面加上人设。所有 runtime 都能用，但会被长对话冲淡。" },
+  { value: "append", label: agentsWording().persona.append.label, detail: agentsWording().persona.append.detail, option: sessionAppendSystemPrompt },
+  { value: "replace", label: agentsWording().persona.replace.label, detail: agentsWording().persona.replace.detail, option: sessionSystemPrompt },
+  { value: "prompt", label: agentsWording().persona.prompt.label, detail: agentsWording().persona.prompt.detail },
 ];
 
 function Persona(props: { draft: Agent; facts: RuntimeFacts; patch: Patch }) {
   const mode = () => personaModes.find((m) => m.value === props.draft.personaMode);
   return (
     <>
-      <Labeled label="人设" tip="它是谁、怎么干活、什么不做。会按下面的方式交给 runtime。">
+      <Labeled label={agentsWording().tab.persona} tip={agentsWording().personaTip}>
         <TextArea
-          aria-label="人设"
+          aria-label={agentsWording().tab.persona}
           rows={9}
-          placeholder="你是一个谨慎的后端工程师。先读懂现有代码再动手……"
+          placeholder={agentsWording().personaHint}
           value={props.draft.persona}
           onInput={(e) => props.patch({ ...props.draft, persona: e.currentTarget.value })}
         />
       </Labeled>
-      <Labeled label="交给 runtime 的方式" hint={mode()?.detail}>
+      <Labeled label={agentsWording().personaMode} hint={mode()?.detail}>
         <div>
           <Segmented
-            label="交给 runtime 的方式"
+            label={agentsWording().personaMode}
             value={props.draft.personaMode}
             options={personaModes.map((m) => ({
               value: m.value,
@@ -673,11 +689,11 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
   return (
     <>
       <Labeled
-        label="技能库"
-        tip="选中的技能跟人设一起交给帮工，每个技能一节。"
+        label={agentsWording().library}
+        tip={agentsWording().libraryTip}
         aside={
           <A href="/settings/skills" class="text-xs text-muted underline">
-            管理技能库 →
+            {agentsWording().manageLibrary}
           </A>
         }
       >
@@ -712,7 +728,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch 
           </For>
         </div>
       </Labeled>
-      <Labeled label={`${props.runtime?.preset.label ?? props.draft.runtime} 自己装的技能`} tip="runtime 自己报告的，在这台机器上已经能用，不用在这里勾。">
+      <Labeled label={agentsWording().ownSkills(props.runtime?.preset.label ?? props.draft.runtime)} tip={agentsWording().ownSkillsTip}>
         <Inventory entries={props.runtime?.skills} />
       </Labeled>
     </>
@@ -742,8 +758,8 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
   return (
     <>
       <Labeled
-        label="MCP 服务器"
-        hint={mcpRefused() ?? "开 session 时交给 runtime（oar 的 SessionOptions.mcpServers）。"}
+        label={agentsWording().mcp}
+        hint={mcpRefused() ?? agentsWording().mcpHint}
         error={mcpRefused() && props.draft.mcpServers.length > 0 ? mcpRefused() : undefined}
       >
         <div class={["flex flex-col gap-1.5", { "opacity-50": !!mcpRefused() }]}>
@@ -756,18 +772,18 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
                 <button
                   type="button"
                   disabled={!!mcpRefused()}
-                  aria-label={`删除 ${s.name}`}
+                  aria-label={agentsWording().removeNamed(s.name)}
                   onClick={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s.name) })}
                   class="cursor-pointer text-xs text-muted hover:text-berry"
                 >
-                  删除
+                  {agentsWording().remove}
                 </button>
               </div>
             )}
           </For>
           <div class="flex flex-wrap items-center gap-1.5">
             <Segmented
-              label="MCP 的种类"
+              label={agentsWording().mcpKind}
               value={type()}
               options={[
                 { value: "stdio", label: "stdio" },
@@ -776,15 +792,15 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
               onChange={setType}
             />
             <TextInput
-              aria-label="MCP 名字"
+              aria-label={agentsWording().mcpName}
               disabled={!!mcpRefused()}
-              placeholder="名字"
+              placeholder={agentsWording().name}
               class="w-28"
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
             />
             <TextInput
-              aria-label="MCP 命令或地址"
+              aria-label={agentsWording().mcpTarget}
               disabled={!!mcpRefused()}
               placeholder={type() === "stdio" ? "npx -y @scope/server" : "https://…/mcp"}
               class="min-w-40 flex-1 font-mono"
@@ -792,19 +808,19 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
               onInput={(e) => setTarget(e.currentTarget.value)}
             />
             <Button disabled={!!mcpRefused() || !name().trim() || !target().trim()} onClick={add}>
-              添加
+              {agentsWording().add}
             </Button>
           </div>
         </div>
       </Labeled>
       <Labeled
-        label="禁用的工具"
-        hint={toolsRefused() ?? "这些工具这个 agent 不能用。下面 runtime 报告的工具点一下就能加进来。"}
+        label={agentsWording().disallowed}
+        hint={toolsRefused() ?? agentsWording().disallowedHint}
         error={toolsRefused() && props.draft.disallowedTools.length > 0 ? toolsRefused() : undefined}
       >
         <ChipsInput
-          label="禁用的工具"
-          placeholder="比如 WebSearch"
+          label={agentsWording().disallowed}
+          placeholder={agentsWording().disallowedExample}
           disabled={!!toolsRefused()}
           value={props.draft.disallowedTools}
           onChange={(disallowedTools) => props.patch({ ...props.draft, disallowedTools })}
@@ -827,7 +843,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch }) {
           )}
         </Show>
       </Labeled>
-      <Labeled label={`${props.runtime?.preset.label ?? props.draft.runtime} 自己连的 MCP`} tip="runtime 自己报告的，和上面加的叠在一起。">
+      <Labeled label={agentsWording().ownMcp(props.runtime?.preset.label ?? props.draft.runtime)} tip={agentsWording().ownMcpTip}>
         <Inventory entries={props.runtime?.mcpServers} />
       </Labeled>
     </>
@@ -854,10 +870,10 @@ function Inventory(props: { entries?: InventoryEntry[] | null }) {
       }
     >
       <Match when={!props.entries}>
-        <span class="text-xs text-muted">这个 runtime 不报告这一项。</span>
+        <span class="text-xs text-muted">{agentsWording().unreported}</span>
       </Match>
       <Match when={props.entries!.length === 0}>
-        <span class="text-xs text-muted">没有。</span>
+        <span class="text-xs text-muted">{agentsWording().none}</span>
       </Match>
     </Switch>
   );

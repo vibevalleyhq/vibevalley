@@ -1,0 +1,315 @@
+{
+  "kinds": [
+    {
+      "id": "fix",
+      "name": "Fix",
+      "icon": "plot-withered",
+      "templates": [
+        {
+          "id": "bug",
+          "title": "Fix a bug: 〔what happens〕",
+          "done": "Reproduce it first, and after the fix it no longer happens; {test} passes; say what caused it and what changed"
+        },
+        {
+          "id": "failing-tests",
+          "title": "Fix the failing tests",
+          "done": "Run {test} and fix what fails (fix the code under test, do not delete tests); in the end {test} all passes"
+        },
+        {
+          "id": "build-errors",
+          "title": "Fix the build errors",
+          "done": "{build} no longer fails; do not change unrelated code along the way"
+        },
+        {
+          "id": "lint",
+          "title": "Fix lint",
+          "done": "{lint} has no errors or warnings; change only what it points at"
+        },
+        {
+          "id": "crash",
+          "title": "Fix a crash: 〔where it crashes〕",
+          "done": "Find steps that reproduce it first; after the fix, following them no longer crashes; {test} passes; say what caused it"
+        },
+        {
+          "id": "flaky",
+          "title": "Fix a flaky test",
+          "done": "Find why it is flaky (timing, order, shared state…) and fix that, not by adding retries; {test} passes several runs in a row"
+        },
+        {
+          "id": "regression",
+          "title": "Find what broke recently: 〔what happens〕",
+          "done": "Find the change in the history that broke it and fix it; {test} passes; say which commit and why it broke"
+        }
+      ]
+    },
+    {
+      "id": "test",
+      "name": "Tests",
+      "icon": "plot-sprout",
+      "templates": [
+        {
+          "id": "recent",
+          "title": "Test what changed recently",
+          "done": "Look at the recent commits and add tests for the behavior they changed; {test} passes; say which were added"
+        },
+        {
+          "id": "module",
+          "title": "Add tests for 〔module〕",
+          "done": "Its main behavior and edge cases have tests; {test} passes"
+        },
+        {
+          "id": "coverage",
+          "title": "Raise the coverage",
+          "done": "Find important code no test reaches and test it; {test} passes; say the coverage before and after"
+        },
+        {
+          "id": "edge",
+          "title": "Test the edge cases of 〔function〕",
+          "done": "Empty, largest and invalid inputs all have tests, and the problems they find are fixed; {test} passes"
+        },
+        {
+          "id": "bug-test",
+          "title": "Add a regression test for the bug just fixed",
+          "done": "The new test fails before the fix and passes after; {test} passes"
+        },
+        {
+          "id": "slow-tests",
+          "title": "Make the tests faster",
+          "done": "Find the slowest tests and remove needless waits and repeated setup; {test} still all passes; say how much faster"
+        }
+      ]
+    },
+    {
+      "id": "feature",
+      "name": "Features",
+      "icon": "plot-seeded",
+      "templates": [
+        {
+          "id": "feature",
+          "title": "Add a feature: 〔what it does〕",
+          "done": "The feature works and has tests; {test} passes; say how to use it"
+        },
+        {
+          "id": "endpoint",
+          "title": "Add an endpoint",
+          "done": "The endpoint can be called, and gives clear errors for bad input; it has tests; {test} passes"
+        },
+        {
+          "id": "page",
+          "title": "Add a page",
+          "done": "The page opens and shows the right things; {build} passes; say how to get there"
+        },
+        {
+          "id": "option",
+          "title": "Add a setting: 〔what it does〕",
+          "done": "It has a default and old uses are unaffected; tests and docs added; {test} passes"
+        },
+        {
+          "id": "command",
+          "title": "Add a command: 〔what it does〕",
+          "done": "The command runs, has help, and says why when it fails; {test} passes"
+        },
+        {
+          "id": "small-change",
+          "title": "A small change: 〔what to change〕",
+          "done": "Change only what was asked; {test} and {lint} pass"
+        }
+      ]
+    },
+    {
+      "id": "tidy",
+      "name": "Tidy",
+      "icon": "plot-weeds",
+      "templates": [
+        {
+          "id": "refactor",
+          "title": "Refactor 〔where〕",
+          "done": "Same behavior, easier to read; {test} passes; say how the structure changed"
+        },
+        {
+          "id": "dead-code",
+          "title": "Delete dead code",
+          "done": "Delete functions, files and settings nobody uses; {build} and {test} pass; list what was deleted"
+        },
+        {
+          "id": "naming",
+          "title": "Make the names consistent",
+          "done": "One name for each concept; {build} and {test} pass; list the names changed"
+        },
+        {
+          "id": "split",
+          "title": "Split big files",
+          "done": "The biggest files split by what they do, same behavior; {test} passes"
+        },
+        {
+          "id": "types",
+          "title": "Add types, remove any",
+          "done": "Remove the any and type assertions that can go, and the type check passes; {test} passes; same behavior"
+        },
+        {
+          "id": "duplicates",
+          "title": "Merge duplicated code",
+          "done": "Find logic repeated in several places and keep it in one; {test} passes; same behavior"
+        },
+        {
+          "id": "todos",
+          "title": "Clear the TODOs",
+          "done": "Do the TODOs that can be done, and say why the rest stay; {test} passes"
+        }
+      ]
+    },
+    {
+      "id": "deps",
+      "name": "Dependencies",
+      "icon": "plot-leafy",
+      "templates": [
+        {
+          "id": "upgrade",
+          "title": "Upgrade the dependencies",
+          "done": "Dependencies up to new compatible versions; {build} and {test} pass; list what was upgraded and any breaking changes"
+        },
+        {
+          "id": "advisories",
+          "title": "Fix the security warnings",
+          "done": "Known vulnerabilities in dependencies fixed (upgraded or replaced); {test} passes; list what was fixed"
+        },
+        {
+          "id": "unused",
+          "title": "Remove unused dependencies",
+          "done": "Delete the dependencies the code does not use; {build} and {test} pass; list what was removed"
+        },
+        {
+          "id": "one-dep",
+          "title": "Upgrade 〔dependency〕 to the latest",
+          "done": "Follow its upgrade guide and fix what broke; {build} and {test} pass; say what changed"
+        },
+        {
+          "id": "lockfile",
+          "title": "Tidy the lock file",
+          "done": "The lock file matches the declared dependencies, with no duplicate versions; {build} and {test} pass"
+        },
+        {
+          "id": "runtime",
+          "title": "Upgrade the runtime version",
+          "done": "The language or runtime up to its current stable version, configuration and CI together; {build} and {test} pass"
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "name": "Docs",
+      "icon": "plot-flowering",
+      "templates": [
+        {
+          "id": "readme",
+          "title": "Say in the README how to start",
+          "done": "Following the README from nothing installs it, runs it and runs the tests ({test}); every command in it was run by hand"
+        },
+        {
+          "id": "explain",
+          "title": "Document 〔where〕",
+          "done": "Say what it does, how to use it and why it is designed so; it matches the code"
+        },
+        {
+          "id": "changelog",
+          "title": "Update the changelog",
+          "done": "Write the changes since the last release into the changelog, split into added, fixed and changed"
+        },
+        {
+          "id": "comments",
+          "title": "Comment the hard parts",
+          "done": "Write only the why and what is easy to get wrong, without restating the code; {lint} passes"
+        },
+        {
+          "id": "api-docs",
+          "title": "Write the API docs",
+          "done": "Each public endpoint's parameters, results and errors written down, matching the code"
+        },
+        {
+          "id": "contributing",
+          "title": "Write how to contribute",
+          "done": "Say how to install, run the tests and submit; following it works end to end"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "icon": "plot-carrot",
+      "templates": [
+        {
+          "id": "recent",
+          "title": "Review the recent changes",
+          "done": "Read the recent commits and list bugs, risks and what could be simpler, each with file and line; do not change code"
+        },
+        {
+          "id": "performance",
+          "title": "Find performance problems",
+          "done": "Find the slowest spots, and say how they were measured, where the time goes and how to fix it; do not change code"
+        },
+        {
+          "id": "security",
+          "title": "Look for security problems",
+          "done": "Look for injection, broken access control, leaked keys and the like, each with its place and severity; do not change code"
+        },
+        {
+          "id": "survey",
+          "title": "Get to know the project",
+          "done": "Say what the project does, how to run it and its tests ({test}), how the folders are laid out and where it is messiest; do not change code"
+        },
+        {
+          "id": "deps-audit",
+          "title": "Check the dependencies for risks",
+          "done": "List outdated, advised-against and unmaintained dependencies with suggestions; do not change code"
+        },
+        {
+          "id": "errors",
+          "title": "Check the error handling",
+          "done": "Find where errors are swallowed, only logged, or reported unclearly, as a list; do not change code"
+        },
+        {
+          "id": "tests-gaps",
+          "title": "Find important code with no tests",
+          "done": "List the places most in need of tests and why; do not change code"
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "name": "Release",
+      "icon": "plot-wheat",
+      "templates": [
+        {
+          "id": "prepare",
+          "title": "Get ready to release",
+          "done": "{build} and {test} pass, version and changelog updated; no tag, no push"
+        },
+        {
+          "id": "tag",
+          "title": "Tag a release",
+          "done": "Tag the next version on main's latest commit, following the existing version rules; no push; say the version and what it includes"
+        },
+        {
+          "id": "notes",
+          "title": "Write the release notes",
+          "done": "Write release notes from the commits since the last release: added, fixed, and changes to watch for"
+        },
+        {
+          "id": "version",
+          "title": "Bump the version",
+          "done": "Bump the version by the size of the changes, the same everywhere; {build} passes"
+        },
+        {
+          "id": "smoke",
+          "title": "Check before releasing",
+          "done": "{build}, {test} and {lint} all pass; a fresh install by the docs works; list the problems found"
+        },
+        {
+          "id": "hotfix",
+          "title": "Make a fix release: 〔what it fixes〕",
+          "done": "Only this one fix; {test} passes; release notes written"
+        }
+      ]
+    }
+  ]
+}

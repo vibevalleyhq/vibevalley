@@ -3,11 +3,12 @@
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
+import { memoryWording } from "./words.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
-import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabels } from "./recall.ts";
+import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
@@ -275,15 +276,14 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
       const off: MemorySourceInfo[] = [];
       for (const c of now) {
         const name = c.kind;
-        const isOff = (why: string) =>
-          off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
+        const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
         if (!c.enabled) {
-          isOff("没打开");
+          isOff(memoryWording().off);
           continue;
         }
         const one = build(c);
         if (!one) {
-          isOff("不认识这种来源");
+          isOff(memoryWording().unknownSource);
           continue;
         }
         const why = one.unavailable();
@@ -341,7 +341,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
     const infoOf = (g: Generation): MemorySourceInfo[] => [
       ...g.all.map((one) => ({
         name: one.name,
-        label: sourceLabels[one.name] ?? one.name,
+        label: sourceLabel(one.name),
         on: true,
         canList: one.can.list,
         canForget: one.can.forget,
@@ -352,9 +352,9 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
 
     const forgetProblem = (id: string) => {
       const g = snapshot();
-      if (!g) return "记性来源已经停下";
+      if (!g) return memoryWording().stopped;
       const [one] = owner(g.all, id);
-      return one.can.forget ? undefined : `${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`;
+      return one.can.forget ? undefined : memoryWording().forgetThere(sourceLabel(one.name));
     };
 
     // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
@@ -412,7 +412,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
                 return {
                   source: one.name,
                   found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
-                  coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
+                  coverage: page ? page.coverage : memoryWording().coverage.failed,
                 };
               }),
           );

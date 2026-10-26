@@ -3,6 +3,7 @@
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
+import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
@@ -59,7 +60,7 @@ export function TaskBoard() {
     >
       {(g) => (
         <div class="flex flex-col">
-          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="种植计划">
+          <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={farmWording().graph.name}>
             <For each={list()}>
               {(item) => (
                 <button
@@ -80,7 +81,7 @@ export function TaskBoard() {
               class="flex cursor-pointer items-center gap-1 bg-cream-200 px-3 py-1 text-[12px] text-leaf-700 hover:bg-cream-300"
             >
               <SpriteIcon name="button-add" size={12} />
-              新计划
+              {farmWording().graph.new}
             </button>
           </div>
           <div class="mt-3">
@@ -122,35 +123,33 @@ function NewTask(props: { onCancel?: () => void; onSplit: (id: string) => void }
   };
   return (
     <div class="flex flex-col gap-3">
-      <p class="text-[13px] text-bark-900">
-        一件很长的活：先派一个帮工读代码，把它拆成几步，每步交给一个帮工，有先后。拆好了你看过、改过再开工；每步做完合进计划自己的分支，全做完你再一次收进主分支。
-      </p>
-      <PxField label="要做什么">
-        <PxTextArea value={goal()} onChange={setGoal} rows={4} placeholder="比如：给 clock-in 加按月查询打卡记录，带一个页面，要有测试" />
+      <p class="text-[13px] text-bark-900">{farmWording().graph.intro}</p>
+      <PxField label={farmWording().graph.goal}>
+        <PxTextArea value={goal()} onChange={setGoal} rows={4} placeholder={farmWording().graph.goalExample} />
       </PxField>
       <div class="flex gap-3">
         <div class="flex-1">
-          <PxField label="在哪个项目">
+          <PxField label={farmWording().graph.project}>
             <PxTextInput value={where()} onChange={setProject} placeholder="clock-in" suggestions={known()} />
           </PxField>
         </div>
         <div class="flex-1">
-          <PxField label="谁来拆">
+          <PxField label={farmWording().graph.splitter}>
             <PxPick
               value={splitter()}
-              placeholder="按规则挑"
+              placeholder={farmWording().graph.byRule}
               onChange={setSplitter}
-              options={[{ value: "auto", label: "按规则挑" }, ...agents().map((a) => ({ value: a.id, label: a.name }))]}
+              options={[{ value: "auto", label: farmWording().graph.byRule }, ...agents().map((a) => ({ value: a.id, label: a.name }))]}
             />
           </PxField>
         </div>
       </div>
       <div class="flex justify-end gap-2">
         <Show when={props.onCancel}>
-          <PxButton onClick={() => props.onCancel?.()}>算了</PxButton>
+          <PxButton onClick={() => props.onCancel?.()}>{farmWording().never}</PxButton>
         </Show>
         <PxButton tone="primary" disabled={!ok()} onClick={() => void submit()}>
-          拆计划
+          {farmWording().graph.split}
         </PxButton>
       </div>
       <Said answer={said()} />
@@ -173,20 +172,18 @@ function TaskView(props: { graph: TaskGraph }) {
           <span class="text-[13px]">{props.graph.title}</span>
           <StateTag g={props.graph} />
           <Show when={props.graph.tasks.length > 0}>
-            <span class={xs}>
-              {settled()}/{props.graph.tasks.length} 步
-            </span>
+            <span class={xs}>{farmWording().graph.steps(settled(), props.graph.tasks.length)}</span>
           </Show>
-          <Show when={props.graph.spent}>{(spent) => <span class={xs}>花了 {spentText(spent())}</span>}</Show>
+          <Show when={props.graph.spent}>{(spent) => <span class={xs}>{farmWording().graph.spent(spentText(spent()))}</span>}</Show>
         </div>
         <p class="mt-1 text-[13px] text-bark-800">{props.graph.goal}</p>
         <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <FarmTag text={`项目 ${props.graph.project}`} fill="#a5743f" ink="#f7e8c4" />
+          <FarmTag text={farmWording().graph.projectTag(props.graph.project)} fill="#a5743f" ink="#f7e8c4" />
           <Show when={props.graph.branch}>
             <FarmTag text={props.graph.branch!} />
           </Show>
           <Show when={props.graph.state === "running"}>
-            <span class="text-[12px] text-bark-500">每步做完合进这条分支；收获时整条合进主分支</span>
+            <span class="text-[12px] text-bark-500">{farmWording().graph.running}</span>
           </Show>
         </div>
         <Show when={props.graph.note}>
@@ -201,7 +198,7 @@ function TaskView(props: { graph: TaskGraph }) {
                 {actionText(props.graph, "start")}
               </PxButton>
               <PxButton icon="button-add" onClick={() => setAdding(true)}>
-                加一步
+                {farmWording().graph.addStep}
               </PxButton>
             </Show>
             <Show when={props.graph.actions?.includes("pause")}>
@@ -214,11 +211,15 @@ function TaskView(props: { graph: TaskGraph }) {
             </Show>
             <Show when={props.graph.state === "ready"}>
               <PxButton tone="primary" onClick={() => setReviewing(true)}>
-                看改动，{actionText(props.graph, "merge")}…
+                {farmWording().graph.review(actionText(props.graph, "merge"))}
               </PxButton>
             </Show>
             <Show when={props.graph.actions?.includes("abandon")}>
-              <Confirm label={`${actionText(props.graph, "abandon")}这个计划`} sure="确定放弃？分支会留着" onConfirm={() => void act("abandon")} />
+              <Confirm
+                label={farmWording().graph.abandon(actionText(props.graph, "abandon"))}
+                sure={farmWording().graph.abandonSure}
+                onConfirm={() => void act("abandon")}
+              />
             </Show>
           </div>
         </Show>
@@ -236,7 +237,7 @@ function TaskView(props: { graph: TaskGraph }) {
             />
           </Match>
           <Match when={props.graph.state === "splitting"}>
-            <FarmEmpty text="帮工在读代码、拆计划。拆好了会出现在这里，你看过再开工。" />
+            <FarmEmpty text={farmWording().graph.splitting} />
           </Match>
         </Switch>
       </div>
@@ -253,7 +254,7 @@ function Confirm(props: { label: string; sure: string; onConfirm: () => void }) 
         <PxButton tone="danger" onClick={() => props.onConfirm()}>
           {props.sure}
         </PxButton>
-        <PxButton onClick={() => setAsking(false)}>不了</PxButton>
+        <PxButton onClick={() => setAsking(false)}>{farmWording().graph.no}</PxButton>
       </span>
     </Show>
   );
@@ -262,14 +263,17 @@ function Confirm(props: { label: string; sure: string; onConfirm: () => void }) 
 function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) {
   const changes = useGraphChanges(() => props.graph.id);
   return (
-    <Switch fallback={<p class="py-10 text-center text-[13px] text-bark-600">正在看计划分支改了什么…</p>}>
+    <Switch fallback={<p class="py-10 text-center text-[13px] text-bark-600">{farmWording().graph.readingChanges}</p>}>
       <Match when={changes.error}>
         {(error) => (
           <div class="flex flex-col items-start gap-3">
             <Tinted color={tint("#c84a3a", 0.12)}>
-              <p class="text-[13px] text-berry">看不了改动：{reasonOf(error())}</p>
+              <p class="text-[13px] text-berry">
+                {farmWording().graph.unreadable}
+                {reasonOf(error())}
+              </p>
             </Tinted>
-            <PxButton onClick={() => props.onDone()}>先不收</PxButton>
+            <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
           </div>
         )}
       </Match>
@@ -280,23 +284,19 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
           return (
             <div class="flex flex-col">
               <p class="text-[13px]">
-                {c().branch ?? ""} → {c().project} 的 {c().base}：{c().commits.length} 个提交，{c().files.length} 个文件，
+                {farmWording().graph.summary(c().branch ?? "", c().project, c().base, c().commits.length, c().files.length)}
                 <span class="text-leaf-700">+{counts()[0]}</span>
                 <span class="text-berry"> -{counts()[1]}</span>
                 <Show when={c().behind > 0}>
-                  <span class="text-bark-600">
-                    ；这期间 {c().base} 多了 {Math.round(c().behind)} 个提交
-                  </span>
+                  <span class="text-bark-600">{farmWording().graph.behind(c().base, Math.round(c().behind))}</span>
                 </Show>
               </p>
               <Show when={conflicts().size > 0}>
                 <Tinted color={tint("#c84a3a", 0.12)} class="mt-1">
-                  <p class="text-[13px] text-berry">
-                    合进 {c().base} 会冲突：{c().conflicts.join("、")}。先不收，等 {c().base} 上的改动处理好。
-                  </p>
+                  <p class="text-[13px] text-berry">{farmWording().graph.conflict(c().base, c().conflicts)}</p>
                 </Tinted>
               </Show>
-              <FarmSection title="提交">
+              <FarmSection title={farmWording().graph.commits}>
                 <For each={c().commits}>
                   {(x) => (
                     <div class="flex items-center gap-2">
@@ -306,15 +306,15 @@ function TaskHarvest(props: { graph: TaskGraph; onDone: (a?: Answer) => void }) 
                   )}
                 </For>
               </FarmSection>
-              <FarmSection title="文件">
+              <FarmSection title={farmWording().graph.files}>
                 <div class="flex flex-col gap-1">
                   <For each={c().files}>{(f) => <FileRow file={f} conflict={conflicts().has(f.path)} />}</For>
                 </div>
               </FarmSection>
               <div class="mt-3 flex justify-end gap-2">
-                <PxButton onClick={() => props.onDone()}>先不收</PxButton>
+                <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
                 <PxButton tone="primary" disabled={conflicts().size > 0} onClick={() => void graphs.act(props.graph.id, "merge").then((a) => props.onDone(a))}>
-                  确认收获，合进 {c().base}
+                  {farmWording().graph.harvest(c().base)}
                 </PxButton>
               </div>
             </div>
@@ -352,7 +352,7 @@ function SmallBtn(props: { label: string; onClick?: () => void; primary?: boolea
 function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) => void; onAdded: () => void; onHistory: (id: string) => void }) {
   const [editing, setEditing] = createSignal<string>();
   return (
-    <Show when={props.graph.tasks.length > 0 || props.adding} fallback={<FarmEmpty text="计划里还没有步骤。" />}>
+    <Show when={props.graph.tasks.length > 0 || props.adding} fallback={<FarmEmpty text={farmWording().graph.noSteps} />}>
       <div class="flex items-start overflow-x-auto pb-2">
         <For each={props.graph.layers ?? []} keyed={false}>
           {(ids, i) => (
@@ -362,8 +362,8 @@ function Steps(props: { graph: TaskGraph; adding: boolean; onSaid: (a: Answer) =
                   →
                 </span>
               </Show>
-              <div class="flex w-60 shrink-0 flex-col gap-2" role="group" aria-label={i === 0 ? "先做" : `第 ${i + 1} 批`}>
-                <span class="px-1 text-[12px] text-bark-500">{i === 0 ? "先做" : `第 ${i + 1} 批`}</span>
+              <div class="flex w-60 shrink-0 flex-col gap-2" role="group" aria-label={i === 0 ? farmWording().graph.first : farmWording().graph.batch(i + 1)}>
+                <span class="px-1 text-[12px] text-bark-500">{i === 0 ? farmWording().graph.first : farmWording().graph.batch(i + 1)}</span>
                 <For each={ids()}>
                   {(id) => (
                     <Show when={taskOf(props.graph, id)}>
@@ -432,8 +432,8 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           {props.node.title}
         </span>
         <Show when={props.node.acceptance}>
-          <span title={props.node.frozen?.length ? `验收，冻结了：${props.node.frozen.join("、")}` : "验收：写好时要不通过，最后一步让它通过"}>
-            <FarmTag text="验收" fill="#5c7a3a" ink="#f7e8c4" />
+          <span title={props.node.frozen?.length ? farmWording().graph.frozen(props.node.frozen) : farmWording().graph.acceptanceHint}>
+            <FarmTag text={farmWording().plot.review} fill="#5c7a3a" ink="#f7e8c4" />
           </span>
         </Show>
         <FarmTag text={props.node.stateText ?? ""} fill={tone().tag} ink={tone().ink} />
@@ -443,22 +443,22 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
       </p>
       <div class="mt-1.5 flex items-center gap-1">
         <Show when={agent()}>{(a) => <AgentFace agentId={a().id} runtime={session()?.runtime ?? a().runtime} look={a().look} size={18} />}</Show>
-        <span class="text-[12px] text-bark-600">{agent()?.name ?? "按规则挑"}</span>
+        <span class="text-[12px] text-bark-600">{agent()?.name ?? farmWording().graph.byRule}</span>
         <Show when={props.node.check}>
-          <span title={`做完跑 ${props.node.check}`} class="ml-auto truncate bg-cream-50/80 px-1 font-mono text-[10px] text-bark-900">
+          <span title={farmWording().graph.checkHint(props.node.check ?? "")} class="ml-auto truncate bg-cream-50/80 px-1 font-mono text-[10px] text-bark-900">
             {props.node.check}
           </span>
         </Show>
       </div>
       <Show when={props.node.needs.length > 0}>
         <p class="mt-1 text-[12px] text-bark-600">
-          {waits().length ? `等 ${waits().map(titleOf).join("、")}` : `接在 ${props.node.needs.map(titleOf).join("、")} 后面`}
+          {waits().length ? farmWording().graph.waits(waits().map(titleOf)) : farmWording().graph.after(props.node.needs.map(titleOf))}
         </p>
       </Show>
       <Show when={session()}>
         {(s) => (
           <p class="mt-1.5 bg-cream-50/70 px-1.5 py-1 text-[12px] text-bark-800">
-            {s().name} · 第 {stationOfSession(s()) + 1} 块地{doing() && doing()!.action !== "none" ? ` · 在${doing()!.actionText ?? ""}` : ""}
+            {farmWording().graph.onPlot(s().name, stationOfSession(s()) + 1, doing() && doing()!.action !== "none" ? (doing()!.actionText ?? "") : undefined)}
           </p>
         )}
       </Show>
@@ -479,12 +479,12 @@ function NodeCard(props: { graph: TaskGraph; node: Task; onEdit: () => void; onS
           <SmallBtn label={props.node.actionText?.skip ?? ""} onClick={() => void nodeAct("skip")} />
         </Show>
         <Show when={props.node.canEdit}>
-          <SmallBtn label="改" onClick={() => props.onEdit()} />
+          <SmallBtn label={farmWording().graph.edit} onClick={() => props.onEdit()} />
         </Show>
         <Show when={props.node.canRemove}>
-          <SmallBtn label="删" onClick={() => void graphs.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
+          <SmallBtn label={farmWording().graph.remove} onClick={() => void graphs.removeTask(props.graph.id, props.node.id).then((a) => props.onSaid(a))} />
         </Show>
-        <SmallBtn label="经过" onClick={() => props.onHistory()} />
+        <SmallBtn label={farmWording().graph.story} onClick={() => props.onHistory()} />
       </div>
     </div>
   );
@@ -512,21 +512,21 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
   return (
     <div class="flex flex-col gap-1.5 border-[1.5px] border-leaf-500 bg-cream-100 p-2.5">
       <Show when={!props.node}>
-        <PxTextInput value={id()} onChange={setId} placeholder="步骤 id，比如 docs" label="步骤 id" mono />
+        <PxTextInput value={id()} onChange={setId} placeholder={farmWording().graph.stepIdHint} label={farmWording().graph.stepId} mono />
       </Show>
-      <PxTextInput value={title()} onChange={setTitle} placeholder="标题" label="标题" />
-      <PxTextArea value={brief()} onChange={setBrief} rows={5} placeholder="工单：目标、改哪里、做到什么程度算完" label="工单" />
+      <PxTextInput value={title()} onChange={setTitle} placeholder={farmWording().graph.title} label={farmWording().graph.title} />
+      <PxTextArea value={brief()} onChange={setBrief} rows={5} placeholder={farmWording().graph.briefHint} label={farmWording().graph.brief} />
       <PxPick
         value={agent()}
-        placeholder="谁来做：按规则挑"
+        placeholder={farmWording().graph.whoHint}
         clearable
-        label="谁来做"
+        label={farmWording().graph.who}
         onChange={setAgent}
         options={agents().map((a) => ({ value: a.id, label: a.name }))}
       />
-      <PxTextInput value={check()} onChange={setCheck} placeholder="做完跑的检查，比如 pnpm test（可空）" label="检查命令" mono />
+      <PxTextInput value={check()} onChange={setCheck} placeholder={farmWording().graph.checkExample} label={farmWording().graph.check} mono />
       <Show when={others().length > 0}>
-        <span class="text-[12px] text-bark-600">等这些做完：</span>
+        <span class="text-[12px] text-bark-600">{farmWording().graph.waitFor}</span>
         <div class="flex flex-wrap gap-1">
           <For each={others()}>
             {(n) => {
@@ -549,8 +549,8 @@ function NodeEditor(props: { graph: TaskGraph; node?: Task; onDone: (a?: Answer)
         <p class="text-[12px] text-berry">{problem()}</p>
       </Show>
       <div class="flex justify-end gap-1">
-        <SmallBtn label="算了" onClick={() => props.onDone()} />
-        <SmallBtn label={props.node ? "改好了" : "加上"} primary onClick={isReady() ? () => void save() : undefined} />
+        <SmallBtn label={farmWording().never} onClick={() => props.onDone()} />
+        <SmallBtn label={props.node ? farmWording().graph.done : farmWording().graph.add} primary onClick={isReady() ? () => void save() : undefined} />
       </div>
     </div>
   );
@@ -580,17 +580,20 @@ function TaskLog(props: { graph: TaskGraph; only?: string; onAll: () => void }) 
       .filter((e) => !props.only || e.task === props.only)
       .reverse();
   return (
-    <FarmSection title={props.only ? `「${titleOf(props.only)}」的经过` : "经过"}>
+    <FarmSection title={props.only ? farmWording().graph.storyOf(titleOf(props.only)) : farmWording().graph.story}>
       <Show when={props.only}>
         <button
           type="button"
           onClick={() => props.onAll()}
           class="mb-2 cursor-pointer self-start bg-cream-200 px-2.5 py-0.5 text-[12px] text-bark-800 hover:bg-cream-300"
         >
-          看整个计划的经过
+          {farmWording().graph.wholeStory}
         </button>
       </Show>
-      <Show when={shown().length > 0} fallback={<p class="text-[13px] text-bark-600">{events.isSuccess ? "还没有记下什么。" : "正在读…"}</p>}>
+      <Show
+        when={shown().length > 0}
+        fallback={<p class="text-[13px] text-bark-600">{events.isSuccess ? farmWording().graph.nothing : farmWording().graph.readingStory}</p>}
+      >
         <div class="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
           <For each={shown()} keyed={(e) => e.id}>
             {(e) => <LogRow e={e()} />}
@@ -614,7 +617,7 @@ function LogRow(props: { e: GraphEvent }) {
         <p class="text-[12px] text-bark-800">{props.e.text ?? ""}</p>
         <Show when={changes().length > 0}>
           <button type="button" onClick={() => setOpen(!open())} class="mt-0.5 cursor-pointer text-[12px] text-bark-600">
-            改前改后
+            {farmWording().graph.beforeAfter}
           </button>
           <Show when={open()}>
             <For each={changes()}>
@@ -622,7 +625,8 @@ function LogRow(props: { e: GraphEvent }) {
                 <div class="mt-1 text-[12px] text-bark-600">
                   <p>{c.field}</p>
                   <p>
-                    <span class="text-berry line-through">{c.from || "（空）"}</span> → <span class="text-leaf-700">{c.to || "（空）"}</span>
+                    <span class="text-berry line-through">{c.from || farmWording().graph.empty}</span> →{" "}
+                    <span class="text-leaf-700">{c.to || farmWording().graph.empty}</span>
                   </p>
                 </div>
               )}

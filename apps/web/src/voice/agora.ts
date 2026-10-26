@@ -1,6 +1,7 @@
 // A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop,
 // a browser). The phone's shell carries its own (@vibevalley/host's rtc), which goes on with the screen locked.
 
+import { appWording } from "../app/words";
 import type { Rtc } from "@vibevalley/host";
 
 export const webRtc: Rtc = async (grant, on) => {
@@ -14,7 +15,7 @@ export const webRtc: Rtc = async (grant, on) => {
     if (gone || media !== "audio") return;
     client.subscribe(user, "audio").then(
       () => user.audioTrack?.play(),
-      (e: unknown) => !gone && on.problem(`声网：听不到对面：${e instanceof Error ? e.message : String(e)}`),
+      (e: unknown) => !gone && on.problem(appWording().call.cannotHear(e instanceof Error ? e.message : String(e))),
     );
   });
   client.on("stream-message", (_uid: unknown, payload: Uint8Array) => !gone && on.stream(new TextDecoder().decode(payload)));
@@ -28,7 +29,7 @@ export const webRtc: Rtc = async (grant, on) => {
     }
     on.levels(mine, theirs);
   });
-  client.on("exception", (e: { code: number; msg: string }) => !gone && on.problem(`声网：${e.code} ${e.msg}`));
+  client.on("exception", (e: { code: number; msg: string }) => !gone && on.problem(appWording().call.agora(e.code, e.msg)));
   client.on("token-privilege-will-expire", () => !gone && on.expiring());
   const leave = async () => {
     gone = true;

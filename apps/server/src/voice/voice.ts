@@ -3,6 +3,8 @@
 // call it starts; a call keeps the credentials and the area it started with, whatever the settings say later. The line
 // listens on loopback, reachable from outside only through its tunnel, and answers one endpoint, with each call's own key.
 
+import { onCallLine } from "./prompts.ts";
+import { voiceWording } from "./words.ts";
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes, randomInt } from "node:crypto";
 import { createServer, type Server } from "node:http";
@@ -33,7 +35,6 @@ const deepseekChat = "https://api.deepseek.com/chat/completions";
 const lineReadyMs = 60_000;
 /** So calling again does not wait for a new tunnel. */
 const lineLingerMs = 10 * 60_000;
-const lineMisheard = "嗯？我没听清，你再说一遍？";
 /** OpenAI's own cap on one recording. */
 const dictateMaxBytes = 25 << 20;
 const dictateFormats: Record<string, string> = {
@@ -67,7 +68,7 @@ export interface CallLine {
 }
 
 /** For a member added to the union and not to vendorsFor. */
-export const voiceUnknown = "服务端还不会用";
+export const voiceUnknown = () => voiceWording().unknownSuffix;
 
 type Vendors = {
   stt: AresSTT | DeepgramSTT | MicrosoftSTT;
@@ -96,26 +97,26 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         stt = new DeepgramSTT({ model: asr.model, language: voice.language });
         break;
       case "microsoft":
-        if (!keys.asrKey) return unavailable("微软识别还没有 key：在声音页的「识别」里填", "voice");
+        if (!keys.asrKey) return unavailable(voiceWording().noAsrKey, "voice");
         stt = new MicrosoftSTT({ key: keys.asrKey, region: asr.region, language: voice.language });
         break;
       default: {
         const exhaustive: never = asr;
-        return unavailable(`识别用的 ${(exhaustive as { vendor: string }).vendor} ${voiceUnknown}`);
+        return unavailable(voiceWording().unknown(voiceWording().part.asr, (exhaustive as { vendor: string }).vendor));
       }
     }
     let llm: OpenAI;
     const answer = voice.answer;
     switch (answer.vendor) {
       case "orchestrator":
-        if (!line) return unavailable("管家的语音线路没接通");
+        if (!line) return unavailable(voiceWording().noLine);
         llm = new OpenAI({ apiKey: line.key, url: line.url, model: orchestratorModel, ...speech });
         break;
       case "agora":
         llm = new OpenAI({ model: answer.model, ...speech });
         break;
       case "deepseek":
-        if (!deepseekKey) return unavailable("用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填", "deepseek");
+        if (!deepseekKey) return unavailable(voiceWording().noDeepseekKey, "deepseek");
         llm = new OpenAI({
           apiKey: deepseekKey,
           url: deepseekChat,
@@ -124,12 +125,12 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         });
         break;
       case "openai":
-        if (!keys.llmKey) return unavailable("自己的大模型还没有 key：在声音页的「想」里填", "voice");
+        if (!keys.llmKey) return unavailable(voiceWording().noLlmKey, "voice");
         llm = new OpenAI({ apiKey: keys.llmKey, url: answer.url, model: answer.model, ...speech });
         break;
       default: {
         const exhaustive: never = answer;
-        return unavailable(`大模型用的 ${(exhaustive as { vendor: string }).vendor} ${voiceUnknown}`);
+        return unavailable(voiceWording().unknown(voiceWording().part.llm, (exhaustive as { vendor: string }).vendor));
       }
     }
     let tts: Vendors["tts"];
@@ -142,18 +143,18 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         tts = new OpenAITTS({ voice: t.voice });
         break;
       case "microsoft":
-        if (!keys.ttsKey) return unavailable("微软合成还没有 key：在声音页的「说」里填", "voice");
+        if (!keys.ttsKey) return unavailable(voiceWording().noTtsKey, "voice");
         tts = new MicrosoftTTS({ key: keys.ttsKey, region: t.region, voiceName: t.voiceName });
         break;
       default: {
         const exhaustive: never = t;
-        return unavailable(`合成用的 ${(exhaustive as { vendor: string }).vendor} ${voiceUnknown}`);
+        return unavailable(voiceWording().unknown(voiceWording().part.tts, (exhaustive as { vendor: string }).vendor));
       }
     }
     return { stt, llm, tts };
   } catch (e) {
     // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return unavailable("语音设置用不了：" + message(e), "voice");
+    return unavailable(voiceWording().unusable(message(e)), "voice");
   }
 }
 
@@ -297,30 +298,6 @@ export function speakPieces(text: string, max = 480): string[] {
   return out.filter(Boolean);
 }
 
-const spoken = "口语，先说结论；不念代码、路径、命令和长列表。";
-
-/** What the orchestrator is given to tell the owner on the call: everything that waited, as one; ring is what rang, when the
- * owner just picked the call up for it. What it answers is read out. */
-export function onCallLine(texts: readonly string[], ring?: string): string {
-  const list = texts.map((t) => "- " + t).join("\n");
-  if (ring)
-    return (
-      "主人接起了你打的电话。你打电话是为了这件事：" +
-      ring +
-      (list ? "\n这期间又有：\n" + list : "") +
-      "\n先开口说这些：" +
-      (texts.length > 0 ? "合成一段说，" : "一两句，") +
-      spoken
-    );
-  return (
-    "【要告诉主人】\n" +
-    list +
-    "\n\n主人正在和你通电话，你的回答会念给主人听：" +
-    (texts.length > 1 ? `这 ${texts.length} 件合成一段说，一件一句，` : "一两句，") +
-    spoken
-  );
-}
-
 export class Voice extends Context.Service<Voice, VoiceShape>()("vibevalley/Voice") {}
 
 export interface VoiceOptions {
@@ -346,7 +323,7 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
     // A real process: its deadline is real time.
     const cancel = afterRealTime(30_000, () => {
       close();
-      reject(new Error("cloudflared 30 秒没给出地址"));
+      reject(new Error(voiceWording().tunnel.timedOut));
     });
     // cloudflared says its address on either stream; both are read until it exits, so it never blocks on a write.
     const read = (b: Buffer) => {
@@ -360,15 +337,11 @@ function cloudflared(port: number): Promise<{ url: string; close: () => void }> 
     child.stderr?.on("data", read);
     child.on("error", (e) => {
       cancel();
-      reject(
-        (e as NodeJS.ErrnoException).code === "ENOENT"
-          ? new Error("没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道")
-          : e,
-      );
+      reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error(voiceWording().tunnel.missing) : e);
     });
     child.on("exit", () => {
       cancel();
-      reject(new Error("cloudflared 退出了，没给出地址"));
+      reject(new Error(voiceWording().tunnel.exited));
     });
   });
 }
@@ -417,7 +390,7 @@ export const make = (options: VoiceOptions = {}) =>
     // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
-      return c ? Effect.succeed(c) : Effect.fail(unavailable("还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate", "agora"));
+      return c ? Effect.succeed(c) : Effect.fail(unavailable(voiceWording().noAgora, "agora"));
     };
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.
@@ -430,7 +403,7 @@ export const make = (options: VoiceOptions = {}) =>
     let closing: (() => void) | undefined;
     const answer = chatCompletions({
       answerer: orchestrator.answerer("phone"),
-      misheard: lineMisheard,
+      misheard: voiceWording().misheard,
       log: (l) => logs.info(l),
       now: () => clock.currentTimeMillisUnsafe(),
     });
@@ -486,7 +459,7 @@ export const make = (options: VoiceOptions = {}) =>
             });
           });
           s.once("error", (e) => {
-            lineProblem = "语音线路开不起来：" + e.message;
+            lineProblem = voiceWording().lineDown(e.message);
             logs.error(`vibevalley: the voice line cannot listen on 127.0.0.1:${linePort}:`, e.message);
             resolve();
           });
@@ -523,7 +496,7 @@ export const make = (options: VoiceOptions = {}) =>
           .then((t) => {
             if (stopped) {
               t.close();
-              throw new Error("语音线路已经关闭");
+              throw new Error(voiceWording().lineClosed);
             }
             tunnel = t;
             return t.url;
@@ -536,11 +509,11 @@ export const make = (options: VoiceOptions = {}) =>
       return tunnel.url;
     };
     const openLine = async (): Promise<CallLine> => {
-      if (stopped) throw new Error("语音线路已经关闭");
+      if (stopped) throw new Error(voiceWording().lineClosed);
       if (lineProblem) throw new Error(lineProblem);
-      if (!line) throw new Error("语音线路还没开");
+      if (!line) throw new Error(voiceWording().lineNotOpen);
       const url = await base();
-      if (stopped) throw new Error("语音线路已经关闭");
+      if (stopped) throw new Error(voiceWording().lineClosed);
       const id = randomBytes(8).toString("hex");
       const key = randomBytes(24).toString("base64url");
       keys.set(id, key);
@@ -560,7 +533,7 @@ export const make = (options: VoiceOptions = {}) =>
 
     const callOf = (agentId: string) => {
       const call = calls.get(agentId);
-      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed("这通电话已经挂了"));
+      return call && !call.ending ? Effect.succeed(call) : Effect.fail(failed(voiceWording().hungUp));
     };
 
     const liveCall = () => [...calls].find(([, c]) => !c.ending)?.[0];
@@ -667,9 +640,9 @@ export const make = (options: VoiceOptions = {}) =>
         const uid = newUid();
         const issued = yield* Effect.try({
           try: () => sign(c, channel, uid),
-          catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+          catch: (e) => unavailable(voiceWording().noToken(message(e))),
         });
-        if (stopped) return yield* Effect.fail(unavailable("语音服务已经停下"));
+        if (stopped) return yield* Effect.fail(unavailable(voiceWording().stopped));
         prune();
         grants.set(keyOf(channel, uid), {
           credentials: c,
@@ -682,10 +655,10 @@ export const make = (options: VoiceOptions = {}) =>
       renew: Effect.fn("Voice.renew")(function* (channel, uid) {
         prune();
         const g = grants.get(keyOf(channel, uid));
-        if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
+        if (!g) return yield* Effect.fail(unavailable(voiceWording().grantGone));
         const issued = yield* Effect.try({
           try: () => sign(g.credentials, channel, uid),
-          catch: (e) => unavailable("签不出语音令牌：" + message(e)),
+          catch: (e) => unavailable(voiceWording().noToken(message(e))),
         });
         g.expires = now() + tokenSeconds * 1000;
         return issued;
@@ -694,8 +667,8 @@ export const make = (options: VoiceOptions = {}) =>
         prune();
         const key = keyOf(channel, uid);
         const g = grants.get(key);
-        if (!g) return yield* Effect.fail(unavailable("这通电话的语音凭据已经失效，请重新接通"));
-        if (g.starting || g.agent) return yield* Effect.fail(unavailable("这通电话已经在接通"));
+        if (!g) return yield* Effect.fail(unavailable(voiceWording().grantGone));
+        if (g.starting || g.agent) return yield* Effect.fail(unavailable(voiceWording().connecting));
         g.starting = true;
         let release = () => {};
         let callLine: CallLine | undefined;
@@ -709,7 +682,7 @@ export const make = (options: VoiceOptions = {}) =>
             openingLine = openLine();
             callLine = yield* Effect.tryPromise({
               try: () => openingLine!,
-              catch: (e) => unavailable("管家的语音线路接不通：" + message(e)),
+              catch: (e) => unavailable(voiceWording().lineFailed(message(e))),
             });
             const opened = callLine;
             let once = false;
@@ -736,9 +709,9 @@ export const make = (options: VoiceOptions = {}) =>
           starting = pending;
           const id = yield* Effect.tryPromise({
             try: () => pending,
-            catch: (e) => failed("请管家进频道失败：" + message(e)),
+            catch: (e) => failed(voiceWording().joinFailed(message(e))),
           });
-          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable("语音服务已经停下"));
+          if (stopped || grants.get(key) !== g) return yield* Effect.fail(unavailable(voiceWording().stopped));
           g.agent = id;
           g.starting = false;
           calls.set(id, {
@@ -801,7 +774,7 @@ export const make = (options: VoiceOptions = {}) =>
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: (e) => e,
-        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed("请管家离开失败：" + message(e))))));
+        }).pipe(Effect.catch((e) => (alreadyStopping(e) ? Effect.void : Effect.fail(failed(voiceWording().leaveFailed(message(e)))))));
         yield* Effect.ensuring(
           stopping,
           Effect.sync(() => call?.release()),
@@ -812,8 +785,8 @@ export const make = (options: VoiceOptions = {}) =>
       heardCurrent: (text, picked, sendKey) =>
         Effect.suspend(() => {
           const live = [...calls].filter(([, c]) => !c.ending);
-          if (live.length > 1) return Effect.fail(failed("有几通电话正在接通，请升级客户端后重试"));
-          if (live.length === 0) return Effect.fail(failed("没有正在接通的电话"));
+          if (live.length > 1) return Effect.fail(failed(voiceWording().manyCalls));
+          if (live.length === 0) return Effect.fail(failed(voiceWording().noCall));
           return heard(live[0]![0], text, picked, sendKey);
         }),
       // Only a call still on, that Agora's model answers: a late turn after hangup, or the orchestrator's words, are not kept twice.
@@ -823,24 +796,24 @@ export const make = (options: VoiceOptions = {}) =>
       }),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
-        if (!d) return yield* Effect.fail(unavailable("听写还没配：在「声音」页的「听写」里填地址和模型", "voice"));
+        if (!d) return yield* Effect.fail(unavailable(voiceWording().dictation.unset, "voice"));
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: `听写认不得 ${JSON.stringify(format)} 这种录音`,
+            reason: voiceWording().dictation.format(JSON.stringify(format)),
           });
         const audio = Buffer.from(audio64, "base64");
         if (audio.length === 0 || audio.toString("base64").replace(/=+$/, "") !== audio64.replace(/=+$/, "").replace(/\s/g, ""))
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: "录音是空的，或者不是 base64",
+            reason: voiceWording().dictation.empty,
           });
         if (audio.length > dictateMaxBytes)
           return yield* Effect.fail<ApiError>({
             _tag: "Refused",
-            reason: "录音太长了：一段不超过 25 MB",
+            reason: voiceWording().dictation.tooLong,
           });
         const form = new FormData();
         form.append("file", new Blob([audio], { type: kind }), `dictation.${format}`);
@@ -856,16 +829,16 @@ export const make = (options: VoiceOptions = {}) =>
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
               signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
-          catch: (e) => unavailable("听写的地址连不上：" + message(e), "voice"),
+          catch: (e) => unavailable(voiceWording().dictation.unreachable(message(e)), "voice"),
         });
         const raw = (yield* Effect.tryPromise({
           try: () => res.text(),
-          catch: (e) => unavailable("听写的回答读到一半断了：" + message(e), "voice"),
+          catch: (e) => unavailable(voiceWording().dictation.cut(message(e)), "voice"),
         })).slice(0, 1 << 20);
         const got = Schema.decodeUnknownOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;
-        if (!res.ok) return yield* Effect.fail(unavailable(`听写的地址回了 ${res.status}：${[...(detail || raw.trim())].slice(0, 200).join("")}`));
-        if (got._tag === "None") return yield* Effect.fail(unavailable("听写的地址回的不是 OpenAI 的转写格式"));
+        if (!res.ok) return yield* Effect.fail(unavailable(voiceWording().dictation.status(res.status, [...(detail || raw.trim())].slice(0, 200).join(""))));
+        if (got._tag === "None") return yield* Effect.fail(unavailable(voiceWording().dictation.shape));
         return { text: (got.value.text ?? "").trim() };
       }),
       lines: () => keys.size,

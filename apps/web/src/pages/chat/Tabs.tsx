@@ -1,3 +1,4 @@
+import { chatWording } from "./words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Conversation, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
@@ -19,7 +20,7 @@ export function Jobs(props: { channel: Conversation }) {
   const now = useNow();
   const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.kind === "general"));
   return (
-    <Show when={sessions().length > 0} fallback={<Empty icon="icon-tasks">这个频道里还没有活。在聊天里跟管家说一件要做的事，它会派帮工，活就列在这里。</Empty>}>
+    <Show when={sessions().length > 0} fallback={<Empty icon="icon-tasks">{chatWording().jobs.empty}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={sessions()}>
           {(h) => {
@@ -44,7 +45,7 @@ export function Jobs(props: { channel: Conversation }) {
                 <Show when={thread()}>
                   {(t) => (
                     <Button icon="button-thread" onClick={() => router.navigate(chatPath(t()))}>
-                      工单串
+                      {chatWording().jobs.thread}
                     </Button>
                   )}
                 </Show>
@@ -61,10 +62,7 @@ export function Recurrences(props: { channel: Conversation }) {
   const core = useCore();
   const recurrences = () => (core()?.recurrences ?? []).filter((s) => s.channel === props.channel.id);
   return (
-    <Show
-      when={recurrences().length > 0}
-      fallback={<Empty icon="icon-clock">这个频道还没有定时。跟管家说「每天早上九点跑一遍测试」，它会定在这里；到点了频道里出现一条，再派活。</Empty>}
-    >
+    <Show when={recurrences().length > 0} fallback={<Empty icon="icon-clock">{chatWording().recurrences.empty}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
         <For each={recurrences()}>{(s) => <RecurrenceCard s={s} />}</For>
       </div>
@@ -90,12 +88,15 @@ function RecurrenceCard(props: { s: Recurrence }) {
   const meta = () =>
     [
       props.s.whenText ?? "",
-      props.s.pending ? (props.s.nextText ?? "") : `下次 ${props.s.nextText ?? ""}`,
-      ...(props.s.agent ? [`直接派 ${props.s.agent}`] : []),
-      ...(props.s.by === "orchestrator" ? ["管家定的"] : []),
+      props.s.pending ? (props.s.nextText ?? "") : chatWording().recurrences.next(props.s.nextText ?? ""),
+      ...(props.s.agent ? [chatWording().recurrences.direct(props.s.agent)] : []),
+      ...(props.s.by === "orchestrator" ? [chatWording().recurrences.byOrchestrator] : []),
     ].join(" · ");
   return (
-    <div class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]} aria-label={`定时「${props.s.name}」`}>
+    <div
+      class={[card, "flex items-start gap-3", { "opacity-60": !(props.s.enabled || props.s.pending) }]}
+      aria-label={chatWording().recurrences.label(props.s.name)}
+    >
       <Icon name="icon-clock" size={20} class="mt-0.5" />
       <div class="flex min-w-0 flex-1 flex-col">
         <span class="text-sm">
@@ -112,25 +113,32 @@ function RecurrenceCard(props: { s: Recurrence }) {
         fallback={
           <div class="flex gap-2">
             <Button tone={props.s.enabled ? "primary" : "plain"} onClick={() => void setEnabled(!props.s.enabled)}>
-              {props.s.enabled ? "开着" : "关着"}
+              {props.s.enabled ? chatWording().recurrences.on : chatWording().recurrences.off}
             </Button>
             <Show
               when={deleting()}
-              fallback={<Button icon="button-delete" title="删掉" aria-label={`删掉定时「${props.s.name}」`} onClick={() => setDeleting(true)} />}
+              fallback={
+                <Button
+                  icon="button-delete"
+                  title={chatWording().recurrences.remove}
+                  aria-label={chatWording().recurrences.removeWhich(props.s.name)}
+                  onClick={() => setDeleting(true)}
+                />
+              }
             >
               <Button tone="danger" onPointerDown={(e) => e.stopPropagation()} onClick={() => void remove()}>
-                确定删？
+                {chatWording().recurrences.sure}
               </Button>
             </Show>
           </div>
         }
       >
         <div class="flex gap-2">
-          <Button tone="primary" icon="mark-check" aria-label={`同意定时「${props.s.name}」`} onClick={() => void setEnabled(true)}>
-            同意
+          <Button tone="primary" icon="mark-check" aria-label={chatWording().recurrences.approveWhich(props.s.name)} onClick={() => void setEnabled(true)}>
+            {chatWording().recurrences.approve}
           </Button>
-          <Button icon="mark-cross" aria-label={`不要定时「${props.s.name}」`} onClick={() => void remove()}>
-            不要
+          <Button icon="mark-cross" aria-label={chatWording().recurrences.refuseWhich(props.s.name)} onClick={() => void remove()}>
+            {chatWording().recurrences.refuse}
           </Button>
         </div>
       </Show>

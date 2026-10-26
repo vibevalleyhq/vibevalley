@@ -1,3 +1,4 @@
+import { issuesWording } from "./words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { maxRunning } from "@vibevalley/protocol";
@@ -44,8 +45,8 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
       value={text()}
       onInput={(e) => setText(e.currentTarget.value)}
       onKeyDown={submit}
-      placeholder="＋ 写一张，回车存下"
-      aria-label="写一张待办"
+      placeholder={issuesWording().board.add}
+      aria-label={issuesWording().board.addLabel}
       class="h-8 w-full rounded-md border border-dashed border-line bg-page/70 px-2.5 text-sm outline-none placeholder:text-faint hover:border-faint focus:border-solid focus:border-focus focus:bg-page"
     />
   );
@@ -55,16 +56,16 @@ export function QuickAdd(props: { onAdd: (text: string) => void; ref?: (el: HTML
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
     <button type="button" onClick={() => props.onClick()} class="mx-auto block cursor-pointer py-1 text-sm text-water hover:underline">
-      {props.hidden > 0 ? `更早的 ${props.hidden} 张` : "只看最近的"}
+      {props.hidden > 0 ? issuesWording().board.earlier(props.hidden) : issuesWording().board.recent}
     </button>
   );
 }
 
 const emptyText: Record<Lane, string> = {
-  todo: "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
-  working: "没有在干的活。",
-  waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-  closed: "已完成、已取消的工单；拖回「处理中」重开。",
+  todo: issuesWording().board.empty.todo,
+  working: issuesWording().board.empty.working,
+  waiting: issuesWording().board.empty.waiting,
+  closed: issuesWording().board.empty.closed,
 };
 
 export interface BoardProps {
@@ -93,7 +94,7 @@ export function IssueBoard(props: BoardProps) {
     <div class="@container flex min-h-0 flex-1 flex-col px-3 pb-3">
       <div class="mb-2 @min-[700px]:hidden">
         <Segmented
-          label="看哪一列"
+          label={issuesWording().board.whichLane}
           block
           value={lane()}
           onChange={setLane}
@@ -135,7 +136,8 @@ function LaneView(props: {
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
   const accepts = (c: BoardCard | null) => c !== null && (cardMove(c, props.lane) !== undefined || (props.lane === "todo" && c.kind === "todo"));
-  const head = () => (props.lane === "working" ? `${props.cards.filter((c) => c.kind === "issue").length} / ${maxRunning} 个空位` : `${props.cards.length}`);
+  const head = () =>
+    props.lane === "working" ? issuesWording().board.spots(props.cards.filter((c) => c.kind === "issue").length, maxRunning) : `${props.cards.length}`;
   return (
     <section
       aria-label={laneLabel[props.lane]}
@@ -166,8 +168,8 @@ function LaneView(props: {
         <span class="text-xs text-muted">{head()}</span>
         <Show when={props.lane === "todo"}>
           <span class="ml-auto flex">
-            <IconButton icon="button-add" label="写一张" onClick={props.focusAdd} />
-            <IconButton icon="button-edit" label="详细写一张" onClick={p().onWrite} />
+            <IconButton icon="button-add" label={issuesWording().board.write} onClick={props.focusAdd} />
+            <IconButton icon="button-edit" label={issuesWording().board.writeFull} onClick={p().onWrite} />
           </span>
         </Show>
       </header>
@@ -199,7 +201,7 @@ function LaneView(props: {
           }
         >
           <Match when={p().loading}>
-            <p class="px-1 text-xs text-faint">在读……</p>
+            <p class="px-1 text-xs text-faint">{issuesWording().reading}</p>
           </Match>
           <Match when={props.cards.length === 0}>
             <p class="px-1 text-xs leading-relaxed text-faint">{emptyText[props.lane]}</p>

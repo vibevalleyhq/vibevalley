@@ -2,6 +2,7 @@
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
 
+import { recurrenceWording } from "./words.ts";
 import type { Preview, Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
 import type { Actor } from "../base/actor.ts";
 import * as S from "@vibevalley/protocol/schema";
@@ -90,7 +91,7 @@ export const make = Effect.gen(function* () {
 
   const find = (id: string) => {
     const s = (core.state().recurrences ?? []).find((x) => x.id === id);
-    return s ? Effect.succeed(s) : Effect.fail(missing(`没有 ${id} 号定时`, [lookIn.recurrence]));
+    return s ? Effect.succeed(s) : Effect.fail(missing(recurrenceWording().noRecurrence(id), [lookIn.recurrence]));
   };
 
   const ran = (id: string, at: number, enabled: boolean) => db(q.recurrenceRan({ last_run: at, enabled, id }));
@@ -124,13 +125,13 @@ export const make = Effect.gen(function* () {
       if (problem) return yield* Effect.fail(refused(problem));
       const want = req.channel ?? chat.general();
       const channel = (yield* chat.channels()).find((c) => c.id === want);
-      if (!channel) return yield* Effect.fail(refused(`没有 ${want} 这个频道`, [lookIn.channel]));
+      if (!channel) return yield* Effect.fail(refused(recurrenceWording().noChannel(want), [lookIn.channel]));
       const named = (req.agent ?? "").trim();
       const agents = store.agents();
       const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-      if (named && !agent) return yield* Effect.fail(refused(`没有叫 ${req.agent} 的帮工档案`, [lookIn.agent]));
+      if (named && !agent) return yield* Effect.fail(refused(recurrenceWording().noProfile(req.agent ?? ""), [lookIn.agent]));
       const project = (req.project ?? "").trim();
-      if (agent && !project && !channel.project) return yield* Effect.fail(refused(`#${channel.name} 没有默认项目：直接派给帮工的定时要写 project`));
+      if (agent && !project && !channel.project) return yield* Effect.fail(refused(recurrenceWording().noProject(channel.name)));
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by);
       const s: Recurrence = {
@@ -188,7 +189,7 @@ export const make = Effect.gen(function* () {
     }, lock.withPermits(1)),
     previewRemove: (id) =>
       Effect.map(find(id), (was) => ({
-        does: [`删掉定时「${was.name}」${was.whenText ? `（${was.whenText}）` : ""}：以后不再到点开工，它开过的工单留着`],
+        does: [recurrenceWording().remove(was.name, was.whenText ?? "")],
       })),
     tick,
     due: Effect.map(PubSub.subscribe(dueHub), Stream.fromSubscription),

@@ -1,6 +1,7 @@
 // The profiles work is sent to, the skills and each runtime's settings: config.json in
 // the home. The orchestrator is a profile every farm has, built in, never deleted, on VibeValley's own agent.
 
+import { agentWording } from "./words.ts";
 import { join } from "node:path";
 import { type Agent, orchestratorAgent, type Preview, type RuntimeSettings, type Skill, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -49,8 +50,8 @@ export const orchestratorRuntime = "vibevalley";
 
 const orchestratorProfile = (): Agent => ({
   id: orchestratorAgent,
-  name: "管家",
-  role: "替主人派活、转告结果",
+  name: agentWording().orchestrator.name,
+  role: agentWording().orchestrator.role,
   enabled: true,
   runtime: orchestratorRuntime,
   model: "",
@@ -135,7 +136,7 @@ export const make = Effect.gen(function* () {
         disk.write(() => JSON.stringify(next));
         s = next;
       },
-      catch: (e) => refused(`没存下来：${file} 写不进去（${e instanceof Error ? e.message : String(e)}）`),
+      catch: (e) => refused(agentWording().notSaved(file, e instanceof Error ? e.message : String(e))),
     });
 
   const all = () => structuredClone([...s.agents]);
@@ -144,13 +145,13 @@ export const make = Effect.gen(function* () {
 
   // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
   const deletableAgent = (id: string) => {
-    if (id === orchestratorAgent) return Effect.fail(refused("管家删不了：每个工作区都有一个"));
+    if (id === orchestratorAgent) return Effect.fail(refused(agentWording().orchestratorStays));
     const a = s.agents.find((x) => x.id === id);
-    return a ? Effect.succeed(a) : Effect.fail(missing(`没有 ${id} 这个档案`, [lookIn.agent]));
+    return a ? Effect.succeed(a) : Effect.fail(missing(agentWording().noAgent(id), [lookIn.agent]));
   };
   const deletableSkill = (id: string) => {
     const k = s.skills.find((x) => x.id === id);
-    return k ? Effect.succeed(k) : Effect.fail(missing(`没有 ${id} 这个技能`, [lookIn.skill]));
+    return k ? Effect.succeed(k) : Effect.fail(missing(agentWording().noSkill(id), [lookIn.skill]));
   };
 
   const shape: AgentShape = {
@@ -165,13 +166,13 @@ export const make = Effect.gen(function* () {
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     saveAgent: Effect.fn("Agents.saveAgent")(function* (a) {
       if (a.id === orchestratorAgent && a.runtime !== orchestratorRuntime)
-        return yield* Effect.fail(refused("管家只在 VibeValley 自己的 agent 上跑：农机留着 " + orchestratorRuntime));
+        return yield* Effect.fail(refused(agentWording().orchestratorRuntime(orchestratorRuntime)));
       const cast = withCast(a);
       yield* change((x) => ({ ...x, agents: upsert(x.agents, cast) }));
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新档案的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* Effect.fail(refused(agentWording().newAgentId));
       let n = 1;
       while (s.agents.some((a) => a.id === `agent-${n}`)) n++;
       const created = withCast({ ...draft, id: `agent-${n}` });
@@ -185,7 +186,7 @@ export const make = Effect.gen(function* () {
       ),
     previewDeleteAgent: (id) =>
       Effect.map(deletableAgent(id), (a) => ({
-        does: [`删掉档案「${a.name}」（${a.id}，跑在 ${a.runtime} 上）：已经派给它的工单不跟着改`],
+        does: [agentWording().deleteAgent(a.name, a.id, a.runtime)],
       })),
     saveSkill: (skill) =>
       Effect.as(
@@ -193,7 +194,7 @@ export const make = Effect.gen(function* () {
         skill,
       ),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused("新技能的 id 要留空；指定 id 请用保存"));
+      if (draft.id) return yield* Effect.fail(refused(agentWording().newSkillId));
       const stem =
         draft.name
           .toLowerCase()
@@ -216,9 +217,9 @@ export const make = Effect.gen(function* () {
       ),
     previewDeleteSkill: (id) =>
       Effect.map(deletableSkill(id), (k) => {
-        const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => `「${a.name}」`);
+        const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
-          does: [`删掉技能「${k.name}」`, ...(holders.length > 0 ? [`从 ${holders.join("、")} 的档案里摘掉它`] : [])],
+          does: [agentWording().deleteSkill(k.name), ...(holders.length > 0 ? [agentWording().unequip(holders)] : [])],
         };
       }),
     saveSettings: (runtime, settings) =>
@@ -231,8 +232,3 @@ export const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(Agents, make);
-
-/** A profile's role and the work it suits, in words: 「职责：…；适合的活：…」, without a half that is not filled in. 适合的活
- * is its tags, which chooseAgent matches and the prompts tell a model to pick by. */
-export const traitsOf = (a: Agent) =>
-  [...(a.role ? ["职责：" + a.role] : []), ...((a.tags ?? []).length > 0 ? ["适合的活：" + a.tags.join("、")] : [])].join("；");

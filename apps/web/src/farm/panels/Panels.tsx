@@ -2,6 +2,7 @@
 // forms, a panel (shop, warehouse, tasks, log, the orchestrator's looks, the task board) and the Esc menu. A plot's issue
 // (inspect) is IssueView's. Each is a farm dialog: Esc or the backdrop closes it.
 
+import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
@@ -21,12 +22,12 @@ import { tint } from "./bits";
 import { setOrchestratorLook, setPet, usePrefs } from "../../data/prefs";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
-  shop: ["商店", "icon-shop", "sm"],
-  warehouse: ["仓库", "icon-crate", "lg"],
-  graphs: ["任务与成就", "icon-tasks", "lg"],
-  log: ["农场日志", "icon-log", "lg"],
-  orchestrator: ["管家和宠物", "manager-face", "wide"],
-  taskBoard: ["种植计划", "machine-seeder", "lg"],
+  shop: [farmWording().panel.shop, "icon-shop", "sm"],
+  warehouse: [farmWording().panel.warehouse, "icon-crate", "lg"],
+  graphs: [farmWording().panel.graphs, "icon-tasks", "lg"],
+  log: [farmWording().panel.log, "icon-log", "lg"],
+  orchestrator: [farmWording().panel.orchestrator, "manager-face", "wide"],
+  taskBoard: [farmWording().panel.taskBoard, "machine-seeder", "lg"],
 };
 
 /** Each layer is drawn by its kind; one of a kind replaced by another (another plot, another panel) is built anew. */
@@ -61,21 +62,21 @@ function Layer(props: { o: FarmOverlay }) {
     <Switch>
       <Match when={props.o.kind === "review" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={`收获${s().name}的地`} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
+          <FarmDialog title={farmWording().panel.harvest(s().name)} icon="icon-harvest" size="lg" onClose={() => farm.review(null)}>
             <Keyed key={s().id}>{() => <HarvestReview session={s()} onDone={() => farm.review(null)} />}</Keyed>
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "sow" ? props.o : undefined}>
         {(o) => (
-          <FarmDialog title={`播种 · 第 ${o().station + 1} 块地`} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
+          <FarmDialog title={farmWording().panel.sow(o().station + 1)} icon="icon-seeds" size="lg" onClose={() => farm.sow(null)}>
             <SowForm station={o().station} onDone={() => farm.sow(null)} />
           </FarmDialog>
         )}
       </Match>
       <Match when={props.o.kind === "water" ? byId((props.o as { sessionId: string }).sessionId) : undefined}>
         {(s) => (
-          <FarmDialog title={`给${s().name}浇水`} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
+          <FarmDialog title={farmWording().panel.water(s().name)} icon="icon-water" size="sm" onClose={() => farm.water(null)}>
             <WaterForm session={s()} onDone={() => farm.water(null)} />
           </FarmDialog>
         )}
@@ -104,7 +105,7 @@ function Layer(props: { o: FarmOverlay }) {
         )}
       </Match>
       <Match when={props.o.kind === "menu"}>
-        <FarmDialog title="菜单" icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
+        <FarmDialog title={farmWording().panel.menu} icon="icon-wrench" size="md" onClose={() => farm.menu(false)}>
           <Menu />
         </FarmDialog>
       </Match>
@@ -140,7 +141,7 @@ function OrchestratorLooks() {
   const has = (name: string) => loaded().village?.atlas.has(name) ?? false;
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-900">挑一个你喜欢的管家，农场和对话里马上换上。</p>
+      <p class="text-[13px] text-bark-900">{farmWording().panel.pickLook}</p>
       <div class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <For each={orchestratorLooks}>
           {(look) => (
@@ -151,12 +152,12 @@ function OrchestratorLooks() {
                 </Show>
               </span>
               <span class="mt-1.5 text-[13px]">{look.name}</span>
-              <span class="text-center text-[12px] text-bark-600">{lookReady(look.id, has) ? look.blurb : "还在画……"}</span>
+              <span class="text-center text-[12px] text-bark-600">{lookReady(look.id, has) ? look.blurb : farmWording().panel.drawing}</span>
             </Tile>
           )}
         </For>
       </div>
-      <p class="mt-2 text-[13px]">宠物</p>
+      <p class="mt-2 text-[13px]">{farmWording().panel.pets}</p>
       <div class="mt-2 flex gap-2.5">
         <For each={pets}>
           {(p) => (
@@ -169,7 +170,7 @@ function OrchestratorLooks() {
                 </span>
                 <span class="mt-1.5 text-[13px]">{petName[p]}</span>
                 <Show when={!has(`${p}-awake`)}>
-                  <span class="text-[12px] text-bark-600">还在画……</span>
+                  <span class="text-[12px] text-bark-600">{farmWording().panel.drawing}</span>
                 </Show>
               </Tile>
             </div>
@@ -181,17 +182,17 @@ function OrchestratorLooks() {
 }
 
 const shop = [
-  { name: "稻草人", price: 200, icon: "icon-scarecrow", note: "吓跑乌鸦，好看" },
-  { name: "新种子包", price: 300, icon: "icon-seeds", note: "常用工单模板" },
-  { name: "彩旗", price: 400, icon: "icon-bunting", note: "挂在篱笆上" },
-  { name: "狗窝", price: 600, icon: "icon-doghouse", note: "给管家的狗" },
+  { ...farmWording().panel.shopItems.scarecrow, price: 200, icon: "icon-scarecrow" },
+  { ...farmWording().panel.shopItems.seeds, price: 300, icon: "icon-seeds" },
+  { ...farmWording().panel.shopItems.bunting, price: 400, icon: "icon-bunting" },
+  { ...farmWording().panel.shopItems.doghouse, price: 600, icon: "icon-doghouse" },
 ];
 
 function Shop() {
   const core = useCore();
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-800">商店还在装修，下一版开张。现在有 {Math.round(core()?.progress?.coins ?? 0)} 金币，先攒着。</p>
+      <p class="text-[13px] text-bark-800">{farmWording().panel.shopClosed(Math.round(core()?.progress?.coins ?? 0))}</p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <For each={shop}>
           {(item) => (

@@ -91,6 +91,13 @@
         <span class="words">叫醒农场……</span>
       </div>
     </div>
+    <script>
+      // English when the served page (data-locale) or the desktop app (?locale=) says so; Chinese is the default.
+      if ((document.documentElement.dataset.locale ?? new URLSearchParams(location.search).get("locale")) === "en") {
+        document.querySelector("#opening .bar").setAttribute("aria-label", "Waking the farm");
+        document.querySelector("#opening .words").textContent = "Waking the farm…";
+      }
+    </script>
     <!-- /opening -->
     <script>
       // The desktop app comes back here with ?problem= when the server could not start: it says why in place of the bar.
@@ -99,7 +106,8 @@
         document.querySelector("#opening .bar").remove();
         const words = document.querySelector("#opening .words");
         words.className = "problem";
-        words.textContent = "农场起不来：" + problem;
+        const en = new URLSearchParams(location.search).get("locale") === "en";
+        words.textContent = (en ? "The farm cannot start: " : "农场起不来：") + problem;
       }
     </script>
   </body>

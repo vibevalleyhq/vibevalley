@@ -21,7 +21,7 @@ import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibeval
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
-import { graphText } from "../task/rules.ts";
+import { graphText } from "../task/prompts.ts";
 import { inboxLines } from "../channel/rules.ts";
 import { Clock, Context, Data, Effect, FiberSet, Layer, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
@@ -51,7 +51,7 @@ import {
   sessionLine,
   statusOf,
   tail,
-} from "./words.ts";
+} from "./prompts.ts";
 import { parameters, schemas, sessionParameters, sessionSchemas } from "./schemas.ts";
 
 /** A tool's arguments as its Schema reads them. */

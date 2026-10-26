@@ -2,6 +2,7 @@
 // through their tools, all down the same pipeline. One batch at a time for every document: a document's batches are
 // serial and its seq goes up in order.
 
+import { docWording } from "./words.ts";
 import type { Agent, Block, BlockAttrs, BlockInput, DocAck, DocOpResult, DocSnapshot, DocSpan, DocSubmit, Document } from "@vibevalley/protocol";
 import { Clock, Context, Effect, Layer, Option, Schema, Semaphore } from "effect";
 import { SqlClient } from "effect/sql";
@@ -12,7 +13,7 @@ import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { ordered, Page, wire } from "./ops.ts";
 import { unmarked } from "./text.ts";
-import { demoJitter, demoPieces, demoScript } from "./demo.ts";
+import { demoJitter, demoPieces } from "./demo.ts";
 import * as qb from "../../db/generated/doc_block.sql.ts";
 import * as qr from "../../db/generated/doc_block_revision.sql.ts";
 import * as qc from "../../db/generated/doc_change.sql.ts";
@@ -56,9 +57,9 @@ export interface DocShape {
 
 export class Docs extends Context.Service<Docs, DocShape>()("vibevalley/Doc") {}
 
-const missingDoc = (id: string) => missing("文档 " + id, [lookIn.doc]);
+const missingDoc = (id: string) => missing(docWording().doc(id), [lookIn.doc]);
 
-const titleOf = (title: string) => title.trim() || "没起名的文档";
+const titleOf = (title: string) => title.trim() || docWording().untitled;
 
 const document = (d: qd.DocResult): Document => ({ id: d.id, title: d.title, seq: d.seq, created: d.created_at, updated: d.updated_at });
 
@@ -112,7 +113,7 @@ export const make = (options: DocOptions = {}) =>
 
     /** A batch already taken: its results then, its blocks now. */
     const again = Effect.fn("Docs.again")(function* (doc: string, seen: qc.DocChangeByBatchResult) {
-      if (seen.doc_id !== doc) return yield* Effect.fail(refused("这批改动（" + seen.batch_id + "）是另一篇文档的"));
+      if (seen.doc_id !== doc) return yield* Effect.fail(refused(docWording().otherDoc(seen.batch_id)));
       const ids = idsOf(seen.block_ids);
       const all = yield* blocksOf(doc);
       return {
@@ -125,7 +126,7 @@ export const make = (options: DocOptions = {}) =>
 
     /** One batch, under the lock the caller holds. */
     const submitLocked = (id: string, actor: string, body: Pick<DocSubmit, "batchId" | "ops">): Effect.Effect<DocAck, ApiError> => {
-      if (!body.batchId?.trim()) return Effect.fail(refused("这批改动没有 batchId"));
+      if (!body.batchId?.trim()) return Effect.fail(refused(docWording().noBatch));
       return sql
         .withTransaction(
           Effect.gen(function* () {
@@ -263,13 +264,13 @@ export const make = (options: DocOptions = {}) =>
       const block = { ...b, orderKey: yield* keyOrRefuse(after, before) };
       const ack = yield* submitLocked(doc, writer, { batchId: newId(), ops: [{ op: "insert_block", block }] });
       const r = ack.results[0];
-      if (r?.status !== "applied") return yield* Effect.fail(refused("演示的块没插进去：" + r?.status));
+      if (r?.status !== "applied") return yield* Effect.fail(refused(docWording().demoNotInserted(String(r?.status))));
       return blockIn(ack, b.id)!.rev;
     }, lock.withPermits(1));
 
     /** One writer: each paragraph of its section, inserted empty at the section's end, then grown a piece a tick. */
     const demoWrite = Effect.fn("Docs.demoWrite")(function* (doc: string, writer: string, headings: string[], section: number) {
-      for (const text of demoScript[section]!.paragraphs) {
+      for (const text of docWording().demo[section]!.paragraphs) {
         const b = { id: newId(), type: "paragraph", attrs: {}, text: [] };
         let rev = yield* demoInsert(doc, writer, b, { headings, section });
         const chars = Array.from(text);
@@ -288,7 +289,7 @@ export const make = (options: DocOptions = {}) =>
       function* (doc: string, writers: string[]) {
         const headings: string[] = [];
         for (const [i, w] of writers.entries()) {
-          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", demoScript[i]!.heading) };
+          const b = { id: newId(), type: "heading", attrs: { level: 2 }, text: spansOf("heading", docWording().demo[i]!.heading) };
           yield* demoInsert(doc, w, b);
           headings.push(b.id);
           yield* wait(0.5);
@@ -302,10 +303,10 @@ export const make = (options: DocOptions = {}) =>
       if (Option.isNone(yield* findDoc(id))) return yield* Effect.fail(missingDoc(id));
       const writers = helpers
         .filter((a) => a.enabled)
-        .slice(0, demoScript.length)
+        .slice(0, docWording().demo.length)
         .map((a) => a.id);
-      if (writers.length === 0) return yield* Effect.fail(refused("没有能写的帮工：先在档案里打开一个", [lookIn.agent]));
-      if (demoOn) return yield* Effect.fail(refused("演示正在写，写完再点"));
+      if (writers.length === 0) return yield* Effect.fail(refused(docWording().noWriter, [lookIn.agent]));
+      if (demoOn) return yield* Effect.fail(refused(docWording().demoRunning));
       demoOn = true;
       // The demo lives as long as the service: stopping the farm stops it.
       yield* Effect.forkIn(runDemo(id, writers), scope);

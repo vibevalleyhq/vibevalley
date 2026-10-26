@@ -17,7 +17,7 @@ import { transcript } from "../agent/brain/messages.ts";
 import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
-import { agentPrompt, systemPrompt } from "./orchestrator.ts";
+import { agentPrompt, systemPrompt } from "./prompts.ts";
 import { wallTime } from "../base/time.ts";
 import { plainLog } from "../base/log.ts";
 

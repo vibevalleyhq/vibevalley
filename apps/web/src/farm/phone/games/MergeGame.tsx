@@ -2,6 +2,7 @@
 // 12×12 picture. The field is kept while the phone is away or a call comes in. Arrows (or a swipe on the field) slide,
 // B takes one slide back, A starts, goes on after 丰收, and asks before starting over.
 
+import { phoneWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 import { lcd } from "../lcd";
@@ -277,28 +278,32 @@ export function MergeGame() {
   const overlay = () => {
     const now = g();
     return !now
-      ? ["种田 2048", "按 A 开始"]
+      ? [phoneWording().game.merge, phoneWording().merge.start]
       : asking()
-        ? ["重新种这块地？", "A 重开 · B 接着种"]
+        ? [phoneWording().merge.restartAsk, phoneWording().merge.restartKeys]
         : cheer()
-          ? ["丰收了！", "按 A 接着种"]
+          ? [phoneWording().merge.harvest, phoneWording().merge.goOn]
           : now.over
-            ? [`地种满了 · ${score()} 分`, "按 A 再来 · B 悔一步"]
+            ? [phoneWording().merge.full(score()), phoneWording().merge.overKeys]
             : null;
   };
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
       <div class="flex w-full px-1">
-        <span>种田 2048</span>
-        <span class="ml-auto tabular-nums">最好 {Math.max(top(), score())}</span>
+        <span>{phoneWording().game.merge}</span>
+        <span class="ml-auto tabular-nums">
+          {phoneWording().blocks.best} {Math.max(top(), score())}
+        </span>
       </div>
       <div class="flex w-full px-1">
-        <span class="tabular-nums">分数 {score()}</span>
-        <span class="ml-auto">{reached() ? `种到 ${mergeStageName(reached())}` : ""}</span>
+        <span class="tabular-nums">
+          {phoneWording().blocks.score} {score()}
+        </span>
+        <span class="ml-auto">{reached() ? phoneWording().merge.reached(mergeStageName(reached())) : ""}</span>
       </div>
       <div
         role="img"
-        aria-label={g() ? `田里：${board().filter((c) => c).length} 株，最高 ${mergeStageName(Math.max(reached(), 1))}` : "种田 2048"}
+        aria-label={g() ? phoneWording().merge.field(board().filter((c) => c).length, mergeStageName(Math.max(reached(), 1))) : phoneWording().game.merge}
         class="relative grid shrink-0 touch-none"
         style={{
           width: `${side}px`,
@@ -337,7 +342,7 @@ export function MergeGame() {
           )}
         </Show>
       </div>
-      <div class="flex gap-0.5" aria-label="收成图鉴">
+      <div class="flex gap-0.5" aria-label={phoneWording().merge.stages}>
         <For each={mergeStages}>
           {(name, i) => (
             <span title={name}>
@@ -347,8 +352,9 @@ export function MergeGame() {
         </For>
       </div>
       <p class="mt-auto mb-1 text-center leading-[1.625]" style={{ color: lcd.dark }}>
-        方向键或划一下：一样的两株长成下一样
-        <br />B 悔一步 · A 重开
+        {phoneWording().merge.help}
+        <br />
+        {phoneWording().merge.help2}
       </p>
     </div>
   );

@@ -1,10 +1,14 @@
 // The owner's settings: settings.json in the home, readable by the owner only
 // (0600). A key saved here wins over the configuration's. Keys are read each time they are used, so one saved is used at
-// once; a page sees only where each comes from and its last characters; keys are never logged.
+// once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
+// process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
+import { settingWording } from "./words.ts";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Check, Dictation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Check, Dictation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
+import { setLocale } from "@vibevalley/protocol/words";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 import { Settings } from "../base/config.ts";
@@ -25,6 +29,7 @@ type MemorySourceConfig = typeof MemorySourceConfig.Type;
 
 /** settings.json, in the order the file has it. */
 const Stored = Schema.Struct({
+  locale: Schema.optionalKey(S.Locale),
   deepseekApiKey: Schema.optionalKey(Schema.String),
   agoraAppId: Schema.optionalKey(Schema.String),
   agoraAppCertificate: Schema.optionalKey(Schema.String),
@@ -81,6 +86,15 @@ export class Setting extends Context.Service<Setting, SettingShape>()("vibevalle
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
 
+/** The locale saved in a home's settings.json, for a process that does not run the farm (the command line). */
+export function savedLocale(home: string): Locale {
+  try {
+    return (JSON.parse(readFileSync(join(home, "settings.json"), "utf8")) as { locale?: unknown }).locale === "en" ? "en" : "zh";
+  } catch {
+    return "zh";
+  }
+}
+
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
 
@@ -90,16 +104,18 @@ export const make = Effect.gen(function* () {
   const disk = new FileWriter(file, 0o600);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
   // 恢复默认 goes back to these.
-  let defaults = defaultVoice();
-  if (config.voice.id) {
-    const tts = defaultVoice().tts;
-    defaults = { ...defaults, tts: { vendor: "minimax", model: tts.vendor === "minimax" ? tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
-  }
+  // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
+  const defaults = (): VoiceSettings => {
+    const base = defaultVoice();
+    if (!config.voice.id) return base;
+    return { ...base, tts: { vendor: "minimax", model: base.tts.vendor === "minimax" ? base.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
+  };
   let stored: Stored = (yield* readOrSetAside(file, jsonOf(Stored), "the settings start empty")) ?? {};
+  setLocale(stored.locale ?? "zh");
 
   const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
     saved ? [saved, "settings"] : given ? [given, "config"] : undefined;
-  const voiceOf = (s: Stored) => (s.voice ? voiceSettingsOver(defaults, s.voice) : defaults);
+  const voiceOf = (s: Stored) => (s.voice ? voiceSettingsOver(defaults(), s.voice) : defaults());
 
   const status = (): SettingsStatus => {
     const s = stored;
@@ -108,11 +124,12 @@ export const make = Effect.gen(function* () {
     const certificate = pick(s.agoraAppCertificate, fromConfig.certificate);
     return {
       file,
+      locale: s.locale ?? "zh",
       deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : {},
       agoraAppId: appId ? { source: appId[1], value: appId[0] } : {},
       agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : {},
       voice: voiceOf(s),
-      voiceDefaults: defaults,
+      voiceDefaults: defaults(),
       asrKey: secret(s.asrKey, "settings"),
       llmKey: secret(s.llmKey, "settings"),
       ttsKey: secret(s.ttsKey, "settings"),
@@ -136,21 +153,23 @@ export const make = Effect.gen(function* () {
       const given = u[key];
       if (given !== undefined) next[key] = given.trim();
     }
+    if (u.locale) next.locale = u.locale === "zh" ? undefined : u.locale;
     if (u.dictation) {
       const d = { url: u.dictation.url.trim().replace(/\/+$/, ""), model: u.dictation.model.trim() };
       next.dictation = d.url === "" && d.model === "" ? undefined : d;
     }
     if (u.memorySources) next.memorySources = memorySourcesOver(stored.memorySources ?? [], u.memorySources);
-    if (u.voice) next.voice = voiceOverrides(defaults, voiceSettingsOver(defaults, u.voice));
+    if (u.voice) next.voice = voiceOverrides(defaults(), voiceSettingsOver(defaults(), u.voice));
     if (next.voice && Object.keys(next.voice).length === 0) next.voice = undefined;
     if (Array.isArray(next.memorySources) && next.memorySources.length === 0) next.memorySources = undefined;
     const kept = compact(next) as Stored;
     try {
       disk.write(() => JSON.stringify(kept, null, 2) + "\n");
     } catch (e) {
-      return yield* new SettingRefused({ message: `存不进 ${file}：${(e as Error).message}` });
+      return yield* new SettingRefused({ message: settingWording().notSaved(file, (e as Error).message) });
     }
     stored = kept;
+    setLocale(kept.locale ?? "zh");
     return status();
   });
 

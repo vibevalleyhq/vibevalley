@@ -38,7 +38,12 @@ describe("the island's glance", () => {
   });
 
   test("is empty when nothing is in flight; an issue at work with no helper (the orchestrator's) says so", () => {
-    expect(glanceOf(frame([issue(1, "done"), issue(2, "canceled")]), 0)).toEqual({ working: 0, waiting: 0, rows: [] });
+    expect(glanceOf(frame([issue(1, "done"), issue(2, "canceled")]), 0)).toEqual({
+      working: 0,
+      waiting: 0,
+      strip: { working: "没在干", waiting: "0 等你" },
+      rows: [],
+    });
     expect(glanceOf(frame([issue(9, "working")]), 0).rows).toEqual([{ issue: "i9", number: 9, title: "第 9 张", doing: "在做", tone: "working" }]);
   });
 });

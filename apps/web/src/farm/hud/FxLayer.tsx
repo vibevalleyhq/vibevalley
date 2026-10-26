@@ -1,6 +1,7 @@
 // The farm's effects over the page: a level-up banner, an achievement toast with its medal, and the server's notices
 // (the live stream) as toasts. Rewards and penalties are drawn on the plots (canvas fx.ts, Overlay.tsx).
 
+import { farmWording } from "../words";
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import type { GameEffect, GameEffectAchievement } from "@vibevalley/protocol";
 import { localEffects } from "../effects";
@@ -22,7 +23,7 @@ export function FxLayer() {
     if (f.kind === "levelUp") setBanner({ id: Date.now(), level: Math.round(f.level) });
     if (f.kind === "achievement")
       // The words are the server's (the effect carries them).
-      toasts.add({ type: ToastType.achievement, title: f.title, description: `${f.detail} · +${Math.round(f.coins)} 金币`, timeout: 5000, data: f });
+      toasts.add({ type: ToastType.achievement, title: f.title, description: farmWording().fx.coins(f.detail, Math.round(f.coins)), timeout: 5000, data: f });
   };
 
   createEffect(raw, (frame) => {
@@ -40,7 +41,7 @@ export function FxLayer() {
   onSettled(() =>
     subscribeLive((e) => {
       if (e.type !== "notice") return;
-      toasts.add({ type: e.level, title: noticeTitle[e.level] ?? "提示", description: e.text, timeout: e.level === "error" ? 7000 : 4500 });
+      toasts.add({ type: e.level, title: noticeTitle[e.level] ?? farmWording().fx.notice, description: e.text, timeout: e.level === "error" ? 7000 : 4500 });
     }),
   );
 
@@ -59,7 +60,7 @@ export function FxLayer() {
       />
       <Show when={banner()} keyed>
         {(b) => (
-          <div class="pointer-events-none absolute inset-x-0 top-24 flex justify-center" role="status" aria-label={`农场升到 Lv.${b.level}`}>
+          <div class="pointer-events-none absolute inset-x-0 top-24 flex justify-center" role="status" aria-label={farmWording().fx.levelUp(b.level)}>
             <div class="flex flex-col items-center bg-cream-50 px-7 pt-0 pb-4 shadow-px motion-safe:animate-[level-up_3.4s_cubic-bezier(0.2,0.9,0.2,1)_forwards]">
               <span class="flex h-5 w-14 items-end justify-center overflow-visible">
                 <Show when={loaded().village?.atlas.has("icon-star")}>
@@ -67,9 +68,9 @@ export function FxLayer() {
                 </Show>
               </span>
               <span class="mt-0.5 text-[12px] tracking-[0.3px] text-leaf-700">LEVEL UP</span>
-              <span class="text-[24px] text-bark-900">农场 Lv.{b.level}</span>
+              <span class="text-[24px] text-bark-900">{farmWording().fx.level(b.level)}</span>
               <Show when={clearingLevels.has(b.level)}>
-                <span class="mt-0.5 text-[12px] text-bark-600">开垦了一块新地</span>
+                <span class="mt-0.5 text-[12px] text-bark-600">{farmWording().fx.cleared}</span>
               </Show>
             </div>
           </div>

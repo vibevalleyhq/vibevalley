@@ -1,8 +1,9 @@
+import { issuesWording } from "./words";
+import { wording } from "@vibevalley/protocol/words";
 import { For, Match, Show, Switch } from "solid-js";
 import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/protocol";
 import type { BoardCard, Tone } from "../../rules/cards";
 import { cardAgent } from "../../rules/cards";
-import { priorityLabel, statusLabel } from "@vibevalley/protocol/rules";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { useAgent } from "../../data/agents";
 
@@ -24,7 +25,14 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
     return `M${c()},${c()} L${c()},${c() - pr} A${pr},${pr} 0 ${part() > 0.5 ? 1 : 0} 1 ${c() + pr * Math.cos(a)},${c() + pr * Math.sin(a)} Z`;
   };
   return (
-    <svg width={size()} height={size()} viewBox={`0 0 ${size()} ${size()}`} role="img" aria-label={props.label ?? statusLabel[props.status]} class="shrink-0">
+    <svg
+      width={size()}
+      height={size()}
+      viewBox={`0 0 ${size()} ${size()}`}
+      role="img"
+      aria-label={props.label ?? wording().status[props.status]}
+      class="shrink-0"
+    >
       <Switch
         fallback={
           <>
@@ -78,7 +86,7 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
 /** Bars that rise with the priority; urgent is a filled berry square with a bang, so it stands out on a busy lane. */
 export function PriorityMark(props: { priority: Priority; size?: number }) {
   const s = () => props.size ?? 14;
-  const label = () => `优先级：${priorityLabel[props.priority]}`;
+  const label = () => issuesWording().marks.priority(wording().priority[props.priority]);
   const lit = () => (props.priority === "high" ? 3 : props.priority === "medium" ? 2 : 1);
   const w = () => s() / 5;
   return (
@@ -136,8 +144,8 @@ export function NoFaceMark(props: { size?: number }) {
   const c = () => s() / 2;
   const r = () => s() / 2 - 1;
   return (
-    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label="还没选帮工" class="shrink-0">
-      <title>还没选帮工</title>
+    <svg width={s()} height={s()} viewBox={`0 0 ${s()} ${s()}`} role="img" aria-label={issuesWording().noHelper} class="shrink-0">
+      <title>{issuesWording().noHelper}</title>
       <circle
         cx={c()}
         cy={c()}

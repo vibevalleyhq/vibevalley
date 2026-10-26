@@ -1,6 +1,7 @@
 // 推箱子 on the phone: the rules are farm/phone/games/sokoban.ts; the warehouse is kept while the phone is away or a
 // call comes in.
 
+import { phoneWording } from "../words";
 import { For, Show } from "solid-js";
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 import { lcd } from "../lcd";
@@ -50,17 +51,13 @@ export function SokobanGame() {
   return (
     <div class="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
       <div class="flex justify-between">
-        <span>
-          推箱子 {g().level + 1}/{warehouses.length}
-        </span>
-        <span>
-          {g().moves} 步 · {g().pushes} 推
-        </span>
+        <span>{phoneWording().sokoban.title(g().level + 1, warehouses.length)}</span>
+        <span>{phoneWording().sokoban.moves(g().moves, g().pushes)}</span>
       </div>
       <p class="text-center">{level().name}</p>
       <svg
         role="img"
-        aria-label={`仓库棋盘，${placed()}/${g().boxes.length} 箱已归位`}
+        aria-label={phoneWording().sokoban.board(placed(), g().boxes.length)}
         viewBox={`0 0 ${width() * 16} ${level().rows.length * 16}`}
         class="mx-auto block w-full max-w-[224px]"
         shape-rendering="crispEdges"
@@ -95,7 +92,7 @@ export function SokobanGame() {
         </For>
       </svg>
       <p role="status" class="text-center">
-        {done() ? (last() ? "收成全部入仓！" : "这一仓收拾好了！") : "把木箱推到 ◆ 上"}
+        {done() ? (last() ? phoneWording().sokoban.allIn : phoneWording().sokoban.done) : phoneWording().sokoban.goal}
       </p>
       <div class="mt-auto flex justify-center gap-3">
         <button
@@ -105,7 +102,7 @@ export function SokobanGame() {
           class="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >
-          B 撤销
+          {phoneWording().sokoban.undo}
         </button>
         <button
           type="button"
@@ -113,11 +110,11 @@ export function SokobanGame() {
           class="cursor-pointer px-2 py-1"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >
-          A {done() ? (last() ? "再玩一轮" : "下一关") : "重开"}
+          A {done() ? (last() ? phoneWording().sokoban.again : phoneWording().sokoban.next) : phoneWording().sokoban.restart}
         </button>
       </div>
       <p class="text-center" style={{ color: lcd.dark }}>
-        方向键走动 · 箱子只能推
+        {phoneWording().sokoban.help}
       </p>
     </div>
   );

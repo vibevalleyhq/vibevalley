@@ -6,7 +6,8 @@
     ".": "./src/index.ts",
     "./rules": "./src/rules/index.ts",
     "./schema": "./src/schema.ts",
-    "./api": "./src/api.ts"
+    "./api": "./src/api.ts",
+    "./words": "./src/words/index.ts"
   },
   "dependencies": {
     "effect": "catalog:"

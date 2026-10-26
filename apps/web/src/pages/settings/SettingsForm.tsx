@@ -1,5 +1,7 @@
-// The keys and the memory sources (setting.load, setting.save), a part at a time; and what the server found of gh.
+// The keys, the language and the memory sources (setting.load, setting.save), a part at a time; and what the server
+// found of gh.
 
+import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -7,6 +9,8 @@ import {
   type GitHubStatus,
   type KeySource,
   type KeyStatus,
+  type Locale,
+  LocaleValues,
   type MemorySource,
   type MemorySourceKind,
   MemorySourceKindValues,
@@ -17,10 +21,12 @@ import { api, reasonOf } from "../../data/api";
 import { queries, ready, useQuery, useSettings } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
+import { Segmented } from "../../ui/Segmented";
+import { currentLocale } from "@vibevalley/protocol/words";
 import { Quiet, SecretInput, TextLink, Toggle } from "../kit";
 
-const from: Record<KeySource, string> = { settings: "存在设置里", config: "来自配置（vibevalley.yaml 或环境变量）" };
-const keyLine = (k: KeyStatus) => (k.source ? `在用 ${k.hint ?? ""}（${from[k.source]}）` : "还没有");
+const from: Record<KeySource, string> = { settings: settingsWording().from.settings, config: settingsWording().from.config };
+const keyLine = (k: KeyStatus) => (k.source ? settingsWording().inUse(k.hint ?? "", from[k.source]) : settingsWording().none);
 
 export type SettingsPart = "deepseek" | "agora" | "memory";
 
@@ -72,8 +78,8 @@ const draftOf = (kind: MemorySourceKind, saved: MemorySource | undefined): Sourc
 export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();
   return (
-    <Pick fallback={<Quiet>在问服务端……</Quiet>}>
-      <Match when={settings.error}>{(e) => <Quiet>问不到服务端：{reasonOf(e())}</Quiet>}</Match>
+    <Pick fallback={<Quiet>{settingsWording().asking}</Quiet>}>
+      <Match when={settings.error}>{(e) => <Quiet>{settingsWording().unreachable(reasonOf(e()))}</Quiet>}</Match>
       <Match when={ready(settings, undefined)}>{(status) => <Form part={props.part} status={untrack(status)} />}</Match>
     </Pick>
   );
@@ -171,12 +177,12 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <KeyField
           label="DeepSeek API Key"
           help={<TextLink href="https://platform.deepseek.com/api_keys">platform.deepseek.com</TextLink>}
-          line={cleared().has("deepseekApiKey") ? "存的时候清掉" : keyLine(status().deepseekApiKey)}
+          line={cleared().has("deepseekApiKey") ? settingsWording().clearOnSave : keyLine(status().deepseekApiKey)}
           onClear={status().deepseekApiKey.source === "settings" && !cleared().has("deepseekApiKey") ? () => clear("deepseekApiKey") : undefined}
         >
           <SecretInput
             aria-label="DeepSeek API Key"
-            placeholder="sk-…（不改就空着）"
+            placeholder={settingsWording().keys.deepseekHint}
             value={deepseek()}
             onInput={(e) => typed(setDeepseek)(e.currentTarget.value)}
           />
@@ -186,26 +192,32 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <KeyField
           label="Agora App ID"
           help={<TextLink href="https://console.agora.io/">console.agora.io</TextLink>}
-          line={cleared().has("agoraAppId") ? "存的时候清掉" : status().agoraAppId.source ? `（${from[status().agoraAppId.source!]}）` : "还没有"}
+          line={
+            cleared().has("agoraAppId")
+              ? settingsWording().clearOnSave
+              : status().agoraAppId.source
+                ? `（${from[status().agoraAppId.source!]}）`
+                : settingsWording().none
+          }
           onClear={status().agoraAppId.source === "settings" && !cleared().has("agoraAppId") ? () => clear("agoraAppId") : undefined}
         >
           <TextInput
             aria-label="Agora App ID"
             class="font-mono"
-            placeholder="32 位，比如 0123…cdef"
+            placeholder={settingsWording().keys.appIdHint}
             value={appId()}
             onInput={(e) => typed(setAppId)(e.currentTarget.value)}
           />
         </KeyField>
         <KeyField
           label="Agora App Certificate"
-          help={<span class="text-xs text-muted">和 App ID 在同一个项目里</span>}
-          line={cleared().has("agoraAppCertificate") ? "存的时候清掉" : keyLine(status().agoraAppCertificate)}
+          help={<span class="text-xs text-muted">{settingsWording().keys.certificateHelp}</span>}
+          line={cleared().has("agoraAppCertificate") ? settingsWording().clearOnSave : keyLine(status().agoraAppCertificate)}
           onClear={status().agoraAppCertificate.source === "settings" && !cleared().has("agoraAppCertificate") ? () => clear("agoraAppCertificate") : undefined}
         >
           <SecretInput
             aria-label="Agora App Certificate"
-            placeholder="不改就空着"
+            placeholder={settingsWording().keepEmpty}
             value={certificate()}
             onInput={(e) => typed(setCertificate)(e.currentTarget.value)}
           />
@@ -220,14 +232,14 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <p class="text-sm text-berry">{error()}</p>
       </Show>
       <Show when={saved()}>
-        <p class="text-sm text-accent">存好了，马上就用上。</p>
+        <p class="text-sm text-accent">{settingsWording().keys.saved}</p>
       </Show>
       <div class="flex items-center gap-3 border-t border-line pt-3">
         <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted" title={status().file}>
           {status().file}
         </span>
         <Button type="submit" tone="primary" disabled={busy()}>
-          保存
+          {settingsWording().save}
         </Button>
       </div>
     </form>
@@ -243,51 +255,66 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
       fallback={
         <div class="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5">
           <span class="flex-1 text-sm font-medium">
-            记性的来源：{label()}（{!props.draft.saved ? "没接" : props.draft.saved.enabled ? "接上了" : "关着"}）
+            {settingsWording().source.state(
+              label(),
+              !props.draft.saved ? settingsWording().source.off : props.draft.saved.enabled ? settingsWording().source.on : settingsWording().source.closed,
+            )}
           </span>
-          <Button aria-label={`改 ${label()}`} onClick={() => props.set({ open: true }, false)}>
-            改
+          <Button aria-label={settingsWording().source.changeWhich(label())} onClick={() => props.set({ open: true }, false)}>
+            {settingsWording().source.change}
           </Button>
         </div>
       }
     >
       <div class="rounded-lg border border-line p-3">
         <KeyField
-          label={`记性的来源：${label()}`}
-          help={<Toggle label="接上" checked={props.draft.enabled} onChange={(enabled) => props.set({ enabled })} />}
-          line={props.draft.keyCleared ? "key 存的时候清掉" : savedKey()?.source ? `key ${keyLine(savedKey()!)}` : "本机的不用 key"}
+          label={settingsWording().source.title(label())}
+          help={<Toggle label={settingsWording().source.enabled} checked={props.draft.enabled} onChange={(enabled) => props.set({ enabled })} />}
+          line={
+            props.draft.keyCleared ? settingsWording().source.keyCleared : savedKey()?.source ? `key ${keyLine(savedKey()!)}` : settingsWording().source.noKey
+          }
           onClear={savedKey()?.source === "settings" && !props.draft.keyCleared ? () => props.set({ keyCleared: true }) : undefined}
         >
           <div class="flex flex-col gap-1.5">
             <TextInput
-              aria-label={`${label()} 的地址`}
+              aria-label={settingsWording().source.address(label())}
               class="font-mono"
               placeholder={sourceAddress[props.draft.kind]}
               value={props.draft.url}
               onInput={(e) => props.set({ url: e.currentTarget.value })}
             />
             <SecretInput
-              aria-label={`${label()} 的 key`}
-              placeholder="key（不用或不改就空着）"
+              aria-label={settingsWording().source.key(label())}
+              placeholder={settingsWording().source.keyHint}
               value={props.draft.key}
               onInput={(e) => props.set({ key: e.currentTarget.value })}
             />
             <Show when={props.draft.kind === "everos"}>
               <TextInput
-                aria-label={`${label()} 的 user_id`}
-                placeholder="你在 EverOS 里的 user_id（空着就是 owner）"
+                aria-label={settingsWording().source.user(label())}
+                placeholder={settingsWording().source.userHint}
                 value={props.draft.user}
                 onInput={(e) => props.set({ user: e.currentTarget.value })}
               />
             </Show>
           </div>
           <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2.5">
-            <Toggle label="读" hint="开工想起、帮工翻记性时也问它" checked={props.draft.read} onChange={(read) => props.set({ read })} />
-            <Toggle label="写" hint="记下的也送一份过去" checked={props.draft.write} onChange={(write) => props.set({ write })} />
+            <Toggle
+              label={settingsWording().source.read}
+              hint={settingsWording().source.readHint}
+              checked={props.draft.read}
+              onChange={(read) => props.set({ read })}
+            />
+            <Toggle
+              label={settingsWording().source.write}
+              hint={settingsWording().source.writeHint}
+              checked={props.draft.write}
+              onChange={(write) => props.set({ write })}
+            />
             <Show when={props.draft.kind === "nowledge"}>
               <Toggle
-                label="读全部"
-                hint="不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到"
+                label={settingsWording().source.everything}
+                hint={settingsWording().source.everythingHint}
                 checked={props.draft.everything}
                 onChange={(everything) => props.set({ everything })}
               />
@@ -311,7 +338,7 @@ function KeyField(props: { label: string; help: JSX.Element; line: string; onCle
         <span class="flex-1 text-xs text-muted">{props.line}</span>
         <Show when={props.onClear}>
           <TextLink danger onClick={() => props.onClear?.()}>
-            清掉
+            {settingsWording().clear}
           </TextLink>
         </Show>
       </div>
@@ -328,8 +355,12 @@ export function GitHub() {
   const lines = () => {
     const s = refreshed() ?? ready(status, undefined);
     return !s
-      ? [status.error ? `问不到服务端：${reasonOf(status.error)}` : "在问服务端……"]
-      : [s.installed ? `gh ${s.version}` : "没装 gh", ...(s.loggedIn ? [`已登录 github.com：${s.account}`] : []), ...(s.reason ? [s.reason] : [])];
+      ? [status.error ? settingsWording().unreachable(reasonOf(status.error)) : settingsWording().asking]
+      : [
+          s.installed ? `gh ${s.version}` : settingsWording().github.noGh,
+          ...(s.loggedIn ? [settingsWording().github.signedIn(s.account ?? "")] : []),
+          ...(s.reason ? [s.reason] : []),
+        ];
   };
   const recheck = async () => {
     setBusy(true);
@@ -345,15 +376,50 @@ export function GitHub() {
   return (
     <div class="flex flex-col gap-1.5">
       <For each={lines()}>{(l) => <p class="text-sm">{l}</p>}</For>
-      <p class="text-xs text-muted">能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。</p>
+      <p class="text-xs text-muted">{settingsWording().github.note}</p>
       <Show when={error()}>
         <p class="text-sm text-berry">{error()}</p>
       </Show>
       <div class="pt-2">
         <Button disabled={busy()} onClick={() => void recheck()}>
-          重新检测
+          {settingsWording().github.recheck}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps.
+ * Saved, the page opens again in it: its words are read once, when it loads (protocol words/locale.ts). */
+export function LanguageForm() {
+  const [error, setError] = createSignal<string>();
+  const [busy, setBusy] = createSignal(false);
+  const choose = async (locale: Locale) => {
+    if (locale === currentLocale() || busy()) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await saveSettings({ locale });
+      location.reload();
+    } catch (e) {
+      setError(reasonOf(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="flex flex-col gap-3">
+      <p class="text-sm text-muted">{settingsWording().language.line}</p>
+      <div>
+        <Segmented
+          label={settingsWording().language.label}
+          value={currentLocale()}
+          options={LocaleValues.map((l) => ({ value: l, label: settingsWording().language[l], disabled: busy() }))}
+          onChange={(l) => void choose(l)}
+        />
+      </div>
+      <Show when={error()}>
+        <p class="text-sm text-berry">{error()}</p>
+      </Show>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // A session's events read as facts and journal steps. Pure: it reads the session as
 // the core state has it and the session's own bookkeeping, and changes nothing.
 
+import { sessionWording } from "./words.ts";
 import { relative } from "node:path";
 import type { Event, TokenTotals, ToolOutputPart } from "@botiverse/oar";
 import { classifyTool, type ToolActionKind } from "@botiverse/oar/observe";
@@ -88,7 +89,7 @@ export function near(cwd: string, detail: string): string {
 }
 
 const toolOutput = (content: readonly ToolOutputPart[] = []) =>
-  content.flatMap((part) => (part.type === "text" ? (part.text ? [part.text] : []) : part.type === "image" ? ["[图片]"] : [])).join("\n");
+  content.flatMap((part) => (part.type === "text" ? (part.text ? [part.text] : []) : part.type === "image" ? [sessionWording().log.image] : [])).join("\n");
 
 function label(runtime: string, tool: string, input: string | undefined, cwd: string) {
   const action = classifyTool(runtime, tool, input);
@@ -173,11 +174,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       doing("speaking_text", "");
       break;
     case "retry": {
-      let text = `调用模型没成功，第 ${event.attempt}`;
-      if (event.maxAttempts) text += `/${event.maxAttempts}`;
-      text += " 次重试";
-      if (event.delayMs) text += `，${Math.ceil(event.delayMs / 1000)} 秒后`;
-      if (event.reason) text += "：" + clip(event.reason, 160);
+      const text = sessionWording().log.retry(event.attempt, event.maxAttempts, event.delayMs, event.reason ? clip(event.reason, 160) : "");
       journal.push({ type: "note", kind: "llm/retry", text });
       facts.push({ type: "retry", id, attempt: event.attempt, ...(event.maxAttempts ? { of: event.maxAttempts } : {}) });
       break;
@@ -210,9 +207,9 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       break;
     case "exited":
       if (session && isBusy(session)) {
-        const why = ctx.runtime + " 进程退出了" + (event.code !== null && event.code !== undefined ? `（退出码 ${event.code}）` : "");
+        const why = sessionWording().log.exited(ctx.runtime, event.code);
         facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs });
-        warn = session.name + " 的 " + why;
+        warn = sessionWording().log.exitedNotice(session.name, why);
       }
       break;
     default:

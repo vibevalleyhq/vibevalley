@@ -14,6 +14,11 @@
  *   no-comment-divider: a comment does not title or fence off a stretch of code (docs/style/code.md). Only the divider
  *   is recognised (a run of ─ ━ ═, or a comment of nothing but -=*#~_/); the comments a pattern cannot judge are
  *   scripts/comment-review.ts's.
+ *
+ *   no-cjk-literal: what is said to the owner is in a word table, in Chinese and in English (words.ts, a words/ folder;
+ *   @vibevalley/protocol/words), and what is said to a model in a prompts.ts; vite.config.ts turns the rule off for
+ *   those files and the tests. A string, a template or JSX text with a Chinese character anywhere else is a word left
+ *   out of the tables. A regular expression is not: it reads what people and models write.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";
@@ -78,7 +83,30 @@ const noCommentDivider = defineRule({
   },
 });
 
+const han = /\p{Script=Han}/u;
+
+const noCjkLiteral = defineRule({
+  meta: {
+    messages: {
+      cjk: "words for the owner go in a word table (words.ts, with their English), words for a model in a prompts.ts (@vibevalley/protocol/words)",
+    },
+  },
+  create(context) {
+    return {
+      Literal(node) {
+        if (typeof node.value === "string" && han.test(node.value)) context.report({ node, messageId: "cjk" });
+      },
+      TemplateLiteral(node) {
+        if (node.quasis.some((q) => han.test(q.value.cooked ?? q.value.raw))) context.report({ node, messageId: "cjk" });
+      },
+      JSXText(node) {
+        if (han.test(node.value)) context.report({ node, messageId: "cjk" });
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
-  rules: { "no-wall-clock": noWallClock, "no-test-sleep": noTestSleep, "no-comment-divider": noCommentDivider },
+  rules: { "no-wall-clock": noWallClock, "no-test-sleep": noTestSleep, "no-comment-divider": noCommentDivider, "no-cjk-literal": noCjkLiteral },
 });

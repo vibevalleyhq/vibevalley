@@ -6,6 +6,8 @@
 // go. An input given while the agent is busy may be taken after one given later; the words follow the agent's events, so
 // they go to the route of the input taken last, and the tools read that route too.
 
+import { sessionWording } from "./words.ts";
+import { agentWording } from "../agent/words.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
@@ -182,7 +184,7 @@ export class AgentHost<R> {
 
   private closeInput(input: Hosted<R>) {
     input.caller?.end();
-    return { ok: false as const, why: this.o.label + "已经停下", run: "" };
+    return { ok: false as const, why: sessionWording().host.stopped(this.o.label), run: "" };
   }
 
   /** now joins the run under way; otherwise the input waits until the run would stop. false and why when the agent
@@ -201,12 +203,12 @@ export class AgentHost<R> {
       } catch (err) {
         if (this.closing) return this.closeInput(input);
         const why = err instanceof Error ? err.message : String(err);
-        const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", "起不来：" + why)).catch((e: Error) => {
-          this.o.notice("error", this.o.label + "的执行没能记下：" + e.message);
+        const id = await this.o.go(this.execution.failedStart(run, input.run.asked ?? "", sessionWording().host.cannotStart(why))).catch((e: Error) => {
+          this.o.notice("error", sessionWording().host.notRecorded(this.o.label, e.message));
           return "";
         });
-        this.o.notice("error", this.o.label + "起不来：" + why);
-        input.caller?.push("我这边起不来：" + why);
+        this.o.notice("error", sessionWording().host.startFailed(this.o.label, why));
+        input.caller?.push(sessionWording().host.callerStart(why));
         input.caller?.end();
         return { ok: false, why, run: id };
       }
@@ -239,7 +241,7 @@ export class AgentHost<R> {
       this.execution.resume(this.o.restored(at.route));
       if (b.resume(maxAgeMs)) return;
       this.execution.resume(undefined);
-      if (!b.busy()) this.journal.note("run/error", "上一轮停在了半路，太久了，没有接着做");
+      if (!b.busy()) this.journal.note("run/error", sessionWording().log.staleRun);
     });
   }
 
@@ -270,13 +272,13 @@ export class AgentHost<R> {
   markWrong(on: number, want: string, model: string, tools: readonly string[]): Effect.Effect<{ id: string; file: string }, ApiError> {
     return Effect.suspend(() => {
       const w = want.trim();
-      if (!w) return Effect.fail(refused("写一句它应该怎样"));
+      if (!w) return Effect.fail(refused(sessionWording().host.markNeedsWords));
       const asked = this.journal.events().find((e) => e.seq === on);
-      if (!asked) return Effect.fail(missing(`${this.o.label}轨迹里没有第 ${on} 步`, [{ say: "步数在页面上它的日志里，每一步前面的编号" }]));
-      if (asked.type !== "user/message") return Effect.fail(refused(`第 ${on} 步不是${this.o.label}收到的话`));
+      if (!asked) return Effect.fail(missing(sessionWording().host.noStep(this.o.label, on), [{ say: sessionWording().host.stepHint }]));
+      if (asked.type !== "user/message") return Effect.fail(refused(sessionWording().host.notAsked(on, this.o.label)));
       const lines = readLines(this.transcript);
       const at = turnAt(lines, asked.text, asked.time, this.o.inputType);
-      if (at < 0) return Effect.fail(refused(`第 ${on} 步收到的话没进${this.o.label}的对话（那时${this.o.label}没起来？）`));
+      if (at < 0) return Effect.fail(refused(sessionWording().host.notInConversation(on, this.o.label)));
       let memoryText = "";
       try {
         memoryText = readFileSync(memoryFile(this.o.home), "utf8");
@@ -310,7 +312,7 @@ export class AgentHost<R> {
   // Started on first use: loading it is not free, and a farm without a model works otherwise.
   private start(): Promise<Brain> {
     if (this.brain) return Promise.resolve(this.brain);
-    if (this.closing) return Promise.reject(new Error(this.o.label + "已经停下"));
+    if (this.closing) return Promise.reject(new Error(sessionWording().host.stopped(this.o.label)));
     this.starting ??= (async () => {
       const llm = this.o.llm();
       const b = await Brain.start(
@@ -332,7 +334,7 @@ export class AgentHost<R> {
       );
       if (this.closing) {
         await b.close();
-        throw new Error(this.o.label + "已经停下");
+        throw new Error(sessionWording().host.stopped(this.o.label));
       }
       this.o.fresh();
       // Listening before the first input is sent.
@@ -388,7 +390,7 @@ export class AgentHost<R> {
 
   // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
   private async settled(aborted: boolean) {
-    if (aborted && !this.closing) this.journal.note("run/error", "主人叫停了");
+    if (aborted && !this.closing) this.journal.note("run/error", sessionWording().log.stoppedByOwner);
     this.input.caller?.end();
     this.input = { route: this.input.route, run: this.input.run };
     this.open = false;
@@ -415,7 +417,9 @@ export class AgentHost<R> {
     let run: RunInput | undefined;
     if (e.type === "message_start" && isHosted(e.message, this.o.inputType)) run = this.local.get(e.message)?.run ?? { by: { kind: "" } };
     if (e.type !== "agent_settled" && e.type !== "compaction_start" && e.type !== "compaction_end" && e.type !== "prefix_changed" && e.type !== "tasks_changed")
-      await this.o.go(this.execution.observe(e, run)).catch((err: Error) => this.o.notice("error", this.o.label + "的执行没能记下：" + err.message));
+      await this.o
+        .go(this.execution.observe(e, run))
+        .catch((err: Error) => this.o.notice("error", sessionWording().host.notRecorded(this.o.label, err.message)));
     switch (e.type) {
       case "message_start":
         if (isHosted(e.message, this.o.inputType)) {
@@ -440,13 +444,13 @@ export class AgentHost<R> {
         const m = e.message;
         this.noteUsage(m.usage);
         await this.done(messageText(m).trim());
-        if (m.stopReason === "error") this.o.notice("error", this.o.label + "出错了：" + (m.errorMessage || "模型出错了"));
+        if (m.stopReason === "error") this.o.notice("error", sessionWording().host.failed(this.o.label, m.errorMessage || agentWording().modelFailed));
         return;
       }
       case "compaction_end":
         if (e.usage) {
           const tokens = tokensOf(e.usage);
-          this.journal.usage(tokens, "整理对话，" + usageText(tokens));
+          this.journal.usage(tokens, sessionWording().log.folded(usageText(tokens)));
         }
         if (e.compaction) this.o.fresh();
         return;

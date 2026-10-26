@@ -2,11 +2,13 @@
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
+import { desktopWording } from "./words";
+import { wording } from "@vibevalley/protocol/words";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { type Attention, readStream, type StateFrame, statePath } from "@vibevalley/protocol";
-import { attentionLabel, attentionWantsOwner, phaseText, stuckLabel } from "@vibevalley/protocol/rules";
+import { attentionWantsOwner, phaseText } from "@vibevalley/protocol/rules";
 
 /** How a row is drawn. The shapes here are apps/island IslandCore Messages.swift's; keep the two the same. */
 export type Tone = "working" | "waiting" | "stuck";
@@ -24,6 +26,8 @@ export interface Glance {
   working: number;
   /** Issues that want the owner: asked, handed back, stuck. */
   waiting: number;
+  /** The strip's words for the two counts, in the farm's language. */
+  strip: { working: string; waiting: string };
   /** Those waiting first, then those at work; by number within each. */
   rows: IslandRow[];
 }
@@ -47,13 +51,16 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     const tone = toneOf[state];
     if (!tone) continue;
     const head = frame.state.sessions.find((h) => h.id === issue.sessions.at(-1));
-    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? stuckLabel[stuck] : attentionLabel[state];
+    const doing = tone === "working" && head ? `${head.name} · ${phaseText(head, now)}` : stuck ? wording().stuck[stuck] : wording().attention[state];
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
   rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);
+  const working = rows.filter((r) => r.tone === "working").length;
+  const waiting = rows.filter((r) => r.first).length;
   return {
-    working: rows.filter((r) => r.tone === "working").length,
-    waiting: rows.filter((r) => r.first).length,
+    working,
+    waiting,
+    strip: { working: desktopWording().working(working), waiting: desktopWording().waiting(waiting) },
     rows: rows.map(({ first: _, ...row }) => row),
   };
 }

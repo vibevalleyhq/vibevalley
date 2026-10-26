@@ -2,6 +2,7 @@
 
 import type { ApiError } from "./api";
 import type * as T from "./shapes";
+import { wording } from "./words";
 
 /** A refusal from the server: its tagged error (Refused, VoiceUnavailable…) and reason, or the bare status. */
 export class VibeValleyApiError extends Error {
@@ -385,7 +386,7 @@ export class VibeValleyApi {
           ? j.reason
           : typeof j.what === "string"
             ? j.what
-            : text.trim() || "服务端答 " + res.status;
+            : text.trim() || wording().serverAnswered(res.status);
       throw new VibeValleyApiError(res.status, typeof j._tag === "string" ? j._tag : undefined, reason, error, text);
     }
     return text === "" ? undefined : JSON.parse(text);

@@ -1,3 +1,4 @@
+import { farmWording } from "../words";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { cx, pxRing, pxText } from "./style";
@@ -45,7 +46,7 @@ export function PxField(props: {
             <span class="text-leaf-300"> *</span>
           </Show>
           <Show when={props.optional}>
-            <span class="text-bark-500">{"  可选"}</span>
+            <span class="text-bark-500">{farmWording().optional}</span>
           </Show>
         </label>
         <Show when={props.aside != null}>

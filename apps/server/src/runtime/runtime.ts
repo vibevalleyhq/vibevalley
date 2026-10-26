@@ -4,6 +4,7 @@
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
 
+import { runtimeWording } from "./words.ts";
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
@@ -140,7 +141,7 @@ export function probeInstallation(runtime: Runtime, binPath: string): Promise<In
 
 function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>>): AccountUsage {
   if (usage.kind === "reauth_required") return { status: "login_required" };
-  if (usage.kind === "unsupported") return { status: "unavailable", reason: usage.reason || "这个 runtime 不报用量" };
+  if (usage.kind === "unsupported") return { status: "unavailable", reason: usage.reason || runtimeWording().noUsage };
   return {
     status: "ok",
     subscription: usage.plan || null,
@@ -294,7 +295,7 @@ export const make = (options: RuntimeOptions = {}) =>
       };
       const runtime = registry.get(id);
       if (!runtime) {
-        const reason = id === "cursor" ? "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接" : "oar 不认识这个 runtime";
+        const reason = id === "cursor" ? runtimeWording().cursor : runtimeWording().oarUnknown;
         return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
       }
       const notFound: InstallationSnapshot = { kind: "not_found" };
@@ -346,7 +347,7 @@ export const make = (options: RuntimeOptions = {}) =>
             ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
           })),
           inventory(runtime.mcpServers, found, cwd, (m) => {
-            const parts = [m.status, m.toolCount !== undefined ? `${m.toolCount} 个工具` : ""].filter(Boolean);
+            const parts = [m.status, m.toolCount !== undefined ? runtimeWording().tools(m.toolCount) : ""].filter(Boolean);
             return {
               name: m.name,
               ...optional("description", parts.join(" · ")),
@@ -460,7 +461,7 @@ export const make = (options: RuntimeOptions = {}) =>
       update: (id, s) =>
         known(id)
           ? Effect.andThen(
-              store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(`没存下 ${id} 的设置：${e.reason}`) : e))),
+              store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(runtimeWording().notSaved(id, e.reason)) : e))),
               refresh(id),
             )
           : Effect.succeed(undefined),
@@ -470,12 +471,12 @@ export const make = (options: RuntimeOptions = {}) =>
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
       resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);
-        if (!runtime) return yield* Effect.fail(refused(`oar 驱动不了 ${agent.runtime}`));
+        if (!runtime) return yield* Effect.fail(refused(runtimeWording().cannotDrive(agent.runtime)));
         const { info: i, settings } = yield* configuration(agent.runtime);
         const { model, effort, env, missingModel, problems } = sessionOptions(agent, settings, i);
         const problem = problems.find((i) => i.level === "error");
-        if (problem) return yield* Effect.fail(refused(`${agent.name} 派不出去：${problem.text}`));
-        if (missingModel) yield* core.notice("warn", `${runtimeLabel(agent.runtime)} 没有 ${missingModel} 这个模型，${agent.name} 先用默认模型`);
+        if (problem) return yield* Effect.fail(refused(runtimeWording().cannotSend(agent.name, problem.text)));
+        if (missingModel) yield* core.notice("warn", runtimeWording().defaultModel(runtimeLabel(agent.runtime), missingModel, agent.name));
         const observed = cache.get(agent.runtime);
         const installation = observed?.found && observed.info.settings.binPath === settings.binPath ? structuredClone(observed.found) : undefined;
         return {

@@ -1517,8 +1517,11 @@ export const MemorySource: Codec<T.MemorySource> = Schema.Struct({
   key: KeyStatus,
 });
 
+export const Locale: Codec<T.Locale> = Schema.Literals(T.LocaleValues);
+
 export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   file: Schema.String,
+  locale: Locale,
   deepseekApiKey: KeyStatus,
   agoraAppId: AgoraAppID,
   agoraAppCertificate: KeyStatus,
@@ -1558,6 +1561,7 @@ export const SettingsUpdateVoice: Codec<T.SettingsUpdateVoice> = Schema.Struct({
 });
 
 export const SettingsUpdate: Codec<T.SettingsUpdate> = Schema.Struct({
+  locale: Schema.optionalKey(Locale),
   deepseekApiKey: Schema.optionalKey(Schema.String),
   agoraAppId: Schema.optionalKey(Schema.String),
   agoraAppCertificate: Schema.optionalKey(Schema.String),

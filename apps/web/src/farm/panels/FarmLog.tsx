@@ -1,9 +1,10 @@
 // The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
+import { farmWording } from "../words";
+import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { outcomeLabel } from "@vibevalley/protocol/rules";
 import { generalOf, messagesIn, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
 import { useAgent } from "../../data/agents";
@@ -14,9 +15,9 @@ import { clockOf, FarmEmpty, FarmTag } from "./bits";
 import { usePrefs } from "../../data/prefs";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
-  completed: [outcomeLabel.completed, "#efcf92", "#2f1f13"],
-  failed: [outcomeLabel.failed, "#f0cda6", "#c84a3a"],
-  interrupted: [outcomeLabel.interrupted, "#e2c995", "#67482d"],
+  completed: [wording().outcome.completed, "#efcf92", "#2f1f13"],
+  failed: [wording().outcome.failed, "#f0cda6", "#c84a3a"],
+  interrupted: [wording().outcome.interrupted, "#e2c995", "#67482d"],
 };
 
 /** The turn reports, newest first. */
@@ -41,7 +42,7 @@ export function FarmLog() {
     ].sort((a, b) => b.message.at - a.message.at);
   };
   return (
-    <Show when={rows().length > 0} fallback={<FarmEmpty text="还没有事。开工以后，你和管家说的话、谁做完了什么，都记在这里。" />}>
+    <Show when={rows().length > 0} fallback={<FarmEmpty text={farmWording().log.empty} />}>
       <div class="flex flex-col">
         <For each={rows().slice(0, 80)} keyed={(row) => row.message.id}>
           {(row, i) => (
@@ -71,12 +72,12 @@ function Said(props: { m: ChatMessage; look: string }) {
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} look={props.look} />}>
-        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">你</span>
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">{farmWording().log.you}</span>
       </Show>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
-          <span class="text-[13px]">{you() ? "你" : "管家"}</span>
-          <FarmTag text={you() ? "说" : props.m.final ? "答" : "正在说"} ink="#67482d" />
+          <span class="text-[13px]">{you() ? farmWording().log.you : farmWording().orchestrator}</span>
+          <FarmTag text={you() ? farmWording().log.said : props.m.final ? farmWording().log.answered : farmWording().log.saying} ink="#67482d" />
         </div>
         <div class={["mt-0.5 text-[13px]", you() ? "text-bark-900" : "text-bark-800"]}>
           <PxMarkdown text={props.m.text} />
@@ -104,7 +105,7 @@ function Report(props: { r: ChatMessage; issue?: Issue }) {
           <p class="mt-0.5 text-[13px]">{props.issue!.title}</p>
         </Show>
         <p class={["line-clamp-4 text-[12px]", outcome() === "failed" ? "text-berry" : "text-bark-600"]}>{props.r.text}</p>
-        <Show when={props.r.spent}>{(spent) => <p class="text-[12px] text-bark-400">这一轮花了 {spentText(spent())}</p>}</Show>
+        <Show when={props.r.spent}>{(spent) => <p class="text-[12px] text-bark-400">{farmWording().log.spent(spentText(spent()))}</p>}</Show>
       </div>
     </>
   );

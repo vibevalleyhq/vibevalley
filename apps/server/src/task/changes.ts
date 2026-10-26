@@ -1,7 +1,9 @@
-// What changed in a task graph, step by step, and how each change is said.
+// What changed in a task graph, step by step, and how each change is said. What is kept is the fact (a field's key, a
+// count), so the history reads in the locale of whoever reads it.
 
-import type { ActorKind, GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
+import type { GraphEventKind, Task, TaskFieldChange, TaskGraph } from "@vibevalley/protocol";
 import { taskOf } from "./graph.ts";
+import { type TaskField, taskWording } from "./words.ts";
 
 /** A graph event before it is stored: no id, actor or time yet. */
 export interface GraphChange {
@@ -14,14 +16,20 @@ export interface GraphChange {
   commits?: string[];
 }
 
-const taskFields: readonly { field: string; text: (n: Task) => string }[] = [
-  { field: "标题", text: (n) => n.title },
-  { field: "工单", text: (n) => n.brief },
-  { field: "要等的", text: (n) => (n.needs ?? []).join("、") },
-  { field: "谁来做", text: (n) => n.agent ?? "" },
-  { field: "检查", text: (n) => n.check ?? "" },
-  { field: "该改的地方", text: (n) => (n.scope ?? []).join("、") },
+const taskFields: readonly { field: TaskField; text: (n: Task) => string }[] = [
+  { field: "title", text: (n) => n.title },
+  { field: "brief", text: (n) => n.brief },
+  { field: "needs", text: (n) => taskWording().list(n.needs ?? []) },
+  { field: "agent", text: (n) => n.agent ?? "" },
+  { field: "check", text: (n) => n.check ?? "" },
+  { field: "scope", text: (n) => taskWording().list(n.scope ?? []) },
 ];
+
+const isField = (f: string): f is TaskField => taskFields.some((x) => x.field === f);
+
+/** The changes as they are shown: each field by its name. */
+export const renderedChanges = (changes: readonly TaskFieldChange[]): TaskFieldChange[] =>
+  changes.map((c) => ({ ...c, field: isField(c.field) ? taskWording().field[c.field] : c.field }));
 
 export function taskFieldChanges(was: Task, now: Task): TaskFieldChange[] {
   const out: TaskFieldChange[] = [];
@@ -46,7 +54,7 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
       case "splitting":
         break;
       case "draft":
-        graph("drafted", `${(after.tasks ?? []).length} 步`);
+        graph("drafted", String((after.tasks ?? []).length));
         break;
       case "running":
         if (before.state === "paused") graph("resumed");
@@ -112,51 +120,53 @@ export function graphChanges(before: TaskGraph | undefined, after: TaskGraph): G
   return out;
 }
 
-export const actorText: Record<ActorKind, string> = { owner: "主人", orchestrator: "管家", session: "帮工", system: "VibeValley" };
-
 export function graphEventText(e: GraphChange, titleOf: (task: string) => string = (id) => id): string {
-  const step = e.task ? "「" + titleOf(e.task) + "」" : "「」";
-  const by = e.session ? "（" + e.session + "）" : "";
+  const w = taskWording().event;
+  const step = w.step(e.task ? titleOf(e.task) : "");
+  const by = e.session ? w.by(e.session) : "";
   const detail = e.detail ?? "";
-  const why = detail ? "：" + detail : "";
+  const why = detail ? w.why(detail) : "";
   switch (e.kind) {
     case "splitting":
-      return "要拆一张计划" + why;
+      return w.splitting(why);
     case "drafted":
-      return detail ? "拆好了，" + detail + "，等主人看" : "拆好了，等主人看";
+      return w.drafted(detail);
     case "started":
-      return detail ? "开工了，分支 " + detail : "开工了";
+      return w.started(detail);
     case "paused":
-      return "暂停了" + why;
+      return w.paused(why);
     case "resumed":
-      return "接着做了";
+      return w.resumed;
     case "ready":
-      return "都做完了，等主人合进主分支";
+      return w.ready;
     case "merged":
-      return "合进了主分支";
+      return w.merged;
     case "abandoned":
-      return "放弃了" + why;
+      return w.abandoned(why);
     case "noted":
       return detail;
     case "task_started":
-      return step + "开工" + by;
+      return w.taskStarted(step, by);
     case "task_sent_back":
-      return step + "退回去重做" + by + why;
+      return w.taskSentBack(step, by, why);
     case "task_merged":
-      return step + "合进了计划分支" + ((e.commits ?? []).length > 0 ? "（" + e.commits!.join("、") + "）" : "") + why;
+      return w.taskMerged(step, e.commits ?? [], why);
     case "task_failed":
-      return step + "没做成" + why;
+      return w.taskFailed(step, why);
     case "task_retried":
-      return step + "重试";
+      return w.taskRetried(step);
     case "task_requeued":
-      return step + "没有帮工在做了，重新排上";
+      return w.taskRequeued(step);
     case "task_skipped":
-      return step + "跳过了，后面的照做";
+      return w.taskSkipped(step);
     case "task_edited":
-      return "改了" + step + "的" + (e.changes ?? []).map((c) => c.field).join("、");
+      return w.taskEdited(
+        step,
+        (e.changes ?? []).map((c) => (isField(c.field) ? taskWording().field[c.field] : c.field)),
+      );
     case "task_added":
-      return "加了一步" + step;
+      return w.taskAdded(step);
     case "task_removed":
-      return "删了一步「" + (e.detail !== undefined ? e.detail : (e.task ?? "")) + "」";
+      return w.taskRemoved(e.detail !== undefined ? e.detail : (e.task ?? ""));
   }
 }

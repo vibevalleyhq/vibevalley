@@ -1,6 +1,7 @@
 // What pi itself is set up with: its default model, the DeepSeek key and address it
 // uses, and its DeepSeek balance. pi keeps these in its agent folder; the farm only reads them.
 
+import { runtimeWording } from "./words.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -91,7 +92,7 @@ export const unavailable = (reason: string): AccountUsage => ({ status: "unavail
 /** pi's balance at DeepSeek, when its default model is DeepSeek's; no other provider reports one. */
 export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">): Promise<AccountUsage> {
   const provider = piProvider(settings);
-  if (provider !== "deepseek") return unavailable(provider ? provider + " 不报余额" : "pi 没有设默认模型");
+  if (provider !== "deepseek") return unavailable(provider ? runtimeWording().piNoBalance(provider) : runtimeWording().piNoModel);
   const { key, base } = piDeepseek();
   if (!key) return { status: "login_required" };
   let res: Response;
@@ -108,7 +109,7 @@ export async function piBalance(settings: Pick<RuntimeSettings, "defaultModel">)
   try {
     b = Schema.decodeUnknownSync(BalanceResponse)(await res.json());
   } catch {
-    return unavailable("没读到 DeepSeek 余额");
+    return unavailable(runtimeWording().piUnread);
   }
   return {
     status: "balance",

@@ -3,6 +3,7 @@
 // memories are stars (rules.ts starsOf). Opening, the tree grows from a sprout to its size; moving the time slider
 // grows it back or on. Looking up, the meadow sinks, the sky goes dark and every leaf and fruit rises to its star.
 
+import { treeWording } from "./words";
 import { onSettled } from "solid-js";
 import { reducedMotion } from "../farm/kit";
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
@@ -591,7 +592,7 @@ export function Scene(props: {
     <canvas
       ref={(el) => (canvas = el)}
       role="img"
-      aria-label="记忆树：每片叶是记下的一句话，每颗果是一次经验，树下的种子是手艺；抬头是同一份记忆的星空"
+      aria-label={treeWording().scene}
       data-testid="memory-scene"
       class="absolute inset-0 block size-full touch-none [image-rendering:pixelated]"
     />

@@ -1,6 +1,7 @@
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
+import { rulesWording } from "./words";
 import type { SessionEvent } from "@vibevalley/protocol";
 import { tookText } from "./time";
 
@@ -87,40 +88,40 @@ export function farmToolText(text: string) {
     case undefined:
       return undefined;
     case "channel_say":
-      return "在田头说话";
+      return rulesWording().rounds.farm.channel_say;
     case "channel_read":
-      return "读田头的消息";
+      return rulesWording().rounds.farm.channel_read;
     case "channel_inbox":
-      return "看有没有找它的话";
+      return rulesWording().rounds.farm.channel_inbox;
     case "session_list":
-      return "看田头上都有谁";
+      return rulesWording().rounds.farm.session_list;
     default:
-      return `田头：${m}`;
+      return rulesWording().rounds.farm.other(m);
   }
 }
 
 export function spanLabel(step: SessionEvent) {
   switch (step.type) {
     case "user/message":
-      return "收到";
+      return rulesWording().rounds.span.heard;
     case "memory/recalled":
-      return "想起";
+      return rulesWording().rounds.span.recalled;
     case "assistant/thinking":
-      return "思考";
+      return rulesWording().rounds.span.thinking;
     case "assistant/message":
-      return "说";
+      return rulesWording().rounds.span.said;
     case "llm/retry":
-      return "重试";
+      return rulesWording().rounds.span.retry;
     case "llm/usage":
-      return "缓存";
+      return rulesWording().rounds.span.cache;
     case "run/error":
-      return "出错";
+      return rulesWording().rounds.span.error;
     case "run/start":
     case "run/end":
     case "tool/result":
       return "";
     case "tool/call":
-      return farmToolText(step.text) ? "田头" : (step.actionText ?? "工具");
+      return farmToolText(step.text) ? rulesWording().rounds.span.farm : (step.actionText ?? rulesWording().rounds.span.tool);
   }
 }
 
@@ -184,9 +185,9 @@ export function readableInput(step: SessionEvent) {
 /** What started a round, as its fold says it: the first word is the issue, later ones are words carried to it. */
 export function roundLabel(r: Round, firstAsked: number | undefined, asked?: string) {
   const a = r.asked;
-  if (!a) return "更早的步骤";
-  if (a.under !== undefined) return "帮手接到";
-  return asked ?? (a.seq === firstAsked ? "工单" : "带话");
+  if (!a) return rulesWording().rounds.earlier;
+  if (a.under !== undefined) return rulesWording().rounds.subagentGot;
+  return asked ?? (a.seq === firstAsked ? rulesWording().rounds.job : rulesWording().rounds.told);
 }
 
 /** Folded to `lines` when longer. */
@@ -196,7 +197,7 @@ export const isLongText = (text: string, lines: number) => text.length > lines *
 export function turnLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
-  return tools > 0 ? `用了 ${tools} 个工具` : "这一轮的干活过程";
+  return tools > 0 ? rulesWording().rounds.usedTools(tools) : rulesWording().rounds.process;
 }
 
 export type Lane = "asked" | "model" | "tool";
@@ -326,9 +327,9 @@ export function summaryOf(log: SessionEvent[], end: number): TrajectorySummary {
 export const cacheHit = (s: TrajectorySummary) => (s.input + s.cacheRead > 0 ? s.cacheRead / (s.input + s.cacheRead) : undefined);
 
 /** Under ten seconds to a tenth. */
-export const secondsText = (ms: number) => (ms < 10000 ? `${(ms / 1000).toFixed(1)} 秒` : tookText(ms));
+export const secondsText = (ms: number) => (ms < 10000 ? rulesWording().time.tenths((ms / 1000).toFixed(1)) : tookText(ms));
 
-export const tokensText = (n: number) => (n < 10000 ? `${n}` : `${(n / 10000).toFixed(1)} 万`);
+export const tokensText = (n: number) => (n < 10000 ? `${n}` : rulesWording().big(n, 1));
 
 /** The part after an MCP server's prefix: `mcp__vibevalley__channel_say` is channel_say. */
 export function toolName(tool: string) {
@@ -341,21 +342,21 @@ export function tagOf(step: SessionEvent, asked?: string, job = false): string {
   const sub = step.under !== undefined;
   switch (step.type) {
     case "user/message":
-      return sub ? "帮手接到" : (asked ?? (job ? "工单" : "带话"));
+      return sub ? rulesWording().rounds.subagentGot : (asked ?? (job ? rulesWording().rounds.job : rulesWording().rounds.told));
     case "memory/recalled":
-      return "想起";
+      return rulesWording().rounds.span.recalled;
     case "assistant/thinking":
-      return sub ? "帮手想了想" : "想了想";
+      return sub ? rulesWording().rounds.tag.subagentThought : rulesWording().rounds.tag.thought;
     case "assistant/message":
-      return sub ? "帮手说" : "它说";
+      return sub ? rulesWording().rounds.tag.subagentSaid : rulesWording().rounds.tag.said;
     case "llm/retry":
-      return "重试";
+      return rulesWording().rounds.span.retry;
     case "llm/usage":
-      return "用量";
+      return rulesWording().rounds.tag.usage;
     case "run/error":
-      return "出错";
+      return rulesWording().rounds.span.error;
     case "tool/call":
-      if (farmToolText(step.text) !== undefined) return "田头";
+      if (farmToolText(step.text) !== undefined) return rulesWording().rounds.span.farm;
       return step.tool ? toolName(step.tool) : spanLabel(step);
     case "run/start":
     case "run/end":
