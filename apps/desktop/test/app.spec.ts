@@ -70,6 +70,9 @@ test("the window opens on the bar at once, and says there why the server could n
     args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
     env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: home, VIBEVALLEY_WORK_ROOT: join(dir, "work") },
   });
+  // What the main process says, kept with the results (CI uploads them): this case fails before any page can.
+  const said: string[] = [];
+  for (const out of [app.process().stdout, app.process().stderr]) out?.on("data", (d) => said.push(String(d)));
   try {
     const page = await app.firstWindow();
     await expect(page).toHaveURL(/\/opening\.html\?problem=/);
@@ -78,6 +81,7 @@ test("the window opens on the bar at once, and says there why the server could n
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
     await page.screenshot({ path: test.info().outputPath("problem.png") });
   } finally {
+    writeFileSync(test.info().outputPath("electron.log"), said.join(""));
     await app.close();
   }
 });

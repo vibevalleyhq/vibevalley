@@ -71,13 +71,19 @@ function windowNow(): BrowserWindow {
   return made;
 }
 
+/** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
+const loaded = (load: Promise<void>) =>
+  load.catch((e: unknown) => {
+    if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
+  });
+
 /** The bar while the server comes up (apps/web public/opening.html, from the app's files), or why it did not. */
 function opening(problem?: string) {
-  void windowNow().loadFile(join(files().web, "opening.html"), problem ? { query: { problem } } : {});
+  void loaded(windowNow().loadFile(join(files().web, "opening.html"), problem ? { query: { problem } } : {}));
 }
 
 function open(url: string) {
-  void windowNow().loadURL(url);
+  void loaded(windowNow().loadURL(url));
 }
 
 ipcMain.handle("host:notify", (_event, notice: Notice) => {
