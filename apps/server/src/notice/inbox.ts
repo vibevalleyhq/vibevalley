@@ -133,6 +133,10 @@ function gathered(state: WorkspaceState): Unworded[] {
           });
         }
         break;
+      case "abandoned":
+      case "done":
+      case "splitting":
+        break;
     }
   }
 

@@ -278,6 +278,8 @@ export class WeixinClient implements WeixinApi {
             owner: s.ilink_user_id,
           };
         }
+        case undefined:
+          break;
       }
     }
     if (signal.aborted) throw signal.reason ?? new Error("aborted");
@@ -355,6 +357,8 @@ export function text(m: Message): string {
         break;
       case 5:
         part = "[视频]";
+        break;
+      case undefined:
         break;
     }
     if (part) parts.push(part);

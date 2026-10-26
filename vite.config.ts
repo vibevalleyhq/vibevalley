@@ -73,6 +73,9 @@ export default defineConfig({
       "import/no-cycle": "error",
       // A promise handed where nothing awaits it (a callback, a condition) fails, or is always true, without anyone seeing.
       "typescript/no-misused-promises": "error",
+      // A switch on a closed union covers every member, or says with default that the rest are left out on purpose: a
+      // member added later is then a compile error where it is not handled (AGENTS.md, 封闭的联合穷尽处理).
+      "typescript/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

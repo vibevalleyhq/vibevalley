@@ -67,6 +67,10 @@ export function llmMessages(messages: readonly AgentMessage[]): Message[] {
       case "toolResult":
         out.push(m);
         break;
+      case "bashExecution":
+      case "branchSummary":
+      case "system":
+        break;
     }
   }
   return out;
@@ -105,6 +109,9 @@ export function messageText(m: AgentMessage): string {
     case "assistant":
     case "toolResult":
       return blocksText(m.content);
+    case "bashExecution":
+    case "branchSummary":
+      break;
   }
   return "";
 }
@@ -130,6 +137,10 @@ export function transcript(messages: readonly AgentMessage[]): string {
         break;
       case "toolResult":
         out.push("## " + m.toolName + " 的结果" + (m.isError ? "（失败）" : "") + "\n" + messageText(m));
+        break;
+      case "bashExecution":
+      case "branchSummary":
+      case "system":
         break;
     }
   }

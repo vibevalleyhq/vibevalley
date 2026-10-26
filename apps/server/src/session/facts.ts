@@ -215,6 +215,8 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
         warn = session.name + " 的 " + why;
       }
       break;
+    default:
+      break;
   }
 
   // A sub-agent's steps (a claude TaskGraph, a codex sub-thread) say whose they are.

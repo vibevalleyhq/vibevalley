@@ -65,6 +65,8 @@ export function forOwner(m: ChatMessage): boolean {
       return true;
     case "chat":
       return m.fromKind === "orchestrator" || (m.mentions ?? []).includes(ownerId) || (m.mentions ?? []).includes(everyone);
+    case "notice":
+      break;
   }
   return false;
 }

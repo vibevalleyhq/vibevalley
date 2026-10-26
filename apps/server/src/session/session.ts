@@ -1177,6 +1177,8 @@ export const make = (options: SessionOptionsIn = {}) =>
               return name + " 这一轮做完再看这句话";
             case "run":
               return d.woke ? name + " 醒了，开始新的一轮" : name + " 开始新的一轮";
+            case "refused":
+              break;
           }
           return d.reason ?? "";
         }),

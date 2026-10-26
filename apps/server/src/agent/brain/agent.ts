@@ -136,6 +136,11 @@ export function unfinished(messages: readonly AgentMessage[]): {
     case "user":
     case "custom":
       return { missing: [], ok: true };
+    case "bashExecution":
+    case "branchSummary":
+    case "compactionSummary":
+    case "system":
+      break;
   }
   return { missing: [], ok: false };
 }
@@ -459,6 +464,8 @@ export class Brain {
       case "message_end":
         if (e.message.role === "assistant") this.accounting.message(e.message);
         else if (e.message.role === "user" || e.message.role === "custom") this.accounting.heard();
+        break;
+      default:
         break;
     }
   }

@@ -24,6 +24,8 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
         return "in_review";
       case "done":
         return "done";
+      case "abandoned":
+        break;
     }
     return "canceled";
   }
@@ -39,6 +41,8 @@ export function issueStatusOf(t: Issue, state: WorkspaceState): IssueStatus {
       }
       case "merged":
         return "done";
+      case "skipped":
+        break;
     }
     return "canceled";
   }
