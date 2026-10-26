@@ -66,7 +66,7 @@ flowchart LR
 - macOS（Apple 芯片）。macOS 应用是主要的形态，单独跑的服务端也能用浏览器打开；手机版正在换成新的壳，暂时用不了。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
-- 构建要 Node 24 和 [Vite+](https://viteplus.dev)（`vp`，它带着 pnpm）。
+- 构建要 [Vite+](https://viteplus.dev)（`vp`）：它照 `.node-version` 装 Node 24，带着 pnpm。
 - 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
 
 ### 打一个 macOS 应用
