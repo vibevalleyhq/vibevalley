@@ -1,6 +1,7 @@
 // What the phone works out with no device in the way: where a pairing link points, what to call this phone, how the
 // page is told its key. The rest of the shell (App.tsx and its pieces) only wires these to the native modules.
 
+import { mobileWording } from "./words";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
 /** A pairing: the farm's address on the network (scheme, host and port) and the one-time code. */
@@ -41,7 +42,7 @@ function parseFarm(text: string): string | undefined {
 /** What the owner's list calls this phone until they rename it there. */
 export function deviceName(os: string, model: string | undefined): string {
   if (model) return model;
-  return os === "ios" ? "iPhone" : os === "android" ? "安卓手机" : "一台手机";
+  return os === "ios" ? "iPhone" : os === "android" ? mobileWording().android : mobileWording().phone;
 }
 
 /** The script that puts the key where the page's requests carry it, before the page runs: the cookie the farm's lan

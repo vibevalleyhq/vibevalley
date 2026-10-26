@@ -235,11 +235,11 @@ struct IslandView: View {
     HStack(spacing: 6) {
       HStack(spacing: 5) {
         Rectangle().fill(toneColor(.working)).frame(width: 7, height: 7)
-        Text(model.glance.working > 0 ? "\(model.glance.working) 在干" : "没在干").font(text(12)).foregroundStyle(cream)
+        Text(model.glance.strip.working).font(text(12)).foregroundStyle(cream)
       }
       Spacer(minLength: model.notchWidth)
       if model.glance.waiting > 0 {
-        Text("\(model.glance.waiting) 等你").font(text(12)).foregroundStyle(toneColor(.waiting))
+        Text(model.glance.strip.waiting).font(text(12)).foregroundStyle(toneColor(.waiting))
       }
     }
     .padding(.horizontal, 14)

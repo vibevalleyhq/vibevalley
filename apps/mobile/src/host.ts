@@ -1,4 +1,5 @@
 import type { FromNative, RtcEvents, RtcLine, ToNative } from "@vibevalley/host";
+import { mobileWording } from "./words";
 import { notify } from "./notify";
 import { nativeRtc } from "./rtc";
 
@@ -34,7 +35,7 @@ export function nativeHost(post: (m: FromNative) => void) {
           const line = await rtc.join(m.grant, events);
           if (closed || current !== call) {
             await line.leave();
-            throw new Error("通话已结束");
+            throw new Error(mobileWording().callEnded);
           }
           call.line = line;
           break;
@@ -42,7 +43,7 @@ export function nativeHost(post: (m: FromNative) => void) {
         case "rtc.mute":
         case "rtc.renew": {
           const line = current?.id === m.line ? current.line : undefined;
-          if (!line) throw new Error("通话已结束");
+          if (!line) throw new Error(mobileWording().callEnded);
           if (m.call === "rtc.mute") await line.mute(m.on);
           else await line.renew(m.token);
           break;

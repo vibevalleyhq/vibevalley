@@ -1,6 +1,7 @@
 // The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
 // cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
 
+import { mobileWording } from "./words";
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";
 import { type PairLink, parsePairLink } from "./rules";
@@ -96,7 +97,7 @@ export class FarmConnection {
       });
       if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "读不出保存的农场：" + reason(e) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotRead(reason(e)) });
     }
   }
 
@@ -139,7 +140,7 @@ export class FarmConnection {
           signal: request.signal,
         });
       } catch {
-        throw new Error("连不上那台电脑：两台设备要在同一个网络里，那台电脑要允许连接");
+        throw new Error(mobileWording().unreachable);
       }
       const text = await response.text();
       if (!this.owns(revision)) return;
@@ -150,7 +151,7 @@ export class FarmConnection {
         } catch {
           // Not the farm's refusal: its text as it is.
         }
-        throw new Error(problem || `那台电脑答了 ${response.status}`);
+        throw new Error(problem || mobileWording().answered(response.status));
       }
       const paired = JSON.parse(text) as LanPaired;
       const farm: Farm = { url: choice.link.url, key: paired.key, hostName: paired.hostName };
@@ -159,13 +160,13 @@ export class FarmConnection {
         try {
           await writeFarm(farm);
         } catch (e) {
-          throw new Error("保存配对失败：" + reason(e), { cause: e });
+          throw new Error(mobileWording().cannotSave(reason(e)), { cause: e });
         }
         if (!this.owns(revision)) {
           try {
             await writeFarm(this.committed);
           } catch (e) {
-            if (this.choice.kind === "pairing") this.publish({ ...this.choice, problem: "恢复保存的农场失败：" + reason(e) });
+            if (this.choice.kind === "pairing") this.publish({ ...this.choice, problem: mobileWording().cannotRestore(reason(e)) });
           }
           return;
         }
@@ -189,7 +190,7 @@ export class FarmConnection {
         if (this.owns(revision)) this.publish(this.committed ? { kind: "farm", farm: this.committed } : this.pairing());
       });
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "恢复保存的农场失败：" + reason(e) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotRestore(reason(e)) });
     }
   }
 
@@ -202,7 +203,7 @@ export class FarmConnection {
         this.committed = undefined;
       });
     } catch (e) {
-      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: "忘不掉保存的农场：" + reason(e) });
+      if (this.owns(revision)) this.publish({ ...this.pairing(), problem: mobileWording().cannotForget(reason(e)) });
     }
   }
 }

@@ -1,6 +1,7 @@
 // Agora exposes one native engine. Each attempt owns it until it ends; late permission replies and callbacks from an
 // ended attempt cannot initialize, release or send events through its successor.
 
+import { mobileWording } from "./words";
 import {
   ChannelProfileType,
   ClientRoleType,
@@ -15,7 +16,7 @@ import type { Rtc, RtcLine } from "@vibevalley/host";
 import { level } from "./rules";
 
 const fail = (code: number, what: string) => {
-  if (code < 0) throw new Error(`声网：${what}失败（${code}）`);
+  if (code < 0) throw new Error(mobileWording().agora(what, code));
 };
 
 let releaseCurrent: (() => void) | undefined;
@@ -35,7 +36,7 @@ export function nativeRtc() {
       resolveJoin = resolve;
       rejectJoin = reject;
     });
-    const close = (reason = new Error("通话已结束")) => {
+    const close = (reason = new Error(mobileWording().callEnded)) => {
       if (closed) return;
       closed = true;
       if (stop === close) stop = undefined;
@@ -50,22 +51,22 @@ export function nativeRtc() {
     releaseCurrent = close;
     const line: RtcLine = {
       mute: async (on) => {
-        if (closed || !engine) throw new Error("通话已结束");
-        fail(engine.muteLocalAudioStream(on), on ? "静音" : "取消静音");
+        if (closed || !engine) throw new Error(mobileWording().callEnded);
+        fail(engine.muteLocalAudioStream(on), on ? mobileWording().step.mute : mobileWording().step.unmute);
       },
       renew: async (token) => {
-        if (closed || !engine) throw new Error("通话已结束");
-        fail(engine.renewToken(token), "续期");
+        if (closed || !engine) throw new Error(mobileWording().callEnded);
+        fail(engine.renewToken(token), mobileWording().step.renew);
       },
       leave: async () => close(),
     };
     void (async () => {
       try {
         if (Platform.OS === "android" && (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) !== PermissionsAndroid.RESULTS.GRANTED)
-          throw new Error("没有麦克风权限");
+          throw new Error(mobileWording().noMic);
         if (closed) return;
         engine = createAgoraRtcEngine();
-        fail(engine.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), "初始化");
+        fail(engine.initialize({ appId: grant.appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting }), mobileWording().step.initialize);
         handler = {
           onJoinChannelSuccess: (connection) => {
             if (!owns(connection)) return;
@@ -89,15 +90,15 @@ export function nativeRtc() {
           // onError has no connection identity; queued errors from a released engine cannot end this attempt.
           onConnectionStateChanged: (connection, state, reason) => {
             if (!owns(connection) || state !== ConnectionStateType.ConnectionStateFailed) return;
-            const text = `声网：连接失败（${reason}）`;
+            const text = mobileWording().agoraLost(reason);
             if (!joined) close(new Error(text));
             else events.problem(text);
           },
           onTokenPrivilegeWillExpire: (connection) => owns(connection) && events.expiring(),
         };
         engine.registerEventHandler(handler);
-        fail(engine.enableAudio(), "打开麦克风");
-        fail(engine.enableAudioVolumeIndication(200, 3, true), "读取音量");
+        fail(engine.enableAudio(), mobileWording().step.mic);
+        fail(engine.enableAudioVolumeIndication(200, 3, true), mobileWording().step.volume);
         // The agent listens only to the numeric uid in the grant.
         fail(
           engine.joinChannel(grant.token, grant.channel, Number(grant.uid), {
@@ -106,7 +107,7 @@ export function nativeRtc() {
             publishMicrophoneTrack: true,
             autoSubscribeAudio: true,
           }),
-          "加入频道",
+          mobileWording().step.join,
         );
       } catch (e) {
         close(e instanceof Error ? e : new Error(String(e)));

@@ -2,6 +2,7 @@
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
 
+import { desktopWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -25,6 +26,8 @@ export interface Glance {
   working: number;
   /** Issues that want the owner: asked, handed back, stuck. */
   waiting: number;
+  /** The strip's words for the two counts, in the farm's language. */
+  strip: { working: string; waiting: string };
   /** Those waiting first, then those at work; by number within each. */
   rows: IslandRow[];
 }
@@ -52,9 +55,12 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
     rows.push({ issue: issue.id, number: issue.number, title: issue.title, doing, tone, first: attentionWantsOwner(state) });
   }
   rows.sort((a, b) => Number(b.first) - Number(a.first) || a.number - b.number);
+  const working = rows.filter((r) => r.tone === "working").length;
+  const waiting = rows.filter((r) => r.first).length;
   return {
-    working: rows.filter((r) => r.tone === "working").length,
-    waiting: rows.filter((r) => r.first).length,
+    working,
+    waiting,
+    strip: { working: desktopWording().working(working), waiting: desktopWording().waiting(waiting) },
     rows: rows.map(({ first: _, ...row }) => row),
   };
 }

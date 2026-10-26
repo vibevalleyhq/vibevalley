@@ -3,6 +3,7 @@
 // It runs on Electron's own Node (ELECTRON_RUN_AS_NODE), unbundled: the migrations, the word lists, PGlite's wasm and the
 // coding agents' SDKs are found beside their packages, so the server keeps its node_modules.
 
+import { desktopWording } from "./words";
 import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -72,16 +73,16 @@ export function startServer(files: ServerFiles, env: NodeJS.ProcessEnv, port = 0
   return new Promise((resolve, reject) => {
     const fail = (reason: string) => {
       void stop();
-      reject(new Error(`${reason}，日志在 ${files.log}`));
+      reject(new Error(desktopWording().seeLog(reason, files.log)));
     };
-    const timer = setTimeout(() => fail(`服务端 ${startTimeoutMs / 1000} 秒内没有发布就绪地址`), startTimeoutMs);
+    const timer = setTimeout(() => fail(desktopWording().noAddress(startTimeoutMs / 1000)), startTimeoutMs);
     child.once("error", (e) => {
       clearTimeout(timer);
-      fail(`服务端启动失败：${e.message}`);
+      fail(desktopWording().failed(e.message));
     });
     void exited.then((code) => {
       clearTimeout(timer);
-      fail(`服务端退出了（${code}）`);
+      fail(desktopWording().exited(code));
     });
     let ready = false;
     createInterface({ input: child.stdout }).on("line", (line) => {
