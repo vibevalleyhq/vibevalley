@@ -1,7 +1,3 @@
-// An issue's rules: its text as a job and back, the next task's
-// id, its draft (what the drafting session is told and how what it hands back is read), where its status may move, and
-// the sowing form's templates filled for a project.
-
 import { reportVerdict } from "../session/rules.ts";
 import type {
   Deliverable,
@@ -28,8 +24,7 @@ export const isClosed = (s: IssueStatus) => s === "done" || s === "canceled";
 export const criteriaHead =
   "验收标准（主人照这几条验收；做完逐条对照，在结论前面每条写一行「标准 N：做到了」「标准 N：没做到」或「标准 N：不确定」，后面接凭据：跑了什么命令、结果如何，或改了哪个文件）：";
 
-/** The criteria go last, so whoever works it checks each one before it hands the work back. An answer issue is read
- * only, and its job ends with the block its conclusion comes back in (parseAnswer). */
+/** The criteria go last, so whoever works it checks each one before handing the work back; an answer issue's job ends with the block parseAnswer reads. */
 export function issueJob(t: Pick<Issue, "title" | "description" | "criteria"> & { readonly deliver?: Deliverable }): string {
   let job = t.title;
   if (t.description) job += "\n\n" + t.description;
@@ -55,7 +50,7 @@ const answerFormat = [
   "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
 ].join("\n");
 
-/** 接着修 for an answer that could not be read: what was wrong with it, and the format again. */
+/** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
 export const answerCureWords = (problem: string) => `接着修：上一轮交回的结论读不出来（${problem}）。接着查清楚，最后照这个格式交：\n${answerFormat}`;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
@@ -78,7 +73,6 @@ export function splitJob(job: string): [string, string] {
 
 const int64Max = 9223372036854775807n;
 
-/** One more than the largest p<number> among ids (a number as Go's ParseInt reads one); the rest do not count. */
 export function nextTaskId(ids: readonly string[]): string {
   let top = 0n;
   for (const id of ids) {
@@ -91,7 +85,7 @@ export function nextTaskId(ids: readonly string[]): string {
   return "p" + (top + 1n).toString();
 }
 
-/** A draft as its session hands it back, in the json block its brief asks for. A list may come as one string. */
+/** As its session hands it back; a list may come as one string. */
 export interface IssueRefinement {
   readonly title: string;
   readonly why: string;
@@ -101,10 +95,8 @@ export interface IssueRefinement {
   readonly files: string[];
 }
 
-/** The lines with words in them, trimmed. */
 export const kept = (lines: readonly string[] | undefined) => (lines ?? []).map((l) => l.trim()).filter((l) => l !== "");
 
-/** The questions with words in them. */
 export const openQuestions = (questions: readonly Question[] | undefined): Question[] => (questions ?? []).filter((a) => a.question.trim() !== "");
 
 function linesOf(v: unknown, field: string): string[] {
@@ -154,7 +146,6 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
   return { problem };
 }
 
-/** The issue's description from a draft, under the same headings every time; a heading with nothing under it is left out. */
 export function refinementDescription(d: IssueRefinement): string {
   const parts: string[] = [];
   const why = d.why.trim();
@@ -171,7 +162,7 @@ export function refinementDescription(d: IssueRefinement): string {
 export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
-/** What the drafting session is told: the owner's word, the draft so far when there is one (as the owner may have edited it), and what it asked with the owner's answer. */
+/** The draft so far goes in when there is one: the owner may have edited it. */
 export function refinementBrief(
   t: Pick<Issue, "title" | "description" | "criteria"> & { readonly questions?: readonly Question[] },
   word: string,
@@ -224,7 +215,6 @@ const recentTitles = 5;
 /** A title longer than this is a long instruction, not one to send again. */
 const recentTitleLength = 60;
 
-/** The owner's own issues sent out in the project, newest first, each title once. */
 export function sentTitles(all: readonly Issue[], project: string): string[] {
   const mine = all
     .filter(
@@ -282,8 +272,8 @@ function startWords(t: RunTrigger, first: boolean): [MilestoneKind, string] {
   }
 }
 
-/** The issue's milestones out of what is kept: its runs (oldest first), the findings it was sent back with, its
- * acceptance and its close; newest first. The questions it waits on now go with its last run. names: a session's name. */
+/** runs oldest first; names: a session's name by its id. The milestones come newest first, the questions it waits on now
+ * with its last run. */
 export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<string, string>): IssueTimeline {
   const out: Milestone[] = [{ at: t.createdAt, kind: "opened", text: "开单" }];
   const lastDone = runs.findLastIndex((r) => r.endedAt !== undefined);
@@ -327,16 +317,14 @@ export function milestonesOf(t: Issue, runs: readonly Run[], names: ReadonlyMap<
   return { milestones, ...(spent ? { spent } : {}) };
 }
 
-/** 接着做: a round that stopped halfway goes on. */
 export const resumeWords = "上一轮停在了半路，接着把它做完。";
 
-/** 接着修: the job once, with what to do about the failure; a job that was told this before is not told it twice. */
+/** Calling it twice gives the same job: a 接着修 told before is taken off first. */
 export function cureWords(job: string): string {
   const original = job.replace(/^接着修：/, "").replace(/。看一下报错，修好再跑一遍测试$/, "");
   return `接着修：${original}。看一下报错，修好再跑一遍测试`;
 }
 
-/** 打回: one finding a line. */
 export const findingsOf = (text: string) =>
   text
     .split("\n")
@@ -346,11 +334,9 @@ export const findingsOf = (text: string) =>
 /** A pull request's description: the session's conclusion (its 结论： part), else all it last said. */
 export const pullRequestConclusion = (text: string) => reportVerdict(text) || text;
 
-/** A text column: blank is null. */
 export const nullText = (s: string | undefined) => {
   const t = (s ?? "").trim();
   return t === "" ? null : t;
 };
 
-/** A JSON column: null when there is nothing to keep. */
 export const jsonOrNull = (v: unknown, there: boolean) => (there ? JSON.stringify(v) : null);

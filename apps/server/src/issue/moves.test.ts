@@ -1,5 +1,3 @@
-// Where an issue may be moved: the table, and how it reads the attention.
-
 import { describe, expect, it } from "vite-plus/test";
 import { type Fact, type Issue, type IssueStatus, type Session } from "@vibevalley/protocol";
 import { emptyWorkspaceState } from "../core/core.ts";
@@ -40,11 +38,9 @@ describe("status moves", () => {
     const failed = issue("in_review", true, { attention: { state: "stuck", stuck: "failed", acts: [] } });
     expect(statusMoves(failed)).toEqual(["todo", "canceled"]);
     expect(statusMove(failed, "done")).toEqual(["none", "这一轮没做成：带句话再干一轮，或者关掉"]);
-    // Stopped halfway is not failed: what is there may still be completed.
     expect(statusMoves(issue("in_review", true, { attention: { state: "stuck", stuck: "interrupted", acts: [] } }))).toEqual(["todo", "done", "canceled"]);
   });
 
-  // Who does the work is not in the table: an issue no session works on (the orchestrator's) has run when its own run says so.
   it("an issue run by no session goes by the same table", () => {
     const ran = (status: IssueStatus, more: Partial<Issue>) => issue(status, false, { lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" }, ...more });
     expect(statusMoves(ran("in_review", {}))).toEqual(["todo", "done", "canceled"]);
@@ -63,7 +59,6 @@ describe("moves and the attention", () => {
     ...session("completed"),
     lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
   } as Session;
-  // An answer issue's round that got through but handed back no answer to read did not get it done.
   it("an answer issue waits on a conclusion it can read", () => {
     const answerIssue = { ...base, deliver: "answer" } as Issue;
     expect(attentionOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
@@ -72,11 +67,9 @@ describe("moves and the attention", () => {
       lead: "acknowledge",
       acts: ["acknowledge", "reject", "tell", "close"],
     });
-    // A change issue's round needs no such block.
     expect(attentionOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
   });
-  // One table: an act that takes the issue to done is offered exactly when the move is.
-  it("agree on done, whatever the round came to", () => {
+  it("an act to done is offered exactly when the move to done is, whatever the round came to", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [
       [{}, session("completed")],
       [{}, session("failed")],
@@ -148,7 +141,6 @@ describe("next steps after a refusal", () => {
       ["issue", "status", "41", "--json", '{"status":"done"}'],
       ["issue", "status", "41", "--json", '{"status":"canceled"}'],
     ]);
-    // A word to the helper, and another round, need the owner's words: named, not run.
     expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
       "带话：issue act 41，--json 带 act「tell」和要说的 text",
       "挪到待办：issue status 41，--json 带 status「todo」和这一轮要它做什么的 text",

@@ -1,5 +1,3 @@
-// An issue in the core state: its status, who drafts it, its place in the list and its findings left attention.
-
 import { type WorkspaceState, type Issue, type IssueRefining, type IssueStatus, orchestratorAgent } from "@vibevalley/protocol";
 import { isBusy, same } from "@vibevalley/protocol/rules";
 import { sessionOf } from "../session/state.ts";
@@ -79,7 +77,6 @@ export function withIssue(all: readonly Issue[] | undefined, t: Issue): Issue[] 
   return next.sort(issueOrder);
 }
 
-/** The session drafting an unsent issue: the one on the farm for it with draft set. */
 export function issueRefiningOf(t: Issue, state: WorkspaceState): IssueRefining | undefined {
   const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
