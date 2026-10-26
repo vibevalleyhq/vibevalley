@@ -9,7 +9,7 @@ export interface Module {
 }
 
 export const modules: readonly Module[] = [
-  { name: "Platform", parts: ["base", "core", "setting", "errors.ts"] },
+  { name: "Platform", parts: ["base", "core", "setting", "errors.ts", "words.ts", "prompts.ts"] },
   { name: "Agents", parts: ["agent", "runtime", "memory", "ai"] },
   { name: "Source Control", parts: ["project"] },
   { name: "Collaboration", parts: ["channel", "doc"] },
