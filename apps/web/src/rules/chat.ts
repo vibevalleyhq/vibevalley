@@ -9,6 +9,7 @@ import {
   generalName,
   type Issue,
   orchestratorAgent,
+  ownerId,
   type Phase,
   type Session,
   type Spent,
@@ -103,7 +104,7 @@ export function threadTitle(chat: Chat | undefined, thread: Conversation, issues
 export const messagesIn = (chat: Chat | undefined, conversation: string) => chat?.messages.filter((m) => m.conversation === conversation) ?? [];
 
 export const unreadIn = (chat: Chat | undefined, c: Conversation) =>
-  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.from !== "user" && m.kind !== "notice" && m.final).length;
+  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice" && m.final).length;
 
 export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(chat, c), 0);
 
@@ -264,7 +265,7 @@ export function roleShort(role: string) {
   return first.length > 18 ? first.slice(0, 18) : first;
 }
 
-export const mentionOf: Record<string, string> = { [orchestratorAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Record<string, string> = { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" };
 
 export interface Nameable {
   token: string;

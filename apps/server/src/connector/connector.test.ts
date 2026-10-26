@@ -193,7 +193,7 @@ const nth = (script: Script, app: ConnectorID, n: number, what: string) => until
 const saidIn = (conversation: string) =>
   Effect.gen(function* () {
     const chat = yield* Channels;
-    return (yield* chat.history(conversation)).filter((m) => m.from === "user").map((m) => m.text);
+    return (yield* chat.history(conversation)).filter((m) => m.from === "owner").map((m) => m.text);
   });
 
 const weixinConnected = (script: Script) =>

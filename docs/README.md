@@ -88,7 +88,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 技能书 | skill（`Skill`） | 帮工档案能带的技能 | 插件 |
 | 计划 | task graph（`TaskGraph`，带 `graph` 的父工单） | 一件长活拆成的有先后的几件，按 DAG 推进；都做完了一次合进主分支 | 工作流、playbook、plan、种植计划 |
 | 一件 | task（`Task`，带 `task` 的子工单） | 计划里的一件，一个帮工做 | 步骤、step、节点、node |
-| 主人 | user | 你 | |
+| 主人 | owner | 你 | |
 | 田头 | general | 默认的频道：你、管家和帮工都在 | 群 |
 | 频道 | channel | 另开的说话的地方；微信、飞书、QQ 各接一个 | 群 |
 | 串 | thread | 挂在一条消息下面的话题串；派活时开的叫工单串 | 子频道 |

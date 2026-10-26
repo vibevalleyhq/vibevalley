@@ -179,7 +179,7 @@ export const CallState: Codec<T.CallState> = Schema.Literals(T.CallStateValues);
 
 export const OrchestratorState: Codec<T.OrchestratorState> = Schema.Literals(T.OrchestratorStateValues);
 
-export const SenderKind: Codec<T.SenderKind> = Schema.Literals(T.SenderKindValues);
+export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const MessageKind: Codec<T.MessageKind> = Schema.Literals(T.MessageKindValues);
 
@@ -195,7 +195,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   number: Schema.Number,
   conversation: Schema.String,
   from: Schema.String,
-  fromKind: SenderKind,
+  fromKind: ActorKind,
   name: Schema.String,
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
@@ -475,8 +475,6 @@ export const RecurrenceWhen: Codec<T.RecurrenceWhen> = Schema.Union([
   RecurrenceWhenWeekly,
   RecurrenceWhenCron,
 ]);
-
-export const ActorKind: Codec<T.ActorKind> = Schema.Literals(T.ActorKindValues);
 
 export const Recurrence: Codec<T.Recurrence> = Schema.Struct({
   id: Schema.String,

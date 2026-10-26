@@ -100,7 +100,7 @@ describe("mcp", () => {
       expect(who.split("\n").slice(0, -1).join("\n")).not.toContain("@");
       expect(yield* Effect.promise(() => c.tool("channel_say", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
       const m = messagesIn(core.state().chat, thread!).find((x) => x.text === "从 MCP 说一句");
-      expect(m).toMatchObject({ from: id, fromKind: "agent" });
+      expect(m).toMatchObject({ from: id, fromKind: "session" });
       expect(yield* Effect.promise(() => c.tool("channel_inbox"))).not.toBe("");
       expect(yield* Effect.promise(() => c.tool("read_chat"))).toContain("从 MCP 说一句");
       expect(yield* Effect.promise(() => client(mcp, "").tool("session_list"))).toContain("没认出你是谁");

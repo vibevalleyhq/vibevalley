@@ -10,6 +10,7 @@ import {
   type Fact,
   type LedgerEntry,
   orchestratorAgent,
+  ownerId,
   type Progress,
   type ProgressNews,
   type TaskGraph,
@@ -237,16 +238,16 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
     }
     case "message": {
       if (!isNew(before, fact.message.id)) break;
-      if (fact.message.fromKind === "user") {
+      if (fact.message.fromKind === "owner") {
         if (fact.thread) {
           const h = sessionOnIssue(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions ?? []) {
-          const h = named !== orchestratorAgent && named !== "user" && named !== everyone ? sessionOf(before, named) : undefined;
+          const h = named !== orchestratorAgent && named !== ownerId && named !== everyone ? sessionOf(before, named) : undefined;
           if (h) out.push({ kind: "called", session: h.id });
         }
-      } else if (fact.message.fromKind === "agent" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
+      } else if (fact.message.fromKind === "session" && fact.answers) out.push({ kind: "handoff", session: fact.answers, to: fact.message.from });
       break;
     }
     case "commits": {

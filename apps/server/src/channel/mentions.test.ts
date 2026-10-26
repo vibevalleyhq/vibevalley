@@ -70,7 +70,7 @@ it.live("only reading or replying in the mentioned conversation completes an own
     expect(mentionIds(core)).toEqual([]);
     const third = (yield* chat.speak("orchestrator", "@主人 第三份变更", { target: "#review", anyway: true })).message!;
     expect(mentionIds(core)).toEqual([third.id]);
-    yield* chat.read("user", { target: "#review" });
+    yield* chat.read("owner", { target: "#review" });
     expect(mentionIds(core)).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(world({ config })), Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
 });

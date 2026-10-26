@@ -211,7 +211,7 @@ export const AgentWakesByConversationResult = Schema.Struct({
 export type AgentWakesByConversationResult = typeof AgentWakesByConversationResult.Type
 
 
-export const AgentWakesByConversationSql = "-- name: AgentWakesByConversation :many\n-- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.conversation_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'user'), '')\n  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.conversation_id;"
+export const AgentWakesByConversationSql = "-- name: AgentWakesByConversation :many\n-- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.conversation_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'owner'), '')\n  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.conversation_id;"
 
 export const agentWakesByConversation = Effect.fn("AgentWakesByConversation")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -235,7 +235,7 @@ export const LastAgentWakesResult = Schema.Struct({
 export type LastAgentWakesResult = typeof LastAgentWakesResult.Type
 
 
-export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- When each recipient was last woken by an agent (channel/audience.ts).\nselect d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.recipient_id;"
+export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- When each recipient was last woken by an agent (channel/audience.ts).\nselect d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere s.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.recipient_id;"
 
 export const lastAgentWakes = Effect.fn("LastAgentWakes")(function* () {
   const sql = yield* SqlClient.SqlClient

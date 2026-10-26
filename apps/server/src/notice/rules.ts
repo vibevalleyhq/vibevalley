@@ -1,7 +1,7 @@
 // Notifications' rules: what of the farm's talk reaches the owner off the farm (forOwner), and the patrol (巡查), no model. Each inbox item waits out its kind's grace (a question may be answered
 // in a minute), is reported once, and again only after reportAgainMs if it still stands.
 
-import { type ChatMessage, everyone, type InboxKind, type WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, everyone, type InboxKind, ownerId, type WorkspaceState } from "@vibevalley/protocol";
 import { inboxEntries } from "./inbox.ts";
 
 /** In ms. Kinds not here the orchestrator does not hear of from the patrol: a failed run reaches it as it happens, a task
@@ -58,13 +58,13 @@ export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMem
 /** What of the farm's talk reaches the owner off the farm (the chat apps): reports, dispatches, the orchestrator's words
  * and what names the owner or everyone, once said in full (the orchestrator's words grow while he speaks). */
 export function forOwner(m: ChatMessage): boolean {
-  if (!m.final || m.from === "user") return false;
+  if (!m.final || m.from === ownerId) return false;
   switch (m.kind) {
     case "report":
     case "dispatch":
       return true;
     case "chat":
-      return m.fromKind === "orchestrator" || (m.mentions ?? []).includes("user") || (m.mentions ?? []).includes(everyone);
+      return m.fromKind === "orchestrator" || (m.mentions ?? []).includes(ownerId) || (m.mentions ?? []).includes(everyone);
   }
   return false;
 }

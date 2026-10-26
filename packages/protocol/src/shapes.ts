@@ -11,6 +11,9 @@ export type SessionId = string & Brand.Brand<"SessionId">;
 /** The orchestrator's participant id, and the agent of an issue for it. No agent profile has this id. */
 export const orchestratorAgent = "orchestrator";
 
+/** The owner's participant id: who @主人 is. */
+export const ownerId = "owner";
+
 /** Who @所有人 is. */
 export const everyone = "everyone";
 
@@ -199,8 +202,9 @@ export type CallState = (typeof CallStateValues)[number];
 export const OrchestratorStateValues = ["idle", "listening", "thinking", "speaking"] as const;
 export type OrchestratorState = (typeof OrchestratorStateValues)[number];
 
-export const SenderKindValues = ["user", "orchestrator", "agent", "system"] as const;
-export type SenderKind = (typeof SenderKindValues)[number];
+/** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself; also who said a message. */
+export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
+export type ActorKind = (typeof ActorKindValues)[number];
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
 export type MessageKind = (typeof MessageKindValues)[number];
@@ -218,7 +222,7 @@ export interface ChatMessage {
   number: number;
   conversation: string;
   from: string;
-  fromKind: SenderKind;
+  fromKind: ActorKind;
   name: string;
   agent?: string;
   kind: MessageKind;
@@ -444,10 +448,6 @@ export interface Recurrence {
   whenText?: string;
   nextText?: string;
 }
-
-/** Who did a thing, as it is kept: the owner, the orchestrator, a session (a helper at work), or the farm itself. */
-export const ActorKindValues = ["owner", "orchestrator", "session", "system"] as const;
-export type ActorKind = (typeof ActorKindValues)[number];
 
 export interface OwnerMention {
   message: ChatMessage;

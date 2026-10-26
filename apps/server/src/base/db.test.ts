@@ -38,7 +38,7 @@ describe("the database", () => {
     const seqs = Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ count: number }>`SELECT count(*)::int AS count FROM channel_participant`.pipe(Effect.orDie);
-      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'user', '主人', 1)`.pipe(Effect.orDie);
+      yield* sql`INSERT INTO channel_participant (id, kind, name, joined_at) VALUES ('u', 'owner', '主人', 1)`.pipe(Effect.orDie);
       const seq = yield* sql<{ seq: number }>`SELECT seq FROM channel_participant WHERE id = 'u'`.pipe(Effect.orDie);
       return [rows[0]!.count, seq[0]!.seq];
     });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Audience } from "./audience.ts";
 
-const wake = { recipient: "w2", senderKind: "agent", recipientKind: "agent", wakes: true, held: false, at: 5 };
+const wake = { recipient: "w2", senderKind: "session", recipientKind: "session", wakes: true, held: false, at: 5 };
 
 describe("the audience", () => {
   it("counts agents waking agents since the owner last spoke, from the messages after their words", () => {
@@ -19,8 +19,8 @@ describe("the audience", () => {
     // Held, not waking, the owner's, or to the owner: none count.
     a.delivered({ ...wake, conversation: "c", message: "m14", held: true });
     a.delivered({ ...wake, conversation: "c", message: "m15", wakes: false });
-    a.delivered({ ...wake, conversation: "c", message: "m16", senderKind: "user" });
-    a.delivered({ ...wake, conversation: "c", message: "m17", recipientKind: "user" });
+    a.delivered({ ...wake, conversation: "c", message: "m16", senderKind: "owner" });
+    a.delivered({ ...wake, conversation: "c", message: "m17", recipientKind: "owner" });
     expect(a.hops("c")).toBe(1);
   });
 

@@ -1,7 +1,7 @@
 // The orchestrator's pure rules: where an input came from, how the farm reads to it and what changed
 // in it, what the patrol finds, and how a model answer's tokens are worded.
 
-import type { RunTriggerKind, RuntimeInfo } from "@vibevalley/protocol";
+import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 import { head } from "../base/text.ts";
 import { type InboxMessage, messageLine } from "../channel/rules.ts";
 import { quotaLow, yuan } from "../runtime/money.ts";
@@ -113,7 +113,9 @@ export const orchestratorInboxLines = (messages: readonly InboxMessage[]) =>
     .map((m) => {
       const text = m.text.trim();
       return messageLine(
-        m.from !== "user" && text.length > lineMax ? { ...m, text: head(text, lineMax) + `…（这条有 ${text.length} 字，全文用 read_chat 读 ${m.target}）` } : m,
+        m.from !== ownerId && text.length > lineMax
+          ? { ...m, text: head(text, lineMax) + `…（这条有 ${text.length} 字，全文用 read_chat 读 ${m.target}）` }
+          : m,
       );
     })
     .join("\n");

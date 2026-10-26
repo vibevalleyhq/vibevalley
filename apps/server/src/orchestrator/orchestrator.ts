@@ -7,7 +7,7 @@
 
 import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
-import { orchestratorAgent } from "@vibevalley/protocol";
+import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
 import { runtimeLabel } from "../agent/seed.ts";
 import { nextRun } from "../recurrence/when.ts";
 import { isOpen } from "../task/graph.ts";
@@ -350,8 +350,8 @@ export const make = (options: OrchestratorOptions = {}) =>
     };
 
     const heardInChat = async (n: OrchestratorNews) => {
-      const fromPerson = n.messages.every((m) => m.from === "user");
-      const owner = n.messages.some((m) => m.from === "user");
+      const fromPerson = n.messages.every((m) => m.from === ownerId);
+      const owner = n.messages.some((m) => m.from === ownerId);
       let picked: Pick = {};
       for (const m of n.messages) {
         const p = selected.get(m.id);
@@ -447,7 +447,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
         yield* core.open();
-        if (yield* chat.spoken("user", text, sendKey)) return;
+        if (yield* chat.spoken(ownerId, text, sendKey)) return;
         const picked = agent ? store.agent(agent)?.id : undefined;
         void take({
           source: "owner",
@@ -479,7 +479,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         if (model !== orchestratorModel) return undefined;
         if (on === "api") return (text, signal) => answer("主人说：" + text, signal);
         return (text, signal) => {
-          void go(Effect.ignore(chat.spoken("user", text, "")));
+          void go(Effect.ignore(chat.spoken(ownerId, text, "")));
           return answer(voiceNote + "\n主人说：" + text, signal);
         };
       },

@@ -167,7 +167,7 @@ export const OwnerMentionsResult = Schema.Struct({
 export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
 
 
-export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nleft join channel_read_cursor r on r.participant_id = 'user' and r.conversation_id = c.id\nwhere n.target_id = 'user' and m.sender_id <> 'user' and m.final\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'user' and reply.number > m.number)\norder by m.id;"
+export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.final, m.meta, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.conversation_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner' and m.final\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
 
 export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -386,7 +386,7 @@ export const CalledByResult = Schema.Struct({
 export type CalledByResult = typeof CalledByResult.Type
 
 
-export const CalledBySql = "-- name: CalledBy :one\n-- The session who last @-ed the speaker here since the speaker last spoke.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\njoin channel_participant p on p.id = m.sender_id and p.kind = 'agent'\nwhere m.conversation_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.conversation_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit 1;"
+export const CalledBySql = "-- name: CalledBy :one\n-- The session who last @-ed the speaker here since the speaker last spoke.\nselect m.sender_id\nfrom channel_message m\njoin channel_mention n on n.message_id = m.id and n.target_id = $1\njoin channel_participant p on p.id = m.sender_id and p.kind = 'session'\nwhere m.conversation_id = $2 and m.sender_id <> $1 and m.id < $3\n  and m.id > coalesce((select max(s.id) from channel_message s where s.conversation_id = $2 and s.sender_id = $1 and s.id < $3), '')\norder by m.id desc\nlimit 1;"
 
 export const calledBy = Effect.fn("CalledBy")(function* (params: CalledByParams) {
   const sql = yield* SqlClient.SqlClient
@@ -433,7 +433,7 @@ export const HoldNoticeSinceUserResult = Schema.Struct({
 export type HoldNoticeSinceUserResult = typeof HoldNoticeSinceUserResult.Type
 
 
-export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.conversation_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = $1 and u.sender_id = 'user'), '');"
+export const HoldNoticeSinceUserSql = "-- name: HoldNoticeSinceUser :one\nselect count(*)::int as n from channel_message m\nwhere m.conversation_id = $1 and m.sender_id = 'system' and (m.meta::jsonb ->> 'code') = 'hop_limit'\n  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = $1 and u.sender_id = 'owner'), '');"
 
 export const holdNoticeSinceUser = Effect.fn("HoldNoticeSinceUser")(function* (params: HoldNoticeSinceUserParams) {
   const sql = yield* SqlClient.SqlClient
@@ -492,7 +492,7 @@ export const OwnerLastMessagesResult = Schema.Struct({
 export type OwnerLastMessagesResult = typeof OwnerLastMessagesResult.Type
 
 
-export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- The owner's last message in each conversation, from which agents waking agents are counted (channel/audience.ts).\nselect conversation_id, max(id)::text as id from channel_message where sender_id = 'user' group by conversation_id;"
+export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- The owner's last message in each conversation, from which agents waking agents are counted (channel/audience.ts).\nselect conversation_id, max(id)::text as id from channel_message where sender_id = 'owner' group by conversation_id;"
 
 export const ownerLastMessages = Effect.fn("OwnerLastMessages")(function* () {
   const sql = yield* SqlClient.SqlClient

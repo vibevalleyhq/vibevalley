@@ -180,9 +180,9 @@ function Dispatch(props: { text: string }) {
 function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conversation }) {
   const core = useCore();
   const agentOf = useAgent(() => props.m.agent);
-  const session = () => (props.m.fromKind === "agent" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
+  const session = () => (props.m.fromKind === "session" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
   const who = () => {
-    if (props.m.fromKind !== "agent") return "";
+    if (props.m.fromKind !== "session") return "";
     const agent = agentOf();
     const s = session();
     return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.role ? roleShort(agent.role) : ""].filter(Boolean).join(" ");
@@ -192,7 +192,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
     <Frame
       face={<SenderFace m={props.m} />}
       dot={session() && <Dot tone={phaseDot(session()!.phase)} size={11} />}
-      name={props.m.fromKind === "user" ? "主人" : props.m.name}
+      name={props.m.fromKind === "owner" ? "主人" : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}`}
       continues={props.continues}
     >
@@ -225,7 +225,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
       <Show when={props.m.final && props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
         <TurnSteps session={orchestratorAgent} run={props.m.run} orchestrator />
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "agent" && props.m.kind === "report"}>
+      <Show when={props.m.final && props.m.fromKind === "session" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />
       </Show>
       <Show when={props.thread}>{(thread) => <ThreadPreview thread={thread()} />}</Show>
@@ -265,7 +265,7 @@ function ThreadPreview(props: { thread: Conversation }) {
       <Show when={last()}>
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().fromKind === "user" ? "主人" : m().name}</span>
+            <span class="shrink-0 font-medium">{m().fromKind === "owner" ? "主人" : m().name}</span>
             <span class="min-w-0 flex-1 truncate text-muted">{m().text.replace(/\s+/g, " ")}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>

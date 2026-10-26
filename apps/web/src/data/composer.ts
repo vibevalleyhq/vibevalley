@@ -27,7 +27,7 @@ const [pendingLines, setPendingLines] = createSignal<readonly PendingLine[]>([])
 export const pending = pendingLines;
 
 export const arrived = (p: PendingLine, messages: readonly ChatMessage[]) =>
-  messages.some((m) => m.conversation === p.conversation && m.fromKind === "user" && m.number > p.after && m.text === p.text);
+  messages.some((m) => m.conversation === p.conversation && m.fromKind === "owner" && m.number > p.after && m.text === p.text);
 
 export interface ComposerWays {
   /** Every routing field of the next message; its text and retry identity belong to the composer. */

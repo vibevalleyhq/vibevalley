@@ -1,11 +1,11 @@
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
-import { type Conversation, everyone, generalName, orchestratorAgent, type MessageKind, type Outcome, type SenderKind } from "@vibevalley/protocol";
+import { type Conversation, everyone, generalName, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
-const chatNamed: Readonly<Record<string, string>> = { 管家: orchestratorAgent, 主人: "user", 所有人: everyone };
+const chatNamed: Readonly<Record<string, string>> = { 管家: orchestratorAgent, 主人: ownerId, 所有人: everyone };
 
-export const mentionOf: Readonly<Record<string, string>> = { [orchestratorAgent]: "@管家", user: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Readonly<Record<string, string>> = { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" };
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;
@@ -56,7 +56,7 @@ export interface Delivery {
 
 export interface AudienceInput {
   readonly from: string;
-  readonly fromKind: SenderKind;
+  readonly fromKind: ActorKind;
   readonly kind: MessageKind;
   readonly mentions: readonly string[];
   /** Only its kind is read. */
@@ -79,7 +79,7 @@ export interface AudienceInput {
 export function chatAudience(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
   if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken) return out;
-  const byAgent = i.fromKind === "agent" || i.fromKind === "orchestrator";
+  const byAgent = i.fromKind === "session" || i.fromKind === "orchestrator";
   const present = i.present ?? i.sessions ?? [];
   let hops = i.hops;
   const add = (recipient: string, reason: DeliveryReason, wakes: boolean) => {
@@ -88,7 +88,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     let heldBy: HeldBy | undefined;
     if (wakes && byAgent && hops >= hopLimit) heldBy = "hop_limit";
     else if (wakes && byAgent && recipient !== orchestratorAgent && (i.cooling ?? []).includes(recipient)) heldBy = "cooldown";
-    else if (wakes && i.fromKind !== "user" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
+    else if (wakes && i.fromKind !== "owner" && (i.broken ?? []).includes(recipient)) heldBy = "wake_breaker";
     if (wakes && byAgent && !heldBy) hops++;
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
@@ -100,16 +100,16 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   const mentions = i.mentions ?? [];
   for (const m of mentions) {
     if (m === everyone) {
-      if (i.fromKind === "user") for (const h of i.sessions ?? []) add(h, "everyone", true);
-    } else if (m !== "user") add(m, "mention", true);
+      if (i.fromKind === "owner") for (const h of i.sessions ?? []) add(h, "everyone", true);
+    } else if (m !== ownerId) add(m, "mention", true);
   }
   const thread = i.conversation.kind === "thread";
   const owner = thread ? (i.threadOwner ?? "") : "";
-  if (i.fromKind === "user") {
+  if (i.fromKind === "owner") {
     if (owner) add(owner, "own_thread", true);
     if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
     else {
-      if (!mentions.some((m) => m !== "user")) add(orchestratorAgent, "addressed", true);
+      if (!mentions.some((m) => m !== ownerId)) add(orchestratorAgent, "addressed", true);
       for (const h of i.sessions ?? []) add(h, "general", false);
     }
   } else if (owner) add(owner, "own_thread", true);
@@ -164,14 +164,14 @@ export interface InboxMessage {
   readonly number: number;
   readonly target: string;
   readonly from: string;
-  readonly fromKind: SenderKind;
+  readonly fromKind: ActorKind;
   readonly name: string;
   readonly text: string;
 }
 
 /** The words' own line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: InboxMessage): string {
-  const from = m.fromKind === "agent" ? m.from + " " + m.name : m.name;
+  const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
   return `[target=${m.target} msg=${m.number} from=${from}] ${m.text.trim().replaceAll("\n", "\n  │ ")}`;
 }
 

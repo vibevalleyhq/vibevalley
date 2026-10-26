@@ -43,13 +43,13 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
   const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
   return (
     <Switch>
-      <Match when={props.m.fromKind === "user"}>
+      <Match when={props.m.fromKind === "owner"}>
         <OwnerFace size={props.size ?? 36} />
       </Match>
       <Match when={props.m.fromKind === "orchestrator"}>
         <OrchestratorFace size={props.size ?? 36} />
       </Match>
-      <Match when={props.m.fromKind === "agent" || props.m.fromKind === "system"}>
+      <Match when={props.m.fromKind === "session" || props.m.fromKind === "system"}>
         <HelperFace agent={props.m.agent ?? session()?.agent ?? props.m.from} runtime={session()?.runtime} size={props.size ?? 36} />
       </Match>
     </Switch>
