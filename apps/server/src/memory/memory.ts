@@ -12,7 +12,8 @@ import {
   type Preview,
   type RecallPreview,
 } from "@vibevalley/protocol";
-import { Clock, Context, Effect, FiberSet, Layer } from "effect";
+import { Clock, Context, Effect, Layer } from "effect";
+import { HttpClient } from "effect/http";
 import { Agents } from "../agent/agent.ts";
 import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
 import { Settings } from "../base/config.ts";
@@ -34,8 +35,7 @@ import {
   type SearchResult,
   sourceLabels,
 } from "./recall.ts";
-import { type EndedSession, interleave, localSource, mergeRecalled, type Source, Sources } from "./sources.ts";
-import { timeHere } from "../base/time.ts";
+import { type EndedSession, interleave, localSource, makeSources, mergeRecalled, type Source } from "./sources.ts";
 
 export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery, SearchResult };
 export { foundText };
@@ -91,10 +91,9 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
 };
 
 /** Which outside source a configured one is; tests put their own. */
-/** now: the memory service's Clock. */
-export type BuildSource = (c: Parameters<typeof nowledge>[0], now: () => number) => Source | undefined;
+export type BuildSource = (c: Parameters<typeof nowledge>[0], http: HttpClient.HttpClient) => Source | undefined;
 
-const defaultBuild: BuildSource = (c, now) => (c.kind === "nowledge" ? nowledge(c, now) : c.kind === "everos" ? everos(c, now) : undefined);
+const defaultBuild: BuildSource = (c, http) => (c.kind === "nowledge" ? nowledge(c) : c.kind === "everos" ? everos(c, http) : undefined);
 
 export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
   Effect.gen(function* () {
@@ -102,24 +101,18 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const setting = yield* Setting;
     const agents = yield* Agents;
     const local = yield* makeMemories;
-    // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
-    const run = yield* FiberSet.makeRuntimePromise<never>();
-    const forkHere = yield* FiberSet.makeRuntime<never>();
-    const log = (line: string) => void forkHere(Effect.logWarning(line));
-    const time = yield* timeHere;
-    const sources = new Sources(
-      localSource(local, () => agents.agents().map((a) => a.id), run, time.now),
-      setting.memorySources,
-      (c) => build(c, time.now),
-      log,
-      timeoutMs,
-    );
-    yield* Effect.addFinalizer(() => Effect.promise(() => sources.stop()));
+    const http = yield* HttpClient.HttpClient;
+    const sources = yield* makeSources({
+      local: localSource(local, () => agents.agents().map((a) => a.id)),
+      configured: setting.memorySources,
+      build: (c) => build(c, http),
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    });
     // What an older cut left is cut again in the background.
     yield* Effect.forkScoped(local.recutTerms);
     const home = orchestratorHome(config.home);
 
-    const list = (agent: string) => Effect.promise(async () => (await sources.list(agent)).memories);
+    const list = (agent: string) => Effect.map(sources.list(agent), (r) => r.memories);
 
     const write = Effect.fn("Memories.write")(function* (n: Note) {
       const kept = yield* local.write(n).pipe(Effect.mapError((e) => refused(e.message)));
@@ -127,8 +120,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       return kept;
     });
 
-    const forget = (agent: string, id: string) =>
-      Effect.tryPromise({ try: () => sources.forget(agent, id), catch: (e) => refused(e instanceof Error ? e.message : String(e)) });
+    const forget = (agent: string, id: string) => Effect.mapError(sources.forget(agent, id), (e) => refused(e.message));
 
     const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (text: string) {
       const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
@@ -144,8 +136,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     };
 
     const preview = (agent: string, project: string, text: string) =>
-      Effect.promise(async (): Promise<RecallPreview> => {
-        const lines = mergeRecalled(await sources.prefetch({ agent, project, text, peek: true }));
+      Effect.map(sources.prefetch({ agent, project, text, peek: true }), (groups): RecallPreview => {
+        const lines = mergeRecalled(groups);
         return { lines: lines.map((l) => l.line), chars: lines.reduce((n, l) => n + l.line.length + 1, 0), limit: recallChars };
       });
 
@@ -154,15 +146,14 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const forgettable = Effect.fn("Memories.forgettable")(function* (agent: string, id: string) {
       const problem = agent === orchestratorAgent ? undefined : sources.forgetProblem(id);
       if (problem) return yield* Effect.fail(refused(problem));
-      const listed =
-        agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* Effect.promise(() => sources.list(agent));
+      const listed = agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* sources.list(agent);
       const m = listed.memories.find((x) => x.id === id);
       if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
       return m;
     });
 
     const shape: MemoryShape = {
-      memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : Effect.promise(() => sources.list(agent))),
+      memoriesOf: (agent) => (agent === orchestratorAgent ? Effect.sync(orchestrator) : sources.list(agent)),
       remember: (n) => (n.agent === orchestratorAgent ? writeOrchestrator(n.text) : write(n)),
       forgetOf: (agent, id) =>
         Effect.andThen(
@@ -176,27 +167,26 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       recallOf: (agent, project, text) =>
         agent === orchestratorAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text),
       recall: Effect.fn("Memories.recall")(function* (cue) {
-        const told = mergeRecalled(yield* Effect.promise(() => sources.prefetch(cue)));
+        const told = mergeRecalled(yield* sources.prefetch(cue));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
         yield* local.markRecalled(ids.filter((id) => !id.includes(":")));
         return { ids, lines: told.map((l) => l.line) };
       }),
-      search: (q) =>
-        Effect.promise(async () => {
-          const query = { ...q, limit: q.limit > 0 ? q.limit : searchLimit };
-          const pages = await sources.search(query);
-          const coverage = pages.flatMap((page) => {
-            const notes = page.coverage ? [page.coverage] : [];
-            if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push("有命中的项目范围未经确认，已从本项目检索中排除");
-            return notes.map((note) => `${sourceLabels[page.source] ?? page.source}：${note}`);
-          });
-          const found = interleave(
-            pages.map((page) => page.found),
-            (f) => f.text,
-            (f) => inProject(f.scope, query.project),
-          ).slice(0, query.limit);
-          return { found, coverage };
-        }),
+      search: Effect.fn("Memories.search")(function* (q) {
+        const query = { ...q, limit: q.limit > 0 ? q.limit : searchLimit };
+        const pages = yield* sources.search(query);
+        const coverage = pages.flatMap((page) => {
+          const notes = page.coverage ? [page.coverage] : [];
+          if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push("有命中的项目范围未经确认，已从本项目检索中排除");
+          return notes.map((note) => `${sourceLabels[page.source] ?? page.source}：${note}`);
+        });
+        const found = interleave(
+          pages.map((page) => page.found),
+          (f) => f.text,
+          (f) => inProject(f.scope, query.project),
+        ).slice(0, query.limit);
+        return { found, coverage };
+      }),
       keep: Effect.fn("Memories.keep")(function* (r) {
         yield* local.keep(r);
         sources.keep(r);

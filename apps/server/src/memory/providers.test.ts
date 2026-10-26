@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Memory, MemorySourceUpdate } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { layer as agentLayer } from "../agent/agent.ts";
 import { Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
@@ -11,10 +12,10 @@ import { whenTrue } from "../testing/until.ts";
 import { owner as ownerActor } from "../base/actor.ts";
 import { type BuildSource, type FinishedRun, foundText, type Found, Memories, make, type Note, type RecallCue, type SearchQuery } from "./memory.ts";
 import { localName, recallChars, recallCount, searchLimit } from "./recall.ts";
-import { mergeRecalled, type RecalledLine, type Source } from "./sources.ts";
+import { mergeRecalled, type RecalledLine, type Source, sourceError } from "./sources.ts";
 
-/** A source outside the farm, played: what it gives and what it was given. */
-class Fake implements Source {
+/** A source outside the farm, played: what it gives and what it was given, as a library would, in promises. */
+class Fake {
   available = true;
   lines: RecalledLine[] = [];
   listed: Memory[] = [];
@@ -57,12 +58,30 @@ class Fake implements Source {
   };
 }
 
+/** The fake as the farm sees it: each call a request that interrupting aborts. */
+const sourceOf = (f: Fake): Source => ({
+  name: f.name,
+  unavailable: () => f.unavailable(),
+  stop: Effect.promise(() => f.stop()),
+  prefetch: (cue) => Effect.tryPromise({ try: (signal) => f.prefetch(cue, signal), catch: sourceError }),
+  syncTurn: (run) => Effect.tryPromise({ try: () => f.syncTurn(run), catch: sourceError }),
+  sessionEnded: () => Effect.tryPromise({ try: () => f.sessionEnded(), catch: sourceError }),
+  search: (q) => Effect.tryPromise({ try: (signal) => f.search(q, signal), catch: sourceError }),
+  list: (agent) => Effect.tryPromise({ try: (signal) => f.list(agent, signal), catch: sourceError }),
+  add: (n) => Effect.tryPromise({ try: () => f.add(n), catch: sourceError }),
+  forget: (agent, id) => Effect.tryPromise({ try: (signal) => f.forget(agent, id, signal), catch: sourceError }),
+  get can() {
+    return f.can;
+  },
+});
+
 const world = (build: BuildSource = () => undefined, timeoutMs = 50) =>
   Layer.effect(Memories, make(build, timeoutMs)).pipe(
     Layer.provideMerge(agentLayer),
     Layer.provideMerge(settingLayer),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
+    Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(Layer.succeed(Settings, testConfig())),
   );
 
@@ -75,7 +94,7 @@ const withFake = <A, E>(fake: Fake, body: (m: Memories["Service"]) => Effect.Eff
   Effect.gen(function* () {
     yield* save(nowledgeOn).pipe(Effect.orDie);
     return yield* body(yield* Memories);
-  }).pipe(Effect.provide(world(() => fake)));
+  }).pipe(Effect.provide(world(() => sourceOf(fake))));
 
 const owner = (agent: string, text: string, project = ""): Note => ({ agent, text, project, by: ownerActor });
 
@@ -158,7 +177,7 @@ describe("memory sources", () => {
     const build = (c: MemorySourceConfig) => {
       built++;
       fake.available = c.url !== "http://down/";
-      return fake;
+      return sourceOf(fake);
     };
     return Effect.gen(function* () {
       const m = yield* Memories;
@@ -208,7 +227,7 @@ describe("memory sources", () => {
       yield* Effect.promise(() => until(() => events.includes("old:stop")));
       expect(events).toEqual(["old:first", "old:stop", "new:third"]);
       expect((yield* m.list("lab")).map((m) => m.text).sort()).toEqual(["first", "second", "third"]);
-    }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => (c.url === nowledgeOn.url ? old : fresh))));
+    }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh))));
   });
 
   for (const operation of ["prefetch", "search", "list", "forget"] as const)
@@ -248,11 +267,11 @@ describe("memory sources", () => {
         yield* Effect.promise(() => until(() => entered));
         yield* save({ ...nowledgeOn, url: "http://new/" });
         m.sources();
-        expect(asked?.aborted).toBe(true);
+        yield* Effect.promise(() => until(() => asked?.aborted === true));
         yield* Effect.promise(() => pending);
         yield* Effect.promise(() => until(() => stopped));
         release();
-      }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => (c.url === nowledgeOn.url ? old : fresh), 60_000)));
+      }).pipe(Effect.ensuring(Effect.sync(() => release())), Effect.provide(world((c) => sourceOf(c.url === nowledgeOn.url ? old : fresh), 60_000)));
     });
 
   it.live("only what is told is counted as recalled", () => {

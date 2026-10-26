@@ -4,7 +4,7 @@
 // in the log; writes to one go in the background, in order.
 
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
-import { type Effect } from "effect";
+import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
 import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabels } from "./recall.ts";
@@ -30,23 +30,45 @@ export interface EndedSession {
   readonly project: string;
 }
 
-/** A source. Its methods may fail (a service down, a bad answer): the caller logs and goes on. */
+/** Why a source did not answer: a service down, a bad answer, stopped. The caller logs it and goes on. */
+export class SourceError extends Data.TaggedError("SourceError")<{ readonly message: string }> {}
+
+export const sourceError = (e: unknown) => new SourceError({ message: e instanceof Error ? e.message : String(e) });
+
+/** A source. Interrupting one of its operations ends it: a source outside the farm aborts its request. */
 export interface Source {
   /** Prefixes the ids of the memories it gives, except the local one's. */
   readonly name: string;
   /** Configured and ready, by config alone: undefined, or why not. */
   readonly unavailable: () => string | undefined;
-  readonly stop: () => Promise<void>;
+  /** Lets go of what it holds; an operation that starts after it fails. */
+  readonly stop: Effect.Effect<void>;
   /** What the agent should recall as a run starts, best first. */
-  readonly prefetch: (cue: RecallCue, signal: AbortSignal) => Promise<RecalledLine[]>;
-  readonly syncTurn: (run: FinishedRun, signal: AbortSignal) => Promise<void>;
-  readonly sessionEnded: (s: EndedSession, signal: AbortSignal) => Promise<void>;
-  readonly search: (q: SearchQuery, signal: AbortSignal) => Promise<SourceSearch>;
-  readonly list: (agent: string, signal: AbortSignal) => Promise<Memory[]>;
-  readonly add: (n: Note, signal: AbortSignal) => Promise<Memory | undefined>;
-  readonly forget: (agent: string, id: string, signal: AbortSignal) => Promise<void>;
+  readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[], SourceError>;
+  readonly syncTurn: (run: FinishedRun) => Effect.Effect<void, SourceError>;
+  readonly sessionEnded: (s: EndedSession) => Effect.Effect<void, SourceError>;
+  readonly search: (q: SearchQuery) => Effect.Effect<SourceSearch, SourceError>;
+  readonly list: (agent: string) => Effect.Effect<Memory[], SourceError>;
+  readonly add: (n: Note) => Effect.Effect<Memory | undefined, SourceError>;
+  readonly forget: (agent: string, id: string) => Effect.Effect<void, SourceError>;
   readonly can: Abilities;
 }
+
+/** A source outside the farm's own lifetime: once stopped, an operation going fails (its request interrupted) and one
+ * that starts after fails at once. */
+export const sourceLife = (name: string) => {
+  const stopped = Deferred.makeUnsafe<void>();
+  const why = new SourceError({ message: `${name} source has stopped` });
+  return {
+    stopped: () => Deferred.isDoneUnsafe(stopped),
+    alive: <A>(e: Effect.Effect<A, SourceError>): Effect.Effect<A, SourceError> =>
+      Effect.suspend(() =>
+        Deferred.isDoneUnsafe(stopped) ? Effect.fail(why) : Effect.raceFirst(e, Effect.andThen(Deferred.await(stopped), Effect.fail(why))),
+      ),
+    /** True the first time. */
+    stop: Deferred.succeed(stopped, undefined),
+  };
+};
 
 /** How long a source outside the farm may take to answer a read: a run waiting on it is the owner waiting. */
 export const prefetchTimeoutMs = 2_000;
@@ -55,36 +77,42 @@ export const writeTimeoutMs = 30_000;
 const writeQueue = 256;
 
 /** The local source: the memory table, picked by recall.ts. Nothing is marked recalled here: the caller marks those it keeps. */
-/** now: the memory service's Clock, for which memories are fresh. */
-export function localSource(m: Memories, profiles: () => string[], run: <A>(e: Effect.Effect<A, unknown>) => Promise<A>, now: () => number): Source {
+export function localSource(m: Memories, profiles: () => string[]): Source {
+  const said = <A, E>(e: Effect.Effect<A, E>) => Effect.mapError(e, sourceError);
   return {
     name: localName,
     unavailable: () => undefined,
-    stop: async () => {},
-    prefetch: async (cue) => {
-      let picked: Memory[];
-      if (cue.peek) {
-        if (cue.project === "") return [];
-        const all = await run(m.list(cue.agent));
-        picked = pick(all, { project: cue.project, text: cue.text, now: now(), matches: await run(m.matches(cue.agent, cue.text)) });
-      } else picked = await run(m.recallable(cue));
-      return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.project), score: picked.length - i }));
-    },
-    syncTurn: (r) => run(m.keep(r)),
-    sessionEnded: async () => {},
-    search: async (q) => {
-      const agents = q.agent === "" ? profiles() : [q.agent];
-      const all: Memory[] = [];
-      const matches: Record<string, number> = {};
-      for (const agent of agents) {
-        all.push(...(await run(m.list(agent))));
-        Object.assign(matches, await run(m.matches(agent, q.text)));
-      }
-      return { found: search(all, q, matches) };
-    },
-    list: (agent) => run(m.listed(agent)),
-    add: (n) => run(m.write(n)),
-    forget: (agent, id) => run(m.forget(agent, id)),
+    stop: Effect.void,
+    prefetch: (cue) =>
+      said(
+        Effect.gen(function* () {
+          let picked: Memory[];
+          if (cue.peek) {
+            if (cue.project === "") return [];
+            const all = yield* m.list(cue.agent);
+            picked = pick(all, { project: cue.project, text: cue.text, now: yield* Clock.currentTimeMillis, matches: yield* m.matches(cue.agent, cue.text) });
+          } else picked = yield* m.recallable(cue);
+          return picked.map((x, i) => ({ id: x.id, line: lineOf(x, cue.project), score: picked.length - i }));
+        }),
+      ),
+    syncTurn: (r) => said(m.keep(r)),
+    sessionEnded: () => Effect.void,
+    search: (q) =>
+      said(
+        Effect.gen(function* () {
+          const agents = q.agent === "" ? profiles() : [q.agent];
+          const all: Memory[] = [];
+          const matches: Record<string, number> = {};
+          for (const agent of agents) {
+            all.push(...(yield* m.list(agent)));
+            Object.assign(matches, yield* m.matches(agent, q.text));
+          }
+          return { found: search(all, q, matches) };
+        }),
+      ),
+    list: (agent) => said(m.listed(agent)),
+    add: (n) => said(m.write(n)),
+    forget: (agent, id) => said(m.forget(agent, id)),
     can: { list: true, forget: true, transcripts: false },
   };
 }
@@ -155,228 +183,165 @@ export function mergeRecalled(groups: readonly (readonly RecalledLine[])[]): Rec
   );
 }
 
+/** At most ms on the service's Clock: past it, the operation is interrupted and fails. */
+const within = <A>(e: Effect.Effect<A, SourceError>, ms: number) =>
+  Effect.timeoutOrElse(e, { duration: ms, orElse: () => Effect.fail(new SourceError({ message: "timed out" })) });
+
+/** The sources as one setting made them. Its scope holds what it does: the operations still going and the writer. */
 interface Generation {
   readonly all: Source[];
   readonly off: MemorySourceInfo[];
-  readonly control: AbortController;
-  readonly active: Set<Promise<unknown>>;
-  queue: Promise<void>;
-  closing?: Promise<void>;
+  readonly scope: Scope.Closeable;
+  readonly operations: FiberSet.FiberSet<unknown, unknown>;
+  /** Background writes, in order, taken by the writer. */
+  readonly writes: Queue.Queue<Effect.Effect<void>, Cause.Done>;
+  readonly writer: Fiber.Fiber<void>;
+  /** Why it was retired, once it is: what an operation it cut short says. */
+  why?: string;
+  retired?: Fiber.Fiber<void>;
 }
 
-/** A canceled operation has no further access to its source; adapters seal their resources when stopped. */
-const abortable = <A>(work: () => Promise<A>, signal: AbortSignal): Promise<A> =>
-  new Promise<A>((resolve, reject) => {
-    if (signal.aborted) return reject(signal.reason);
-    const abort = () => reject(signal.reason);
-    signal.addEventListener("abort", abort, { once: true });
-    Promise.resolve()
-      .then(() => {
-        signal.throwIfAborted();
-        return work();
-      })
-      .then(
-        (value) => {
-          signal.removeEventListener("abort", abort);
-          if (signal.aborted) reject(signal.reason);
-          else resolve(value);
-        },
-        (error: unknown) => {
-          signal.removeEventListener("abort", abort);
-          reject(error);
-        },
-      );
-  });
-
 /** Owns source generations and every accepted operation, including retirement and shutdown. */
-export class Sources {
-  private current: Generation | undefined;
-  private readonly generations = new Set<Generation>();
-  private built: string | undefined;
-  private stopped = false;
-  private queued = 0;
-  private stopping: Promise<void> | undefined;
+export interface Sources {
+  readonly prefetch: (cue: RecallCue) => Effect.Effect<RecalledLine[][]>;
+  readonly list: (agent: string) => Effect.Effect<{ memories: Memory[]; sources: MemorySourceInfo[] }>;
+  readonly search: (query: SearchQuery) => Effect.Effect<(SourceSearch & { source: string })[]>;
+  /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
+  readonly forgetProblem: (id: string) => string | undefined;
+  readonly forget: (agent: string, id: string) => Effect.Effect<void, SourceError>;
+  readonly add: (note: Note) => void;
+  readonly keep: (run: FinishedRun) => void;
+  readonly endSession: (session: EndedSession) => void;
+  readonly info: () => MemorySourceInfo[];
+}
 
-  constructor(
-    private readonly local: Source,
-    private readonly configured: () => readonly MemorySourceConfig[],
-    private readonly build: (c: MemorySourceConfig) => Source | undefined,
-    private readonly log: (line: string) => void,
-    private readonly timeoutMs = prefetchTimeoutMs,
-  ) {}
+export interface SourcesOptions {
+  readonly local: Source;
+  readonly configured: () => readonly MemorySourceConfig[];
+  readonly build: (c: MemorySourceConfig) => Source | undefined;
+  readonly timeoutMs?: number;
+}
 
-  private snapshot(): Generation | undefined {
-    if (this.stopped) return undefined;
-    const configured = this.configured();
-    const key = JSON.stringify(configured);
-    if (key !== this.built) {
-      if (this.current) void this.retire(this.current, "memory sources changed; outside operation canceled");
-      const next: Generation = { all: [this.local], off: [], control: new AbortController(), active: new Set(), queue: Promise.resolve() };
-      this.current = next;
-      this.generations.add(next);
-      this.built = key;
-      for (const c of configured) {
+/** Made in the memory service's make: the sources stop with it, the writes still waiting given a moment to go first. */
+export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, never, Scope.Scope> =>
+  Effect.gen(function* () {
+    const { local, configured, build } = options;
+    const timeoutMs = options.timeoutMs ?? prefetchTimeoutMs;
+    // Generations are made and retired from synchronous calls (the settings changed under info): with the service's
+    // services (its logger, its Clock), on its fibers.
+    const forkHere = yield* FiberSet.makeRuntime<never>();
+    const runHere = Effect.runSyncWith(yield* Effect.context<never>());
+    const generations = new Set<Generation>();
+    let current: Generation | undefined;
+    let built: string | undefined;
+    let stopped = false;
+
+    const outside = (g: Generation) => g.all.filter((one) => one !== local);
+
+    const retire = (g: Generation, why: string): Fiber.Fiber<void> =>
+      (g.retired ??= forkHere(
+        Effect.gen(function* () {
+          g.why = why;
+          // Interrupts the writer, the writes still waiting, and every operation going.
+          yield* Scope.close(g.scope, Exit.void);
+          yield* Effect.forEach(
+            outside(g),
+            (one) =>
+              one.stop.pipe(
+                Effect.timeoutOption(prefetchTimeoutMs),
+                Effect.catchCause((cause) => Effect.logWarning(`stopping memory source ${one.name}: ${Cause.pretty(cause)}`)),
+              ),
+            { concurrency: "unbounded", discard: true },
+          );
+          generations.delete(g);
+        }),
+      ));
+
+    const generation = Effect.fnUntraced(function* (sources: Source[], off: MemorySourceInfo[]) {
+      const scope = yield* Scope.make();
+      const operations = yield* Scope.provide(FiberSet.make(), scope);
+      const writes = yield* Queue.dropping<Effect.Effect<void>, Cause.Done>(writeQueue);
+      const writer = yield* Effect.forkIn(Effect.ignore(Effect.forever(Effect.flatMap(Queue.take(writes), (write) => write))), scope);
+      return { all: sources, off, scope, operations, writes, writer } satisfies Generation;
+    });
+
+    const snapshot = (): Generation | undefined => {
+      if (stopped) return undefined;
+      const now = configured();
+      const key = JSON.stringify(now);
+      if (key === built) return current;
+      if (current) retire(current, "memory sources changed; outside operation canceled");
+      const all = [local];
+      const off: MemorySourceInfo[] = [];
+      for (const c of now) {
         const name = c.kind;
-        const off = (why: string) =>
-          next.off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
+        const isOff = (why: string) =>
+          off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
         if (!c.enabled) {
-          off("没打开");
+          isOff("没打开");
           continue;
         }
-        const one = this.build(c);
+        const one = build(c);
         if (!one) {
-          off("不认识这种来源");
+          isOff("不认识这种来源");
           continue;
         }
         const why = one.unavailable();
         if (why) {
-          this.log(`memory from ${name} is off: ${why}`);
-          off(why);
+          forkHere(Effect.logWarning(`memory from ${name} is off: ${why}`));
+          isOff(why);
           continue;
         }
-        next.all.push(one);
+        all.push(one);
       }
-    }
-    return this.current;
-  }
-
-  private lease<A>(generation: Generation, signal: AbortSignal, work: () => Promise<A>): Promise<A> {
-    const pending = abortable(work, signal);
-    generation.active.add(pending);
-    void pending.then(
-      () => generation.active.delete(pending),
-      () => generation.active.delete(pending),
-    );
-    return pending;
-  }
-
-  private retire(generation: Generation, why: string): Promise<void> {
-    if (generation.closing) return generation.closing;
-    generation.control.abort(new Error(why));
-    generation.closing = (async () => {
-      await generation.queue;
-      await Promise.allSettled([...generation.active]);
-      await Promise.all(
-        generation.all
-          .filter((one) => one !== this.local)
-          .map(async (one) => {
-            try {
-              await abortable(one.stop, AbortSignal.timeout(prefetchTimeoutMs));
-            } catch (e) {
-              this.log(`stopping memory source ${one.name}: ${String(e)}`);
-            }
-          }),
-      );
-      this.generations.delete(generation);
-    })();
-    return generation.closing;
-  }
-
-  private readAll<T>(generation: Generation, what: string, ask: (one: Source, signal: AbortSignal) => Promise<T[]>, all = generation.all): Promise<T[][]> {
-    return Promise.all(
-      all.map(async (one) => {
-        const signal = one === this.local ? new AbortController().signal : AbortSignal.any([generation.control.signal, AbortSignal.timeout(this.timeoutMs)]);
-        try {
-          return await this.lease(generation, signal, () => ask(one, signal));
-        } catch (e) {
-          this.log(`memory from ${one.name} for ${what}: ${e instanceof Error ? e.message : String(e)}`);
-          return [];
-        }
-      }),
-    );
-  }
-
-  private enqueue(what: string, write: (one: Source, signal: AbortSignal) => Promise<unknown>) {
-    const generation = this.snapshot();
-    if (!generation) return;
-    for (const one of generation.all.slice(1)) {
-      if (this.queued >= writeQueue) {
-        this.log(`${what}: too many writes waiting, dropped`);
-        continue;
-      }
-      this.queued++;
-      generation.queue = generation.queue.then(async () => {
-        const signal = AbortSignal.any([generation.control.signal, AbortSignal.timeout(writeTimeoutMs)]);
-        try {
-          await this.lease(generation, signal, () => write(one, signal));
-        } catch (e) {
-          this.log(`${what} (${one.name}): ${e instanceof Error ? e.message : String(e)}`);
-        } finally {
-          this.queued--;
-        }
-      });
-    }
-  }
-
-  prefetch(cue: RecallCue): Promise<RecalledLine[][]> {
-    const generation = this.snapshot();
-    return generation
-      ? this.readAll(generation, cue.agent, async (one, signal) =>
-          (await one.prefetch(cueFor(one, cue), signal)).map((line) => ({ ...line, id: idOf(one, line.id) })),
-        )
-      : Promise.resolve([]);
-  }
-
-  async list(agent: string): Promise<{ memories: Memory[]; sources: MemorySourceInfo[] }> {
-    const generation = this.snapshot();
-    if (!generation) return { memories: [], sources: [] };
-    const listing = generation.all.filter((one) => one.can.list);
-    const groups = await this.readAll(generation, `the memories of ${agent}`, (one, signal) => one.list(agent, signal), listing);
-    return {
-      memories: groups.flatMap((listed, i) => {
-        const one = listing[i]!;
-        return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
-      }),
-      sources: this.infoOf(generation),
+      // Made at once: nothing in it waits.
+      current = runHere(generation(all, off));
+      generations.add(current);
+      built = key;
+      return current;
     };
-  }
 
-  async search(query: SearchQuery): Promise<(SourceSearch & { source: string })[]> {
-    const generation = this.snapshot();
-    if (!generation) return [];
-    const groups = await this.readAll(generation, "a search", async (one, signal) => [await one.search(query, signal)]);
-    return generation.all.map((one, i) => {
-      const page = groups[i]?.[0];
-      return {
-        source: one.name,
-        found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
-        coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
-      };
-    });
-  }
+    /** An operation of the generation's: retiring it interrupts the operation, which then fails with why. */
+    const leased = <A>(g: Generation, operation: Effect.Effect<A, SourceError>): Effect.Effect<A, SourceError> =>
+      Effect.flatMap(FiberSet.run(g.operations, operation), (fiber) =>
+        Fiber.join(fiber).pipe(
+          Effect.onInterrupt(() => Fiber.interrupt(fiber)),
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause) ? Effect.fail(new SourceError({ message: g.why ?? "canceled" })) : Effect.failCause(cause),
+          ),
+        ),
+      );
 
-  /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
-  forgetProblem(id: string): string | undefined {
-    const generation = this.snapshot();
-    if (!generation) return "记性来源已经停下";
-    const [one] = owner(generation.all, id);
-    return one.can.forget ? undefined : `${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`;
-  }
+    /** A failure, or a bug, as the line in the log that stands for it. */
+    const logged =
+      (line: (why: string) => string) =>
+      <A, B>(e: Effect.Effect<A, SourceError>, otherwise: B): Effect.Effect<A | B> =>
+        e.pipe(
+          Effect.catch((err) => Effect.as(Effect.logWarning(line(err.message)), otherwise)),
+          Effect.catchCause((cause) => Effect.as(Effect.logWarning(line(Cause.pretty(cause))), otherwise)),
+        );
 
-  async forget(agent: string, id: string): Promise<void> {
-    const problem = this.forgetProblem(id);
-    if (problem) throw new Error(problem);
-    const generation = this.snapshot()!;
-    const [one, own] = owner(generation.all, id);
-    const signal = one === this.local ? new AbortController().signal : AbortSignal.any([generation.control.signal, AbortSignal.timeout(writeTimeoutMs)]);
-    await this.lease(generation, signal, () => one.forget(agent, own, signal));
-  }
+    /** Every source asked at once; one outside the farm that fails or takes past timeoutMs gives nothing, with a line in the log. */
+    const readAll = <T>(g: Generation, what: string, ask: (one: Source) => Effect.Effect<T[], SourceError>, all = g.all) =>
+      Effect.forEach(
+        all,
+        (one) => logged((why) => `memory from ${one.name} for ${what}: ${why}`)(one === local ? ask(one) : leased(g, within(ask(one), timeoutMs)), [] as T[]),
+        {
+          concurrency: "unbounded",
+        },
+      );
 
-  add(note: Note) {
-    this.enqueue(`a note for ${note.agent} did not reach its source`, (one, signal) => one.add(note, signal));
-  }
+    const enqueue = (what: string, write: (one: Source) => Effect.Effect<unknown, SourceError>) => {
+      const g = snapshot();
+      if (!g) return;
+      for (const one of g.all.slice(1)) {
+        const job = logged((why) => `${what} (${one.name}): ${why}`)(leased(g, within(Effect.asVoid(write(one)), writeTimeoutMs)), undefined);
+        if (!Queue.offerUnsafe(g.writes, job)) forkHere(Effect.logWarning(`${what}: too many writes waiting, dropped`));
+      }
+    };
 
-  keep(run: FinishedRun) {
-    this.enqueue(`what ${run.session} learned was not kept outside`, (one, signal) => one.syncTurn(run, signal));
-  }
-
-  endSession(session: EndedSession) {
-    this.enqueue(`the end of ${session.session} did not reach its source`, (one, signal) => one.sessionEnded(session, signal));
-  }
-
-  private infoOf(generation: Generation): MemorySourceInfo[] {
-    return [
-      ...generation.all.map((one) => ({
+    const infoOf = (g: Generation): MemorySourceInfo[] => [
+      ...g.all.map((one) => ({
         name: one.name,
         label: sourceLabels[one.name] ?? one.name,
         on: true,
@@ -384,24 +349,91 @@ export class Sources {
         canForget: one.can.forget,
         transcripts: one.can.transcripts,
       })),
-      ...generation.off,
+      ...g.off,
     ];
-  }
 
-  info(): MemorySourceInfo[] {
-    const generation = this.snapshot();
-    return generation ? this.infoOf(generation) : [];
-  }
+    const forgetProblem = (id: string) => {
+      const g = snapshot();
+      if (!g) return "记性来源已经停下";
+      const [one] = owner(g.all, id);
+      return one.can.forget ? undefined : `${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`;
+    };
 
-  stop(): Promise<void> {
-    if (this.stopping) return this.stopping;
-    this.stopped = true;
-    this.stopping = Promise.all(
-      [...this.generations].map(async (g) => {
-        if (!g.closing) await abortable(() => g.queue, AbortSignal.timeout(prefetchTimeoutMs)).catch(() => {});
-        await this.retire(g, "memory sources stopped; outside operation canceled");
+    // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
+    yield* Effect.addFinalizer(() =>
+      Effect.gen(function* () {
+        stopped = true;
+        yield* Effect.forEach(
+          [...generations],
+          Effect.fnUntraced(function* (g) {
+            if (!g.retired) {
+              yield* Queue.end(g.writes);
+              yield* Effect.timeoutOption(Fiber.await(g.writer), prefetchTimeoutMs);
+            }
+            yield* Fiber.await(retire(g, "memory sources stopped; outside operation canceled"));
+          }),
+          { concurrency: "unbounded", discard: true },
+        );
+        yield* local.stop;
       }),
-    ).then(() => this.local.stop());
-    return this.stopping;
-  }
-}
+    );
+
+    return {
+      prefetch: (cue) =>
+        Effect.suspend(() => {
+          const g = snapshot();
+          return g
+            ? readAll(g, cue.agent, (one) => Effect.map(one.prefetch(cueFor(one, cue)), (lines) => lines.map((line) => ({ ...line, id: idOf(one, line.id) }))))
+            : Effect.succeed([]);
+        }),
+      list: (agent) =>
+        Effect.suspend(() => {
+          const g = snapshot();
+          if (!g) return Effect.succeed({ memories: [], sources: [] });
+          const listing = g.all.filter((one) => one.can.list);
+          return Effect.map(
+            readAll(g, `the memories of ${agent}`, (one) => one.list(agent), listing),
+            (groups) => ({
+              memories: groups.flatMap((listed, i) => {
+                const one = listing[i]!;
+                return listed.map((m) => ({ ...m, id: idOf(one, m.id), ...(one.name !== localName ? { source: one.name } : {}) }));
+              }),
+              sources: infoOf(g),
+            }),
+          );
+        }),
+      search: (query) =>
+        Effect.suspend(() => {
+          const g = snapshot();
+          if (!g) return Effect.succeed([]);
+          return Effect.map(
+            readAll(g, "a search", (one) => Effect.map(one.search(query), (page) => [page])),
+            (groups) =>
+              g.all.map((one, i) => {
+                const page = groups[i]?.[0];
+                return {
+                  source: one.name,
+                  found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
+                  coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
+                };
+              }),
+          );
+        }),
+      forgetProblem,
+      forget: (agent, id) =>
+        Effect.suspend(() => {
+          const problem = forgetProblem(id);
+          if (problem) return Effect.fail(new SourceError({ message: problem }));
+          const g = snapshot()!;
+          const [one, own] = owner(g.all, id);
+          return one === local ? one.forget(agent, own) : leased(g, within(one.forget(agent, own), writeTimeoutMs));
+        }),
+      add: (note) => enqueue(`a note for ${note.agent} did not reach its source`, (one) => one.add(note)),
+      keep: (run) => enqueue(`what ${run.session} learned was not kept outside`, (one) => one.syncTurn(run)),
+      endSession: (session) => enqueue(`the end of ${session.session} did not reach its source`, (one) => one.sessionEnded(session)),
+      info: () => {
+        const g = snapshot();
+        return g ? infoOf(g) : [];
+      },
+    } satisfies Sources;
+  });

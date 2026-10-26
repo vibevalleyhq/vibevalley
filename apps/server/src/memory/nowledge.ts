@@ -4,11 +4,12 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Option, Schema } from "effect";
+import type { Memory } from "@vibevalley/protocol";
+import { Clock, Effect, Option, Schema } from "effect";
 import { redact } from "../base/redact.ts";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import { memoryNotesOf, recallCount, clip, type MemoryScope } from "./recall.ts";
-import { prefetchTimeoutMs, type Source } from "./sources.ts";
+import { prefetchTimeoutMs, type Source, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 const app = "vibevalley";
 // Its memory_search takes at most 20, and a query of at most 500 characters.
@@ -81,23 +82,22 @@ function hitText(h: Hit): string {
   return !h.title || body.startsWith(h.title) ? body : `${h.title}：${body}`;
 }
 
-/** now: the memory service's Clock, for when a note was kept. */
-export function nowledge(c: MemorySourceConfig, now: () => number): Source {
-  let closed = false;
-  const life = new AbortController();
+export function nowledge(c: MemorySourceConfig): Source {
+  const life = sourceLife("Nowledge");
+  // The session is the SDK's, shared by every call: connecting it is not any one call's to cancel, only stop's.
+  const connecting = new AbortController();
   let client: Promise<Client> | undefined;
   let transport: StreamableHTTPClientTransport | undefined;
 
   // The session opens on first use: Nowledge not running when the farm starts must not keep it off until a restart.
-  const open = () => {
-    if (closed) return Promise.reject(new Error("Nowledge source has stopped"));
-    return (client ??= (async () => {
+  const open = () =>
+    (client ??= (async () => {
       const wire = new StreamableHTTPClientTransport(new URL(c.url), { requestInit: c.key ? { headers: { Authorization: `Bearer ${c.key}` } } : undefined });
       transport = wire;
       const one = new Client({ name: app, version: "1" });
       try {
-        await one.connect(wire, { timeout: prefetchTimeoutMs, signal: life.signal });
-        life.signal.throwIfAborted();
+        await one.connect(wire, { timeout: prefetchTimeoutMs, signal: connecting.signal });
+        connecting.signal.throwIfAborted();
       } catch (e) {
         await one.close().catch(() => {});
         await wire.close().catch(() => {});
@@ -108,98 +108,91 @@ export function nowledge(c: MemorySourceConfig, now: () => number): Source {
       client = undefined;
       throw e;
     }));
-  };
 
   /** One tool call; its answer is the text of the result. A session that failed is dropped, so the next call opens another. */
-  const call = async (tool: string, args: Record<string, unknown>, signal: AbortSignal) => {
-    signal = AbortSignal.any([signal, life.signal]);
-    signal.throwIfAborted();
-    const session = await open();
-    signal.throwIfAborted();
-    let res;
-    try {
-      res = await session.callTool({ name: tool, arguments: args }, undefined, { signal });
-      signal.throwIfAborted();
-    } catch (e) {
-      if (!signal.aborted) {
-        client = undefined;
-        void session.close();
-      }
-      throw e;
-    }
-    const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
-    if (res.isError) throw new Error(`${tool}: ${head(text, 300)}`);
-    return text;
-  };
+  const call = (tool: string, args: Record<string, unknown>) =>
+    life.alive(
+      Effect.gen(function* () {
+        const session = yield* Effect.tryPromise({ try: open, catch: sourceError });
+        const res = yield* Effect.tryPromise({
+          try: (signal) => session.callTool({ name: tool, arguments: args }, undefined, { signal }),
+          catch: (e) => {
+            if (!life.stopped()) {
+              client = undefined;
+              void session.close();
+            }
+            return sourceError(e);
+          },
+        });
+        const text = ((res.content ?? []) as { type: string; text?: string }[]).map((x) => (x.type === "text" ? (x.text ?? "") : "")).join("");
+        if (res.isError) return yield* Effect.fail(new SourceError({ message: `${tool}: ${head(text, 300)}` }));
+        return text;
+      }),
+    );
 
   /** agent "" reads what the farm wrote for any profile; everything reads all that is in it. */
-  const find = async (agent: string, query: string, limit: number, everything: boolean, signal: AbortSignal): Promise<Hit[]> => {
+  const find = Effect.fnUntraced(function* (agent: string, query: string, limit: number, everything: boolean) {
     const args: Record<string, unknown> = { limit: Math.max(1, Math.min(limit, most)), source_app: app };
     // Its search without a query lists nothing; filtered by labels, any query finds all they hold.
     const q = head(redact(query).trim(), queryMost) || (everything ? "" : "*");
     if (q !== "") args.query = q;
     if (!everything) args.filter_labels = agent ? label("agent", agent) : app;
-    const text = await call("memory_search", args, signal);
-    try {
-      return Schema.decodeUnknownSync(SearchResponse)(text).results ?? [];
-    } catch {
-      throw new Error("memory_search answered what it should not: " + head(text, 200));
-    }
-  };
+    const text = yield* call("memory_search", args);
+    return yield* Effect.mapError(
+      Schema.decodeUnknownEffect(SearchResponse)(text),
+      () => new SourceError({ message: "memory_search answered what it should not: " + head(text, 200) }),
+    ).pipe(Effect.map((r): Hit[] => r.results ?? []));
+  });
 
-  const add = async (agent: string, text: string, project: string, signal: AbortSignal) => {
+  const add = Effect.fnUntraced(function* (agent: string, text: string, project: string) {
     const body = redact(text);
-    const answer = await call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app }, signal);
+    const answer = yield* call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app });
     // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
     // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
     const added = Option.getOrUndefined(Schema.decodeUnknownOption(AddedResponse)(answer));
-    if (!added) throw new Error("memory_add answered what it should not: " + head(answer, 200));
+    if (!added) return yield* Effect.fail(new SourceError({ message: "memory_add answered what it should not: " + head(answer, 200) }));
     return added.memory_id || added.id || added.memory?.id || "";
-  };
+  });
 
   return {
     name: "nowledge",
     unavailable: () => (c.url ? undefined : "没填地址"),
     // Closing the transport ends a connect still waiting on a Nowledge that does not answer.
-    stop: async () => {
-      if (closed) return;
-      closed = true;
-      life.abort(new Error("Nowledge source has stopped"));
+    stop: Effect.gen(function* () {
+      if (!(yield* life.stop)) return;
+      connecting.abort(new Error("Nowledge source has stopped"));
       const was = transport;
       client = undefined;
       transport = undefined;
-      await was?.close().catch(() => {});
-    },
+      if (was) yield* Effect.promise(() => was.close().catch(() => {}));
+    }),
     // Nothing to ask with, nothing asked: listing its newest would only be noise at the start of a run.
-    prefetch: async (cue, signal) => {
+    prefetch: Effect.fnUntraced(function* (cue) {
       if (!c.read || cue.text.trim() === "") return [];
-      const hits = await find(cue.agent, cue.text, recallCount, !!c.everything, signal);
+      const hits = yield* find(cue.agent, cue.text, recallCount, !!c.everything);
       return hits
         .filter((h) => !cue.skip?.has(hitID(h)))
         .map((h) => ({ id: hitID(h), line: "- （Nowledge）" + clip(hitText(h), lineMost), score: h.relevance_score ?? 0 }));
-    },
+    }),
     // Its memories are notes; it has no jobs done.
-    search: async (q, signal) => {
+    search: Effect.fnUntraced(function* (q) {
       if (!c.read || q.kind === "issue") return { found: [] };
-      const hits = await find(q.agent, q.text, q.limit, !!c.everything, signal);
+      const hits = yield* find(q.agent, q.text, q.limit, !!c.everything);
       const selected = hits.slice(0, most);
-      const scopes: MemoryScope[] = selected.map(() => ({ kind: "unknown" }));
-      let next = 0;
       // MCP search omits labels; only its detail result can prove a project's scope. The caller's read budget covers both.
-      await Promise.all(
-        Array.from({ length: Math.min(2, selected.length) }, async () => {
-          for (let index = next++; index < selected.length; index = next++) {
-            if (signal.aborted) return;
-            const id = hitID(selected[index]!);
-            if (!id) continue;
-            try {
-              const detail = Schema.decodeUnknownSync(DetailResponse)(await call("get_memory_by_id", { memory_id: id }, signal));
-              scopes[index] = scopeOf(detail.labels);
-            } catch {
-              // An unreadable detail does not turn an unknown project into a global memory.
-            }
-          }
-        }),
+      const scopes = yield* Effect.forEach(
+        selected,
+        (h): Effect.Effect<MemoryScope> => {
+          const id = hitID(h);
+          if (!id) return Effect.succeed({ kind: "unknown" });
+          return call("get_memory_by_id", { memory_id: id }).pipe(
+            Effect.flatMap(Schema.decodeUnknownEffect(DetailResponse)),
+            Effect.map((detail) => scopeOf(detail.labels)),
+            // An unreadable detail does not turn an unknown project into a global memory.
+            Effect.orElseSucceed((): MemoryScope => ({ kind: "unknown" })),
+          );
+        },
+        { concurrency: 2 },
       );
       return {
         found: selected.map((h, index) => ({
@@ -214,28 +207,27 @@ export function nowledge(c: MemorySourceConfig, now: () => number): Source {
           scope: scopes[index]!,
         })),
       };
-    },
+    }),
     // The farm's own; Nowledge does not say which project each is for.
-    list: async (agent, signal) => {
+    list: Effect.fnUntraced(function* (agent) {
       if (!c.read) return [];
-      const hits = await find(agent, "", most, false, signal);
-      return hits.map((h) => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0 }));
-    },
+      const hits = yield* find(agent, "", most, false);
+      return hits.map((h): Memory => ({ id: hitID(h), agent, kind: "note", text: hitText(h), at: 0, recalled: 0 }));
+    }),
     // The 「记住：」 lines; a stopped run leaves nothing here either.
-    syncTurn: async (run, signal) => {
+    syncTurn: Effect.fnUntraced(function* (run) {
       if (!c.write || run.outcome === "interrupted") return;
-      for (const note of memoryNotesOf(run.said)) await add(run.agent, note.text, note.everywhere ? "" : run.project, signal);
-    },
-    sessionEnded: async () => {},
-    add: async (n, signal) => {
+      for (const note of memoryNotesOf(run.said)) yield* add(run.agent, note.text, note.everywhere ? "" : run.project);
+    }),
+    sessionEnded: () => Effect.void,
+    add: Effect.fnUntraced(function* (n) {
       if (!c.write) return undefined;
       const project = n.project.trim();
-      const id = await add(n.agent, n.text, project, signal);
-      return { id, agent: n.agent, kind: "note", text: n.text, at: now(), recalled: 0, ...(project ? { project } : {}) };
-    },
-    forget: async () => {
-      throw new Error("Nowledge Mem 里的记忆到 Nowledge Mem 里删");
-    },
+      const id = yield* add(n.agent, n.text, project);
+      const at = yield* Clock.currentTimeMillis;
+      return { id, agent: n.agent, kind: "note", text: n.text, at, recalled: 0, ...(project ? { project } : {}) } satisfies Memory;
+    }),
+    forget: () => Effect.fail(new SourceError({ message: "Nowledge Mem 里的记忆到 Nowledge Mem 里删" })),
     can: { list: true, forget: false, transcripts: false },
   };
 }
