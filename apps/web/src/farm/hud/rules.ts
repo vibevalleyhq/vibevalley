@@ -1,6 +1,7 @@
 // Words the HUD shows, from the frame: the clock, the warehouse, what a helper is doing, a plot's title and what the
 // orchestrator last said. The runtimes' quotas are rules/quota.ts.
 
+import { farmWording } from "../words";
 import type { Chat, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";
 import { generalOf, messagesIn } from "../../rules/chat";
 
@@ -27,8 +28,8 @@ export const doingOf = (h: Session): Doing => (h.phase._tag === "working" ? h.ph
 export const clearingLevels = new Set(beds.flatMap((b) => (b.unlockLevel === undefined ? [] : [b.unlockLevel])));
 
 export function plotTitle(bed: Bed, session: Session | undefined, crop: Crop) {
-  if (bed.unlockLevel !== undefined) return crop === "locked" ? "没开垦的地" : "花坛";
-  if (!session) return `第 ${bed.station + 1} 块地 · 空地`;
+  if (bed.unlockLevel !== undefined) return crop === "locked" ? farmWording().overlay.unclaimed : farmWording().overlay.flowerbed;
+  if (!session) return farmWording().overlay.bare(bed.station + 1);
   return `${session.name} · ${cropLabel[crop]}`;
 }
 

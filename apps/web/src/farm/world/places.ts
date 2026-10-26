@@ -1,3 +1,4 @@
+import { farmWording } from "../words";
 // What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
 // a place opens a farm panel, a workbench page, or the chat (the phone unfolded to 田头).
 
@@ -16,16 +17,16 @@ export interface YardPlace {
 }
 
 export const yardPlaces: readonly YardPlace[] = [
-  { id: "shop", label: "商店", hint: "种子、装饰、开垦新地", panel: "shop" },
-  { id: "warehouse", label: "仓库", hint: "收进来的成果", panel: "warehouse" },
-  { id: "tasks", label: "任务与成就", hint: "新手任务、开垦、成就墙", panel: "graphs" },
-  { id: "log", label: "农场日志", hint: "说过的话和收成，按时间倒着排", panel: "log" },
-  { id: "taskBoard", label: "种植计划", hint: "一件长活拆成几步，交给几个帮工", panel: "taskBoard" },
-  { id: "agents", label: "帮工名册", hint: "每个帮工用哪台农机、带什么人设和技能、长什么样", route: "/agents" },
+  { id: "shop", label: farmWording().panel.shop, hint: farmWording().yard.shop.hint, panel: "shop" },
+  { id: "warehouse", label: farmWording().panel.warehouse, hint: farmWording().yard.warehouse.hint, panel: "warehouse" },
+  { id: "tasks", label: farmWording().panel.graphs, hint: farmWording().yard.tasks.hint, panel: "graphs" },
+  { id: "log", label: farmWording().panel.log, hint: farmWording().yard.log.hint, panel: "log" },
+  { id: "taskBoard", label: farmWording().yard.taskBoard.label, hint: farmWording().yard.taskBoard.hint, panel: "taskBoard" },
+  { id: "agents", label: farmWording().menu.agents, hint: farmWording().yard.agents.hint, route: "/agents" },
   // Changing its look is the HUD's face (换管家的样子); the orchestrator in the yard is someone to talk to.
-  { id: "manager", label: "管家", hint: "跟管家说话", chat: true },
-  { id: "runtimes", label: "工坊 · 农具", hint: "每台农机是一种 runtime：装没装、用量", route: "/runtimes" },
-  { id: "skills", label: "书屋 · 技能书", hint: "帮工能带的技能", route: "/settings/skills" },
+  { id: "manager", label: farmWording().orchestrator, hint: farmWording().yard.manager.hint, chat: true },
+  { id: "runtimes", label: farmWording().yard.runtimes.label, hint: farmWording().yard.runtimes.hint, route: "/runtimes" },
+  { id: "skills", label: farmWording().yard.skills.label, hint: farmWording().yard.skills.hint, route: "/settings/skills" },
 ];
 
 export const yardPlace = (id: string) => yardPlaces.find((p) => p.id === id);

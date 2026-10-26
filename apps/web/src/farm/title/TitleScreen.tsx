@@ -3,6 +3,7 @@
 // show again on this machine. Without the orchestrator's key 开始游戏 says so in place: the workbench pages have no toasts to
 // carry it there.
 
+import { farmWording } from "../words";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "../../data/api";
 import { playSound } from "../sound";
@@ -26,9 +27,9 @@ export function TitleScreen() {
   const canContinue = () => hasFarm(core());
   const settings = useSettings();
   const items = () => [
-    { id: "start" as const, label: "开始游戏", enabled: true },
-    { id: "continue" as const, label: "继续游戏", enabled: canContinue() },
-    { id: "settings" as const, label: "设置", enabled: true },
+    { id: "start" as const, label: farmWording().title.start, enabled: true },
+    { id: "continue" as const, label: farmWording().title.continue, enabled: canContinue() },
+    { id: "settings" as const, label: farmWording().chat.settingsLink, enabled: true },
   ];
   const [picked, setPicked] = createSignal<Item>();
   const [note, setNote] = createSignal<string>();
@@ -39,7 +40,7 @@ export function TitleScreen() {
     switch (item) {
       case "start":
         // The orchestrator cannot think without DeepSeek's key: say so under the menu, where 设置 is.
-        if (!orchestratorReady(ready(settings, undefined))) return setNote("先填钥匙：管家要 DeepSeek 的 API Key 才能干活，在设置里填上。");
+        if (!orchestratorReady(ready(settings, undefined))) return setNote(farmWording().title.keyFirst);
         farm.closeTitle();
         return void api.orchestrator.open().catch(() => {});
       case "continue":
@@ -69,19 +70,19 @@ export function TitleScreen() {
   });
 
   return (
-    <div class="absolute inset-0 z-[60] overflow-hidden bg-[#2a1d2e] font-pixel" role="dialog" aria-label="码农场物语 首页">
+    <div class="absolute inset-0 z-[60] overflow-hidden bg-[#2a1d2e] font-pixel" role="dialog" aria-label={farmWording().title.label}>
       <TitleStage scene={startScene()} />
       <div class="absolute inset-y-0 left-0 w-[min(46rem,70vw)] bg-gradient-to-r from-[#1e1424]/75 via-[#1e1424]/35 to-transparent" />
       <div class="relative flex h-full flex-col justify-center gap-8 overflow-y-auto px-[6vw] py-8 sm:gap-10">
         <header class="title-float">
           <h1 class="text-[clamp(40px,6vw,72px)] leading-none text-cream-50" style={deep}>
-            码农场物语
+            {farmWording().title.name}
           </h1>
           <p class="mt-3 text-[24px] text-cream-100" style={soft}>
-            一群写代码的小动物，等你来派活
+            {farmWording().title.tagline}
           </p>
         </header>
-        <nav class="flex w-56 flex-col gap-3" aria-label="开始">
+        <nav class="flex w-56 flex-col gap-3" aria-label={farmWording().sow.start}>
           <For each={items()} keyed={(item) => item.id}>
             {(item, i) => {
               const on = () => at() === item().id && item().enabled;
@@ -110,7 +111,7 @@ export function TitleScreen() {
           </Show>
           <Show when={!canContinue()}>
             <p class="px-1 text-[12px] text-cream-100" style={soft}>
-              还没有农场可以继续：先开始游戏。
+              {farmWording().title.nothingToContinue}
             </p>
           </Show>
         </nav>

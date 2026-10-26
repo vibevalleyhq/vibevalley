@@ -1,6 +1,7 @@
 // The beds (the village's plots), what grows in them and what a tool does on them: the server folds the state, these
 // only read it.
 
+import { farmWording } from "../words";
 import type { Crop, FarmView, PlotView, Session } from "@vibevalley/protocol";
 
 export interface Bed {
@@ -57,16 +58,16 @@ export function cropOfBed(bed: Bed, sessions: readonly Session[], view: FarmView
 }
 
 export const cropLabel: Record<Crop, string> = {
-  empty: "空地",
-  seeded: "刚播种",
-  sprout: "发芽",
-  leafy: "长叶",
-  flowering: "开花",
-  wheat: "成熟",
-  carrot: "成熟",
-  withered: "枯萎",
-  weeds: "长草",
-  dry: "干旱",
-  harvested: "收完了",
-  locked: "没开垦",
+  empty: farmWording().crop.empty,
+  seeded: farmWording().crop.seeded,
+  sprout: farmWording().crop.sprout,
+  leafy: farmWording().crop.leafy,
+  flowering: farmWording().crop.flowering,
+  wheat: farmWording().crop.wheat,
+  carrot: farmWording().crop.wheat,
+  withered: farmWording().crop.withered,
+  weeds: farmWording().crop.weeds,
+  dry: farmWording().crop.dry,
+  harvested: farmWording().crop.harvested,
+  locked: farmWording().crop.locked,
 };

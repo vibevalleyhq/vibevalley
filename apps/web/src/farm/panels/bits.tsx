@@ -1,6 +1,7 @@
 // Small pieces the farm's panels share: tags, tints, an empty note, a said line and its clock, and a harvest's line
 // counts, file rows and patch.
 
+import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
@@ -105,9 +106,9 @@ export function FileRow(props: { file: ChangedFile; conflict: boolean }) {
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <FarmTag text="冲突" fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />
+          <FarmTag text={farmWording().conflictTag} fill={tint("#c84a3a", 0.15)} ink="#c84a3a" />
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-[12.5px] text-bark-500">二进制</span>}>
+        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-[12.5px] text-bark-500">{farmWording().binary}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>

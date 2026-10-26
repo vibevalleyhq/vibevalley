@@ -1,6 +1,7 @@
 // What the owner does to the farm: each calls the server, then plays the bed's effect.
 // A refusal is the server's to tell (a notice), so most callers fire and forget (`fire`).
 
+import { farmWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { IssueActRequest, Session, StateFrame } from "@vibevalley/protocol";
 import { api, newSendKey } from "../data/api";
@@ -41,7 +42,7 @@ export interface FarmCommands {
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
   const send = async (s: Session, body: IssueActRequest) => {
-    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(`这张工单现在不能「${wording().act[body.act]}」`);
+    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(farmWording().command.cannot(wording().act[body.act]));
     await api.issue.act({ id: issueOf(s), body });
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {
@@ -67,11 +68,11 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     },
     async harvest(s) {
       await send(s, { act: "complete" });
-      fx(s, "harvest", "收进仓库");
+      fx(s, "harvest", farmWording().command.stored);
     },
     async shovel(s) {
       const act = actForTool("shovel", issue(s)?.attention.acts ?? []);
-      if (!act) throw new Error("这张工单现在不能铲除");
+      if (!act) throw new Error(farmWording().command.noShovel);
       await send(s, { act });
       fx(s, "shovel");
     },
@@ -84,7 +85,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {
       const { session, aim } = aimAt(bed, tool);
-      if (session?.id !== pointed?.id) return { kind: "refused", text: "这块地已经变了，请重新点一次" };
+      if (session?.id !== pointed?.id) return { kind: "refused", text: farmWording().command.changed };
       if (!aim.ok || !session) {
         if (aim.ok) return { kind: "sow", station: bed.station };
         farm.bedFx(bed.index, "note", aim.text);

@@ -2,6 +2,7 @@
 // frame and the profiles, turns its clicks into the farm's commands, publishes where things are on the page for the
 // DOM over it (store screen), and wears the tool's cursor.
 
+import { farmWording } from "../words";
 import { createEffect, createMemo, createSignal, Show, snapshot } from "solid-js";
 
 import type { Agent } from "@vibevalley/protocol";
@@ -134,7 +135,7 @@ export function VillageCanvas() {
   );
 
   return (
-    <div class="absolute inset-0 overflow-hidden" style={{ background }} aria-label="码农场物语的像素农场" role="region">
+    <div class="absolute inset-0 overflow-hidden" style={{ background }} aria-label={farmWording().canvas.label} role="region">
       <Show when={loaded().village}>
         <div
           aria-hidden="true"
@@ -144,7 +145,7 @@ export function VillageCanvas() {
       </Show>
       <div ref={(el) => (host = el)} class="absolute inset-0" data-testid="village" />
       <Show when={loaded().error ?? failed()} fallback={<Show when={!drawn()}>{<Entering mapped={!!loaded().village} />}</Show>}>
-        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">没拿到村子的地图：{why()}</p>}
+        {(why) => <p class="absolute inset-0 grid place-items-center font-pixel text-cream-200">{farmWording().canvas.noMap(String(why()))}</p>}
       </Show>
     </div>
   );
@@ -163,15 +164,15 @@ function Entering(props: { mapped: boolean }) {
   };
   const words = () => {
     const { done, total } = pictures();
-    if (!props.mapped || total === 0) return "看地图……";
-    return done < total ? `搬东西进村 ${done}/${total}` : "点灯……";
+    if (!props.mapped || total === 0) return farmWording().canvas.map;
+    return done < total ? farmWording().canvas.moving(done, total) : farmWording().canvas.lights;
   };
   return (
     <div class="absolute inset-0 grid place-items-center">
       <div class="flex flex-col items-center gap-2 font-pixel text-[12px] text-cream-100">
         <div
           role="progressbar"
-          aria-label="进村"
+          aria-label={farmWording().canvas.entering}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fill() * 100)}

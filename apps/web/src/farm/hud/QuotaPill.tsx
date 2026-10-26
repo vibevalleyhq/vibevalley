@@ -1,6 +1,7 @@
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
+import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../rules/quota";
@@ -16,17 +17,17 @@ const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#
 
 function UsageLines(props: { usage: AccountUsage | null }) {
   return (
-    <Switch fallback={<p class="text-[12px] text-bark-400">不报额度</p>}>
+    <Switch fallback={<p class="text-[12px] text-bark-400">{farmWording().quota.unreported}</p>}>
       <Match when={props.usage?.status === "login_required"}>
-        <p class="text-[12px] text-[#b8682a]">没登录，额度读不到</p>
+        <p class="text-[12px] text-[#b8682a]">{farmWording().quota.signedOut}</p>
       </Match>
       <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
-        {(u) => <p class="text-[12px] text-bark-400">读不到：{u().reason}</p>}
+        {(u) => <p class="text-[12px] text-bark-400">{farmWording().quota.unreadable(u().reason)}</p>}
       </Match>
       <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
         {(u) => (
           <p class="text-[12px]" style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
-            按量计费 · {u().provider} 余额{u().available ? "" : "，不够用了"}
+            {farmWording().quota.balance(u().provider, u().available)}
           </p>
         )}
       </Match>
@@ -77,8 +78,10 @@ function Machine(props: { info: RuntimeInfo }) {
         <UsageLines usage={usage()} />
         <Show when={props.info.spentToday !== undefined}>
           <p class="mt-0.5 text-[12px] text-bark-500">
-            今天花了约 {yuan(props.info.spentToday!)}
-            {(props.info.settings.dailyBudget ?? 0) > 0 ? ` / 预算 ${yuan(props.info.settings.dailyBudget!)}` : ""}
+            {farmWording().quota.spentToday(
+              yuan(props.info.spentToday!),
+              (props.info.settings.dailyBudget ?? 0) > 0 ? yuan(props.info.settings.dailyBudget!) : undefined,
+            )}
           </p>
         </Show>
         <Show when={props.info.stop}>
@@ -113,7 +116,7 @@ export function QuotaPill(props: { height: number }) {
       <div ref={box} class="pointer-events-auto relative">
         <button
           type="button"
-          aria-label={shown() === undefined ? "各 runtime 的剩余额度" : `剩余额度，最少的还剩 ${shown()}%`}
+          aria-label={shown() === undefined ? farmWording().quota.all : farmWording().quota.lowest(String(shown()))}
           aria-expanded={aria(open())}
           onClick={() => setOpen(!open())}
           class="cursor-pointer"
@@ -123,14 +126,20 @@ export function QuotaPill(props: { height: number }) {
               name={bottleSprite({ level: quotaLevel(lowest()), fill: lowest() === undefined ? 0 : lowest()! / 100, short: "", text: "" })}
               size={28}
             />
-            <span style={{ color: lowest() === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest())] }}>{shown() === undefined ? "额度" : `${shown()}%`}</span>
+            <span style={{ color: lowest() === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest())] }}>
+              {shown() === undefined ? farmWording().quota.quota : `${shown()}%`}
+            </span>
           </HudCard>
         </button>
         <Show when={open()}>
-          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label="剩余额度">
+          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={farmWording().quota.left}>
             <div class="flex items-center">
-              <span class="flex-1 text-[13px]">剩余额度</span>
-              <PxButton size="icon" label="现在读一次额度" onClick={() => runtimes().forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}>
+              <span class="flex-1 text-[13px]">{farmWording().quota.left}</span>
+              <PxButton
+                size="icon"
+                label={farmWording().quota.refresh}
+                onClick={() => runtimes().forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}
+              >
                 <SpriteIcon name="button-refresh" size={14} />
               </PxButton>
             </div>
@@ -139,7 +148,7 @@ export function QuotaPill(props: { height: number }) {
                 {(r) => <Machine info={r()} />}
               </For>
             </div>
-            <p class="mt-2 text-[12px] text-bark-400">从各家账户读来，几分钟更新一次；帮工干完一轮也会更新。</p>
+            <p class="mt-2 text-[12px] text-bark-400">{farmWording().quota.note}</p>
           </div>
         </Show>
       </div>

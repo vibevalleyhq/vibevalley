@@ -1,6 +1,7 @@
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
+import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -25,7 +26,7 @@ export function ChatText(props: { text: string; folds?: boolean; link?: string }
           <PxMarkdown text={props.text} mentions />
         </div>
         <button type="button" onClick={() => setOpen(!open())} class={["mt-1 cursor-pointer text-[12px] hover:underline", props.link ?? "text-leaf-700"]}>
-          {open() ? "收起" : "展开阅读"}
+          {open() ? farmWording().chat.less : farmWording().chat.more}
         </button>
       </div>
     </Show>
@@ -38,7 +39,7 @@ function DispatchNote(props: { text: string }) {
   return (
     <button
       type="button"
-      aria-label={open() ? "收起派活" : "展开派活"}
+      aria-label={open() ? farmWording().chat.foldDispatch : farmWording().chat.unfoldDispatch}
       onClick={() => setOpen(!open())}
       class="group flex w-full cursor-pointer items-start gap-1.5 text-left"
     >
@@ -137,7 +138,7 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
         {tag()[0]}
       </span>
       <ChatText text={props.m.text} folds={props.m.final} />
-      <Show when={props.m.spent}>{(spent) => <p class={["mt-1", small]}>这一轮花了 {spentText(spent())}</p>}</Show>
+      <Show when={props.m.spent}>{(spent) => <p class={["mt-1", small]}>{farmWording().chat.spent(spentText(spent()))}</p>}</Show>
       {props.steps}
     </ChatRow>
   );
@@ -151,9 +152,9 @@ export function ThreadChip(props: { thread: Conversation; unread: number; onOpen
       class="mt-1.5 flex cursor-pointer items-center gap-1.5 border border-cream-300 bg-cream-50/80 px-2 py-0.5 hover:bg-cream-50"
     >
       <SpriteIcon name="button-thread" size={12} />
-      <span class="text-[12px] text-leaf-700">{props.thread.replies > 0 ? `${props.thread.replies} 条回复` : "工单串"}</span>
+      <span class="text-[12px] text-leaf-700">{props.thread.replies > 0 ? farmWording().chat.replies(props.thread.replies) : farmWording().chat.thread}</span>
       <Show when={props.unread > 0}>
-        <span class="bg-berry px-1.5 text-[12px] text-cream-50">{props.unread} 新</span>
+        <span class="bg-berry px-1.5 text-[12px] text-cream-50">{farmWording().chat.newCount(props.unread)}</span>
       </Show>
       <SpriteIcon name="button-next" size={12} />
     </button>

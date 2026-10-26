@@ -2,6 +2,7 @@
 // pointed at, a reward, a note, its badge, its project, the level that clears it), what each helper is doing over its
 // head, the orchestrator's last words, and the yard's signs, names and counts. Words let clicks through to the village.
 
+import { farmWording } from "../words";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import type { Session, SessionId } from "@vibevalley/protocol";
 import { doingOf, harvestedOf, lastOrchestratorSaid, plotTitle } from "./rules";
@@ -133,7 +134,7 @@ export function Overlay() {
           rows: [
             [words(plotTitle(bed, session, plot.crop))],
             ...(session?.project ? [[words(session.project, CardColors.muted)]] : []),
-            [words(aim.ok ? `点击：${aim.text}` : aim.text, aim.ok ? CardColors.good : CardColors.muted)],
+            [words(aim.ok ? farmWording().overlay.click(aim.text) : aim.text, aim.ok ? CardColors.good : CardColors.muted)],
           ],
         };
       } else if (reward) {
@@ -148,7 +149,7 @@ export function Overlay() {
         card = { padX: 3, padY: 0, rows: [[words(session.project, CardColors.muted)]] };
       } else if (bed.unlockLevel !== undefined && plot.crop === "locked") {
         where = "middle";
-        card = { rows: [[words(`Lv.${bed.unlockLevel} 开垦`)]] };
+        card = { rows: [[words(farmWording().overlay.clearAt(bed.unlockLevel))]] };
       }
       if (!card) continue;
       const key = `bed:${bed.index}`;
@@ -299,7 +300,7 @@ function OrchestratorWords(props: { x: number; y: number; hidden: boolean; sessi
     const said = props.said;
     const at = doneAt();
     const fresh = said && (at === undefined || now() - at < speechMs);
-    return fresh ? plainText(said.text) : props.sessions === 0 ? "今天种点什么？" : undefined;
+    return fresh ? plainText(said.text) : props.sessions === 0 ? farmWording().overlay.idle : undefined;
   };
   return (
     <Show when={text()}>

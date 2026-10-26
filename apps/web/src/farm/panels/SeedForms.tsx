@@ -2,6 +2,7 @@
 // mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
 // few words to the helper.
 
+import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -99,7 +100,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     if (!canSow() || !p) return;
     try {
       const got = await writeIssue(text(), agentOf(sower()) ?? "", p);
-      if (got.refused) toasts.add({ type: ToastType.info, title: "先没起草", description: got.refused });
+      if (got.refused) toasts.add({ type: ToastType.info, title: farmWording().sow.notDrafted, description: got.refused });
       props.onDone();
       router.navigate(`/issues/${encodeURIComponent(got.issue.id)}`);
     } catch (e) {
@@ -117,10 +118,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
       when={project()}
       fallback={
         <div class="flex flex-col items-start gap-2.5">
-          <p class="text-[14px] text-bark-900">这座农场不是哪个项目的</p>
-          <p class={xs}>{projects().length > 0 ? "种地要先进一个项目的农场：回地图挑一座岛。" : "工作台里还没有项目：先在「项目」页开一个。"}</p>
+          <p class="text-[14px] text-bark-900">{farmWording().sow.homeless}</p>
+          <p class={xs}>{projects().length > 0 ? farmWording().sow.toMap : farmWording().sow.noProjects}</p>
           <PxButton tone="primary" onClick={() => (props.onDone(), router.navigate("/projects"))}>
-            {projects().length > 0 ? "去地图" : "去开一个项目"}
+            {projects().length > 0 ? farmWording().sow.map : farmWording().sow.makeProject}
           </PxButton>
         </div>
       }
@@ -129,7 +130,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
             <p class="min-w-0 flex-1 truncate text-[14px] text-bark-900">
-              种在 {p()}
+              {farmWording().sow.plantIn(p())}
               <Show when={bag()?.stack.label}>
                 <span class={["ml-2", xs]}>{bag()!.stack.label}</span>
               </Show>
@@ -138,29 +139,32 @@ export function SowForm(props: { station: number; onDone: () => void }) {
           <div class="mt-3 flex flex-col">
             <Switch>
               <Match when={templates.isPending && !!project()}>
-                <p class={["mt-2.5", xs]}>在翻种子袋……</p>
+                <p class={["mt-2.5", xs]}>{farmWording().sow.rummaging}</p>
               </Match>
               <Match when={templates.error}>
                 {(e) => (
                   <div class="mt-2.5 flex flex-wrap items-center gap-2">
-                    <p class="text-[12px] text-berry">种子袋没拿到：{reasonOf(e())}</p>
+                    <p class="text-[12px] text-berry">
+                      {farmWording().sow.noSeeds}
+                      {reasonOf(e())}
+                    </p>
                     <PxButton size="sm" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
-                      重新拿种子袋
+                      {farmWording().sow.retry}
                     </PxButton>
                   </div>
                 )}
               </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
-              <p class={["mt-2.5", xs]}>最近</p>
+              <p class={["mt-2.5", xs]}>{farmWording().sow.recent}</p>
               <div class="mt-1.5 flex flex-wrap gap-1.5">
                 <For each={seeds().recent}>{(r) => <Chip text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
-              <p class={["mt-2.5", xs]}>常见的活</p>
+              <p class={["mt-2.5", xs]}>{farmWording().sow.kinds}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label="常见的活" class="mt-1.5 flex flex-wrap gap-1">
+              <div role="tablist" aria-label={farmWording().sow.kinds} class="mt-1.5 flex flex-wrap gap-1">
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button
@@ -191,7 +195,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </Show>
             </Show>
-            <p class={["mt-2.5", xs]}>自己写</p>
+            <p class={["mt-2.5", xs]}>{farmWording().sow.own}</p>
             <div class="mt-1.5">
               <PxTextArea
                 ref={(el) => (words = el)}
@@ -199,13 +203,13 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 selection={selection()}
                 onChange={setText}
                 rows={3}
-                placeholder="要做什么，做到什么程度算完"
-                label="工单"
+                placeholder={farmWording().sow.jobHint}
+                label={farmWording().sow.job}
               />
             </div>
-            <p class={["mt-3", xs]}>谁来种</p>
-            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="谁来种">
-              <WhoTile active={sower() === byOrchestrator} label="管家挑" onClick={() => setWho(byOrchestrator)}>
+            <p class={["mt-3", xs]}>{farmWording().sow.who}</p>
+            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={farmWording().sow.who}>
+              <WhoTile active={sower() === byOrchestrator} label={farmWording().sow.orchestratorPicks} onClick={() => setWho(byOrchestrator)}>
                 <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-[16px] text-bark-600">?</span>
               </WhoTile>
               <For each={agents()} keyed={(a) => a.id}>
@@ -217,12 +221,12 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </For>
             </div>
             <div class="mt-3 flex items-center gap-2">
-              <p class={["min-w-0 flex-1", xs]}>开始：管家把这句话交给帮工，在 {p()} 里马上开工。草稿：帮工读过代码写成工单，你看过再开工。</p>
+              <p class={["min-w-0 flex-1", xs]}>{farmWording().sow.how(p())}</p>
               <PxButton disabled={!canSow()} onClick={() => void write()}>
-                草稿
+                {farmWording().sow.draft}
               </PxButton>
               <PxButton tone="primary" disabled={!canSow()} onClick={sow}>
-                开始
+                {farmWording().sow.start}
               </PxButton>
             </div>
             <Show when={refused()}>
@@ -235,7 +239,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   );
 }
 
-const dropsOfAdvice = ["改动小一点", "先别动测试", "做完跟我说一声", "顺便补个测试"];
+const dropsOfAdvice = farmWording().water.drops;
 
 export function WaterForm(props: { session: Session; onDone: () => void }) {
   const core = useCore();
@@ -257,24 +261,29 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
   };
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-800">
-        {props.session.phase._tag === "working" ? "它正在干活，这句话会在下一步之前收到。" : "它现在没在干活，这句话会让它接着干一轮。"}
-      </p>
-      <p class={["mt-1", xs]}>这句话记在它的工单串里，它回的话也在那儿。</p>
-      <p class={["mt-1", xs]}>现在的活：{props.session.brief}</p>
+      <p class="text-[13px] text-bark-800">{props.session.phase._tag === "working" ? farmWording().water.working : farmWording().water.idle}</p>
+      <p class={["mt-1", xs]}>{farmWording().water.thread}</p>
+      <p class={["mt-1", xs]}>{farmWording().water.job(props.session.brief)}</p>
       <div class="mt-3 flex flex-wrap gap-1.5">
         <For each={dropsOfAdvice}>{(s) => <Chip text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>
       <div class="mt-3 flex items-end gap-2">
         <div class="flex-1">
-          <PxTextArea value={text()} onChange={setText} rows={2} placeholder="带句话……" label={`给${props.session.name}带句话`} autoFocus />
+          <PxTextArea
+            value={text()}
+            onChange={setText}
+            rows={2}
+            placeholder={farmWording().water.hint}
+            label={farmWording().plot.tell(props.session.name)}
+            autoFocus
+          />
         </div>
         <PxButton tone="primary" disabled={!text().trim() || !canTell()} onClick={() => void water()}>
-          浇水
+          {farmWording().water.water}
         </PxButton>
       </div>
       <Show when={!canTell()}>
-        <p class="mt-1.5 text-[12px] text-bark-600">工单状态变了，先回到地块看看要你做的事。</p>
+        <p class="mt-1.5 text-[12px] text-bark-600">{farmWording().water.moved}</p>
       </Show>
       <Show when={refused()}>
         <p class="mt-1.5 text-[12px] text-berry">{refused()}</p>

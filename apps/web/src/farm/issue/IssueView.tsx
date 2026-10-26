@@ -3,6 +3,8 @@
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
 
+import { rulesWording } from "../../rules/words";
+import { farmWording } from "../words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -34,8 +36,8 @@ const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", wate
 const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
-const speciesLabel: Record<string, string> = { bear: "熊", rabbit: "兔子", fox: "小狐狸", cat: "猫", owl: "猫头鹰", hedgehog: "刺猬", raccoon: "浣熊" };
-const outfitLabel: Record<string, string> = { farmer: "农夫", gardener: "园丁", rain: "雨衣", winter: "冬装" };
+const speciesLabel: Record<string, string> = rulesWording().cast.species;
+const outfitLabel: Record<string, string> = rulesWording().cast.outfit;
 
 /** The plot's issue while the store says so (the inspect layer). */
 export function IssueView() {
@@ -48,7 +50,7 @@ export function IssueView() {
   return (
     <Show when={session()}>
       {(s) => (
-        <FarmDialog title={`${s().name}的地`} size="lg" onClose={() => farm.select(null)}>
+        <FarmDialog title={farmWording().plotOf(s().name)} size="lg" onClose={() => farm.select(null)}>
           <PlotDetail session={s()} onDone={() => farm.select(null)} />
         </FarmDialog>
       )}
@@ -68,7 +70,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
   };
   const hasThread = () => issueThreadOf(core()?.chat, id()) !== undefined;
   return (
-    <Show when={issue()} fallback={<p class={body}>这块地的工单还没读到。</p>}>
+    <Show when={issue()} fallback={<p class={body}>{farmWording().plot.unread}</p>}>
       {(i) => (
         <IssueBody
           issue={i()}
@@ -123,7 +125,7 @@ function IssueBody(props: {
         await f();
         return true;
       } catch (e) {
-        toasts.add({ type: ToastType.warn, title: "没办成", description: reasonOf(e) });
+        toasts.add({ type: ToastType.warn, title: farmWording().plot.failed, description: reasonOf(e) });
         return false;
       }
     },
@@ -184,13 +186,13 @@ function IssueBody(props: {
             <span class={xs}>{s().project}</span>
           </Show>
         </div>
-        <p class="mt-1 text-[13px]" style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label="现在怎样">
+        <p class="mt-1 text-[13px]" style={{ color: s().attention.state === "stuck" ? tones.berry : "#5a3d26" }} aria-label={farmWording().plot.now}>
           {s().statusLine(now(), timeline()?.spent?.cny)}
         </p>
 
         <Show when={s().ask}>
           {(ask) => (
-            <div class="mt-3 p-3" style={{ background: tint(tones[ask().tone] ?? "#c8a46e", 0.3) }} aria-label="要你做的" role="region">
+            <div class="mt-3 p-3" style={{ background: tint(tones[ask().tone] ?? "#c8a46e", 0.3) }} aria-label={farmWording().plot.yours} role="region">
               <p class="text-[14px]">{ask().head}</p>
               <Show when={ask().line}>
                 <p class={["mt-1 line-clamp-4 whitespace-pre-wrap", body]}>{ask().line}</p>
@@ -201,7 +203,7 @@ function IssueBody(props: {
                     <div class="mt-2">
                       <p class={body}>{q.question}</p>
                       <Show when={q.options?.length}>
-                        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={`回答：${q.question}`}>
+                        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={farmWording().plot.answerTo(q.question)}>
                           <For each={q.options}>
                             {(o) => (
                               <PxButton size="sm" disabled={busy()} onClick={() => void acts.send("answer", o).then((ok) => ok && acts.setText(""))}>
@@ -226,17 +228,23 @@ function IssueBody(props: {
               rows={box() === "reject" ? 3 : 2}
               placeholder={
                 box() === "reject"
-                  ? "哪里没过，一行一条"
+                  ? farmWording().plot.rejectWhere
                   : state() === "asking"
-                    ? "自己说……"
+                    ? farmWording().plot.sayIt
                     : state() === "canceled"
-                      ? "这次要它做什么（不填就是接着做完）"
+                      ? farmWording().plot.reopenWhat
                       : props.session.phase._tag === "working"
-                        ? "干着活也能收到这句话"
-                        : "说一句，它接着做一轮"
+                        ? farmWording().plot.tellWorking
+                        : farmWording().plot.tellIdle
               }
               label={
-                box() === "reject" ? "哪里没过" : state() === "asking" ? "回答" : state() === "canceled" ? "重开这张工单" : `给${props.session.name}带句话`
+                box() === "reject"
+                  ? farmWording().plot.rejectLabel
+                  : state() === "asking"
+                    ? farmWording().plot.answer
+                    : state() === "canceled"
+                      ? farmWording().plot.reopen
+                      : farmWording().plot.tell(props.session.name)
               }
               disabled={busy()}
             />
@@ -249,26 +257,23 @@ function IssueBody(props: {
           <For each={blockActs()}>{(a) => button(a, () => false)}</For>
           <For each={rowActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
           <PxButton icon="button-open" onClick={() => props.onNavigate()}>
-            在看板上看
+            {farmWording().plot.onBoard}
           </PxButton>
         </div>
 
-        <FarmSection title={s().criteria.length > 0 ? `做到哪了 · ${s().met} / ${s().criteria.length} 条做到了` : "做到哪了"}>
+        <FarmSection title={s().criteria.length > 0 ? farmWording().plot.progressMet(s().met, s().criteria.length) : farmWording().plot.progress}>
           <Show when={s().doing}>
             <p class={[body, "text-[#4f8fbd]"]}>{s().doing}</p>
           </Show>
           <Show when={s().inTask}>
             <p class={xs}>{s().taskText}</p>
           </Show>
-          <Show
-            when={s().criteria.length > 0}
-            fallback={<p class={xs}>这张工单没写做完的标准：交回来时看{props.issue.deliver === "answer" ? "结论" : "改动"}判断。</p>}
-          >
+          <Show when={s().criteria.length > 0} fallback={<p class={xs}>{farmWording().plot.noCriteria(props.issue.deliver === "answer")}</p>}>
             <Criteria rows={s().criteria} checking={state() === "reviewing" && props.issue.reviewedAt === undefined} />
           </Show>
           <Show when={s().openFindings.length > 0}>
             <div class="mt-1.5">
-              <For each={s().openFindings}>{(f) => <p class={[body, "text-berry"]}>上次打回 · {f.text}</p>}</For>
+              <For each={s().openFindings}>{(f) => <p class={[body, "text-berry"]}>{farmWording().plot.rejected(f.text)}</p>}</For>
             </div>
           </Show>
         </FarmSection>
@@ -276,25 +281,29 @@ function IssueBody(props: {
         <div class="mt-4">
           <Show when={props.issue.deliver === "answer" ? props.issue.answer : undefined}>
             {(a) => (
-              <FarmSection title="结论">
+              <FarmSection title={farmWording().plot.conclusion}>
                 <p class={body}>{a().conclusion}</p>
-                <For each={a().evidence}>{(l) => <p class={xs}>依据 · {l}</p>}</For>
-                <For each={a().next}>{(l) => <p class={xs}>接着做 · {l}</p>}</For>
+                <For each={a().evidence}>{(l) => <p class={xs}>{farmWording().plot.evidence(l)}</p>}</For>
+                <For each={a().next}>{(l) => <p class={xs}>{farmWording().plot.next(l)}</p>}</For>
               </FarmSection>
             )}
           </Show>
           <Show when={s().showsChanges && props.issue.deliver !== "answer"}>
             <Fold
-              label={changed() ? (nothingChanged(changed()!) ? "做出了什么：还没有改动" : `做出了什么（${changed()!.files.length} 个文件）`) : "做出了什么"}
+              label={
+                changed()
+                  ? nothingChanged(changed()!)
+                    ? farmWording().plot.madeNothing
+                    : farmWording().plot.madeFiles(changed()!.files.length)
+                  : farmWording().plot.made
+              }
             >
-              <Show when={changed()} fallback={<p class={body}>{changes.isPending ? "在读……" : "读不到改动。"}</p>}>
+              <Show when={changed()} fallback={<p class={body}>{changes.isPending ? farmWording().reading : farmWording().plot.changesUnread}</p>}>
                 {(c) => (
                   <div class="flex flex-col">
                     <p class={body}>{changesLine(c())}</p>
                     <Show when={c().conflicts.length > 0}>
-                      <p class={[body, "text-berry"]}>
-                        合进 {c().base} 会冲突：{c().conflicts.join("、")}
-                      </p>
+                      <p class={[body, "text-berry"]}>{farmWording().plot.conflict(c().base, c().conflicts)}</p>
                     </Show>
                     <div class="mt-1.5">
                       <For each={c().files.slice(0, 12)}>
@@ -305,7 +314,7 @@ function IssueBody(props: {
                         )}
                       </For>
                       <Show when={c().files.length > 12}>
-                        <p class={xs}>还有 {c().files.length - 12} 个文件</p>
+                        <p class={xs}>{farmWording().plot.moreFiles(c().files.length - 12)}</p>
                       </Show>
                     </div>
                   </div>
@@ -313,8 +322,8 @@ function IssueBody(props: {
               </Show>
             </Fold>
           </Show>
-          <Fold label="怎么走到这一步">
-            <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.isPending ? "在读……" : "读不到。"}</p>}>
+          <Fold label={farmWording().plot.story}>
+            <Show when={timeline()} fallback={<p class={xs}>{timelineQuery.isPending ? farmWording().reading : farmWording().unread}</p>}>
               {(t) => (
                 <For each={t().milestones}>
                   {(m) => (
@@ -329,37 +338,37 @@ function IssueBody(props: {
               )}
             </Show>
           </Fold>
-          <Fold label="帮工的每一步">
+          <Fold label={farmWording().plot.steps}>
             <Show when={steps().length > 0} fallback={<p class={xs}>{noStepsText(s().head)}</p>}>
               <WorkLog steps={steps()} now={now()} working={state() === "working"} />
             </Show>
           </Fold>
-          <Fold label="每次干活">
+          <Fold label={farmWording().plot.runs}>
             <Runs issue={props.issue.id} version={`${props.issue.sessions.length}:${s().head.runs}:${s().head.phase._tag}`} />
           </Fold>
-          <Fold label="详情">
+          <Fold label={farmWording().plot.details}>
             <div class="flex flex-col">
               <Show when={s().description}>
-                <Row label="要做的">
+                <Row label={farmWording().plot.job}>
                   <p class="whitespace-pre-wrap text-[13px] text-bark-800">{s().description}</p>
                 </Row>
               </Show>
-              <Row label="谁在做">
+              <Row label={farmWording().plot.who}>
                 <p class={body}>{s().whoLine}</p>
               </Row>
               <Show when={s().crewLine}>
-                <Row label="地上的人">
+                <Row label={farmWording().plot.crew}>
                   <p class={body}>{s().crewLine}</p>
                 </Row>
               </Show>
               <Show when={!s().inTask}>
-                <Row label="验收">
+                <Row label={farmWording().plot.review}>
                   <div class="flex flex-wrap items-center gap-1.5">
                     <For
                       each={
                         [
-                          ["glance", "看一眼就收"],
-                          ["required", "必须过验收"],
+                          ["glance", farmWording().plot.glance],
+                          ["required", farmWording().plot.required],
                         ] as const
                       }
                     >
@@ -375,23 +384,23 @@ function IssueBody(props: {
                       )}
                     </For>
                     <Show when={props.issue.reviewedAt !== undefined}>
-                      <span class="text-[12px] text-leaf-700">已验收 {wallClockText(props.issue.reviewedAt!)}</span>
+                      <span class="text-[12px] text-leaf-700">{farmWording().plot.reviewed(wallClockText(props.issue.reviewedAt!))}</span>
                     </Show>
                   </div>
                 </Row>
               </Show>
               <Show when={s().resolvedFindings.length > 0}>
-                <Row label="拔了的草">
-                  <For each={s().resolvedFindings}>{(f) => <p class={[body, "text-bark-400 line-through"]}>已拔 · {f.text}</p>}</For>
+                <Row label={farmWording().plot.weeded}>
+                  <For each={s().resolvedFindings}>{(f) => <p class={[body, "text-bark-400 line-through"]}>{farmWording().plot.weed(f.text)}</p>}</For>
                 </Row>
               </Show>
               <Show when={agent()?.model}>
-                <Row label="模型">
+                <Row label={farmWording().plot.model}>
                   <p class={body}>{agent()!.model}</p>
                 </Row>
               </Show>
               <Show when={s().head.branch}>
-                <Row label="分支">
+                <Row label={farmWording().plot.branch}>
                   <p class="font-mono text-[12.5px] text-bark-800">{s().head.branch}</p>
                 </Row>
               </Show>
@@ -401,35 +410,35 @@ function IssueBody(props: {
                     <div class="flex items-center gap-2">
                       <span class="min-w-0 flex-1 font-mono text-[12.5px] break-all select-text">{tree()}</span>
                       <PxButton size="sm" onClick={() => void navigator.clipboard.writeText(tree())}>
-                        复制路径
+                        {farmWording().plot.copyPath}
                       </PxButton>
                     </div>
                   </Row>
                 )}
               </Show>
-              <Row label="开单">
+              <Row label={farmWording().plot.opened}>
                 <p class={body}>{wallClockText(props.issue.createdAt)}</p>
               </Row>
               <Show when={props.issue.closedAt !== undefined}>
-                <Row label="关单">
+                <Row label={farmWording().plot.closed}>
                   <p class={body}>{wallClockText(props.issue.closedAt!)}</p>
                 </Row>
               </Show>
-              <Row label="做过">
+              <Row label={farmWording().plot.history}>
                 <p class={body}>{s().historyLine}</p>
               </Row>
-              <Row label="用时">
+              <Row label={farmWording().plot.took}>
                 <p class={body}>{s().usedLine(steps(), now())}</p>
               </Row>
               <div class="flex flex-wrap gap-2">
                 <Show when={props.onThread}>
                   <PxButton size="sm" onClick={() => props.onThread?.()}>
-                    看工单串
+                    {farmWording().plot.thread}
                   </PxButton>
                 </Show>
                 <Show when={s().inTask && props.onTask}>
                   <PxButton size="sm" onClick={() => props.onTask?.()}>
-                    看计划
+                    {farmWording().plot.plan}
                   </PxButton>
                 </Show>
               </div>
@@ -471,17 +480,15 @@ function Aside(props: { session: Session; agent?: Agent }) {
       <p class={["text-center", xs]}>
         {speciesLabel[kind()[0] ?? ""] ?? kind()[0]} · {outfitLabel[kind()[1] ?? ""] ?? kind()[1]}
       </p>
-      <p class={xs}>
-        第 {stationOfSession(props.session) + 1} 块地 · 第 {Math.round(props.session.runs)} 轮
-      </p>
+      <p class={xs}>{farmWording().plot.where(stationOfSession(props.session) + 1, Math.round(props.session.runs))}</p>
     </div>
   );
 }
 
 const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: string; label: string }> = {
-  met: { icon: "mark-check", label: "它说做到了" },
-  unmet: { icon: "mark-cross", label: "它说没做到" },
-  unsure: { icon: "mark-warn", label: "它说不确定" },
+  met: { icon: "mark-check", label: farmWording().plot.result.met },
+  unmet: { icon: "mark-cross", label: farmWording().plot.result.unmet },
+  unsure: { icon: "mark-warn", label: farmWording().plot.result.unsure },
 };
 
 /** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
@@ -518,7 +525,7 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             >
               <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border-2 border-bark-400 bg-cream-50 group-hover:border-bark-600">
                 <Show when={ticked().has(i())}>
-                  <SpriteIcon name="mark-check" size={12} label="看过了" />
+                  <SpriteIcon name="mark-check" size={12} label={farmWording().plot.ticked} />
                 </Show>
               </span>
               <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">{mark(r())}</span>
@@ -552,8 +559,8 @@ function Fold(props: { label: string; children: JSX.Element }) {
       {/* Mounted with the dialog and only hidden while folded: content first mounted by the click reads queries in
           flight, and Solid holds that click's whole update until they land, so the fold would not open. */}
       <div class="pb-3" hidden={!open()}>
-        <Errored fallback={<p class="text-[12px] text-bark-500">读不到。</p>}>
-          <Loading fallback={<p class="text-[12px] text-bark-500">在读……</p>}>{props.children}</Loading>
+        <Errored fallback={<p class="text-[12px] text-bark-500">{farmWording().unread}</p>}>
+          <Loading fallback={<p class="text-[12px] text-bark-500">{farmWording().reading}</p>}>{props.children}</Loading>
         </Errored>
       </div>
     </div>
@@ -578,9 +585,9 @@ function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(runsQuery, []);
   const now = useNow();
   return (
-    <Show when={runs().length > 0} fallback={<p class={xs}>还没有干过。</p>}>
-      <FarmSection title="每次干活">
-        <p class={xs}>{runs().length} 次</p>
+    <Show when={runs().length > 0} fallback={<p class={xs}>{farmWording().plot.noRuns}</p>}>
+      <FarmSection title={farmWording().plot.runs}>
+        <p class={xs}>{farmWording().plot.runCount(runs().length)}</p>
         <For each={[...runs()].reverse()} keyed={(r) => r.id}>
           {(r) => (
             <Row label={wallClockText(r().startedAt)}>

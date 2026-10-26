@@ -3,6 +3,7 @@
 // bottom. Under it, the words over the village (Overlay.tsx); over it, the effects (FxLayer.tsx). Laid out in the part
 // of the village on the page (store screen.shown).
 
+import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { clockText, thousands } from "./rules";
@@ -52,7 +53,7 @@ export function HudTap(props: { label: string; onClick: () => void; selected?: b
 export function Hud() {
   const shown = useFarm((s) => s.screen?.shown);
   return (
-    <div class="pointer-events-none absolute inset-0" aria-label="农场的 HUD">
+    <div class="pointer-events-none absolute inset-0" aria-label={farmWording().hud.label}>
       <Overlay />
       <ProjectSign />
       <Show when={shown()}>
@@ -88,7 +89,7 @@ function TopLeft() {
   };
   return (
     <div class="absolute flex items-start" style={{ left: `${edge}px`, top: `${edge + titleBar.top}px`, gap: `${gap}px` }}>
-      <HudTap label="换管家的样子" onClick={() => open("orchestrator")}>
+      <HudTap label={farmWording().hud.look} onClick={() => open("orchestrator")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span
             class="box-border flex items-center justify-center border-2 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -98,7 +99,7 @@ function TopLeft() {
           </span>
         </span>
       </HudTap>
-      <HudTap label="任务与成就" onClick={() => open("graphs")}>
+      <HudTap label={farmWording().panel.graphs} onClick={() => open("graphs")}>
         <span class="inline-block pr-0.5 pb-0.5 text-left">
           <span
             class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-[2px_2px_0_0_#3a2a1899]"
@@ -115,7 +116,7 @@ function TopLeft() {
               <span class="block h-full" style={{ width: `${need() === 0 ? 0 : Math.min(100, (lv().xp / need()) * 100)}%`, background: CardColors.barFill }} />
             </span>
             <span class="text-[12px] leading-[14px]" style={{ color: CardColors.muted }}>
-              {Math.round(lv().xp)}/{need()} commit{next() !== undefined ? ` · Lv.${next()} 开垦` : ""}
+              {farmWording().hud.toLevel(Math.round(lv().xp), need(), next())}
             </span>
           </span>
         </span>
@@ -123,7 +124,7 @@ function TopLeft() {
       {/* A link, so it opens in a new tab too; in the row, so it covers nothing. */}
       <a
         href="/issues"
-        title="工单、聊天……管活的页面"
+        title={farmWording().hud.workbenchHint}
         onClick={(e) => {
           if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           e.preventDefault();
@@ -134,7 +135,7 @@ function TopLeft() {
       >
         <HudCard height={top}>
           <SpriteIcon name="icon-tasks" size={20} />
-          工作台
+          {farmWording().hud.workbench}
         </HudCard>
       </a>
     </div>
@@ -151,24 +152,24 @@ function TopRight() {
   };
   return (
     <div class="absolute flex items-start" style={{ right: `${edge}px`, top: `${edge}px`, gap: `${gap}px` }}>
-      <HudTap label="记忆树：农场学会了什么" onClick={() => go("/tree")}>
+      <HudTap label={farmWording().hud.treeHint} onClick={() => go("/tree")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-tree" size={20} />
-          记忆树
+          {farmWording().hud.tree}
         </HudCard>
       </HudTap>
       <Show when={webRoutes.includes("/projects")}>
-        <HudTap label="地图：每个项目一座岛" onClick={() => go("/projects")}>
+        <HudTap label={farmWording().hud.mapHint} onClick={() => go("/projects")}>
           <HudCard height={top}>
             <SpriteIcon name="icon-map" size={20} />
-            地图
+            {farmWording().hud.map}
           </HudCard>
         </HudTap>
       </Show>
-      <HudTap label={unread() > 0 ? `频道，${unread()} 条没读` : "频道"} onClick={() => go("/chat")}>
+      <HudTap label={unread() > 0 ? farmWording().hud.channelsUnread(unread()) : farmWording().chat.channels} onClick={() => go("/chat")}>
         <HudCard height={top}>
           <SpriteIcon name="icon-board" size={20} />
-          频道
+          {farmWording().chat.channels}
           <Show when={unread() > 0}>
             <span class="bg-berry px-1 text-[10px] text-cream-50">{unread()}</span>
           </Show>
@@ -176,7 +177,7 @@ function TopRight() {
       </HudTap>
       <QuotaPill height={top} />
       <HudTap
-        label="菜单（Esc）"
+        label={farmWording().hud.menuHint}
         onClick={() => {
           playSound("open");
           farm.menu(true);
@@ -186,7 +187,7 @@ function TopRight() {
           height={top}
           rows={[
             [
-              { kind: "words", text: "菜单" },
+              { kind: "words", text: farmWording().panel.menu },
               { kind: "words", text: "Esc", color: CardColors.muted },
             ],
           ]}
@@ -215,7 +216,7 @@ function BottomLeft() {
 function ToolBar() {
   const held = useFarm((s) => s.tool);
   return (
-    <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label="农具">
+    <div class="absolute inset-x-0 flex justify-center" style={{ bottom: `${edge}px`, gap: `${gap}px` }} role="toolbar" aria-label={farmWording().hud.tools}>
       <For each={tools}>
         {(tool, i) => (
           <HudTap label={`${tool.label}：${tool.hint}（${i() + 1}）`} selected={held() === tool.id} onClick={() => farm.hold(tool.id)}>

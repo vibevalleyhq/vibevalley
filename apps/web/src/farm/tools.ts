@@ -1,6 +1,7 @@
 // The tools the owner holds over the plots, and what a click with one means. aimTool is the
 // rule: the screen shows it while pointing and follows it on a click.
 
+import { farmWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { Issue, IssueAct, PlotView, Session } from "@vibevalley/protocol";
 import { type Bed, isRipe } from "./world/plots";
@@ -8,12 +9,12 @@ import { type Bed, isRipe } from "./world/plots";
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
 
 export const tools: readonly { readonly id: Tool; readonly label: string; readonly hint: string; readonly icon: string }[] = [
-  { id: "hand", label: "手", hint: "点一块地看详情，点空地播种", icon: "icon-hand" },
-  { id: "water", label: "浇水", hint: "给帮工带句话，正在干活的会中途收到", icon: "icon-water" },
-  { id: "bug", label: "杀虫", hint: "活没做成（地里有虫）：让它接着修", icon: "icon-bug" },
-  { id: "weed", label: "除草", hint: "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉", icon: "icon-weed" },
-  { id: "harvest", label: "收获", hint: "熟了的地：收下成果，帮工收工", icon: "icon-harvest" },
-  { id: "shovel", label: "铲除", hint: "正在干活的叫停；没在干活的请它收工", icon: "icon-shovel" },
+  { id: "hand", label: farmWording().tool.hand.label, hint: farmWording().tool.hand.hint, icon: "icon-hand" },
+  { id: "water", label: farmWording().water.water, hint: farmWording().tool.water.hint, icon: "icon-water" },
+  { id: "bug", label: farmWording().tool.bug.label, hint: farmWording().tool.bug.hint, icon: "icon-bug" },
+  { id: "weed", label: farmWording().tool.weed.label, hint: farmWording().tool.weed.hint, icon: "icon-weed" },
+  { id: "harvest", label: farmWording().tool.harvest.label, hint: farmWording().tool.harvest.hint, icon: "icon-harvest" },
+  { id: "shovel", label: farmWording().tool.shovel.label, hint: farmWording().tool.shovel.hint, icon: "icon-shovel" },
 ];
 
 /** The keys 1–6 pick the tools in this order. */
@@ -62,25 +63,29 @@ export function actForTool(tool: Tool, acts: readonly IssueAct[]): IssueAct | un
 
 export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot: PlotView, level: number, issue?: Issue): Aim {
   const unlock = bed.unlockLevel;
-  if (unlock !== undefined) return { ok: false, text: level >= unlock ? "开垦好的花坛" : `Lv.${unlock} 开垦这块地` };
+  if (unlock !== undefined) return { ok: false, text: level >= unlock ? farmWording().aim.flowerbed : farmWording().aim.clearAt(unlock) };
   const crop = plot.crop;
   const act = actForTool(tool, issue?.attention.acts ?? []);
-  const unavailable = issue ? `这张工单${wording().attention[issue.attention.state]}，先打开地块看看` : "这块地的工单还没读到";
+  const unavailable = issue ? farmWording().aim.unavailable(wording().attention[issue.attention.state]) : farmWording().aim.unread;
   switch (tool) {
     case "hand":
-      return { ok: true, text: session ? "看看这块地" : "播种" };
+      return { ok: true, text: session ? farmWording().aim.look : farmWording().aim.sow };
     case "water":
-      return session && act ? { ok: true, text: `给${session.name}浇水（带句话）` } : { ok: false, text: session ? unavailable : "还没种东西，先用手播种" };
+      return session && act
+        ? { ok: true, text: farmWording().aim.water(session.name) }
+        : { ok: false, text: session ? unavailable : farmWording().aim.nothingYet };
     case "bug":
-      return session && act ? { ok: true, text: "杀虫：让它接着修" } : { ok: false, text: session ? unavailable : "这块地没有虫" };
+      return session && act ? { ok: true, text: farmWording().aim.bug } : { ok: false, text: session ? unavailable : farmWording().aim.noBugs };
     case "weed":
-      return { ok: false, text: crop === "weeds" ? "帮工修完、验收通过草就拔了" : "没有杂草" };
+      return { ok: false, text: crop === "weeds" ? farmWording().aim.weeds : farmWording().aim.noWeeds };
     case "harvest":
       return session && act
-        ? { ok: true, text: isRipe(crop) ? "收获，帮工收工" : "收获：看看它改了什么" }
-        : { ok: false, text: session ? unavailable : "空地没有东西可收" };
+        ? { ok: true, text: isRipe(crop) ? farmWording().aim.harvestRipe : farmWording().aim.harvestLook }
+        : { ok: false, text: session ? unavailable : farmWording().aim.nothingToHarvest };
     case "shovel":
-      return session && act ? { ok: true, text: act === "stop" ? "铲除：叫停" : "铲除：请它收工" } : { ok: false, text: session ? unavailable : "空地不用铲" };
+      return session && act
+        ? { ok: true, text: act === "stop" ? farmWording().aim.shovelStop : farmWording().aim.shovelDismiss }
+        : { ok: false, text: session ? unavailable : farmWording().aim.noShovel };
   }
 }
 

@@ -2,6 +2,7 @@
 // Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
 // frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
 
+import { farmWording } from "./words";
 import { createEffect, Show } from "solid-js";
 import type { FarmSoundInput } from "./sound";
 import { farm } from "./store";
@@ -55,7 +56,7 @@ export function FarmPage(props: { project: string }) {
       </FramesContext>
       <Show when={!frames.frame}>
         <p role="status" class="absolute inset-x-0 top-1/3 text-center text-cream-200">
-          {frames.link === "lost" ? "连不上农场，重连中……（server 开着吗？）" : "在等农场……"}
+          {frames.link === "lost" ? farmWording().page.lost : farmWording().page.waiting}
         </p>
       </Show>
       <Show when={titleOpen()}>

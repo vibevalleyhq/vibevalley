@@ -1,6 +1,7 @@
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, a
 // new channel, the current one's settings, and the way to its full page (its recurrences are there).
 
+import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { createChannelForm } from "../../data/channelForm";
@@ -32,7 +33,7 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
     <div ref={box} class="relative min-w-0">
       <button
         type="button"
-        aria-label={`频道：${channelLabel(props.current)}，点开切换或开新频道`}
+        aria-label={farmWording().chat.channel(channelLabel(props.current))}
         aria-expanded={aria(open())}
         onClick={() => {
           if (!open()) playSound("open");
@@ -48,14 +49,14 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
         <SpriteIcon name="button-next" size={10} class="rotate-90" />
       </button>
       <Show when={open()}>
-        <div class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px" role="dialog" aria-label="频道">
+        <div class="absolute top-full left-0 z-20 mt-1.5 w-72 bg-cream-50 p-2 shadow-px" role="dialog" aria-label={farmWording().chat.channels}>
           <Switch>
             <Match when={mode() === "list"}>
               <div class="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
                 <For each={channels()}>
                   {(c) => {
                     const unread = () => unreadUnder(chat(), c);
-                    const line = () => [c.description, c.project ? `项目 ${c.project}` : undefined].filter(Boolean).join(" · ");
+                    const line = () => [c.description, c.project ? farmWording().chat.projectTag(c.project) : undefined].filter(Boolean).join(" · ");
                     return (
                       <button
                         type="button"
@@ -86,16 +87,16 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
               <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-cream-200 pt-1.5 text-[12px] text-leaf-700">
                 <button type="button" onClick={() => setMode("create")} class="flex cursor-pointer items-center gap-1 hover:underline">
                   <SpriteIcon name="button-add" size={12} />
-                  开新频道
+                  {farmWording().chat.newChannel}
                 </button>
                 <button type="button" onClick={() => router.navigate(chatPath(props.current))} class="flex cursor-pointer items-center gap-1 hover:underline">
                   <SpriteIcon name="button-open" size={12} />
-                  频道页和定时
+                  {farmWording().chat.pageAndSchedules}
                 </button>
                 <Show when={props.current?.kind === "channel"}>
                   <button type="button" onClick={() => setMode("settings")} class="flex cursor-pointer items-center gap-1 hover:underline">
                     <SpriteIcon name="button-settings" size={12} />
-                    设置
+                    {farmWording().chat.settingsLink}
                   </button>
                 </Show>
               </div>
@@ -117,7 +118,7 @@ function FormButtons(props: { onBack: () => void; submit: string; onSubmit?: () 
   return (
     <div class="mt-2 flex items-center justify-end gap-2">
       <button type="button" onClick={() => props.onBack()} class="cursor-pointer text-[12px] text-leaf-700 hover:underline">
-        返回
+        {farmWording().chat.back2}
       </button>
       <PxButton tone="primary" size="sm" disabled={!props.onSubmit} onClick={props.onSubmit && (() => props.onSubmit?.())}>
         {props.submit}
@@ -139,15 +140,26 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">开新频道</p>
-      <p class="text-[12px] text-bark-500">一件长期的事、一个项目，单独一个地方说话、派活。在这里叫管家，活就派在这里。</p>
-      <PxTextInput value={form.name()} onChange={form.setName} placeholder="名字，比如 clock-in" label="频道名" autoFocus />
-      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder="做什么的（可以不填）" label="频道说明" />
-      <PxTextInput value={form.project()} onChange={form.setProject} placeholder="默认项目（可以不填）" label="默认项目" suggestions={names()} />
+      <p class="text-[13px]">{farmWording().chat.newChannel}</p>
+      <p class="text-[12px] text-bark-500">{farmWording().chat.newChannelLine}</p>
+      <PxTextInput value={form.name()} onChange={form.setName} placeholder={farmWording().chat.nameHint} label={farmWording().chat.name} autoFocus />
+      <PxTextInput
+        value={form.description()}
+        onChange={form.setDescription}
+        placeholder={farmWording().chat.descriptionHint}
+        label={farmWording().chat.description}
+      />
+      <PxTextInput
+        value={form.project()}
+        onChange={form.setProject}
+        placeholder={farmWording().chat.projectHint}
+        label={farmWording().chat.project}
+        suggestions={names()}
+      />
       <Show when={form.error()}>
         <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit="开" onSubmit={form.ready() ? () => void submit() : undefined} />
+      <FormButtons onBack={() => props.onBack()} submit={farmWording().chat.open} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }
@@ -162,13 +174,19 @@ function ChannelSettings(props: { channel: Conversation; onDone: () => void; onB
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">{channelLabel(props.channel)} 的设置</p>
-      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder="做什么的" label="频道说明" />
-      <PxTextInput value={form.project()} onChange={form.setProject} placeholder="默认项目（空着就没有）" label="默认项目" suggestions={names()} />
+      <p class="text-[13px]">{farmWording().chat.settingsOf(channelLabel(props.channel))}</p>
+      <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={farmWording().chat.what} label={farmWording().chat.description} />
+      <PxTextInput
+        value={form.project()}
+        onChange={form.setProject}
+        placeholder={farmWording().chat.projectNone}
+        label={farmWording().chat.project}
+        suggestions={names()}
+      />
       <Show when={form.error()}>
         <p class="text-[12px] text-berry">{form.error()}</p>
       </Show>
-      <FormButtons onBack={() => props.onBack()} submit="存" onSubmit={form.ready() ? () => void submit() : undefined} />
+      <FormButtons onBack={() => props.onBack()} submit={farmWording().chat.save} onSubmit={form.ready() ? () => void submit() : undefined} />
     </div>
   );
 }
