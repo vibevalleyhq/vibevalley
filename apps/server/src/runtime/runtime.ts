@@ -155,16 +155,29 @@ function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>
   };
 }
 
-async function inventory<T>(
+/** An oar read, given up on after probeTimeoutMs of real time: fallback then, and when it fails. */
+const oarRead = <A, B>(read: () => Promise<A>, fallback: B): Effect.Effect<A | B> =>
+  Effect.promise(() => withinRealTime<A | B>(read(), probeTimeoutMs, fallback));
+
+const inventory = <T>(
   read: InventoryReader<T> | undefined,
   found: AvailableInstallation,
   cwd: string,
   entry: (t: T) => InventoryEntry,
-): Promise<InventoryEntry[] | null> {
-  if (!read) return null;
-  const result = await withinRealTime(read(found, { cwd, timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
-  return result?.kind === "ok" ? result.items.map(entry) : null;
-}
+): Effect.Effect<InventoryEntry[] | null> =>
+  read
+    ? Effect.map(
+        oarRead(() => read(found, { cwd, timeoutMs: probeTimeoutMs }), undefined),
+        (result) => (result?.kind === "ok" ? result.items.map(entry) : null),
+      )
+    : Effect.succeed(null);
+
+const defaultUsageOf: UsageOf = async (id, runtime, found, settings) => {
+  if (id === "pi") return piBalance(settings);
+  if (!runtime.accountUsage) return null;
+  const usage = await withinRealTime(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
+  return usage ? fromOar(usage) : null;
+};
 
 /** Only what is there. */
 const optional = <K extends string>(key: K, v: string | undefined) => (v ? ({ [key]: v } as Record<K, string>) : {});
@@ -181,7 +194,12 @@ export const make = (options: RuntimeOptions = {}) =>
     // Fibers started from callbacks belong to this service: they end with it and keep its services (the logger).
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const emit = (e: Effect.Effect<void>) => void forkHere(e);
-    const usageOf: UsageOf = (id, runtime, found, settings) => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings);
+    /** null when the read fails. */
+    const usageOf = (id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings) =>
+      Effect.orElseSucceed(
+        Effect.tryPromise(() => (options.usageOf ?? defaultUsageOf)(id, runtime, found, settings)),
+        () => null,
+      );
 
     const cache = new Map<string, Observation>();
     /**
@@ -259,7 +277,7 @@ export const make = (options: RuntimeOptions = {}) =>
       return info;
     }
 
-    async function probe(id: string): Promise<Observation> {
+    const probe = Effect.fnUntraced(function* (id: string): Effect.fn.Return<Observation> {
       const settings = store.settings(id);
       const info: RuntimeInfo = {
         id,
@@ -279,9 +297,8 @@ export const make = (options: RuntimeOptions = {}) =>
         const reason = id === "cursor" ? "Cursor 要单独装它的 SDK（@cursor/sdk），VibeValley 还没接" : "oar 不认识这个 runtime";
         return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
       }
-      const snapshot = await withinRealTime(probeInstallation(runtime, settings.binPath), probeTimeoutMs, {
-        kind: "not_found",
-      });
+      const notFound: InstallationSnapshot = { kind: "not_found" };
+      const snapshot = yield* oarRead(() => probeInstallation(runtime, settings.binPath), notFound);
       if (snapshot.kind !== "available") {
         return {
           info: {
@@ -302,83 +319,88 @@ export const make = (options: RuntimeOptions = {}) =>
             }
           : { status: "available", via: "bundled", command: id, version: null };
       const cwd = projectsDir(config);
-      const [models, usage, skills, mcpServers, tools] = await Promise.all([
-        runtime.listModels
-          ? withinRealTime(runtime.listModels(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined).then((m) =>
-              m?.kind === "ok"
-                ? m.models
-                    .filter((x) => !x.disabled)
-                    .map((x) => ({
-                      id: x.id,
-                      name: x.displayName || x.id,
-                      effortLevels: [...(x.effortLevels ?? [])],
-                      isDefault: !!x.default,
-                    }))
-                : null,
-            )
-          : Promise.resolve(null),
-        usageOf(id, runtime, found, settings).catch(() => null),
-        inventory(runtime.skills, found, cwd, (s) => ({
-          name: s.name,
-          ...optional("description", s.description),
-          ...optional("source", s.path || s.source),
-          ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
-        })),
-        inventory(runtime.mcpServers, found, cwd, (m) => {
-          const parts = [m.status, m.toolCount !== undefined ? `${m.toolCount} 个工具` : ""].filter(Boolean);
-          return {
-            name: m.name,
-            ...optional("description", parts.join(" · ")),
-            ...optional("source", m.source),
-            ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
-          };
-        }),
-        inventory(runtime.tools, found, cwd, (t) => ({
-          name: t.name,
-          ...optional("description", t.description),
-          ...optional("source", t.mcpServerId || t.source),
-          ...(t.enabled !== undefined ? { enabled: t.enabled } : {}),
-        })),
-      ]);
+      const listModels = runtime.listModels;
+      const [models, usage, skills, mcpServers, tools] = yield* Effect.all(
+        [
+          listModels
+            ? Effect.map(
+                oarRead(() => listModels(found, { timeoutMs: probeTimeoutMs }), undefined),
+                (m) =>
+                  m?.kind === "ok"
+                    ? m.models
+                        .filter((x) => !x.disabled)
+                        .map((x) => ({
+                          id: x.id,
+                          name: x.displayName || x.id,
+                          effortLevels: [...(x.effortLevels ?? [])],
+                          isDefault: !!x.default,
+                        }))
+                    : null,
+              )
+            : Effect.succeed(null),
+          usageOf(id, runtime, found, settings),
+          inventory(runtime.skills, found, cwd, (s) => ({
+            name: s.name,
+            ...optional("description", s.description),
+            ...optional("source", s.path || s.source),
+            ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
+          })),
+          inventory(runtime.mcpServers, found, cwd, (m) => {
+            const parts = [m.status, m.toolCount !== undefined ? `${m.toolCount} 个工具` : ""].filter(Boolean);
+            return {
+              name: m.name,
+              ...optional("description", parts.join(" · ")),
+              ...optional("source", m.source),
+              ...(m.enabled !== undefined ? { enabled: m.enabled } : {}),
+            };
+          }),
+          inventory(runtime.tools, found, cwd, (t) => ({
+            name: t.name,
+            ...optional("description", t.description),
+            ...optional("source", t.mcpServerId || t.source),
+            ...(t.enabled !== undefined ? { enabled: t.enabled } : {}),
+          })),
+        ],
+        { concurrency: "unbounded" },
+      );
       return { info: { ...info, models, usage, skills, mcpServers, tools }, found, read: 0 };
-    }
-
-    async function defaultUsageOf(id: string, runtime: Runtime, found: AvailableInstallation, settings: RuntimeSettings): Promise<AccountUsage | null> {
-      if (id === "pi") return piBalance(settings);
-      if (!runtime.accountUsage) return null;
-      const usage = await withinRealTime(runtime.accountUsage(found, { timeoutMs: probeTimeoutMs }), probeTimeoutMs, undefined);
-      return usage ? fromOar(usage) : null;
-    }
+    });
 
     const known = (id: string) => runtimeIds().includes(id);
 
-    async function refresh(id: string): Promise<RuntimeInfo | undefined> {
+    const refresh = Effect.fnUntraced(function* (id: string): Effect.fn.Return<RuntimeInfo | undefined> {
       if (!known(id) || closed) return undefined;
       const read = begin(id);
-      try {
-        // The settings are the farm's own, whatever stands in for the machine.
-        const next: Observation = options.probe ? { info: { ...(await options.probe(id)), settings: store.settings(id) }, read: 0 } : await probe(id);
-        if (closed) return undefined;
-        return remember(next, read);
-      } finally {
+      // The settings are the farm's own, whatever stands in for the machine.
+      const looked = options.probe
+        ? Effect.map(
+            Effect.promise(() => options.probe!(id)),
+            (i): Observation => ({ info: { ...i, settings: store.settings(id) }, read: 0 }),
+          )
+        : probe(id);
+      return yield* Effect.ensuring(
+        Effect.map(looked, (next) => (closed ? undefined : remember(next, read))),
         // A probe that failed leaves nothing cached: the next list asks again instead of showing "checking" for good.
-        if (!cache.has(id) && reads.get(id) === read) reads.delete(id);
-      }
-    }
+        Effect.sync(() => {
+          if (!cache.has(id) && reads.get(id) === read) reads.delete(id);
+        }),
+      );
+    });
 
-    async function info(id: string): Promise<RuntimeInfo | undefined> {
-      const hit = cache.get(id);
-      return hit ? withSpend(hit.info) : refresh(id);
-    }
+    const info = (id: string) =>
+      Effect.suspend(() => {
+        const hit = cache.get(id);
+        return hit ? Effect.succeed(withSpend(hit.info)) : refresh(id);
+      });
 
-    async function refreshUsage(id: string) {
+    const refreshUsage = Effect.fnUntraced(function* (id: string) {
       const runtime = registry.get(id);
       const before = cache.get(id);
       // A runtime switched off is not asked: claude's reading, for one, calls its API every time.
       if (closed || !runtime || !before?.found || !before.info.settings.enabled) return;
       const asked = (usageAsked.get(id) ?? 0) + 1;
       usageAsked.set(id, asked);
-      const usage = await usageOf(id, runtime, before.found, before.info.settings).catch(() => null);
+      const usage = yield* usageOf(id, runtime, before.found, before.info.settings);
       // Kept unless a newer full probe replaced the one it read from, or a usage read asked later already landed. The
       // cached observation itself may have been rebuilt meanwhile (a spend pushes a new total): that is no reason to drop it.
       const now = cache.get(id);
@@ -386,37 +408,27 @@ export const make = (options: RuntimeOptions = {}) =>
       usageTaken.set(id, asked);
       if (JSON.stringify(usage) === JSON.stringify(now.info.usage)) return;
       remember({ ...now, info: { ...now.info, usage, checkedAt: clock.currentTimeMillisUnsafe() } }, now.read);
-    }
+    });
 
-    /** At most four runtimes asked at once. */
-    async function each(f: (id: string) => Promise<unknown>) {
-      const ids = runtimeIds();
-      await Promise.all(
-        Array.from({ length: 4 }, async () => {
-          for (let id = ids.shift(); id !== undefined && !closed; id = ids.shift()) await f(id).catch(() => undefined);
-        }),
-      );
-    }
+    /** At most four runtimes asked at once; one that fails does not stop the others. */
+    const each = (f: (id: string) => Effect.Effect<unknown>) =>
+      Effect.forEach(runtimeIds(), (id) => Effect.ignoreCause(f(id)), { concurrency: 4, discard: true });
 
     // In the background, so the first page load does not wait on every runtime.
     if (options.background ?? true)
       yield* Effect.forkScoped(
-        Effect.andThen(
-          Effect.promise(() => each(refresh)),
-          Effect.repeat(Effect.promise(() => each(refreshUsage)).pipe(Effect.delay(usageEveryMs)), Schedule.forever),
-        ),
+        Effect.andThen(each(refresh), each(refreshUsage).pipe(Effect.repeat(Schedule.spaced(usageEveryMs)), Effect.delay(usageEveryMs))),
       );
 
     // A saved setting applies before its probe finishes; checks and resolution read the same current settings.
-    const configuration = async (id: string) => {
-      const observed = await info(id);
-      const settings = store.settings(id);
-      return { settings, info: observed ? withSpend({ ...observed, settings }) : undefined };
-    };
+    const configuration = (id: string) =>
+      Effect.map(info(id), (observed) => {
+        const settings = store.settings(id);
+        return { settings, info: observed ? withSpend({ ...observed, settings }) : undefined };
+      });
 
     const assess = (agent: Agent) =>
-      Effect.promise(async (): Promise<Assessment> => {
-        const { info: i } = await configuration(agent.runtime);
+      Effect.map(configuration(agent.runtime), ({ info: i }): Assessment => {
         const problems = agentProblems(agent, i);
         return { agent, info: i, problems, blocking: problems.filter((x) => x.level === "error") };
       });
@@ -429,7 +441,7 @@ export const make = (options: RuntimeOptions = {}) =>
           const hit = cache.get(id);
           if (hit) return withSpend(hit.info);
           // In the service's own fiber set: a probe that fails is retried by the next list, and none outlives the service.
-          if (!closed && !reads.has(id)) emit(Effect.ignore(Effect.tryPromise(() => refresh(id))));
+          if (!closed && !reads.has(id)) emit(Effect.ignoreCause(refresh(id)));
           return {
             id,
             preset: presetOf(id),
@@ -444,13 +456,13 @@ export const make = (options: RuntimeOptions = {}) =>
             checkedAt: 0,
           };
         }),
-      refresh: (id) => Effect.promise(() => refresh(id)),
-      info: (id) => Effect.promise(() => info(id)),
+      refresh,
+      info,
       update: (id, s) =>
         known(id)
           ? Effect.andThen(
               store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(`没存下 ${id} 的设置：${e.reason}`) : e))),
-              Effect.promise(() => refresh(id)),
+              refresh(id),
             )
           : Effect.succeed(undefined),
       check: (agent) => Effect.map(assess(agent), (a) => a.problems),
@@ -460,7 +472,7 @@ export const make = (options: RuntimeOptions = {}) =>
       resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);
         if (!runtime) return yield* Effect.fail(refused(`oar 驱动不了 ${agent.runtime}`));
-        const { info: i, settings } = yield* Effect.promise(() => configuration(agent.runtime));
+        const { info: i, settings } = yield* configuration(agent.runtime);
         const { model, effort, env, missingModel, problems } = sessionOptions(agent, settings, i);
         const problem = problems.find((i) => i.level === "error");
         if (problem) return yield* Effect.fail(refused(`${agent.name} 派不出去：${problem.text}`));
@@ -512,14 +524,7 @@ export const make = (options: RuntimeOptions = {}) =>
       },
       usageSoon: (id) => {
         if (closed) return;
-        later(
-          `usage:${id}`,
-          Effect.delay(
-            Effect.promise(() => refreshUsage(id).catch(() => {})),
-            usageAfterRunMs,
-          ),
-          { onlyIfMissing: true },
-        );
+        later(`usage:${id}`, Effect.delay(Effect.ignoreCause(refreshUsage(id)), usageAfterRunMs), { onlyIfMissing: true });
       },
     };
     return Object.assign(shape, {

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { NodeServices } from "@effect/platform-node";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Fiber, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
 import { type Config, Settings } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
@@ -107,7 +107,7 @@ describe("runtime", () => {
         used = found.via === "executable" ? found.command : "";
         return null;
       };
-      yield* Effect.promise(() => r.refreshUsage("pi"));
+      yield* r.refreshUsage("pi");
       expect(used).toBe("new");
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
@@ -145,16 +145,16 @@ describe("runtime", () => {
         yield* r.refresh("pi");
         const fullRefresh = Effect.runPromise(r.refresh("pi"));
         yield* Effect.promise(() => until(() => full === 2));
-        const usageRefresh = r.refreshUsage("pi");
+        const usageRefresh = yield* Effect.forkChild(r.refreshUsage("pi"));
         yield* Effect.promise(() => until(() => usageCalls === 2));
         if (first === "full") {
           releaseFull();
           yield* Effect.promise(() => fullRefresh);
           releaseUsage();
-          yield* Effect.promise(() => usageRefresh);
+          yield* Fiber.join(usageRefresh);
         } else {
           releaseUsage();
-          yield* Effect.promise(() => usageRefresh);
+          yield* Fiber.join(usageRefresh);
           releaseFull();
           yield* Effect.promise(() => fullRefresh);
         }
@@ -195,25 +195,25 @@ describe("runtime", () => {
       });
       yield* r.refresh("pi");
       // A spend while the read is out pushes a new total, rebuilding the cached observation.
-      const read = r.refreshUsage("pi");
+      const read = yield* Effect.forkChild(r.refreshUsage("pi"));
       yield* Effect.promise(() => until(() => out.length === 1));
       const shown = r.cached.get("pi");
       r.spend("pi", 1);
       yield* TestClock.adjust(3_000);
       yield* Effect.promise(() => until(() => r.cached.get("pi") !== shown));
       out[0]!(used(40));
-      yield* Effect.promise(() => read);
+      yield* Fiber.join(read);
       expect((yield* r.info("pi"))!.usage).toEqual(used(40));
       expect((yield* r.info("pi"))!.spentToday).toBe(1);
       // Two reads out at once: the one asked later answers first, and the older one's late answer is dropped.
-      const older = r.refreshUsage("pi");
+      const older = yield* Effect.forkChild(r.refreshUsage("pi"));
       yield* Effect.promise(() => until(() => out.length === 2));
-      const newer = r.refreshUsage("pi");
+      const newer = yield* Effect.forkChild(r.refreshUsage("pi"));
       yield* Effect.promise(() => until(() => out.length === 3));
       out[2]!(used(100));
-      yield* Effect.promise(() => newer);
+      yield* Fiber.join(newer);
       out[1]!(used(70));
-      yield* Effect.promise(() => older);
+      yield* Fiber.join(older);
       expect((yield* r.info("pi"))!.usage).toEqual(used(100));
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
