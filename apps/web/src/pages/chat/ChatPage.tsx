@@ -1,3 +1,4 @@
+import { chatWording } from "./words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Conversation, generalName, type OrchestratorState, type Session } from "@vibevalley/protocol";
@@ -88,9 +89,9 @@ function Chat() {
 type Tab = "chat" | "jobs" | "recurrences";
 
 const tabs: { tab: Tab; icon: string; label: string }[] = [
-  { tab: "chat", icon: "icon-board", label: "聊天" },
-  { tab: "jobs", icon: "icon-tasks", label: "任务" },
-  { tab: "recurrences", icon: "icon-clock", label: "定时" },
+  { tab: "chat", icon: "icon-board", label: chatWording().tab.chat },
+  { tab: "jobs", icon: "icon-tasks", label: chatWording().tab.jobs },
+  { tab: "recurrences", icon: "icon-clock", label: chatWording().tab.recurrences },
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
@@ -99,16 +100,17 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
   const [search, setSearch] = createSignal<string>();
   const [settings, setSettings] = createSignal(false);
   const name = () => channelName(props.channel);
-  const about = () => [props.channel?.description, props.channel?.project ? `默认项目 ${props.channel.project}` : ""].filter(Boolean).join(" · ");
+  const about = () =>
+    [props.channel?.description, props.channel?.project ? chatWording().defaultProject(props.channel.project) : ""].filter(Boolean).join(" · ");
   return (
     <section class="flex min-w-0 flex-1 flex-col" aria-label={`#${name()}`}>
       <header class={[head, "gap-3 px-4"]}>
-        <button type="button" class={[iconButton, "md:hidden"]} aria-label="频道列表" onClick={() => props.onDrawer()}>
+        <button type="button" class={[iconButton, "md:hidden"]} aria-label={chatWording().channels} onClick={() => props.onDrawer()}>
           <Icon name="icon-board" size={18} />
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">#</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.kind === "general" ? "默认的频道：你、管家和帮工都在这儿" : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.kind === "general" ? chatWording().general : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -123,8 +125,8 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
               value={search() ?? ""}
               onInput={(e) => setSearch(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Escape" && setSearch(undefined)}
-              placeholder="在这个频道里找…"
-              aria-label="在这个频道里找"
+              placeholder={chatWording().findHint}
+              aria-label={chatWording().find}
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
@@ -132,9 +134,9 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
         <button
           type="button"
           class={[iconButton, { "bg-selected": search() !== undefined }]}
-          aria-label="找消息"
+          aria-label={chatWording().findMessages}
           aria-pressed={aria(search() !== undefined)}
-          title="找消息"
+          title={chatWording().findMessages}
           onClick={() => {
             setSearch(search() === undefined ? "" : undefined);
             setTab("chat");
@@ -142,11 +144,18 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
         >
           <Icon name="act-search" size={18} />
         </button>
-        <button type="button" class={iconButton} aria-label="频道设置" title="频道设置" disabled={!props.channel} onClick={() => setSettings(true)}>
+        <button
+          type="button"
+          class={iconButton}
+          aria-label={chatWording().settings}
+          title={chatWording().settings}
+          disabled={!props.channel}
+          onClick={() => setSettings(true)}
+        >
           <Icon name="icon-wrench" size={18} />
         </button>
       </header>
-      <div role="tablist" aria-label="频道里的" class="flex shrink-0 gap-1 border-b border-line px-3">
+      <div role="tablist" aria-label={chatWording().inChannel} class="flex shrink-0 gap-1 border-b border-line px-3">
         <For each={tabs}>
           {(t) => (
             <button
@@ -166,12 +175,8 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
         </For>
       </div>
       <Show when={tab() === "chat"}>
-        <MessageList
-          conversation={props.channel}
-          filter={search()}
-          emptyText={`#${name()} 里还没人说话。跟管家说一件要做的事，比如「让测试小吴跑一遍测试」。`}
-        />
-        <Composer conversation={props.channel} placeholder={`发送消息至 #${name()}`} />
+        <MessageList conversation={props.channel} filter={search()} emptyText={chatWording().empty(name())} />
+        <Composer conversation={props.channel} placeholder={chatWording().sendTo(name())} />
       </Show>
       <Show when={props.channel}>
         {(c) => (
@@ -201,14 +206,20 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
     props.onPick();
   };
   return (
-    <aside aria-label="频道和帮工" class="flex w-full flex-col border-r border-line bg-side">
-      <div class={[head, "px-5 text-xl font-semibold"]}>聊天</div>
+    <aside aria-label={chatWording().side} class="flex w-full flex-col border-r border-line bg-side">
+      <div class={[head, "px-5 text-xl font-semibold"]}>{chatWording().tab.chat}</div>
       <div class="flex-1 overflow-y-auto p-3">
         <Section
-          title="频道"
+          title={chatWording().channelsTitle}
           count={Math.max(1, channels().length)}
           action={
-            <button type="button" class={[iconButton, "size-6"]} aria-label="创建频道" title="创建频道" onClick={() => props.onNew()}>
+            <button
+              type="button"
+              class={[iconButton, "size-6"]}
+              aria-label={chatWording().newChannel}
+              title={chatWording().newChannel}
+              onClick={() => props.onNew()}
+            >
               <Icon name="button-add" size={14} />
             </button>
           }
@@ -221,9 +232,9 @@ function Sidebar(props: { channel: Conversation | undefined; thread: Conversatio
             {(c) => <ChannelRow label={channelName(c)} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
           </For>
         </Section>
-        <Section title="帮工" count={sessions().length}>
+        <Section title={chatWording().helpers} count={sessions().length}>
           <Show when={sessions().length === 0}>
-            <p class="px-3 text-xs text-muted">还没有在场的帮工：在频道里跟管家说一件活。</p>
+            <p class="px-3 text-xs text-muted">{chatWording().noHelpers}</p>
           </Show>
           <For each={sessions()}>{(h) => <SessionRow h={h} active={!!props.thread && jobThreadOf(chat(), h)?.id === props.thread.id} onShow={go} />}</For>
         </Section>
@@ -305,13 +316,18 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversati
   );
 }
 
-const mood: Record<OrchestratorState, string> = { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" };
+const mood: Record<OrchestratorState, string> = {
+  idle: chatWording().mood.idle,
+  listening: chatWording().mood.listening,
+  thinking: chatWording().mood.thinking,
+  speaking: chatWording().mood.speaking,
+};
 
 function OrchestratorLine(props: { mood: OrchestratorState }) {
   return (
-    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label="管家">
+    <div class="flex items-center gap-2 border-t border-line px-4 py-3 text-sm" aria-label={chatWording().orchestrator}>
       <OrchestratorFace size={32} />
-      管家
+      {chatWording().orchestrator}
       <Dot tone={props.mood === "idle" ? "idle" : props.mood === "thinking" ? "wheat" : "leaf"} size={8} class="ml-1" />
       <span class="text-xs text-muted">{mood[props.mood]}</span>
       <Show when={props.mood === "thinking"}>
@@ -328,10 +344,14 @@ function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
   const session = () => threadOwnerOf(props.thread, sessions());
   const status = () => {
     const s = session();
-    return s ? `@${s.id} · ${phaseText(s, now())}` : props.thread.subjectKind === "issue" ? "现在没有帮工在干，串还留着" : `${props.thread.replies} 条回复`;
+    return s
+      ? `@${s.id} · ${phaseText(s, now())}`
+      : props.thread.subjectKind === "issue"
+        ? chatWording().nobodyOnIt
+        : chatWording().replies(props.thread.replies);
   };
   return (
-    <section aria-label="串" class="flex min-w-0 flex-1 flex-col">
+    <section aria-label={chatWording().thread} class="flex min-w-0 flex-1 flex-col">
       <header class={[head, "gap-2.5 px-4"]}>
         <span class="flex size-8 shrink-0 items-center justify-center">
           <Show when={session()} fallback={<Icon name="button-thread" size={16} />}>
@@ -345,12 +365,12 @@ function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
             <span class="truncate">{status()}</span>
           </span>
         </div>
-        <button type="button" class={iconButton} aria-label="关上串" title="关上串" onClick={() => props.onClose()}>
+        <button type="button" class={iconButton} aria-label={chatWording().closeThread} title={chatWording().closeThread} onClick={() => props.onClose()}>
           <Icon name="button-close" size={16} />
         </button>
       </header>
-      <MessageList conversation={props.thread} emptyText="串里还没人说话。在这里说的话，它的帮工会看到。" />
-      <Composer conversation={props.thread} placeholder={session() ? `在串里说，${session()!.name}会看到` : "回复这个串"} />
+      <MessageList conversation={props.thread} emptyText={chatWording().threadEmpty} />
+      <Composer conversation={props.thread} placeholder={session() ? chatWording().sayInThread(session()!.name) : chatWording().reply} />
     </section>
   );
 }
