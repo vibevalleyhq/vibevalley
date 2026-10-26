@@ -4,6 +4,8 @@
 // a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
 // than lost. Everything that changes the chat runs one at a time.
 
+import { busyNotice, wakeInput } from "./prompts.ts";
+import { channelWording } from "./words.ts";
 import {
   type Chat,
   type ChatMessage,
@@ -31,7 +33,6 @@ import { keepConversations, keepMessages, targetOf } from "./state.ts";
 import { head } from "../base/text.ts";
 import {
   agentWakeCooldownMs,
-  busyNotice,
   channelNameProblem,
   chatAudience,
   type Delivery,
@@ -45,7 +46,6 @@ import {
   retryWindowMs,
   summaryConversations,
   type UnreadRow,
-  wakeInput,
 } from "./rules.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
 import { Settings } from "../base/config.ts";
@@ -399,8 +399,8 @@ export const make = Effect.gen(function* () {
     );
 
   for (const [id, kind, name] of [
-    [ownerId, "owner", "主人"],
-    [orchestratorAgent, "orchestrator", "管家"],
+    [ownerId, "owner", channelWording().name.owner],
+    [orchestratorAgent, "orchestrator", channelWording().name.orchestrator],
     ["system", "system", "VibeValley"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
@@ -554,7 +554,7 @@ export const make = Effect.gen(function* () {
   const settle = Effect.fn("Channels.settle")(function* (inserted: MsgRow) {
     let row = inserted;
     const conv = model.conversation(row.conversation_id);
-    if (!conv) return yield* Effect.die(new Error(`没有 ${row.conversation_id} 这个对话`));
+    if (!conv) return yield* Effect.die(new Error(`no conversation ${row.conversation_id}`));
     const meta = metaOf(row.meta);
     const mentions = mentionsIn(row.body);
     const sessionsNow = presentSessions();
@@ -663,7 +663,7 @@ export const make = Effect.gen(function* () {
         if (!w.id) {
           // The row as MessageByID would read it back: the sender's name and kind are the participant's.
           const sender = model.participant(w.from);
-          if (!sender) return yield* Effect.die(new Error(`没有 ${w.from} 这个人`));
+          if (!sender) return yield* Effect.die(new Error(`no participant ${w.from}`));
           const id = newId();
           const meta = metaText(w.meta);
           const created_at = yield* Clock.currentTimeMillis;
@@ -700,7 +700,7 @@ export const make = Effect.gen(function* () {
         } else {
           yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: yield* Clock.currentTimeMillis, id: w.id }));
           const got = yield* one(qm.messageByID({ id: w.id }));
-          if (!got) return yield* Effect.die(new Error(`没有 ${w.id} 这条消息`));
+          if (!got) return yield* Effect.die(new Error(`no message ${w.id}`));
           row = got;
         }
         const { id, number } = row;
@@ -772,7 +772,7 @@ export const make = Effect.gen(function* () {
   });
 
   const deliver = (recipient: string, text: string, message: string): Effect.Effect<Delivered> =>
-    helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
+    helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: channelWording().notBack });
 
   const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
     const rows = open.of(recipient);
@@ -847,7 +847,7 @@ export const make = Effect.gen(function* () {
                 conversation: where,
                 from: "system",
                 kind: "notice",
-                text: `${name} 连续 ${failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。`,
+                text: channelWording().breaker(name, failed),
                 final: true,
                 meta: { code: "wake_breaker" },
               });
@@ -895,18 +895,19 @@ export const make = Effect.gen(function* () {
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ conversation_id: channel }))).n ?? 0;
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
+    const d = channelWording().dispatch;
     const what = h.graph?.task
-      ? `做计划 ${h.graph.id} 的「${h.graph.task}」`
+      ? d.step(h.graph.id, h.graph.task)
       : h.graph
-        ? "拆计划 " + h.graph.id
+        ? d.split(h.graph.id)
         : h.refining
-          ? "看代码，起草这张工单"
+          ? d.draft
           : head(h.brief.replace(/\s+/g, " "), 80);
     yield* write({
       conversation: channel,
       from: orchestratorAgent,
       kind: "dispatch",
-      text: `派 @${h.id}（${h.name}）去 ${h.project ?? "项目"}：${what}`,
+      text: d.sent(h.id, h.name, h.project ?? d.project, what),
       final: true,
       meta: { session: h.id },
       thread: job,
@@ -925,7 +926,7 @@ export const make = Effect.gen(function* () {
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
-    const text = h.refining ? `这张工单交给 @${h.id}（${h.name}）再起草一版` : `这张工单交给 @${h.id}（${h.name}）接着做，第 ${nth} 次派活`;
+    const text = h.refining ? channelWording().dispatch.redraft(h.id, h.name) : channelWording().dispatch.handedOn(h.id, h.name, nth);
     yield* write({ conversation: thread, from: orchestratorAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
   });
 
@@ -1014,17 +1015,17 @@ export const make = Effect.gen(function* () {
       return general;
     }
     const parsed = parseChatTarget(target);
-    if (!parsed) return yield* Effect.fail(refused(`不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`));
+    if (!parsed) return yield* Effect.fail(refused(channelWording().badTarget(target)));
     let channel = general;
     const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
-      if (!found) return yield* Effect.fail(missing(`没有叫 #${name} 的频道。有：${channelTags().join("、")}`, [lookIn.channel]));
+      if (!found) return yield* Effect.fail(missing(channelWording().noChannelNamed(name, channelTags()), [lookIn.channel]));
       channel = found.id;
     }
     if (parsed.kind === "channel") return channel;
     const parent = yield* one(qm.messageByNumber({ conversation_id: channel, number: parsed.parent }));
-    if (!parent) return yield* Effect.fail(refused(`频道里没有 ${parsed.parent} 这条消息`));
+    if (!parent) return yield* Effect.fail(refused(channelWording().noMessage(parsed.parent)));
     const thread = yield* tx(threadFor({ id: parent.id, number: parent.number, conversation: parent.conversation_id }, { kind: "talk", id: "", owner: "" }));
     yield* publishConversation(thread);
     return thread;
@@ -1042,13 +1043,13 @@ export const make = Effect.gen(function* () {
     say: (text, conversation, sendKey) =>
       locked(
         Effect.gen(function* () {
-          if (!text.trim()) return yield* Effect.fail(refused("没说什么"));
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused("sendKey 太长"));
+          if (!text.trim()) return yield* Effect.fail(refused(channelWording().empty));
+          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
           const where = conversation ?? general;
-          if (!model.conversation(where)) return yield* Effect.fail(missing(`没有 ${where} 这个对话`, [lookIn.channel]));
+          if (!model.conversation(where)) return yield* Effect.fail(missing(channelWording().noConversation(where), [lookIn.channel]));
           const written = yield* write({ conversation: where, from: ownerId, kind: "chat", text: text.trim(), final: true, sendKey, readBy: ownerId });
           if (written.again) return { message: toMessage(written.row), again: true };
-          if (written.absent.length > 0) yield* core.notice("warn", written.absent.map((m) => mentionOf[m] ?? "@" + m).join("、") + " 不在场，没送到");
+          if (written.absent.length > 0) yield* core.notice("warn", channelWording().absent(written.absent.map((m) => mentionOf(m) ?? "@" + m)));
           return { message: toMessage(written.row), again: false };
         }),
       ),
@@ -1058,7 +1059,7 @@ export const make = Effect.gen(function* () {
           const thread = yield* threadOfSession(session);
           if (!thread) {
             // Sent with no channel, so no thread to say it in: the session hears it straight.
-            if (!helpers?.present(session)) return yield* Effect.fail(missing(`没有 ${session} 这个帮工`, [lookIn.session]));
+            if (!helpers?.present(session)) return yield* Effect.fail(missing(channelWording().noHelper(session), [lookIn.session]));
             yield* helpers.deliver(session, text.trim(), { kind: "comment" });
             return undefined;
           }
@@ -1080,10 +1081,10 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const words = text.trim();
-          if (!words) return yield* Effect.fail(refused("没说什么"));
+          if (!words) return yield* Effect.fail(refused(channelWording().empty));
           const conversation = yield* resolveTarget(from, opt.target ?? "");
           const row = model.conversation(conversation);
-          if (!row) return yield* Effect.fail(refused("找不到这个对话"));
+          if (!row) return yield* Effect.fail(refused(channelWording().conversationGone));
           const target = targetOfConv(row);
           // A retry of the same words is the same message.
           const again = yield* one(
@@ -1132,7 +1133,7 @@ export const make = Effect.gen(function* () {
     spoken: (from, text, sendKey) =>
       locked(
         Effect.gen(function* () {
-          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused("sendKey 太长"));
+          if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
           if (!text.trim()) return false;
           const written = yield* write({
             conversation: general,
@@ -1164,7 +1165,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const conversation = yield* resolveTarget(who, opt.target ?? "");
           const row = model.conversation(conversation);
-          if (!row) return yield* Effect.fail(refused("找不到这个对话"));
+          if (!row) return yield* Effect.fail(refused(channelWording().conversationGone));
           const target = targetOfConv(row);
           const limit = opt.limit ? Math.min(Math.max(opt.limit, 1), 100) : readLimit;
           const cursor = (yield* one(qr.readCursor({ participant_id: who, conversation_id: conversation })))?.read_number ?? 0;
@@ -1186,7 +1187,7 @@ export const make = Effect.gen(function* () {
     markRead: (conversation, seq) =>
       locked(
         Effect.gen(function* () {
-          if (!model.conversation(conversation)) return yield* Effect.fail(missing(`没有 ${conversation} 这个对话`, [lookIn.channel]));
+          if (!model.conversation(conversation)) return yield* Effect.fail(missing(channelWording().noConversation(conversation), [lookIn.channel]));
           yield* readThrough(ownerId, conversation, seq);
           yield* publishConversation(conversation);
         }),
@@ -1249,7 +1250,7 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = model.conversation(id);
-          if (!row || row.kind === "thread") return yield* Effect.fail(missing(`没有 ${id} 这个频道`, [lookIn.channel]));
+          if (!row || row.kind === "thread") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
           const desc = (description !== undefined ? optional(description) : null) ?? row.description;
           const proj = project !== undefined ? optional(project) : row.project;
           yield* db(qc.updateChannel({ description: desc, project: proj, id }));

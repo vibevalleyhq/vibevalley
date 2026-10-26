@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { orchestratorInboxLines, patrolText, situationDelta, intake } from "./rules.ts";
+import { orchestratorInboxLines, situationDelta, intake } from "./rules.ts";
+import { patrolText } from "./prompts.ts";
 
 describe("the orchestrator's rules", () => {
   it("say what changed in the farm, or the whole when most did", () => {

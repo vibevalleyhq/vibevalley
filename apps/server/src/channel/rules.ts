@@ -1,15 +1,25 @@
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
+import { channelWording } from "./words.ts";
 import { type Conversation, everyone, generalName, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
-const chatNamed: Readonly<Record<string, string>> = { 管家: orchestratorAgent, 主人: ownerId, 所有人: everyone };
+// The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English.
+const chatNamed: Readonly<Record<string, string>> = {
+  管家: orchestratorAgent,
+  主人: ownerId,
+  所有人: everyone,
+  manager: orchestratorAgent,
+  owner: ownerId,
+  everyone,
+};
 
-export const mentionOf: Readonly<Record<string, string>> = { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" };
+/** How a mention of who is not a helper is written, in the owner's words. */
+export const mentionOf = (id: string): string | undefined => channelWording().mention[id];
 
 const chatFence = /```[\s\S]*?```/g;
 const chatTick = /`[^`\n]*`/g;
-const chatMention = /(^|[^\p{L}\p{N}_@])@(w[0-9]+|管家|主人|所有人)/gu;
+const chatMention = /(^|[^\p{L}\p{N}_@])@(w[0-9]+|管家|主人|所有人|manager|owner|everyone)/gu;
 
 /** Code is not prose: a mention inside backticks or a fence names no one. A name ends where its token ends, so `@w3你看` names w3. */
 export function mentionsIn(text: string): string[] {
@@ -27,8 +37,8 @@ const channelNamePattern = /^[\p{L}\p{N}_-]{1,24}$/u;
 const chatThreadTarget = /^[\p{L}\p{N}_-]{1,24}:([0-9]+)$/u;
 
 export function channelNameProblem(name: string, taken: readonly string[]): string {
-  if (!channelNamePattern.test(name)) return "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字";
-  if (taken.includes(name)) return "已经有叫 " + name + " 的频道了";
+  if (!channelNamePattern.test(name)) return channelWording().channelName;
+  if (taken.includes(name)) return channelWording().channelTaken(name);
   return "";
 }
 
@@ -116,7 +126,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   return out;
 }
 
-export const hopLimitText = (limit: number) => `帮工之间已经来回 ${limit} 次了，先停一停：等主人说一句再接着叫人。`;
+export const hopLimitText = (limit: number) => channelWording().hopLimit(limit);
 
 export interface UnreadRow {
   readonly target: string;
@@ -124,22 +134,6 @@ export interface UnreadRow {
   readonly mentionsYou: boolean;
   readonly latest?: string;
 }
-
-const rowText = (r: UnreadRow) => `${r.target} ${r.unread} 条` + (r.mentionsYou ? "（提到了你）" : "") + (r.latest ? "，最后是 " + r.latest : "");
-
-/** What a session woken for messages is told: the newest few for it, and what else is unread elsewhere. */
-export function wakeInput(messages: readonly InboxMessage[], others: readonly UnreadRow[]): string {
-  const shown = messages.slice(Math.max(0, messages.length - wakeMessages));
-  const more = messages.length > shown.length ? `（这里是最新的 ${shown.length} 条）` : "";
-  const lines = [`[${generalName}消息] 有 ${messages.length} 条给你的新消息${more}：`, ...shown.map(messageLine)];
-  if (others.length > 0) lines.push("", "别处还有没读的（只读不回，除非直接问到你）：", ...others.slice(0, summaryConversations).map((r) => "- " + rowText(r)));
-  lines.push("", "要回就用 channel_say，target 照抄；要看前面的上下文用 read_chat。不用回的就不回。");
-  return lines.join("\n");
-}
-
-/** What a busy session is told of messages it has not read. */
-export const busyNotice = (rows: readonly UnreadRow[]) =>
-  `[${generalName}提示] 有新消息还没读：${rows.slice(0, summaryConversations).map(rowText).join("；")}。方便的时候用 read_chat 读；不读不代表没事。`;
 
 /** Counted since the person last spoke in the conversation. */
 export const hopLimit = 4;
