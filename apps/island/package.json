@@ -1,0 +1,8 @@
+{
+  "name": "vibevalley-island",
+  "private": true,
+  "scripts": {
+    "build": "swift build -c release",
+    "test": "swift test"
+  }
+}

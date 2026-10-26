@@ -1,6 +1,6 @@
-// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg and the .app beside it): the shell from build/, and two
-// resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, server/ is apps/server
-// with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
+// Packages the macOS app (dist/VibeValley-<version>-<arch>.dmg and the .app beside it): the shell from build/, and three
+// resources the shell finds under process.resourcesPath (src/main.ts): web/ is apps/web/dist, island/ the island's
+// release build, server/ is apps/server with its production dependencies installed as real copies. The server runs unbundled with tsx, as it does in the
 // repository: PGlite's wasm, the word lists, the migrations and the agent SDKs are read from paths beside their code.
 
 import { build, Platform } from "electron-builder";
@@ -16,6 +16,11 @@ const server = join(stage, "server");
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 sh(repo, "vp", "run", "--filter", "vibevalley-web", "build");
 sh(desktop, "pnpm", "exec", "vpx", "scripts/build.ts");
+// The island, for this Mac's architecture as the rest of the package is; where SwiftPM puts it differs between its
+// versions, so it is asked.
+const island = join(repo, "apps/island");
+sh(island, "swift", "build", "-c", "release");
+const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });
@@ -80,7 +85,10 @@ await build({
     extraMetadata: { version: /^\d+\.\d+\.\d+/.test(version) ? version : "0.0.0" },
     directories: { output: join(desktop, "dist"), buildResources: join(desktop, "resources") },
     files: ["build/**", "package.json"],
-    extraResources: [{ from: join(repo, "apps/web/dist"), to: "web" }],
+    extraResources: [
+      { from: join(repo, "apps/web/dist"), to: "web" },
+      { from: islandBinary, to: "island/VibeValleyIsland" },
+    ],
     // extraResources leaves out every node_modules; the server needs its own, so it is copied in whole.
     afterPack: async (ctx) => {
       cpSync(server, join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app/Contents/Resources/server`), { recursive: true, verbatimSymlinks: true });
