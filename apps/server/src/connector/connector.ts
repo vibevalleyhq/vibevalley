@@ -21,6 +21,7 @@ import { newId } from "../base/ids.ts";
 import { jsonOf } from "../base/json.ts";
 import { causeMessage } from "../base/db.ts";
 import { Channels } from "../channel/chat.ts";
+import { Core } from "../core/core.ts";
 import { Orchestrator } from "../orchestrator/orchestrator.ts";
 import { type FeishuApi, FeishuClient, text as feishuText } from "./feishu.ts";
 import { type QQApi, QQClient, SendError } from "./qq.ts";
@@ -294,6 +295,7 @@ export const make = (options: ConnectorOptions = {}) =>
     const logs = yield* callbackLog;
     const sql = yield* SqlClient.SqlClient;
     const chat = yield* Channels;
+    const core = yield* Core;
     const notices = yield* Notices;
     const orchestrator = yield* Orchestrator;
     const retryFirst = options.retryFirstMs ?? 30_000;
@@ -317,11 +319,30 @@ export const make = (options: ConnectorOptions = {}) =>
       let attempt = 0;
       let err = "";
       const progressed = new Set<() => void>();
+      // What the page and the tests see: the status, said to the core whenever a part of it may have changed (the error,
+      // the account, the login's progress, what waits to go out); the core keeps it only when it differs. One at a time,
+      // each read when its turn comes, so the last said is the latest.
+      let telling = Promise.resolve();
+      const told = () => {
+        telling = telling.then(async () => {
+          await runHere(core.apply({ type: "connector", status: await status() })).catch(() => {});
+        });
+      };
+      const setErr = (e: string) => {
+        if (err === e) return;
+        err = e;
+        told();
+      };
       const signal = () => {
         for (const f of progressed) f();
+        told();
       };
 
       const reload = async () => {
+        await reloadAccount();
+        told();
+      };
+      const reloadAccount = async () => {
         const row = await run(Effect.catchNoSuchElement(accountQ.connectorAccount({ connector: id })));
         if (Option.isNone(row)) {
           account = undefined;
@@ -332,7 +353,7 @@ export const make = (options: ConnectorOptions = {}) =>
         try {
           secrets = jsonOf(Schema.Record(Schema.String, Schema.String))(r.secrets);
         } catch (e) {
-          err = "存着的登录信息读不出来，断开重新连一次";
+          setErr("存着的登录信息读不出来，断开重新连一次");
           logs.error(`vibevalley: ${id}: the saved secrets cannot be read:`, message(e));
         }
         account = {
@@ -358,6 +379,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const outboxChanged = (by?: (n: number) => number) => {
         outChanges++;
         pendingOut = by && pendingOut !== undefined ? by(pendingOut) : undefined;
+        told();
       };
       const pendingNow = async () => {
         if (pendingOut !== undefined) return pendingOut;
@@ -400,10 +422,10 @@ export const make = (options: ConnectorOptions = {}) =>
         try {
           await run(accountQ.pauseAccount({ paused_until: time.now() + stalePauseMs, connector: id }));
           await reload();
-          err = "登录过期了，一小时后再试；也可以断开重新连。";
+          setErr("登录过期了，一小时后再试；也可以断开重新连。");
           return true;
         } catch (e) {
-          err = message(e);
+          setErr(message(e));
           return false;
         }
       };
@@ -445,17 +467,17 @@ export const make = (options: ConnectorOptions = {}) =>
                 outboxChanged((n) => n - out.ids.length);
               } catch (e) {
                 outboxChanged();
-                err = message(e);
+                setErr(message(e));
                 return false;
               }
-              err = "";
+              setErr("");
               continue;
             }
             for (const oid of out.ids) await kept(run(outboxQ.outboxFailed({ error: sent.reason || null, id: oid })));
             if (sent.kind === "stale") await pause();
             // The app would not take it now (WeChat's, QQ's reply window): tried again later, and with the owner's next message.
-            else if (sent.kind === "restricted") err = "";
-            else err = sent.reason;
+            else if (sent.kind === "restricted") setErr("");
+            else setErr(sent.reason);
             return false;
           }
           return true;
@@ -491,7 +513,7 @@ export const make = (options: ConnectorOptions = {}) =>
           outboxChanged((n) => n + pieces.length);
         } catch (e) {
           outboxChanged();
-          err = message(e);
+          setErr(message(e));
           return;
         }
         outboxDirty = true;
@@ -564,7 +586,7 @@ export const make = (options: ConnectorOptions = {}) =>
             }),
           );
         } catch (e) {
-          if (!life.signal.aborted) err = message(e);
+          if (!life.signal.aborted) setErr(message(e));
           throw e;
         }
         wakeInbox?.();
@@ -592,7 +614,7 @@ export const make = (options: ConnectorOptions = {}) =>
           try {
             await drainInbox(signal);
           } catch (e) {
-            if (!signal.aborted) err = message(e);
+            if (!signal.aborted) setErr(message(e));
           }
           await waitFor(time, 1_000, signal, (wake) => {
             wakeInbox = wake;
@@ -634,7 +656,7 @@ export const make = (options: ConnectorOptions = {}) =>
               await run(accountQ.pauseAccount({ paused_until: null, connector: id }));
               await reload();
             } catch (e) {
-              err = message(e);
+              setErr(message(e));
               if (!(await sleep(time, Math.min(30_000, retryMost), signal))) return;
             }
             continue;
@@ -653,7 +675,7 @@ export const make = (options: ConnectorOptions = {}) =>
             if (!(await pause()) && !(await sleep(time, Math.min(30_000, retryMost), signal))) return;
             continue;
           }
-          err = stopped.reason;
+          setErr(stopped.reason);
           failures++;
           let wait = 2_000;
           if (failures >= 3) {
@@ -720,7 +742,7 @@ export const make = (options: ConnectorOptions = {}) =>
               failure = e instanceof Error ? e : new Error(String(e));
             }
           }
-          err = failure ? failure.message : "";
+          setErr(failure ? failure.message : "");
           resetProgress();
           current = connected();
         });
@@ -763,10 +785,11 @@ export const make = (options: ConnectorOptions = {}) =>
             await stopGeneration(current);
             current = undefined;
             attempt++;
-            err = "";
+            setErr("");
             verifyCode = "";
             progress = { state: "waiting" };
             current = loggingIn(input);
+            told();
             return attempt;
           });
           // Up to a moment for the code to show.
@@ -788,6 +811,7 @@ export const make = (options: ConnectorOptions = {}) =>
         verify: (code: string) => {
           verifyCode = code.trim();
           if (progress?.state === "verify") progress = { state: "scanned", ...(progress.qr ? { qr: progress.qr } : {}) };
+          told();
           return status();
         },
         logout: async () => {
@@ -811,12 +835,13 @@ export const make = (options: ConnectorOptions = {}) =>
             resetProgress();
             attempt++;
             if (failure) {
-              err = message(failure);
+              setErr(message(failure));
               current = connected();
             } else {
               account = undefined;
-              err = "";
+              setErr("");
             }
+            told();
           });
           return status();
         },

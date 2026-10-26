@@ -3,7 +3,6 @@
 
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useQueryClient } from "@tanstack/solid-query";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
 import { channelLabel, channelsOf } from "../../rules/chat";
@@ -11,7 +10,6 @@ import { momentText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../app/util";
 import { useCore } from "../../data/frame";
-import { ready, useQuery } from "../../data/query";
 import { Button } from "../../ui/Button";
 import { Field, Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -54,28 +52,20 @@ export const stateLabel: Record<ConnectorState, string> = {
 
 const dot = (s: ConnectorState | undefined) => (s === "connected" ? "bg-leaf" : s === "pairing" || s === "paused" ? "bg-wheat" : "bg-cream-300");
 
-const key = ["connectors"];
-
-/** One connector's answer, kept over the list; a poll still out when it came is dropped, so it cannot undo it. */
-function useConnectorAction() {
-  const client = useQueryClient();
-  return async (call: () => Promise<ConnectorStatus>, quiet = false) => {
-    await client.cancelQueries({ queryKey: key });
-    try {
-      const got = await call();
-      await client.cancelQueries({ queryKey: key });
-      client.setQueryData<ConnectorStatus[]>(key, (all) => [...(all ?? []).filter((s) => s.id !== got.id), got]);
-    } catch (e) {
-      if (quiet) throw e;
-      toast(reasonOf(e));
-    }
-  };
+/** A connector's action; what it changes comes back in the core state, where the connectors say each status. */
+async function act(call: () => Promise<ConnectorStatus>, quiet = false) {
+  try {
+    await call();
+  } catch (e) {
+    if (quiet) throw e;
+    toast(reasonOf(e));
+  }
 }
 
 export function ConnectorsPage(props: { id?: string }) {
-  const all = useQuery(() => ({ queryKey: key, queryFn: () => api.connector.list(), refetchInterval: 1500 }));
+  const core = useCore();
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
-  const list = () => ready(all, undefined);
+  const list = () => core()?.connectors;
   const of = (c: ConnectorID) => list()?.find((s) => s.id === c);
   return (
     <Split
@@ -102,7 +92,7 @@ export function ConnectorsPage(props: { id?: string }) {
           when={list()}
           fallback={
             <Card title={connectorLabel[selected()]}>
-              <Quiet>{all.error ? reasonOf(all.error) : "在问服务端……"}</Quiet>
+              <Quiet>在问服务端……</Quiet>
             </Card>
           }
         >
@@ -135,7 +125,6 @@ function Row(props: { label: string; children: JSX.Element }) {
 }
 
 function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
-  const act = useConnectorAction();
   const [busy, setBusy] = createSignal(false);
   const run = async (call: () => Promise<ConnectorStatus>) => {
     setBusy(true);
@@ -219,7 +208,6 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
 
 function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
-  const act = useConnectorAction();
   const [error, setError] = createSignal<string>();
   const options = () => {
     const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? "田头", label: channelLabel(c) }));

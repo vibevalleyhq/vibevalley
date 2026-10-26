@@ -643,6 +643,24 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   attention: IssueAttention,
 });
 
+export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
+
+export const ConnectorState: Codec<T.ConnectorState> = Schema.Literals(T.ConnectorStateValues);
+
+export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
+  id: ConnectorID,
+  state: ConnectorState,
+  qr: Schema.optionalKey(Schema.String),
+  pairCode: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
+  owner: Schema.optionalKey(Schema.String),
+  since: Schema.optionalKey(Schema.Number),
+  lastInbound: Schema.optionalKey(Schema.Number),
+  pausedUntil: Schema.optionalKey(Schema.Number),
+  pending: Schema.Number,
+  error: Schema.optionalKey(Schema.String),
+});
+
 export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
@@ -653,6 +671,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   progress: Schema.optionalKey(Progress),
   recurrences: Schema.optionalKey(Schema.mutable(Schema.Array(Recurrence))),
   issues: Schema.optionalKey(Schema.mutable(Schema.Array(Issue))),
+  connectors: Schema.optionalKey(Schema.mutable(Schema.Array(ConnectorStatus))),
 });
 
 export const SessionEventType: Codec<T.SessionEventType> = Schema.Literals(T.SessionEventTypeValues);
@@ -1056,24 +1075,6 @@ export const LanStatus: Codec<T.LanStatus> = Schema.Struct({
   problem: Schema.optionalKey(Schema.String),
   pairing: Schema.optionalKey(LanPairing),
   devices: Schema.mutable(Schema.Array(LanDevice)),
-});
-
-export const ConnectorID: Codec<T.ConnectorID> = Schema.Literals(T.ConnectorIDValues);
-
-export const ConnectorState: Codec<T.ConnectorState> = Schema.Literals(T.ConnectorStateValues);
-
-export const ConnectorStatus: Codec<T.ConnectorStatus> = Schema.Struct({
-  id: ConnectorID,
-  state: ConnectorState,
-  qr: Schema.optionalKey(Schema.String),
-  pairCode: Schema.optionalKey(Schema.String),
-  channel: Schema.optionalKey(Schema.String),
-  owner: Schema.optionalKey(Schema.String),
-  since: Schema.optionalKey(Schema.Number),
-  lastInbound: Schema.optionalKey(Schema.Number),
-  pausedUntil: Schema.optionalKey(Schema.Number),
-  pending: Schema.Number,
-  error: Schema.optionalKey(Schema.String),
 });
 
 export const ConnectorLogin: Codec<T.ConnectorLogin> = Schema.Struct({
@@ -1733,6 +1734,12 @@ export const FactRecurrenceGone: Codec<T.FactRecurrenceGone> = Schema.Struct({
   id: Schema.String,
 });
 
+export const FactConnector: Codec<T.FactConnector> = Schema.Struct({
+  type: Schema.Literal("connector"),
+  at: Schema.Number,
+  status: ConnectorStatus,
+});
+
 export const Fact: Codec<T.Fact> = Schema.Union([
   FactCall,
   FactOrchestrator,
@@ -1755,6 +1762,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactProgress,
   FactRecurrence,
   FactRecurrenceGone,
+  FactConnector,
 ]);
 
 export const SideEventSnapshot: Codec<T.SideEventSnapshot> = Schema.Struct({
@@ -1805,6 +1813,7 @@ export const SideEvent: Codec<T.SideEvent> = Schema.Union([
   FactProgress,
   FactRecurrence,
   FactRecurrenceGone,
+  FactConnector,
   SideEventSnapshot,
   SideEventSessionEvent,
   SideEventNotice,

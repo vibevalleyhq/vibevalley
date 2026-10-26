@@ -98,5 +98,13 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "issueGone":
       if (!(state.issues ?? []).some((x) => x.id === f.id)) return [state, false];
       return [{ ...state, issues: state.issues!.filter((x) => x.id !== f.id) }, true];
+    case "connector": {
+      const all = [...(state.connectors ?? [])];
+      const i = all.findIndex((x) => x.id === f.status.id);
+      if (i >= 0 && same(all[i], f.status)) return [state, false];
+      if (i >= 0) all[i] = f.status;
+      else all.push(f.status);
+      return [{ ...state, connectors: all }, true];
+    }
   }
 }
