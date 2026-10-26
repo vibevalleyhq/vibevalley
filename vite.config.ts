@@ -151,7 +151,7 @@ export default defineConfig({
           "**/*.test.ts",
           "**/*.test.tsx",
           "apps/server/src/testing/**",
-          "apps/server/src/agent/brain/testing.ts",
+          "apps/server/src/**/testing.ts",
           // What speaks only to models: VibeValley's own agent (its prompts, its tools, its errors to the model) and the
           // tools the orchestrator and the helpers call (their descriptions and results).
           "apps/server/src/agent/brain/**",

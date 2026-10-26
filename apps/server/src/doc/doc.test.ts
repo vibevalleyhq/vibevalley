@@ -7,7 +7,8 @@ import { Settings, type Config } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
 import { waitFor, whenTrue } from "../testing/until.ts";
 import { make } from "./doc.ts";
-import { demoPieces, demoScript } from "./demo.ts";
+import { demoPieces } from "./demo.ts";
+import { docWording } from "./words.ts";
 import { plain } from "./text.ts";
 import { bold, para, sample, span } from "./testing.ts";
 
@@ -150,7 +151,7 @@ describe("doc", () => {
             continue;
           }
           expect(b.updatedBy).toBe(writers[section]);
-          expect(demoScript[section]!.paragraphs).toContain(plain(b.text));
+          expect(docWording().demo[section]!.paragraphs).toContain(plain(b.text));
           expect(b.rev).toBe(demoPieces + 1);
         }
         expect([section, snap.blocks.length]).toEqual([2, 1 + 3 * 4]);

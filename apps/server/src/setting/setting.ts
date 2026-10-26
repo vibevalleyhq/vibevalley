@@ -4,8 +4,9 @@
 // process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
 import { settingWording } from "./words.ts";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Check, Dictation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { Check, Dictation, KeySource, Locale, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { setLocale } from "@vibevalley/protocol/words";
 import { defaultVoice, keyHint, memorySourcesOver, settingsProblem, voiceOverrides, voiceSettingsOver } from "./rules.ts";
@@ -84,6 +85,15 @@ export interface SettingShape {
 export class Setting extends Context.Service<Setting, SettingShape>()("vibevalley/Setting") {}
 
 const secret = (value: string | undefined, source: KeySource): KeyStatus => (value ? { source, hint: keyHint(value) } : {});
+
+/** The locale saved in a home's settings.json, for a process that does not run the farm (the command line). */
+export function savedLocale(home: string): Locale {
+  try {
+    return (JSON.parse(readFileSync(join(home, "settings.json"), "utf8")) as { locale?: unknown }).locale === "en" ? "en" : "zh";
+  } catch {
+    return "zh";
+  }
+}
 
 /** Fields set to "" or nothing leave the file. */
 const compact = (s: Record<string, unknown>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined && v !== ""));
