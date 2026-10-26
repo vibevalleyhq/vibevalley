@@ -14,7 +14,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
-import { Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { code as newCode, newId } from "../base/ids.ts";
@@ -116,7 +116,6 @@ export const remoteMay = (method: string, path: string) => remote.some((r) => r.
 
 export interface LanOptions {
   readonly address?: () => string;
-  readonly now?: () => number;
   /** The host the listener binds; every interface when absent. */
   readonly host?: string;
 }
@@ -129,7 +128,9 @@ export const make = (options: LanOptions = {}) =>
     const config = yield* Settings;
     const { run: db } = yield* Db;
     const address = options.address ?? lanAddress;
-    const now = options.now ?? Date.now;
+    // Read in callbacks too: the Clock the service was built with.
+    const clock = yield* Clock.Clock;
+    const now = () => clock.currentTimeMillisUnsafe();
 
     const devices = new Map<string, Device>();
     for (const row of yield* db(q.lanDevices())) {

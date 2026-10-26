@@ -245,7 +245,7 @@ describe("an issue", () => {
 
   it.live("of a recurrence is one, told again and reopened", () => {
     let now = Date.now();
-    const f = farm({ now: () => now });
+    const f = farm({ clock: () => now });
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;

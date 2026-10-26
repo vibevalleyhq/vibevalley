@@ -595,7 +595,7 @@ describe("issues", () => {
       const [run] = yield* sessions.runs(issue!.id);
       expect(run!.triggeredBy).toEqual({ kind: "recurrence", recurrence: sc.id, missed: true });
       expect((yield* sessions.get(run!.session))?.channel).toBe(channel.id);
-    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], now: () => clock.now })));
+    }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], clock: () => clock.now })));
   });
 
   it.live("a queued todo starts from the sowing form when there is room", () => {
