@@ -2,10 +2,9 @@
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
-import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { Context } from "effect";
+import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
 import { parse } from "yaml";
 
 export interface Config {
@@ -71,93 +70,108 @@ export function defaults(home = homedir()): Config {
   };
 }
 
-const snake = (key: string) => key.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+/** Why the configuration cannot be read: the file, or a key's value. */
+export class ConfigError extends Data.TaggedError("ConfigError")<{ readonly message: string }> {}
 
-/** Other services' own names for their keys. */
-const ownNames: Readonly<Record<string, string>> = {
-  "deepseek.api_key": "DEEPSEEK_API_KEY",
-  "agora.app_id": "AGORA_APP_ID",
-  "agora.app_certificate": "AGORA_APP_CERTIFICATE",
-};
+const port = (name: string, value: number) => Keys.Int(name).pipe(Keys.withDefault(value));
+const text = (name: string, value: string) => Keys.String(name).pipe(Keys.withDefault(value));
+const number = (name: string, value: number) => Keys.Finite(name).pipe(Keys.withDefault(value));
+/** A list: comma-separated in the environment, a list in the file. */
+const list = (name: string) =>
+  Keys.Array(Schema.String, name).pipe(
+    Keys.map((all) => all.map((s) => s.trim()).filter((s) => s !== "")),
+    Keys.withDefault<readonly string[]>([]),
+  );
 
-export class ConfigError extends Error {}
-
-/** A value from the file or the environment, as the default's kind: a number, a list (comma-separated from the environment), or text. */
-function coerce(key: string, value: unknown, like: unknown, file: string): unknown {
-  if (typeof like === "number") {
-    const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
-    if (!Number.isFinite(n)) throw new ConfigError(`${file}: ${key} 不是数：${String(value)}`);
-    return n;
-  }
-  if (Array.isArray(like)) {
-    if (Array.isArray(value)) return value.map(String);
-    if (typeof value === "string") return value === "" ? [] : value.split(",").map((s) => s.trim());
-    throw new ConfigError(`${file}: ${key} 要一串`);
-  }
-  if (typeof value === "object" && value !== null) throw new ConfigError(`${file}: ${key} 不能是一组`);
-  return String(value);
-}
-
-function merge(
-  base: Record<string, unknown>,
-  file: Record<string, unknown> | undefined,
-  env: NodeJS.ProcessEnv,
-  prefix: string,
-  name: string,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [field, like] of Object.entries(base)) {
-    const key = prefix + snake(field);
-    const given = file?.[snake(field)];
-    if (typeof like === "object" && like !== null && !Array.isArray(like)) {
-      out[field] = merge(
-        like as Record<string, unknown>,
-        typeof given === "object" && given !== null ? (given as Record<string, unknown>) : undefined,
-        env,
-        key + ".",
-        name,
-      );
-      continue;
-    }
-    let value: unknown = like;
-    if (given !== undefined && given !== null) value = coerce(key, given, like, name);
-    const fromEnv = env["VIBEVALLEY_" + key.replaceAll(".", "_").toUpperCase()] ?? (ownNames[key] ? env[ownNames[key]] : undefined);
-    if (fromEnv !== undefined) value = coerce(key, fromEnv, like, name);
-    out[field] = value;
-  }
-  return out;
-}
+/** Every key but home and version, by its snake_case name, with its default (d). */
+const keys = (d: Config) =>
+  Keys.all({
+    workRoot: text("work_root", d.workRoot),
+    db: text("db", d.db),
+    port: port("port", d.port),
+    web: text("web", d.web),
+    agent: Keys.nested(Keys.all({ model: text("model", d.agent.model) }), "agent"),
+    deepseek: Keys.nested(Keys.all({ apiKey: text("api_key", d.deepseek.apiKey) }), "deepseek"),
+    agora: Keys.nested(Keys.all({ appId: text("app_id", d.agora.appId), appCertificate: text("app_certificate", d.agora.appCertificate) }), "agora"),
+    voice: Keys.nested(
+      Keys.all({
+        id: text("id", d.voice.id),
+        line: Keys.nested(Keys.all({ port: port("port", d.voice.line.port), url: text("url", d.voice.line.url) }), "line"),
+      }),
+      "voice",
+    ),
+    lan: Keys.nested(Keys.all({ port: port("port", d.lan.port) }), "lan"),
+    gitEmails: list("git_emails"),
+    tokei: text("tokei", d.tokei),
+    cnyPerUsd: number("cny_per_usd", d.cnyPerUsd),
+    patrol: Keys.nested(Keys.all({ heartbeatMinutes: number("heartbeat_minutes", d.patrol.heartbeatMinutes) }), "patrol"),
+    recurrence: Keys.nested(Keys.all({ tickMs: number("tick_ms", d.recurrence.tickMs) }), "recurrence"),
+    session: Keys.nested(
+      Keys.all({ stallSeconds: number("stall_seconds", d.session.stallSeconds), trajectoryDays: number("trajectory_days", d.session.trajectoryDays) }),
+      "session",
+    ),
+    project: Keys.nested(
+      Keys.all({
+        maxSessions: number("max_sessions", d.project.maxSessions),
+        checkTimeoutSeconds: number("check_timeout_seconds", d.project.checkTimeoutSeconds),
+      }),
+      "project",
+    ),
+    github: Keys.nested(Keys.all({ prProjects: list("pr_projects"), prPollSeconds: number("pr_poll_seconds", d.github.prPollSeconds) }), "github"),
+    chat: Keys.nested(
+      Keys.all({ noticeBatchMs: number("notice_batch_ms", d.chat.noticeBatchMs), retryWakeMs: number("retry_wake_ms", d.chat.retryWakeMs) }),
+      "chat",
+    ),
+    otlp: Keys.nested(Keys.all({ url: text("url", d.otlp.url) }), "otlp"),
+  });
 
 const expandHome = (path: string) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
 
-/** file: the YAML to read, which must be there; empty is home/vibevalley.yaml, read if it is there. */
-export function loadConfig(file = "", env: NodeJS.ProcessEnv = process.env): Config {
+/** The YAML file: a record of keys, or nothing when it is optional and not there. */
+const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
+  const fs = yield* FileSystem.FileSystem;
+  if (!(yield* Effect.orElseSucceed(fs.exists(path), () => false))) {
+    if (optional) return undefined;
+    return yield* new ConfigError({ message: `${path}: 没有这个文件` });
+  }
+  const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
+  return yield* Effect.try({
+    try: (): unknown => parse(body),
+    catch: (e) => new ConfigError({ message: `${path}: ${e instanceof Error ? e.message : String(e)}` }),
+  });
+});
+
+/** file: the YAML to read, which must be there; empty is home/vibevalley.yaml, read if it is there. The environment wins
+ * over the file: VIBEVALLEY_<KEY>, then the other services' own names (DEEPSEEK_API_KEY…). */
+export const loadConfig = Effect.fnUntraced(function* (
+  file: string = "",
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): Effect.fn.Return<Config, ConfigError, FileSystem.FileSystem> {
   const base = defaults();
   const home = env.VIBEVALLEY_HOME || base.home;
   const optional = file === "";
   const path = optional ? join(home, "vibevalley.yaml") : file;
-  let given: Record<string, unknown> | undefined;
-  if (existsSync(path)) {
-    try {
-      given = (parse(readFileSync(path, "utf8")) as Record<string, unknown> | null) ?? undefined;
-    } catch (e) {
-      throw new ConfigError(`${path}: ${(e as Error).message}`);
-    }
-  } else if (!optional) {
-    throw new ConfigError(`${path}: 没有这个文件`);
-  }
-  const { home: _home, version: _version, ...keys } = base;
-  const c = { ...base, ...merge(keys, given, env, "", path), home } as Config;
-  for (const [name, port] of [
-    ["port", c.port],
-    ["voice.line.port", c.voice.line.port],
-    ["lan.port", c.lan.port],
+  const given = yield* readFile(path, optional);
+  const set = Object.fromEntries(Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined));
+  // A value set empty in the environment is that value: an empty list, no page.
+  const fromEnv = ConfigProvider.fromEnv({ env: set, preserveEmptyStrings: true }).pipe(ConfigProvider.nested("VIBEVALLEY"), ConfigProvider.constantCase);
+  const ownNames = ConfigProvider.fromUnknown({
+    deepseek: { api_key: env.DEEPSEEK_API_KEY },
+    agora: { app_id: env.AGORA_APP_ID, app_certificate: env.AGORA_APP_CERTIFICATE },
+  });
+  const provider = ConfigProvider.orElse(fromEnv, ConfigProvider.orElse(ownNames, ConfigProvider.fromUnknown(given ?? {})));
+  const read = yield* Effect.mapError(keys(base).parse(provider), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
+  for (const [name, n] of [
+    ["port", read.port],
+    ["voice.line.port", read.voice.line.port],
+    ["lan.port", read.lan.port],
   ] as const) {
-    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new ConfigError(`${path}: ${name} 不是端口：${port}`);
+    if (n < 0 || n > 65535) return yield* new ConfigError({ message: `${path}: ${name} 不是端口：${n}` });
   }
-  if (c.github.prPollSeconds <= 0) throw new ConfigError("github.pr_poll_seconds 必须大于 0");
+  if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: "github.pr_poll_seconds 必须大于 0" });
+  const c: Config = { ...base, ...read, home };
   return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
-}
+});
 
 /** The database's folder, or "memory". */
 export function dbDir(c: Config): string {
