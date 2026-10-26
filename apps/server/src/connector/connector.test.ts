@@ -3,6 +3,7 @@ import { rmSync } from "node:fs";
 import { type ConnectorID, type ConnectorState, type ConnectorStatus, orchestratorAgent } from "@vibevalley/protocol";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 import { Channels } from "../channel/chat.ts";
 import { layer as orchestrator } from "../orchestrator/orchestrator.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -386,7 +387,7 @@ describe("the chat apps", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(script)));
   });
 
-  it.live("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", () => {
+  it.effect("a QQ gateway that fails mid-message: what it was handing over arrives, a late handover is refused, and it listens again", () => {
     const script = new Script();
     let listens = 0;
     let late: ((m: QQMessage) => Promise<void>) | undefined;
@@ -409,8 +410,13 @@ describe("the chat apps", () => {
       yield* qqPaired(script);
       const before = listens;
       script.qqIn.push(qqMsg("owner-openid", "断开"));
-      // A failed receive is tried again after its backoff: the same account listens once more.
-      yield* until(async () => listens > before, "it listens again", 10_000);
+      // A failed receive is tried again after its backoff on the farm's Clock: moved through each time it is asked, as
+      // the test cannot see when the backoff starts. The same account listens once more.
+      yield* waitFor(
+        Effect.map(TestClock.adjust(2_000), () => listens),
+        (n) => n > before,
+        "it listens again",
+      );
       expect(yield* saidIn(chat.general())).toContain("断开前的一句");
       const refused = yield* Effect.promise(() =>
         late!(qqMsg("owner-openid", "迟到的一句")).then(
