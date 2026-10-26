@@ -2,8 +2,12 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SessionEvent } from "@vibevalley/protocol";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect } from "vite-plus/test";
+import { it } from "@effect/vitest";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import { readJournal, Trajectories } from "./journal.ts";
+import { timeHere, wallTime } from "../base/time.ts";
 
 const open: Trajectories[] = [];
 afterEach(() => {
@@ -14,7 +18,7 @@ afterEach(() => {
 const warnings: string[] = [];
 
 const trajectories = (home = mkdtempSync(join(tmpdir(), "journal-")), push: (id: string, e: SessionEvent) => void = () => {}) => {
-  const t = new Trajectories(home, push, (message) => warnings.push(message));
+  const t = new Trajectories(home, push, (message) => warnings.push(message), wallTime);
   open.push(t);
   return t;
 };
@@ -127,6 +131,34 @@ describe("a session's log", () => {
   });
 
   // What is written stays as it was: later events only follow it. A draft is not on disk until it is done, and then under the seq it was pushed with.
+  // On the service's Clock (base/time.ts): the push and save windows are moved, not waited for.
+  it.effect("pushes a step 300 ms after it changes and saves 1.5 s after the last change, on the Clock it was given", () =>
+    Effect.gen(function* () {
+      const pushed: string[] = [];
+      const home = mkdtempSync(join(tmpdir(), "journal-"));
+      const file = join(home, "events", "w1.json");
+      const tr = new Trajectories(
+        home,
+        (_, e) => pushed.push(e.text ?? ""),
+        (message) => warnings.push(message),
+        yield* timeHere,
+      );
+      open.push(tr);
+      const j = tr.openLog("w1");
+      j.asked("一");
+      yield* TestClock.adjust(299);
+      expect(pushed).toEqual([]);
+      yield* TestClock.adjust(1);
+      expect(pushed).toEqual(["一"]);
+      yield* TestClock.adjust(900);
+      j.asked("二");
+      yield* TestClock.adjust(1_300);
+      expect(existsSync(file)).toBe(false);
+      yield* TestClock.adjust(200);
+      expect(readJournal(file)?.map((e) => e.text)).toEqual(["一", "二"]);
+    }),
+  );
+
   it("only grows", () => {
     const home = mkdtempSync(join(tmpdir(), "journal-"));
     const tr = trajectories(home);

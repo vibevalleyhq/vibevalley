@@ -12,6 +12,7 @@ import { Schema } from "effect";
 import { cut } from "../base/text.ts";
 import { FileWriter } from "../base/files.ts";
 import type { From, ToolStart } from "./facts.ts";
+import type { Time } from "../base/time.ts";
 
 const keepEvents = 240;
 const textMax = 6000;
@@ -83,8 +84,9 @@ class FileJournal implements Journal {
   private draftWho = "";
   private draftCall = "";
   private dirty: number[] = [];
-  private pushing: NodeJS.Timeout | undefined;
-  private saving: NodeJS.Timeout | undefined;
+  /** What cancels the pending push and the pending save. */
+  private pushing: (() => void) | undefined;
+  private saving: (() => void) | undefined;
   private closed = false;
   /** The open run the events belong to. */
   private run: string | undefined;
@@ -96,6 +98,8 @@ class FileJournal implements Journal {
     private readonly push: (e: SessionEvent) => void,
     /** Where a save that failed is said: the service's logger. */
     private readonly warn: (message: string) => void,
+    /** The service's Clock: the steps' times and the push and save windows. */
+    private readonly time: Time,
     private readonly keep = keepEvents,
   ) {
     this.disk = new FileWriter(file);
@@ -110,7 +114,7 @@ class FileJournal implements Journal {
   private body = () => JSON.stringify(this.steps);
 
   private flush = () => {
-    clearTimeout(this.pushing);
+    this.pushing?.();
     this.pushing = undefined;
     const out = this.dirty.flatMap((n) => {
       const step = this.steps.findLast((s) => s.seq === n) ?? (this.draft?.seq === n ? this.draft : undefined);
@@ -123,15 +127,15 @@ class FileJournal implements Journal {
   private changed(n: number) {
     if (this.closed) return;
     if (!this.dirty.includes(n)) this.dirty.push(n);
-    this.pushing ??= setTimeout(this.flush, pushAfterMs);
-    clearTimeout(this.saving);
-    this.saving = setTimeout(() => {
+    this.pushing ??= this.time.after(pushAfterMs, this.flush);
+    this.saving?.();
+    this.saving = this.time.after(saveAfterMs, () => {
       try {
         this.disk.write(this.body);
       } catch (e) {
         this.warn(`vibevalley: could not save ${this.file}: ${String(e)}`);
       }
-    }, saveAfterMs);
+    });
   }
 
   private under(from: From | undefined): number | undefined {
@@ -145,7 +149,7 @@ class FileJournal implements Journal {
     const out: SessionEvent = {
       seq: this.next++,
       revision: 0,
-      time: Date.now(),
+      time: this.time.now(),
       ...step,
       ...(under !== undefined ? { under } : {}),
       ...(this.run !== undefined ? { run: this.run } : {}),
@@ -273,7 +277,7 @@ class FileJournal implements Journal {
   close() {
     this.seal();
     this.flush();
-    clearTimeout(this.saving);
+    this.saving?.();
     this.closed = true;
     try {
       this.disk.finish(this.body);
@@ -296,6 +300,8 @@ export class Trajectories {
     private readonly push: (id: string, e: SessionEvent) => void,
     /** Where a log that could not be saved is said: the service's logger (Effect.logWarning on its fiber). */
     private readonly warn: (message: string) => void,
+    /** The service's Clock, handed to every log. */
+    private readonly time: Time,
   ) {
     this.dir = join(home, "events");
   }
@@ -304,7 +310,7 @@ export class Trajectories {
 
   /** A session's log, carried on from what it kept: a session back from a restart goes on where it was. */
   openLog(id: string, keep = 0): Journal {
-    const j = new FileJournal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), this.warn, keep > 0 ? keep : keepEvents);
+    const j = new FileJournal(this.file(id), readJournal(this.file(id)) ?? [], (e) => this.push(id, e), this.warn, this.time, keep > 0 ? keep : keepEvents);
     this.open.set(id, j);
     return j;
   }
