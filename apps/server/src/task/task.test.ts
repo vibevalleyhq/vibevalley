@@ -12,7 +12,7 @@ import { Issues } from "../issue/issue.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import { splitBrief } from "./rules.ts";
 import { type Hired, type HireOptions, type Roster, NotTakenIn, type SessionShape } from "../session/session.ts";
-import { MergeFailure, type Workplace } from "../project/project.ts";
+import { MergeFailure, type Workplace } from "../project/shapes.ts";
 import { notTakenIn } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
 import { worldBelowTasks } from "../testing/world.ts";

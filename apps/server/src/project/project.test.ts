@@ -7,18 +7,8 @@ import { Effect, Fiber, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
-import {
-  activityOf,
-  countsOf,
-  githubRepository,
-  type GitHubRun,
-  MergeFailure,
-  type ProjectHooks,
-  projectProblem,
-  Projects,
-  layer,
-  tokeiArgs,
-} from "./project.ts";
+import { activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, Projects, layer, tokeiArgs } from "./project.ts";
+import { MergeFailure } from "./shapes.ts";
 
 /** gh is not installed. */
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });

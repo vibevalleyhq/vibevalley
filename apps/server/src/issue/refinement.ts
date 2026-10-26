@@ -12,7 +12,7 @@ import { cut } from "../base/text.ts";
 import type { ChannelShape } from "../channel/chat.ts";
 import type { CoreShape } from "../core/core.ts";
 import { type ApiError, refused, lookIn } from "../errors.ts";
-import type { WorkplaceRelease } from "../project/project.ts";
+import type { WorkplaceRelease } from "../project/shapes.ts";
 import { chooseAgent } from "../runtime/rules.ts";
 import type { RuntimeShape } from "../runtime/runtime.ts";
 import type { Hired, HireOptions, SessionShape } from "../session/session.ts";

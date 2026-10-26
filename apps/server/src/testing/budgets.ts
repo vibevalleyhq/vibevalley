@@ -1,11 +1,10 @@
-// What a test may take, by its layer (docs/subsystems/foundation.md): a run ends by naming each test that took more than
-// twice its layer's budget, slowest first. It does not fail the run: times differ by machine, and a slow test is a design
-// to look at (what it waits for, what it builds), not a broken one.
+// What a test may take, by its layer of the pyramid (pyramid.ts): a run ends with the pyramid's shape (each layer's
+// files, tests and time) and each test that took more than twice its layer's budget, slowest first. It does not fail
+// the run: times differ by machine, and a slow test is a design to look at (what it waits for, what it builds), not a
+// broken one.
 
 import type { Reporter, TestModule, Vitest } from "vite-plus/test/node";
-
-/** A flow builds the whole farm and runs real git; every other test is a module's, on the farm up to it. */
-export const budgetMs = (file: string) => (file.startsWith("src/flows/") ? 2_000 : 300);
+import { budgetMs, type Layer, layers, pyramid } from "./pyramid.ts";
 
 export default class Budgets implements Reporter {
   private vitest: Vitest | undefined;
@@ -15,15 +14,27 @@ export default class Budgets implements Reporter {
   }
 
   onTestRunEnd(modules: ReadonlyArray<TestModule>) {
-    const over = modules.flatMap((m) =>
-      [...m.children.allTests()].flatMap((t) => {
+    const { layerOf } = pyramid(this.vitest?.config.root ?? process.cwd());
+    const shape = new Map<Layer, { files: number; tests: number; ms: number }>(layers.map((l) => [l, { files: 0, tests: 0, ms: 0 }]));
+    const over: { ms: number; name: string; layer: Layer }[] = [];
+    for (const m of modules) {
+      const layer = layerOf(m.relativeModuleId);
+      const at = shape.get(layer)!;
+      at.files++;
+      for (const t of m.children.allTests()) {
         const ms = t.diagnostic()?.duration ?? 0;
-        return ms > 2 * budgetMs(m.relativeModuleId) ? [{ ms, name: `${m.relativeModuleId} > ${t.fullName}` }] : [];
-      }),
+        at.tests++;
+        at.ms += ms;
+        if (ms > 2 * budgetMs[layer]) over.push({ ms, name: `${m.relativeModuleId} > ${t.fullName}`, layer });
+      }
+    }
+    const rows = layers.map((l) => {
+      const s = shape.get(l)!;
+      return `  ${l.padEnd(6)} ${String(s.files).padStart(4)} files ${String(s.tests).padStart(5)} tests ${(s.ms / 1000).toFixed(1).padStart(7)} s   budget ${budgetMs[l]} ms`;
+    });
+    const lines = over.sort((a, b) => b.ms - a.ms).map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.layer.padEnd(6)} ${t.name}`);
+    this.vitest?.logger.log(
+      `\nThe test pyramid:\n${rows.join("\n")}\n` + (lines.length > 0 ? `\nOver twice their layer's budget:\n${lines.join("\n")}\n` : ""),
     );
-    if (over.length === 0) return;
-    over.sort((a, b) => b.ms - a.ms);
-    const lines = over.map((t) => `  ${String(Math.round(t.ms)).padStart(6)} ms  ${t.name}`);
-    this.vitest?.logger.log(`\nOver twice their layer's budget (flows 2 s, the rest 300 ms):\n${lines.join("\n")}\n`);
   }
 }
