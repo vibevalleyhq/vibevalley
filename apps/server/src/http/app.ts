@@ -34,9 +34,14 @@ const ready = (listening: (address: string) => Effect.Effect<void>) =>
   );
 
 /** port 0 is a free one. */
-export const app = (config: Config, port: number, listening: (address: string) => Effect.Effect<void> = () => Effect.void, options: ServiceOptions = {}) =>
-  HttpRouter.serve(routes(config), { disableListenLog: true, disableLogger: true }).pipe(
+export const app = (config: Config, port: number, listening: (address: string) => Effect.Effect<void> = () => Effect.void, options: ServiceOptions = {}) => {
+  const server = createServer();
+  return HttpRouter.serve(routes(config), { disableListenLog: true, disableLogger: true }).pipe(
     Layer.merge(ready(listening)),
+    // Stopping waits for every socket to close, and an event stream whose client has gone keeps its socket until its
+    // next write (a frame, or the ping 20 s on): every connection is closed first, before the server's own close.
+    Layer.merge(Layer.effectDiscard(Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections())))),
     Layer.provideMerge(services(config, options)),
-    Layer.provide(NodeHttpServer.layer(createServer, { host: "127.0.0.1", port })),
+    Layer.provide(NodeHttpServer.layer(() => server, { host: "127.0.0.1", port })),
   );
+};
