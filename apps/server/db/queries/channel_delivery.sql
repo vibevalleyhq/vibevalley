@@ -4,18 +4,6 @@
 insert into channel_delivery (recipient_id, message_id, reason, wakes, held_by, created_at)
 values (sqlc.arg(recipient_id), sqlc.arg(message_id), sqlc.arg(reason), sqlc.arg(wakes), sqlc.narg(held_by), sqlc.arg(created_at)) on conflict do nothing;
 
--- name: OpenDeliveries :many
-select d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body, m.created_at,
-       p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,
-       coalesce(ch.name, c.name, '')::text as channel_name
-from channel_delivery d
-join channel_message m on m.id = d.message_id
-join channel_participant p on p.id = m.sender_id
-join channel_conversation c on c.id = m.conversation_id
-left join channel_conversation ch on ch.id = c.channel_id
-where d.recipient_id = sqlc.arg(recipient_id) and d.state in ('pending', 'announced', 'handed')
-order by m.id;
-
 -- name: MarkAnnounced :exec
 update channel_delivery set state = 'announced', launch = sqlc.arg(launch), announced_at = sqlc.arg(announced_at)
 where recipient_id = sqlc.arg(recipient_id) and message_id = sqlc.arg(message_id) and state in ('pending', 'announced');
@@ -71,3 +59,16 @@ join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 where s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null
 group by d.recipient_id;
+
+-- name: AllOpenDeliveries :many
+-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).
+select d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body,
+       m.created_at, p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,
+       coalesce(ch.name, c.name, '')::text as channel_name
+from channel_delivery d
+join channel_message m on m.id = d.message_id
+join channel_participant p on p.id = m.sender_id
+join channel_conversation c on c.id = m.conversation_id
+left join channel_conversation ch on ch.id = c.channel_id
+where d.state in ('pending', 'announced', 'handed')
+order by m.id;

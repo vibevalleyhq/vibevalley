@@ -54,6 +54,7 @@ import { jsonOrNone } from "../base/json.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { Audience } from "./audience.ts";
+import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ConvRow } from "./model.ts";
 import { type ApiError, refused, lookIn, missing } from "../errors.ts";
 import * as qc from "../../db/generated/channel_conversation.sql.ts";
@@ -150,7 +151,6 @@ const metaText = (m: Meta | undefined) =>
       );
 
 type MsgRow = qm.MessageByIDResult;
-type DeliveryRow = qd.OpenDeliveriesResult;
 
 const senderKind = (kind: string): SenderKind => (kind === "user" || kind === "orchestrator" || kind === "agent" ? kind : "system");
 const messageKind = (kind: string): MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
@@ -350,6 +350,7 @@ export const make = Effect.gen(function* () {
   const { run: db, one, inTx } = yield* Db;
   const model = new ChatModel();
   const reach = new Audience();
+  const open = new Deliveries();
   const follow = (conversation: string, participant: string, reason: string, from: number) =>
     Effect.andThen(
       db(qf.follow({ conversation_id: conversation, participant_id: participant, reason, from_number: from })),
@@ -358,6 +359,7 @@ export const make = Effect.gen(function* () {
   const reload = Effect.gen(function* () {
     model.load(yield* db(qc.allConversations()), yield* db(qp.participants()), yield* db(qr.readCursorsOf({ participant_id: "user" })));
     reach.load(yield* db(qf.allFollows()), yield* db(qd.agentWakesByConversation()), yield* db(qd.lastAgentWakes()), yield* db(qm.ownerLastMessages()));
+    open.load(yield* db(qd.allOpenDeliveries()));
   });
   /** A transaction that tells the model what it changes as it goes: if it fails, those changes are not in the database,
    * so the model is read again from it. */
@@ -539,6 +541,7 @@ export const make = Effect.gen(function* () {
     yield* setRead(who, conversation, upto, now);
     yield* db(qs.pruneSeenMarks({ participant: who, conversation, upto }));
     yield* db(qd.seenUpTo({ at: now, recipient: who, upto, conversation }));
+    open.seenUpTo(who, conversation, upto);
   });
   const readThrough = (who: string, conversation: string, upto: number) =>
     tx(readUpTo(who, conversation, upto)).pipe(Effect.andThen(who === "user" ? publishOwnerMentions : Effect.void));
@@ -547,9 +550,12 @@ export const make = Effect.gen(function* () {
   const heardLaunch = Effect.fnUntraced(
     function* (who: string, launch: string) {
       const seen = yield* db(qd.seenHanded({ seen_at: yield* Clock.currentTimeMillis, recipient_id: who, launch }));
-      for (const r of seen) yield* db(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
+      for (const r of seen) {
+        open.seen(who, r.message_id);
+        yield* db(qs.addSeenMark({ participant_id: who, message_id: r.message_id }));
+      }
     },
-    (effect) => inTx(effect),
+    (effect) => tx(effect),
   );
 
   // ── writing ──
@@ -611,6 +617,29 @@ export const make = Effect.gen(function* () {
       yield* db(
         qd.insertDelivery({ recipient_id: d.recipient, message_id: row.id, reason: d.reason, wakes: d.wakes, held_by: d.heldBy ?? null, created_at: now }),
       );
+      open.inserted(d.recipient, {
+        message_id: row.id,
+        number: row.number,
+        reason: d.reason,
+        wakes: d.wakes,
+        held_by: d.heldBy ?? null,
+        state: "pending",
+        launch: null,
+        conversation_id: conv.id,
+        sender_id: row.sender_id,
+        kind: row.kind,
+        body: row.body,
+        created_at: row.created_at,
+        name: row.sender_name,
+        sender_kind: row.sender_kind,
+        conversation_kind: conv.kind,
+        parent_id: conv.parent_id,
+        parent_number: conv.parent_number,
+        subject_kind: conv.subject_kind,
+        subject_id: conv.subject_id,
+        // As OpenDeliveries reads it: the thread's channel's name, else the conversation's own.
+        channel_name: (conv.channel_id !== null ? model.conversation(conv.channel_id)?.name : undefined) ?? conv.name ?? "",
+      });
       reach.delivered({
         conversation: conv.id,
         message: row.id,
@@ -757,7 +786,7 @@ export const make = Effect.gen(function* () {
     helpers ? helpers.deliver(recipient, text, { kind: "comment", message }) : Effect.succeed({ kind: "refused", reason: "帮工还没接回来" });
 
   const kick = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
-    const rows = yield* db(qd.openDeliveries({ recipient_id: recipient }));
+    const rows = open.of(recipient);
     const waking = rows.filter((r) => r.wakes && r.held_by === null && (r.state === "pending" || r.state === "announced"));
     if (recipient === orchestratorAgent) {
       const byConversation = Map.groupBy(waking, (r) => r.conversation_id);
@@ -765,12 +794,18 @@ export const make = Effect.gen(function* () {
       for (const [conversation, rs] of byConversation) {
         const messages = rs.map(asInbox);
         PubSub.publishUnsafe(orchestratorHub, { conversation, target: messages[0]!.target, messages });
-        for (const r of rs) yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
+        for (const r of rs) {
+          yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
+          open.seen(orchestratorAgent, r.message_id);
+        }
       }
       return;
     }
     const session = sessionOf(recipient);
-    if (!session) return yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
+    if (!session) {
+      yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: recipient }));
+      return open.dropped(recipient);
+    }
     if (isBusy(session)) {
       // Gathered for a moment: a burst of messages is one notice.
       if (rows.some((r) => r.state === "pending" && r.held_by === null)) later(`notice:${recipient}`, config.chat.noticeBatchMs, () => notify(recipient));
@@ -782,7 +817,10 @@ export const make = Effect.gen(function* () {
     const delivered = yield* deliver(recipient, wakeInput(messages, others), waking[0]!.message_id);
     if (delivered.kind === "refused") return yield* Effect.logInfo(`chat: ${recipient} not woken: ${delivered.reason}`);
     const now = yield* Clock.currentTimeMillis;
-    for (const r of waking) yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+    for (const r of waking) {
+      yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
+      open.handed(recipient, r.message_id, delivered.launch ?? "");
+    }
   });
 
   const notify = Effect.fnUntraced(function* (recipient: string): Effect.fn.Return<void> {
@@ -790,12 +828,15 @@ export const make = Effect.gen(function* () {
     const session = sessionOf(recipient);
     if (!session) return;
     if (!isBusy(session)) return yield* kick(recipient);
-    const rows = (yield* db(qd.openDeliveries({ recipient_id: recipient }))).filter((r) => r.state === "pending" && r.held_by === null);
+    const rows = open.of(recipient).filter((r) => r.state === "pending" && r.held_by === null);
     if (rows.length === 0) return;
     const delivered = yield* deliver(recipient, busyNotice(groupRows(rows)), rows[0]!.message_id);
     if (delivered.kind === "refused") return;
     const now = yield* Clock.currentTimeMillis;
-    for (const r of rows) yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+    for (const r of rows) {
+      yield* db(qd.markAnnounced({ launch: delivered.launch ?? "", announced_at: now, recipient_id: recipient, message_id: r.message_id }));
+      open.announced(recipient, r.message_id, delivered.launch ?? "");
+    }
   });
 
   const onActivity = Effect.fnUntraced(function* (a: LaunchActivity): Effect.fn.Return<void> {
@@ -807,6 +848,7 @@ export const make = Effect.gen(function* () {
       case "ended": {
         if (!a.spoke) {
           const rolled = yield* db(qd.rollbackHanded({ recipient_id: a.id }));
+          open.handedBack(a.id);
           if (rolled.length > 0) {
             const { count: failed, tripped } = breaker.failed(a.id);
             if (tripped) {
@@ -830,7 +872,9 @@ export const make = Effect.gen(function* () {
       }
       case "closed":
         yield* db(qd.rollbackHanded({ recipient_id: a.id }));
-        return yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
+        open.handedBack(a.id);
+        yield* db(qd.rollbackAnnounced({ recipient_id: a.id, launch: a.launch }));
+        return open.announcedBack(a.id, a.launch);
       case "compacting":
         if (a.on) compacting.add(a.id);
         else {
@@ -842,9 +886,15 @@ export const make = Effect.gen(function* () {
 
   /** Reading a digest only proposes context; the execution acknowledges what it actually took. */
   const consumed = (input: InputConsumed) =>
-    Effect.forEach(input.messages, (id) => db(qd.seenOne({ seen_at: clock.currentTimeMillisUnsafe(), recipient_id: input.session, message_id: id })), {
-      discard: true,
-    });
+    Effect.forEach(
+      input.messages,
+      (id) =>
+        Effect.andThen(
+          db(qd.seenOne({ seen_at: clock.currentTimeMillisUnsafe(), recipient_id: input.session, message_id: id })),
+          Effect.sync(() => open.seen(input.session, id)),
+        ),
+      { discard: true },
+    );
 
   // ── sessions coming and going ──
 
@@ -900,6 +950,7 @@ export const make = Effect.gen(function* () {
       yield* db(qp.participantLeft({ left_at: now, id: p.id }));
       model.left(p.id, now);
       yield* db(qd.dropOpen({ dropped_why: "left", recipient_id: p.id }));
+      open.dropped(p.id);
       yield* FiberMap.remove(waits, `notice:${p.id}`);
       breaker.reset(p.id);
     }
@@ -928,6 +979,7 @@ export const make = Effect.gen(function* () {
       // A word half said when the server stopped is as said as it got; whatever was handed and not seen goes back.
       yield* db(qm.finalizeAll({ updated_at: yield* Clock.currentTimeMillis }));
       yield* db(qd.rollbackAll());
+      open.load(yield* db(qd.allOpenDeliveries()));
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
       for (const c of [...convs].reverse()) yield* core.apply({ type: "conversation", conversation: toConversation(c) });
       const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
@@ -1070,6 +1122,7 @@ export const make = Effect.gen(function* () {
               shown.push(inboxOf(m, target));
               yield* db(qs.addSeenMark({ participant_id: from, message_id: m.id }));
               yield* db(qd.seenOne({ seen_at: now, recipient_id: from, message_id: m.id }));
+              open.seen(from, m.id);
             }
             if (shown.length === unseen.length) yield* setRead(from, conversation, shown.at(-1)!.number, now);
             return { kind: "held", target, shown: shown.reverse(), more: unseen.length - shown.length };
@@ -1165,7 +1218,12 @@ export const make = Effect.gen(function* () {
     ),
     orchestratorDigest: () =>
       locked(
-        Effect.map(db(qd.openDeliveries({ recipient_id: orchestratorAgent })), (rows) => rows.filter((r) => !(r.wakes && r.held_by === null)).map(asInbox)),
+        Effect.sync(() =>
+          open
+            .of(orchestratorAgent)
+            .filter((r) => !(r.wakes && r.held_by === null))
+            .map(asInbox),
+        ),
       ),
     channels: () => Effect.sync(() => model.channels().map(infoOf)),
     openChannel: (name, description, project) =>
