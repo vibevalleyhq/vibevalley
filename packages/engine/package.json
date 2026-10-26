@@ -8,10 +8,6 @@
     "./audio": "./src/audio/index.ts",
     "./clock": "./src/clock.ts"
   },
-  "scripts": {
-    "check": "tsc --noEmit",
-    "test": "vp test run"
-  },
   "dependencies": {
     "pixi.js": "catalog:"
   },

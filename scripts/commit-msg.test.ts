@@ -39,7 +39,7 @@ test("a subject is English; the interface's words and code are quoted", () => {
 });
 
 test("a pull request's body has the template's sections, in English", () => {
-  const body = (what: string) => `## What changed\n\n${what}\n\n## Checks\n\n- \`bun run check\`\n\n## Not verified\n\nNone.\n`;
+  const body = (what: string) => `## What changed\n\n${what}\n\n## Checks\n\n- \`vp check\`\n\n## Not verified\n\nNone.\n`;
   expect(bodyProblems(body("The board groups issues by helper."))).toEqual([]);
   expect(bodyProblems(body("A full gateway says 「网关满了」.\n\n```\nexpected '还在等' to be '收到'\n```"))).toEqual([]);
   expect(bodyProblems(body("<!-- 模板的注释不算 -->\nThe board groups issues."))).toEqual([]);

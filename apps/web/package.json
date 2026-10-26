@@ -4,11 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "pnpm run check && vp build",
-    "check": "tsc --noEmit",
-    "test": "vp test run && playwright test",
-    "test:dev": "VIBEVALLEY_WEB_DEV=1 playwright test",
-    "test:rules": "vp test run"
+    "e2e": "vp run build && playwright test",
+    "e2e:dev": "VIBEVALLEY_WEB_DEV=1 playwright test"
   },
   "dependencies": {
     "@solidjs/web": "catalog:",

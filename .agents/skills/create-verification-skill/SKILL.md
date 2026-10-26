@@ -14,7 +14,7 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 按顺序问，答「能」就去做那件事，不写分册：
 
 1. 能不能改代码，让这类错误写不出来（类型、不变量、只留一个入口）？
-2. 能不能写成测试或检查，进 `bun run server:check`、`bun run web:check`、`cd apps/web && bun run test`、`bun run docs:verify`？服务端的测试能用 oar 的 `scriptedRuntime`、真的 git 仓库和 pi-ai 的假模型，页面的 Playwright 对着真的服务端，大部分行为都能这样测。
+2. 能不能写成测试或检查，进 `vp run server:check`、`vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run docs:verify`？服务端的测试能用 oar 的 `scriptedRuntime`、真的 git 仓库和 pi-ai 的假模型，页面的 Playwright 对着真的服务端，大部分行为都能这样测。
 
 只有要真的跑起来看、要判断（画面对不对、交互顺不顺、真的帮工能不能开工）的，才写分册。一份分册里能改成检查的步骤，也宜改成检查，分册里只留一句命令。
 
@@ -35,7 +35,7 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 
 放在 `.agents/skills/acceptance/<块>.md`，`<块>` 用实际的概念或目录名（`server`、`page`、`mobile`），不用皮的叫法。分册没有 frontmatter：agent 什么时候读它，由入口的表决定。
 
-开头一句指回入口（`[验收](.agents/skills/acceptance/SKILL.md)的一份分册`），说它证明什么。正文用这几节，名字固定，`bun run docs:verify` 会查：
+开头一句指回入口（`[验收](.agents/skills/acceptance/SKILL.md)的一份分册`），说它证明什么。正文用这几节，名字固定，`vp run docs:verify` 会查：
 
 - `## 什么时候用`：哪些路径、哪类改动；哪些改动只跑检查就够、不用它。
 - `## 准备`：要先有什么（生成的代码最新、构建、模拟器、钥匙），每条带命令。
@@ -55,7 +55,7 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 ## 5. 登记
 
 1. 在 [acceptance 的入口](.agents/skills/acceptance/SKILL.md)「什么时候用」的表里加一行：改了什么、读哪份、证明什么；入口的 `description` 补上触发它的路径和说法。
-2. 跑 `bun run docs:verify`：它查每份分册有那几节，入口的表正好列全分册。
+2. 跑 `vp run docs:verify`：它查每份分册有那几节，入口的表正好列全分册。
 
 ## 维护
 

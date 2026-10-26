@@ -1,6 +1,6 @@
 # 地基
 
-服务端和页面共用的骨架，不是一块业务，农场上也不画出来：一个 Bun workspaces 的 TypeScript 仓库；服务端 `apps/server` 一块业务一个文件夹、一个 Effect 服务，按次序叠成 layer；形状和规则只在 `packages/protocol`，服务端和页面 import 同一份；SQL 只在 effect-sqlc，表结构只有一份；测试共用一套工具，帮工由脚本扮演。
+服务端和页面共用的骨架，不是一块业务，农场上也不画出来：一个 pnpm workspace 的 TypeScript 仓库；服务端 `apps/server` 一块业务一个文件夹、一个 Effect 服务，按次序叠成 layer；形状和规则只在 `packages/protocol`，服务端和页面 import 同一份；SQL 只在 effect-sqlc，表结构只有一份；测试共用一套工具，帮工由脚本扮演。
 
 ## 管什么，不管什么
 
@@ -15,14 +15,14 @@
 
 ## 在哪
 
-- **仓库**：根目录的 `package.json` 是 Bun workspaces（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次（pnpm 12，设置都在 `pnpm-workspace.yaml`）。依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog 里，各包的 `package.json` 写 `catalog:`（Expo SDK 定的那批写 `catalog:expo`），同一个依赖全仓库只有一个版本；`pnpm add` 照 `catalogMode: strict` 把版本放进 catalog，手写的版本由 `scripts/catalog.test.ts` 拦下；`vite`、`vitest` 再经 `overrides` 指到 Vite+ 带的那一份。`site/` 不在 workspace 里，有自己的 `pnpm-workspace.yaml` 和版本；桌面版打包时把 `catalog:` 换成 pnpm 装的确切版本再交给 npm（`apps/desktop/scripts/package.ts`）。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`，每个包的 `check` 是 `tsc --noEmit`。
+- **仓库**：`pnpm-workspace.yaml` 列出 workspace（`apps/*`、`packages/*`），由 Vite+（`vp`）管：`vp install` 装一次（pnpm 12，设置都在 `pnpm-workspace.yaml`）。依赖的版本只写在 `pnpm-workspace.yaml` 的 catalog 里，各包的 `package.json` 写 `catalog:`（Expo SDK 定的那批写 `catalog:expo`），同一个依赖全仓库只有一个版本；`pnpm add` 照 `catalogMode: strict` 把版本放进 catalog，手写的版本由 `scripts/catalog.test.ts` 拦下；`vite`、`vitest` 再经 `overrides` 指到 Vite+ 带的那一份。`site/` 不在 workspace 里，有自己的 `pnpm-workspace.yaml` 和版本；桌面版打包时把 `catalog:` 换成 pnpm 装的确切版本再交给 npm（`apps/desktop/scripts/package.ts`）。根目录的 `vite.config.ts` 是格式（oxfmt）和 lint（oxlint，带类型）的设置，`vp check` 一起跑它们和类型；共用的 TypeScript 设置在 `tsconfig.base.json`，根目录的 `tsconfig.json` 管 `scripts/`，每个包的 `check` 是 `tsc --noEmit`。
 - **服务端** `apps/server`：`src/main.ts`（服务端）、`src/cli.ts`（命令行）；`src/services.ts`（全部服务的次序）、`src/handlers.ts`（每个接口转给哪个服务）、`src/http/`（`app.ts` 组装、`api.ts` 按接口表路由、`streams.ts` 三条 SSE、`mcp.ts`、`page.ts` 页面）。
 - **地基** `src/base`：`config.ts`（`Config`、`Settings`、`loadConfig`）、`db.ts`（`Database`）、`ids.ts`（`newId`、`code`）、`lease.ts`（家目录的租约）、`files.ts`、`redact.ts`；`src/errors.ts` 是接口的拒绝。
 - **形状和接口**：`packages/protocol/src/shapes.ts`（类型和两边共用的常量）、`schema.ts`（每个形状的 Schema）、`api.ts`（`endpoints` 表、`Handlers`、`errorStatus`）、`client.ts`（`VibeValleyApi`，由 `scripts/api-client.ts` 照 `api.ts` 写出）、`stream.ts`（读 SSE）；能力表 [capabilities.md](docs/reference/capabilities.md) 由 `scripts/capabilities.ts` 从 `endpoints` 写出。
 - **规则和黄金数据**：页面和服务端都跑的在 `packages/protocol/src/rules`（`@vibevalley/protocol/rules`），只有服务端跑的在拥有它的模块里（`issue/state.ts`、`channel/rules.ts`……），折法和拼帧在 `projection/`；黄金数据是 `apps/server/src/<模块>/testdata/*.jsonl.gz`（核心状态的折法、拼帧和共用规则的在 `core/testdata`，`core/golden.test.ts` 读），读写工具 `src/testing/golden.ts`。
 - **存盘**：`apps/server/db/migrations/0001_schema.up.sql`、`db/queries/<表>.sql`、生成的 `db/generated/`，生成器的设置 `db/effect-sqlc.json`，脚本 `scripts/db-generate.ts`。
 - **测试工具**：`src/testing/layers.ts`（`testConfig`、`testDatabase`：临时家目录、内存库）、`world.ts`（`world`：一整座农场，农机和它的额度由测试给）、`git.ts`（真的 git 仓库）、`golden.ts`；`src/flows/farm.ts`（流程测试的农场和帮工）；`agent/brain/testing.ts`（pi-ai 的假模型）。
-- **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`bun run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
+- **检查**：`src/base/schema.test.ts`（表结构）、`scripts/stale-names.ts`（`vp run names:verify`）、`scripts/capabilities.ts --check`，后两个在 `docs:verify` 里。
 
 ## 模型和不变量
 
@@ -57,16 +57,16 @@
 **形状和规则**
 
 - **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Codec<T.X>`（`Schema.Codec<T.X, Wire<T.X>>`：线上的一侧是去掉 id 品牌的同一个形状），两边对不上就编不过，`schema.test.ts` 再逐个查 Schema 和 interface 的键；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
-- **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`bun run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
+- **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`vp run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，页面就不用带上 effect 的 Schema；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
 - **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/state.ts`、`issue/state.ts`、`task/graph.ts`、`game/view.ts`、`notice/inbox.ts`、`setting/rules.ts`、`runtime/rules.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
-- **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`bun run golden:update`，`-- <模块>` 或 `-- protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
+- **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`vp run golden:update`，后面加 `<模块>` 或 `protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
 - **字符串照 JavaScript 自己的算法**：长度按 UTF-16 码元、空白是 `\s`；切断的代理对换成 U+FFFD（`apps/server/src/base/text.ts`）。没有另一份。
 
 **存盘**
 
 - **一个 PGlite 库**：`base/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `bigint`。
-- **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `npm run db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
+- **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter vibevalley-server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
 - **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
 - **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起，省掉大半的准备时间。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里的 id 都是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
@@ -88,7 +88,7 @@
 **加一张表或改表**
 
 1. 在 `0001_schema.up.sql` 里拥有它的那一段直接改：表名 `<模块>_<概念>`，索引以表名开头，主键 `text` 存 uuidv7。
-2. 写 `db/queries/<表>.sql`，跑 `cd apps/server && npm run db:generate`。
+2. 写 `db/queries/<表>.sql`，跑 `vp run --filter vibevalley-server db:generate`。
 3. 服务里调生成的函数，新行的 id 用 `newId()`。
 4. 删掉本机的库重建；`schema.test.ts` 查命名、基线和查询文件。
 
@@ -96,12 +96,12 @@
 
 1. 改 `shapes.ts`，在 `schema.ts` 写它的 Schema；接口在 `api.ts` 的 `endpoints` 加一行（`can` 写清谁能调）。
 2. 编不过的地方就是还没接上的地方：`handlers.ts` 实现新接口，新事实在 `reduce` 里折，要每种都处理的 `switch` 补上。
-3. 改了接口跑 `bun run capabilities`；跑 `bun run server:check` 和 `bun run web:check`。
+3. 改了接口跑 `vp run capabilities`；跑 `vp run server:check` 和 `vp run web:check`。
 
 **改一条规则**
 
 1. 改它的主人那里的纯函数；第二个模块也要用，就让它问主人的服务，或挪进 `packages/protocol`。
-2. `bun run golden:update` 重写黄金数据，看 diff 是不是只改了该改的。
+2. `vp run golden:update` 重写黄金数据，看 diff 是不是只改了该改的。
 
 ## 和谁打交道
 
@@ -140,8 +140,8 @@
 ## 怎么验证
 
 - `src/base/schema.test.ts`：一份基线，表名、索引名，每个查询文件只写它自己的表。
-- `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`bun run golden:update` 后 `git diff` 只该动有意改的。
-- `bun run check`：`vp check`，格式、lint 和类型。
-- `bun run server:check`：protocol 的测试、服务端的类型、`db:check`、vitest。
-- `bun run web:check`、`cd apps/web && bun run test`、`bun run desktop:test`：各包的类型、页面能构建，Playwright 对着真的服务端和整个应用。
-- `bun run docs:verify`：旧名字、能力表是否最新。
+- `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`vp run golden:update` 后 `git diff` 只该动有意改的。
+- `vp check`：格式、lint 和全部包的类型。
+- `vp run server:check`：`vp check`、protocol 的测试、`db:check`、服务端的 vitest。
+- `vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run desktop:test`：类型、各包的规则测试、页面能构建，Playwright 对着真的服务端和整个应用。
+- `vp run docs:verify`：旧名字、能力表是否最新。

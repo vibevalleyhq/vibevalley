@@ -27,11 +27,10 @@ Agora's frameworks.
 ## Commands
 
 ```bash
-bun run check                                   # types
-bun run test                                    # farm choice, rules and native call ownership (mock native dependencies)
-CI=1 bunx expo prebuild -p android --no-install # android/, then:
+vp run test                                     # farm choice, rules and native call ownership (mock native dependencies)
+CI=1 vp exec expo prebuild -p android --no-install # android/, then:
 cd android && JAVA_HOME=<a JDK 17> ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
-CI=1 bunx expo prebuild -p ios --no-install && (cd ios && pod install)   # ios/, then:
+CI=1 vp exec expo prebuild -p ios --no-install && (cd ios && pod install)   # ios/, then:
 cd ios && xcodebuild -workspace VibeValley.xcworkspace -scheme VibeValley -configuration Release -sdk iphonesimulator \
   -arch arm64 -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES
 vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android   # from the root, with an emulator running and apps/web/dist built; ios likewise

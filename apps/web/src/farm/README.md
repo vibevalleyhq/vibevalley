@@ -107,6 +107,6 @@ Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.
 
 ## Tests
 
-`bun test src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the sounds);
+`vp test run src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the sounds);
 `test/farm.spec.ts` (Playwright on a real server: the canvas, the links; a screenshot at `test-results/farm.png`).
 Playwright tests on the farm start past the title screen (`localStorage` `vibevalley.title.seen` = `true`).

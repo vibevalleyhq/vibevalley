@@ -6,8 +6,6 @@
   "scripts": {
     "build": "vpx scripts/build.ts",
     "dev": "vpx scripts/dev.ts",
-    "check": "tsc --noEmit",
-    "test": "vpx scripts/build.ts && playwright test",
     "package": "vpx scripts/package.ts"
   },
   "devDependencies": {

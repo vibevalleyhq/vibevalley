@@ -69,7 +69,7 @@ for (const e of endpoints) {
 }
 for (const op of signatures.keys()) if (!endpoints.some((e) => e.op === op)) throw new Error(`api-client: ${op} is in Handlers but not in endpoints`);
 
-const text = `// Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: pnpm run api:client.
+const text = `// Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
 import type { ApiError } from "./api";
 import type * as T from "./shapes";
@@ -161,15 +161,15 @@ ${[...groups].map(([g, ms]) => `\n  readonly ${g} = {\n${ms.join("\n")}\n  };\n`
 `;
 
 const format = (t: string) => {
-  // The same formatter as bun run check, so the file it writes is the file check:fix would leave.
-  const done = spawnSync("pnpm", ["exec", "vp", "fmt", `--stdin-filepath=${out}`], { input: t, encoding: "utf8", cwd: join(import.meta.dirname, "..") });
+  // The same formatter as vp check, so the file it writes is the file vp check --fix would leave.
+  const done = spawnSync("vp", ["fmt", `--stdin-filepath=${out}`], { input: t, encoding: "utf8", cwd: join(import.meta.dirname, "..") });
   return done.status === 0 ? done.stdout : t;
 };
 
 const formatted = format(text);
 if (process.argv.includes("--check")) {
   if (readFileSync(out, "utf8") !== formatted) {
-    console.error("api-client: packages/protocol/src/client.ts is stale: run pnpm run api:client");
+    console.error("api-client: packages/protocol/src/client.ts is stale: run vp run api:client");
     process.exit(1);
   }
 } else writeFileSync(out, formatted);

@@ -41,7 +41,7 @@ const unreachable = (base: string) => (e: HttpClientError.HttpClientError) =>
     code: exit.unreachable,
     tag: "Unreachable",
     text: `连不上 ${base}：${whyOf(e)}`,
-    next: [{ say: "先起服务端（apps/server 下 npm start），或用 --server 指到在跑的那个" }],
+    next: [{ say: "先起服务端（vp run --filter vibevalley-server start），或用 --server 指到在跑的那个" }],
   });
 
 const codeOf: Readonly<Record<ApiError["_tag"], number>> = {

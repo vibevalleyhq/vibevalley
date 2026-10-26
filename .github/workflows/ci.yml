@@ -20,17 +20,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # pnpm's version is package.json's packageManager.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
+      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      - uses: voidzero-dev/setup-vp@v1
+        with: { node-version: 24, cache: true }
       - name: pull request title
         if: github.event_name == 'pull_request'
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: pnpm exec vpx scripts/commit-msg.ts --title "$TITLE"
+        run: vpx scripts/commit-msg.ts --title "$TITLE"
       - name: pull request body and branch
         if: github.event_name == 'pull_request'
         # The body becomes the squashed commit's message. Editing the title or body does not run CI again: vv-pr checks
@@ -38,10 +36,10 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
-        run: pnpm exec vpx scripts/commit-msg.ts --body "$BODY" && pnpm exec vpx scripts/commit-msg.ts --branch "$BRANCH"
-      - run: pnpm run check
-      - run: pnpm run docs:verify
-      - run: pnpm run scripts:test
+        run: vpx scripts/commit-msg.ts --body "$BODY" && vpx scripts/commit-msg.ts --branch "$BRANCH"
+      - run: vp check
+      - run: vp run docs:verify
+      - run: vp run scripts:test
 
   # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
   server-tests:
@@ -53,18 +51,15 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
-      # pnpm's version is package.json's packageManager.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      - uses: voidzero-dev/setup-vp@v1
+        with: { node-version: 24, cache: true }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: pnpm install --frozen-lockfile
       # server:check without db:check: effect-sqlc (the generator) is not published, so only a clone with ../effect-sqlc
       # can tell whether db/generated is current. The rest runs against the committed db/generated.
       - if: matrix.shard == 1
-        run: pnpm run test
-        working-directory: packages/protocol
-      - run: pnpm exec vp test run --shard=${{ matrix.shard }}/3
+        run: vp run --filter @vibevalley/protocol test
+      - run: vp test run --shard=${{ matrix.shard }}/3
         working-directory: apps/server
 
   # The one check main requires for the server: it passes only when every part did.
@@ -81,29 +76,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # pnpm's version is package.json's packageManager.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      - uses: voidzero-dev/setup-vp@v1
+        with: { node-version: 24, cache: true }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: pnpm install --frozen-lockfile
-      # web:check without the packages' tsc: the check job's vp check covers their types.
-      - run: pnpm --filter @vibevalley/host run test && pnpm --filter vibevalley-mobile run test && pnpm --filter vibevalley-web run build
-      # Only the page's rule tests: the Playwright suite runs on the owner's machine (cd apps/web && pnpm run test).
-      - run: pnpm run test:rules
-        working-directory: apps/web
+      # web:check without its vp check, which the check job runs. The page's Playwright suite (e2e) runs on the owner's
+      # machine: vp run --filter vibevalley-web e2e.
+      - run: vp run --filter @vibevalley/engine --filter @vibevalley/host --filter vibevalley-mobile --filter vibevalley-web test
+      - run: vp run --filter vibevalley-web build
 
   desktop:
     name: desktop
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # pnpm's version is package.json's packageManager.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: xvfb-run -a pnpm run desktop:test
+      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      - uses: voidzero-dev/setup-vp@v1
+        with: { node-version: 24, cache: true }
+      - run: xvfb-run -a vp run desktop:test
       - uses: actions/upload-artifact@v4
         if: failure()
         with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
@@ -113,8 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # pnpm's version is package.json's packageManager.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
-      - run: pnpm run site:check && pnpm run site:build
+      # Node, then Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
+      - uses: voidzero-dev/setup-vp@v1
+        with: { node-version: 24, cache: true }
+      - run: vp run site:check && vp run site:build

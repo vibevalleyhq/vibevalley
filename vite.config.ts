@@ -1,6 +1,38 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  // vp dev, build and preview at the root mean the page.
+  defaultPackage: "./apps/web",
+  // Checks are tasks here and in each package's vite.config.ts: cached, so a run with nothing changed replays its
+  // result. What writes files or keeps running (golden:update, api:client, desktop:dev…) stays a package.json script.
+  run: {
+    tasks: {
+      "scripts:test": "vp test run",
+      "docs:verify": [
+        "vpx scripts/agent-notes.ts",
+        "vpx scripts/skills.ts",
+        "vpx scripts/doc-links.ts",
+        "vpx scripts/stale-names.ts",
+        "vpx scripts/capabilities.ts --check",
+        "vpx scripts/api-client.ts --check",
+      ],
+      "notes:verify": "vpx scripts/agent-notes.ts",
+      "names:verify": "vpx scripts/stale-names.ts",
+      // db:check is a script: it reads ../effect-sqlc, outside what the cache can see.
+      "server:check": [
+        "vp check",
+        "vp run --filter @vibevalley/protocol test",
+        "vp run --filter vibevalley-server db:check",
+        "vp run --filter vibevalley-server test",
+      ],
+      "web:check": [
+        "vp check",
+        "vp run --filter @vibevalley/engine --filter @vibevalley/host --filter vibevalley-mobile --filter vibevalley-web test",
+        "vp run --filter vibevalley-web build",
+      ],
+      "desktop:test": { command: "vp run --filter vibevalley-desktop e2e", cache: false },
+    },
+  },
   // scripts/'s own tests; each package has its vite.config.ts with its own.
   test: { include: ["scripts/**/*.test.ts"] },
   // The pre-commit hook (.vite-hooks/pre-commit) runs these on the staged files.

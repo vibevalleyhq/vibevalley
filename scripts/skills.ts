@@ -3,7 +3,7 @@
  * whose `description` is not empty; acceptance's SKILL.md and each of its parts (the other .md files beside it) have the
  * fixed sections create-verification-skill asks for, and its table lists every part and nothing else; the README's table
  * lists every skill and nothing else; .claude/skills links to .agents/skills, so Claude Code
- * and Codex read the same files. Run as part of `pnpm run docs:verify`; anything wrong exits 1.
+ * and Codex read the same files. Run as part of `vp run docs:verify`; anything wrong exits 1.
  */
 
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync } from "node:fs";

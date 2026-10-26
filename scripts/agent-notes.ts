@@ -2,8 +2,8 @@
  * The Agent Note tree and file format (.agents/notes/README.md), checked, and its catalog written. The lifecycle and
  * class sets are closed: this file is their single source, and the README's tables follow it. Runs on Bun:
  *
- *   pnpm run notes:verify                 check every note and that CATALOG.md is current; any error exits 1
- *   pnpm run notes:catalog                write CATALOG.md from the notes first, then check
+ *   vp run notes:verify                 check every note and that CATALOG.md is current; any error exits 1
+ *   vp run notes:catalog                write CATALOG.md from the notes first, then check
  *
  * Checks: every folder under .agents/notes is a known lifecycle; every note sits at {lifecycle}/{class}/ with a
  * known class and a yyyy-mm-dd-topic.md name; no hand-written INDEX.md; the header block is exactly
@@ -128,7 +128,7 @@ export function catalogOf(notes: readonly AgentNote[]): string {
   const out = [
     "# Agent Notes 目录",
     "",
-    `由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 \`pnpm run notes:catalog\`，过期了 \`pnpm run notes:verify\` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。`,
+    `由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 \`vp run notes:catalog\`，过期了 \`vp run notes:verify\` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。`,
   ];
   for (const lifecycle of AGENT_NOTE_LIFECYCLES) {
     const here = notes.filter((n) => n.lifecycle === lifecycle);
@@ -154,7 +154,7 @@ if (import.meta.main) {
   const catalog = catalogOf(notes);
   const file = resolve(agentNoteRoot, CATALOG);
   if (write) writeFileSync(file, catalog);
-  else if (!existsSync(file) || readFileSync(file, "utf8") !== catalog) errors.push(`${CATALOG}: out of date; run \`pnpm run notes:catalog\``);
+  else if (!existsSync(file) || readFileSync(file, "utf8") !== catalog) errors.push(`${CATALOG}: out of date; run \`vp run notes:catalog\``);
   const all = [...errors, ...notes.flatMap(checkAgentNote)];
   for (const e of all) console.error(`agent notes: ${e}`);
   if (all.length > 0) process.exit(1);

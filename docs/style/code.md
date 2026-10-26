@@ -4,7 +4,7 @@
 
 ## 格式
 
-- 格式交给 oxfmt（`bun run check:fix`，160 列，设置在根目录 `vite.config.ts`），lint 交给 oxlint（`bun run check`），不手调；Markdown 不排，表格照写成 `|---|`。
+- 格式交给 oxfmt（`vp check --fix`，160 列，设置在根目录 `vite.config.ts`），lint 交给 oxlint（`vp check`），不手调；Markdown 不排，表格照写成 `|---|`。
 - 工具管不到的（命名、文件里的先后、错误怎么说）照周围的代码。
 
 ## 叫法

@@ -1,5 +1,5 @@
 // The orchestrator's evals on the real model, and so never in the default run: VIBEVALLEY_EVALS_LIVE=1 with DEEPSEEK_API_KEY
-// (npm run evals), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
+// (vp run evals in apps/server), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
 
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";

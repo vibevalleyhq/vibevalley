@@ -12,7 +12,7 @@
 
 ## 准备
 
-1. `bun run web:check`（类型、构建出 `apps/web/dist`，沙箱提供的就是它）。
+1. `vp run web:check`（类型、构建出 `apps/web/dist`，沙箱提供的就是它）。
 
 ## 步骤
 
@@ -33,7 +33,7 @@
    - 带 id 的详情页（`/issues/<id>`、`/agents/<id>`）用子命令里刚造出来的 id。
 3. 打开截图，对照改动检查内容、用语、溢出和重叠。空状态只能证明空状态，不能代替列表、卡片和详情的验收。
 4. 要点开、拖动、输入以后的样子，在 `apps/web/test` 里写一个 Playwright 测试（它对着同样隔离的服务端），用 `page.screenshot` 留图。
-5. 改了代码，重新 `bun run --filter vibevalley-web build`，再跑同一条命令。
+5. 改了代码，重新 `vp run --filter vibevalley-web build`，再跑同一条命令。
 
 ## 证据
 

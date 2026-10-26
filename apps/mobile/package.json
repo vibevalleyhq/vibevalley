@@ -4,9 +4,7 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
-    "check": "tsc --noEmit",
-    "test": "vp test run"
+    "start": "expo start"
   },
   "dependencies": {
     "@vibevalley/host": "workspace:*",

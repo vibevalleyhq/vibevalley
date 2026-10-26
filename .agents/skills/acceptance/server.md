@@ -13,8 +13,8 @@
 
 ## 准备
 
-1. `bun run server:check`。
-2. 改了查询或表结构，先 `cd apps/server && npm run db:generate`；改了接口，先 `bun run capabilities`。
+1. `vp run server:check`。
+2. 改了查询或表结构，先 `vp run --filter vibevalley-server db:generate`；改了接口，先 `vp run capabilities`。
 
 ## 步骤
 
@@ -58,7 +58,7 @@
 ## 出错时
 
 - **`issue run` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
-- **表结构对不上**：`db/generated` 不是最新的，`cd apps/server && npm run db:generate`。
+- **表结构对不上**：`db/generated` 不是最新的，`vp run --filter vibevalley-server db:generate`。
 
 ## 收拾
 

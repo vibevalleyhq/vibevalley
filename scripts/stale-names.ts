@@ -1,6 +1,6 @@
 /**
  * Names the code has moved past, looked for where they must not come back: the server's code, the page's and the
- * shapes'. Run as part of `pnpm run docs:verify`; a hit names the file, the line, and what to say instead.
+ * shapes'. Run as part of `vp run docs:verify`; a hit names the file, the line, and what to say instead.
  *
  * A name belongs here when renaming it was a decision (a note says why), not when the old word still means something:
  * `t.Helper`, the farm's helpers on screen and the game's harvest are not stale; an issue's state in farm words is.

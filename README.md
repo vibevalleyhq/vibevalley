@@ -66,15 +66,15 @@ flowchart LR
 - macOS（Apple 芯片）。macOS 应用是主要的形态，单独跑的服务端也能用浏览器打开；手机版正在换成新的壳，暂时用不了。
 - 至少一个装好并登录的编码 agent：[pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex](https://github.com/openai/codex)。VibeValley 也自带一个农机，只要 DeepSeek 的钥匙。
 - 一把 [DeepSeek](https://platform.deepseek.com/) 的 API 钥匙，管家要用。
-- 构建要 Bun 1.4 和 Node 24。
+- 构建要 Node 24 和 [Vite+](https://viteplus.dev)（`vp`，它带着 pnpm）。
 - 可选：[Agora](https://www.agora.io/) 的凭据（用来语音），以及微信、飞书或 QQ 的机器人（从外面派活）。
 
 ### 打一个 macOS 应用
 
 ```bash
 git clone https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley
-bun install
-bun run package:mac                 # 打出 apps/desktop/dist 里的 VibeValley.app 和 .dmg
+vp install
+vp run package:mac                  # 打出 apps/desktop/dist 里的 VibeValley.app 和 .dmg
 open apps/desktop/dist/mac-arm64/VibeValley.app
 ```
 
@@ -85,8 +85,8 @@ open apps/desktop/dist/mac-arm64/VibeValley.app
 ### 或者分开跑（开发时）
 
 ```bash
-bun install && bun run --filter vibevalley-web build    # 页面
-cd apps/server && npm start -- --web ../web/dist      # 服务端，127.0.0.1:8787，浏览器打开它
+vp install && vp run --filter vibevalley-web build      # 页面
+vp run --filter vibevalley-server start --web ../web/dist   # 服务端，127.0.0.1:8787，浏览器打开它
 ```
 
 数据同样在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙在「设置」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进 `$VIBEVALLEY_HOME/vibevalley.yaml`（或 `--config` 给的文件）和相应的环境变量。设置里的钥匙优先，详见[设置和配置](docs/subsystems/setting.md)。

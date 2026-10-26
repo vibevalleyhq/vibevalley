@@ -8,10 +8,6 @@
     "./schema": "./src/schema.ts",
     "./api": "./src/api.ts"
   },
-  "scripts": {
-    "check": "tsc --noEmit",
-    "test": "vp test run"
-  },
   "dependencies": {
     "effect": "catalog:"
   },

@@ -30,7 +30,7 @@
 - **改代码的同一个改动里改文档**：受影响的参考文档、包 README 和注释一起改；改了决策就改它的 Note（[什么时候写](.agents/notes/README.md#什么时候写)）。
 - **用农场的叫法**（[用语表](docs/README.md#用语)）；代码名第一次出现时加上。
 - **直接写**：说清是谁、做什么、什么时候、出错怎样。不写推理过程，不复述代码。
-- **链接从仓库根写**：`[工单](docs/subsystems/issue.md)`，不写 `../`、`./`，也不以 `/` 开头（读起来像磁盘上的绝对路径）；一个文件不管从哪链过去都是同一个写法，挪了它搜一个字符串就能改完。`bun run docs:verify` 拒绝别的写法，并检查它们都能打开。
+- **链接从仓库根写**：`[工单](docs/subsystems/issue.md)`，不写 `../`、`./`，也不以 `/` 开头（读起来像磁盘上的绝对路径）；一个文件不管从哪链过去都是同一个写法，挪了它搜一个字符串就能改完。`vp run docs:verify` 拒绝别的写法，并检查它们都能打开。
 - **怎么写**照 [style/writing.md](docs/style/writing.md)：用中文写，结论和证据在前，一件事只写在一处，用用语表里的词。
 
 ## 检查清单
@@ -47,7 +47,7 @@
 ## 检查命令
 
 ```bash
-bun run notes:verify    # Agent Notes 的目录、文件名、格式，CATALOG.md 是否最新
-bun run notes:catalog   # 加、挪、删 Note 或改了标题以后：重写 CATALOG.md
-bun run docs:verify     # 文档地图覆盖，加上所有 Markdown 里的链接（从仓库根写）
+vp run notes:verify     # Agent Notes 的目录、文件名、格式，CATALOG.md 是否最新
+vp run notes:catalog    # 加、挪、删 Note 或改了标题以后：重写 CATALOG.md
+vp run docs:verify      # 文档地图覆盖，加上所有 Markdown 里的链接（从仓库根写）
 ```

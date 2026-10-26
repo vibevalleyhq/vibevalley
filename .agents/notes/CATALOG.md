@@ -1,6 +1,6 @@
 # Agent Notes 目录
 
-由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `pnpm run notes:catalog`，过期了 `pnpm run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
+由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
 ## proposed（22 篇）
 
