@@ -185,6 +185,19 @@ jobs:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
+  # The island at the notch (apps/island) is Swift, built and tested on macOS: the desktop job above runs on Linux, where
+  # the app goes without it.
+  island:
+    name: island
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      # No job pushes, so the token is not left in the checkout's git config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: swift test --package-path apps/island
+      - run: swift build -c release --package-path apps/island
+
   site:
     name: site
     runs-on: ubuntu-latest
