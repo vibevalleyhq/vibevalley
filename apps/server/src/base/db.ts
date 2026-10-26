@@ -34,6 +34,35 @@ export function setAsideStale(where: string, hash: string, now = Date.now()): st
  * baseline ran: making one from scratch is most of a test's setup. */
 let memoryBase: Promise<Blob> | undefined;
 
+/** In memory, a database given back is emptied and kept for the next farm: making a PGlite from the copy above takes
+ * about 110 ms, emptying one about 13 ms. Each farm open at the same time has its own. Only one whose schema is still
+ * the baseline's is kept (tests add triggers, drop or rename tables to make writes fail); any other is closed. The
+ * migrations' own table is not emptied: a kept database has the baseline already. */
+const spare: PGlite[] = [];
+let baselineShape: string | undefined;
+let emptyAll: string | undefined;
+const shapeOf = async (pglite: PGlite) =>
+  (
+    await pglite.query<{ shape: string }>(`SELECT
+      (SELECT string_agg(table_name || '.' || column_name || ':' || data_type, ',' ORDER BY table_name, column_name)
+         FROM information_schema.columns WHERE table_schema = 'public')
+      || '|' || (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal)
+      || '|' || (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public')
+      || '|' || (SELECT count(*) FROM pg_indexes WHERE schemaname = 'public') AS shape`)
+  ).rows[0]!.shape;
+/** Empties a database given back and keeps it, or closes it when its schema was changed. */
+const giveBack = async (pglite: PGlite) => {
+  if (baselineShape === undefined || (await shapeOf(pglite)) !== baselineShape) return pglite.close();
+  if (emptyAll === undefined) {
+    const tables = await pglite.query<{ name: string }>(
+      "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'effect_sql_migrations'",
+    );
+    emptyAll = `TRUNCATE ${tables.rows.map((t) => `"${t.name}"`).join(", ")} RESTART IDENTITY CASCADE`;
+  }
+  await pglite.exec(emptyAll);
+  spare.push(pglite);
+};
+
 const migrate = (pglite: PGlite, client: SqlClient.SqlClient) =>
   PgliteMigrator.run({
     loader: PgliteMigrator.fromRecord({ "1_schema": Effect.promise(() => pglite.exec(baselineSql())).pipe(Effect.asVoid) }),
@@ -51,12 +80,14 @@ export const Database = PgliteClient.layerFrom(
       if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
     }
     const base = memory ? memoryBase : undefined;
+    const kept = memory ? spare.pop() : undefined;
     const pglite = yield* Effect.acquireRelease(
-      Effect.promise(async () => (memory ? PGlite.create(base ? { loadDataDir: await base } : undefined) : PGlite.create(where))),
-      (db) => Effect.promise(() => db.close()),
+      Effect.promise(async () => kept ?? (memory ? PGlite.create(base ? { loadDataDir: await base } : undefined) : PGlite.create(where))),
+      (db) => Effect.promise(() => (memory ? giveBack(db) : db.close())),
     );
     const client = yield* PgliteClient.fromClient({ liveClient: pglite });
-    yield* migrate(pglite, client);
+    if (!kept) yield* migrate(pglite, client);
+    if (memory && baselineShape === undefined) baselineShape = yield* Effect.promise(() => shapeOf(pglite));
     // Taken before anyone writes: the copy is the baseline alone.
     if (memory && !base) memoryBase ??= Promise.resolve(yield* Effect.promise(() => pglite.dumpDataDir("none")));
     if (!memory) writeFileSync(where + ".schema", hash + "\n");
