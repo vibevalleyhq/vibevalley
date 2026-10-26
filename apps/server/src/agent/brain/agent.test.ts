@@ -14,6 +14,7 @@ import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
 import { objectSchema, stopped, textTool } from "./tool.ts";
 import { timeHere, wallTime } from "../../base/time.ts";
+import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -38,7 +39,6 @@ const said = (messages: readonly AgentMessage[]) => messages.map((m) => m.role +
 const summarizing = (r: { messages: Request["messages"] }) => lastUser(r) === summaryInPlace;
 const prefixChanges = (r: Rig) => r.events.flatMap((e) => (e.type === "prefix_changed" ? [e.parts.join(",")] : []));
 const settled = (r: Rig) => r.events.find((e) => e.type === "agent_settled") as { run: { aborted: boolean } } | undefined;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
@@ -76,7 +76,8 @@ describe("the agent", () => {
         void second.then(() => {
           done = true;
         });
-        await sleep(10);
+        // A close that did not wait for the gate would have ended by the next turn.
+        await nextTurn();
         expect(done).toBe(false);
         release();
         await Promise.all([first, second]);
@@ -137,11 +138,18 @@ describe("the agent", () => {
 
   it("steers with send and waits with later", async () => {
     const dir = home();
+    // The nap lasts until the test has said its two lines: they come while the tool runs.
+    const wake = gate();
+    let napping = false;
     const nap = textTool<object>({
       name: "nap",
       description: "睡一会",
       parameters: objectSchema(),
-      run: async () => (await sleep(40), "醒了"),
+      run: async () => {
+        napping = true;
+        await wake.opened;
+        return "醒了";
+      },
     });
     await withAgent(
       dir,
@@ -152,9 +160,10 @@ describe("the agent", () => {
       ],
       async (r) => {
         r.agent.send(userMessage("开始", wallTime.now()));
-        await sleep(10);
+        await until(() => napping);
         r.agent.later(userMessage("完了再说这个", wallTime.now()));
         r.agent.send(userMessage("顺便", wallTime.now()));
+        wake.open();
         await until(() => r.agent.history().length >= 7);
         expect(said(r.agent.history())).toEqual([
           "user:开始",
@@ -244,7 +253,8 @@ describe("the agent", () => {
       parameters: objectSchema(),
       run: async () => {
         most = Math.max(most, ++running);
-        await sleep(30);
+        // Each waits for the other: side by side they both get here, one after the other they never would.
+        await whenTrue(() => most >= 2, "both helpers napping at once");
         running--;
         return "醒了";
       },
@@ -486,7 +496,7 @@ describe("the agent", () => {
         async (r) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await until(() => asked > 0);
-          await sleep(50);
+          await r.agent.core.waitForIdle();
           expect(asked).toBe(1);
           expect(r.requests.length).toBe(3);
           expect(r.agent.history()[0]!.role).toBe("user");
@@ -554,7 +564,7 @@ describe("the agent", () => {
         await withAgent(dir, [step((c) => fauxAssistantMessage(JSON.stringify(results(c))))], async (r) => {
           expect(r.agent.resume(30 * 60_000)).toBe(resumed);
           if (!resumed) {
-            await sleep(20);
+            // Not resumed: nothing was started to wait for.
             expect(r.requests.length).toBe(0);
             return;
           }

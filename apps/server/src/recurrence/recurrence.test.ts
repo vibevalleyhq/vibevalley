@@ -10,6 +10,7 @@ import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { testConfig } from "../testing/layers.ts";
+import { aTurn } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { afterRun, dueRecurrences, isMissed, needsOK } from "./rules.ts";
 import { type Due, Recurrences } from "./recurrence.ts";
@@ -69,7 +70,8 @@ const collect = Effect.gen(function* () {
   return got;
 });
 
-const drained = Effect.sleep(50);
+/** What a tick makes due is published before the tick returns: a turn lets the collecting fiber take it. */
+const drained = aTurn;
 
 const req = (name: string, text: string, when: RecurrenceWhen, more: Partial<RecurrenceRequest> = {}): RecurrenceRequest => ({ name, text, when, ...more });
 

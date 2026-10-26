@@ -83,7 +83,7 @@ describe("the game", () => {
   it.live("counts the owner's review and call", () =>
     Effect.gen(function* () {
       const core = yield* Core;
-      yield* Effect.sleep(10);
+      // The game hears the owner from its start: Core.owner is subscribed before the game's layer is built.
       yield* core.did({ kind: "reviewed", session: sessionId("w1") });
       yield* core.did({ kind: "talked" });
       yield* until(kinds, (k) => [...k].sort().join() === "reviewed,voice", "both");
@@ -118,7 +118,6 @@ describe("the game", () => {
           return h ? playOf(h).station : -2;
         });
       const arriving = { _tag: "arriving" } as Session["phase"];
-      yield* Effect.sleep(10);
       game.want(4);
       yield* core.apply({ type: "hired", session: helper("w1", arriving) });
       yield* until(stationOf("w1"), (s) => s === 4, "w1 on station 4");

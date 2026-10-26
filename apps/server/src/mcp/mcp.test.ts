@@ -11,7 +11,7 @@ import { Issues } from "../issue/issue.ts";
 import { Memories } from "../memory/memory.ts";
 import { world } from "../testing/world.ts";
 import { Mcp } from "./mcp.ts";
-import { until } from "../testing/until.ts";
+import { until, waitFor } from "../testing/until.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
@@ -78,13 +78,7 @@ describe("mcp", () => {
       const got = yield* issues.hire(lab(), "写 hello", "chat-j");
       const id = got.session!.id;
       yield* until(() => tokens.length > 0, "the session's token");
-      let thread: string | undefined;
-      yield* Effect.promise(async () => {
-        for (let i = 0; i < 500 && !thread; i++) {
-          thread = await Effect.runPromise(chat.jobThread(id));
-          if (!thread) await new Promise((r) => setTimeout(r, 10));
-        }
-      });
+      const thread = yield* waitFor(chat.jobThread(id), (t) => t !== undefined, "the session's thread");
       const c = client(mcp, tokens[0]!);
       yield* Effect.promise(c.init);
       expect((yield* Effect.promise(c.list)).sort()).toEqual([

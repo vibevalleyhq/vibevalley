@@ -5,6 +5,7 @@ import { SqlClient } from "effect/sql";
 import { Database, DbLayer } from "../base/db.ts";
 import { Settings, type Config } from "../base/config.ts";
 import { testConfig } from "../testing/layers.ts";
+import { waitFor, whenTrue } from "../testing/until.ts";
 import { make } from "./doc.ts";
 import { demoPieces, demoScript } from "./demo.ts";
 import { plain } from "./text.ts";
@@ -20,11 +21,7 @@ const texts = (blocks: { text: { t: string }[] }[]) => blocks.map((b) => plain(b
 
 const helpers = (...list: [string, boolean][]) => list.map(([id, enabled]) => ({ id, enabled }) as Agent);
 
-const finished = (s: Service) =>
-  Effect.promise(async () => {
-    for (let i = 0; i < 2000 && s.demoRunning(); i++) await new Promise((r) => setTimeout(r, 5));
-    expect(s.demoRunning()).toBe(false);
-  });
+const finished = (s: Service) => Effect.promise(() => whenTrue(() => !s.demoRunning(), "the demo finished", 10_000));
 
 describe("doc", () => {
   it.live("what one person writes is there after the server starts again", () => {
@@ -172,16 +169,15 @@ describe("doc", () => {
         const s = yield* make({ tickMs: 20 });
         const id = (yield* s.create("演示")).doc.id;
         yield* s.demo(id, helpers(["backend", true]));
-        let taken = "";
-        for (let i = 0; i < 500 && !taken; i++) {
+        // The owner takes the second block over once the demo has written it twice: asked again until it holds.
+        const tryTaking = Effect.gen(function* () {
           const snap = yield* s.get(id);
           const b = snap.blocks[1];
-          if (snap.blocks.length === 2 && b && b.rev >= 2) {
-            const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
-            if (ack.results[0]!.status === "applied") taken = b.id;
-          }
-          if (!taken) yield* Effect.sleep(2);
-        }
+          if (snap.blocks.length !== 2 || !b || b.rev < 2) return "";
+          const ack = yield* submit(s, id, "owner", { op: "update_text", blockId: b.id, baseRev: b.rev, text: [span("主人接手了")] });
+          return ack.results[0]!.status === "applied" ? b.id : "";
+        });
+        const taken = yield* waitFor(tryTaking, (t) => t !== "", "the owner taking the block over");
         expect(taken).not.toBe("");
         yield* finished(s);
         const snap = yield* s.get(id);

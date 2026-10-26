@@ -270,6 +270,8 @@ describe("Nowledge Mem", () => {
       yield* save({ kind: "nowledge", url, enabled: true, read: true, write: false, everything: true });
       expect((yield* m.search(q)).found.map((f) => f.text)).toEqual(["主人的偏好：测试要写成可观察的结果"]);
       yield* m.write({ agent: "lab", text: "不写进去", project: "", by: "owner" });
+      // A write would go out in the background; nothing to wait on shows that none does.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(50);
       expect(fake.adds).toEqual([]);
     }).pipe(Effect.provide(world())),
@@ -403,6 +405,8 @@ describe("EverOS", () => {
       yield* m.endSession({ agent: "lab", session: "w1", project: "demo" });
       yield* m.endSession({ agent: "lab", session: "w2", project: "demo" });
       yield* until(() => fake.seen("flush").length === 1);
+      // The second session has nothing to flush; nothing to wait on shows it does not.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(50);
       const flushes = fake.seen("flush");
       expect(flushes).toHaveLength(1);

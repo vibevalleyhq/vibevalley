@@ -362,13 +362,7 @@ describe("voice", () => {
       capture.before = undefined;
       release();
       yield* Fiber.join(interrupting);
-      yield* Effect.promise(async () => {
-        for (let i = 0; i < 300; i++) {
-          if (capture.urls.some((url) => url.includes("/agents/parity-agent/leave"))) return;
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        throw new Error("the late agent was not stopped");
-      });
+      yield* until(() => capture.urls.some((url) => url.includes("/agents/parity-agent/leave")), "the late agent stopped");
       expect(voice.lines()).toBe(0);
       expect(yield* Effect.flip(voice.start(grant.channel, grant.uid))).toMatchObject({
         _tag: "VoiceUnavailable",
@@ -428,14 +422,8 @@ describe("voice", () => {
         summary: "做完了",
         runs: 1,
       });
-      const at = yield* Effect.promise(async () => {
-        for (let i = 0; i < 300; i++) {
-          const found = capture.urls.findIndex((u) => u.endsWith(`/agents/${call.agentId}/speak`));
-          if (found >= 0) return found;
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        throw new Error("never spoken");
-      });
+      yield* until(() => capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`)), "spoken");
+      const at = capture.urls.findIndex((u) => u.endsWith(`/agents/${call.agentId}/speak`));
       const spoken = capture.requests[at]!;
       expect(spoken).toMatchObject({ priority: "APPEND", interruptable: true });
       // Agora answers 401 to a speak without the session's ConvoAI token: it once went out bare and was never heard.
@@ -454,13 +442,7 @@ describe("voice", () => {
       const call = yield* voice.start(grant.channel, grant.uid, "#41「写打卡」交回来了，等你验收");
       const llm = (capture.requests[0]!.properties as Record<string, Record<string, unknown>>).llm!;
       expect(llm.greeting_message ?? "").toBe("");
-      yield* Effect.promise(async () => {
-        for (let i = 0; i < 300; i++) {
-          if (capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`))) return;
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        throw new Error("never spoken");
-      });
+      yield* until(() => capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`)), "spoken");
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
 
@@ -495,10 +477,10 @@ describe("voice", () => {
         runs: 1,
       });
       const speaks = () => capture.urls.filter((u) => u.endsWith(`/agents/${call.agentId}/speak`)).length;
-      yield* Effect.promise(async () => {
-        for (let i = 0; i < 300 && speaks() === 0; i++) await new Promise((r) => setTimeout(r, 10));
-        await new Promise((r) => setTimeout(r, 300));
-      });
+      yield* until(() => speaks() > 0, "spoken");
+      // Both reports were gathered into that one answer; nothing to wait on shows no second one follows.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
+      yield* Effect.sleep(300);
       expect(speaks()).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
   });
@@ -527,7 +509,6 @@ describe("voice", () => {
         runs: 1,
       });
       yield* until(() => asks === 1, "the failed brief");
-      yield* Effect.sleep(50);
       yield* core.apply({ type: "hired", session: helperOn("w2", "t2") });
       yield* core.apply({ type: "issue", issue: issueOf("t2", 42, "w2") });
       yield* core.apply({
@@ -580,7 +561,7 @@ describe("voice", () => {
       yield* until(() => asked === 1, "the pending brief");
       yield* Scope.close(scope, Exit.void);
       expect(cancelled).toBe(true);
-      yield* Effect.sleep(50);
+      // Closed: nothing of the voice runs any more to speak.
       expect(capture.urls.some((u) => u.endsWith(`/agents/${call.agentId}/speak`))).toBe(false);
     }).pipe(Effect.scoped);
   });
@@ -620,6 +601,8 @@ describe("voice", () => {
       yield* Effect.promise(() => first);
       yield* voice.stop(call.agentId);
       release();
+      // The held piece went out; nothing to wait on shows that no later piece does.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(80);
       expect(speaks()).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(farm(capture, async () => "这一句要分很多段念。".repeat(40))));

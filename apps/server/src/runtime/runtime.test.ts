@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineRuntime, type InstallationSnapshot, RuntimeRegistry } from "@botiverse/oar";
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import type { AccountUsage, Agent, LiveEvent, RuntimeInfo } from "@vibevalley/protocol";
+import type { AccountUsage, Agent, RuntimeInfo, SideEvent } from "@vibevalley/protocol";
 import { factsOf, presetOf, runtimeIds } from "../agent/seed.ts";
 import { Effect, Layer, Stream } from "effect";
 import { Agents, layer as agentLayer } from "../agent/agent.ts";
@@ -13,6 +13,7 @@ import { type Config, Settings } from "../base/config.ts";
 import { Core, layer as coreLayer } from "../core/core.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { testConfig } from "../testing/layers.ts";
+import { nextTurn, whenTrue } from "../testing/until.ts";
 import { piBalance } from "./pi.ts";
 import { inCny, price } from "./price.ts";
 import { make, type RuntimeOptions, usable } from "./runtime.ts";
@@ -57,10 +58,7 @@ const deferred = <T>() => {
   return { promise, resolve, reject };
 };
 
-const until = async (ok: () => boolean) => {
-  for (let i = 0; i < 500 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
-  expect(ok()).toBe(true);
-};
+const until = (ok: () => boolean) => whenTrue(ok, "it");
 
 const servers: Server[] = [];
 const dirs: string[] = [];
@@ -218,22 +216,25 @@ describe("runtime", () => {
 
   it.live("a failed list probe is retried without changing the synchronous checking answer", () => {
     const first = deferred<RuntimeInfo>();
+    const second = deferred<RuntimeInfo>();
     let probes = 0;
     return Effect.gen(function* () {
       const r = yield* runtimes({
         probe: (id) => {
           if (id !== "pi") return notFound(id);
           probes++;
-          return probes === 1 ? first.promise : notFound(id);
+          return probes === 1 ? first.promise : second.promise;
         },
       });
       const pi = () => r.list().find((info) => info.id === "pi")!;
       expect(pi().installation.status).toBe("checking");
       yield* Effect.promise(() => until(() => probes === 1));
       first.reject(new Error("first probe failed"));
-      yield* Effect.sleep(20);
+      // Asked again, the list tries again, and says checking until the second read answers.
+      yield* Effect.promise(() => until(() => pi().installation.status === "checking" && probes === 2));
       expect(pi().installation.status).toBe("checking");
-      yield* Effect.promise(() => until(() => probes === 2 && pi().installation.status === "not_found"));
+      second.resolve(yield* Effect.promise(() => notFound("pi")));
+      yield* Effect.promise(() => until(() => pi().installation.status === "not_found"));
       expect(probes).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
@@ -260,10 +261,10 @@ describe("runtime", () => {
       old.reject(new Error("old probe failed"));
       expect(yield* Effect.promise(() => oldResult)).toMatchObject({ status: "rejected" });
       expect(r.list().find((info) => info.id === "pi")!.installation.status).toBe("checking");
-      yield* Effect.sleep(20);
-      expect(probes).toBe(2);
       latest.resolve(yield* Effect.promise(() => notFound("pi")));
       expect((yield* Effect.promise(() => latestResult))!.installation.status).toBe("not_found");
+      // The old read's failure started no read of its own.
+      expect(probes).toBe(2);
     }).pipe(Effect.scoped, Effect.provide(world()));
   });
 
@@ -500,7 +501,7 @@ describe("runtime", () => {
       fake("pi", {
         installation: async () => {
           const bin = process.env.OAR_PI_BIN;
-          await new Promise((r) => setTimeout(r, 5));
+          await nextTurn();
           return { kind: "available", via: "executable", command: bin ?? "none" } as const;
         },
       }),
@@ -610,9 +611,9 @@ describe("runtime", () => {
       const got = yield* r.resolve(a);
       expect([got.runtime.id, got.model, got.effort, got.env]).toEqual(["pi", "known", "default-effort", { base: "kept", override: "profile" }]);
       const core = yield* Core;
-      const notices: LiveEvent[] = [];
-      yield* Effect.forkScoped(Stream.runForEach(core.live, (e) => Effect.sync(() => notices.push(e))));
-      yield* Effect.sleep(10);
+      const notices: SideEvent[] = [];
+      // Subscribed before it returns: no wait for the reader to start.
+      yield* Effect.forkScoped(Stream.runForEach(yield* core.subscribe, (e) => Effect.sync(() => notices.push(e))));
       const fallback = yield* r.resolve({ ...a, model: "unknown", effort: "profile-effort" });
       expect([fallback.model, fallback.effort]).toEqual(["", "profile-effort"]);
       yield* Effect.promise(() => until(() => notices.some((e) => e.type === "notice")));

@@ -102,3 +102,9 @@ export const gate = () => {
   const opened = new Promise<void>((resolve) => (open = resolve));
   return { opened, open: () => open() };
 };
+
+/** One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already
+ * resolved) has run. For "nothing came of it" when what could have come would have been set going already; it is not a
+ * wait for time. */
+export const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));
+export const aTurn = Effect.promise(nextTurn);

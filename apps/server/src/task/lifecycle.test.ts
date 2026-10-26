@@ -113,7 +113,8 @@ describe("a task's workplace", () => {
       expect(continuing.kind).toBe("run");
       yield* until(() => sessions.sessionOf(other.id)?.phase._tag === "working", "the other session working during acceptance");
       expect(yield* sessions.stop(other.id)).toBe(true);
-      // A delivery can complete here only if acceptance does not own the session.
+      // A delivery can complete here only if acceptance does not own the session: nothing to wait on shows it does not.
+      // oxlint-disable-next-line vibevalley/no-test-sleep
       yield* Effect.sleep(200);
       writeFileSync(release, "release\n");
       yield* until(() => tasks.graphs()[0]?.state === "ready", "the checked step being merged");

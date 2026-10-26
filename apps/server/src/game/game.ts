@@ -120,7 +120,7 @@ export const make = Effect.gen(function* () {
     ),
   );
   yield* Effect.forkScoped(
-    Stream.runForEach(core.owner, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
+    Stream.runForEach(yield* core.owner, (d) => (d.kind === "reviewed" ? record({ kind: "reviewed", session: d.session }) : record({ kind: "voice" }))),
   );
 
   return Game.of({

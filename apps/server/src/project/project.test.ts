@@ -7,6 +7,7 @@ import { Effect, Fiber, Layer } from "effect";
 import { type Config, Settings } from "../base/config.ts";
 import { gitSync, projectsDir, repo, write } from "../testing/git.ts";
 import { testConfig } from "../testing/layers.ts";
+import { untilGot as until } from "../testing/until.ts";
 import { activityOf, countsOf, githubRepository, type GitHubRun, type ProjectHooks, projectProblem, Projects, layer, tokeiArgs } from "./project.ts";
 import { MergeFailure } from "./shapes.ts";
 
@@ -589,7 +590,7 @@ describe("projects", () => {
                 mkdirSync(join(place.cwd, ".vibevalley"));
                 write(join(place.cwd, ".vibevalley/check"), `#!/bin/sh\ntouch '${started}'\nwhile [ ! -f '${release}' ]; do sleep 0.05; done\n`, 0o755);
                 const merging = yield* Effect.forkChild(Effect.result(into ? p.mergeInto(place, target) : p.merge(place)));
-                while (!existsSync(started)) yield* Effect.sleep(20);
+                yield* until(() => existsSync(started), "the check started");
                 yield* p.workplace("demo", 2, true, "").pipe(Effect.timeout(2000));
                 if (changed) gitSync(place.cwd, "commit", "--allow-empty", "-m", "changed during check");
                 writeFileSync(release, "");

@@ -17,7 +17,7 @@ import { testConfig } from "../testing/layers.ts";
 import { world } from "../testing/world.ts";
 import { type LaunchActivity } from "../channel/chat.ts";
 import { Sessions, type SessionsInside, watchStalls } from "./session.ts";
-import { until } from "../testing/until.ts";
+import { until, waitFor } from "../testing/until.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 const lab = (): Agent => ({ ...seedAgents().find((a) => a.id === "lab")!, effort: "" });
@@ -243,7 +243,6 @@ describe("sessions", () => {
       const core = yield* Core;
       const seen: LaunchActivity[] = [];
       const following = yield* Effect.forkScoped(Stream.runForEach(yield* sessions.launches, (a) => Effect.sync(() => seen.push(a))));
-      yield* Effect.sleep(5);
 
       const hired = yield* sessions.send(lab(), "给打卡接口加分页", "demo", { issue: { id: issueId("i1"), number: 1 }, worktree: true });
       const id = hired.session!.id;
@@ -263,11 +262,7 @@ describe("sessions", () => {
         expect.arrayContaining(["run/start", "user/message", "tool/call", "tool/result", "assistant/message", "run/end"]),
       );
       // The run's end is written just after the report's fact.
-      let runs = yield* sessions.runs("i1");
-      for (let i = 0; i < 100 && runs[0]?.outcome === undefined; i++) {
-        yield* Effect.sleep(10);
-        runs = yield* sessions.runs("i1");
-      }
+      const runs = yield* waitFor(sessions.runs("i1"), (rs) => rs[0]?.outcome !== undefined, "the run's end written");
       expect(runs.map((r) => [r.triggeredBy.kind, r.outcome])).toEqual([["issue", "completed"]]);
       expect((sessions as SessionsInside).currentRun(id)).toBe("");
 
