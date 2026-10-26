@@ -70,7 +70,8 @@ const scopeOf = (project: string) => (project ? "project-" + createHash("sha256"
 const sessionOf = (session: string) => `${app}-${session}`;
 const agentOf = (agent: string) => `${app}-${agent}`;
 
-export function everos(c: MemorySourceConfig): Source {
+/** now: the memory service's Clock, for the times the messages it writes carry. */
+export function everos(c: MemorySourceConfig, now: () => number): Source {
   let closed = false;
   const life = new AbortController();
   const user = c.user || "owner";
@@ -184,12 +185,12 @@ export function everos(c: MemorySourceConfig): Source {
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: async (run, signal) => {
       if (!c.write || run.outcome === "interrupted") return;
-      const now = Date.now();
+      const at = now();
       const messages: Message[] = [];
-      if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: now, content: run.job });
+      if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
       let said = run.said.trim() === "" ? run.summary : run.said;
       if (run.outcome === "failed") said = "（这一轮没做成）" + said;
-      if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: now, content: said });
+      if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
       if (messages.length === 0) return;
       await add(sessionOf(run.session), run.project, messages, signal);
       told.add(run.session);
@@ -206,13 +207,13 @@ export function everos(c: MemorySourceConfig): Source {
       if (!c.write) return undefined;
       const session = `vibevalley-note-${n.agent}-${newId()}`;
       const project = n.project.trim();
-      const now = Date.now();
+      const at = now();
       await add(
         session,
         project,
         [
-          { sender_id: user, role: "user", timestamp: now, content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}` },
-          { sender_id: agentOf(n.agent), role: "assistant", timestamp: now, content: `记下了：${n.text}` },
+          { sender_id: user, role: "user", timestamp: at, content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}` },
+          { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: `记下了：${n.text}` },
         ],
         signal,
       );

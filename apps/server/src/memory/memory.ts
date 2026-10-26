@@ -35,6 +35,7 @@ import {
   sourceLabels,
 } from "./recall.ts";
 import { type EndedSession, interleave, localSource, mergeRecalled, type Source, Sources } from "./sources.ts";
+import { timeHere } from "../base/time.ts";
 
 export type { EndedSession, FinishedRun, Found, Note, RecallCue, SearchQuery, SearchResult };
 export { foundText };
@@ -90,9 +91,10 @@ const lineMemory = (line: MemoryLine, fileTime: number): Memory => {
 };
 
 /** Which outside source a configured one is; tests put their own. */
-export type BuildSource = (c: Parameters<typeof nowledge>[0]) => Source | undefined;
+/** now: the memory service's Clock. */
+export type BuildSource = (c: Parameters<typeof nowledge>[0], now: () => number) => Source | undefined;
 
-const defaultBuild: BuildSource = (c) => (c.kind === "nowledge" ? nowledge(c) : c.kind === "everos" ? everos(c) : undefined);
+const defaultBuild: BuildSource = (c, now) => (c.kind === "nowledge" ? nowledge(c, now) : c.kind === "everos" ? everos(c, now) : undefined);
 
 export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
   Effect.gen(function* () {
@@ -104,10 +106,11 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
     const run = yield* FiberSet.makeRuntimePromise<never>();
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const log = (line: string) => void forkHere(Effect.logWarning(line));
+    const time = yield* timeHere;
     const sources = new Sources(
-      localSource(local, () => agents.agents().map((a) => a.id), run),
+      localSource(local, () => agents.agents().map((a) => a.id), run, time.now),
       setting.memorySources,
-      build,
+      (c) => build(c, time.now),
       log,
       timeoutMs,
     );

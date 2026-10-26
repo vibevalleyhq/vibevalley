@@ -16,6 +16,7 @@ import { foundText, Memories, make } from "./memory.ts";
 import { localName } from "./recall.ts";
 import { nowledge, nowledgeLabels } from "./nowledge.ts";
 import { until } from "../testing/until.ts";
+import { wallTime } from "../base/time.ts";
 
 /** How EverOS names a farm project's scope (everos.ts): ASCII, and never the same as global. */
 const everosProject = (project: string) => "project-" + createHash("sha256").update(project).digest("hex");
@@ -305,7 +306,7 @@ describe("EverOS", () => {
   it.live("a memory_add answer that does not read is a failure, while one without an id is a note already there", () =>
     Effect.gen(function* () {
       const fake = new FakeNowledge();
-      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true });
+      const source = nowledge({ kind: "nowledge", url: yield* Effect.promise(() => fake.serve()), enabled: true, read: false, write: true }, wallTime.now);
       const note = { agent: "lab", text: "记住：苹果", project: "", by: "agent" as const };
       fake.addResult = { title: "已经有了" };
       expect((yield* Effect.promise(() => source.add(note, new AbortController().signal)))?.id).toBe("");

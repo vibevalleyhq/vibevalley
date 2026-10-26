@@ -4,6 +4,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Schema } from "effect";
 import { sleep } from "./wait.ts";
+import { wallTime } from "../base/time.ts";
 
 /** A confirmed login may name another host for its account. */
 export const baseUrl = "https://ilinkai.weixin.qq.com";
@@ -250,7 +251,7 @@ export class WeixinClient implements WeixinApi {
           break;
         case "need_verifycode":
           progress("verify", show);
-          await sleep(1_000, attempt);
+          await sleep(wallTime, 1_000, attempt);
           break;
         case "scaned_but_redirect":
           if ("redirect_host" in status && status.redirect_host) base = "https://" + status.redirect_host;

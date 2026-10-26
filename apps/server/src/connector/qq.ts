@@ -2,6 +2,7 @@
 // message id, which QQ honours only for a while.
 
 import { Schema } from "effect";
+import { wallTime } from "../base/time.ts";
 
 const apiBase = "https://api.sgroup.qq.com";
 const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
@@ -67,7 +68,8 @@ export class QQClient implements QQApi {
   private async token(signal: AbortSignal, app: App): Promise<string> {
     const key = app.appId + "\u0000" + app.secret;
     const cached = this.tokens.get(key);
-    if (cached && cached.until > Date.now()) return cached.token;
+    // A token lasts as long as QQ said, in real time.
+    if (cached && cached.until > wallTime.now()) return cached.token;
     const timed = AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
     let body: typeof TokenResponse.Type;
     try {
@@ -84,7 +86,7 @@ export class QQClient implements QQApi {
     }
     if (!body.access_token) throw new Error("QQ 鉴权：" + (body.message || "AppID 或 AppSecret 不对"));
     const seconds = typeof body.expires_in === "number" ? body.expires_in : Number.parseFloat(String(body.expires_in ?? "")) || 7200;
-    this.tokens.set(key, { token: body.access_token, until: Date.now() + (seconds - 60) * 1000 });
+    this.tokens.set(key, { token: body.access_token, until: wallTime.now() + (seconds - 60) * 1000 });
     return body.access_token;
   }
 
@@ -115,14 +117,15 @@ export class QQClient implements QQApi {
     const ws = new WebSocket(gateway.url);
     return new Promise((resolve, reject) => {
       let seq: number | null = null;
-      let beat: NodeJS.Timeout | undefined;
+      // The gateway's heartbeat, on the protocol's own (real) time: what stops it.
+      let beat: (() => void) | undefined;
       let done = false;
       const abort = () => end();
       const end = (e?: Error) => {
         if (done) return;
         done = true;
         signal.removeEventListener("abort", abort);
-        if (beat) clearInterval(beat);
+        beat?.();
         ws.close();
         if (e && !signal.aborted) reject(e);
         else resolve();
@@ -155,7 +158,13 @@ export class QQClient implements QQApi {
                   d: { token: "QQBot " + token, intents, shard: [0, 1], properties: {} },
                 });
                 const every = (msg.d as { heartbeat_interval?: number } | undefined)?.heartbeat_interval ?? 0;
-                beat ??= setInterval(() => send({ op: 1, d: seq }), every > 0 ? every : 30_000);
+                const beatEvery = (ms: number) => {
+                  beat = wallTime.after(ms, () => {
+                    send({ op: 1, d: seq });
+                    beatEvery(ms);
+                  });
+                };
+                if (!beat) beatEvery(every > 0 ? every : 30_000);
                 return;
               }
               case 0: {

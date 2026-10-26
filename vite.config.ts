@@ -83,20 +83,6 @@ export default defineConfig({
         rules: { "vibevalley/no-wall-clock": "off" },
       },
       {
-        // Still reading the wall clock on their own: each takes a Time when it is converted, and leaves this list
-        // (.agents/notes/proposed/testing/2026-10-26-fast-testable-server.md, step 7). Nothing is added to it.
-        files: [
-          "apps/server/src/connector/connector.ts",
-          "apps/server/src/connector/qq.ts",
-          "apps/server/src/connector/wait.ts",
-          "apps/server/src/memory/everos.ts",
-          "apps/server/src/memory/nowledge.ts",
-          "apps/server/src/memory/sources.ts",
-          "apps/server/src/voice/voice.ts",
-        ],
-        rules: { "vibevalley/no-wall-clock": "off" },
-      },
-      {
         files: [
           "apps/server/src/cli.ts",
           "apps/server/src/cli/**",
