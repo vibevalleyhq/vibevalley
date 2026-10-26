@@ -4,6 +4,8 @@
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
+import { memoryWording } from "./words.ts";
+import { everosWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Schema } from "effect";
 import { createHash } from "node:crypto";
@@ -146,7 +148,7 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
 
   return {
     name: "everos",
-    unavailable: () => (c.url ? undefined : "没填地址"),
+    unavailable: () => (c.url ? undefined : memoryWording().noUrl),
     // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
     stop: async () => {
       if (closed) return;
@@ -169,8 +171,8 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: async (q, signal) => {
       if (!c.read || q.text.trim() === "") return { found: [] };
-      if (q.project === "") return { found: [], coverage: "不支持跨项目检索，请指定一个项目；本次未包含 EverOS" };
-      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: "此查询需要指定帮工档案，本次未包含 EverOS" };
+      if (q.project === "") return { found: [], coverage: memoryWording().coverage.everosAcross };
+      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: memoryWording().coverage.everosAgent };
       const kind: MemoryKind = q.kind || "note";
       const hits = await find(q.agent, q.text, q.limit, kind, q.project, signal);
       return {
@@ -180,7 +182,7 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
       };
     },
     list: async () => {
-      throw new Error("EverOS 的记忆不在这里列出");
+      throw new Error(memoryWording().everosList);
     },
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: async (run, signal) => {
@@ -189,7 +191,7 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
       const messages: Message[] = [];
       if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
       let said = run.said.trim() === "" ? run.summary : run.said;
-      if (run.outcome === "failed") said = "（这一轮没做成）" + said;
+      if (run.outcome === "failed") said = everosWords.failed + said;
       if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
       if (messages.length === 0) return;
       await add(sessionOf(run.session), run.project, messages, signal);
@@ -212,8 +214,8 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
         session,
         project,
         [
-          { sender_id: user, role: "user", timestamp: at, content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}` },
-          { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: `记下了：${n.text}` },
+          { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
+          { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
         ],
         signal,
       );
@@ -225,7 +227,7 @@ export function everos(c: MemorySourceConfig, now: () => number): Source {
       return undefined;
     },
     forget: async () => {
-      throw new Error("EverOS 里的记忆到 EverOS 里删");
+      throw new Error(memoryWording().everosForget);
     },
     can: { list: false, forget: false, transcripts: true },
   };

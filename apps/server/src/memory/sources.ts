@@ -3,11 +3,12 @@
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
+import { memoryWording } from "./words.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { type Effect } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
 import type { FinishedRun, Memories, Note, RecallCue } from "./memories.ts";
-import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabels } from "./recall.ts";
+import { lineOf, localName, memoryLikeness, pick, recallChars, recallCount, search, type SearchQuery, type SourceSearch, sourceLabel } from "./recall.ts";
 import { termsOf } from "./terms.ts";
 
 /** One line a source would have the agent recall, with how good a match it is (only to order one source's own). */
@@ -218,14 +219,14 @@ export class Sources {
       for (const c of configured) {
         const name = c.kind;
         const off = (why: string) =>
-          next.off.push({ name, label: sourceLabels[name] ?? name, on: false, canList: false, canForget: false, transcripts: false, off: why });
+          next.off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
         if (!c.enabled) {
-          off("没打开");
+          off(memoryWording().off);
           continue;
         }
         const one = this.build(c);
         if (!one) {
-          off("不认识这种来源");
+          off(memoryWording().unknownSource);
           continue;
         }
         const why = one.unavailable();
@@ -340,7 +341,7 @@ export class Sources {
       return {
         source: one.name,
         found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
-        coverage: page ? page.coverage : "读取失败、已取消或超时，未包含此来源",
+        coverage: page ? page.coverage : memoryWording().coverage.failed,
       };
     });
   }
@@ -348,9 +349,9 @@ export class Sources {
   /** Why the memory with this id cannot be forgotten here; forget refuses for the same reason. */
   forgetProblem(id: string): string | undefined {
     const generation = this.snapshot();
-    if (!generation) return "记性来源已经停下";
+    if (!generation) return memoryWording().stopped;
     const [one] = owner(generation.all, id);
-    return one.can.forget ? undefined : `${sourceLabels[one.name] ?? one.name} 里的记忆到它自己那里删`;
+    return one.can.forget ? undefined : memoryWording().forgetThere(sourceLabel(one.name));
   }
 
   async forget(agent: string, id: string): Promise<void> {
@@ -378,7 +379,7 @@ export class Sources {
     return [
       ...generation.all.map((one) => ({
         name: one.name,
-        label: sourceLabels[one.name] ?? one.name,
+        label: sourceLabel(one.name),
         on: true,
         canList: one.can.list,
         canForget: one.can.forget,

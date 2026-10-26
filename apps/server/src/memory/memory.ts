@@ -2,6 +2,8 @@
 // orchestrator's own MEMORY.md (agent/brain/memory.ts), which it carries whole rather than recalling from. A note the owner
 // writes for the orchestrator starts with 「主人交代：」, so the orchestrator reading it knows whose it is.
 
+import { memoryWording } from "./words.ts";
+import { fromOwner } from "./prompts.ts";
 import { join } from "node:path";
 import {
   type ArchiveListing,
@@ -21,19 +23,7 @@ import { Setting } from "../setting/setting.ts";
 import { everos } from "./everos.ts";
 import { type FinishedRun, makeMemories, MemoryRefused, type Note, type RecallCue } from "./memories.ts";
 import { nowledge } from "./nowledge.ts";
-import {
-  clip,
-  foundText,
-  type Found,
-  fromOwner,
-  inProject,
-  noteMaxChars,
-  recallChars,
-  searchLimit,
-  type SearchQuery,
-  type SearchResult,
-  sourceLabels,
-} from "./recall.ts";
+import { clip, foundText, type Found, inProject, noteMaxChars, recallChars, searchLimit, type SearchQuery, type SearchResult, sourceLabel } from "./recall.ts";
 import { type EndedSession, interleave, localSource, mergeRecalled, type Source, Sources } from "./sources.ts";
 import { timeHere } from "../base/time.ts";
 
@@ -132,9 +122,9 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
 
     const writeOrchestrator = Effect.fn("Memories.writeOrchestrator")(function* (text: string) {
       const body = clip(text.replace(/\s*\n\s*/g, " "), noteMaxChars);
-      if (body === "") return yield* Effect.fail(refused("要记的话是空的"));
+      if (body === "") return yield* Effect.fail(refused(memoryWording().empty));
       const at = yield* Clock.currentTimeMillis;
-      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body, new Date(at)), catch: () => refused("没记下来：MEMORY.md 写不进去") });
+      const written = yield* Effect.try({ try: () => remember(home, fromOwner + body, new Date(at)), catch: () => refused(memoryWording().fileFailed) });
       return lineMemory(written, at);
     });
 
@@ -157,7 +147,7 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
       const listed =
         agent === orchestratorAgent ? yield* Effect.try({ try: orchestrator, catch: fileRefused }) : yield* Effect.promise(() => sources.list(agent));
       const m = listed.memories.find((x) => x.id === id);
-      if (!m) return yield* Effect.fail(missing(`${agent} 的记性里没有 ${id}`, [memoriesOf(agent)]));
+      if (!m) return yield* Effect.fail(missing(memoryWording().noMemory(agent, id), [memoriesOf(agent)]));
       return m;
     });
 
@@ -171,10 +161,10 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
         ),
       previewForgetOf: (agent, id) =>
         Effect.map(forgettable(agent, id), (m) => ({
-          does: [agent === orchestratorAgent ? `从管家的 MEMORY.md 删掉这一行：「${m.text}」` : `从 ${agent} 的记性里忘掉：「${m.text}」`],
+          does: [agent === orchestratorAgent ? memoryWording().forgetOrchestrator(m.text) : memoryWording().forget(agent, m.text)],
         })),
       recallOf: (agent, project, text) =>
-        agent === orchestratorAgent ? Effect.fail(refused("管家不靠想起：它每次带着整份记性")) : preview(agent, project, text),
+        agent === orchestratorAgent ? Effect.fail(refused(memoryWording().orchestratorRecall)) : preview(agent, project, text),
       recall: Effect.fn("Memories.recall")(function* (cue) {
         const told = mergeRecalled(yield* Effect.promise(() => sources.prefetch(cue)));
         const ids = told.map((l) => l.id).filter((id) => id !== "");
@@ -187,8 +177,8 @@ export const make = (build: BuildSource = defaultBuild, timeoutMs?: number) =>
           const pages = await sources.search(query);
           const coverage = pages.flatMap((page) => {
             const notes = page.coverage ? [page.coverage] : [];
-            if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push("有命中的项目范围未经确认，已从本项目检索中排除");
-            return notes.map((note) => `${sourceLabels[page.source] ?? page.source}：${note}`);
+            if (query.project && page.found.some((f) => f.scope.kind === "unknown")) notes.push(memoryWording().coverage.unconfirmed);
+            return notes.map((note) => memoryWording().coverage.note(sourceLabel(page.source), note));
           });
           const found = interleave(
             pages.map((page) => page.found),

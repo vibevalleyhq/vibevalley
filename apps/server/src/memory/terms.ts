@@ -3,16 +3,14 @@
 // characters left out; Latin words, numbers and code whole (a path or a version one word: db/migrations, v1.2.3). Stop
 // words are left out: they match everything.
 
+import stopwords from "./stopwords.json";
 import { cutAll, cutSearch, goLower } from "./gse.ts";
 
 /** Raised when the cut or the dictionary changes: every memory's terms are then cut again (recutTerms). */
 export const termsVersion = 1;
 
-export const recallStop = new Set(
-  "一个 这个 那个 我们 你们 他们 可以 需要 什么 没有 就是 不是 然后 如果 因为 所以 已经 还是 这样 时候 一下 the and for with this that from are was you to of in is it on".split(
-    " ",
-  ),
-);
+/** Words too common to match on, in Chinese and in English (stopwords.json: data, not words to anyone). */
+export const recallStop = new Set<string>(stopwords);
 
 const codeWord = /[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/g;
 const han = /\p{Script=Han}/u;

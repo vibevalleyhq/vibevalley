@@ -2,6 +2,7 @@
 // the farm writes carries labels, vibevalley and the profile's, so that a profile reads back its own; with everything it
 // reads all that is in it. Whatever is sent is redacted: a run's words may carry a key.
 
+import { memoryWording } from "./words.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Option, Schema } from "effect";
@@ -159,7 +160,7 @@ export function nowledge(c: MemorySourceConfig, now: () => number): Source {
 
   return {
     name: "nowledge",
-    unavailable: () => (c.url ? undefined : "没填地址"),
+    unavailable: () => (c.url ? undefined : memoryWording().noUrl),
     // Closing the transport ends a connect still waiting on a Nowledge that does not answer.
     stop: async () => {
       if (closed) return;
@@ -234,7 +235,7 @@ export function nowledge(c: MemorySourceConfig, now: () => number): Source {
       return { id, agent: n.agent, kind: "note", text: n.text, at: now(), recalled: 0, ...(project ? { project } : {}) };
     },
     forget: async () => {
-      throw new Error("Nowledge Mem 里的记忆到 Nowledge Mem 里删");
+      throw new Error(memoryWording().nowledgeForget);
     },
     can: { list: true, forget: false, transcripts: false },
   };
