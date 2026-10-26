@@ -30,8 +30,9 @@ export function setAsideStale(where: string, hash: string, now: number): string 
   return aside;
 }
 
-/** In memory (the tests), every database after the first starts from a copy of the first one's files right after the
- * baseline ran: making one from scratch is most of a test's setup. */
+/** Every new database after the first in memory starts from a copy of that one's files right after the baseline ran:
+ * running the baseline is most of a test's setup (in memory about 570 ms against 110; a new folder on disk, as the tests'
+ * restarts make, about 830 ms against 320). A server makes one database and no copy, so it runs the baseline. */
 let memoryBase: Promise<Blob> | undefined;
 
 /** In memory, a database given back is emptied and kept for the next farm: making a PGlite from the copy above takes
@@ -79,10 +80,12 @@ export const Database = PgliteClient.layerFrom(
       const aside = setAsideStale(where, hash, yield* Clock.currentTimeMillis);
       if (aside) yield* Effect.logWarning(`vibevalley: the database was made from another schema; it is set aside at ${aside} and a new one is made`);
     }
-    const base = memory ? memoryBase : undefined;
+    // A folder that is not there yet is a new database: it can start from the copy too.
+    const base = memory || !existsSync(where) ? memoryBase : undefined;
     const kept = memory ? spare.pop() : undefined;
+    const from = async () => (base ? { loadDataDir: await base } : undefined);
     const pglite = yield* Effect.acquireRelease(
-      Effect.promise(async () => kept ?? (memory ? PGlite.create(base ? { loadDataDir: await base } : undefined) : PGlite.create(where))),
+      Effect.promise(async () => kept ?? (memory ? PGlite.create(await from()) : PGlite.create(where, await from()))),
       (db) => Effect.promise(() => (memory ? giveBack(db) : db.close())),
     );
     const client = yield* PgliteClient.fromClient({ liveClient: pglite });
