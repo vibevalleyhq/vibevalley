@@ -23,25 +23,26 @@ export const follow = Effect.fn("Follow")(function* (params: FollowParams) {
   })(params)
 })
 
-export const FollowersParams = Schema.Struct({
-  ["conversation_id"]: Schema.String,
+export const AllFollowsParams = Schema.Struct({
+
 })
-export type FollowersParams = typeof FollowersParams.Type
+export type AllFollowsParams = typeof AllFollowsParams.Type
 
 
-export const FollowersResult = Schema.Struct({
+export const AllFollowsResult = Schema.Struct({
+  ["conversation_id"]: Schema.String,
   ["participant_id"]: Schema.String,
 })
-export type FollowersResult = typeof FollowersResult.Type
+export type AllFollowsResult = typeof AllFollowsResult.Type
 
 
-export const FollowersSql = "-- name: Followers :many\nselect participant_id from channel_follow where conversation_id = $1 and unfollowed_at is null order by participant_id;"
+export const AllFollowsSql = "-- name: AllFollows :many\nselect conversation_id, participant_id from channel_follow where unfollowed_at is null;"
 
-export const followers = Effect.fn("Followers")(function* (params: FollowersParams) {
+export const allFollows = Effect.fn("AllFollows")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: FollowersParams,
-    Result: FollowersResult,
-    execute: (p) => sql.unsafe(FollowersSql, [p["conversation_id"]]),
-  })(params)
+    Request: AllFollowsParams,
+    Result: AllFollowsResult,
+    execute: () => sql.unsafe(AllFollowsSql, []),
+  })({})
 })

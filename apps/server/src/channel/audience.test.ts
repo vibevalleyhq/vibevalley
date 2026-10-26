@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vite-plus/test";
+import { Audience } from "./audience.ts";
+
+const wake = { recipient: "w2", senderKind: "agent", recipientKind: "agent", wakes: true, held: false, at: 5 };
+
+describe("the audience", () => {
+  it("counts agents waking agents since the owner last spoke, from the messages after their words", () => {
+    const a = new Audience();
+    a.load([], [{ conversation_id: "c", n: 2 }], [], [{ conversation_id: "c", id: "m10" }]);
+    expect(a.hops("c")).toBe(2);
+    a.delivered({ ...wake, conversation: "c", message: "m11" });
+    expect(a.hops("c")).toBe(3);
+    a.ownerSpoke("c", "m12");
+    expect(a.hops("c")).toBe(0);
+    // Streamed from before the owner's words, it is finished after them: it does not count.
+    a.delivered({ ...wake, conversation: "c", message: "m11b" });
+    expect(a.hops("c")).toBe(0);
+    a.delivered({ ...wake, conversation: "c", message: "m13" });
+    // Held, not waking, the owner's, or to the owner: none count.
+    a.delivered({ ...wake, conversation: "c", message: "m14", held: true });
+    a.delivered({ ...wake, conversation: "c", message: "m15", wakes: false });
+    a.delivered({ ...wake, conversation: "c", message: "m16", senderKind: "user" });
+    a.delivered({ ...wake, conversation: "c", message: "m17", recipientKind: "user" });
+    expect(a.hops("c")).toBe(1);
+  });
+
+  it("knows when an agent last woke each one, and who follows a thread", () => {
+    const a = new Audience();
+    a.load([{ conversation_id: "t", participant_id: "w3" }], [], [{ recipient_id: "w2", at: 9 }], []);
+    a.delivered({ ...wake, conversation: "c", message: "m1", at: 4 });
+    a.delivered({ ...wake, conversation: "c", message: "m2", recipient: "w4", at: 12 });
+    expect([a.lastWake("w2"), a.lastWake("w4"), a.lastWake("w5")]).toEqual([9, 12, 0]);
+    a.followed("t", "w1");
+    a.followed("t", "w3");
+    expect(a.followers("t")).toEqual(["w1", "w3"]);
+    expect(a.followers("other")).toEqual([]);
+  });
+});

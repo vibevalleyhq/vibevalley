@@ -240,48 +240,50 @@ export const dropOpen = Effect.fn("DropOpen")(function* (params: DropOpenParams)
   })(params)
 })
 
-export const AgentWakesSinceUserParams = Schema.Struct({
-  ["conversation"]: Schema.String,
+export const AgentWakesByConversationParams = Schema.Struct({
+
 })
-export type AgentWakesSinceUserParams = typeof AgentWakesSinceUserParams.Type
+export type AgentWakesByConversationParams = typeof AgentWakesByConversationParams.Type
 
 
-export const AgentWakesSinceUserResult = Schema.Struct({
+export const AgentWakesByConversationResult = Schema.Struct({
+  ["conversation_id"]: Schema.String,
   ["n"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
-export type AgentWakesSinceUserResult = typeof AgentWakesSinceUserResult.Type
+export type AgentWakesByConversationResult = typeof AgentWakesByConversationResult.Type
 
 
-export const AgentWakesSinceUserSql = "-- name: AgentWakesSinceUser :one\n-- Agents waking agents since the owner last spoke here, held ones not counted.\nselect count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.conversation_id = $1\n  and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = $1 and u.sender_id = 'user'), '')\n  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;"
+export const AgentWakesByConversationSql = "-- name: AgentWakesByConversation :many\n-- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.conversation_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'user'), '')\n  and s.kind in ('agent', 'orchestrator') and r.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.conversation_id;"
 
-export const agentWakesSinceUser = Effect.fn("AgentWakesSinceUser")(function* (params: AgentWakesSinceUserParams) {
+export const agentWakesByConversation = Effect.fn("AgentWakesByConversation")(function* () {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: AgentWakesSinceUserParams,
-    Result: AgentWakesSinceUserResult,
-    execute: (p) => sql.unsafe(AgentWakesSinceUserSql, [p["conversation"]]),
-  })(params)
+  return yield* SqlSchema.findAll({
+    Request: AgentWakesByConversationParams,
+    Result: AgentWakesByConversationResult,
+    execute: () => sql.unsafe(AgentWakesByConversationSql, []),
+  })({})
 })
 
-export const LastAgentWakeParams = Schema.Struct({
+export const LastAgentWakesParams = Schema.Struct({
+
+})
+export type LastAgentWakesParams = typeof LastAgentWakesParams.Type
+
+
+export const LastAgentWakesResult = Schema.Struct({
   ["recipient_id"]: Schema.String,
-})
-export type LastAgentWakeParams = typeof LastAgentWakeParams.Type
-
-
-export const LastAgentWakeResult = Schema.Struct({
   ["at"]: Schema.NullOr(Schema.Number),
 })
-export type LastAgentWakeResult = typeof LastAgentWakeResult.Type
+export type LastAgentWakesResult = typeof LastAgentWakesResult.Type
 
 
-export const LastAgentWakeSql = "-- name: LastAgentWake :one\nselect coalesce(max(d.created_at), 0)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere d.recipient_id = $1 and s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null;"
+export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- When each recipient was last woken by an agent (channel/audience.ts).\nselect d.recipient_id, max(d.created_at)::float8 as at from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\nwhere s.kind in ('agent', 'orchestrator') and d.wakes and d.held_by is null\ngroup by d.recipient_id;"
 
-export const lastAgentWake = Effect.fn("LastAgentWake")(function* (params: LastAgentWakeParams) {
+export const lastAgentWakes = Effect.fn("LastAgentWakes")(function* () {
   const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findOne({
-    Request: LastAgentWakeParams,
-    Result: LastAgentWakeResult,
-    execute: (p) => sql.unsafe(LastAgentWakeSql, [p["recipient_id"]]),
-  })(params)
+  return yield* SqlSchema.findAll({
+    Request: LastAgentWakesParams,
+    Result: LastAgentWakesResult,
+    execute: () => sql.unsafe(LastAgentWakesSql, []),
+  })({})
 })

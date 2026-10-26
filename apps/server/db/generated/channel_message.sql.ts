@@ -478,3 +478,27 @@ export const messageByNumber = Effect.fn("MessageByNumber")(function* (params: M
     execute: (p) => sql.unsafe(MessageByNumberSql, [p["conversation_id"], p["number"]]),
   })(params)
 })
+
+export const OwnerLastMessagesParams = Schema.Struct({
+
+})
+export type OwnerLastMessagesParams = typeof OwnerLastMessagesParams.Type
+
+
+export const OwnerLastMessagesResult = Schema.Struct({
+  ["conversation_id"]: Schema.String,
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type OwnerLastMessagesResult = typeof OwnerLastMessagesResult.Type
+
+
+export const OwnerLastMessagesSql = "-- name: OwnerLastMessages :many\n-- The owner's last message in each conversation, from which agents waking agents are counted (channel/audience.ts).\nselect conversation_id, max(id)::text as id from channel_message where sender_id = 'user' group by conversation_id;"
+
+export const ownerLastMessages = Effect.fn("OwnerLastMessages")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: OwnerLastMessagesParams,
+    Result: OwnerLastMessagesResult,
+    execute: () => sql.unsafe(OwnerLastMessagesSql, []),
+  })({})
+})
