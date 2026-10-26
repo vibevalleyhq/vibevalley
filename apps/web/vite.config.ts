@@ -8,6 +8,14 @@ export default defineConfig({
   server: { proxy: { "/api": "http://127.0.0.1:8787" } },
   // The rules' tests, pure, without a DOM (the Solid plugin would give them jsdom); test/ is Playwright's.
   test: { include: ["src/**/*.test.ts"], environment: "node" },
-  // test: the rules' tests; e2e (package.json) is Playwright against real servers, not cached.
-  run: { tasks: { test: "vp test run", build: "vp build" } },
+  // test: the rules' tests; e2e (package.json) is Playwright against real servers, not cached. The build's input leaves
+  // out the listing of this package's node_modules (only links into the root's .pnpm, whose files stay tracked) and
+  // .vite-temp, where Vite writes its bundled config and removes it: else the cache misses whenever that folder comes
+  // or goes, as on CI's fresh checkout.
+  run: {
+    tasks: {
+      test: "vp test run",
+      build: { command: "vp build", cache: { input: [{ auto: true }, "!node_modules", "!node_modules/.vite-temp/**"] } },
+    },
+  },
 });

@@ -21,7 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      - uses: voidzero-dev/setup-vp@v1
+      # v1.22.0, pinned by commit: a third-party action running with the repository token. (@v1 lags: no cache-toolchain.)
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
       # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
@@ -69,7 +70,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      - uses: voidzero-dev/setup-vp@v1
+      # v1.22.0, pinned by commit: a third-party action running with the repository token. (@v1 lags: no cache-toolchain.)
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
       # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
@@ -110,7 +112,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      - uses: voidzero-dev/setup-vp@v1
+      # v1.22.0, pinned by commit: a third-party action running with the repository token. (@v1 lags: no cache-toolchain.)
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
       # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
@@ -139,7 +142,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      - uses: voidzero-dev/setup-vp@v1
+      # v1.22.0, pinned by commit: a third-party action running with the repository token. (@v1 lags: no cache-toolchain.)
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
       # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
@@ -167,6 +171,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      - uses: voidzero-dev/setup-vp@v1
+      # v1.22.0, pinned by commit: a third-party action running with the repository token. (@v1 lags: no cache-toolchain.)
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       - run: vp run site:check && vp run site:build
