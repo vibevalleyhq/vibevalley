@@ -83,6 +83,16 @@ export default defineConfig({
         rules: { "vibevalley/no-wall-clock": "off" },
       },
       {
+        // The tests wait on conditions, not on the clock (scripts/oxlint-plugin.ts); testing/ and the pages' fixtures are
+        // where the waiting itself is written.
+        files: ["apps/*/src/**/*.test.ts", "apps/*/src/**/*.test.tsx", "apps/web/test/**", "apps/desktop/test/**", "packages/*/src/**/*.test.ts"],
+        rules: { "vibevalley/no-test-sleep": "error" },
+      },
+      {
+        files: ["apps/web/test/fixtures.ts", "apps/web/test/global-setup.ts"],
+        rules: { "vibevalley/no-test-sleep": "off" },
+      },
+      {
         files: [
           "apps/server/src/cli.ts",
           "apps/server/src/cli/**",
