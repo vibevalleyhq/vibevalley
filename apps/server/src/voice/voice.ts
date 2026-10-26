@@ -10,7 +10,7 @@ import { type AgoraGrant, type Area, type Dictated, orchestratorAgent, type Voic
 import { type ApiError, type VoiceFix, type VoiceUnavailable } from "@vibevalley/protocol/api";
 import { Agent, AgoraClient, Area as AgoraArea, AresSTT, DeepgramSTT, MicrosoftSTT, MicrosoftTTS, MiniMaxTTS, OpenAI, OpenAITTS } from "agora-agents";
 import agoraToken from "agora-token";
-import { Context, Effect, FiberSet, Layer, Schema, Stream } from "effect";
+import { Clock, Context, Effect, FiberSet, Layer, Schema, Stream } from "effect";
 import { chatCompletions } from "../agent/brain/openai.ts";
 import { Settings } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
@@ -311,7 +311,6 @@ export class Voice extends Context.Service<Voice, VoiceShape>()("vibevalley/Voic
 export interface VoiceOptions {
   /** Agora's REST calls go through it; fetch when absent. */
   readonly fetch?: typeof fetch;
-  readonly now?: () => number;
   /** A tunnel to the line's port: its public address and how to close it. cloudflared's quick tunnel when absent. */
   readonly tunnel?: (port: number) => Promise<{ readonly url: string; readonly close: () => void }>;
   /** How long what is to be told waits for others to join it before the orchestrator is asked; 3 s when absent. */
@@ -384,7 +383,9 @@ export const make = (options: VoiceOptions = {}) =>
     const settings = yield* Setting;
     const chat = yield* Channels;
     const orchestrator = yield* Orchestrator;
-    const now = options.now ?? Date.now;
+    // Read in callbacks too: the Clock the service was built with.
+    const clock = yield* Clock.Clock;
+    const now = () => clock.currentTimeMillisUnsafe();
 
     const grants = new Map<string, Grant>();
     const calls = new Map<string, Call>();

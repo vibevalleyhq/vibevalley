@@ -73,14 +73,14 @@ const respond = (c: Request): AssistantMessage => {
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
 /** The farm with a orchestrator on the faux model, answering with f; the patrol runs by hand. */
-const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), patrolNow?: () => number) => {
+const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), clock?: () => number) => {
   const { faux, llm, requests } = fauxLLM();
   faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages as Message[], options: undefined })));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],
     repos: ["demo", "notes"],
-    ...(patrolNow ? { patrolNow } : {}),
+    ...(clock ? { clock } : {}),
   });
   return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
 };
