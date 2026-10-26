@@ -75,7 +75,7 @@ test("the window opens on the bar at once, and says there why the server could n
   for (const out of [app.process().stdout, app.process().stderr]) out?.on("data", (d) => said.push(String(d)));
   try {
     const page = await app.firstWindow();
-    await expect(page).toHaveURL(/\/opening\.html\?problem=/);
+    await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/);
     await expect(page.getByText(/^农场起不来：/)).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
@@ -95,13 +95,16 @@ test("the island follows the issues in flight and opens one", async () => {
     // The server's pi is the scripted helper (apps/server src/testing/helper.ts): an issue can really be worked.
     env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: join(dir, "home"), VIBEVALLEY_WORK_ROOT: join(dir, "work"), VIBEVALLEY_TEST_RUNTIMES: "1" },
   });
-  type Probe = { glance?: { working: number; waiting: number; rows: { issue: string; tone: string; doing: string }[] }; helper: boolean };
+  type Probe = {
+    glance?: { working: number; waiting: number; strip: { working: string; waiting: string }; rows: { issue: string; tone: string; doing: string }[] };
+    helper: boolean;
+  };
   const probe = () => app.evaluate(() => (globalThis as { vibevalleyIsland?: Probe }).vibevalleyIsland);
   try {
     const page = await app.firstWindow();
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 45_000 });
     const api = new VibeValleyApi(new URL(page.url()).origin);
-    await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, rows: [] });
+    await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, strip: { working: "没在干", waiting: "0 等你" }, rows: [] });
     // Built on macOS by scripts/build.ts; elsewhere there is no helper.
     expect((await probe())?.helper).toBe(process.platform === "darwin");
 
