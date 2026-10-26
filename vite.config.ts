@@ -84,6 +84,8 @@ export default defineConfig({
       // Inside try, a promise returned without await escapes its catch and finally.
       "typescript/return-await": "error",
       "eslint/no-fallthrough": "error",
+      // A deprecated API is moved off when it is met; one kept on purpose says why at the call.
+      "typescript/no-deprecated": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
