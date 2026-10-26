@@ -75,6 +75,7 @@
 
 ## 还没做的
 
+- 没价值的注释：分隔线已由 lint 挡，模型审新加注释的脚本提 PR 前在本机跑，还没拿已知该删的注释校准过：[提案](.agents/notes/proposed/process/2026-10-26-comment-review.md)。
 - 用 VibeValley 开发 VibeValley：干活的农场和正在改的代码分开、合并前跑检查、渠道各用各的工作目录：[提案](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
 
 ## 怎么验证

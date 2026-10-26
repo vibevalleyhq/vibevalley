@@ -38,6 +38,7 @@ scripts/                   文档、Note、旧名字的检查，和验证服务�
 ```bash
 vp install                                                      # 根目录：装 apps/*、packages/* 的依赖（Vite+ 带的 pnpm 12，pnpm workspace）
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型）和全部包的类型；--fix 改格式
+vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
 vp run --filter vibevalley-server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
 vp run --filter vibevalley-server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
 vp run server:check                                             # 改完服务端或 packages/protocol：类型（vp check）、规则的测试、查询是否最新、vitest
