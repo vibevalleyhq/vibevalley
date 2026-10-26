@@ -27,7 +27,6 @@ export const maxRunning = 6;
 export const dayMs = 86400000;
 
 /** The voice line's first words when the settings have none of their own; the voice samples say it. */
-export const defaultGreeting = "来啦！今天想种点什么？";
 
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;

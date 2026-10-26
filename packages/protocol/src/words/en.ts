@@ -77,5 +77,6 @@ export const en: Words = {
   },
   span: (ms) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : `${Math.round(ms / 60_000)} min`),
   order: { invalid: "not a valid order key", unordered: (a, b) => `order key ${a} is not before ${b}` },
+  greeting: "Hey there! What shall we grow today?",
   serverAnswered: (status) => "the server answered " + status,
 };

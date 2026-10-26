@@ -3,6 +3,7 @@
 // once; a page sees only where each comes from and its last characters; keys are never logged. The locale is the
 // process's (@vibevalley/protocol/words): set when the file is read and when it is saved.
 
+import { settingWording } from "./words.ts";
 import { join } from "node:path";
 import type { Check, Dictation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -154,7 +155,7 @@ export const make = Effect.gen(function* () {
     try {
       disk.write(() => JSON.stringify(kept, null, 2) + "\n");
     } catch (e) {
-      return yield* new SettingRefused({ message: `存不进 ${file}：${(e as Error).message}` });
+      return yield* new SettingRefused({ message: settingWording().notSaved(file, (e as Error).message) });
     }
     stored = kept;
     setLocale(kept.locale ?? "zh");

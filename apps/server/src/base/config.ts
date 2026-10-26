@@ -2,6 +2,7 @@
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
+import { baseWording } from "./words.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -86,15 +87,15 @@ export class ConfigError extends Error {}
 function coerce(key: string, value: unknown, like: unknown, file: string): unknown {
   if (typeof like === "number") {
     const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
-    if (!Number.isFinite(n)) throw new ConfigError(`${file}: ${key} 不是数：${String(value)}`);
+    if (!Number.isFinite(n)) throw new ConfigError(baseWording().notNumber(file, key, String(value)));
     return n;
   }
   if (Array.isArray(like)) {
     if (Array.isArray(value)) return value.map(String);
     if (typeof value === "string") return value === "" ? [] : value.split(",").map((s) => s.trim());
-    throw new ConfigError(`${file}: ${key} 要一串`);
+    throw new ConfigError(baseWording().notList(file, key));
   }
-  if (typeof value === "object" && value !== null) throw new ConfigError(`${file}: ${key} 不能是一组`);
+  if (typeof value === "object" && value !== null) throw new ConfigError(baseWording().notGroup(file, key));
   return String(value);
 }
 
@@ -144,7 +145,7 @@ export function loadConfig(file = "", env: NodeJS.ProcessEnv = process.env): Con
       throw new ConfigError(`${path}: ${(e as Error).message}`);
     }
   } else if (!optional) {
-    throw new ConfigError(`${path}: 没有这个文件`);
+    throw new ConfigError(baseWording().noFile(path));
   }
   const { home: _home, version: _version, ...keys } = base;
   const c = { ...base, ...merge(keys, given, env, "", path), home } as Config;
@@ -153,9 +154,9 @@ export function loadConfig(file = "", env: NodeJS.ProcessEnv = process.env): Con
     ["voice.line.port", c.voice.line.port],
     ["lan.port", c.lan.port],
   ] as const) {
-    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new ConfigError(`${path}: ${name} 不是端口：${port}`);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new ConfigError(baseWording().notPort(path, name, port));
   }
-  if (c.github.prPollSeconds <= 0) throw new ConfigError("github.pr_poll_seconds 必须大于 0");
+  if (c.github.prPollSeconds <= 0) throw new ConfigError(baseWording().prPoll);
   return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
 }
 

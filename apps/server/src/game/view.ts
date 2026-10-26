@@ -1,6 +1,7 @@
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
 
+import { gameWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import type {
   Achievement,
@@ -65,15 +66,16 @@ function growth(h: Session): Crop {
   return crop;
 }
 
-const badgeRipe: Badge = { text: "可收获", tone: "ripe" };
-const badgeBugs: Badge = { text: "有虫", tone: "bug" };
-const badgeConflict: Badge = { text: wording().stuck.conflict, tone: "bug" };
-const badgeQuiet: Badge = { text: wording().stuck.quiet, tone: "stuck" };
-const badgeHalfway: Badge = { text: wording().stuck.interrupted, tone: "stuck" };
-const badgeRetrying: Badge = { text: "重试中", tone: "stuck" };
-const badgeRest: Badge = { text: "歇着", tone: "rest" };
-const badgeReview: Badge = { text: wording().attention.reviewing, tone: "wait" };
-const badgeQuestions: Badge = { text: wording().attention.asking, tone: "wait" };
+// Made when asked for: their words are the locale's of the moment.
+const badgeRipe = (): Badge => ({ text: gameWording().badge.ripe, tone: "ripe" });
+const badgeBugs = (): Badge => ({ text: gameWording().badge.bugs, tone: "bug" });
+const badgeConflict = (): Badge => ({ text: wording().stuck.conflict, tone: "bug" });
+const badgeQuiet = (): Badge => ({ text: wording().stuck.quiet, tone: "stuck" });
+const badgeHalfway = (): Badge => ({ text: wording().stuck.interrupted, tone: "stuck" });
+const badgeRetrying = (): Badge => ({ text: gameWording().badge.retrying, tone: "stuck" });
+const badgeRest = (): Badge => ({ text: gameWording().badge.rest, tone: "rest" });
+const badgeReview = (): Badge => ({ text: wording().attention.reviewing, tone: "wait" });
+const badgeQuestions = (): Badge => ({ text: wording().attention.asking, tone: "wait" });
 
 /**
  * A plot is a picture of its issue's attention, never a second reading of it: the crop and the badge say where the
@@ -87,28 +89,28 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
     case "queued":
     case "working": {
       if (h.phase._tag === "arriving") return { crop: "seeded" };
-      if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying };
+      if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying() };
       // Another round after a failed acceptance: it works on what the review said.
       const open = openFindings(issue);
-      return open > 0 ? { crop: "weeds", badge: { text: `除草中 ${open}`, tone: "bug" } } : { crop: growth(h) };
+      return open > 0 ? { crop: "weeds", badge: { text: gameWording().badge.weeding(open), tone: "bug" } } : { crop: growth(h) };
     }
     case "asking":
-      return { crop: "dry", badge: badgeQuestions };
+      return { crop: "dry", badge: badgeQuestions() };
     case "reviewing":
-      if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe };
+      if (issue.reviewedAt !== undefined) return { crop: ripeCrop(h), badge: badgeRipe() };
       // One its task graph acts on asks nothing of the owner here.
-      return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview } : { crop: "flowering" };
+      return a.acts.length > 0 ? { crop: "flowering", badge: badgeReview() } : { crop: "flowering" };
     case "stuck":
       switch (a.stuck) {
         case "conflict":
-          return { crop: "withered", badge: badgeConflict };
+          return { crop: "withered", badge: badgeConflict() };
         case "failed":
         case undefined:
-          return { crop: "withered", badge: badgeBugs };
+          return { crop: "withered", badge: badgeBugs() };
         case "interrupted":
-          return { crop: growth(h), badge: badgeHalfway };
+          return { crop: growth(h), badge: badgeHalfway() };
         case "quiet":
-          return { crop: "dry", badge: badgeQuiet };
+          return { crop: "dry", badge: badgeQuiet() };
       }
       break;
     case "done":
@@ -126,15 +128,15 @@ export function plotOfSession(h: Session): PlotView {
     case "arriving":
       return { crop: "seeded" };
     case "working":
-      if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet };
-      if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying };
+      if (need?.kind === "quiet") return { crop: "dry", badge: badgeQuiet() };
+      if (need?.kind === "retrying") return { crop: growth(h), badge: badgeRetrying() };
       return { crop: growth(h) };
     case "done":
-      return { crop: ripeCrop(h), badge: conflict ? badgeConflict : badgeRipe };
+      return { crop: ripeCrop(h), badge: conflict ? badgeConflict() : badgeRipe() };
     case "failed":
-      return { crop: "withered", badge: badgeBugs };
+      return { crop: "withered", badge: badgeBugs() };
     case "resting":
-      return { crop: growth(h), badge: conflict ? badgeConflict : badgeRest };
+      return { crop: growth(h), badge: conflict ? badgeConflict() : badgeRest() };
     case "closed":
       break;
   }
@@ -189,13 +191,13 @@ export function achievementInWords(a: AchievementDef): Achievement {
 function tierTitle(a: AchievementDef, tier: number): string {
   const titles = a.tierTitles ?? [];
   if (tier >= 1 && tier <= titles.length) return titles[tier - 1]!;
-  return tier === 2 ? "银牌" + a.title : tier === 3 ? "金牌" + a.title : a.title;
+  return tier === 2 ? gameWording().tier.silver(a.title) : tier === 3 ? gameWording().tier.gold(a.title) : a.title;
 }
 
 function reachedText(a: AchievementDef, tier: number): string {
-  if (a.category === "starter") return "新手任务做完了";
-  if (a.category === "secret") return "发现一个彩蛋";
-  return tier === 3 ? "升到金牌" : tier === 2 ? "升到银牌" : "解锁成就";
+  if (a.category === "starter") return gameWording().reached.starter;
+  if (a.category === "secret") return gameWording().reached.secret;
+  return tier === 3 ? gameWording().reached.gold : tier === 2 ? gameWording().reached.silver : gameWording().reached.unlocked;
 }
 
 function achievementEffect(id: string, tier: number): GameEffectAchievement {

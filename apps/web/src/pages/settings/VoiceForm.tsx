@@ -2,12 +2,12 @@
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
+import { wording } from "@vibevalley/protocol/words";
 import { createSignal, For, Match, onSettled, Show, snapshot, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { keepPreviousData } from "@tanstack/solid-query";
 import {
   AreaValues,
-  defaultGreeting,
   type Dictation,
   type KeySource,
   type KeyStatus,
@@ -570,7 +570,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
               <button
                 type="button"
                 disabled={!sample}
-                title={sample ? `试听：${defaultGreeting}` : "没有样音"}
+                title={sample ? `试听：${wording().greeting}` : "没有样音"}
                 aria-label={playing() === v.id ? `停下 ${v.label}` : `试听 ${v.label}`}
                 class="ml-0.5 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-hover disabled:cursor-default disabled:opacity-40"
                 onClick={() => sample && play(v.id, sample)}
