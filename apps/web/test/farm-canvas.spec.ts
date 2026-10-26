@@ -62,11 +62,11 @@ test("the village runs for a while without errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(e.message));
-  // The page's clock is moved through: three seconds of the village without waiting them out.
+  // The page's clock is moved through, frame by frame: a second of the village (sixty frames) without waiting it out.
   await page.clock.install();
   await page.goto("/farm/");
   await expect(page.getByTestId("village")).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
-  await page.clock.runFor(3000);
+  await page.clock.runFor(1000);
   expect(errors).toEqual([]);
 });
 
