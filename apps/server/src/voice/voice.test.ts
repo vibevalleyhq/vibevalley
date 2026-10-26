@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { onCallLine } from "./prompts.ts";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
@@ -12,20 +13,7 @@ import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
-import {
-  agentFor,
-  type CallLine,
-  clientOf,
-  layer,
-  onCallLine,
-  retrying,
-  speakPieces,
-  tokenSeconds,
-  vendorsFor,
-  Voice,
-  voiceAgentUid,
-  voiceUnknown,
-} from "./voice.ts";
+import { agentFor, type CallLine, clientOf, layer, retrying, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
 import { timeHere, wallTime } from "../base/time.ts";
 import { TestClock } from "effect/testing";
@@ -173,7 +161,7 @@ describe("a call's agent", () => {
       }),
     ).toBe("");
     expect(problem({ ...d, answer: { vendor: "orchestrator" } })).toContain("语音线路");
-    expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown);
+    expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown());
     expect(fixedIn(deepseek)).toBe("deepseek");
     expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("voice");
     expect(fixedIn({ ...d, answer: { vendor: "orchestrator" } })).toBeUndefined();

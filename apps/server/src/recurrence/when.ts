@@ -2,14 +2,13 @@
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
 
+import { recurrenceWording } from "./words.ts";
 import { Cron, DateTime, Option } from "effect";
 import type { Recurrence, RecurrenceWhen } from "@vibevalley/protocol";
 
 export const minEveryMinutes = 1;
 
 export const recurrenceTime = /^([01]?\d|2[0-3]):([0-5]\d)$/;
-
-export const weekdays = ["日", "一", "二", "三", "四", "五", "六"] as const;
 
 const givenOffset = /^(?:GMT)?([+-])([01]\d|2[0-3])(?::?([0-5]\d))?$/;
 
@@ -78,14 +77,17 @@ function clock(at: number, tz: string): string {
 export function whenText(when: RecurrenceWhen, tz: string): string {
   switch (when.kind) {
     case "once":
-      return clock(when.at, tz) + " 一次";
+      return recurrenceWording().when.once(clock(when.at, tz));
     case "every":
-      return when.minutes % 60 === 0 ? "每 " + String(when.minutes / 60) + " 小时" : "每 " + String(when.minutes) + " 分钟";
+      return when.minutes % 60 === 0 ? recurrenceWording().when.hours(when.minutes / 60) : recurrenceWording().when.minutes(when.minutes);
     case "daily":
-      return "每天 " + when.time;
+      return recurrenceWording().when.daily(when.time);
     case "weekly": {
       const days = [...new Set(when.days ?? [])].sort((a, b) => a - b);
-      return "每周" + days.map((d) => (d >= 0 && d < 7 ? weekdays[d]! : String(d))).join("、") + " " + when.time;
+      return recurrenceWording().when.weekly(
+        days.map((d) => (d >= 0 && d < 7 ? recurrenceWording().weekdays[d]! : String(d))),
+        when.time,
+      );
     }
     case "cron":
       return cronText(when.expr);
@@ -96,10 +98,11 @@ export function whenText(when: RecurrenceWhen, tz: string): string {
 export function nextText(s: Recurrence): string {
   const next = nextRun(s);
   if (next !== undefined) return clock(next, s.tz);
-  if (s.enabled) return "不会再到点";
-  if (s.pending) return "等主人同意";
-  if (s.when.kind === "once" && s.lastRun !== undefined) return "做过了";
-  return "关着";
+  const w = recurrenceWording().next;
+  if (s.enabled) return w.never;
+  if (s.pending) return w.pending;
+  if (s.when.kind === "once" && s.lastRun !== undefined) return w.done;
+  return w.off;
 }
 
 /** The fields as sets; the day fields are both due (and) when either starts with *, else either one is. */
@@ -112,12 +115,13 @@ interface CronSpec {
   readonly and: boolean;
 }
 
+/** The bounds of the five fields; recurrenceWording().cron.fields names them, in this order. */
 const cronFields = [
-  { name: "分钟", min: 0, max: 59 },
-  { name: "小时", min: 0, max: 23 },
-  { name: "日", min: 1, max: 31 },
-  { name: "月", min: 1, max: 12 },
-  { name: "周几", min: 0, max: 7 },
+  { min: 0, max: 59 },
+  { min: 0, max: 23 },
+  { min: 1, max: 31 },
+  { min: 1, max: 12 },
+  { min: 0, max: 7 },
 ] as const;
 
 /** Go's strconv.Atoi: an optional sign and ASCII digits, within 64 bits. */
@@ -131,8 +135,8 @@ function atoi(s: string): number | undefined {
 export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/).filter((f) => f !== "");
 
 function cronField(field: string, i: number): Set<number> | string {
-  const { min: lo, max: hi, name } = cronFields[i]!;
-  const bad = "cron 的" + name + "写错了：" + field;
+  const { min: lo, max: hi } = cronFields[i]!;
+  const bad = recurrenceWording().cron.badField(recurrenceWording().cron.fields[i]!, field);
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");
@@ -164,7 +168,7 @@ function cronField(field: string, i: number): Set<number> | string {
 
 export function parseCron(expr: string): CronSpec | string {
   const f = fields(expr);
-  if (f.length !== 5) return "cron 要五段：分 时 日 月 周几，比如 0 9 * * 1-5";
+  if (f.length !== 5) return recurrenceWording().cron.fiveFields;
   const bits: Set<number>[] = [];
   for (let i = 0; i < 5; i++) {
     const b = cronField(f[i]!, i);
@@ -186,37 +190,41 @@ function cronNext(from: number, expr: string, tz: string): number | undefined {
 /** The common shapes in words, the rest as the expression itself. */
 export function cronText(expr: string): string {
   const f = fields(expr);
-  if (typeof parseCron(expr) === "string") return "cron " + expr;
+  const w = recurrenceWording().when;
+  if (typeof parseCron(expr) === "string") return w.cron(expr);
   const mi = atoi(f[0]!);
   const h = atoi(f[1]!);
   const clock = mi !== undefined && h !== undefined ? String(100 + h).slice(1) + ":" + String(100 + mi).slice(1) : "";
   if (clock !== "" && f[2] === "*" && f[3] === "*") {
     switch (f[4]) {
       case "*":
-        return "每天 " + clock;
+        return w.daily(clock);
       case "1-5":
-        return "工作日 " + clock;
+        return w.weekdays(clock);
       case "0,6":
       case "6,0":
       case "6,7":
       case "6-7":
-        return "周末 " + clock;
+        return w.weekend(clock);
       case undefined:
         break;
     }
     const days: number[] = [];
     for (const d of f[4]!.split(",")) {
       const n = atoi(d);
-      if (n === undefined) return "cron " + expr;
+      if (n === undefined) return w.cron(expr);
       days.push(n % 7);
     }
     const sorted = [...new Set(days)].sort((a, b) => a - b);
-    return "每周" + sorted.map((d) => weekdays[d]).join("、") + " " + clock;
+    return w.weekly(
+      sorted.map((d) => recurrenceWording().weekdays[d]!),
+      clock,
+    );
   }
   if (clock !== "" && f[3] === "*" && f[4] === "*") {
     const d = atoi(f[2]!);
-    return d !== undefined ? "每月 " + d + " 号 " + clock : "cron " + expr;
+    return d !== undefined ? w.monthly(d, clock) : w.cron(expr);
   }
-  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return "每小时第 " + mi + " 分";
-  return "cron " + expr;
+  if (mi !== undefined && f[1] === "*" && f[2] === "*" && f[3] === "*" && f[4] === "*") return w.hourly(mi);
+  return w.cron(expr);
 }
