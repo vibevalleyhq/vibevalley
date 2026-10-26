@@ -1,5 +1,6 @@
 // An issue's lane, title and status and priority words.
 
+import { rulesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
 import {
@@ -51,19 +52,19 @@ export const issueIs = (issue: Issue, id: string) => issue.id === id || issue.se
 export function taskLine(g: TaskGraph) {
   switch (g.state) {
     case "splitting":
-      return "在拆步骤";
+      return rulesWording().graph.splitting;
     case "draft":
-      return "拆好了，看过再开工";
+      return rulesWording().graph.draft;
     case "running":
-      return `做到 ${Math.round(g.settled ?? 0)} / ${g.tasks.length} 步`;
+      return rulesWording().graph.running(Math.round(g.settled ?? 0), g.tasks.length);
     case "paused":
-      return "暂停了";
+      return rulesWording().graph.paused;
     case "ready":
-      return "都做完了，等你合进主分支";
+      return rulesWording().graph.ready;
     case "done":
-      return "合进了主分支";
+      return rulesWording().graph.done;
     case "abandoned":
-      return "放弃了";
+      return rulesWording().graph.abandoned;
   }
 }
 
@@ -79,7 +80,12 @@ export function issueSession(core: WorkspaceState | undefined, issue: Issue): Se
 
 export type Lane = "todo" | "working" | "waiting" | "closed";
 export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
-export const laneLabel: Record<Lane, string> = { todo: "待办", working: "处理中", waiting: "等你看", closed: "已关" };
+export const laneLabel: Record<Lane, string> = {
+  todo: rulesWording().board.lane.todo,
+  working: rulesWording().board.lane.working,
+  waiting: rulesWording().board.lane.waiting,
+  closed: rulesWording().board.lane.closed,
+};
 
 /** The status a lane's header is drawn with: the one its cards mostly have. */
 export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
@@ -87,7 +93,11 @@ export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "i
 /** The three acts of a plot (docs/concepts.md): talk it through, get it worked, finish it. */
 export type Stage = "talk" | "work" | "finish";
 export const stages: Stage[] = ["talk", "work", "finish"];
-export const stageLabel: Record<Stage, string> = { talk: "聊清楚", work: "安排活", finish: "完成" };
+export const stageLabel: Record<Stage, string> = {
+  talk: rulesWording().board.stage.talk,
+  work: rulesWording().board.stage.work,
+  finish: rulesWording().board.stage.finish,
+};
 
 export function stageOf(s: IssueStatus): Stage {
   if (s === "backlog") return "talk";
@@ -96,7 +106,7 @@ export function stageOf(s: IssueStatus): Stage {
 }
 
 /** The title an issue made by the plus has until the owner says what it is for. */
-export const newIssueTitle = "新工单";
+export const newIssueTitle = rulesWording().board.newIssue;
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
 export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
@@ -137,17 +147,17 @@ export const closedShown = 15;
 function runTriggerText(t: RunTrigger) {
   switch (t.kind) {
     case "issue":
-      return "派出去";
+      return rulesWording().trigger.issue;
     case "comment":
-      return t.message ? `带话（#${t.message.slice(0, 8)}）` : "带话";
+      return t.message ? rulesWording().trigger.commentNumbered(t.message.slice(0, 8)) : rulesWording().trigger.comment;
     case "task":
-      return "计划";
+      return rulesWording().trigger.task;
     case "recurrence":
-      return t.missed ? "定时（补跑）" : "定时";
+      return t.missed ? rulesWording().trigger.missed : rulesWording().trigger.recurrence;
     case "refine":
-      return "起草";
+      return rulesWording().trigger.refine;
     case "runtime":
-      return "农机自己";
+      return rulesWording().trigger.runtime;
   }
 }
 
@@ -155,8 +165,8 @@ function runTriggerText(t: RunTrigger) {
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),
-    r.outcome ? wording().outcome[r.outcome] : "正在干",
+    r.outcome ? wording().outcome[r.outcome] : rulesWording().run.working,
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
-    ...(r.heard.length ? [`中途听到 ${r.heard.length} 句`] : []),
+    ...(r.heard.length ? [rulesWording().run.heard(r.heard.length)] : []),
   ].join(" · ");

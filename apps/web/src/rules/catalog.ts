@@ -1,6 +1,7 @@
 // 图鉴's shelves: every drawing in sprites.json on a shelf by its name, a
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
 
+import { rulesWording } from "./words";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "./cast";
 
@@ -43,20 +44,30 @@ export interface Shelf {
 }
 
 export const shelves: readonly Shelf[] = [
-  { id: "helpers", label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修", match: isHelper },
-  { id: "orchestrator", label: "管家", hint: "六种样子，各有说话、听和头像", match: (n) => n.startsWith("manager-") },
-  { id: "dog", label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……", match: (n) => n.startsWith("dog-") },
-  { id: "plots", label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着", match: (n) => n.startsWith("plot-") },
-  { id: "yard", label: "院子", hint: "地图、道具、镜头前的草木、小动物", match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n) },
-  { id: "map", label: "地图", hint: "每个项目一座岛，罗盘、云、排队的种子袋、空位的木桩", match: (n) => /^(island|map)-/.test(n) },
-  { id: "machines", label: "农机", hint: "每台是一种 runtime", match: (n) => n.startsWith("machine-") },
-  { id: "icons", label: "图标", hint: "面板、入口和提示用的", match: (n) => n.startsWith("icon-") },
-  { id: "acts", label: "在做什么", hint: "帮工头上的小图标：读、改、跑命令、搜……", match: (n) => n.startsWith("act-") },
-  { id: "medals", label: "奖章与成就", hint: "奖章、成就图案、印章、金币", match: (n) => /^(medal|emblem|stamp|coins|banner)-/.test(n) },
-  { id: "logos", label: "Logo", hint: "农机上的 agent、聊天软件、网页和桌面的图标", match: (n) => /^(logo|connector|app)-/.test(n) },
-  { id: "langs", label: "语言", hint: "项目页上种了什么", match: (n) => n.startsWith("lang-") },
-  { id: "ui", label: "界面", hint: "精力瓶、田头的按钮、日历的格子", match: (n) => /^(button|energy|day)-/.test(n) },
-  { id: "other", label: "其他", hint: "没归上类的", match: () => true },
+  { id: "helpers", label: rulesWording().shelf.helpers.label, hint: rulesWording().shelf.helpers.hint, match: isHelper },
+  { id: "orchestrator", label: rulesWording().card.orchestrator, hint: rulesWording().shelf.orchestrator.hint, match: (n) => n.startsWith("manager-") },
+  { id: "dog", label: rulesWording().shelf.dog.label, hint: rulesWording().shelf.dog.hint, match: (n) => n.startsWith("dog-") },
+  { id: "plots", label: rulesWording().shelf.plots.label, hint: rulesWording().shelf.plots.hint, match: (n) => n.startsWith("plot-") },
+  {
+    id: "yard",
+    label: rulesWording().shelf.yard.label,
+    hint: rulesWording().shelf.yard.hint,
+    match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n),
+  },
+  { id: "map", label: rulesWording().shelf.map.label, hint: rulesWording().shelf.map.hint, match: (n) => /^(island|map)-/.test(n) },
+  { id: "machines", label: rulesWording().shelf.machines.label, hint: rulesWording().shelf.machines.hint, match: (n) => n.startsWith("machine-") },
+  { id: "icons", label: rulesWording().shelf.icons.label, hint: rulesWording().shelf.icons.hint, match: (n) => n.startsWith("icon-") },
+  { id: "acts", label: rulesWording().shelf.acts.label, hint: rulesWording().shelf.acts.hint, match: (n) => n.startsWith("act-") },
+  {
+    id: "medals",
+    label: rulesWording().shelf.medals.label,
+    hint: rulesWording().shelf.medals.hint,
+    match: (n) => /^(medal|emblem|stamp|coins|banner)-/.test(n),
+  },
+  { id: "logos", label: "Logo", hint: rulesWording().shelf.logos.hint, match: (n) => /^(logo|connector|app)-/.test(n) },
+  { id: "langs", label: rulesWording().shelf.langs.label, hint: rulesWording().shelf.langs.hint, match: (n) => n.startsWith("lang-") },
+  { id: "ui", label: rulesWording().shelf.ui.label, hint: rulesWording().shelf.ui.hint, match: (n) => /^(button|energy|day)-/.test(n) },
+  { id: "other", label: rulesWording().shelf.other.label, hint: rulesWording().shelf.other.hint, match: () => true },
 ];
 
 export const shelfOf = (name: string) => shelves.find((s) => s.match(name))!.id;

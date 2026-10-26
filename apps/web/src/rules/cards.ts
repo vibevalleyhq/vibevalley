@@ -1,6 +1,7 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
+import { rulesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./board";
@@ -73,7 +74,7 @@ function cardWords(c: BoardCard): (string | undefined)[] {
       return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
     }
     case "orchestrator":
-      return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, "管家"];
+      return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, rulesWording().card.orchestrator];
     case "task":
       return [c.graph.title, c.graph.goal, c.graph.project, c.graph.id];
   }
@@ -145,13 +146,13 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
   switch (c.kind) {
     case "todo": {
       const item = c.issue;
-      if (item.refining) flags.push({ text: `${item.refining.name}在起草`, tone: "water" });
-      else if (item.status === "backlog") flags.push({ text: "草稿", tone: "wheat" });
-      if (item.queuedAt !== undefined) flags.push({ text: "排队中", tone: "water" });
-      if (item.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
-      lines.push(item.assignee === undefined ? "还没选帮工" : nameOf(item.assignee));
-      if (item.assignee === undefined || item.project === undefined) lines.push("没选帮工或项目，开工前要选好");
-      lines.push(item.queuedAt !== undefined ? `等空位，${ago(item.queuedAt, now)}排上的` : `写于 ${ago(item.createdAt, now)}`);
+      if (item.refining) flags.push({ text: rulesWording().card.refining(item.refining.name), tone: "water" });
+      else if (item.status === "backlog") flags.push({ text: rulesWording().card.draft, tone: "wheat" });
+      if (item.queuedAt !== undefined) flags.push({ text: rulesWording().card.queued, tone: "water" });
+      if (item.recurrence !== undefined) flags.push({ text: rulesWording().card.recurrence, tone: "faint" });
+      lines.push(item.assignee === undefined ? rulesWording().card.noHelper : nameOf(item.assignee));
+      if (item.assignee === undefined || item.project === undefined) lines.push(rulesWording().card.pickFirst);
+      lines.push(item.queuedAt !== undefined ? rulesWording().card.waiting(ago(item.queuedAt, now)) : rulesWording().card.written(ago(item.createdAt, now)));
       return { number: numberOf(item), title: item.title, status: item.status, priority: item.priority, flags, detail: lines.join("\n") };
     }
     case "issue": {
@@ -164,15 +165,23 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const st = issue.attention;
       if (attentionWantsOwner(st.state))
         flags.push({ text: wording().attention[st.state] + (st.stuck ? "：" + wording().stuck[st.stuck] : ""), tone: attentionTone[st.state] });
-      if (issue.canceled === "lost") flags.push({ text: "丢了", tone: "berry" });
-      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.canceled === "lost") flags.push({ text: rulesWording().card.lost, tone: "berry" });
+      if (issue.recurrence !== undefined) flags.push({ text: rulesWording().card.recurrence, tone: "faint" });
       lines.push(head.name);
-      if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(`${tookText(now - phase.quietSince)}没动静`);
-      if (sessions.length > 1) lines.push(`第 ${sessions.length} 次`);
+      if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(rulesWording().card.quiet(tookText(now - phase.quietSince)));
+      if (sessions.length > 1) lines.push(rulesWording().card.nth(sessions.length));
       const turns = Math.round(now0.runs);
       const cny = now0.spent?.cny;
-      const took = tagOpen(tag) ? `开了 ${tookText(now - head.hiredAt)}` : `用了 ${tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt)}`;
-      lines.push([tag === "working" ? `第 ${turns + 1} 轮` : `${turns} 轮`, took, ...(cny !== undefined ? [`¥${cny.toFixed(2)}`] : [])].join(" · "));
+      const took = tagOpen(tag)
+        ? rulesWording().card.open(tookText(now - head.hiredAt))
+        : rulesWording().card.used(tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt));
+      lines.push(
+        [
+          tag === "working" ? rulesWording().card.turn(turns + 1) : rulesWording().card.turns(turns),
+          took,
+          ...(cny !== undefined ? [`¥${cny.toFixed(2)}`] : []),
+        ].join(" · "),
+      );
       const said = now0.lastRun?.summary;
       if (tag === "waiting" && said) lines.push(said);
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
@@ -188,25 +197,25 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     }
     case "orchestrator": {
       const { issue } = c;
-      if (issue.recurrence !== undefined) flags.push({ text: "定时", tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: rulesWording().card.recurrence, tone: "faint" });
       const tag = issueTag(issue);
-      lines.push(tagOpen(tag) ? "管家在做" : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
+      lines.push(tagOpen(tag) ? rulesWording().card.orchestratorWorking : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };
     }
     case "missing":
-      flags.push({ text: "记录缺失", tone: "berry" });
+      flags.push({ text: rulesWording().card.missingFlag, tone: "berry" });
       return {
         number: numberOf(c.issue),
         title: c.issue.title,
         status: c.issue.status,
         priority: c.issue.priority,
         flags,
-        detail: `执行记录缺失：${c.missing.join("、")}`,
+        detail: rulesWording().card.missing(c.missing),
       };
     case "task":
       return {
         number: c.issue ? numberOf(c.issue) : undefined,
-        title: `计划：${c.graph.title}`,
+        title: rulesWording().card.plan(c.graph.title),
         status: c.issue?.status ?? laneStatus[c.lane],
         flags,
         detail: taskLine(c.graph),
