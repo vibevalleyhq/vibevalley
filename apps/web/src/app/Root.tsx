@@ -1,4 +1,4 @@
-import { Loading } from "solid-js";
+import { Loading, onSettled } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { createFrames, FramesContext } from "../data/frame";
@@ -14,10 +14,19 @@ export function Root(props: { children: JSX.Element }) {
         <FarmUiContext value={createFarmUi()}>
           <QueryClientProvider client={queries}>
             {/* A read nobody guarded with ready() waits here rather than leaving the page blank forever. */}
-            <Loading>{props.children}</Loading>
+            <Loading>
+              <Opened />
+              {props.children}
+            </Loading>
           </QueryClientProvider>
         </FarmUiContext>
       </FramesContext>
     </RouterContext>
   );
+}
+
+/** The page is up: the bar index.html started on (public/opening.html) goes; until then it covers the empty page. */
+function Opened() {
+  onSettled(() => document.getElementById("opening")?.remove());
+  return null;
 }

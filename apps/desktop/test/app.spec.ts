@@ -3,7 +3,7 @@
 // the host interface reaches the main process. Which calls ring is apps/web/src/rules/notice.ts's (its own tests).
 
 import { _electron as electron, expect, test } from "@playwright/test";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { VibeValleyApi } from "@vibevalley/protocol";
@@ -59,4 +59,25 @@ test("the desktop app shows the live board and sends a notice", async () => {
   }
   // Quitting stopped the server it started.
   await expect(fetch(server + "/api/v1/health")).rejects.toThrow();
+});
+
+test("the window opens on the bar at once, and says there why the server could not start", async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vibevalley-desktop-")));
+  // A file where the farm's home should be: the server cannot start in it.
+  const home = join(dir, "home");
+  writeFileSync(home, "");
+  const app = await electron.launch({
+    args: [`--user-data-dir=${join(dir, "electron")}`, join(import.meta.dirname, "..")],
+    env: { ...cleanEnv(), HOME: dir, VIBEVALLEY_HOME: home, VIBEVALLEY_WORK_ROOT: join(dir, "work") },
+  });
+  try {
+    const page = await app.firstWindow();
+    await expect(page).toHaveURL(/\/opening\.html\?problem=/);
+    await expect(page.getByText(/^农场起不来：/)).toBeVisible();
+    await expect(page.getByRole("progressbar")).toHaveCount(0);
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
+    await page.screenshot({ path: test.info().outputPath("problem.png") });
+  } finally {
+    await app.close();
+  }
 });

@@ -49,12 +49,15 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 **开机（桌面）**
 
 1. Electron 拿单实例锁；拿不到就退出，让已经开着的那个出来。
-2. 问登录 shell 要 PATH（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的），因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。
-3. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
-4. 等收据：服务端开始答 HTTP 以后在 stdout 写一行 JSON（`url`、`pid`）。40 秒没有、或子进程先退出，就停掉它，弹框说原因和日志在哪，应用退出。
-5. 开窗口到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
+2. 马上开窗口，先放页面文件里的 `opening.html`（`apps/web/public`，从应用自己的文件读，不经服务端）：一条在走的条和「叫醒农场……」，样子和农场的「进村」条一样，窗口底色是页面的地色。
+3. 问登录 shell 要 PATH（`loginShellPath`，`$SHELL -ilc`，5 秒，问不到用原来的），因为从 Finder 或登录时打开的应用拿不到 pi、claude、codex 所在的 PATH。
+4. `startServer` 用 Electron 自己的 Node（`ELECTRON_RUN_AS_NODE=1`）带 tsx 起 `apps/server/src/main.ts --ready-json --web <页面>`，`VIBEVALLEY_PORT=0`，工作目录是服务端的文件夹（开发时是仓库的 `apps/server`，打包的应用是 `Contents/Resources/server`），其余配置读家目录的 `vibevalley.yaml`。stdout 和 stderr 都追加进 `$VIBEVALLEY_HOME/logs/desktop-server.log`。
+5. 等收据：服务端开始答 HTTP 以后在 stdout 写一行 JSON（`url`、`pid`）。40 秒没有、或子进程先退出，就停掉它，窗口换成同一页带着原因（`?problem=`，「农场起不来：……，日志在 ……」），关掉窗口应用退出；窗口已经被关掉时弹框说。
+6. 窗口换到那个地址；注册 ⌥⇧Space（被别的程序占了也照常开，页面的通话按钮还能用）。
 
-**退出**：退出前先停服务端：SIGTERM，让它存好状态，8 秒没退就 SIGKILL；注销快捷键。macOS 上关窗口不退出，点 Dock 图标再开窗口。
+**打开页面**：`index.html` 构建时嵌进 `opening.html` 里同一段条（`apps/web/vite.config.ts` 的 `opening`），所以页面的脚本还没跑起来时就是这条；`Root` 的 `<Loading>` 第一次安定下来时把它拿掉，农场自己的「进村」条在同一个位置接着走。
+
+**退出**：退出前先停服务端（还在起来的，等它起来再停）：SIGTERM，让它存好状态，8 秒没退就 SIGKILL；注销快捷键。macOS 上关窗口不退出，点 Dock 图标再开窗口。
 
 **首页**：只在这台设备第一次打开农场时出来（`localStorage` 的 `vibevalley.title.seen`），之后直接进农场，菜单的「回到首页」能回去。
 
@@ -92,6 +95,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **推折好的整份状态，页面不折。** 页面再写一份 `reduce` 就是第二份核心状态，两边改规则靠自觉对齐。推整份的代价是带宽：一份真实状态几十 KB，本机和局域网没问题；要换增量时，增量格式又是一份两端都要遵守的约定。
 - **页面问服务端，不移植规则。** 页面要的只是结论；档案的问题依赖没存的草稿，记性的预览依赖主人正在打的字，都不是农场的状态，所以另开接口问。服务端和页面都要的纯规则放进 `packages/protocol`，一份代码两处用。
 - **只给真实数据。** 服务端没开时换成模拟农场，提示再大也会被当成真的；没有服务端就说没有。
+- **窗口先开，再等服务端。** 等服务端时没有窗口，双击以后几秒（第一次开、要建库时十来秒）屏幕上什么都没有，像没打开。加载条是一个不靠服务端、也不跑页面脚本的静态文件，所以能在服务端起来之前从应用自己的文件里打开；页面的 `index.html` 带着同一段，换页时画面不跳。放弃了在 Electron 里另画一个窗口（两份样子），和弹系统的启动画面（不像游戏，起不来时也说不了原因）。
 - **子进程自己发布就绪地址。** 宿主先绑端口 0、读出端口、关掉再交给服务端，关掉到重绑之间端口可能被抢；从人读的日志里找地址，日志措辞就成了协议。绑定结果只有子进程知道，所以由它写一行 JSON 说出来。
 - **宿主接口封闭、缺的是 null。** 页面问「我在哪个壳里」再分支，每加一个宿主就要改每一处；按能力有没有来画，加宿主只是实现一遍接口。
 - **连进来的浏览器用 cookie 带钥匙。** 页面的状态流和 REST 都走 `fetch`，同源的 cookie 自动带上，页面不用改；监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。
@@ -109,6 +113,6 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 - 页面的规则：`apps/web/src/rules/*.test.ts`（看板、通知和菜单栏摘要、一轮的瀑布图、项目、文档的块、远端和配对……）。
 - 每块页面的 Playwright：`apps/web/test/*.spec.ts`，每个 worker 一个真的服务端；`shell.spec.ts` 查每个地方在自己的外框里打开，`pair.spec.ts` 查一台「手机」经「连接到本机」配对后打开工单。
-- 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键。
+- 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键；家目录是个文件、服务端起不来时，窗口先开在加载条上，再换成原因。
 - 打包：`vp run package:mac` 后用临时家目录开 `apps/desktop/dist/mac-arm64/VibeValley.app`，`desktop-server.log` 里有收据，`curl` 那个地址拿到页面和接口。
 - 真程序：`acceptance/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。
