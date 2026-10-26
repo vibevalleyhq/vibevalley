@@ -71,6 +71,8 @@ export default defineConfig({
       "typescript/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
       // Modules that import each other have no order to read, test or start them in.
       "import/no-cycle": "error",
+      // A promise handed where nothing awaits it (a callback, a condition) fails, or is always true, without anyone seeing.
+      "typescript/no-misused-promises": "error",
       // ({ secret: _, ...rest }) leaves a field out.
       "eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },

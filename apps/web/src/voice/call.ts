@@ -121,17 +121,18 @@ export class VoiceCall {
           },
           problem: (text) => mine() && ((this.problem = text), this.changed()),
           // The token lasts an hour: a fresh one for the same channel and uid before it runs out.
-          expiring: async () => {
-            if (!mine()) return;
-            try {
-              const fresh = await api.voice.renew({ body: { channel: session.channel, uid: session.uid } });
-              if (mine()) await line!.renew(fresh.token);
-            } catch (e) {
+          expiring: () =>
+            void (async () => {
               if (!mine()) return;
-              this.problem = `令牌续期失败：${reasonOf(e)}`;
-              this.changed();
-            }
-          },
+              try {
+                const fresh = await api.voice.renew({ body: { channel: session.channel, uid: session.uid } });
+                if (mine()) await line!.renew(fresh.token);
+              } catch (e) {
+                if (!mine()) return;
+                this.problem = `令牌续期失败：${reasonOf(e)}`;
+                this.changed();
+              }
+            })(),
         }).then(async (l) => {
           if (cancelled) {
             await l.leave();

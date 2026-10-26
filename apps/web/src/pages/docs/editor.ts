@@ -168,13 +168,7 @@ export class DocEditor {
   private recurrence() {
     clearTimeout(this.poll);
     if (this.disposed) return;
-    this.poll = setTimeout(
-      async () => {
-        await this.refresh();
-        this.recurrence();
-      },
-      this.othersWriting ? pollFast : pollEvery,
-    );
+    this.poll = setTimeout(() => void this.refresh().then(() => this.recurrence()), this.othersWriting ? pollFast : pollEvery);
   }
 
   private async refresh() {

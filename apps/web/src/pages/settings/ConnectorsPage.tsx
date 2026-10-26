@@ -149,7 +149,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const label = () => connectorLabel[props.id];
   const disconnect = () => (
     <div>
-      <Button tone="danger" disabled={busy()} onClick={logout}>
+      <Button tone="danger" disabled={busy()} onClick={() => void logout()}>
         断开
       </Button>
     </div>
@@ -159,21 +159,21 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
     <Card title={label()} action={<span class="text-sm text-muted">{stateLabel[state()]}</span>}>
       <Switch>
         <Match when={state() === "off"}>
-          <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => login({ appId, secret })} />}>
+          <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
             <p class="text-sm">
               {props.id === "weixin"
                 ? "用手机微信扫一个码，就能在微信里和管家说话：派活、问进度，帮工的汇报和提问也会发到微信上。"
                 : "用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和管家说话。"}
             </p>
             <div>
-              <Button tone="primary" disabled={busy()} onClick={() => login()}>
+              <Button tone="primary" disabled={busy()} onClick={() => void login()}>
                 {label()}扫码登录
               </Button>
             </div>
           </Show>
         </Match>
         <Match when={state() === "waiting" || state() === "scanned" || state() === "verify"}>
-          <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => login({ force: true })} onVerify={verify} />
+          <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => void login({ force: true })} onVerify={(code) => void verify(code)} />
         </Match>
         <Match when={state() === "pairing"}>
           <p class="text-sm">机器人连上了。最后一步：用你自己的{label()}，私聊这个机器人，发：</p>

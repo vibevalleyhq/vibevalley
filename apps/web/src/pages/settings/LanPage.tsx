@@ -46,7 +46,7 @@ export function LanPage() {
                   <>
                     <p class="text-sm">打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在田头说话。</p>
                     <div>
-                      <Button tone="primary" onClick={() => act(() => api.lan.update({ body: { open: true } }))}>
+                      <Button tone="primary" onClick={() => void act(() => api.lan.update({ body: { open: true } }))}>
                         允许连接
                       </Button>
                     </div>
@@ -61,10 +61,10 @@ export function LanPage() {
                   when={s().pairing}
                   fallback={
                     <div class="flex flex-wrap gap-2">
-                      <Button tone="primary" disabled={!s().url} onClick={() => act(() => api.lan.startPairing())}>
+                      <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.startPairing())}>
                         添加设备
                       </Button>
-                      <Button onClick={() => act(() => api.lan.update({ body: { open: false } }))}>关掉连接</Button>
+                      <Button onClick={() => void act(() => api.lan.update({ body: { open: false } }))}>关掉连接</Button>
                     </div>
                   }
                 >
@@ -100,7 +100,7 @@ export function LanPage() {
                       配对于 {momentText(d.pairedAt)} · {d.lastSeen ? `上次来 ${momentText(d.lastSeen)}` : "还没来过"}
                     </span>
                   </span>
-                  <Button tone="danger" aria-label={`移除 ${d.name}`} onClick={() => act(() => api.lan.deleteDevice({ id: d.id }))}>
+                  <Button tone="danger" aria-label={`移除 ${d.name}`} onClick={() => void act(() => api.lan.deleteDevice({ id: d.id }))}>
                     移除
                   </Button>
                 </div>
@@ -141,8 +141,8 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
               <Button icon="button-copy" onClick={() => void copy(props.pairing.link)}>
                 复制链接
               </Button>
-              <Button onClick={() => props.act(() => api.lan.startPairing())}>换一个码</Button>
-              <Button onClick={() => props.act(() => api.lan.stopPairing())}>不加了</Button>
+              <Button onClick={() => void props.act(() => api.lan.startPairing())}>换一个码</Button>
+              <Button onClick={() => void props.act(() => api.lan.stopPairing())}>不加了</Button>
             </div>
           </div>
         </div>
@@ -152,10 +152,10 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
         <div class="flex flex-col gap-3">
           <p class="text-sm">「{asking()}」想连接到这台电脑。让它进来以后，它能和你一样用这台电脑上的 VibeValley。</p>
           <div class="flex gap-2">
-            <Button tone="primary" onClick={() => props.act(() => api.lan.answerPairing({ body: { allow: true } }))}>
+            <Button tone="primary" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: true } }))}>
               让它进来
             </Button>
-            <Button tone="danger" onClick={() => props.act(() => api.lan.answerPairing({ body: { allow: false } }))}>
+            <Button tone="danger" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: false } }))}>
               不让
             </Button>
           </div>

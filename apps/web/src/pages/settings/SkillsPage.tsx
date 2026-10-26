@@ -187,14 +187,14 @@ function SkillEditor(props: { skill?: Skill }) {
             {(s) => (
               <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>删除</Button>}>
                 <span class="text-xs text-muted">{agents().length > 0 ? `${agents().length} 个 agent 在用，删掉会从它们身上去掉。` : "删掉？"}</span>
-                <Button tone="danger" disabled={busy()} onClick={() => remove(s())}>
+                <Button tone="danger" disabled={busy()} onClick={() => void remove(s())}>
                   删除
                 </Button>
                 <Button onClick={() => setSure(false)}>算了</Button>
               </Show>
             )}
           </Show>
-          <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={save}>
+          <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
             保存
           </Button>
         </div>

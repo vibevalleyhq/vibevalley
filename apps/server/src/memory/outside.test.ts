@@ -111,11 +111,14 @@ class FakeNowledge {
 
   async serve() {
     const url = await listen(
-      createServer(async (req, res) => {
-        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-        await this.server().connect(transport);
-        await transport.handleRequest(req, res, req.method === "POST" ? await bodyOf(req) : undefined);
-      }),
+      createServer(
+        (req, res) =>
+          void (async () => {
+            const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+            await this.server().connect(transport);
+            await transport.handleRequest(req, res, req.method === "POST" ? await bodyOf(req) : undefined);
+          })(),
+      ),
     );
     return url + "/mcp/";
   }
@@ -133,42 +136,45 @@ class FakeEveros {
   searchData: unknown;
   serve() {
     return listen(
-      createServer(async (req, res) => {
-        const body = ((await bodyOf(req)) ?? {}) as Record<string, unknown>;
-        this.requests.push({ path: req.url ?? "", auth: req.headers.authorization ?? "", body });
-        res.setHeader("Content-Type", "application/json");
-        if (req.url === "/api/v2/memory/search") {
-          const data =
-            body.user_id !== undefined
-              ? {
-                  episodes: [
-                    {
-                      id: "ep-1",
-                      subject: "登录页",
-                      summary: "主人让修登录页，改完了",
-                      score: 0.7,
-                      app_id: body.app_id ?? "default",
-                      project_id: body.project_id ?? "default",
-                    },
-                  ],
-                }
-              : {
-                  agent_cases: [
-                    {
-                      id: "case-1",
-                      task_intent: "给打卡接口加分页",
-                      approach: "先跑 pnpm test",
-                      key_insight: "分页参数从 1 开始",
-                      score: 0.8,
-                      app_id: body.app_id ?? "default",
-                      project_id: body.project_id ?? "default",
-                    },
-                  ],
-                };
-          res.end(JSON.stringify(this.searchData === undefined ? { request_id: "r1", data } : this.searchData));
-        } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(JSON.stringify({ request_id: "r2", data: {} }));
-        else res.writeHead(404).end();
-      }),
+      createServer(
+        (req, res) =>
+          void (async () => {
+            const body = ((await bodyOf(req)) ?? {}) as Record<string, unknown>;
+            this.requests.push({ path: req.url ?? "", auth: req.headers.authorization ?? "", body });
+            res.setHeader("Content-Type", "application/json");
+            if (req.url === "/api/v2/memory/search") {
+              const data =
+                body.user_id !== undefined
+                  ? {
+                      episodes: [
+                        {
+                          id: "ep-1",
+                          subject: "登录页",
+                          summary: "主人让修登录页，改完了",
+                          score: 0.7,
+                          app_id: body.app_id ?? "default",
+                          project_id: body.project_id ?? "default",
+                        },
+                      ],
+                    }
+                  : {
+                      agent_cases: [
+                        {
+                          id: "case-1",
+                          task_intent: "给打卡接口加分页",
+                          approach: "先跑 pnpm test",
+                          key_insight: "分页参数从 1 开始",
+                          score: 0.8,
+                          app_id: body.app_id ?? "default",
+                          project_id: body.project_id ?? "default",
+                        },
+                      ],
+                    };
+              res.end(JSON.stringify(this.searchData === undefined ? { request_id: "r1", data } : this.searchData));
+            } else if (req.url === "/api/v2/memory/add" || req.url === "/api/v2/memory/flush") res.end(JSON.stringify({ request_id: "r2", data: {} }));
+            else res.writeHead(404).end();
+          })(),
+      ),
     );
   }
   seen(path: string) {
