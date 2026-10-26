@@ -9,6 +9,7 @@ import { Core } from "../core/core.ts";
 import { Issues } from "../issue/issue.ts";
 import { Sessions } from "../session/session.ts";
 import { await_, farm, git, lab, mustHire, until, watch } from "./farm.ts";
+import { releaseHeld } from "../testing/helper.ts";
 
 const drafting = (core: Core["Service"]) => core.state().sessions.some((h) => h.refining);
 
@@ -51,6 +52,7 @@ describe("a refined issue", () => {
       expect(got.moves).toEqual(["canceled"]);
       expect((yield* Effect.flip(issues.setStatus(issue.id, "todo", "", "")))._tag).toBe("Refused");
       expect((yield* Effect.flip(issues.refine(issue.id, "再来", "")))._tag).toBe("Refused");
+      yield* releaseHeld();
 
       issue = yield* await_(
         () => issues.get(issue.id),
@@ -127,11 +129,12 @@ describe("a refined issue", () => {
       const core = yield* Core;
       yield* (yield* Agents).saveAgent(lab());
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
-      // Slow enough for the thread to open before it hands back, as any real draft is.
+      // Held until the issue's thread is open, as it is before any real draft hands back.
       const before = yield* issues.refine(issue.id, "慢慢乱写一通", "");
-      yield* until(() => !drafting(core), "the refiner left");
       const thread = () => core.state().chat?.conversations?.find((c) => c.subjectId === issue.id)?.id;
       yield* until(() => thread() !== undefined, "the issue's thread");
+      yield* releaseHeld();
+      yield* until(() => !drafting(core), "the refiner left");
       yield* until(
         () => messagesIn(core.state().chat, thread()!).some((m) => m.kind === "notice" && m.text.includes("读不出来")),
         "the thread says the draft did not read",

@@ -10,26 +10,53 @@ import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { factsOf, presetOf } from "../agent/seed.ts";
 import { answerOpening, criteriaHead } from "../issue/rules.ts";
 import { jobBreak } from "../session/rules.ts";
+import { Effect } from "effect";
+import { until } from "./until.ts";
 
 const sessionGit = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-c", "user.name=session", "-c", "user.email=session@vibevalley.test", ...args], { cwd, stdio: "ignore" });
 
 const version = /写版本(\w)/;
 
-/** Waits ms, or until the turn is stopped: true when it was. */
-const idle = (turn: ScriptedTurn, ms: number) =>
+/** Turns held by 慢慢 or 发呆 until the test lets them go on (releaseHeld), 1.5 s pass, or they are stopped: a test acts
+ * while a session is busy, then says when it may finish, instead of waiting out a timer. */
+const held = new Set<() => void>();
+
+/** Once n turns are held, lets every held turn go on: a turn not yet at its hold would miss a release made before. */
+export const releaseHeld = (n = 1) =>
+  Effect.andThen(
+    until(() => held.size >= n, `${n} held turn${n === 1 ? "" : "s"}`),
+    Effect.sync(() => {
+      for (const go of [...held]) go();
+    }),
+  );
+
+/** Holds the turn as above: true when it was stopped. */
+const hold = (turn: ScriptedTurn) =>
   new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => resolve(false), ms);
-    turn.signal.addEventListener("abort", () => {
+    // The page's tests cannot release: a turn goes on by itself after this long, as it always did.
+    const timer = setTimeout(() => go(), 1_500);
+    const go = () => {
       clearTimeout(timer);
-      resolve(true);
-    });
+      held.delete(go);
+      resolve(false);
+    };
+    held.add(go);
+    turn.signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        held.delete(go);
+        resolve(true);
+      },
+      { once: true },
+    );
   });
 
-/** A drafting session: 慢慢 takes its time, 顺手提交 changes and commits what it should not, 乱写 hands back no block; the
- * answer 用 8797 makes the second version, which asks nothing. */
+/** A drafting session: 慢慢 is held (releaseHeld), 顺手提交 changes and commits what it should not, 乱写 hands back no
+ * block; the answer 用 8797 makes the second version, which asks nothing. */
 async function draft(turn: ScriptedTurn, input: string) {
-  if (input.includes("慢慢") && (await idle(turn, 1500))) return;
+  if (input.includes("慢慢") && (await hold(turn))) return;
   if (input.includes("乱写")) return turn.say("看了一圈，不知道写什么。\n\n结论：没写出来");
   const cwd = turn.options.cwd;
   if (input.includes("顺手提交")) {
@@ -71,7 +98,7 @@ async function answer(turn: ScriptedTurn, input: string) {
 }
 
 /** The helper every flow hires: what it does is in the words of its job (the part after the reminders). 只起草工单 drafts;
- * 必败 fails; 发呆 idles a while; 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
+ * 必败 fails; 发呆 is held (releaseHeld); 写版本X commits same.ts as X; 有冲突 merges main and settles same.ts; 提交 commits
  * clock.ts; 先问清楚 asks the owner until 用 8797 is said (给选项: with 用 8787 and 用 8797 to pick); 记一笔 notes two
  * memories. It answers with its job and persona, and says of each numbered criterion that it was met. */
 export const helper = (turns: ScriptedTurn[] = []): Runtime =>
@@ -84,7 +111,7 @@ export const helper = (turns: ScriptedTurn[] = []): Runtime =>
       if (input.includes("只起草工单")) return draft(turn, input);
       if (input.includes(answerOpening) || input.includes("结论读不出来")) return answer(turn, input);
       if (input.includes("必败")) throw new Error("provider said no");
-      if (input.includes("发呆") && (await idle(turn, 1500))) return;
+      if (input.includes("发呆") && (await hold(turn))) return;
       const cwd = turn.options.cwd;
       const v = version.exec(input)?.[1];
       if (v !== undefined) {
