@@ -150,8 +150,10 @@ export function nowledge(c: MemorySourceConfig): Source {
   const add = async (agent: string, text: string, project: string, signal: AbortSignal) => {
     const body = redact(text);
     const answer = await call("memory_add", { content: body, title: head(body, 60), labels: nowledgeLabels(agent, project), source_app: app }, signal);
-    // The new memory's id, at the top or under memory; none when it found the same memory there already.
-    const added = Option.getOrUndefined(Schema.decodeUnknownOption(AddedResponse)(answer)) ?? {};
+    // The new memory's id, at the top or under memory; none when it found the same memory there already. An answer of
+    // another shape is not taken for that: the note may not have been kept, and saying so lets the source's queue log it.
+    const added = Option.getOrUndefined(Schema.decodeUnknownOption(AddedResponse)(answer));
+    if (!added) throw new Error("memory_add answered what it should not: " + head(answer, 200));
     return added.memory_id || added.id || added.memory?.id || "";
   };
 

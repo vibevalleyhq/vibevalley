@@ -367,6 +367,11 @@ export const make = (options: OrchestratorOptions = {}) =>
     // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
     const answer = (line: string, signal?: AbortSignal): AsyncIterable<string> => {
       const me = new Caller();
+      // A caller that already left (the request was cancelled before this ran) is not answered: no run starts for it.
+      if (signal?.aborted) {
+        me.end();
+        return me.words(signal);
+      }
       latestCall?.end();
       latestCall = me;
       signal?.addEventListener(

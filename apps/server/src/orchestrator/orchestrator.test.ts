@@ -228,6 +228,22 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  it.live("does not start an answer whose caller already left", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator;
+      const words = orchestrator.answerer("api")(orchestratorModel)!("在吗", AbortSignal.abort());
+      const said = yield* Effect.promise(async () => {
+        let out = "";
+        for await (const w of words) out += w;
+        return out;
+      });
+      expect(said).toBe("");
+      yield* settle;
+      expect(f.requests).toHaveLength(0);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("says once why it cannot start", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {

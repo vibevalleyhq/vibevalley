@@ -88,7 +88,9 @@ export function chatCompletions(c: ChatCompletions) {
     const text = newestUserText(req);
     if (!text && !c.misheard) return refuse(400, "invalid_request_error", "no_user_message", "no user message to answer");
     const ended = new AbortController();
-    request.signal.addEventListener("abort", () => ended.abort(), { once: true });
+    // An abort before this line has already fired: it is passed on as it is, so the answer is not started for nobody.
+    if (request.signal.aborted) ended.abort();
+    else request.signal.addEventListener("abort", () => ended.abort(), { once: true });
     const words = text ? answer(text, ended.signal) : once(c.misheard!);
     const id = "chatcmpl-" + randomBytes(6).toString("hex");
     const created = Math.floor(asked / 1000);
