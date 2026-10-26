@@ -9,7 +9,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 | 页面、两种语言的文字、404 页、分享卡片 | 游戏里的首页场景和它的摆放（`apps/web/src/farm/title/`，[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
 | 构建时压缩图片、裁像素字、画分享卡片 | 图本身：生图、切图（`design/`），切好的在 `apps/web/public` |
 | 页面上农场数字的抄本（`facts.ts`） | 这些数的真值：农机、帮工的样子、地数、成就、小游戏、连接器（`packages/protocol`、`apps/web/src/farm/phone`） |
-| 发布到 Cloudflare | 截图怎么拍（`verify-app` 的 Playwright，截图在 `docs/images/`，README 也用） |
+| 发布到 Cloudflare | 截图怎么拍（`acceptance/page.md` 的 Playwright，截图在 `docs/images/`，README 也用） |
 | | 演讲稿（`site/talks/<场>/`，讲完挪进 `public/talks/` 原样发布，约定在 [site/README.md](site/README.md#演讲稿)） |
 
 ## 在哪
@@ -66,7 +66,7 @@ vibevalley.dev 是仓库 `site/` 里的一页静态网页：Astro 构建时渲�
 
 - **`apps/web/public`**：`title/` 的场景贴图和 `title/sprites.json`（`scene.ts` 读尺寸）、`pixel/` 的背景、图标、帮工的帧、地块和 `pixel/sprites.json`（`assets.ts` 读尺寸和站点）、`fonts/` 的像素字。改了文件名，官网构建报错（`no picture`、`no sprite`）。
 - **游戏的首页**（`apps/web/src/farm/title/`）：官网的 `scene.ts` 和 `global.css` 的动法是同一套摆放的另一份；改了一边，另一边跟着改。
-- **`docs/images`**：截图，README 和官网共用，界面变了照 `verify-app` 重拍。
+- **`docs/images`**：截图，README 和官网共用，界面变了照 `acceptance/page.md` 重拍。
 - **游戏代码里的数**：`facts.ts` 抄 `packages/protocol/src/shapes.ts`（样子、连接器、`maxRunning`）、`apps/server/src/agent/seeds.json` 的成就、`apps/web/src/farm/phone/screens.tsx`（小游戏）；在用的四台农机见[其他农机的提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。那边变了要手改这里。
 - **Cloudflare**：DNS 和 Worker；没有按分支的预览地址。
 - **GitHub**：`links.ts` 的仓库地址，仓库公开以前打不开。

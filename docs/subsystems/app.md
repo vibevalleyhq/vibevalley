@@ -80,7 +80,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **「连接到本机」（`lan`）**：它的监听把页面放给任何人（页面里没有农场的东西），接口和流只放带钥匙的；配对的链接是 `http://<地址>:<端口>/pair?c=<码>`，手机相机扫开就是浏览器里的 `/pair`。
 - **设置（`setting`）**：设置页读写设置，保存前问 `settings/check`；钥匙从不回到页面，页面只看到来源和末四位。
 - **语音（`voice`）**：通话在 `src/voice/call.ts`（`voiceCall`），按钮和 ⌥⇧Space 发同一个动作；Agora 的 SDK 只在那里动态 import。
-- **验证脚本**：`scripts/verify-server.ts` 起一个隔离的服务端，`verify-app` 对着它用 Playwright 截图。
+- **验证脚本**：`scripts/verify-server.ts` 起一个隔离的服务端，`acceptance/page.md` 对着它用 Playwright 截图。
 
 ## 为什么这样
 
@@ -111,4 +111,4 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - 每块页面的 Playwright：`apps/web/test/*.spec.ts`，每个 worker 一个真的服务端；`shell.spec.ts` 查每个地方在自己的外框里打开，`pair.spec.ts` 查一台「手机」经「连接到本机」配对后打开工单。
 - 桌面壳：`apps/desktop/test/app.spec.ts` 起整个 Electron 应用（临时家目录），查看板、系统通知、菜单栏摘要和快捷键。
 - 打包：`bun run package:mac` 后用临时家目录开 `apps/desktop/dist/mac-arm64/VibeValley.app`，`desktop-server.log` 里有收据，`curl` 那个地址拿到页面和接口。
-- 真程序：`verify-app`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。
+- 真程序：`acceptance/page.md`（Playwright 对着 `scripts/verify-server.ts` 起的服务端截每一页）。

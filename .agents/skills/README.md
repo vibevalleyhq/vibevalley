@@ -2,13 +2,10 @@
 
 这里放这个项目自己的 skill：要 agent 判断、写不成代码或检查的做法（[AGENTS.md](AGENTS.md#怎么让-agent-做对) 的第 3 层）。`.claude/skills` 是指向这里的链接，Claude Code 和 Codex 读同一份。`bun run docs:verify` 查每个 skill 的格式，也查下面的表和目录对得上（[scripts/skills.ts](scripts/skills.ts)）。
 
-现在的 skill 多是**验证 skill**（`verify-*`）：改了一块以后，怎么在真的程序上证明它对了。新写一个照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md)。
+验收（改完以后在真的程序上证明它对了）只有一个 skill：[acceptance](.agents/skills/acceptance/SKILL.md)。它的 `SKILL.md` 是入口，写共同的沙箱、证据和收拾，再按「改了什么」把 agent 指到同目录的一份分册（服务端、页面、手机壳、管家的评测），只读用得上的那份。新的一块照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 加一份分册。
 
 | skill | 什么时候用 | 证明什么 |
 |---|---|---|
-| [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) | 一类改动没有现成的验证办法 | 写出下一个 agent 照着就能做的验证步骤 |
+| [acceptance](.agents/skills/acceptance/SKILL.md) | 改了接口、服务、表结构、页面、手机壳、管家的提示之后，汇报之前 | 隔开的服务端起得来、接口和状态里有这次的改动、页面画对了、手机配得上；管家的评测用真模型重放（花钱，先问主人） |
+| [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) | 一类改动没有现成的验收办法 | 给 acceptance 写出下一个 agent 照着就能做的一份分册 |
 | [effect-ts](.agents/skills/effect-ts/SKILL.md) | 给一个用 Effect 的仓库做准备：装 `effect`、在 AGENTS.md 里指到它自带的 `AGENTS.md` 和源码（照抄自 [Effect-TS/skills](https://github.com/Effect-TS/skills/tree/main/skills/effect-ts)，不改） | 写 Effect 的 agent 先读 Effect 自己的指南，再查 `node_modules/effect/src` |
-| [verify-server](.agents/skills/verify-server/SKILL.md) | 改了 `apps/server` 的接口、服务、表结构、开机 | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动 |
-| [verify-app](.agents/skills/verify-app/SKILL.md) | 改了 `apps/web` 的页面、组件、贴图 | 对着真的服务端，页面画出来是对的（截图） |
-| [verify-mobile](.agents/skills/verify-mobile/SKILL.md) | 改了 `apps/mobile`、宿主的桥、「连接到本机」的配对 | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
-| [verify-orchestrator-evals](.agents/skills/verify-orchestrator-evals/SKILL.md) | 改了管家的提示、工具描述或 `agent/brain` 的提示拼法；加了管家的样例 | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了（花钱，先问主人） |

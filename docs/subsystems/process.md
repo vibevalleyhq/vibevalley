@@ -31,7 +31,7 @@
 - **链接从仓库根写**，不写 `../`、`./`，不以 `/` 开头；目标要存在，大小写要和磁盘上的文件一致（macOS 不分大小写，`agents.md` 会打开 `AGENTS.md`）。外链不抓、`#片段` 不查；代码块和反引号里的链接算例子。
 - **反引号里的源文件路径也查**：带一层以上目录、扩展名是 `go`、`dart`、`ts`、`tsx`、`astro`、`sql`、`json`、`yaml`、`sh`、`py`、`gz` 的，要能在仓库里找到；可以从仓库根写、从包里写（`core/core.ts`），或相对文档所在目录。范围是全部受管的 Markdown，除了 `.agents/notes/`（Note 写的是当时的文件）。没目录或扩展名不在表里的（家目录里的 `config.json`）不查；还没 `git add` 的新文件也算在仓库里。类型和函数名不查。
 - **旧名字只在代码里查**：`stale-names.ts` 扫 `apps/server/src`、`apps/web/src`、`apps/web/test`、`packages/protocol/src` 的 TypeScript，命中时报文件、行号和该写成什么。一个名字进这张表，要求改名本身是个决定，而不是这个词还有别的正经意思（测试的 helper、界面上的帮工、游戏里的收获都不算）。
-- **skill 放在 `.agents/skills/<名字>/SKILL.md`**：frontmatter 的 `name` 和目录同名、`description` 不空；`verify-*` 必须有「什么时候用」「准备」「步骤」「证据」「出错时」「收拾」六节；README 的表和目录一一对得上；`.claude/skills` 必须是指向 `../.agents/skills` 的符号链接。
+- **skill 放在 `.agents/skills/<名字>/SKILL.md`**：frontmatter 的 `name` 和目录同名、`description` 不空；`acceptance` 的入口和每份分册（同目录的其他 `.md`）都要有「什么时候用」「准备」「步骤」「证据」「出错时」「收拾」六节，入口的表正好列全分册；README 的表和目录一一对得上；`.claude/skills` 必须是指向 `../.agents/skills` 的符号链接。
 - **名字**：给人看的地方用 VibeValley 和码农场物语（窗口、首页、通知、Dock 写码农场物语，文档正文写 VibeValley），代码、命令、目录、环境变量（`VIBEVALLEY_*`）、分支（`vibevalley/…`）、bundle id（`dev.vibevalley.app`）写小写的 `vibevalley`；GitHub 组织是 `vibevalleyhq`，官网 vibevalley.dev。改名以前就删掉的东西（旧 TypeScript 服务端、Electron 应用）讲到时照旧写它当时的名字，只有还在的东西用新名字。代码里不认旧名字。
 
 ## 怎么走
@@ -54,7 +54,7 @@
 - **根目录 `AGENTS.md`**：「怎么让 agent 做对」一节是四层手段的常驻版本，理由链到这里；规矩列表里每条链到它的家。
 - **各子系统**：沉淀的去处；`docs:verify` 查它们的链接和路径。
 - **地基、客户端**：它们的检查（黄金数据、`schema.test.ts`、`db:check`、各包的类型）是第 2 层的另一半，跟着各自的代码住。
-- **验证 skill**：`verify-server`、`verify-app` 用 `scripts/verify-server.ts` 起隔离的服务端；`verify-orchestrator-evals` 归[管家](docs/subsystems/orchestrator.md)。
+- **验收只有一个 skill**：[acceptance](.agents/skills/acceptance/SKILL.md) 的入口写共同的沙箱（`scripts/verify-server.ts` 起隔离的服务端）、证据和收拾，按「改了什么」指到一份分册（服务端、页面、手机壳、管家的评测，管家的评测归[管家](docs/subsystems/orchestrator.md)）。一个入口，agent 改完不用先猜该找哪个 skill；分册只在用得上时读，验一个接口不带上模拟器和花钱的步骤。
 - **农场的皮**：读 `process.py` 写出的 `apps/web/public/pixel/` 和 `sprites.json`；界面按钮图标只用这条流水线的贴图（[AGENTS.md](AGENTS.md#规矩)「图标是像素素材」）。
 
 ## 为什么这样
@@ -80,6 +80,6 @@
 ## 怎么验证
 
 - `bun run docs:verify`：依次跑 `agent-notes.ts`、`skills.ts`、`doc-links.ts`、`stale-names.ts`，任何一个失败都退出 1，报出文件和行号。
-- 在文档里写一个不存在的反引号路径或 `../` 链接，`bun scripts/doc-links.ts` 报错；删掉一个 `verify-*` 的「证据」一节，`bun scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`bun scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
+- 在文档里写一个不存在的反引号路径或 `../` 链接，`bun scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`bun scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`bun scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
 - `bun test scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
 - 素材没有自动检查：重跑 `process.py` 后看 `git diff apps/web/public/pixel/`，图鉴页能看全部贴图。

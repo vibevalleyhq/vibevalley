@@ -131,7 +131,7 @@ type Caller struct {
 - 服务端里 `== protocol.OrchestratorAgent` 只剩 `agent` 包里，别的地方问 `agent.Service` 是不是常驻，或者查 `Can`。
 - `packages/protocol/src/api.ts` 的 `can` 里没有 `orchestrator`、`session`；`protocol` 里没有能力和工具的对应。
 - 管家用 `hire` 建的档案是停用的，频道里有一条说明。
-- `bun run server:check`、`bun run capabilities`、`bun run web:check` 通过；改了管家的工具描述，跑一次 `verify-orchestrator-evals`（要花钱，先问主人）。
+- `bun run server:check`、`bun run capabilities`、`bun run web:check` 通过；改了管家的工具描述，跑一次 `acceptance/orchestrator-evals.md`（要花钱，先问主人）。
 
 ## Risks
 

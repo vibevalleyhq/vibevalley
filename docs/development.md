@@ -110,7 +110,7 @@ bun run package:mac      # apps/desktop/dist：VibeValley.app（mac-arm64/）和
    vibevalley issue status <id> --json '{"status":"done"}'
    ```
 
-状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [verify-server](.agents/skills/verify-server/SKILL.md) 的 `--scripted-helper`。
+状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [acceptance/server.md](.agents/skills/acceptance/server.md) 的 `--scripted-helper`。
 
 ## 素材、音效和官网
 

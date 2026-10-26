@@ -117,7 +117,7 @@ type Task struct {
 ## Acceptance criteria
 
 - 第一阶段：模型写一张三件、有先后的图，库里（`task_graph`）有它；成环、重复、等不存在的整批被拒；做完一件下一件变成可以做；全部做完图收起来。`helper` 节点自动派、并行不超过上限、结果交回；叫停时帮手一起停；提醒有次数上限；系统提示的哈希不因图变化而变。`agent/brain` 和 `task/engine` 的测试覆盖，模型用 `ai.FauxProvider`。
-- 第二阶段：代码里没有 playbook、plan（`stale-names` 查）；`protocol` 里没有从父子工单拼回 `TaskGraph` 的那一层；种植计划的 ready、状态、重试走引擎；开工和收获不是主人说的就不动手，有测试；照 `verify-server` 用 `vibevalley task …` 建一个三步、有先后的种植计划，第二步等第一步合进去才开工；`verify-orchestrator-evals` 重放通过（要花钱，先问主人）。
+- 第二阶段：代码里没有 playbook、plan（`stale-names` 查）；`protocol` 里没有从父子工单拼回 `TaskGraph` 的那一层；种植计划的 ready、状态、重试走引擎；开工和收获不是主人说的就不动手，有测试；照 `acceptance/server.md` 用 `vibevalley task …` 建一个三步、有先后的种植计划，第二步等第一步合进去才开工；`acceptance/orchestrator-evals.md` 重放通过（要花钱，先问主人）。
 - `bun run server:check` 通过。
 
 ## Risks
