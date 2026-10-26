@@ -19,9 +19,9 @@
 1. 在仓库根目录造一张工单，截工单页：
 
    ```bash
-   bun scripts/verify-server.ts -- sh -c '
+   vpx scripts/verify-server.ts -- sh -c '
      "$VIBEVALLEY_VERIFY_CLI" issue create --json "{\"title\":\"截图验收\"}" &&
-     VIBEVALLEY_PAGES=/issues bun apps/web/scripts/screens.ts
+     VIBEVALLEY_PAGES=/issues vpx apps/web/scripts/screens.ts
    '
    ```
 

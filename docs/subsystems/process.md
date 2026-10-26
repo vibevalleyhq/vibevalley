@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **`scripts/`**（Bun 跑，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `bun run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统。
+- **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `bun run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统。
 - **`.agents/`**：`notes/` 是 Agent Notes，`CATALOG.md` 是生成的清单；`skills/` 是项目自己的 skill，`.claude/skills` 是指向它的符号链接。
 - **`docs/`**：分层见 [docs/AGENTS.md](docs/AGENTS.md)；`docs/style/` 是 `writing.md` 和 `code.md`。
 - **`design/`**：`pixel/gen.sh`（codex 生图）、`pixel/process.py`（切图，写 `apps/web/public/pixel/` 和 `sprites.json`）、`pixel/prompts/`（提示词）、`pixel/icons/`（Hugeicons 的 SVG 和排参考图的 `ref.py`）；`assets/` 只留最早一套手绘界面的 `gen.sh`、提示词和原图；`art.sh` 把单独仓库 vibevalley-art 里的原图链接进来；`names.md` 是给档案和人物起名的梗。
@@ -65,7 +65,7 @@
 - **文档只写现状，理由和计划另有家。** 一份文档同时写现状、历史和理由，读的人分不清哪句还算数，理由一改文档就丢。放弃了一个 `decisions.md` 记全部决策（越写越长、改动挤在一个文件、分不清哪些还在提案），也放弃了理由留在文档里（文档会被不断改成现状，理由跟着被删）。照 DeepSeek Harness 的 Agent Notes，类别也编进路径，没照 kico 写在 `Category:` 行。
 - **Note 做完就沉淀进子系统、删掉。** 留着的 `implemented/` Note 要跟着代码改事实，几十篇散着，讲一个子系统的理由要翻好几篇；子系统一篇讲完边界、模型和放弃的路，Note 只剩计划这一个用途。
 - **清单生成，不手写。** 手写的 `INDEX.md` 会和路径、标题对不上，不相关的改动挤在一个文件上；只靠目录和搜索，要总览就得翻两层目录。也没把清单写进 README 的一节（重新生成时得小心只换那一节），没给每篇加一行摘要（每篇多一个要维护的字段，标题已经说得清）。
-- **检查跑在 Bun 上。** Bun 自带 glob 和文件读写，脚本不用别的依赖、不带构建；Node 只跑服务端（它的 agent SDK 在 Node 上）。
+- **脚本用 `vpx` 直接跑 TypeScript。** Vite+ 本来就是工具链，`vpx` 不用 tsx 也不用构建就跑 `.ts`，跑在项目的 Node 上，和服务端同一个；不为脚本另装一个运行时。
 - **链接从仓库根写。** 一个文件不管从哪链过去都是同一个写法，挪了它搜一个字符串就能改完；以 `/` 开头读起来像磁盘上的绝对路径。
 - **反引号里的路径查，名字不查。** 挪文件、改名时文档里的旧路径没人提醒，一轮下来当前文档里写着早不在的文件；名字试过一起查，驼峰词在代码里找不到就报，会报出例子和别处的叫法（`QUOTA_LOW`、`XMembers`），要维护白名单。名字改由 `stale-names.ts` 在代码里查，表里只放有决定的改名。
 - **写作规范以信息密度为主，STE 只留词和格式。** 整篇照 ASD-STE100 时，管得住一句话会不会被读错，管不住一段话该不该有：每句合规的 Note 仍然把清单抄一遍、同一条理由写两遍；「一句一事」「每句不超过 50 字」「三项以上用列表」还把一个因果拆碎，和信息密度相反。没选两套都留（句子层方向相反，写的人要自己裁决），也没选 STE 全删（「应」「宜」分不清、同一个东西换着叫，agent 会读错）。这条写不成检查，属于第 3 层。
@@ -80,6 +80,6 @@
 ## 怎么验证
 
 - `bun run docs:verify`：依次跑 `agent-notes.ts`、`skills.ts`、`doc-links.ts`、`stale-names.ts`，任何一个失败都退出 1，报出文件和行号。
-- 在文档里写一个不存在的反引号路径或 `../` 链接，`bun scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`bun scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`bun scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
-- `bun test scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
+- 在文档里写一个不存在的反引号路径或 `../` 链接，`vpx scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`vpx scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`vpx scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
+- `vp test run scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
 - 素材没有自动检查：重跑 `process.py` 后看 `git diff apps/web/public/pixel/`，图鉴页能看全部贴图。

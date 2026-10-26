@@ -30,7 +30,7 @@ jobs:
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: pnpm exec tsx scripts/commit-msg.ts --title "$TITLE"
+        run: pnpm exec vpx scripts/commit-msg.ts --title "$TITLE"
       - run: pnpm run check
       - run: pnpm run docs:verify
       - run: pnpm run scripts:test

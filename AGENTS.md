@@ -58,7 +58,7 @@ bun run docs:verify                                             # 改完文档�
 bun run site:check && bun run site:build                        # 改完 site/：类型和模板，再生成到 site/dist（不开 astro dev）
 ```
 
-Node 24（服务端经 tsx 跑），Bun 1.4（workspaces、脚本、页面和 protocol 的单元测试），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
+Node 24（服务端经 tsx 跑，脚本经 `vpx` 直接跑 `.ts`），Bun 1.4（workspaces、页面和 protocol 的单元测试），Electron 44。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `apps/server` 要重启它。
 
 一件事的主线：oar 的会话事件 → `apps/server/src/session/facts.ts`（纯函数）读成事实 → `Core.apply` 用 `projection/reduce.ts` 的 `reduce` 折进核心状态 → `GET /api/v1/state` 把折好的 `StateFrame` 经 SSE 推给页面；每个会话和管家的每一步由 `session/journal.ts` 记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
@@ -98,7 +98,7 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - **帮工没有权限确认**：服务端只听 127.0.0.1，永远不要对外；帮工只在工作目录里开工（[理由](docs/subsystems/session.md)）。例外只有两个，都是单独的监听：语音线路只有一个接口、每通电话一把钥匙，经隧道给声网（[理由](docs/subsystems/voice.md)）；「连接到本机」默认关着，只放主人在本机点过头的设备、每台一把钥匙，不放 `/mcp`（[理由](docs/subsystems/lan.md)）。
 - **图标是像素素材**：界面上的按钮图标用 `design/pixel` 生成的贴图（`apps/web/public/pixel`，`<Icon>`；形状照 Hugeicons：`icons/ref.py`、`gen.sh`、`process.py`），不用 ▶、■、✓ 这类字符代替（[流程](docs/subsystems/process.md)）。
 - **密钥**：写了钥匙的 `vibevalley.yaml`（`$VIBEVALLEY_HOME/vibevalley.yaml` 或 `--config` 给的）、`.agora/` 不进仓库；日志和文档里不出现密钥。
-- **工具链**：Vite+（`vp`）管装依赖、格式、lint 和页面的构建，配置在根目录 `vite.config.ts`：`bun run check`（`vp check`）查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和类型，`bun run check:fix` 改格式；各包的 `check` 另用 `tsc --noEmit`。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import；服务端另用 `@effect/vitest`），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；只有 `scripts/` 的用 `bun test`：脚本是 Bun 程序；界面和整个应用用 Playwright；脚本用 Bun 跑，都不带构建。
+- **工具链**：Vite+（`vp`）管装依赖、格式、lint 和页面的构建，配置在根目录 `vite.config.ts`：`bun run check`（`vp check`）查格式（oxfmt，160 列；Markdown、生成的和数据不排）、oxlint（带类型的规则）和类型，`bun run check:fix` 改格式；各包的 `check` 另用 `tsc --noEmit`。测试用 `vp test`（vitest，跑在 Node 上，测试从 `vite-plus/test` import；服务端另用 `@effect/vitest`），每个包的 `vite.config.ts` 写它的 `test`（哪些文件、时区）；`scripts/` 的也用 `vp test`；界面和整个应用用 Playwright；脚本用 `vpx` 直接跑 `.ts`，都不带构建。
 - **代码风格**：代码和接口用实际的概念，界面上的字用中文（[用语表](docs/README.md#用语)）；工单的状态和动作在哪里都用工单自己的词（完成、改动、问题、计划，词表在 `packages/protocol/src/rules`），种地的词（收获、缺肥、种植计划……）只在农场的皮里，`stale-names.ts` 查（[状态和用语](docs/subsystems/issue.md#状态和用语)）；注释用英文，只写不看就会写错或改错的：为什么、顺序和锁、安全边界、格式和取值、要和别处保持一致的，不复述代码、不写概述和历史（[建议和不建议的写法](docs/style/code.md)）。
 - **测试**：服务端的测试用 oar 的 `scriptedRuntime`（`@botiverse/oar/testing`）扮演帮工、用真的 git 仓库（`src/testing/git.ts`）、模型用 pi-ai 的 faux（`agent/brain/testing.ts`），不连网，`src/testing/world.ts` 搭一个整农场，跨好几个模块的流程写在 `src/flows`（帮工照工单的字眼干活，`src/testing/helper.ts`）；纯函数的规则直接测；页面的 Playwright 对着真的服务端，测试的服务端拿到的环境去掉了一切钥匙，`HOME` 也是临时的，不问这台机器上的编码 agent：pi 换成同一个照字眼干活的帮工、别的 runtime 都当没装（`VIBEVALLEY_TEST_RUNTIMES`），派活、提问、交活都能真走一遍，不用手搓帧。改了帮工、项目、工单的状态和完成、核心状态或游戏规则的行为，补对应的测试。
 - **改完要验证**：先跑最窄的检查；改了接口、服务、页面或手机壳，照 [acceptance](.agents/skills/acceptance/SKILL.md) 找到对应的分册，在真的程序上看一遍，汇报时附上它要的证据；一类改动没有分册，又花了工夫才验证完，就照 `create-verification-skill` 补一份（[.agents/skills](.agents/skills/README.md)）。

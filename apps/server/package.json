@@ -8,8 +8,8 @@
     "evals": "VIBEVALLEY_EVALS_LIVE=1 vp test run src/manager/evals.live.test.ts",
     "check": "tsc --noEmit",
     "test": "vp test run",
-    "db:generate": "node --import tsx scripts/db-generate.ts",
-    "db:check": "node --import tsx scripts/db-generate.ts --check"
+    "db:generate": "vpx scripts/db-generate.ts",
+    "db:check": "vpx scripts/db-generate.ts --check"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "2.0.0",

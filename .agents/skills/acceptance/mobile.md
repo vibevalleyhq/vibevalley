@@ -42,7 +42,7 @@
 2. 在仓库根目录跑：
 
    ```bash
-   bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts android
+   vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
    ```
 
    脚本把应用重新装一遍（不留上次的农场），农场打开「连接到本机」、出一个码，用 `vibevalley://pair` 链接打开应用；应用请主人放行，脚本替主人点头，再看农场收到这台手机带钥匙的请求（页面经「连接到本机」加载了）；截图；经 WebView 的 DevTools 让页面往桥上发一条通知，看安卓真的弹出来；最后杀掉应用重开，看它不再要配对就回到农场。
@@ -68,7 +68,7 @@ iOS（Xcode 装好、跑过一次 `xcodebuild -runFirstLaunch`）：
 cd apps/mobile && CI=1 bunx expo prebuild -p ios --no-install && (cd ios && pod install)
 cd ios && EXPO_PUBLIC_VIBEVALLEY_E2E=1 xcodebuild -workspace VibeValley.xcworkspace -scheme VibeValley -configuration Release \
   -sdk iphonesimulator -arch arm64 -derivedDataPath build CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES
-bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts ios   # 在仓库根目录；默认 iPhone 17，VIBEVALLEY_SIMULATOR 换
+vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios   # 在仓库根目录；默认 iPhone 17，VIBEVALLEY_SIMULATOR 换
 ```
 
 - 要临时签名（`CODE_SIGN_IDENTITY=-`）：不签的话模拟器不肯加载声网的框架，应用一开就退。
