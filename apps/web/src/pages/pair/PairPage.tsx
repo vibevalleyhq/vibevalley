@@ -1,6 +1,7 @@
 // /pair: another device joins the farm (连接到本机). The owner's QR code opens it with the code; the device names itself
 // and questions, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
 
+import { pagesWording } from "../words";
 import { createSignal, Show } from "solid-js";
 import { api, reasonOf } from "../../data/api";
 import { deviceGuess, keyCookie } from "../../rules/lan";
@@ -36,26 +37,26 @@ export function PairPage() {
           if (!asking()) void ask();
         }}
       >
-        <h1 class="text-lg font-semibold">连进那台电脑</h1>
-        <p class="text-sm text-muted">这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在田头说话。配对要那台电脑上的主人点头。</p>
+        <h1 class="text-lg font-semibold">{pagesWording().pair.title}</h1>
+        <p class="text-sm text-muted">{pagesWording().pair.intro}</p>
         <Show when={!given}>
-          <Field label="配对码" hint="在那台电脑的「连接到本机」里点「添加设备」">
+          <Field label={pagesWording().pair.code} hint={pagesWording().pair.codeHint}>
             <TextInput value={code()} onInput={(e) => setCode(e.currentTarget.value)} autocapitalize="characters" autocomplete="off" />
           </Field>
         </Show>
-        <Field label="这台设备叫" hint="主人在设备列表里看到的名字">
+        <Field label={pagesWording().pair.name} hint={pagesWording().pair.nameHint}>
           <TextInput value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
         </Field>
         <Show
           when={asking()}
           fallback={
             <Button tone="primary" type="submit" disabled={!code().trim()} class="self-start">
-              请主人放行
+              {pagesWording().pair.ask}
             </Button>
           }
         >
           <p role="status" class="text-sm">
-            等那台电脑上的主人点头……
+            {pagesWording().pair.waiting}
           </p>
         </Show>
         <Show when={problem()}>

@@ -1,6 +1,7 @@
 // 图鉴: every drawing the farm uses, its pointers and its sounds. /catalog is the drawings,
 // /catalog/<name> one of them large, /catalog/cursors and /catalog/sounds the other shelves.
 
+import { catalogWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -19,9 +20,9 @@ import { Card, Quiet, Toggle } from "../kit";
 
 type Ground = "check" | "grass" | "night";
 const grounds: { value: Ground; label: string }[] = [
-  { value: "check", label: "格子" },
-  { value: "grass", label: "草地" },
-  { value: "night", label: "夜里" },
+  { value: "check", label: catalogWording().ground.check },
+  { value: "grass", label: catalogWording().ground.grass },
+  { value: "night", label: catalogWording().ground.night },
 ];
 
 const groundStyle = (g: Ground): JSX.CSSProperties =>
@@ -57,16 +58,16 @@ const usePictures = () =>
   }));
 
 const shelfTabs = [
-  { id: "sprites", label: "图", to: "/catalog" },
-  { id: "cursors", label: "指针", to: "/catalog/cursors" },
-  { id: "sounds", label: "音效", to: "/catalog/sounds" },
+  { id: "sprites", label: catalogWording().tab.sprites, to: "/catalog" },
+  { id: "cursors", label: catalogWording().tab.cursors, to: "/catalog/cursors" },
+  { id: "sounds", label: catalogWording().tab.sounds, to: "/catalog/sounds" },
 ] as const;
 
 /** `rest` is the path after /catalog/. */
 export function CatalogPage(props: { rest: string }) {
   const shelf = () => (props.rest === "cursors" ? "cursors" : props.rest === "sounds" ? "sounds" : "sprites");
   const tabs = () => (
-    <div role="tablist" aria-label="图鉴的书架" class="flex gap-0.5 rounded-lg bg-hover p-0.5">
+    <div role="tablist" aria-label={catalogWording().shelves} class="flex gap-0.5 rounded-lg bg-hover p-0.5">
       <For each={shelfTabs}>
         {(t) => (
           <A
@@ -124,14 +125,14 @@ function Search(props: { query: string; onChange: (q: string) => void; placehold
   return (
     <div class="flex flex-wrap items-center gap-2">
       <TextInput
-        aria-label="找素材"
+        aria-label={catalogWording().find}
         class="min-w-48 flex-1"
         placeholder={props.placeholder}
         value={props.query}
         onInput={(e) => props.onChange(e.currentTarget.value)}
       />
       <Show when={props.ground && props.onGround ? props.ground : undefined}>
-        {(g) => <Segmented label="底色" value={g()} options={grounds} onChange={(v) => props.onGround?.(v)} />}
+        {(g) => <Segmented label={catalogWording().background} value={g()} options={grounds} onChange={(v) => props.onGround?.(v)} />}
       </Show>
     </div>
   );
@@ -183,28 +184,22 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
         <Layout
           left={
             <Column tabs={props.tabs}>
-              <nav aria-label="分类" class="flex flex-col gap-0.5">
-                <ShelfButton id="all" label="全部" count={pics().length} />
+              <nav aria-label={catalogWording().categories} class="flex flex-col gap-0.5">
+                <ShelfButton id="all" label={catalogWording().all} count={pics().length} />
                 <For each={present()}>{(s) => <ShelfButton id={s.id} label={s.label} count={counts().get(s.id) ?? 0} />}</For>
               </nav>
-              <p class="px-2 pt-1 text-xs text-muted">{pics().length} 张，切自 design/pixel/raw。</p>
+              <p class="px-2 pt-1 text-xs text-muted">{catalogWording().count(pics().length)}</p>
             </Column>
           }
           right={
-            <Show when={selected()} keyed fallback={<Quiet>点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。</Quiet>}>
+            <Show when={selected()} keyed fallback={<Quiet>{catalogWording().pick}</Quiet>}>
               {(s) => <Detail picture={s} has={has} byName={byName()} ground={ground()} />}
             </Show>
           }
         >
-          <Search
-            query={query()}
-            onChange={setQuery}
-            placeholder="找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）"
-            ground={ground()}
-            onGround={setGround}
-          />
+          <Search query={query()} onChange={setQuery} placeholder={catalogWording().findHint} ground={ground()} onGround={setGround} />
           <Show when={shown().length === 0}>
-            <Quiet>没有对得上的。</Quiet>
+            <Quiet>{catalogWording().noMatch}</Quiet>
           </Show>
           <For each={visible()}>
             {(s) => {
@@ -238,7 +233,9 @@ function Sprites(props: { id?: string; tabs: JSX.Element }) {
                                   <span class="relative flex size-20 items-center justify-center overflow-hidden rounded-md" style={groundStyle(ground())}>
                                     <Img p={p} scale={fitScale(p, 72)} />
                                     <Show when={framesOf(p.name, has)}>
-                                      <span class="absolute top-0.5 right-0.5 rounded-[3px] bg-bark-900/70 px-1 text-[10px] leading-[14px] text-paper">动</span>
+                                      <span class="absolute top-0.5 right-0.5 rounded-[3px] bg-bark-900/70 px-1 text-[10px] leading-[14px] text-paper">
+                                        {catalogWording().moves}
+                                      </span>
                                     </Show>
                                   </span>
                                   <span class="w-full truncate text-center font-mono text-[11.5px] text-muted">{p.name}</span>
@@ -278,7 +275,7 @@ function Copy(props: { text: string }) {
       class="flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-hover"
     >
       <Icon name={done() ? "mark-check" : "button-copy"} size={12} />
-      {done() ? "复制了" : "复制"}
+      {done() ? catalogWording().copied : catalogWording().copy}
     </button>
   );
 }
@@ -332,7 +329,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
           <Img p={shown()} scale={scale()} />
           <Show when={marks()}>
             <span
-              title="落脚点"
+              title={catalogWording().anchor}
               class="absolute"
               style={{
                 left: `${shown().ax * scale() - 6}px`,
@@ -344,7 +341,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
             />
             <Show when={shown().hx !== undefined && shown().hy !== undefined}>
               <span
-                title="头"
+                title={catalogWording().head}
                 class="absolute border-2 border-[#0ea5e9]"
                 style={{ left: `${shown().hx! * scale() - 5}px`, top: `${shown().hy! * scale() - 5}px`, width: "10px", height: "10px" }}
               />
@@ -354,23 +351,23 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <Segmented
-          label="放大"
+          label={catalogWording().zoom}
           value={String(scale())}
           options={scales().map((s) => ({ value: String(s), label: `${s < 1 ? s.toFixed(2).replace(/0$/, "") : numberText(s)}×` }))}
           onChange={(v) => setScale(Number(v))}
         />
-        <Toggle label="落脚点和头" checked={marks()} onChange={setMarks} />
+        <Toggle label={catalogWording().marks} checked={marks()} onChange={setMarks} />
       </div>
       <Show when={frames()}>
         {(f) => (
           <div class="flex flex-col gap-1.5 rounded-lg bg-hover p-2">
             <div class="flex items-center gap-2">
-              <Button onClick={() => setPlaying(!playing())}>{playing() ? "停" : "播放"}</Button>
-              <span class="text-xs text-muted">{f().length} 帧</span>
+              <Button onClick={() => setPlaying(!playing())}>{playing() ? catalogWording().stop : catalogWording().play}</Button>
+              <span class="text-xs text-muted">{catalogWording().frames(f().length)}</span>
               <span class="flex-1" />
               <input
                 type="range"
-                aria-label="每秒几帧"
+                aria-label={catalogWording().fps}
                 min={1}
                 max={12}
                 step={1}
@@ -378,7 +375,7 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
                 onInput={(e) => setFps(Number(e.currentTarget.value))}
                 class="w-24 accent-[#74a046]"
               />
-              <span class="w-14 text-xs text-muted">{fps()} 帧/秒</span>
+              <span class="w-14 text-xs text-muted">{catalogWording().perSecond(fps())}</span>
             </div>
             <div class="flex flex-wrap gap-1">
               <For each={f()}>
@@ -407,23 +404,23 @@ function Detail(props: { picture: Picture; has: (n: string) => boolean; byName: 
         )}
       </Show>
       <div class="flex flex-col gap-1.5">
-        <Row label="尺寸">{`${numberText(props.picture.w)} × ${numberText(props.picture.h)} 像素`}</Row>
-        <Row label="落脚点">{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
+        <Row label={catalogWording().size}>{catalogWording().pixels(numberText(props.picture.w), numberText(props.picture.h))}</Row>
+        <Row label={catalogWording().anchor}>{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Row>
         <Show when={props.picture.hx !== undefined && props.picture.hy !== undefined}>
-          <Row label="头">{`(${numberText(props.picture.hx!)}, ${numberText(props.picture.hy!)})`}</Row>
+          <Row label={catalogWording().head}>{`(${numberText(props.picture.hx!)}, ${numberText(props.picture.hy!)})`}</Row>
         </Show>
-        <Row label="来自">
-          <Show when={props.picture.sheet} fallback={<span class="text-xs text-muted">没记下来（不再用的旧图）</span>}>
+        <Row label={catalogWording().from}>
+          <Show when={props.picture.sheet} fallback={<span class="text-xs text-muted">{catalogWording().unrecorded}</span>}>
             {(sheet) => <Code text={sheet()} />}
           </Show>
         </Row>
         <Show when={remake()}>
           {(r) => (
             <>
-              <Row label="重画">
+              <Row label={catalogWording().redraw}>
                 <Code text={r().draw} />
               </Row>
-              <Row label="重新切">
+              <Row label={catalogWording().recut}>
                 <Code text={r().cut} />
               </Row>
             </>
@@ -455,17 +452,14 @@ function Cursors(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p class="px-2 pt-1 text-xs text-muted">鼠标在农场里的样子：平时、指着能点的、拿着工具时。</p>
+          <p class="px-2 pt-1 text-xs text-muted">{catalogWording().cursorsIntro}</p>
         </Column>
       }
     >
-      <Search query={query()} onChange={setQuery} placeholder="找：指针的名字（glove、water、harvest……）" ground={ground()} onGround={setGround} />
-      <Card title={`指针 · ${all()?.length ?? 0}`}>
-        <p class="text-sm text-muted">
-          红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自
-          design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。
-        </p>
-        <Show when={data() !== null} fallback={<Quiet>这个版本没有带上指针的图（assets/cursors）。</Quiet>}>
+      <Search query={query()} onChange={setQuery} placeholder={catalogWording().cursorsFind} ground={ground()} onGround={setGround} />
+      <Card title={catalogWording().cursors(all()?.length ?? 0)}>
+        <p class="text-sm text-muted">{catalogWording().cursorsNote}</p>
+        <Show when={data() !== null} fallback={<Quiet>{catalogWording().noCursors}</Quiet>}>
           <div class="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-1.5">
             <For each={all() ?? []}>{([name, hot]) => <CursorTile name={name} hx={hot.hx} hy={hot.hy} ground={ground()} />}</For>
           </div>
@@ -523,15 +517,16 @@ function Sounds(props: { tabs: JSX.Element }) {
     <Layout
       left={
         <Column tabs={props.tabs}>
-          <p class="px-2 pt-1 text-xs text-muted">农场里的每个声音，点一下就能听。</p>
+          <p class="px-2 pt-1 text-xs text-muted">{catalogWording().soundsIntro}</p>
         </Column>
       }
     >
-      <Search query={query()} onChange={setQuery} placeholder="找：声音的名字或分组（浇水、院子、coin……）" />
+      <Search query={query()} onChange={setQuery} placeholder={catalogWording().soundsFind} />
       <Card>
         <p class="text-sm text-muted">
-          音效都是现合成的，没有音频文件：配方在 <code class="font-mono text-[12.5px]">apps/web/src/farm/sound.ts</code>
-          。关了音效就听不到。背景音乐还没有，给 Suno 的提示词在 <code class="font-mono text-[12.5px]">design/music/suno-prompts.md</code>。
+          {catalogWording().soundsRecipes} <code class="font-mono text-[12.5px]">apps/web/src/farm/sound.ts</code>
+          {catalogWording().soundsMusic} <code class="font-mono text-[12.5px]">design/music/suno-prompts.md</code>
+          {catalogWording().period}
         </p>
       </Card>
       <For each={SOUND_GROUPS}>
@@ -545,7 +540,7 @@ function Sounds(props: { tabs: JSX.Element }) {
                     {(name) => (
                       <button
                         type="button"
-                        aria-label={`播放 ${SOUND_LABEL[name] ?? name}`}
+                        aria-label={catalogWording().playSound(SOUND_LABEL[name] ?? name)}
                         onClick={() => playSound(name)}
                         class="flex h-8 cursor-pointer items-center gap-2 rounded-md border border-line bg-page pr-3 pl-1.5 hover:bg-hover active:bg-selected"
                       >
