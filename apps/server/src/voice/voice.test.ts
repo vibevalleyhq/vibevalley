@@ -12,8 +12,23 @@ import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { notificationsStart } from "../services.ts";
 import { Core } from "../core/core.ts";
-import { agentFor, type CallLine, clientOf, layer, onCallLine, speakPieces, tokenSeconds, vendorsFor, Voice, voiceAgentUid, voiceUnknown } from "./voice.ts";
+import {
+  agentFor,
+  type CallLine,
+  clientOf,
+  layer,
+  onCallLine,
+  retrying,
+  speakPieces,
+  tokenSeconds,
+  vendorsFor,
+  Voice,
+  voiceAgentUid,
+  voiceUnknown,
+} from "./voice.ts";
 import { sessionId, issueId } from "@vibevalley/protocol/schema";
+import { timeHere, wallTime } from "../base/time.ts";
+import { TestClock } from "effect/testing";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -91,7 +106,7 @@ describe("a call's agent", () => {
       );
       if ("_tag" in vendors) throw new Error(vendors.reason);
       const capture = new Capture();
-      const client = clientOf({ appId, appCertificate: cert }, c.voice.area, capture.fetch);
+      const client = clientOf({ appId, appCertificate: cert }, c.voice.area, wallTime, capture.fetch);
       const id = await agentFor(client, c.voice, vendors)
         .createSession({
           name: "parity",
@@ -242,6 +257,57 @@ describe("voice", () => {
     }).pipe(Effect.scoped, Effect.provide(farm(new Capture()))),
   );
 
+  // Agora's retries, on the service's Clock (voice.ts retrying): moved through, not waited for.
+  it.effect("retries 408, 429 and 5xx twice on the Clock, as Agora's SDK would, and nothing else", () =>
+    Effect.gen(function* () {
+      const time = yield* timeHere;
+      // A retry's sleep is taken after the answer comes back: let it be taken, then move the clock.
+      const step = (ms: number) =>
+        Effect.andThen(
+          Effect.promise(() => new Promise((r) => setImmediate(r))),
+          TestClock.adjust(ms),
+        );
+      const answering = (...answers: [number, Record<string, string>?][]) => {
+        const seen: number[] = [];
+        const fetcher = (async () => {
+          const [status, headers] = answers.shift()!;
+          seen.push(status);
+          return new Response("{}", { status, headers: headers ?? {} });
+        }) as unknown as typeof fetch;
+        return { seen, call: Effect.forkChild(Effect.promise(() => retrying(fetcher, time)("https://api.example"))) };
+      };
+
+      const flaky = answering([503], [502], [200]);
+      const flakyCall = yield* flaky.call;
+      yield* step(999);
+      expect(flaky.seen).toEqual([503]);
+      yield* step(1);
+      expect(flaky.seen).toEqual([503, 502]);
+      yield* step(1_999);
+      expect(flaky.seen).toEqual([503, 502]);
+      yield* step(1);
+      expect((yield* Fiber.join(flakyCall)).status).toBe(200);
+
+      const busy = answering([429, { "Retry-After": "5" }], [200]);
+      const busyCall = yield* busy.call;
+      yield* step(4_999);
+      expect(busy.seen).toEqual([429]);
+      yield* step(1);
+      expect((yield* Fiber.join(busyCall)).status).toBe(200);
+
+      const refused = answering([400]);
+      expect((yield* Fiber.join(yield* refused.call)).status).toBe(400);
+      expect(refused.seen).toEqual([400]);
+
+      const down = answering([500], [500], [500]);
+      const downCall = yield* down.call;
+      yield* step(1_000);
+      yield* step(2_000);
+      expect((yield* Fiber.join(downCall)).status).toBe(500);
+      expect(down.seen).toEqual([500, 500, 500]);
+    }),
+  );
+
   it.live("starts and stops the orchestrator on his line", () => {
     const capture = new Capture();
     return Effect.gen(function* () {
@@ -263,7 +329,8 @@ describe("voice", () => {
       capture.body = `{"detail":"Agent is already in the process of shutting down"}`;
       yield* voice.stop(agent.agentId);
       expect(voice.lines()).toBe(0);
-      capture.status = 500;
+      // A failure that is not retried: the retries have their own test (retrying, below).
+      capture.status = 403;
       capture.body = `{"detail":"boom"}`;
       expect(yield* Effect.flip(voice.stop("other"))).toMatchObject({ _tag: "VoiceAgentFailed" });
     }).pipe(Effect.scoped, Effect.provide(farm(capture)));
@@ -325,8 +392,8 @@ describe("voice", () => {
           voice: { area: "US" } as never,
         }),
       );
-      capture.status = 500;
-      capture.body = `{"detail":"temporary failure"}`;
+      capture.status = 403;
+      capture.body = `{"detail":"refused"}`;
       yield* Effect.flip(voice.stop(agent.agentId));
       // A failed remote stop keeps no local line.
       expect(voice.lines()).toBe(0);
@@ -594,7 +661,7 @@ describe("voice", () => {
       yield* credentials();
       const grant = yield* voice.session();
       const call = yield* voice.start(grant.channel, grant.uid);
-      capture.status = 500;
+      capture.status = 403;
       capture.body = `{"detail":"stop failed"}`;
       yield* Effect.flip(voice.stop(call.agentId));
       expect(yield* Effect.flip(voice.heard(call.agentId, "late", "", ""))).toMatchObject({

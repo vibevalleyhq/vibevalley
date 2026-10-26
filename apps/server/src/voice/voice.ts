@@ -21,6 +21,7 @@ import { Notices } from "../notice/notice.ts";
 import { type AgoraCredentials, Setting, type VoiceKeys } from "../setting/setting.ts";
 import { callbackLog } from "../base/log.ts";
 import { afterRealTime, timeHere, wallTime } from "../base/time.ts";
+import type { Time } from "../base/time.ts";
 
 const { RtcRole, RtcTokenBuilder } = agoraToken;
 
@@ -157,12 +158,26 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
 
 const areaOf = (area: Area) => ({ US: AgoraArea.US, EU: AgoraArea.EU, AP: AgoraArea.AP, CN: AgoraArea.CN })[area] ?? AgoraArea.US;
 
-export const clientOf = (c: AgoraCredentials, area: Area, fetcher?: typeof fetch) =>
+/** Agora's REST calls retried as its SDK would on its own (408, 429 and 5xx, twice: what Retry-After says, else 1 s
+ * then 2 s), but sleeping on time: the SDK's retries wait on real time, out of reach of the service's Clock. */
+export const retrying =
+  (fetcher: typeof fetch, time: Time): typeof fetch =>
+  async (input, init) => {
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetcher(input, init);
+      if (attempt >= 2 || !([408, 429].includes(res.status) || res.status >= 500)) return res;
+      const after = Number(res.headers.get("Retry-After"));
+      await time.sleep(after > 0 ? Math.min(after * 1000, 60_000) : 1000 * 2 ** attempt, init?.signal ?? undefined);
+    }
+  };
+
+export const clientOf = (c: AgoraCredentials, area: Area, time: Time, fetcher: typeof fetch = fetch) =>
   new AgoraClient({
     area: areaOf(area) as never,
     appId: c.appId,
     appCertificate: c.appCertificate,
-    ...(fetcher ? { fetch: fetcher } : {}),
+    maxRetries: 0,
+    fetch: retrying(fetcher, time),
   });
 
 /** Read at each start: a change takes effect on the next call. Captions go over the RTC data stream: the client has no RTM. */
@@ -703,7 +718,7 @@ export const make = (options: VoiceOptions = {}) =>
           const forCall = about ? { ...voice, greeting: "" } : voice;
           const vendors = vendorsFor(forCall, vendorKeys, deepseekApiKey, callLine);
           if ("_tag" in vendors) return yield* Effect.fail(vendors);
-          const agora = clientOf(g.credentials, voice.area, options.fetch);
+          const agora = clientOf(g.credentials, voice.area, time, options.fetch);
           client = agora;
           const session = agentFor(agora, forCall, vendors).createSession({
             channel,
@@ -777,7 +792,7 @@ export const make = (options: VoiceOptions = {}) =>
           call.ending = true;
           call.life.abort();
           client = call.client;
-        } else client = clientOf(yield* creds(), settings.voice().area, options.fetch);
+        } else client = clientOf(yield* creds(), settings.voice().area, time, options.fetch);
         const stopping = Effect.tryPromise({
           try: () => client.stopAgent(agentId),
           catch: (e) => e,
