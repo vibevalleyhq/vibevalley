@@ -331,8 +331,8 @@ describe("EverOS", () => {
       expect(
         fake
           .seen("search")
-          .map((r) => [r.body.app_id, r.body.project_id])
-          .sort(),
+          .map((r): [string, string] => [String(r.body.app_id), String(r.body.project_id)])
+          .sort(([, a], [, b]) => a.localeCompare(b)),
       ).toEqual([
         ["vibevalley", "global"],
         ["vibevalley", everosProject("demo")],

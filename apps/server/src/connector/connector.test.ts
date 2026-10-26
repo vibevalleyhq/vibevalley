@@ -389,13 +389,13 @@ describe("the chat apps", () => {
     const script = new Script();
     let listens = 0;
     let late: ((m: QQMessage) => Promise<void>) | undefined;
-    const listen = script.qq.listen;
+    const qq = script.qq;
     // The SDK's handler can outlive its listen: this one keeps got, and fails the gateway while a message is in flight.
     (script as { qq: QQApi }).qq = {
       ...script.qq,
       listen: async (signal, app, got) => {
         listens++;
-        return listen(signal, app, async (m) => {
+        return qq.listen(signal, app, async (m) => {
           if (m.content !== "断开") return got(m);
           void got(qqMsg("owner-openid", "断开前的一句"));
           late = got;

@@ -244,6 +244,34 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  // The situation it is given is read from the farm; a read that fails ends the answer instead of leaving it open.
+  it.live("ends an answer whose input could not be put together", () => {
+    const f = (() => {
+      const { faux, llm, requests } = fauxLLM();
+      faux.appendResponses([() => fauxAssistantMessage("收到")]);
+      const below = world({
+        config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } },
+        runtimes: [pi],
+        usage: () => {
+          throw new Error("额度读不出来");
+        },
+      });
+      return { requests, layer: layer({ llm: () => llm }).pipe(Layer.provideMerge(below)) };
+    })();
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator;
+      const got = yield* Effect.promise(async () => {
+        const words = (async () => {
+          for await (const _ of orchestrator.answerer("api")(orchestratorModel)!("在吗", new AbortController().signal)) void _;
+          return "ended";
+        })().catch((e: Error) => e.message);
+        return Promise.race([words, new Promise<string>((r) => setTimeout(() => r("still waiting"), 3000))]);
+      });
+      expect(got).toContain("额度读不出来");
+      expect(f.requests).toHaveLength(0);
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("says once why it cannot start", () => {
     const below = world({ config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } } });
     return Effect.gen(function* () {

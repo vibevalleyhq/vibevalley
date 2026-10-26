@@ -13,7 +13,7 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
   let entered!: () => void;
   const held = new Promise<void>((done) => (release = done));
   const started = new Promise<void>((done) => (entered = done));
-  vi.spyOn(Client.prototype, "connect").mockImplementation(async () => {
+  const connect = vi.spyOn(Client.prototype, "connect").mockImplementation(async () => {
     entered();
     await held;
   });
@@ -30,7 +30,7 @@ test("a late Nowledge connection cannot issue a tool call or reopen after the so
   expect(await pending).toBe("canceled");
   await expect(source.search(query, new AbortController().signal)).rejects.toThrow("stopped");
   expect(call).not.toHaveBeenCalled();
-  expect(Client.prototype.connect).toHaveBeenCalledTimes(1);
+  expect(connect).toHaveBeenCalledTimes(1);
 });
 
 test("EverOS flushes completed writes but a canceled late response creates no new pending session", async () => {
@@ -40,7 +40,7 @@ test("EverOS flushes completed writes but a canceled late response creates no ne
   const held = new Promise<Response>((done) => (release = done));
   const started = new Promise<void>((done) => (entered = done));
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body)) as { session_id: string };
+    const body = JSON.parse(init.body as string) as { session_id: string };
     requests.push({ path: new URL(url).pathname, session: body.session_id });
     if (body.session_id === "vibevalley-late" && url.endsWith("/add")) {
       entered();

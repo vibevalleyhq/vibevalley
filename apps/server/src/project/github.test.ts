@@ -205,6 +205,25 @@ describe("GitHub", () => {
     );
   });
 
+  it.effect("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
+    const issue = { number: 1, title: "sample" } as Issue;
+    return projects(
+      projectsDir(),
+      Effect.gen(function* () {
+        const p = yield* Projects;
+        const place = yield* p.workplace("sample", 1, true, "");
+        gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
+        expect((yield* Effect.flip(p.submitPullRequest(place, issue, "done"))).message).toBe("无法读取已有 PR");
+        expect((yield* Effect.flip(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
+      }),
+      {},
+      {
+        push: () => Effect.succeed(true),
+        gh: gh((args) => ({ out: args[1] === "list" ? `[{"html_url":"https://github.com/test/sample/pull/4"}]` : "null" })),
+      },
+    );
+  });
+
   it.effect("the pull request's body says whether the check ran", () =>
     Effect.gen(function* () {
       for (const hasCheck of [false, true]) {

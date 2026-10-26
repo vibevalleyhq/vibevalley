@@ -288,8 +288,16 @@ export const make = (options: OrchestratorOptions = {}) =>
       return ["这期间田头上的汇报（不用逐条转述，主人问到再说）：\n" + orchestratorInboxLines(digest), digest.map((m) => m.id)];
     };
 
-    /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. */
-    const take = async (i: Intake): Promise<boolean> => {
+    /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. It
+     * never rejects: an input that could not be taken is logged, and a caller waiting on it is failed instead of left open. */
+    const take = (i: Intake): Promise<boolean> =>
+      taking(i).catch((err: unknown) => {
+        i.caller?.fail(err);
+        logs.error(`vibevalley: the orchestrator could not take ${i.source}:`, err);
+        return false;
+      });
+
+    const taking = async (i: Intake): Promise<boolean> => {
       const rule = intake[i.source];
       const asked = rule.head + i.line;
       const route: Route = {
@@ -450,7 +458,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const stop = () => me.end();
         signal?.addEventListener("abort", stop, { once: true });
         try {
-          if (!signal?.aborted) void take({ source: "issue", line, conversation: general, caller: me }).catch((e) => me.fail(e));
+          if (!signal?.aborted) void take({ source: "issue", line, conversation: general, caller: me });
           let said = "";
           for await (const w of me.words(signal)) said += w;
           return said.trim();
