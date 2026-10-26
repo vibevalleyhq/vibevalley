@@ -549,6 +549,7 @@ export const layer = (options: RuntimeOptions = {}) =>
         home: () => config.home,
         llm: (model) => deepseek(model, keys.deepseekApiKey),
         time,
+        log: yield* callbackLog,
         tasks: yield* dbStores,
       });
       return yield* make({ ...options, registry: registryOf([own, dshRuntime]) });

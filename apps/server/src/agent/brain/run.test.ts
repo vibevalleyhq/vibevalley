@@ -19,6 +19,7 @@ import { AgentTaskRunner } from "./agentTaskTools.ts";
 import { answered, fauxLLM, lastUser, type Request, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { objectSchema, textTool } from "./tool.ts";
 import { wallTime } from "../../base/time.ts";
+import { plainLog } from "../../base/log.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -78,6 +79,7 @@ async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptio
   const dir = home();
   const agent = await Brain.start({
     time: wallTime,
+    log: plainLog,
     name: "receipt",
     instructions: "",
     llm,
@@ -192,6 +194,7 @@ describe("a run's receipt", () => {
     const dir = home();
     const agent = await Brain.start({
       time: wallTime,
+      log: plainLog,
       name: "partial",
       instructions: "",
       llm,
@@ -376,7 +379,7 @@ describe("the agent's own tasks", () => {
 
   it("carries the open graph into a fold's summary", async () => {
     const store = memoryStore();
-    const runner = new AgentTaskRunner(store, undefined, new AbortController().signal, () => {});
+    const runner = new AgentTaskRunner(store, undefined, new AbortController().signal, () => {}, plainLog);
     expect(await runner.summary()).toBe("");
     await store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
     expect(await runner.summary()).toBe("【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读");

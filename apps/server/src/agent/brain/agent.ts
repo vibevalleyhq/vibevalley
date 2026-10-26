@@ -22,6 +22,7 @@ import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
 import { AgentTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
 import { stopped } from "./tool.ts";
+import type { CallbackLog } from "../../base/log.ts";
 import type { Time } from "../../base/time.ts";
 
 /** A pi-agent-core event, or one of this agent's own. */
@@ -89,6 +90,9 @@ export interface BrainOptions {
   /** Its clock (base/time.ts): message times, the reminder ticks, the idle fold, a resumed run's age. A subagent it
    * sends out shares it. */
   readonly time: Time;
+  /** Where what went wrong is written (base/log.ts): the service's logger, or plainLog on the command line. Shared with a
+   * subagent too. */
+  readonly log: CallbackLog;
 }
 
 export interface McpStatus {
@@ -244,6 +248,7 @@ export class Brain {
             noSubagents: true,
             reminders: false,
             time: options.time,
+            log: options.log,
           },
           signal,
         );
@@ -263,6 +268,7 @@ export class Brain {
         subagent,
         this.life.signal,
         (text) => this.later(taskMessage(text, options.time.now())),
+        options.log,
         options.maxSubagents ?? 3,
         options.maxNudges ?? 3,
       );
@@ -277,7 +283,12 @@ export class Brain {
     const reminding = options.reminders ?? this.session !== undefined;
     let reminders: Reminders | undefined;
     if (reminding) {
-      reminders = new Reminders(options.home, options.wake ?? ((text) => this.later(customMessage("reminder", text, options.time.now()))), options.time);
+      reminders = new Reminders(
+        options.home,
+        options.wake ?? ((text) => this.later(customMessage("reminder", text, options.time.now()))),
+        options.time,
+        options.log,
+      );
       tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
     }
     this.core = new Agent({
@@ -317,7 +328,7 @@ export class Brain {
         try {
           this.session.append(e.message);
         } catch (err) {
-          console.error(`agent ${options.name}: cannot save the conversation:`, err);
+          options.log.error(`agent ${options.name}: cannot save the conversation:`, err);
         }
       }
       this.publish(e);
@@ -347,7 +358,7 @@ export class Brain {
       try {
         l(e);
       } catch (err) {
-        console.error(`agent ${this.options.name}: a listener failed:`, err);
+        this.options.log.error(`agent ${this.options.name}: a listener failed:`, err);
       }
     }
   }
@@ -421,7 +432,7 @@ export class Brain {
     try {
       ({ summary, usage } = await compactInPlace(plan, folding, this.prefix, tools, signal));
     } catch (err) {
-      console.error(`agent ${this.options.name}: cannot fold the conversation:`, err);
+      this.options.log.error(`agent ${this.options.name}: cannot fold the conversation:`, err);
     }
     this.publish({
       type: "compaction_end",
@@ -448,7 +459,7 @@ export class Brain {
     try {
       this.session?.append(message);
     } catch (err) {
-      console.error(`agent ${this.options.name}: cannot save the conversation:`, err);
+      this.options.log.error(`agent ${this.options.name}: cannot save the conversation:`, err);
     }
   }
 
@@ -508,7 +519,7 @@ export class Brain {
     this.stopIdle();
     this.accounting.begin();
     this.steps = 0;
-    this.core.prompt(message).catch((err) => console.error(`agent ${this.options.name}: cannot start a run:`, err));
+    this.core.prompt(message).catch((err) => this.options.log.error(`agent ${this.options.name}: cannot start a run:`, err));
   }
 
   /** Starts a run when idle, steers the one under way otherwise. */

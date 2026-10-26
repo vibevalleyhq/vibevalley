@@ -78,6 +78,7 @@ import * as qr from "../../db/generated/session_run.sql.ts";
 import * as qi from "../../db/generated/session_run_issue.sql.ts";
 import * as qs from "../../db/generated/session.sql.ts";
 import { timeHere } from "../base/time.ts";
+import { callbackLog } from "../base/log.ts";
 
 /** A burst of changes is one write. */
 const saveAfterMs = 300;
@@ -407,6 +408,7 @@ export const make = (options: SessionOptionsIn = {}) =>
     const stallMs = options.stallMs ?? config.session.stallSeconds * 1000;
     const clock = yield* Clock.Clock;
     const time = yield* timeHere;
+    const logs = yield* callbackLog;
     let mcpUrl = `http://${serverAddress(config)}/mcp`;
     const trajectories = new Trajectories(
       config.home,
@@ -1258,7 +1260,7 @@ export const make = (options: SessionOptionsIn = {}) =>
       inputsConsumed: Effect.map(PubSub.subscribe(consumedHub), Stream.fromSubscription),
       who,
       setAddress: (address) => void (mcpUrl = `http://${address}/mcp`),
-      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time),
+      host: (o) => new AgentHost(o, trajectories.openLog(o.name, o.keepEvents), runStore, time, logs),
       restore,
     };
     // The channels' helpers are these sessions: the channels hand them what is said to them and hear what they did.

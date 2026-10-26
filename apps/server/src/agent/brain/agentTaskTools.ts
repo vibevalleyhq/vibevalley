@@ -4,6 +4,7 @@
 // own tasks are its to do; nothing here does them.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { CallbackLog } from "../../base/log.ts";
 import { head } from "../../base/text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
@@ -120,6 +121,7 @@ export class AgentTaskRunner {
     private readonly subagent: Subagent | undefined,
     private readonly life: AbortSignal,
     private readonly tell: (text: string) => void,
+    private readonly log: CallbackLog,
     private readonly max = 3,
     private readonly maxNudges = 3,
   ) {}
@@ -143,7 +145,7 @@ export class AgentTaskRunner {
         return picked.length === 0 ? undefined : next;
       });
     } catch (e) {
-      console.error("agent: cannot move its tasks:", e);
+      this.log.error("agent: cannot move its tasks:", e);
       return;
     }
     for (const t of picked) {
@@ -174,7 +176,7 @@ export class AgentTaskRunner {
     try {
       g = await this.store.change((g) => engine.settle(g, t.id, said, failed));
     } catch (e) {
-      console.error(`agent: cannot record task ${t.id}:`, e);
+      this.log.error(`agent: cannot record task ${t.id}:`, e);
       return;
     }
     const state = g.find((x) => x.id === t.id)?.state ?? "failed";
@@ -196,7 +198,7 @@ export class AgentTaskRunner {
     try {
       await this.store.change((g) => engine.requeue(g, ids));
     } catch (e) {
-      console.error("agent: cannot put stopped tasks back:", e);
+      this.log.error("agent: cannot put stopped tasks back:", e);
     }
   }
 
@@ -213,7 +215,7 @@ export class AgentTaskRunner {
         return engine.states(next).join() === engine.states(g).join() ? undefined : next;
       });
     } catch (e) {
-      console.error("agent: cannot read its tasks:", e);
+      this.log.error("agent: cannot read its tasks:", e);
       return;
     }
     await this.advance();

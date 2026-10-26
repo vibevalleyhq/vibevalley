@@ -17,6 +17,7 @@ import { taskTools } from "./agentTaskTools.ts";
 import { effectTool, objectSchema, stopped } from "./tool.ts";
 import { fauxLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
+import { plainLog } from "../../base/log.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -197,7 +198,7 @@ describe("reminders", () => {
     const woke: string[] = [];
     // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
     let at = wallTime.now();
-    const s = new Reminders(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at });
+    const s = new Reminders(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at }, plainLog);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
@@ -222,7 +223,7 @@ describe("reminders", () => {
   it("wake only once the claim is stored", () => {
     const dir = home();
     let wakes = 0;
-    const s = new Reminders(dir, () => wakes++, wallTime);
+    const s = new Reminders(dir, () => wakes++, wallTime, plainLog);
     const now = new Date();
     writeFileSync(
       join(dir, "reminders.json"),
@@ -250,7 +251,7 @@ describe("reminders", () => {
   it("do not run a persisted reminder whose shape is wrong", () => {
     const dir = home();
     const woke: string[] = [];
-    const s = new Reminders(dir, (text) => woke.push(text), wallTime);
+    const s = new Reminders(dir, (text) => woke.push(text), wallTime, plainLog);
     const damaged = JSON.stringify([
       {
         id: "important",
@@ -274,6 +275,7 @@ describe("reminders", () => {
         throw new Error("unexpected wake");
       },
       wallTime,
+      plainLog,
     );
     const damaged = `[{"id":"important"`;
     writeFileSync(join(dir, "reminders.json"), damaged);
@@ -355,6 +357,7 @@ describe("MCP", () => {
     writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
     const agent = await Brain.start({
       time: wallTime,
+      log: plainLog,
       name: "test",
       instructions: "",
       llm: fauxLLM().llm,

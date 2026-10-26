@@ -13,6 +13,7 @@ import { codingTools } from "./coding.ts";
 import { deepseek, defaultModel, type LLM, type McpServer } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
 import type { Time } from "../../base/time.ts";
+import type { CallbackLog } from "../../base/log.ts";
 
 export const vibevalleyRuntime = "vibevalley";
 
@@ -34,6 +35,8 @@ export interface RuntimeOptions {
   readonly tasks?: (session: string) => AgentTaskStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
   readonly time: Time;
+  /** The sessions' logger: the Runtimes service's, or plainLog on the command line. */
+  readonly log: CallbackLog;
 }
 
 const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
@@ -68,6 +71,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const tasks = options.tasks?.(kernel.sessionId);
     const agent = await Brain.start({
       time: options.time,
+      log: options.log,
       name: "helper",
       instructions,
       llm,
