@@ -2,6 +2,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { memoryStore } from "./agentTaskStore.ts";
 import { Brain } from "./agent.ts";
@@ -13,6 +14,7 @@ import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Remi
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./agentTaskTools.ts";
+import { effectTool, objectSchema, stopped } from "./tool.ts";
 import { fauxLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
 
@@ -66,6 +68,40 @@ describe("the task tools", () => {
     expect(await call(tools, "task_graph", {})).toMatch(/read 读代码 → 在 jwt.go/);
     expect(await call(tools, "task_update", { id: "fix", state: "done" })).toMatch(/都做完了，这张图收起来了。$/);
     expect(await call(tools, "task_graph", {})).toBe("现在没有任务。");
+  });
+});
+
+describe("a tool whose work is an Effect", () => {
+  it("is interrupted when the run stops, and answers that it stopped", async () => {
+    let interrupted = false;
+    const waits = effectTool(
+      {
+        name: "waits",
+        description: "",
+        parameters: objectSchema(),
+        run: () =>
+          Effect.never.pipe(
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                interrupted = true;
+              }),
+            ),
+          ),
+      },
+      (effect, options) => Effect.runPromise(effect, options),
+    );
+    const stop = new AbortController();
+    const answer = waits.execute("t", {}, stop.signal);
+    stop.abort();
+    expect(await fails(answer.then((r) => JSON.stringify(r)))).toBe(stopped);
+    expect(interrupted).toBe(true);
+  });
+
+  it("says a failure's message as its failed result", async () => {
+    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new Error("不行")) }, (effect, options) =>
+      Effect.runPromise(effect, options),
+    );
+    expect(await fails(call([refuses], "refuses", {}))).toBe("不行");
   });
 });
 
