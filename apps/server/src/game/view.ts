@@ -202,7 +202,7 @@ function reachedText(a: AchievementDef, tier: number): string {
 
 function achievementEffect(id: string, tier: number): GameEffectAchievement {
   const e: GameEffectAchievement = { kind: "achievement", achievement: id, tier, title: "", reached: "", detail: "", coins: 0 };
-  for (const a of achievements) {
+  for (const a of achievements()) {
     if (a.id !== id) continue;
     const words = achievementInWords(a);
     e.detail = a.detail;
@@ -214,7 +214,7 @@ function achievementEffect(id: string, tier: number): GameEffectAchievement {
 }
 
 function standingsOf(p: Progress | undefined): AchievementStanding[] {
-  return achievements.map((a) => {
+  return achievements().map((a) => {
     const s: AchievementStanding = { id: a.id, tier: 0, count: 0 };
     if (p) {
       s.count = p.counts?.[a.id] ?? 0;
