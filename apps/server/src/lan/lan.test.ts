@@ -9,6 +9,7 @@ import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
 import { Lan } from "./lan.ts";
 import { until } from "../testing/until.ts";
+import { quietApp } from "../testing/world.ts";
 
 const web = mkdtempSync(join(tmpdir(), "vv-lan-web-"));
 writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>");
@@ -17,7 +18,7 @@ writeFileSync(join(web, "index.html"), "<!doctype html><title>VibeValley</title>
 const farm = (lanPort = 0) =>
   Effect.gen(function* () {
     const config = { ...testConfig(), web, lan: { port: lanPort } };
-    const built = yield* Layer.build(app(config, 0, () => Effect.void, { lan: { host: "127.0.0.1", address: () => "127.0.0.1" } }));
+    const built = yield* Layer.build(app(config, 0, () => Effect.void, { ...quietApp, lan: { host: "127.0.0.1", address: () => "127.0.0.1" } }));
     return Context.get(built, Lan);
   });
 

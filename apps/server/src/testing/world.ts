@@ -21,6 +21,16 @@ import { installedOnly } from "./helper.ts";
 
 export const noGitHub: GitHubRun = () => Effect.succeed({ out: "", ok: false, missing: true });
 
+/** For a test that builds the whole app (http/app.ts): nothing of this machine's is asked in the background. No runtime is
+ * probed (the coding agents installed here would be started and asked their models), gh is never run, the orchestrator does
+ * not listen for work, and the queued issues are not tried. Under load those made the app slow enough to time tests out. */
+export const quietApp = {
+  runtime: { background: false },
+  project: { gh: noGitHub },
+  orchestrator: { listen: false },
+  issue: { background: false },
+} satisfies ServiceOptions;
+
 export interface WorldOptions {
   readonly config?: Config;
   /** The runtimes sessions run on; each is probed as installed. */
