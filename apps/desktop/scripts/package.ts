@@ -15,7 +15,7 @@ const server = join(stage, "server");
 
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 sh(repo, "pnpm", "--filter", "vibevalley-web", "run", "build");
-sh(desktop, "pnpm", "exec", "tsx", "scripts/build.ts");
+sh(desktop, "pnpm", "exec", "vpx", "scripts/build.ts");
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(server, { recursive: true });

@@ -2,8 +2,8 @@
  * What a commit message must be (docs/development.md#分支提交和-pr). The commit-msg hook runs it on the message file;
  * CI runs it on a pull request's title, which squash merging makes the commit's subject.
  *
- *   pnpm exec tsx scripts/commit-msg.ts <message file>
- *   pnpm exec tsx scripts/commit-msg.ts --title <text>
+ *   vpx scripts/commit-msg.ts <message file>
+ *   vpx scripts/commit-msg.ts --title <text>
  */
 
 import { readFileSync } from "node:fs";

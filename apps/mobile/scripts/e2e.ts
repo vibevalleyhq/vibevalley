@@ -3,8 +3,8 @@
 // opened with its vibevalley://pair link, the owner lets it in, and the farm then hears from the phone with its key (its
 // page loaded through the lan listener). Leaves a screenshot in apps/mobile/.screens/. Build the app first (README.md).
 //
-//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts android
-//	bun scripts/verify-server.ts -- bun apps/mobile/scripts/e2e.ts ios
+//	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts android
+//	vpx scripts/verify-server.ts -- vpx apps/mobile/scripts/e2e.ts ios
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { execFileSync, spawnSync } from "node:child_process";

@@ -13,7 +13,7 @@ const run = (cmd: string, args: string[], cwd: string) => {
   if (done.status !== 0) process.exit(done.status ?? 1);
 };
 
-run("pnpm", ["exec", "tsx", "scripts/build.ts"], desktop);
+run("pnpm", ["exec", "vpx", "scripts/build.ts"], desktop);
 run("pnpm", ["exec", "vp", "build"], web);
 const watcher = spawn("pnpm", ["exec", "vp", "build", "--watch"], { cwd: web, stdio: ["ignore", "inherit", "inherit"] });
 const electron = spawn("pnpm", ["exec", "electron", "."], { cwd: desktop, env: { ...process.env, VIBEVALLEY_DEV: "1" }, stdio: "inherit" });

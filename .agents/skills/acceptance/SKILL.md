@@ -33,7 +33,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收：起�
 2. 除了管家的评测，都用同一个沙箱，在仓库根目录跑：
 
    ```bash
-   bun scripts/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
+   vpx scripts/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
    ```
 
    它用 Node 和 tsx 从 `apps/server` 起服务端，临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占主人的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`help` 列出全部接口）。每次调用是一个新农场，要的数据在同一个子命令里造。

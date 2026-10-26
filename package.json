@@ -8,26 +8,25 @@
     "check:fix": "vp check --fix",
     "scripts:test": "vp test run",
     "server:check": "pnpm --dir packages/protocol run test && pnpm --dir apps/server run check && pnpm --dir apps/server run db:check && pnpm --dir apps/server run test",
-    "golden:update": "tsx scripts/golden-update.ts",
+    "golden:update": "vpx scripts/golden-update.ts",
     "web:check": "pnpm -r run check && pnpm --filter @vibevalley/host run test && pnpm --filter vibevalley-mobile run test && pnpm --filter vibevalley-web run build",
     "desktop:dev": "pnpm --filter vibevalley-desktop run dev",
     "desktop:test": "pnpm --filter vibevalley-web run build && pnpm --filter vibevalley-desktop run test",
-    "notes:verify": "tsx scripts/agent-notes.ts",
-    "notes:catalog": "tsx scripts/agent-notes.ts --write",
-    "docs:verify": "tsx scripts/agent-notes.ts && tsx scripts/skills.ts && tsx scripts/doc-links.ts && tsx scripts/stale-names.ts && tsx scripts/capabilities.ts --check && tsx scripts/api-client.ts --check",
+    "notes:verify": "vpx scripts/agent-notes.ts",
+    "notes:catalog": "vpx scripts/agent-notes.ts --write",
+    "docs:verify": "vpx scripts/agent-notes.ts && vpx scripts/skills.ts && vpx scripts/doc-links.ts && vpx scripts/stale-names.ts && vpx scripts/capabilities.ts --check && vpx scripts/api-client.ts --check",
     "site:check": "pnpm --dir site install --ignore-workspace && pnpm --dir site run check",
     "site:build": "pnpm --dir site install --ignore-workspace && pnpm --dir site run build",
     "site:deploy": "pnpm --dir site install --ignore-workspace && pnpm --dir site run deploy",
-    "names:verify": "tsx scripts/stale-names.ts",
+    "names:verify": "vpx scripts/stale-names.ts",
     "package:mac": "pnpm --filter vibevalley-desktop run package",
-    "capabilities": "tsx scripts/capabilities.ts",
-    "api:client": "tsx scripts/api-client.ts"
+    "capabilities": "vpx scripts/capabilities.ts",
+    "api:client": "vpx scripts/api-client.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "effect": "4.0.5",
     "eslint-plugin-solid": "0.18.1",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"
@@ -35,12 +34,22 @@
   "packageManager": "pnpm@9.15.9",
   "pnpm": {
     "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
-      "vitest": "5.0.5"
+      "vite@*": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+      "vitest@*": "5.0.5"
     },
     "onlyBuiltDependencies": [
       "electron",
       "esbuild"
-    ]
+    ],
+    "peerDependencyRules": {
+      "allowAny": [
+        "vite",
+        "vitest"
+      ],
+      "allowedVersions": {
+        "vite": "*",
+        "vitest": "*"
+      }
+    }
   }
 }

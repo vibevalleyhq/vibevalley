@@ -21,13 +21,13 @@
 1. 只看服务端起得来：
 
    ```bash
-   bun scripts/verify-server.ts
+   vpx scripts/verify-server.ts
    ```
 
 2. 调这次改动的接口、看状态：
 
    ```bash
-   bun scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" state'
+   vpx scripts/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list && "$VIBEVALLEY_VERIFY_CLI" state'
    ```
 
    要造数据或断言，写进同一个子命令。
@@ -35,7 +35,7 @@
 3. 改了工单怎么派、怎么走、怎么交付，只用命令行走一遍：
 
    ```bash
-   bun scripts/verify-server.ts --scripted-helper -- sh -c '
+   vpx scripts/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
      vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"assignee\":\"docs\"}"

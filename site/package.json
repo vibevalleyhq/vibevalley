@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets": "tsx scripts/prepare.ts",
-    "check": "tsx scripts/prepare.ts && astro check",
-    "build": "tsx scripts/prepare.ts && astro build",
+    "assets": "vpx scripts/prepare.ts",
+    "check": "vpx scripts/prepare.ts && astro check",
+    "build": "vpx scripts/prepare.ts && astro build",
     "deploy": "pnpm run build && pnpm dlx wrangler@4 deploy"
   },
   "dependencies": {
@@ -28,7 +28,7 @@
     "opentype.js": "^2.0.0",
     "sharp": "0.35.5",
     "subset-font": "^2.9.0",
-    "tsx": "^4.23.15",
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "vite-plus": "1.4.0"
   }
 }

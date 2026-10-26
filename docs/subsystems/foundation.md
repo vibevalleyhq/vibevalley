@@ -28,7 +28,7 @@
 
 **仓库和包**
 
-- **一门语言**：服务端、页面、桌面壳、规则都是 TypeScript。服务端在 Node 24 上用 tsx 直接跑源码，不打包；页面由 Vite 构建；脚本和单元测试用 Bun。
+- **一门语言**：服务端、页面、桌面壳、规则都是 TypeScript。服务端在 Node 24 上用 tsx 直接跑源码，不打包；页面由 Vite 构建；脚本用 `vpx` 直接跑，单元测试用 `vp test`。
 - **`packages/protocol` 只有形状和纯函数**：不碰文件、网络和时钟以外的东西，服务端和页面都能 import；`effect` 是它唯一的依赖（Schema）。
 - **`packages/host` 是页面向宿主要东西的唯一入口**（[客户端](docs/subsystems/app.md)）。
 
