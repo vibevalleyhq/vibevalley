@@ -152,6 +152,8 @@ export default defineConfig({
           "**/*.test.tsx",
           "apps/server/src/testing/**",
           "apps/server/src/**/testing.ts",
+          // Made-up memories shown until the server sums them up.
+          "apps/web/src/tree/mock.ts",
           // What speaks only to models: VibeValley's own agent (its prompts, its tools, its errors to the model) and the
           // tools the orchestrator and the helpers call (their descriptions and results).
           "apps/server/src/agent/brain/**",

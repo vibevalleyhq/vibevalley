@@ -4,6 +4,7 @@
 // looking up, the same memories as a sky; the panel to the right. The memories are made up (mock.ts) until the server
 // sums them up.
 
+import { treeWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../farm/kit";
@@ -17,14 +18,14 @@ import { allOf, counts, kept, newest, stageName, type Ties, tiesOf, type TreeFil
 import { type SceneArea, type SceneHover, Scene } from "./Scene";
 
 const kindIcon: Record<MemoryKind, string> = { leaf: "icon-leaf", fruit: "icon-fruit", seed: "icon-seed" };
-const kindName: Record<MemoryKind, string> = { leaf: "叶", fruit: "果", seed: "种子" };
+const kindName: Record<MemoryKind, string> = treeWording().kind;
 
 /** A tie's words, by the kind of memory it is about: what it grew from, what grew from it, what it is used with. */
 function tieWords(kind: MemoryKind, ties: Ties): string[] {
   const words: string[] = [];
-  if (ties.from.length > 0) words.push(kind === "seed" ? `提炼自 ${ties.from.length} 次经验` : `这件活记下了 ${ties.from.length} 片叶`);
-  if (ties.grew.length > 0) words.push(kind === "fruit" ? `长出了 ${ties.grew.length} 颗种子` : `长成了 ${ties.grew.length} 次经验`);
-  if (ties.together.length > 0) words.push(`常和 ${ties.together.length} 条一起想起`);
+  if (ties.from.length > 0) words.push(kind === "seed" ? treeWording().distilled(ties.from.length) : treeWording().noted(ties.from.length));
+  if (ties.grew.length > 0) words.push(kind === "fruit" ? treeWording().seeds(ties.grew.length) : treeWording().grew(ties.grew.length));
+  if (ties.together.length > 0) words.push(treeWording().together(ties.together.length));
   return words;
 }
 
@@ -58,7 +59,7 @@ export function TreePage() {
   const sow = (seed: MemoryItem) => {
     playSound("open");
     setSown((s) => new Set([...s, seed.id]));
-    toast(`「${seed.body}」播进了技能书（还是假的，接上服务端以后才真写进去）`);
+    toast(treeWording().sown(seed.body));
   };
   const lookUp = (up: boolean) => {
     playSound("open");
@@ -111,18 +112,18 @@ export function TreePage() {
         }
       >
         <PxWindow class="absolute top-3 left-3 px-3 py-2">
-          <div class={pxText.sm}>农场的记忆星空</div>
-          <div class={[pxText.xs, "text-bark-500"]}>中间是种子，往外是果和叶，越远越旧；拖动可以转</div>
+          <div class={pxText.sm}>{treeWording().sky}</div>
+          <div class={[pxText.xs, "text-bark-500"]}>{treeWording().skyHint}</div>
         </PxWindow>
         <div class="absolute top-3 right-3">
           <PxButton icon="icon-tree" onClick={() => lookUp(false)}>
-            回到树下
+            {treeWording().back}
           </PxButton>
         </div>
       </Show>
       <div class={["absolute top-3 left-3", { hidden: sky() }]}>
         <PxButton icon="icon-map" onClick={home}>
-          回农场
+          {treeWording().farm}
         </PxButton>
       </div>
       <PxWindow
@@ -136,18 +137,18 @@ export function TreePage() {
           <Filters tree={tree} filter={filter()} setFilter={setFilter} class="min-w-[220px] flex-1" />
         </Show>
         <label class="flex min-w-[220px] flex-1 items-center gap-2">
-          <span class={pxText.xs}>最早</span>
+          <span class={pxText.xs}>{treeWording().earliest}</span>
           <input
             type="range"
             min="0"
             max="1"
             step="0.005"
             value={until()}
-            aria-label="看看从前：拖到哪天，树就长回那天的样子"
+            aria-label={treeWording().past}
             onInput={(e) => setUntil(Number(e.currentTarget.value))}
             class="flex-1 accent-[var(--color-leaf-500)]"
           />
-          <span class={[pxText.xs, "w-[64px] text-right"]}>{until() >= 1 ? "现在" : `第 ${day()} 天`}</span>
+          <span class={[pxText.xs, "w-[64px] text-right"]}>{until() >= 1 ? treeWording().now : treeWording().day(day())}</span>
         </label>
       </PxWindow>
       <Show when={hover()}>{(h) => <Tip hover={h()} tree={tree} agentName={agentName} now={now()} />}</Show>
@@ -159,16 +160,16 @@ function Filters(props: { tree: MemoryTree; filter: TreeFilter; setFilter: (f: T
   return (
     <div class={["flex gap-2", props.class]}>
       <PxPick
-        label="只看哪个帮工的"
-        placeholder="全部帮工"
+        label={treeWording().byHelper}
+        placeholder={treeWording().allHelpers}
         clearable
         value={props.filter.agent}
         options={props.tree.agents.map((a) => ({ value: a.id, label: a.name }))}
         onChange={(agent) => props.setFilter({ ...props.filter, agent })}
       />
       <PxPick
-        label="只看哪个项目的"
-        placeholder="全部项目"
+        label={treeWording().byProject}
+        placeholder={treeWording().allProjects}
         clearable
         value={props.filter.project}
         options={props.tree.projects.map((p) => ({ value: p, label: p }))}
@@ -203,52 +204,52 @@ function Panel(props: {
       style={props.narrow ? undefined : { width: `${panelWidth}px` }}
     >
       <header class="text-center">
-        <h1 class={pxText.lg}>农场的记忆树</h1>
-        <p class={[pxText.xs, "text-bark-500"]}>
-          第 {days()} 天 · {props.tree.rounds} 轮 · 想起 {props.tree.recalls} 次
-        </p>
+        <h1 class={pxText.lg}>{treeWording().title}</h1>
+        <p class={[pxText.xs, "text-bark-500"]}>{treeWording().stats(days(), props.tree.rounds, props.tree.recalls)}</p>
       </header>
       <div class="flex items-center gap-2 border-2 border-cream-300 bg-cream-100 px-2 py-1.5">
         <SpriteIcon name="icon-rings" size={20} />
         <span class={pxText.sm}>{stageName[props.tree.stage]}</span>
         <span class={[pxText.xs, "ml-auto text-bark-500"]}>
-          {props.tree.nextStageIn !== undefined ? `再干 ${props.tree.nextStageIn} 轮长成${stageName[(props.tree.stage + 1) as TreeStage]}` : "长成了"}
+          {props.tree.nextStageIn !== undefined
+            ? treeWording().nextStage(props.tree.nextStageIn, stageName[(props.tree.stage + 1) as TreeStage])
+            : treeWording().grown}
         </span>
       </div>
       <div class="grid grid-cols-3 gap-2" data-testid="memory-counts">
-        <Count icon="icon-leaf" label="叶" n={props.tally.leaf} />
-        <Count icon="icon-fruit" label="果" n={props.tally.fruit} />
-        <Count icon="icon-seed" label="种子" n={props.tally.seed} />
+        <Count icon="icon-leaf" label={treeWording().kind.leaf} n={props.tally.leaf} />
+        <Count icon="icon-fruit" label={treeWording().kind.fruit} n={props.tally.fruit} />
+        <Count icon="icon-seed" label={treeWording().kind.seed} n={props.tally.seed} />
       </div>
       <Filters tree={props.tree} filter={props.filter} setFilter={props.setFilter} />
       <Show when={props.picked}>
         {(m) => (
           <Section
-            title={m().kind === "fruit" ? "一次经验" : kindName[m().kind]}
+            title={m().kind === "fruit" ? treeWording().experience : kindName[m().kind]}
             icon={kindIcon[m().kind]}
-            aside={<PxButton size="sm" label="收起" icon="button-close" onClick={props.unpick} />}
+            aside={<PxButton size="sm" label={treeWording().fold} icon="button-close" onClick={props.unpick} />}
           >
             <p class={[pxText.xs, "text-bark-500"]}>
-              {props.agentName(m().agent)} · {m().project ?? "所有项目"} · {ago(m().at, props.now)}
+              {props.agentName(m().agent)} · {m().project ?? treeWording().everyProject} · {ago(m().at, props.now)}
             </p>
             <Show when={m().case} fallback={<p class={pxText.sm}>{m().body}</p>}>
               {(c) => (
                 <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                  <dt class={[pxText.xs, "text-bark-500"]}>想做什么</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().intent}</dt>
                   <dd class={pxText.sm}>{c().intent}</dd>
-                  <dt class={[pxText.xs, "text-bark-500"]}>怎么做的</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().approach}</dt>
                   <dd class={pxText.sm}>{c().approach}</dd>
-                  <dt class={[pxText.xs, "text-bark-500"]}>关键心得</dt>
+                  <dt class={[pxText.xs, "text-bark-500"]}>{treeWording().insight}</dt>
                   <dd class={pxText.sm}>{c().insight}</dd>
                 </dl>
               )}
             </Show>
-            <p class={[pxText.xs, "text-bark-500"]}>想起过 {m().recalled} 次</p>
+            <p class={[pxText.xs, "text-bark-500"]}>{treeWording().recalled(m().recalled)}</p>
             <TieList tree={props.tree} item={m()} pick={props.pick} />
           </Section>
         )}
       </Show>
-      <Section title="最近长出的">
+      <Section title={treeWording().recent}>
         <ul class="flex flex-col gap-1">
           <For each={props.recent}>
             {(m) => (
@@ -264,17 +265,17 @@ function Panel(props: {
         </ul>
       </Section>
       <Section
-        title={`快落的叶 ${props.fading.length}`}
+        title={treeWording().fading(props.fading.length)}
         icon="icon-leaf-fall"
         aside={
           <Show when={props.fading.length > 0}>
             <PxButton size="sm" onClick={() => setShowFading((v) => !v)}>
-              {showFading() ? "收起" : "看看"}
+              {showFading() ? treeWording().fold : treeWording().look}
             </PxButton>
           </Show>
         }
       >
-        <Show when={showFading()} fallback={<p class={[pxText.xs, "text-bark-500"]}>最久没想起的会先落；落了就忘了。</p>}>
+        <Show when={showFading()} fallback={<p class={[pxText.xs, "text-bark-500"]}>{treeWording().fadingNote}</p>}>
           <ul class="flex flex-col gap-1">
             <For each={props.fading}>
               {(m) => (
@@ -286,8 +287,8 @@ function Panel(props: {
           </ul>
         </Show>
       </Section>
-      <Section title="待播种的手艺" icon="icon-seed-gold">
-        <Show when={props.waiting.length > 0} fallback={<p class={[pxText.xs, "text-bark-500"]}>没有新的手艺；好几次经验说的是一件事时，会提炼出一颗种子。</p>}>
+      <Section title={treeWording().waiting} icon="icon-seed-gold">
+        <Show when={props.waiting.length > 0} fallback={<p class={[pxText.xs, "text-bark-500"]}>{treeWording().noSeeds}</p>}>
           <ul class="flex flex-col gap-2">
             <For each={props.waiting}>
               {(seed) => (
@@ -295,7 +296,7 @@ function Panel(props: {
                   <SpriteIcon name="icon-seed" size={20} />
                   <span class={[pxText.sm, "min-w-0 flex-1"]}>{seed.body}</span>
                   <PxButton size="sm" tone="primary" onClick={() => props.onSow(seed)}>
-                    播种
+                    {treeWording().sow}
                   </PxButton>
                 </li>
               )}
@@ -304,7 +305,7 @@ function Panel(props: {
         </Show>
       </Section>
       <PxButton tone="accent" icon="icon-stars" class="mt-auto w-full" onClick={props.onLookUp}>
-        抬头看星空
+        {treeWording().lookUp}
       </PxButton>
     </PxWindow>
   );
@@ -316,10 +317,10 @@ function TieList(props: { tree: MemoryTree; item: MemoryItem; pick: (m: MemoryIt
   const find = (id: string) => props.tree.items.find((m) => m.id === id);
   const groups = () =>
     [
-      { title: props.item.kind === "seed" ? "提炼自" : "这件活记下的", ids: ties().from },
-      { title: props.item.kind === "fruit" ? "长出了" : "长成了", ids: ties().grew },
+      { title: props.item.kind === "seed" ? treeWording().from : treeWording().notedBy, ids: ties().from },
+      { title: props.item.kind === "fruit" ? treeWording().grewInto : treeWording().grewTo, ids: ties().grew },
       {
-        title: "常一起想起",
+        title: treeWording().often,
         ids: ties()
           .together.slice(0, 4)
           .map((t) => t.id),
@@ -381,12 +382,13 @@ function Tip(props: { hover: SceneHover; tree: MemoryTree; agentName: (id: strin
       <div class="flex items-center gap-1.5">
         <SpriteIcon name={kindIcon[m().kind]} size={14} />
         <span class={pxText.xs}>
-          {props.agentName(m().agent)} · {m().project ?? "所有项目"}
+          {props.agentName(m().agent)} · {m().project ?? treeWording().everyProject}
         </span>
       </div>
       <p class={[pxText.sm, "mt-1"]}>{m().body}</p>
       <p class={[pxText.xs, "mt-1 text-bark-500"]}>
-        {ago(m().at, props.now)} · 想起过 {m().recalled} 次{m().fading ? " · 快落了" : ""}
+        {ago(m().at, props.now)} · {treeWording().recalled(m().recalled)}
+        {m().fading ? treeWording().aboutToFall : ""}
       </p>
       <Show when={ties().length > 0}>
         <p class={[pxText.xs, "mt-0.5 text-leaf-700"]}>{ties().join(" · ")}</p>
