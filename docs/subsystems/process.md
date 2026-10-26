@@ -16,7 +16,7 @@
 
 ## 在哪
 
-- **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `vp run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统。
+- **`scripts/`**（`vpx` 直接跑 `.ts`，不带构建）：`agent-notes.ts`（Note 的目录和格式，`--write` 重写 `CATALOG.md`）、`skills.ts`（skill 的格式）、`doc-links.ts`（总地图覆盖、链接和反引号里的源文件路径）、`stale-names.ts`（代码里不许回来的旧名字）、`capabilities.ts`（能力表是否最新）。五个连起来是 `vp run docs:verify`；`notes:verify`、`notes:catalog`、`names:verify` 是单跑其中一个。同一个目录里还有 `deadcode.ts`、`app-imports.ts`、`verify-server.ts`（验证 skill 起隔离服务端用），归各自的子系统、`comment-review.ts`（让模型照 `docs/style/code.md` 审注释，只报不改）。
 - **`.agents/`**：`notes/` 是 Agent Notes，`CATALOG.md` 是生成的清单；`skills/` 是项目自己的 skill，`.claude/skills` 是指向它的符号链接。
 - **`docs/`**：分层见 [docs/AGENTS.md](docs/AGENTS.md)；`docs/style/` 是 `writing.md` 和 `code.md`。
 - **`design/`**：`pixel/gen.sh`（codex 生图）、`pixel/process.py`（切图，写 `apps/web/public/pixel/` 和 `sprites.json`）、`pixel/prompts/`（提示词）、`pixel/icons/`（Hugeicons 的 SVG 和排参考图的 `ref.py`）；`assets/` 只留最早一套手绘界面的 `gen.sh`、提示词和原图；`art.sh` 把单独仓库 vibevalley-art 里的原图链接进来；`names.md` 是给档案和人物起名的梗。
@@ -72,10 +72,11 @@
 - **素材用 codex 照参考图生成，脚本切图。** 风格一致的素材有几百张（田地十几种状态、7 种动物 × 4 套衣服 × 6 个动作、走路循环、图标），手画不现实。一张生成图是一只动物穿一套衣服的全部动作，所以同一个角色各个动作长得一样，放弃了每个动作单独生成；切图只写清单，换一次图重跑，放弃了手切。重新打光（黄昏、夜里）以原图为参考只改光线。代价是生图要 codex 和网络、结果要人看一眼。
 - **原图留着，但放在单独的仓库。** 生图不是确定的，原图删了就回不来；原图和效果图有四百多 MB，不该让每次克隆都带上。`design/art.sh` 链接回 `design/`，脚本照常读写。
 - **叫 VibeValley（码农场物语）。** 原名 heybro 在 GitHub 上撞了一个同样做 AI agent 的项目，也说不出它是什么。VibeValley 一个词连着 vibe coding、《星露谷物语》的田园感和硅谷；码农场物语是「码农」「农场」的双关，「物语」呼应《牧场物语》。放弃了 vibefarm（域名、游戏、GitHub 名都被占）、viberfarm（VIBER 是注册商标，读音也撞）、只改仓库名（GitHub 和应用两个名字，传不起来）、只改名字不改数据里的 id（看不见的地方永远叫旧名，新代码要记住例外），也放弃了兼容旧名字：每个读环境变量或目录的地方都得记着旧名，而当时没有外部用户，改一次最便宜。
+- **没价值的注释：分隔线交给 lint，其余交给模型审新加的。** 量过 main 上的 4663 条注释：能用模式认准的只有分隔线和给一段代码起的标题（40 处，全中）；换个说法复述名字、文件开头的概述、测试里一步步讲，按词比对只对一半，只比声明的名字又只抓到一处，要读懂注释和它旁边的代码。所以分隔线是 `vibevalley/no-comment-divider`；其余由 `scripts/comment-review.ts` 把新加的注释连同附近的代码、`docs/style/code.md` 的「注释」一节交给 DeepSeek 判，[vv-comments](.agents/skills/vv-comments/SKILL.md) 写怎么对着代码核实。只审新加的：花的和改动一样大，旧的由主人点名一块用 `--all` 清。只报不改：删错一条说为什么的注释，比留一条废话代价大。提 PR 前在本机跑、不进 CI：模型的回答每次不一样，不该挡合并。放弃了全写成 lint（认不准，`error` 误报、`warn` 没人看）和每次审整个仓库（3850 条、近两百次请求）。
 
 ## 还没做的
 
-- 没价值的注释：分隔线已由 lint 挡，模型审新加注释的脚本提 PR 前在本机跑，还没拿已知该删的注释校准过：[提案](.agents/notes/proposed/process/2026-10-26-comment-review.md)。
+- 模型审注释还没拿已知该删的注释校准过：它漏掉多少还不知道。
 - 用 VibeValley 开发 VibeValley：干活的农场和正在改的代码分开、合并前跑检查、渠道各用各的工作目录：[提案](.agents/notes/proposed/process/2026-10-18-build-vibevalley-with-vibevalley.md)。
 
 ## 怎么验证
@@ -83,4 +84,5 @@
 - `vp run docs:verify`：依次跑 `agent-notes.ts`、`skills.ts`、`doc-links.ts`、`stale-names.ts`，任何一个失败都退出 1，报出文件和行号。
 - 在文档里写一个不存在的反引号路径或 `../` 链接，`vpx scripts/doc-links.ts` 报错；删掉一份验收分册的「证据」一节、或入口的表漏了一份，`vpx scripts/skills.ts` 报错；加一篇 Note 不跑 `notes:catalog`，`vpx scripts/agent-notes.ts` 报 `CATALOG.md` 过期。
 - `vp test run scripts/verify-server.test.ts`：`only a machine receipt from the owned process announces readiness`、`sandbox owns isolation, readiness, validation failure and cleanup`。
+- `vp test run scripts/comment-review.test.ts`：只挑新加的注释、连着的 `//` 合成一条、跳过工具的指令、模型漏答或答错格式时报错而不当成 `keep`。
 - 素材没有自动检查：重跑 `process.py` 后看 `git diff apps/web/public/pixel/`，图鉴页能看全部贴图。
