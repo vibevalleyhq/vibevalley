@@ -83,6 +83,7 @@ import { type Due, Recurrences } from "../recurrence/recurrence.ts";
 import * as q from "../../db/generated/issue.sql.ts";
 import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
+import { IssueSessions } from "./sessions.ts";
 import { conflictBrief, conflictOf, parseAnswer } from "../session/rules.ts";
 
 /** An issue for the orchestrator, handed to it. */
@@ -227,6 +228,10 @@ export const make = (options: IssueOptions = {}) =>
     const recurrences = yield* Recurrences;
     const sql = yield* SqlClient.SqlClient;
     const { run: db, one, inTx } = yield* Db;
+    const worked = new IssueSessions();
+    /** After an issue is removed: its sessions' rows went with it, and its children's. */
+    const reloadSessions = Effect.suspend(() => Effect.map(db(qs.allSessions()), (rows) => worked.load(rows)));
+    yield* reloadSessions;
     const orchestratorHub = yield* PubSub.unbounded<OrchestratorWork>();
     /** One round of the queue at a time. */
     const trying = yield* Semaphore.make(1);
@@ -286,16 +291,9 @@ export const make = (options: IssueOptions = {}) =>
       return out;
     }
 
-    const runsBy = (rows: readonly { issue: string; session: string }[]) => {
-      const out = new Map<string, string[]>();
-      for (const r of rows) out.set(r.issue, [...(out.get(r.issue) ?? []), r.session]);
-      return out;
-    };
-
     const list = Effect.gen(function* () {
       const rows = yield* db(q.listIssues());
-      const runs = runsBy(yield* db(qs.allSessions()));
-      return rows.map((r) => issueOf(r, runs.get(r.id))).sort(issueOrder);
+      return rows.map((r) => issueOf(r, worked.of(r.id))).sort(issueOrder);
     });
 
     const idOf = Effect.fn("Issues.idOf")(function* (ref: string): Effect.fn.Return<string, ApiError> {
@@ -306,7 +304,7 @@ export const make = (options: IssueOptions = {}) =>
         if (!row) return yield* Effect.fail(missing("工单 #" + number, [lookIn.issue]));
         return row.id;
       }
-      return (yield* one(qs.issueOfSession({ session: r })))?.issue ?? r;
+      return worked.issueOf(r) ?? r;
     });
 
     /** By any of what idOf reads. */
@@ -314,10 +312,7 @@ export const make = (options: IssueOptions = {}) =>
       const issue = yield* idOf(ref);
       const row = yield* one(q.getIssue({ id: issue }));
       if (!row) return yield* Effect.fail(missing("工单 " + ref, [lookIn.issue]));
-      return issueOf(
-        row,
-        (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session),
-      );
+      return issueOf(row, worked.of(issue));
     });
 
     const publish = (id: string) =>
@@ -440,6 +435,7 @@ export const make = (options: IssueOptions = {}) =>
           Effect.provideService(SqlClient.SqlClient, sql),
           Effect.mapError((e) => new Error(causeMessage(e))),
         );
+      worked.added(session.id, id);
       yield* publish(id);
     });
 
@@ -504,6 +500,7 @@ export const make = (options: IssueOptions = {}) =>
       const hired = yield* sessions.send(agent, task, where, { ...opt, issue, ...(!opt.refining ? { hiring: (w: Session) => ran(issue.id, w) } : {}) });
       if (!hired.session && !opt.issue && !hired.retainedWork) {
         yield* db(q.removeIssue({ id: issue.id }));
+        yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id: issue.id });
       }
       if (hired.retainedWork) return { ...hired, refused: `${hired.refused}；工单 #${issue.number} 和它的改动留着，可以接着派这张工单` };
@@ -801,11 +798,11 @@ export const make = (options: IssueOptions = {}) =>
       switch (n._tag) {
         case "left": {
           const e = n.left;
-          const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+          const issue = worked.issueOf(e.id);
           if (!issue) return;
           const row = yield* one(q.getIssue({ id: issue }));
           if (!row || row.graph !== null || row.task !== null) return;
-          const runs = (yield* db(qs.sessionsOf({ issue }))).map((r) => r.session);
+          const runs = worked.of(issue);
           // Closed already (completed by the owner before its session went home): the verdict stands.
           if (runs.at(-1) !== e.id || row.closed_at !== null) return;
           const closing = closingOf(e.closed);
@@ -819,7 +816,7 @@ export const make = (options: IssueOptions = {}) =>
         }
         case "reported": {
           const e = n.report;
-          const issue = (yield* one(qs.issueOfSession({ session: e.id })))?.issue;
+          const issue = worked.issueOf(e.id);
           // A report's 要问主人： lines are what its issue waits on the owner for; a report without them clears them.
           const checks = e.checks ?? [];
           if (issue && checks.length > 0) yield* checked(issue, checks);
@@ -843,8 +840,7 @@ export const make = (options: IssueOptions = {}) =>
     // ── coming back ──
 
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
-    const kept0 = runsBy(yield* db(qs.sessionsOfKept({ closed: keepClosedIssues })));
-    for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, kept0.get(row.id)) });
+    for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });
     // An in-process run on its issues stopped with the server: one still going is lost; one that ended still waits on the owner.
     for (const r of yield* db(q.openOf({ assignee: orchestratorAgent }))) {
       const run = column.run(r.last_run);
@@ -948,6 +944,7 @@ export const make = (options: IssueOptions = {}) =>
         const cleared = yield* clearRefinement(t);
         if (cleared.kept) return yield* Effect.fail(refused(`工单 #${t.number} 还不能删：${cleared.reason}`));
         yield* db(q.removeIssue({ id }));
+        yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id } as never);
       }),
       move: Effect.fn("Issues.move")(function* (id, before) {
@@ -1224,8 +1221,7 @@ export const make = (options: IssueOptions = {}) =>
       putTask: Effect.fn("Issues.putTask")(function* (graph) {
         const family = Effect.fn("Issues.family")(function* (id: string) {
           const rows = yield* db(q.family({ id }));
-          const runs = runsBy(yield* db(qs.sessionsOfFamily({ id })));
-          return rows.map((r) => issueOf(r, runs.get(r.id)));
+          return rows.map((r) => issueOf(r, worked.of(r.id)));
         });
         const before = yield* family(graph.id);
         const issues = graphIssues(graph, before, yield* Clock.currentTimeMillis);
@@ -1260,6 +1256,7 @@ export const make = (options: IssueOptions = {}) =>
             return out;
           }),
         );
+        if (gone.length > 0) yield* reloadSessions;
         // Published as one commit once the transaction has succeeded.
         const updated = yield* Effect.forEach([...issues.slice(1), issues[0]!], (t) => get(t.id).pipe(Effect.orDie));
         yield* core.apply(...gone.map((id) => ({ type: "issueGone", id }) as never), ...updated.map((issue) => ({ type: "issue" as const, issue })));
