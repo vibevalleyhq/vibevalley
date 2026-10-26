@@ -6,11 +6,12 @@ import { NodeServices } from "@effect/platform-node";
 import { run } from "../cli.ts";
 import { app } from "../http/app.ts";
 import { testConfig } from "./layers.ts";
+import { quietApp } from "./world.ts";
 
 /** The whole farm on a free port; the command line is pointed at it. */
 export const farm = Effect.gen(function* () {
   let address = "";
-  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a))));
+  yield* Layer.build(app(testConfig(), 0, (a) => Effect.sync(() => void (address = a)), quietApp));
   return "http://" + address;
 });
 
