@@ -356,7 +356,8 @@ describe("an issue", () => {
       const project = join(f.config.workRoot, "projects", "clock");
       const before = git(project, "rev-parse", "main");
       refusedWith(yield* Effect.flip(issues.setStatus(helper.issue!, "done", "", "")), "merge-check-failed");
-      expect((yield* issues.get(helper.issue!)).status).toBe("in_review");
+      // Not done; the helper is already told what failed (issue/merge.ts notTaken) and may be at it (in_progress).
+      expect((yield* issues.get(helper.issue!)).status).not.toBe("done");
       yield* until(() => {
         const got = sessions.find(helper.id);
         return got !== undefined && got.lastText.includes("merge-check-failed") && !isBusy(got.session);
