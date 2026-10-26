@@ -140,8 +140,8 @@ export default defineConfig({
       {
         // What the shipped code says is in word tables (scripts/oxlint-plugin.ts, no-cjk-literal): Chinese is written
         // only in them, in what is said to models, and in the tests.
-        files: ["apps/*/src/**", "packages/*/src/**"],
-        rules: { "vibevalley/no-cjk-literal": "warn" },
+        files: ["apps/*/src/**", "packages/*/src/**", "apps/mobile/App.tsx"],
+        rules: { "vibevalley/no-cjk-literal": "error" },
       },
       {
         files: [

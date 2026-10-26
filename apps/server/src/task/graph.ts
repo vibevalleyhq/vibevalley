@@ -1,7 +1,7 @@
 // A task graph's rules. Texts are measured as JavaScript does.
 
 import { taskWording } from "./words.ts";
-import type { GraphAction, GraphState, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
+import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
 import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../base/dag.ts";
 
 /** More steps than this means the job should be split into tasks. */

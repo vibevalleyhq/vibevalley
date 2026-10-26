@@ -2,7 +2,7 @@
 // recorded cases (rules.test.ts).
 
 import { channelWording } from "./words.ts";
-import { type Conversation, everyone, generalName, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
+import { type Conversation, everyone, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English.
 const chatNamed: Readonly<Record<string, string>> = {

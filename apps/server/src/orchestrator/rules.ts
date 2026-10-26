@@ -7,7 +7,6 @@ import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/prot
 import { head } from "../base/text.ts";
 import { type InboxMessage, messageLine } from "../channel/rules.ts";
 import { quotaLow, yuan } from "../runtime/money.ts";
-import type { PatrolNote } from "../notice/rules.ts";
 
 /** The model the orchestrator answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */
 export const orchestratorModel = "vibevalley-orchestrator";

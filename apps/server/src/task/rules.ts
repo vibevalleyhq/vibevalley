@@ -3,19 +3,16 @@
 
 import { taskWording } from "./words.ts";
 import {
-  type Agent,
   type WorkspaceState,
   type GraphEvent,
   type GraphState,
   type Issue,
-  type Session,
   type Task,
   type TaskEdit,
   type TaskGraph,
   type IssueId,
 } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
-import { isForOrchestrator } from "../issue/state.ts";
 import { blockedBy, canEditTask, canRemoveTask, graphProblems, isAcceptance, isSettled, taskOf } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
 
