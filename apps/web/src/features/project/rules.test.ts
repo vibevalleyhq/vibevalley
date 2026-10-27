@@ -16,7 +16,7 @@ import {
   plotsIn,
   since,
   streaksOf,
-} from "./projects";
+} from "./rules";
 
 const lang = (name: string, code: number, comments = 0, files = 1): LanguageCount => ({ name, files, code, comments, blanks: 0 });
 

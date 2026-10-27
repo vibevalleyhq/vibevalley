@@ -27,9 +27,9 @@ import {
   sessionInPlot,
   since,
   spotText,
-} from "../../rules/projects";
+} from "./rules";
 import { toast } from "../../ui/toasts";
-import { writeIssue } from "../../features/issue/write";
+import { writeIssue } from "../issue/write";
 import { useRouter } from "../../base/router";
 import { autofocus } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
