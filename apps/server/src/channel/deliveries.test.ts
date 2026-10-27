@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 
-const row = (message: string, number: number, conversation = "c"): DeliveryRow => ({
+const row = (message: string, number: number, channel = "c"): DeliveryRow => ({
   message_id: message,
   number,
   reason: "channel",
@@ -9,16 +9,16 @@ const row = (message: string, number: number, conversation = "c"): DeliveryRow =
   held_by: null,
   state: "pending",
   launch: null,
-  conversation_id: conversation,
+  channel_id: channel,
   sender_id: "owner",
   kind: "chat",
   body: "话",
   created_at: 1,
   name: "主人",
   sender_kind: "owner",
-  conversation_kind: "general",
-  parent_id: null,
-  parent_number: null,
+  channel_type: "general",
+  root_id: null,
+  root_number: null,
   subject_kind: null,
   subject_id: null,
   channel_name: "田头",
@@ -51,7 +51,7 @@ describe("the open deliveries", () => {
     expect(states(d, "w1")).toEqual([["m2", "pending", null]]);
   });
 
-  it("read up to a number in one conversation, or dropped whole", () => {
+  it("read up to a number in one channel, or dropped whole", () => {
     const d = new Deliveries();
     for (const [m, n, c] of [
       ["a1", 1, "a"],

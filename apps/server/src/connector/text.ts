@@ -3,7 +3,7 @@
 
 import { connectorWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
-import { type ChatMessage, type ConnectorID, type Conversation } from "@vibevalley/protocol";
+import { type ChatMessage, type ConnectorID, type Channel } from "@vibevalley/protocol";
 import { slice } from "../base/text.ts";
 
 /** In UTF-16 units; longer ones are cut. */
@@ -26,11 +26,11 @@ export function plainText(markdown: string): string {
 }
 
 /** The owner sees one chat, the farm has many threads. */
-export function ownerLine(m: ChatMessage, where: Conversation | undefined): string {
+export function ownerLine(m: ChatMessage, where: Channel | undefined): string {
   const w = connectorWording().line;
   const who = m.fromKind === "orchestrator" ? w.orchestrator : m.name;
   const what =
-    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? w.dispatch : where?.kind === "thread" ? w.thread : "";
+    m.kind === "report" ? wording().outcome[m.outcome ?? "interrupted"] : m.kind === "dispatch" ? w.dispatch : where?.type === "thread" ? w.thread : "";
   return w.head(who, what) + "\n" + plainText(m.text);
 }
 

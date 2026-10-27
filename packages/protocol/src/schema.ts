@@ -189,7 +189,7 @@ export const Spent: Codec<T.Spent> = Schema.Struct({
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: Schema.String,
   number: Schema.Number,
-  conversation: Schema.String,
+  channel: Schema.String,
   from: Schema.String,
   fromKind: ActorKind,
   name: Schema.String,
@@ -206,19 +206,19 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   at: Schema.Number,
 });
 
-export const ConversationKind: Codec<T.ConversationKind> = Schema.Literals(T.ConversationKindValues);
+export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);
 
 export const SubjectKind: Codec<T.SubjectKind> = Schema.Literals(T.SubjectKindValues);
 
-export const Conversation: Codec<T.Conversation> = Schema.Struct({
+export const Channel: Codec<T.Channel> = Schema.Struct({
   id: Schema.String,
-  kind: ConversationKind,
+  type: ChannelType,
   parent: Schema.optionalKey(Schema.String),
-  parentNumber: Schema.optionalKey(Schema.Number),
+  root: Schema.optionalKey(Schema.String),
+  rootNumber: Schema.optionalKey(Schema.Number),
   name: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
-  channel: Schema.optionalKey(Schema.String),
   subjectKind: Schema.optionalKey(SubjectKind),
   subjectId: Schema.optionalKey(Schema.String),
   lastNumber: Schema.optionalKey(Schema.Number),
@@ -500,11 +500,11 @@ export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
 });
 
 export const Chat: Codec<T.Chat> = Schema.Struct({
-  conversations: Schema.mutable(Schema.Array(Conversation)),
+  channels: Schema.mutable(Schema.Array(Channel)),
   ownerMentions: Schema.optionalKey(Schema.mutable(Schema.Array(OwnerMention))),
 });
 
-export const RoomEvent: Codec<T.RoomEvent> = Schema.Union([
+export const ChannelEvent: Codec<T.ChannelEvent> = Schema.Union([
   Schema.Struct({ _tag: Schema.Literal("Message"), message: ChatMessage }),
   Schema.Struct({ _tag: Schema.Literal("Reset") }),
 ]);
@@ -666,7 +666,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
   orchestrator: OrchestratorState,
-  orchestratorConversation: Schema.optionalKey(Schema.String),
+  orchestratorChannel: Schema.optionalKey(Schema.String),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -839,7 +839,7 @@ export const InboxTargetGraph: Codec<T.InboxTargetGraph> = Schema.Struct({
 
 export const InboxTargetChat: Codec<T.InboxTargetChat> = Schema.Struct({
   kind: Schema.Literal("chat"),
-  conversation: Schema.String,
+  channel: Schema.String,
 });
 
 export const InboxTarget: Codec<T.InboxTarget> = Schema.Union([InboxTargetSession, InboxTargetGraph, InboxTargetChat]);
@@ -1384,7 +1384,7 @@ export const CommentRequest: Codec<T.CommentRequest> = Schema.Struct({
 export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   text: Schema.String,
   station: Schema.optionalKey(Schema.Number),
-  conversation: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),
@@ -1597,7 +1597,7 @@ export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
   at: Schema.Number,
   state: OrchestratorState,
-  conversation: Schema.optionalKey(Schema.String),
+  channel: Schema.optionalKey(Schema.String),
 });
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
@@ -1608,10 +1608,10 @@ export const FactMessage: Codec<T.FactMessage> = Schema.Struct({
   answers: Schema.optionalKey(SessionId),
 });
 
-export const FactConversation: Codec<T.FactConversation> = Schema.Struct({
-  type: Schema.Literal("conversation"),
+export const FactChannel: Codec<T.FactChannel> = Schema.Struct({
+  type: Schema.Literal("channel"),
   at: Schema.Number,
-  conversation: Conversation,
+  channel: Channel,
 });
 
 export const FactOwnerMentions: Codec<T.FactOwnerMentions> = Schema.Struct({
@@ -1746,7 +1746,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactCall,
   FactOrchestrator,
   FactMessage,
-  FactConversation,
+  FactChannel,
   FactOwnerMentions,
   FactHired,
   FactStation,
@@ -1797,7 +1797,7 @@ export const SideEvent: Codec<T.SideEvent> = Schema.Union([
   FactCall,
   FactOrchestrator,
   FactMessage,
-  FactConversation,
+  FactChannel,
   FactOwnerMentions,
   FactHired,
   FactStation,

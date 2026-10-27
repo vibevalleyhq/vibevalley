@@ -5,4 +5,4 @@ insert into channel_seen_mark (participant_id, message_id) values (sqlc.arg(part
 
 -- name: PruneSeenMarks :exec
 delete from channel_seen_mark where participant_id = sqlc.arg(participant)
-  and message_id in (select id from channel_message where conversation_id = sqlc.arg(conversation) and number <= sqlc.arg(upto));
+  and message_id in (select id from channel_message where channel_id = sqlc.arg(channel) and number <= sqlc.arg(upto));

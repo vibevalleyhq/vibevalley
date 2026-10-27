@@ -47,8 +47,8 @@ Workspace（工作目录，一张大地图）
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
 | 改动 | `Changes` | 分支上的提交和 diff，合进去会不会冲突 |
 | 完成 | 动作 `complete`；工单的 `status` 是 `done` | 主人对工单的结论；交付由 `delivered` 另记。合并只是交付的一种，PR 合入后才完成（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
-| 频道 | `Conversation`（`kind: general`、`channel`） | 说话的地方；默认的是田头，主人可以再开；外面的聊天软件经连接器接到一个频道上 |
-| 工单串 | `kind: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
+| 频道 | `Channel`（`type: general`、`channel`、`thread`） | 说话的地方，照 Discord：田头、主人再开的频道和串都是 channel，串挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
+| 工单串 | `type: thread`、`subjectKind: issue` | 一张工单下的对话，相当于 Linear 的评论 |
 | 计划 | `TaskGraph`：带 `graph` 的父工单 | 一件大活拆成的一张 DAG：每件是带 `task` 的子工单，先后是 `blockedBy`；每件合进计划分支，最后合进主分支 |
 | 定时 | `Recurrence` | 一张工单的一种触发：一个定时一张工单，派给一个档案或管家，每次到点是它的一次 run |
 | Inbox | `InboxItem` | 要你处理的事，从核心状态现算 |

@@ -134,7 +134,7 @@ export const defaultVoice = (): VoiceSettings => ({
   area: "US",
   language: settingWording().defaults.language,
   asr: { vendor: "ares" },
-  // The farm's own orchestrator answers: the call is its mouth, with the same conversation as 田头 (voice/voice.ts, the line).
+  // The farm's own orchestrator answers: the call is its mouth, answering as it does in 田头 (voice/voice.ts, the line).
   answer: { vendor: "orchestrator" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   persona: voiceOrchestratorPersona(),

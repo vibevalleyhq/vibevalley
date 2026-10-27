@@ -39,7 +39,7 @@ const en: typeof zh = {
     recurrence: "List the schedules and find its id",
     device: "See the connected devices and find its id",
     archive: "List the manager's archive",
-    channel: "Channels and conversations are in the core state, under state.chat",
+    channel: "The channels are in the core state, under state.chat",
     graph: "Plans are in the core state, under graphs",
     memories: "List its memories and find that one's id",
   },

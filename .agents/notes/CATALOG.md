@@ -20,7 +20,7 @@
 
 ### architecture
 
-- 2026-10-27 [房间的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-rooms-over-effect-rpc.md)
+- 2026-10-27 [页面的连接接着带上在线状态和工单的增量](.agents/notes/proposed/architecture/2026-10-27-presence-and-entity-deltas.md)
 - 2026-10-22 [状态先提交，副作用由 worker 在提交之后做](.agents/notes/proposed/architecture/2026-10-22-commit-then-effects.md)
 - 2026-10-22 [收回派活、工作区、配置、日志与手机线路的使用约束](.agents/notes/proposed/architecture/2026-10-22-close-ownership-gaps.md)
 - 2026-10-18 [Task：一张按 DAG 推进的活，agent 自己的步骤和种植计划都是它](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)

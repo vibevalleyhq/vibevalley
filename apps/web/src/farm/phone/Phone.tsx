@@ -55,7 +55,7 @@ export function Phone(props: { room: { w: number; h: number } }) {
       case "graph":
         return farm.openTaskBoard(call.target.graph);
       case "chat":
-        return router.navigate(`/chat/${call.target.conversation}`);
+        return router.navigate(`/chat/${call.target.channel}`);
     }
   };
   const game = () => ringing() === null && games.has(app());

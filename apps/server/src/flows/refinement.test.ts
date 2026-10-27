@@ -133,7 +133,7 @@ describe("a refined issue", () => {
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       // Held until the issue's thread is open, as it is before any real draft hands back.
       const before = yield* issues.refine(issue.id, "慢慢乱写一通", "");
-      const thread = () => core.state().chat?.conversations?.find((c) => c.subjectId === issue.id)?.id;
+      const thread = () => core.state().chat?.channels?.find((c) => c.subjectId === issue.id)?.id;
       yield* until(() => thread() !== undefined, "the issue's thread");
       yield* releaseHeld();
       yield* until(() => !drafting(core), "the refiner left");

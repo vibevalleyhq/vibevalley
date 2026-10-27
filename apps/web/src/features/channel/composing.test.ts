@@ -13,7 +13,7 @@ function setup() {
   const failed = vi.fn();
   const box = createRoot((stop) => {
     dispose = stop;
-    const [to, setTo] = createSignal<ReturnType<ComposerWays["target"]>>({ conversation: "channel" });
+    const [to, setTo] = createSignal<ReturnType<ComposerWays["target"]>>({ channel: "channel" });
     target = setTo;
     return createComposer(
       () => undefined,
@@ -44,11 +44,11 @@ test("every routing field participates in a send identity, while unchanged retri
   try {
     s.edit("同一句");
     for (const target of [
-      { conversation: "channel" },
-      { conversation: "thread" },
-      { conversation: "thread", agent: "a" },
-      { conversation: "thread", agent: "a", project: "p" },
-      { conversation: "thread", agent: "a", project: "p", station: 1 },
+      { channel: "channel" },
+      { channel: "thread" },
+      { channel: "thread", agent: "a" },
+      { channel: "thread", agent: "a", project: "p" },
+      { channel: "thread", agent: "a", project: "p", station: 1 },
     ]) {
       s.target(target);
       await s.box.send();
@@ -104,7 +104,7 @@ test("a response for the previous destination cannot clear the current destinati
   try {
     s.edit("给这里的一句话");
     const pending = s.box.send();
-    s.target({ conversation: "somewhere-else" });
+    s.target({ channel: "somewhere-else" });
     complete();
     await pending;
     flush();
@@ -132,7 +132,7 @@ test("closing a composer releases its target before a pending response arrives",
       {
         target: () => {
           if (closed) throw new Error("disposed target was read");
-          return { conversation: "a" };
+          return { channel: "a" };
         },
         failed: () => {
           throw new Error("disposed failure callback was called");

@@ -166,8 +166,8 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
     feishu: script.feishu,
     qq: script.qq,
     ...retry,
-    say: (text, conversation, chat) =>
-      Effect.flatMap(chat.say(text, conversation, ""), ({ message }) => chat.orchestratorSays(message.conversation, "收到：**" + text + "**", "")),
+    say: (text, channel, chat) =>
+      Effect.flatMap(chat.say(text, channel, ""), ({ message }) => chat.orchestratorSays(message.channel, "收到：**" + text + "**", "")),
   }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const statusOf = (id: ConnectorID) =>
@@ -187,10 +187,10 @@ const reaches = (id: ConnectorID, state: ConnectorState) => statusIs(id, (s) => 
 
 const nth = (script: Script, app: ConnectorID, n: number, what: string) => until(async () => script.by(app)[n], what);
 
-const saidIn = (conversation: string) =>
+const saidIn = (channel: string) =>
   Effect.gen(function* () {
     const chat = yield* Channels;
-    return (yield* chat.history(conversation)).filter((m) => m.from === "owner").map((m) => m.text);
+    return (yield* chat.history(channel)).filter((m) => m.from === "owner").map((m) => m.text);
   });
 
 const weixinConnected = (script: Script) =>
@@ -539,7 +539,7 @@ describe("the chat apps", () => {
           target: `#田头:${parent.number}`,
           anyway: true,
         });
-        thread = written.message!.conversation;
+        thread = written.message!.channel;
         yield* nth(first, "weixin", 0, "the original answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the external identity saved");
@@ -566,7 +566,7 @@ describe("the chat apps", () => {
         thread = (yield* chat.speak(orchestratorAgent, "旧的答复", {
           target: `#linked:${parent.number}`,
           anyway: true,
-        })).message!.conversation;
+        })).message!.channel;
         yield* nth(first, "weixin", 0, "the old answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the old answer saved");
@@ -575,16 +575,16 @@ describe("the chat apps", () => {
           const fresh = (yield* chat.speak(orchestratorAgent, "其他答复", {
             target: `#田头:${other.number}`,
             anyway: true,
-          })).message!.conversation;
+          })).message!.channel;
           yield* chat.notice(fresh, "第一条动静", "history");
           yield* chat.notice(fresh, "第二条动静", "history");
         }
-        expect(chat.now()?.conversations.some((c) => c.id === thread)).toBe(false);
+        expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
       }).pipe(Effect.scoped, Effect.provide(farm(first, config)));
       const second = new Script();
       yield* Effect.gen(function* () {
         const chat = yield* Channels;
-        expect(chat.now()?.conversations.some((c) => c.id === thread)).toBe(false);
+        expect(chat.now()?.channels.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
         yield* chat.orchestratorSays(thread, "在旧串里继续答复", "");
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");

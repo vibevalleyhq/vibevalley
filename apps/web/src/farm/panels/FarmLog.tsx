@@ -6,7 +6,7 @@ import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { generalOf, useReports, useRoom } from "../../features/channel";
+import { generalOf, useFollowed, useReports } from "../../features/channel";
 import { useCore } from "../../base/frame";
 import { useAgent } from "../../base/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
@@ -29,7 +29,7 @@ type Row = { kind: "said" | "report"; message: ChatMessage };
 export function FarmLog() {
   const core = useCore();
   const look = usePrefs((p) => p.orchestratorLook);
-  const general = useRoom(() => generalOf(core()?.chat)?.id);
+  const general = useFollowed(() => generalOf(core()?.chat)?.id);
   const reports = useReports();
   const rows = (): Row[] =>
     [

@@ -1,5 +1,5 @@
-// What is said in a test farm, from the farm's start: the core state keeps no messages (a page follows a conversation's
-// room), and a test reads them as the message facts told them, by conversation.
+// What is said in a test farm, from the farm's start: the core state keeps no messages (a page follows a channel's
+// room), and a test reads them as the message facts told them, by channel.
 
 import type { ChatMessage } from "@vibevalley/protocol";
 import { Context, Effect, Layer, Stream } from "effect";
@@ -8,7 +8,7 @@ import { Core } from "../core/core.ts";
 export class Said extends Context.Service<
   Said,
   {
-    readonly in: (conversation: string) => ChatMessage[];
+    readonly in: (channel: string) => ChatMessage[];
     readonly all: () => ChatMessage[];
   }
 >()("vibevalley/testing/Said") {}
@@ -20,6 +20,6 @@ export const said = Layer.effect(
     const all: ChatMessage[] = [];
     const events = yield* core.subscribe;
     yield* Effect.forkScoped(Stream.runForEach(events, (e) => Effect.sync(() => void (e.type === "message" && all.push(e.message)))));
-    return Said.of({ in: (conversation) => all.filter((m) => m.conversation === conversation), all: () => [...all] });
+    return Said.of({ in: (channel) => all.filter((m) => m.channel === channel), all: () => [...all] });
   }),
 );

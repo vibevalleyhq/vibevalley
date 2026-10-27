@@ -1,24 +1,24 @@
-// The box for saying a sentence in a conversation, as both chat windows carry it out: the workbench's
+// The box for saying a sentence in a channel, as both chat windows carry it out: the workbench's
 // (features/channel/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a line, @ names
 // someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
 import { createMemo, createSignal, onSettled } from "solid-js";
-import { type ChatMessage, type Conversation, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
 
-/** Says a line in a conversation (the general one when it is undefined), with the picked helper. */
-export async function say(text: string, conversation: Conversation | undefined, sendKey: string, agent: string | undefined) {
-  await api.channel.say({ body: { text, conversation: conversation?.kind === "general" ? undefined : conversation?.id, agent, sendKey } });
+/** Says a line in a channel (the general one when it is undefined), with the picked helper. */
+export async function say(text: string, channel: Channel | undefined, sendKey: string, agent: string | undefined) {
+  await api.channel.say({ body: { text, channel: channel?.type === "general" ? undefined : channel?.id, agent, sendKey } });
 }
 
-/** A line sent and not yet in its conversation's room: a window shows it at once, until the server's copy comes (the
+/** A line sent and not yet in its channel: a window shows it at once, until the server's copy comes (the
  * owner's line carrying the same send key). */
 export interface PendingLine {
   readonly key: string;
-  readonly conversation: string;
+  readonly channel: string;
   readonly text: string;
 }
 
@@ -51,10 +51,10 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     disposed = true;
   });
   const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
-  /** The conversation a line goes to, as the core state has it: none named is the general one. */
-  const conversationOf = (id: string | undefined): Conversation | undefined => {
-    const all = core()?.chat?.conversations ?? [];
-    return id ? all.find((c) => c.id === id) : all.find((c) => c.kind === "general");
+  /** The channel a line goes to, as the core state has it: none named is the general one. */
+  const channelOf = (id: string | undefined): Channel | undefined => {
+    const all = core()?.chat?.channels ?? [];
+    return id ? all.find((c) => c.id === id) : all.find((c) => c.type === "general");
   };
 
   const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
@@ -89,9 +89,9 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     if (!body.text) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
     const sent = attempt;
-    const shown = ways.echo ? conversationOf(body.conversation) : undefined;
+    const shown = ways.echo ? channelOf(body.channel) : undefined;
     if (shown) {
-      setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, conversation: shown.id, text: body.text }]);
+      setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, channel: shown.id, text: body.text }]);
       // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.
       edit("", 0);
     }
@@ -101,7 +101,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     try {
       await api.channel.say({ body: { ...sent.body, sendKey: sent.key } });
       attempt = undefined;
-      // The window hides it once its copy is in the room; the list lets it go a while after.
+      // The window hides it once its copy is in the channel; the list lets it go a while after.
       if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);
       // The user may have edited, or chosen another destination, while this response was in flight.
       else if (!disposed && edits === editedAt && same(intent(), sent.body)) edit("", 0);

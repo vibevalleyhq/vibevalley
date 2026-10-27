@@ -196,6 +196,11 @@ const RULES: readonly Rule[] = [
     except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//,
   },
   {
+    name: "a place to talk under another name",
+    pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/,
+    says: "Channel (channel_id, Channels): 田头, a channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+  },
+  {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",

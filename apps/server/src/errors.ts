@@ -31,7 +31,7 @@ export const lookIn = {
   recurrence: listed("recurrence", ["recurrence", "list"]),
   device: listed("device", ["lan", "status"]),
   archive: listed("archive", ["orchestrator", "list-archive"]),
-  // Channels, conversations and task graphs have no list of their own: they are in the core state.
+  // Channels and task graphs have no list of their own: they are in the core state.
   channel: listed("channel", ["state"]),
   graph: listed("graph", ["state"]),
 } satisfies Record<string, Next>;

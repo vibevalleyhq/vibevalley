@@ -88,7 +88,7 @@ export const handlers = Effect.gen(function* () {
         orchestrator.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
-          body.conversation,
+          body.channel,
           body.sendKey ?? "",
         ),
       ),

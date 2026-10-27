@@ -3,8 +3,8 @@
 
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
-import type { Conversation } from "@vibevalley/protocol";
-import { createChannelForm, channelLabel, channelsOf, chatPath, unreadUnder } from "../../features/channel";
+import type { Channel } from "@vibevalley/protocol";
+import { createChannelForm, channelLabel, topsOf, chatPath, unreadUnder } from "../../features/channel";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import { aria, useClickAway } from "../../base/util";
@@ -15,14 +15,14 @@ import { PxButton, PxTextInput, SpriteIcon } from "../../ui/pixel";
 
 type Mode = "list" | "create" | "settings";
 
-export function ChannelMenu(props: { current: Conversation | undefined }) {
+export function ChannelMenu(props: { current: Channel | undefined }) {
   const core = useCore();
   const router = useRouter();
   const chat = () => core()?.chat;
   const [open, setOpen] = createSignal(false);
   const [mode, setMode] = createSignal<Mode>("list");
   const box = useClickAway(open, () => setOpen(false));
-  const channels = () => channelsOf(chat());
+  const channels = () => topsOf(chat());
   const elsewhere = () =>
     channels()
       .filter((c) => c.id !== props.current?.id)
@@ -62,7 +62,7 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
                         aria-current={c.id === props.current?.id ? "true" : undefined}
                         onClick={() => {
                           close();
-                          farm.showChat(c.kind === "general" ? null : c.id);
+                          farm.showChat(c.type === "general" ? null : c.id);
                         }}
                         class={[
                           "flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left",
@@ -92,7 +92,7 @@ export function ChannelMenu(props: { current: Conversation | undefined }) {
                   <SpriteIcon name="button-open" size={12} />
                   {farmWording().chat.pageAndSchedules}
                 </button>
-                <Show when={props.current?.kind === "channel"}>
+                <Show when={props.current?.type === "channel"}>
                   <button type="button" onClick={() => setMode("settings")} class="flex cursor-pointer items-center gap-1 hover:underline">
                     <SpriteIcon name="button-settings" size={12} />
                     {farmWording().chat.settingsLink}
@@ -163,7 +163,7 @@ function NewChannel(props: { onDone: () => void; onBack: () => void }) {
   );
 }
 
-function ChannelSettings(props: { channel: Conversation; onDone: () => void; onBack: () => void }) {
+function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: () => void }) {
   const projects = useProjects();
   const names = () => ready(projects, []).map((p) => p.name);
   // It starts from the channel as it is when opened.

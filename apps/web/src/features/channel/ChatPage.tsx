@@ -1,22 +1,9 @@
 import { chatWording } from "./words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Conversation, type OrchestratorState, type Session } from "@vibevalley/protocol";
+import { type Channel, type OrchestratorState, type Session } from "@vibevalley/protocol";
 import { wording } from "@vibevalley/protocol/words";
-import {
-  channelName,
-  channelOf,
-  channelsOf,
-  chatPath,
-  conversationOf,
-  jobThreadOf,
-  phaseDot,
-  phaseText,
-  threadOwnerOf,
-  threadTitle,
-  unreadIn,
-  unreadUnder,
-} from "./rules";
+import { channelName, topOf, topsOf, chatPath, channelOf, jobThreadOf, phaseDot, phaseText, threadOwnerOf, threadTitle, unreadIn, unreadUnder } from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
@@ -49,9 +36,9 @@ function Chat() {
         .replace(/^\/chat\/?/, ""),
     ) || undefined;
   const chat = () => core()?.chat;
-  const shown = createMemo(() => conversationOf(chat(), id()));
-  const channel = createMemo(() => channelOf(chat(), shown()) ?? channelsOf(chat())[0]);
-  const thread = createMemo(() => (shown()?.kind === "thread" ? shown() : undefined));
+  const shown = createMemo(() => channelOf(chat(), id()));
+  const channel = createMemo(() => topOf(chat(), shown()) ?? topsOf(chat())[0]);
+  const thread = createMemo(() => (shown()?.type === "thread" ? shown() : undefined));
   const [drawer, setDrawer] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
 
@@ -90,7 +77,7 @@ const tabs: { tab: Tab; icon: string; label: string }[] = [
 ];
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
-function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () => void }) {
+function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void }) {
   const [tab, setTab] = createSignal<Tab>("chat");
   const [search, setSearch] = createSignal<string>();
   const [settings, setSettings] = createSignal(false);
@@ -105,7 +92,7 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">#</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.kind === "general" ? chatWording().general : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.type === "general" ? chatWording().general : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -170,8 +157,8 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
         </For>
       </div>
       <Show when={tab() === "chat"}>
-        <MessageList conversation={props.channel} filter={search()} emptyText={chatWording().empty(name())} />
-        <Composer conversation={props.channel} placeholder={chatWording().sendTo(name())} />
+        <MessageList channel={props.channel} filter={search()} emptyText={chatWording().empty(name())} />
+        <Composer channel={props.channel} placeholder={chatWording().sendTo(name())} />
       </Show>
       <Show when={props.channel}>
         {(c) => (
@@ -190,13 +177,13 @@ function ChannelMain(props: { channel: Conversation | undefined; onDrawer: () =>
   );
 }
 
-function Sidebar(props: { channel: Conversation | undefined; thread: Conversation | undefined; onNew: () => void; onPick: () => void }) {
+function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefined; onNew: () => void; onPick: () => void }) {
   const core = useCore();
   const router = useRouter();
   const chat = () => core()?.chat;
-  const channels = () => channelsOf(chat());
+  const channels = () => topsOf(chat());
   const sessions = () => core()?.sessions ?? [];
-  const go = (c: Conversation) => {
+  const go = (c: Channel) => {
     router.navigate(chatPath(c));
     props.onPick();
   };
@@ -277,7 +264,7 @@ function ChannelRow(props: { label: string; here: boolean; unread: number; onCli
   );
 }
 
-function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversation) => void }) {
+function SessionRow(props: { h: Session; active: boolean; onShow: (c: Channel) => void }) {
   const core = useCore();
   const now = useNow();
   const thread = () => jobThreadOf(core()?.chat, props.h);
@@ -332,7 +319,7 @@ function OrchestratorLine(props: { mood: OrchestratorState }) {
   );
 }
 
-function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
+function ThreadPane(props: { thread: Channel; onClose: () => void }) {
   const core = useCore();
   const now = useNow();
   const sessions = () => core()?.sessions ?? [];
@@ -364,8 +351,8 @@ function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
           <Icon name="button-close" size={16} />
         </button>
       </header>
-      <MessageList conversation={props.thread} emptyText={chatWording().threadEmpty} />
-      <Composer conversation={props.thread} placeholder={session() ? chatWording().sayInThread(session()!.name) : chatWording().reply} />
+      <MessageList channel={props.thread} emptyText={chatWording().threadEmpty} />
+      <Composer channel={props.thread} placeholder={session() ? chatWording().sayInThread(session()!.name) : chatWording().reply} />
     </section>
   );
 }

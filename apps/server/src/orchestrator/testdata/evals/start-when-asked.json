@@ -40,7 +40,7 @@
     "content": "[来源：主人]\n主人说：帮我在 demo 里把 README 写了",
     "display": true,
     "details": {
-      "conversation": "general"
+      "channel": "general"
     },
     "timestamp": 1792271040000
   },

@@ -5,15 +5,15 @@
 
 import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
-import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
+import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../base/api";
 import {
   arrived,
   pending,
   say,
   channelLabel,
+  topOf,
   channelOf,
-  conversationOf,
   feedOf,
   generalOf,
   orchestratorTyping,
@@ -23,9 +23,9 @@ import {
   threadTitle,
   unreadIn,
   useMarkRead,
-  rooms,
+  followed,
   useMessage,
-  useRoom,
+  useFollowed,
 } from "../../features/channel";
 import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "../../features/voice";
 import { playSound } from "../../ui/pixel/sound";
@@ -98,20 +98,20 @@ function NewElsewhere(props: { except: string | undefined }) {
   const core = useCore();
   const waiting = () => {
     const chat = core()?.chat;
-    return (chat?.conversations ?? []).filter((c) => c.id !== props.except && unreadIn(c) > 0);
+    return (chat?.channels ?? []).filter((c) => c.id !== props.except && unreadIn(c) > 0);
   };
   return (
     <Show when={waiting().length > 0 ? waiting().reduce((a, b) => ((b.lastNumber ?? 0) > (a.lastNumber ?? 0) ? b : a)) : undefined}>
       {(newest) => (
         <button
           type="button"
-          onClick={() => farm.showChat(newest().kind === "general" ? null : newest().id)}
+          onClick={() => farm.showChat(newest().type === "general" ? null : newest().id)}
           onDblClick={(e) => e.stopPropagation()}
           class="ml-2 shrink-0 cursor-pointer bg-berry/15 px-2 py-px text-[12px] text-berry hover:bg-berry/25"
         >
           {waiting().length > 1
             ? farmWording().chat.newIn(waiting().length)
-            : newest().kind === "thread"
+            : newest().type === "thread"
               ? farmWording().chat.newInThread
               : farmWording().chat.newInChannel(channelLabel(newest()))}
         </button>
@@ -129,11 +129,11 @@ export function ChatWindow() {
   const shownId = useFarm((s) => s.chatShown);
   const look = usePrefs((p) => p.orchestratorLook);
   const [problem, setProblem] = createSignal<string>();
-  const shown = createMemo(() => (shownId() ? conversationOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));
-  const thread = () => (shown()?.kind === "thread" ? shown() : undefined);
+  const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));
+  const thread = () => (shown()?.type === "thread" ? shown() : undefined);
   const call = createCall();
   const phase = () => phaseOf(call(), core());
-  const room = useRoom(() => shown()?.id);
+  const said = useFollowed(() => shown()?.id);
   useMarkRead(shown);
 
   const toggleLarge = () => farm.chatLarge(!large());
@@ -146,15 +146,15 @@ export function ChatWindow() {
     toggleLarge();
   };
 
-  const items = createMemo(() => feedOf(chat(), room().messages));
+  const items = createMemo(() => feedOf(chat(), said().messages));
   const parent = useMessage(() => {
     const t = thread();
     return t ? parentAt(chat(), t) : undefined;
   });
-  const hasOlder = () => room().ready && !room().complete;
+  const hasOlder = () => said().ready && !said().complete;
   const sending = createMemo(() => {
     const here = shown()?.id;
-    return pending().filter((p) => p.conversation === here && !arrived(p, room().messages));
+    return pending().filter((p) => p.channel === here && !arrived(p, said().messages));
   });
   // What is being said on the call, drawn as it is said: the turns 田头 does not have as lines yet. A copy each time, so
   // the rows read the words they grew to.
@@ -162,15 +162,15 @@ export function ChatWindow() {
   const captions = createMemo(() => {
     const c = call();
     const here = shown();
-    if (c.phase !== "live" || here?.kind !== "general") return [];
-    const spoken: SpokenLine[] = room()
+    if (c.phase !== "live" || here?.type !== "general") return [];
+    const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, spoken, tick()).map((t) => ({ ...t }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
   const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
-  const showSuggestions = () => !thread() && (core()?.call === "live" || (room().ready && room().messages.length === 0));
+  const showSuggestions = () => !thread() && (core()?.call === "live" || (said().ready && said().messages.length === 0));
 
   return (
     <section aria-label={farmWording().chat.label} class="relative h-full w-full">
@@ -215,7 +215,7 @@ export function ChatWindow() {
             <Show when={hasOlder() && shown()}>
               <button
                 type="button"
-                onClick={() => void rooms.loadOlder(shown()!.id)}
+                onClick={() => void followed.loadOlder(shown()!.id)}
                 class={["self-center px-2.5 py-0.5 hover:bg-cream-200 hover:text-bark-800", small]}
               >
                 {farmWording().chat.older}
@@ -289,7 +289,7 @@ export function ChatWindow() {
                   onClick={() => {
                     setProblem(undefined);
                     const c = shown();
-                    void say(line, c?.kind === "general" ? undefined : c, newSendKey(), undefined).catch((e: unknown) =>
+                    void say(line, c?.type === "general" ? undefined : c, newSendKey(), undefined).catch((e: unknown) =>
                       setProblem(farmWording().chat.notSent(e instanceof Error ? e.message : String(e))),
                     );
                   }}
@@ -302,7 +302,7 @@ export function ChatWindow() {
           </div>
         </Show>
         <div class="mt-auto">
-          <FarmComposer conversation={shown()} thread={!!thread()} onProblem={setProblem} />
+          <FarmComposer channel={shown()} thread={!!thread()} onProblem={setProblem} />
         </div>
       </div>
     </section>
@@ -343,12 +343,12 @@ function CallProblem(props: { call: VoiceCall }) {
   );
 }
 
-function ThreadHead(props: { thread: Conversation; large: boolean; onLarge: () => void; onFold: () => void; onDouble: (e: MouseEvent) => void }) {
+function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => void; onFold: () => void; onDouble: (e: MouseEvent) => void }) {
   const core = useCore();
   const now = useNow();
   const chat = () => core()?.chat;
-  const channel = () => channelOf(chat(), props.thread);
-  const backTo = () => (channel()?.kind === "channel" ? channel()!.id : null);
+  const channel = () => topOf(chat(), props.thread);
+  const backTo = () => (channel()?.type === "channel" ? channel()!.id : null);
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
   const title = () => threadTitle(props.thread, core()?.issues ?? [], core()?.sessions ?? []);
   const status = () => {
@@ -376,7 +376,7 @@ function ThreadHead(props: { thread: Conversation; large: boolean; onLarge: () =
   );
 }
 
-function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; agents: ReadonlyMap<string, Agent>; chatUnread: (t: Conversation) => number }) {
+function Item(props: { m: ChatMessage; thread?: Channel; first: boolean; agents: ReadonlyMap<string, Agent>; chatUnread: (t: Channel) => number }) {
   const face = () => <FaceOf m={props.m} agents={props.agents} />;
   const chip = () => {
     const t = props.thread;

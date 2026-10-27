@@ -3,7 +3,7 @@ import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
 import { chatPath, feedOf, parentAt, phaseDot, phaseText, roleShort, runtimeLabel, threadOwnerOf, unreadIn, orchestratorTyping, workbenchClock } from "./rules";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
@@ -13,7 +13,7 @@ import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
-import { rooms, useMessage, useRoom } from "./rooms";
+import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
 import { useAgent } from "../../base/agents";
 
@@ -23,20 +23,20 @@ const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }>
   interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "icon-shovel" },
 };
 
-/** A conversation's messages, newest at the bottom; filter keeps those containing it. */
-export function MessageList(props: { conversation: Conversation | undefined; filter?: string; emptyText: string }) {
+/** A channel's messages, newest at the bottom; filter keeps those containing it. */
+export function MessageList(props: { channel: Channel | undefined; filter?: string; emptyText: string }) {
   const core = useCore();
-  const id = () => props.conversation?.id;
-  const room = useRoom(id);
-  useMarkRead(() => props.conversation);
+  const id = () => props.channel?.id;
+  const said = useFollowed(id);
+  useMarkRead(() => props.channel);
   // Rows newer than this arrived while the list was shown: they rise in; the rest just appear.
   const shownAt = Date.now();
 
-  const items = createMemo(() => feedOf(core()?.chat, room().messages, props.filter ?? ""));
-  const parent = useMessage(() => (props.conversation ? parentAt(core()?.chat, props.conversation) : undefined));
+  const items = createMemo(() => feedOf(core()?.chat, said().messages, props.filter ?? ""));
+  const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const searching = () => (props.filter ?? "").trim() !== "";
-  const hasOlder = () => !!id() && room().messages.length > 0 && !room().complete;
-  const typing = () => orchestratorTyping(core(), props.conversation);
+  const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
+  const typing = () => orchestratorTyping(core(), props.channel);
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
@@ -51,7 +51,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
               </span>
             }
           >
-            <button type="button" onClick={() => void rooms.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
+            <button type="button" onClick={() => void followed.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
               {chatWording().messages.older}
             </button>
           </Show>
@@ -159,7 +159,7 @@ function Dispatch(props: { text: string }) {
   );
 }
 
-function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conversation }) {
+function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel }) {
   const core = useCore();
   const agentOf = useAgent(() => props.m.agent);
   const session = () => (props.m.fromKind === "session" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
@@ -210,7 +210,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
   );
 }
 
-function ThreadPreview(props: { thread: Conversation }) {
+function ThreadPreview(props: { thread: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();

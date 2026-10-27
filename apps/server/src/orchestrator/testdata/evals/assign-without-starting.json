@@ -40,7 +40,7 @@
     "content": "[来源：主人]\n主人说：给 demo 记一张：README 补上安装步骤，让 codex 做，先别开始",
     "display": true,
     "details": {
-      "conversation": "general"
+      "channel": "general"
     },
     "timestamp": 1792270980000
   },

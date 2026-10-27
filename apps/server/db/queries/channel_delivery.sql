@@ -30,7 +30,7 @@ update channel_delivery set state = 'pending', launch = null where recipient_id 
 -- name: SeenUpTo :exec
 update channel_delivery set state = 'seen', seen_at = sqlc.arg(at)
 where recipient_id = sqlc.arg(recipient) and message_id in (
-    select id from channel_message where conversation_id = sqlc.arg(conversation) and number <= sqlc.arg(upto))
+    select id from channel_message where channel_id = sqlc.arg(channel) and number <= sqlc.arg(upto))
   and state in ('pending', 'announced', 'handed');
 
 -- name: SeenOne :exec
@@ -41,16 +41,16 @@ where recipient_id = sqlc.arg(recipient_id) and message_id = sqlc.arg(message_id
 update channel_delivery set state = 'dropped', dropped_why = sqlc.arg(dropped_why), launch = null
 where recipient_id = sqlc.arg(recipient_id) and state in ('pending', 'announced', 'handed');
 
--- name: AgentWakesByConversation :many
--- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat
+-- name: AgentWakesByChannel :many
+-- Agents waking agents in each channel since the owner last spoke there, held ones not counted: what the chat
 -- keeps in memory (channel/audience.ts) when it starts.
-select m.conversation_id, count(*)::int as n from channel_delivery d
+select m.channel_id, count(*)::int as n from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant s on s.id = m.sender_id
 join channel_participant r on r.id = d.recipient_id
-where m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'owner'), '')
+where m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = m.channel_id and u.sender_id = 'owner'), '')
   and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null
-group by m.conversation_id;
+group by m.channel_id;
 
 -- name: LastAgentWakes :many
 -- When each recipient was last woken by an agent (channel/audience.ts).
@@ -62,13 +62,13 @@ group by d.recipient_id;
 
 -- name: AllOpenDeliveries :many
 -- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).
-select d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body,
-       m.created_at, p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,
+select d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,
+       m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
        coalesce(ch.name, c.name, '')::text as channel_name
 from channel_delivery d
 join channel_message m on m.id = d.message_id
 join channel_participant p on p.id = m.sender_id
-join channel_conversation c on c.id = m.conversation_id
-left join channel_conversation ch on ch.id = c.channel_id
+join channel c on c.id = m.channel_id
+left join channel ch on ch.id = c.parent_id
 where d.state in ('pending', 'announced', 'handed')
 order by m.id;

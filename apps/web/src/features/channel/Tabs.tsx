@@ -1,6 +1,6 @@
 import { chatWording } from "./words";
 import { createEffect, createSignal, For, Show } from "solid-js";
-import type { Conversation, Recurrence } from "@vibevalley/protocol";
+import type { Channel, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { chatPath, jobThreadOf, phaseText } from "./rules";
 import { toast } from "../../ui/toasts";
@@ -14,11 +14,11 @@ import { Empty, HelperFace, PhaseGlyph } from "./bits";
 const card = "rounded-lg border border-line bg-page p-3";
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
-export function Jobs(props: { channel: Conversation }) {
+export function Jobs(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.kind === "general"));
+  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.type === "general"));
   return (
     <Show when={sessions().length > 0} fallback={<Empty icon="icon-tasks">{chatWording().jobs.empty}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
@@ -58,7 +58,7 @@ export function Jobs(props: { channel: Conversation }) {
   );
 }
 
-export function Recurrences(props: { channel: Conversation }) {
+export function Recurrences(props: { channel: Channel }) {
   const core = useCore();
   const recurrences = () => (core()?.recurrences ?? []).filter((s) => s.channel === props.channel.id);
   return (

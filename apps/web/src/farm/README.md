@@ -51,7 +51,7 @@ outside a component; `subscribeFarm(fn)` listens. Changes only through `farm.*`:
 | `hold(tool)` | the tool in hand (`tools.ts`: hand, water, bug, weed, harvest, shovel; keys 1–6) |
 | `hover(bed \| null, spot \| null)` | set by the canvas: the bed and the yard place under the pointer |
 | `revealNames(on)` | Alt held: every name tag shows |
-| `chatOpen(open)`, `chatLarge(large)`, `showChat(conversation \| null)` | the chat: unfolding takes the phone out, putting the phone away folds it; null is the general channel |
+| `chatOpen(open)`, `chatLarge(large)`, `showChat(channel \| null)` | the chat: unfolding takes the phone out, putting the phone away folds it; null is the general channel |
 | `phoneOpen(open)`, `friendsOpen(open)` | |
 | `closeTitle()`, `showTitle()` | the title screen; closing it marks this machine as seen (`localStorage` `vibevalley.title.seen`) |
 | `bedFx(bed, kind, text?)` | a bed's effect for 2.2 s (`water`, `spray`, `harvest`, `shovel`, `note`); the commands call it |

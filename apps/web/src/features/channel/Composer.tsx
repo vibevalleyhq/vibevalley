@@ -2,7 +2,7 @@ import { mentionOf } from "./rules";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { chatWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
-import type { Conversation } from "@vibevalley/protocol";
+import type { Channel } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { createComposer } from "./composing";
 import { toast } from "../../ui/toasts";
@@ -13,13 +13,13 @@ import { Icon } from "../../ui/Icon";
 import { DictationButton } from "../voice";
 import { HelperFace } from "./bits";
 
-/** The box for saying a sentence in a conversation: Enter sends, Shift+Enter starts a line, @ names someone. */
-export function Composer(props: { conversation: Conversation | undefined; placeholder: string }) {
+/** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
+export function Composer(props: { channel: Channel | undefined; placeholder: string }) {
   const core = useCore();
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
   const box = createComposer(core, () => input, {
-    target: () => ({ conversation: props.conversation?.id }),
+    target: () => ({ channel: props.channel?.id }),
     failed: (reason) => {
       setProblem(reason);
       toast(chatWording().composer.notSent(reason), "bad");

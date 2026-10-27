@@ -65,7 +65,7 @@ export interface FarmUi {
   /** The phone is unfolded, its right screen the chat; folded whenever the phone is put away, so it opens folded. */
   readonly chatOpen: boolean;
   readonly chatLarge: boolean;
-  /** The conversation the chat shows: null is the general channel, else a thread's or channel's id. */
+  /** The channel the chat shows: null is the general channel, else a thread's or channel's id. */
   readonly chatShown: string | null;
   readonly phoneOpen: boolean;
   readonly friendsOpen: boolean;
@@ -175,8 +175,8 @@ export const farm = {
   /** Unfolds the phone (taking it out) or folds it. */
   chatOpen: (open: boolean) => set(open ? { chatOpen: true, phoneOpen: true } : { chatOpen: false }),
   chatLarge: (large: boolean) => set({ chatLarge: large }),
-  /** Shows a conversation in the chat: the phone comes out unfolded. */
-  showChat: (conversation: string | null) => set({ chatShown: conversation, chatOpen: true, phoneOpen: true }),
+  /** Shows a channel in the chat: the phone comes out unfolded. */
+  showChat: (channel: string | null) => set({ chatShown: channel, chatOpen: true, phoneOpen: true }),
   phoneOpen: (open: boolean) => set(open ? { phoneOpen: true } : { phoneOpen: false, chatOpen: false }),
   friendsOpen: (open: boolean) => set({ friendsOpen: open }),
   /** Leaves the title screen; it does not show again on this machine. */

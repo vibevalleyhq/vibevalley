@@ -5,7 +5,7 @@ import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
 export const FollowParams = Schema.Struct({
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
   ["participant_id"]: Schema.String,
   ["reason"]: Schema.String,
   ["from_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
@@ -13,13 +13,13 @@ export const FollowParams = Schema.Struct({
 export type FollowParams = typeof FollowParams.Type
 
 
-export const FollowSql = "-- Who follows a thread, from which message number on (channel/store.ts).\n\n-- name: Follow :exec\ninsert into channel_follow (conversation_id, participant_id, reason, from_number)\nvalues ($1, $2, $3, $4)\non conflict (conversation_id, participant_id) do update set unfollowed_at = null;"
+export const FollowSql = "-- Who follows a thread, from which message number on (channel/store.ts).\n\n-- name: Follow :exec\ninsert into channel_follow (channel_id, participant_id, reason, from_number)\nvalues ($1, $2, $3, $4)\non conflict (channel_id, participant_id) do update set unfollowed_at = null;"
 
 export const follow = Effect.fn("Follow")(function* (params: FollowParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: FollowParams,
-    execute: (p) => sql.unsafe(FollowSql, [p["conversation_id"], p["participant_id"], p["reason"], p["from_number"]]),
+    execute: (p) => sql.unsafe(FollowSql, [p["channel_id"], p["participant_id"], p["reason"], p["from_number"]]),
   })(params)
 })
 
@@ -30,13 +30,13 @@ export type AllFollowsParams = typeof AllFollowsParams.Type
 
 
 export const AllFollowsResult = Schema.Struct({
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
   ["participant_id"]: Schema.String,
 })
 export type AllFollowsResult = typeof AllFollowsResult.Type
 
 
-export const AllFollowsSql = "-- name: AllFollows :many\nselect conversation_id, participant_id from channel_follow where unfollowed_at is null;"
+export const AllFollowsSql = "-- name: AllFollows :many\nselect channel_id, participant_id from channel_follow where unfollowed_at is null;"
 
 export const allFollows = Effect.fn("AllFollows")(function* () {
   const sql = yield* SqlClient.SqlClient

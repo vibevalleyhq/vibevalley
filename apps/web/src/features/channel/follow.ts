@@ -1,14 +1,14 @@
-// What is said in each conversation the page shows, framework-free: its newest page read once (channel.history), then
-// its room followed from the last number (base/gateway.ts), older pages on asking. A room stays read after nobody
-// shows it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
+// What is said in each channel the page shows, framework-free: its newest page read once (channel.history), then
+// followed from the last number (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
+// it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
 
-import type { ChatMessage, RoomEvent } from "@vibevalley/protocol";
+import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
 import { type Accessor, createEffect, createSignal } from "solid-js";
 import { chatPage } from "./rules";
 import { api } from "../../base/api";
-import { followReports, followRoom } from "../../base/gateway";
+import { followReports, followChannel } from "../../base/gateway";
 
-export interface Room {
+export interface Followed {
   /** By number, oldest first. */
   readonly messages: readonly ChatMessage[];
   /** The first message is among them. */
@@ -17,7 +17,7 @@ export interface Room {
   readonly ready: boolean;
 }
 
-const empty: Room = { messages: [], complete: false, ready: false };
+const empty: Followed = { messages: [], complete: false, ready: false };
 
 /** A message is not changed once written: a number seen again keeps the copy there is. */
 export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]): ChatMessage[] {
@@ -30,7 +30,7 @@ export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]
 const againMs = 1000;
 
 interface Entry {
-  room: Room;
+  followed: Followed;
   readonly listeners: Set<() => void>;
   stop?: () => void;
   retry?: ReturnType<typeof setTimeout>;
@@ -42,12 +42,12 @@ const entries = new Map<string, Entry>();
 
 const entryOf = (id: string) => {
   let e = entries.get(id);
-  if (!e) entries.set(id, (e = { room: empty, listeners: new Set(), epoch: 0 }));
+  if (!e) entries.set(id, (e = { followed: empty, listeners: new Set(), epoch: 0 }));
   return e;
 };
 
-const set = (e: Entry, room: Room) => {
-  e.room = room;
+const set = (e: Entry, followed: Followed) => {
+  e.followed = followed;
   for (const l of e.listeners) l();
 };
 
@@ -65,10 +65,10 @@ function again(id: string, e: Entry) {
   e.retry = setTimeout(() => void (e.listeners.size > 0 && start(id, e)), againMs);
 }
 
-function onEvent(id: string, e: Entry, ev: RoomEvent) {
+function onEvent(id: string, e: Entry, ev: ChannelEvent) {
   switch (ev._tag) {
     case "Message":
-      return set(e, { ...e.room, messages: merged(e.room.messages, [ev.message]) });
+      return set(e, { ...e.followed, messages: merged(e.followed.messages, [ev.message]) });
     case "Reset":
       // Too far behind to catch up: the newest page again, and on from there.
       halt(e);
@@ -79,22 +79,22 @@ function onEvent(id: string, e: Entry, ev: RoomEvent) {
 
 async function start(id: string, e: Entry) {
   const epoch = ++e.epoch;
-  if (!e.room.ready) {
+  if (!e.followed.ready) {
     const page = await api.channel.history({ id, limit: chatPage }).catch(() => undefined);
     if (epoch !== e.epoch) return;
     if (!page) return again(id, e);
-    set(e, { messages: merged(e.room.messages, page), complete: page.length < chatPage, ready: true });
+    set(e, { messages: merged(e.followed.messages, page), complete: page.length < chatPage, ready: true });
   }
-  e.stop = followRoom(
+  e.stop = followChannel(
     id,
-    e.room.messages.at(-1)?.number ?? 0,
+    e.followed.messages.at(-1)?.number ?? 0,
     (ev) => onEvent(id, e, ev),
     () => again(id, e),
   );
 }
 
-export const rooms = {
-  get: (id: string): Room => entries.get(id)?.room ?? empty,
+export const followed = {
+  get: (id: string): Followed => entries.get(id)?.followed ?? empty,
   /** Followed while anyone listens. */
   subscribe(id: string, listener: () => void): () => void {
     const e = entryOf(id);
@@ -107,19 +107,19 @@ export const rooms = {
   },
   async loadOlder(id: string) {
     const e = entryOf(id);
-    if (e.room.complete) return;
-    const page = await api.channel.history({ id, before: e.room.messages[0]?.number, limit: chatPage });
-    set(e, { ...e.room, messages: merged(e.room.messages, page), complete: page.length < chatPage });
+    if (e.followed.complete) return;
+    const page = await api.channel.history({ id, before: e.followed.messages[0]?.number, limit: chatPage });
+    set(e, { ...e.followed, messages: merged(e.followed.messages, page), complete: page.length < chatPage });
   },
-  /** A message by its place, from a room read or read once for it: a thread's parent. */
-  message(conversation: string, number: number, listener: () => void): ChatMessage | undefined {
-    const shown = entries.get(conversation)?.room.messages.find((m) => m.number === number);
+  /** A message by its place, from a channel followed or read once for it: a thread's root. */
+  message(channel: string, number: number, listener: () => void): ChatMessage | undefined {
+    const shown = entries.get(channel)?.followed.messages.find((m) => m.number === number);
     if (shown) return shown;
-    const key = `${conversation}:${number}`;
+    const key = `${channel}:${number}`;
     if (!singles.has(key)) {
       singles.set(key, undefined);
       void api.channel
-        .history({ id: conversation, before: number + 1, limit: 1 })
+        .history({ id: channel, before: number + 1, limit: 1 })
         .then((page) => {
           singles.set(
             key,
@@ -135,26 +135,26 @@ export const rooms = {
 
 const singles = new Map<string, ChatMessage | undefined>();
 
-/** The room of a conversation while it is shown; empty with none. */
-export function useRoom(id: Accessor<string | undefined>): Accessor<Room> {
-  const [room, setRoom] = createSignal<Room>(empty);
+/** A channel's messages while it is shown; empty with none. */
+export function useFollowed(id: Accessor<string | undefined>): Accessor<Followed> {
+  const [said, setFollowed] = createSignal<Followed>(empty);
   createEffect(id, (at) => {
-    if (!at) return void setRoom(empty);
-    setRoom(rooms.get(at));
-    return rooms.subscribe(at, () => setRoom(rooms.get(at)));
+    if (!at) return void setFollowed(empty);
+    setFollowed(followed.get(at));
+    return followed.subscribe(at, () => setFollowed(followed.get(at)));
   });
-  return room;
+  return said;
 }
 
 /** A message by its place (a thread's parent) while it is shown. */
-export function useMessage(at: Accessor<{ conversation: string; number: number } | undefined>): Accessor<ChatMessage | undefined> {
+export function useMessage(at: Accessor<{ channel: string; number: number } | undefined>): Accessor<ChatMessage | undefined> {
   const [message, setMessage] = createSignal<ChatMessage | undefined>(undefined);
   createEffect(at, (p) => {
     if (!p) return setMessage(undefined);
-    const read = () => setMessage(rooms.message(p.conversation, p.number, read));
+    const read = () => setMessage(followed.message(p.channel, p.number, read));
     read();
-    // The room may come to have it as it is read.
-    return rooms.subscribe(p.conversation, read);
+    // The channel may come to have it as it is read.
+    return followed.subscribe(p.channel, read);
   });
   return message;
 }

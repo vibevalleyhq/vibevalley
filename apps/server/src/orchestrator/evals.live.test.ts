@@ -52,7 +52,7 @@ function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
   }));
 }
 
-/** One sample: the brain as the orchestrator makes it, with the case's memory and conversation; the turn the input begins, and
+/** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
 async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));

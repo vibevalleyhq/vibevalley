@@ -21,7 +21,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
   let number = 0;
   const standing = Effect.gen(function* () {
     const core = yield* Core;
-    expect(core.state().chat?.conversations.some((c) => c.id === thread)).toBe(false);
+    expect(core.state().chat?.channels.some((c) => c.id === thread)).toBe(false);
     expect(mentionIds(core)).toEqual([message]);
     expect(patrolStep(core.state(), at + 16 * 60_000, emptyPatrol())[0].map((item) => item.key)).toEqual([message]);
   });
@@ -31,11 +31,11 @@ it.live("an unresolved owner mention survives both history windows and restart u
       const core = yield* Core;
       const parent = (yield* chat.say("需要确认的话题", undefined, "")).message;
       const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", { target: `#田头:${parent.number}`, anyway: true })).message!;
-      ({ conversation: thread, id: message, at, number } = written);
+      ({ channel: thread, id: message, at, number } = written);
       expect(mentionIds(core)).toEqual([message]);
       for (let i = 0; i < 101; i++) {
         const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-        const fresh = (yield* chat.speak("orchestrator", "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.conversation;
+        const fresh = (yield* chat.speak("orchestrator", "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.channel;
         yield* chat.notice(fresh, "动静一", "history");
         yield* chat.notice(fresh, "动静二", "history");
       }
@@ -52,7 +52,7 @@ it.live("an unresolved owner mention survives both history windows and restart u
   }).pipe(Effect.ensuring(Effect.sync(() => rmSync(config.home, { recursive: true, force: true }))));
 });
 
-it.live("only reading or replying in the mentioned conversation completes an owner mention", () => {
+it.live("only reading or replying in the mentioned channel completes an owner mention", () => {
   const config = testConfig();
   return Effect.gen(function* () {
     const chat = yield* Channels;

@@ -7,7 +7,7 @@ import { wording } from "@vibevalley/protocol/words";
 import {
   type Chat,
   type ChatMessage,
-  type Conversation,
+  type Channel,
   everyone,
   type Issue,
   orchestratorAgent,
@@ -17,35 +17,35 @@ import {
   type WorkspaceState,
 } from "@vibevalley/protocol";
 
-export const isChannel = (c: Conversation) => c.kind !== "thread";
+export const isTop = (c: Channel) => c.type !== "thread";
 
-export const generalOf = (chat: Chat | undefined) => chat?.conversations.find((c) => c.kind === "general");
+export const generalOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.type === "general");
 
-export const conversationOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.conversations.find((c) => c.id === id) : undefined);
+export const channelOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
 /** The general first, then by id. */
-export function channelsOf(chat: Chat | undefined): Conversation[] {
-  return (chat?.conversations.filter(isChannel) ?? []).sort((a, b) => {
-    if (a.kind === "general") return -1;
-    if (b.kind === "general") return 1;
+export function topsOf(chat: Chat | undefined): Channel[] {
+  return (chat?.channels.filter(isTop) ?? []).sort((a, b) => {
+    if (a.type === "general") return -1;
+    if (b.type === "general") return 1;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
 
-/** The channel a conversation is in: itself, a thread's channel, else the general. */
-export function channelOf(chat: Chat | undefined, c: Conversation | undefined) {
+/** The channel a channel is in: itself, a thread's channel, else the general. */
+export function topOf(chat: Chat | undefined, c: Channel | undefined) {
   if (!c) return generalOf(chat);
-  if (isChannel(c)) return c;
-  return conversationOf(chat, c.channel) ?? generalOf(chat);
+  if (isTop(c)) return c;
+  return channelOf(chat, c.parent) ?? generalOf(chat);
 }
 
-export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : wording().general);
+export const channelName = (c: Channel | undefined) => (c?.type === "channel" ? (c.name ?? "") : wording().general);
 
 /** A channel as it is said in a line: #name, the general one by its label (田头, Farm chat). */
-export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : wording().general);
+export const channelLabel = (c: Channel | undefined) => (c?.type === "channel" ? `#${c.name ?? ""}` : wording().general);
 
-/** Where the page shows a conversation: the general is /chat. */
-export const chatPath = (c: Conversation | undefined) => (!c || c.kind === "general" ? "/chat" : `/chat/${c.id}`);
+/** Where the page shows a channel: the general is /chat. */
+export const chatPath = (c: Channel | undefined) => (!c || c.type === "general" ? "/chat" : `/chat/${c.id}`);
 
 const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;
@@ -54,17 +54,16 @@ const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {
 };
 
 /** One thread per issue, kept across the sessions that work it. */
-export const issueThreadOf = (chat: Chat | undefined, issue: string) =>
-  findLast(chat?.conversations, (c) => c.subjectKind === "issue" && c.subjectId === issue);
+export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
 
 /** The one way from a session to its thread: through its issue; a session sent for no issue has a talk thread of its own. */
 export function jobThreadOf(chat: Chat | undefined, session: Session) {
   if (session.issue) return issueThreadOf(chat, session.issue);
-  return findLast(chat?.conversations, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
+  return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
 }
 
 /** Whom a thread's words are for now: the session working its issue, or a talk thread's own session. */
-export function threadOwnerOf(thread: Conversation, sessions: Session[]) {
+export function threadOwnerOf(thread: Channel, sessions: Session[]) {
   switch (thread.subjectKind) {
     case "issue":
       return findLast(sessions, (h) => h.issue === thread.subjectId);
@@ -82,7 +81,7 @@ const head = (text: string) => {
 };
 
 /** An issue's thread is named by the issue, so the name holds after its sessions leave; the others by the server's title. */
-export function threadTitle(thread: Conversation, issues: Issue[] = [], sessions: Session[] = []) {
+export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Session[] = []) {
   switch (thread.subjectKind) {
     case "issue": {
       const issue = issues.find((i) => i.id === thread.subjectId);
@@ -101,33 +100,33 @@ export function threadTitle(thread: Conversation, issues: Issue[] = [], sessions
   }
 }
 
-export const unreadIn = (c: Conversation) => c.unread ?? 0;
+export const unreadIn = (c: Channel) => c.unread ?? 0;
 
-export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(c), 0);
+export const unreadTotal = (chat: Chat | undefined) => (chat?.channels ?? []).reduce((n, c) => n + unreadIn(c), 0);
 
-/** The number a receipt for this conversation carries, or undefined with nothing unread. */
-export const newestUnread = (c: Conversation) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
+/** The number a receipt for this channel carries, or undefined with nothing unread. */
+export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
 
 /** A channel's own unread and its threads'; threads without a channel count under the general. */
-export const unreadUnder = (chat: Chat | undefined, channel: Conversation) =>
-  (chat?.conversations ?? [])
-    .filter((c) => c.id === channel.id || c.channel === channel.id || (channel.kind === "general" && c.kind === "thread" && !c.channel))
+export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
+  (chat?.channels ?? [])
+    .filter((c) => c.id === channel.id || c.parent === channel.id || (channel.type === "general" && c.type === "thread" && !c.parent))
     .reduce((n, c) => n + unreadIn(c), 0);
 
-/** A page of a conversation read at a time (features/channel/rooms.ts). */
+/** A page of a channel read at a time (features/channel/follow.ts). */
 export const chatPage = 50;
 
 /** Where a thread's parent message is: its channel's, or the general's for a thread without one. */
-export function parentAt(chat: Chat | undefined, thread: Conversation) {
-  if (thread.kind !== "thread" || thread.parentNumber === undefined) return undefined;
-  const conversation = thread.channel ?? generalOf(chat)?.id;
-  return conversation ? { conversation, number: thread.parentNumber } : undefined;
+export function parentAt(chat: Chat | undefined, thread: Channel) {
+  if (thread.type !== "thread" || thread.rootNumber === undefined) return undefined;
+  const channel = thread.parent ?? generalOf(chat)?.id;
+  return channel ? { channel, number: thread.rootNumber } : undefined;
 }
 
 export interface FeedItem {
   message: ChatMessage;
   /** The thread hanging under this message. */
-  thread?: Conversation;
+  thread?: Channel;
   /** Same sender as the row before, within five minutes on the same day: no header of its own. */
   continues: boolean;
   /** Set on the first row of a day. */
@@ -139,11 +138,11 @@ const runMs = 5 * 60000;
 
 const senderOf = (m: ChatMessage) => (m.kind === "notice" ? "" : m.from);
 
-/** The rows of a conversation's messages, with their day lines and grouping; filter keeps the messages containing it (any
+/** The rows of a channel's messages, with their day lines and grouping; filter keeps the messages containing it (any
  * case). */
 export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], filter = "", now = new Date()): FeedItem[] {
-  const threads = new Map<string, Conversation>();
-  for (const c of chat?.conversations ?? []) if (c.kind === "thread" && c.parent) threads.set(c.parent, c);
+  const threads = new Map<string, Channel>();
+  for (const c of chat?.channels ?? []) if (c.type === "thread" && c.root) threads.set(c.root, c);
   const q = filter.trim().toLowerCase();
   const messages = said.filter((m) => !q || m.text.toLowerCase().includes(q));
   let day = "";
@@ -164,9 +163,9 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   });
 }
 
-/** The orchestrator's dots in a conversation: it is thinking or writing its answer there, as the server says. */
-export function orchestratorTyping(state: WorkspaceState | undefined, conversation: Conversation | undefined): "thinking" | "speaking" | undefined {
-  if (!state || !conversation || state.orchestratorConversation !== conversation.id) return undefined;
+/** The orchestrator's dots in a channel: it is thinking or writing its answer there, as the server says. */
+export function orchestratorTyping(state: WorkspaceState | undefined, channel: Channel | undefined): "thinking" | "speaking" | undefined {
+  if (!state || !channel || state.orchestratorChannel !== channel.id) return undefined;
   return state.orchestrator === "thinking" || state.orchestrator === "speaking" ? state.orchestrator : undefined;
 }
 

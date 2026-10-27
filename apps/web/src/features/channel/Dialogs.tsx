@@ -3,7 +3,7 @@
 import { chatWording } from "./words";
 import { For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import type { Conversation } from "@vibevalley/protocol";
+import type { Channel } from "@vibevalley/protocol";
 import { createChannelForm } from "./channelForm";
 import { channelName } from "./rules";
 import { autofocus } from "../../base/util";
@@ -102,7 +102,7 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
   );
 }
 
-export function ChannelSettingsDialog(props: { channel: Conversation; open: boolean; onClose: () => void }) {
+export function ChannelSettingsDialog(props: { channel: Channel; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={props.open} onClose={() => props.onClose()} title={chatWording().dialog.settingsOf(channelName(props.channel))}>
       <ChannelSettingsForm channel={props.channel} onClose={() => props.onClose()} />
@@ -110,7 +110,7 @@ export function ChannelSettingsDialog(props: { channel: Conversation; open: bool
   );
 }
 
-function ChannelSettingsForm(props: { channel: Conversation; onClose: () => void }) {
+function ChannelSettingsForm(props: { channel: Channel; onClose: () => void }) {
   // The dialog mounts the form when it opens: it starts from the channel as it is then.
   const form = createChannelForm(untrack(() => props.channel));
   const submit = async () => {

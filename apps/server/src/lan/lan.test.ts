@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
-import { roomsPath } from "@vibevalley/protocol/rpc";
+import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer } from "effect";
 import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -56,14 +56,14 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
     return paired;
   });
 
-/** An upgrade to the rooms through the listener: its status, and the socket when it was upgraded. */
+/** An upgrade to the RPC socket through the listener: its status, and the socket when it was upgraded. */
 const upgradeAt = (addr: string, headers: Record<string, string>) =>
   new Promise<{ status: number; socket?: Socket }>((resolve, reject) => {
     const u = new URL(addr);
     const req = httpRequest({
       host: u.hostname,
       port: Number(u.port),
-      path: roomsPath,
+      path: rpcPath,
       agent: false,
       headers: { connection: "Upgrade", upgrade: "websocket", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==", ...headers },
     });
@@ -206,7 +206,7 @@ describe("lan access", () => {
       expect((yield* Effect.promise(() => request("GET", addr + "/api/v1/health", paired.key))).status).toBe(401);
     }).pipe(Effect.scoped),
   );
-  it.live("hands a paired device's rooms WebSocket to the farm, and forgetting the device ends it", () =>
+  it.live("hands a paired device's WebSocket to the farm, and forgetting the device ends it", () =>
     Effect.gen(function* () {
       const lan = yield* farm();
       const addr = yield* open(lan);

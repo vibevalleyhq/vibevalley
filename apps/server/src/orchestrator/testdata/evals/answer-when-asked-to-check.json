@@ -40,7 +40,7 @@
     "content": "[来源：主人]\n主人说：查一下 clock-in 的打卡为什么这么慢",
     "display": true,
     "details": {
-      "conversation": "general"
+      "channel": "general"
     },
     "timestamp": 1792358460000
   },
