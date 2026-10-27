@@ -196,7 +196,6 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
   text: Schema.String,
-  final: Schema.Boolean,
   mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   session: Schema.optionalKey(SessionId),
   run: Schema.optionalKey(Schema.String),

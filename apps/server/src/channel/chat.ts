@@ -170,7 +170,6 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(row.sender_agent ? { agent: row.sender_agent } : {}),
     kind: messageKind(row.kind),
     text: row.body,
-    final: row.final,
     ...(meta.mentions && meta.mentions.length > 0 ? { mentions: meta.mentions } : {}),
     ...(meta.session ? { session: meta.session } : {}),
     ...(meta.run ? { run: meta.run } : {}),
@@ -213,12 +212,10 @@ interface ThreadSubject {
 const jobOf = (h: Session): ThreadSubject => (h.issue ? { kind: "issue", id: h.issue, owner: h.id } : { kind: "talk", id: h.id, owner: h.id });
 
 interface Write {
-  readonly id?: string;
   readonly conversation: string;
   readonly from: string;
   readonly kind: MessageKind;
   readonly text: string;
-  readonly final: boolean;
   readonly meta?: Meta;
   readonly answers?: SessionId;
   readonly thread?: ThreadSubject;
@@ -255,8 +252,8 @@ export interface ChannelShape {
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
   /** Words said on a call, kept in 田头 as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
-  /** The orchestrator's words as they stream: the same key again replaces them until final; delivered once final. */
-  readonly orchestratorSays: (conversation: string, key: string, text: string, final: boolean, run: string) => Effect.Effect<void>;
+  /** The orchestrator's words, one whole message each: it shows once said in full. */
+  readonly orchestratorSays: (conversation: string, text: string, run: string) => Effect.Effect<void>;
   /** code names the kind, for dropping repeats. */
   readonly notice: (conversation: string, text: string, code: string) => Effect.Effect<void>;
   readonly read: (who: string, opt?: ReadOptions) => Effect.Effect<ReadResult, ApiError>;
@@ -371,7 +368,6 @@ export const make = Effect.gen(function* () {
   const compacting = new Set<string>();
   const breaker = new WakeBreaker();
   const lastRead = new Map<string, string>();
-  const streaming = new Map<string, string>();
   let closed = false;
   // Work set off by a timer belongs to this service: it ends with it and keeps its services.
   const forkHere = yield* FiberSet.makeRuntime<never>();
@@ -655,58 +651,45 @@ export const make = Effect.gen(function* () {
   const write = Effect.fnUntraced(function* (w: Write): Effect.fn.Return<Written> {
     const written = yield* tx(
       Effect.gen(function* () {
-        if (!w.id && w.sendKey) {
+        if (w.sendKey) {
           const seen = yield* one(qm.messageBySendKey({ sender_id: w.from, send_key: w.sendKey }));
           if (seen) return { id: seen.id, number: seen.number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: true, row: seen };
         }
-        let row: MsgRow;
-        if (!w.id) {
-          // The row as MessageByID would read it back: the sender's name and kind are the participant's.
-          const sender = model.participant(w.from);
-          if (!sender) return yield* Effect.die(new Error(`no participant ${w.from}`));
-          const id = newId();
-          const meta = metaText(w.meta);
-          const created_at = yield* Clock.currentTimeMillis;
-          const { number } = yield* db(
-            qm.insertMessage({
-              id,
-              conversation: w.conversation,
-              sender: w.from,
-              kind: w.kind,
-              body: w.text,
-              final: w.final,
-              meta,
-              send_key: w.sendKey || null,
-              created_at,
-            }),
-          );
-          yield* db(qc.touchConversation({ number, id: w.conversation }));
-          model.touched(w.conversation, number);
-          if (w.from === ownerId) reach.ownerSpoke(w.conversation, id);
-          row = {
+        // The row as MessageByID would read it back: the sender's name and kind are the participant's.
+        const sender = model.participant(w.from);
+        if (!sender) return yield* Effect.die(new Error(`no participant ${w.from}`));
+        const id = newId();
+        const meta = metaText(w.meta);
+        const created_at = yield* Clock.currentTimeMillis;
+        const { number } = yield* db(
+          qm.insertMessage({
             id,
-            conversation_id: w.conversation,
-            number,
-            sender_id: w.from,
+            conversation: w.conversation,
+            sender: w.from,
             kind: w.kind,
             body: w.text,
-            final: w.final,
             meta,
+            send_key: w.sendKey || null,
             created_at,
-            sender_name: sender.name,
-            sender_kind: sender.kind,
-            sender_agent: sender.agent_id,
-          };
-        } else {
-          yield* db(qm.updateMessageBody({ body: w.text, final: w.final, updated_at: yield* Clock.currentTimeMillis, id: w.id }));
-          const got = yield* one(qm.messageByID({ id: w.id }));
-          if (!got) return yield* Effect.die(new Error(`no message ${w.id}`));
-          row = got;
-        }
-        const { id, number } = row;
-        const out: Written = w.final
-          ? yield* settle(row)
-          : { id, number, recipients: [], resetWake: [], absent: [], held: false, thread: "", again: false, row };
+          }),
+        );
+        yield* db(qc.touchConversation({ number, id: w.conversation }));
+        model.touched(w.conversation, number);
+        if (w.from === ownerId) reach.ownerSpoke(w.conversation, id);
+        const row: MsgRow = {
+          id,
+          conversation_id: w.conversation,
+          number,
+          sender_id: w.from,
+          kind: w.kind,
+          body: w.text,
+          meta,
+          created_at,
+          sender_name: sender.name,
+          sender_kind: sender.kind,
+          sender_agent: sender.agent_id,
+        };
+        const out: Written = yield* settle(row);
         if (w.readBy) yield* readUpTo(w.readBy, w.conversation, number);
         if (w.follow) yield* follow(w.conversation, w.follow, "owner", number);
         if (w.thread) out.thread = yield* threadFor({ id, number, conversation: w.conversation }, w.thread);
@@ -723,7 +706,7 @@ export const make = Effect.gen(function* () {
     yield* publishConversation(conversation);
     if (written.ownerMentionsChanged) yield* publishOwnerMentions;
     if (written.thread) yield* publishConversation(written.thread);
-    if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), final: true, meta: { code: "hop_limit" } });
+    if (written.held) yield* write({ conversation, from: "system", kind: "notice", text: hopLimitText(hopLimit), meta: { code: "hop_limit" } });
     for (const r of written.recipients) yield* kick(r);
   });
 
@@ -848,7 +831,6 @@ export const make = Effect.gen(function* () {
                 from: "system",
                 kind: "notice",
                 text: channelWording().breaker(name, failed),
-                final: true,
                 meta: { code: "wake_breaker" },
               });
             }
@@ -908,7 +890,6 @@ export const make = Effect.gen(function* () {
       from: orchestratorAgent,
       kind: "dispatch",
       text: d.sent(h.id, h.name, h.project ?? d.project, what),
-      final: true,
       meta: { session: h.id },
       thread: job,
     });
@@ -927,7 +908,7 @@ export const make = Effect.gen(function* () {
     // Each dispatch of the issue is in its thread but the first, which the thread hangs under: this is the one after.
     const nth = ((yield* db(qm.dispatchesIn({ conversation_id: thread }))).n ?? 0) + 2;
     const text = h.refining ? channelWording().dispatch.redraft(h.id, h.name) : channelWording().dispatch.handedOn(h.id, h.name, nth);
-    yield* write({ conversation: thread, from: orchestratorAgent, kind: "dispatch", text, final: true, meta: { session: h.id }, follow: h.id });
+    yield* write({ conversation: thread, from: orchestratorAgent, kind: "dispatch", text, meta: { session: h.id }, follow: h.id });
   });
 
   const sessionsLeft = Effect.gen(function* () {
@@ -957,13 +938,12 @@ export const make = Effect.gen(function* () {
     if (!thread) return;
     const said = outcome === "completed" ? (helpers?.report(id) ?? "") : "";
     const meta: Meta = { outcome, ...(spent ? { spent } : {}), forTask: !!w.graph, ...(run ? { run } : {}) };
-    yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), final: true, meta });
+    yield* write({ conversation: thread, from: id, kind: "report", text: head(said || summary, reportMax), meta });
   });
 
   yield* locked(
     Effect.gen(function* () {
-      // A word half said when the server stopped is as said as it got; whatever was handed and not seen goes back.
-      yield* db(qm.finalizeAll({ updated_at: yield* Clock.currentTimeMillis }));
+      // Whatever was handed and not seen goes back.
       yield* db(qd.rollbackAll());
       open.load(yield* db(qd.allOpenDeliveries()));
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
@@ -1047,7 +1027,7 @@ export const make = Effect.gen(function* () {
           if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
           const where = conversation ?? general;
           if (!model.conversation(where)) return yield* Effect.fail(missing(channelWording().noConversation(where), [lookIn.channel]));
-          const written = yield* write({ conversation: where, from: ownerId, kind: "chat", text: text.trim(), final: true, sendKey, readBy: ownerId });
+          const written = yield* write({ conversation: where, from: ownerId, kind: "chat", text: text.trim(), sendKey, readBy: ownerId });
           if (written.again) return { message: toMessage(written.row), again: true };
           if (written.absent.length > 0) yield* core.notice("warn", channelWording().absent(written.absent.map((m) => mentionOf(m) ?? "@" + m)));
           return { message: toMessage(written.row), again: false };
@@ -1069,7 +1049,6 @@ export const make = Effect.gen(function* () {
             from,
             kind: "chat",
             text: text.trim(),
-            final: true,
             meta: run ? { run } : {},
             sendKey,
             ...(from === ownerId ? { readBy: ownerId } : {}),
@@ -1122,7 +1101,6 @@ export const make = Effect.gen(function* () {
             from,
             kind: "chat",
             text: words,
-            final: true,
             ...(answers ? { answers } : {}),
             meta: run ? { run } : {},
           });
@@ -1140,7 +1118,6 @@ export const make = Effect.gen(function* () {
             from,
             kind: "chat",
             text: text.trim(),
-            final: true,
             meta: { spoken: true },
             sendKey,
             ...(from === ownerId ? { readBy: ownerId } : {}),
@@ -1148,18 +1125,14 @@ export const make = Effect.gen(function* () {
           return written.again;
         }).pipe(Effect.catchDefect((d) => Effect.as(Effect.logWarning(`chat: words said on a call: ${String(d)}`), false))),
       ),
-    orchestratorSays: (conversation, key, text, final, run) =>
-      locked(
-        Effect.gen(function* () {
-          const id = streaming.get(key);
-          if (!id && !text.trim() && !final) return;
-          const written = yield* write({ ...(id ? { id } : {}), conversation, from: orchestratorAgent, kind: "chat", text, final, meta: run ? { run } : {} });
-          if (final) streaming.delete(key);
-          else streaming.set(key, written.id);
-        }),
-      ).pipe(logged("the orchestrator's words")),
-    notice: (conversation, text, code) =>
-      locked(write({ conversation, from: "system", kind: "notice", text, final: true, meta: { code } })).pipe(logged("notice")),
+    orchestratorSays: (conversation, text, run) =>
+      text.trim()
+        ? locked(write({ conversation, from: orchestratorAgent, kind: "chat", text, meta: run ? { run } : {} })).pipe(
+            Effect.asVoid,
+            logged("the orchestrator's words"),
+          )
+        : Effect.void,
+    notice: (conversation, text, code) => locked(write({ conversation, from: "system", kind: "notice", text, meta: { code } })).pipe(logged("notice")),
     read: (who, opt = {}) =>
       locked(
         Effect.gen(function* () {
@@ -1197,7 +1170,7 @@ export const make = Effect.gen(function* () {
     ownerInThread: Effect.map(
       core.subscribe,
       Stream.flatMap((e) =>
-        e.type === "message" && e.thread && e.message.fromKind === "owner" && e.message.kind === "chat" && e.message.final
+        e.type === "message" && e.thread && e.message.fromKind === "owner" && e.message.kind === "chat"
           ? Stream.make({ thread: e.thread, message: e.message })
           : Stream.empty,
       ),

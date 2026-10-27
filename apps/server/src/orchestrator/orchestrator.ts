@@ -170,7 +170,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       wakeSoon,
       first: { conversation: general, source: "owner" },
       quiet: (r) => r.quiet ?? false,
-      say: (r, key, text, final, runId) => go(chat.orchestratorSays(r.conversation, key, text, final, runId)),
+      say: (r, text, runId) => go(chat.orchestratorSays(r.conversation, text, runId)),
       state: (s) => go(core.setOrchestrator(s)),
       fresh: () => {
         shown = "";
@@ -275,7 +275,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const words = taken.why === noDeepSeekKey() ? orchestratorWording().noKey : orchestratorWording().cannotStart(taken.why);
       const again = cannot.get(i.conversation) === words;
       cannot.set(i.conversation, words);
-      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${clock.currentTimeMillisUnsafe()}`, words, true, taken.run));
+      if (!again) await go(chat.orchestratorSays(i.conversation, words, taken.run));
       return false;
     };
 

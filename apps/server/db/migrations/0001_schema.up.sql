@@ -39,11 +39,9 @@ CREATE TABLE channel_message (
   sender_id       text not null references channel_participant (id),
   kind            text not null check (kind in ('chat', 'dispatch', 'report', 'notice')),
   body            text not null,
-  final           boolean not null default true,
   meta            text,
   send_key        text,
   created_at      double precision not null,
-  updated_at      double precision,
   unique (conversation_id, number)
 );
 CREATE TABLE channel_mention (

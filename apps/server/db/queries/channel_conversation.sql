@@ -41,7 +41,7 @@ left join channel_conversation ch on ch.id = c.channel_id
 join channel_message m on m.conversation_id = c.id
 left join channel_read_cursor rc on rc.participant_id = sqlc.arg(participant) and rc.conversation_id = c.id
 left join channel_follow f on f.conversation_id = c.id and f.participant_id = sqlc.arg(participant) and f.unfollowed_at is null
-where m.sender_id <> sqlc.arg(participant) and m.final and m.kind <> 'notice'
+where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
   and (c.id = sqlc.arg(channel) or f.participant_id is not null)
   and m.number > greatest(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
   and not exists (select 1 from channel_seen_mark s where s.participant_id = sqlc.arg(participant) and s.message_id = m.id)

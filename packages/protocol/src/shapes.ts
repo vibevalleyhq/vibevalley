@@ -225,7 +225,6 @@ export interface ChatMessage {
   agent?: string;
   kind: MessageKind;
   text: string;
-  final: boolean;
   mentions?: string[];
   session?: SessionId;
   run?: string;

@@ -105,14 +105,14 @@ export function threadTitle(chat: Chat | undefined, thread: Conversation, issues
 export const messagesIn = (chat: Chat | undefined, conversation: string) => chat?.messages.filter((m) => m.conversation === conversation) ?? [];
 
 export const unreadIn = (chat: Chat | undefined, c: Conversation) =>
-  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice" && m.final).length;
+  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice").length;
 
 export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(chat, c), 0);
 
 /** The number a receipt for this conversation carries, or undefined with nothing unread. */
 export function newestUnread(chat: Chat | undefined, c: Conversation) {
   if (unreadIn(chat, c) === 0) return undefined;
-  return findLast(messagesIn(chat, c.id), (m) => m.final && m.number > (c.read ?? 0))?.number;
+  return findLast(messagesIn(chat, c.id), (m) => m.number > (c.read ?? 0))?.number;
 }
 
 /** A channel's own unread and its threads'; threads without a channel count under the general. */

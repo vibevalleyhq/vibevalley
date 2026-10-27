@@ -25,7 +25,7 @@ import { useCore } from "../../data/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, StreamingCaret, Tag, ThinkingDots } from "./bits";
+import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead, useHistory } from "./data";
 import { TurnSteps } from "./WorkLog";
 import { useAgent } from "../../data/agents";
@@ -211,13 +211,8 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
           <Tag icon={outcome().icon} label={outcome().label} fill={outcome().fill} />
         </div>
       </Show>
-      <div class={props.m.final ? "" : "opacity-70"}>
-        <Show when={props.m.kind === "dispatch"} fallback={<Markdown text={props.m.text} mentions />}>
-          <Dispatch text={props.m.text} />
-        </Show>
-      </div>
-      <Show when={!props.m.final}>
-        <StreamingCaret />
+      <Show when={props.m.kind === "dispatch"} fallback={<Markdown text={props.m.text} mentions />}>
+        <Dispatch text={props.m.text} />
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (
@@ -227,10 +222,10 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
           </div>
         )}
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
+      <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
         <TurnSteps session={orchestratorAgent} run={props.m.run} orchestrator />
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "session" && props.m.kind === "report"}>
+      <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />
       </Show>
       <Show when={props.thread}>{(thread) => <ThreadPreview thread={thread()} />}</Show>

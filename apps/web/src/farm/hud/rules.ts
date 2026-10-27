@@ -40,5 +40,5 @@ export function lastOrchestratorSaid(chat: Chat | undefined) {
   const typed = messagesIn(chat, general.id)
     .filter((m) => m.fromKind === "orchestrator" && m.kind === "chat")
     .at(-1);
-  return typed && { key: `m${typed.id}`, text: typed.text, final: typed.final, at: typed.at };
+  return typed && { key: `m${typed.id}`, text: typed.text, at: typed.at };
 }

@@ -391,9 +391,7 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.final && props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? (
-      <TurnSteps session="orchestrator" run={props.m.run} orchestrator />
-    ) : undefined;
+    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <TurnSteps session="orchestrator" run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={
@@ -421,7 +419,7 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.final && props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
       <Match when={props.m.fromKind === "owner"}>

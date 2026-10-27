@@ -66,10 +66,6 @@ export function ThinkingDots() {
   );
 }
 
-export function StreamingCaret() {
-  return <span class="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 bg-ink motion-safe:animate-pulse" aria-hidden="true" />;
-}
-
 export function Count(props: { n: number }) {
   return <span class="shrink-0 rounded-full bg-accent px-1.5 text-xs font-semibold text-page tabular-nums">{props.n}</span>;
 }
