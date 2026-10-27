@@ -1,6 +1,6 @@
 # 验收管家的评测
 
-[验收](.agents/skills/acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用 pi-ai 的假模型，只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/acceptance/SKILL.md)的一份分册，不用沙箱。管家的测试用照脚本回答的模型（`ai/testing.ts`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放主人标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [管家的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 
