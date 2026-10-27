@@ -40,7 +40,7 @@ describe("the tools", () => {
   it("are named in the owner's language", () => {
     setLocale("en");
     try {
-      expect(toolStart("issue_create", { project: "demo" }).text).toBe("Write a ticket: demo");
+      expect(toolStart("memory_search", { query: "the port" }).text).toBe("Search the memory: the port");
     } finally {
       setLocale("zh");
     }

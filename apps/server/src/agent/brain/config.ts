@@ -8,6 +8,7 @@ import type { LlmShape } from "../../ai/llm.ts";
 import type { AssistantMessage, Context } from "../../ai/messages.ts";
 import { getModel, type Model, models } from "../../ai/models.ts";
 import type { RequestOptions } from "../../ai/request.ts";
+import { mcpConfig } from "./prompts.ts";
 
 export const defaultModel = "deepseek-flash";
 
@@ -69,12 +70,12 @@ const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema
 /** A missing file has none; unreadable JSON or a wrong shape is an error. */
 export function readMcpConfig(path: string): McpServer[] {
   const data = existsSync(path) ? readFileSync(path, "utf8") : "{}";
-  if (data.trim() === "") throw new Error(`${path} 不是 JSON`);
+  if (data.trim() === "") throw new Error(mcpConfig.notJson(path));
   let config: { mcpServers?: Record<string, McpEntry> };
   try {
     config = Schema.decodeUnknownSync(McpConfigSchema)(data);
   } catch (e) {
-    throw new Error(`${path} 不是 JSON 或配置形状不对：${String(e)}`, { cause: e });
+    throw new Error(mcpConfig.badShape(path, String(e)), { cause: e });
   }
   const entries = config.mcpServers ?? {};
   const out: McpServer[] = [];

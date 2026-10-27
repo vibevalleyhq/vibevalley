@@ -10,6 +10,7 @@ import type { McpServer } from "./config.ts";
 import { textTool } from "./tool.ts";
 import type { JsonSchema } from "../../ai/tools.ts";
 import { afterRealTime } from "../../base/time.ts";
+import { mcp as mcpWords } from "./prompts.ts";
 
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;
@@ -39,7 +40,7 @@ export function mcpContentText(content: readonly Block[]): string {
       case "resource":
         if (block.resource?.text) parts.push(block.resource.text);
         else if (block.resource?.uri) parts.push("[" + block.resource.uri + "]");
-        else parts.push("[资源]");
+        else parts.push(mcpWords.resourceBlock);
         break;
     }
   }
@@ -105,7 +106,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   }
   const fail = (e: unknown) => {
     const last = stderr.trim().split("\n").at(-1) ?? "";
-    return new Error(`连不上 MCP 服务 ${server.name}：${e instanceof Error ? e.message : String(e)}${last ? "：" + last : ""}`);
+    return new Error(mcpWords.connectFailed(server.name, e instanceof Error ? e.message : String(e), last));
   };
   const client = new Client({ name: "vibevalley-agent", version: "0.1.0" });
   const close = async () => {
@@ -142,10 +143,10 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
           signal: tc.signal,
         });
       } catch (e) {
-        throw new Error(`${server} 的 ${t.name} 出错：${e instanceof Error ? e.message : String(e)}`, { cause: e });
+        throw new Error(mcpWords.callFailed(server, t.name, e instanceof Error ? e.message : String(e)), { cause: e });
       }
       let text = mcpContentText((r.content as Block[] | undefined) ?? []);
-      if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : "（没有内容）";
+      if (text === "") text = r.structuredContent !== undefined ? JSON.stringify(r.structuredContent) : mcpWords.noContent;
       if (r.isError) throw new Error(text);
       return text;
     },

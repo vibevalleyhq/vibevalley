@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { memory as memoryWords } from "./prompts.ts";
 
 /** Cut from the top when the prompt carries it: the newest notes matter most. */
 export const memoryPromptChars = 8_000;
@@ -45,7 +46,7 @@ function snapshotOf(file: string, raw: string, updatedAt: number): MemorySnapsho
   const text = raw.trim();
   const runes = [...text];
   const cutoff = Math.max(0, runes.length - memoryPromptChars);
-  const prompt = cutoff > 0 ? `（更早的记录省略了，全文在 ${file}）\n` + runes.slice(cutoff).join("") : text;
+  const prompt = cutoff > 0 ? memoryWords.truncatedNote(file) + runes.slice(cutoff).join("") : text;
   const lines: MemoryLine[] = [];
   let carried = 0;
   let offset = 0;

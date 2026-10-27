@@ -7,15 +7,14 @@ import { complete, type LLM } from "./config.ts";
 import { archive } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, requestContext, transcript } from "./messages.ts";
 import { applySummary } from "./session.ts";
+import { compaction as compactionWords } from "./prompts.ts";
 
 /** Characters over three: close enough for mixed Chinese and code. */
 export const estimateTokens = (messages: readonly BrainMessage[]) => Math.ceil(JSON.stringify(messages).length / 3);
 
-export const summaryInstructions =
-  "把下面这段对话压成一份摘要，给接下来继续这段对话的你自己看。保留：用户要的是什么、做出的决定、已经完成的事和结果、改过的文件和关键内容、还没做完的事、要注意的坑。去掉寒暄和已经没用的工具输出。用中文，条理清楚，不超过 1500 字。";
+export const summaryInstructions = compactionWords.summaryInstructions;
 
-export const summaryInPlace =
-  "上面的对话要压成一份摘要，给接下来继续这段对话的你自己看；只写摘要，不调工具。保留：用户要的是什么、做出的决定、已经完成的事和结果、改过的文件和关键内容、还没做完的事、要注意的坑。去掉寒暄和已经没用的工具输出。用中文，条理清楚，不超过 1500 字。";
+export const summaryInPlace = compactionWords.summaryInPlace;
 
 const spoke = (m: BrainMessage) => m.role === "assistant" && messageText(m).trim() !== "";
 const opens = (m: BrainMessage | undefined) => m?.role === "user" || m?.role === "custom";
@@ -78,7 +77,7 @@ export function applyPlan(plan: CompactionPlan, summary: CompactionSummaryMessag
 
 const summaryOf = (plan: CompactionPlan, said: string, where: string, options: CompactionOptions) =>
   Effect.gen(function* () {
-    let summary = said || "（摘要没生成出来，原文见归档。）";
+    let summary = said || compactionWords.noSummary;
     const more = options.append ? yield* options.append() : "";
     if (more) summary += "\n\n" + more;
     const message: CompactionSummaryMessage = {

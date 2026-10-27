@@ -1,7 +1,6 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
-import { ownersLanguage } from "../../prompts.ts";
 import { agentWording } from "../words.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
@@ -13,6 +12,7 @@ import { type BrainEvent, type BrainOwner, openBrain } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import { defaultModel, type LLM, type McpServer } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
+import { helperInstructions } from "./prompts.ts";
 import type { Time } from "../../base/time.ts";
 
 export const vibevalleyRuntime = "vibevalley";
@@ -20,11 +20,7 @@ export const vibevalleyRuntime = "vibevalley";
 /** DeepSeek's two. */
 export const efforts = ["high", "max"] as const;
 
-export const helperInstructions = () => `你是一个编码 agent，在主人电脑上的一个项目目录里干活：读写代码、跑命令、查资料。
-- 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
-- 能自己查到的不问；真正要拿主意的才问，一次问清。
-- 几件互不相干、各自要花工夫的事，用 spawn_agent 派帮手同时做。
-- 回答用${ownersLanguage()}，简短，先说结论。`;
+export { helperInstructions };
 
 export interface RuntimeOptions {
   /** $VIBEVALLEY_HOME, else ~/.vibevalley, when absent. */

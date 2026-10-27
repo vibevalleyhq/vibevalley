@@ -103,7 +103,7 @@
 - **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（田头的消息、时间线）是写下那时的语言，换了不回头翻。
 - **田头的名字不翻**：`generalName`（「田头」）是存盘的名字，模型和对话里的 @ 也用它；主人看到的是词表里的 `general`。
 - **模型写的记号不翻**：提示要帮工照原样写「结论：」「要问主人：」「标准 N：」「记住：」；读的时候英文的写法（Conclusion、Ask the owner、Criterion N、Remember）也认。
-- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；词表、`prompts.ts`、测试和测试数据、只对模型说话的 `agent/brain` 和 `tool`、记忆树的假数据不查；正则不查。
+- **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；词表、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
 
 ## 怎么走
 

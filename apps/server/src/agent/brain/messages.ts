@@ -3,6 +3,7 @@
 
 import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "../../ai/messages.ts";
 import type { AgentMessage } from "../loop/agent.ts";
+import { imagePlaceholder, summary as summaryWords, transcript as transcriptWords } from "./prompts.ts";
 
 export type UserContent = string | readonly (TextContent | ImageContent)[];
 
@@ -45,8 +46,8 @@ export const userMessage = (text: string, now: number): UserMessage => ({
 });
 
 export function summaryText(m: { readonly summary: string; readonly archive?: string }): string {
-  const where = m.archive ? "，原文在 " + m.archive : "";
-  return "【之前的对话压成了下面的摘要" + where + "】\n<summary>\n" + m.summary + "\n</summary>";
+  const where = m.archive ? summaryWords.archivedNote(m.archive) : "";
+  return summaryWords.wrapped(where, m.summary);
 }
 
 export function llmMessages(messages: readonly BrainMessage[]): Message[] {
@@ -79,7 +80,7 @@ function blocksText(blocks: readonly { type: string; text?: string }[]): string 
   let out = "";
   for (const c of blocks) {
     if (c.type === "text") out += c.text ?? "";
-    else if (c.type === "image") out += "[图片]";
+    else if (c.type === "image") out += imagePlaceholder;
   }
   return out;
 }
@@ -104,22 +105,22 @@ export function transcript(messages: readonly BrainMessage[]): string {
   for (const m of messages) {
     switch (m.role) {
       case "user":
-        out.push("## 用户\n" + messageText(m));
+        out.push(transcriptWords.userHeading(messageText(m)));
         break;
       case "custom":
-        out.push("## " + m.customType + "\n" + messageText(m));
+        out.push(transcriptWords.customHeading(m.customType, messageText(m)));
         break;
       case "compactionSummary":
-        out.push("## 更早的摘要\n" + m.summary);
+        out.push(transcriptWords.olderSummaryHeading(m.summary));
         break;
       case "assistant":
         for (const c of m.content) {
-          if (c.type === "text" && c.text.trim() !== "") out.push("## 助手\n" + c.text);
-          if (c.type === "toolCall") out.push("## 调用 " + c.name + "\n" + JSON.stringify(c.arguments));
+          if (c.type === "text" && c.text.trim() !== "") out.push(transcriptWords.replyHeading(c.text));
+          if (c.type === "toolCall") out.push(transcriptWords.toolCallHeading(c.name, JSON.stringify(c.arguments)));
         }
         break;
       case "toolResult":
-        out.push("## " + m.toolName + " 的结果" + (m.isError ? "（失败）" : "") + "\n" + messageText(m));
+        out.push(transcriptWords.toolResultHeading(m.toolName, m.isError ?? false, messageText(m)));
         break;
     }
   }

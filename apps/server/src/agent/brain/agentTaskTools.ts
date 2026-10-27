@@ -10,6 +10,7 @@ import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
 import { schemaEffectTool } from "./tool.ts";
+import { agentTaskTools as words } from "./prompts.ts";
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => Effect.Effect<void>): AgentTaskStore {
@@ -23,9 +24,7 @@ export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTas
 export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effect.Effect<void>): Tool[] {
   const task = schemaEffectTool({
     name: "task_add",
-    description:
-      "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
-      "可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
+    description: words.addDescription,
     parameters: Schema.Struct({
       tasks: Schema.Array(
         Schema.Struct({
@@ -45,16 +44,14 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
           problems = bad;
           return next;
         });
-        if (problems.length > 0) return "没收：" + problems.join("；") + "\n\n" + engine.text(g);
+        if (problems.length > 0) return words.notRecorded + problems.join("；") + "\n\n" + engine.text(g);
         yield* changed;
         return engine.text(g);
       }),
   });
   const update = schemaEffectTool({
     name: "task_update",
-    description:
-      "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。" +
-      "没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
+    description: words.updateDescription,
     parameters: Schema.Struct({
       id: Schema.String,
       state: Schema.optionalKey(Schema.Literals(["done", "failed", "skipped", "waiting"])),
@@ -71,14 +68,14 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effe
           ...(p.after != null ? { after: p.after } : {}),
         };
         const g = yield* store.change((g) => engine.update(g, p.id, c));
-        if (engine.finished(g)) return engine.text(g) + "\n\n都做完了，这张图收起来了。";
+        if (engine.finished(g)) return engine.text(g) + words.allDone;
         yield* changed;
         return engine.text(g);
       }),
   });
   const list = schemaEffectTool({
     name: "task_graph",
-    description: "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
+    description: words.graphDescription,
     parameters: Schema.Struct({}),
     run: () => Effect.map(store.load, engine.text),
   });
@@ -162,18 +159,8 @@ export const makeTaskRunner = (
           .pipe(Effect.catch((e) => Effect.as(Effect.logError(`agent: cannot record task ${t.id}:`, e), undefined)));
         if (!g) return;
         const state = g.find((x) => x.id === t.id)?.state ?? "failed";
-        if (state === "done") yield* tell("〔任务〕" + t.id + "（" + t.title + "）帮手做完了：\n" + said.trim() + "\n\n" + engine.text(g));
-        else if (state === "failed")
-          yield* tell(
-            "〔任务〕" +
-              t.id +
-              "（" +
-              t.title +
-              "）帮手没做成：" +
-              head(said, 400) +
-              "\n改了 brief 把它写回 waiting 重来，或者标 skipped。\n\n" +
-              engine.text(g),
-          );
+        if (state === "done") yield* tell(words.taskHeader + t.id + "（" + t.title + words.done + said.trim() + "\n\n" + engine.text(g));
+        else if (state === "failed") yield* tell(words.taskHeader + t.id + "（" + t.title + words.failed + head(said, 400) + words.retryNote + engine.text(g));
         yield* advance;
       });
 
@@ -205,7 +192,7 @@ export const makeTaskRunner = (
         return FiberSet.clear(fibers);
       }),
       recover,
-      summary: Effect.map(store.load, (g) => (g.length === 0 ? "" : "【整理对话时的任务，以 tasks 为准】\n" + engine.text(g))),
+      summary: Effect.map(store.load, (g) => (g.length === 0 ? "" : words.foldedSummary(engine.text(g)))),
       nudge: Effect.map(store.load, (g) => {
         const own = engine
           .readyTasks(g)
@@ -223,7 +210,7 @@ export const makeTaskRunner = (
         }
         if (nudges >= maxNudges) return "";
         nudges++;
-        return `〔任务〕这一轮停了，还有 ${own.length} 件你可以做：${own.join("、")}。接着做；做不了的用 task_update 标 failed 或 skipped，写明原因。\n\n${seen}`;
+        return words.nudge(own.length, own.join("、"), seen);
       }),
     };
   });
