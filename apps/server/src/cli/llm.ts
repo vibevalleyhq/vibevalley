@@ -1,4 +1,4 @@
-// The farm's Llm on the command line and in the live evals: a fetch of its own.
+// The command line and the live evals have no farm to give the Llm its HttpClient: it gets a fetch of its own.
 
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";

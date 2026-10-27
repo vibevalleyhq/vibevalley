@@ -70,7 +70,6 @@ export interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fiel
   readonly parameters: S;
 }
 
-/** schemaTool for a body that is an Effect. */
 export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaEffectToolSpec<S>): Tool {
   const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
   return effectTool<unknown>({

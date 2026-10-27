@@ -163,8 +163,7 @@ export class Brain {
   private core!: Agent<Own>;
   /** What follows a run, an idle fold under way, the first look at its tasks: fibers of the brain's scope. */
   private fibers!: FiberSet.FiberSet;
-  /** An idle fold waiting to start. */
-  private idle!: FiberHandle.FiberHandle;
+  private idleFold!: FiberHandle.FiberHandle;
   private tasks: AgentTaskRunner | undefined;
 
   private readonly session: SessionFile | undefined;
@@ -194,8 +193,7 @@ export class Brain {
   /** The lines of MEMORY.md the model knows: the snapshot's, then as memoryNews told it. */
   private knownMemory: string[] = [];
 
-  /** Connects to its MCP servers first; one that cannot be reached is left out (mcpStatus). Closing the scope stops its run
-   * and its subagents, and closes it. */
+  /** Connects to its MCP servers first: one that cannot be reached is left out (mcpStatus). */
   static make(options: BrainOptions): Effect.Effect<Brain, Error, Scope.Scope> {
     return Effect.gen(function* () {
       const mcp = yield* Effect.acquireRelease(Effect.tryPromise({ try: (signal) => connectAll(options.mcpServers ?? [], signal), catch: asError }), (m) =>
@@ -211,7 +209,7 @@ export class Brain {
   private constructor(
     private readonly options: BrainOptions,
     private readonly mcp: McpConnections,
-    /** The Clock of the scope it was made in: message times, a resumed run's age, when a reminder is due. */
+    /** The Clock of the scope it was made in. */
     private readonly now: () => number,
   ) {
     this.maxSteps = options.maxSteps ?? 40;
@@ -286,7 +284,7 @@ export class Brain {
     const options = this.options;
     return Effect.gen(function* () {
       self.fibers = yield* FiberSet.make();
-      self.idle = yield* FiberHandle.make();
+      self.idleFold = yield* FiberHandle.make();
       if (self.taskStore)
         self.tasks = yield* makeTaskRunner(
           self.taskStore,
@@ -650,7 +648,7 @@ export class Brain {
   }
 
   private stopIdle(): Effect.Effect<void> {
-    return FiberHandle.clear(this.idle);
+    return FiberHandle.clear(this.idleFold);
   }
 
   // Folding when the run ends would give the owner a lossy summary a minute later; folding when they have gone keeps
@@ -660,7 +658,7 @@ export class Brain {
       const after = this.idleAfter();
       if (after < 0 || estimateTokens(this.history()) <= this.idleAt()) return Effect.void;
       // What stopIdle cancels is the wait: a fold under way goes on, and is dropped if something came in meanwhile.
-      return Effect.asVoid(FiberHandle.run(this.idle, Effect.andThen(Effect.sleep(after), FiberSet.run(this.fibers, this.foldIdle()))));
+      return Effect.asVoid(FiberHandle.run(this.idleFold, Effect.andThen(Effect.sleep(after), FiberSet.run(this.fibers, this.foldIdle()))));
     });
   }
 
@@ -703,9 +701,7 @@ export interface BrainOwner {
   readonly scope: Scope.Scope;
 }
 
-/** A brain for Promise code: its Effects as Promises on the owner's fibers. */
 export interface BrainHandle {
-  /** The brain itself, for Effect code. */
   readonly brain: Brain;
   readonly send: (message: BrainMessage) => Promise<void>;
   readonly later: (message: BrainMessage) => Promise<void>;

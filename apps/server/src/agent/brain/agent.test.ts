@@ -332,7 +332,6 @@ describe("the agent", () => {
     expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
   });
 
-  // On the brain's Clock: an hour and its 20 s ticks are moved through, not waited for.
   effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));

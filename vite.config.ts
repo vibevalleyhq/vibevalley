@@ -118,8 +118,8 @@ export default defineConfig({
         },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; the brain
-        // is given its logger as it is given its clock. The command line prints.
+        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
+        // command line prints.
         files: ["apps/server/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
