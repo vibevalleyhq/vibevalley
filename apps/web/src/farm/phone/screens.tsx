@@ -17,7 +17,7 @@ import { createCall } from "../../features/voice/createCall";
 import { voiceCall } from "../../features/voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { useAgent } from "../../features/agent/data";
+import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";

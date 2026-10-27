@@ -1,8 +1,8 @@
 import { keepPreviousData } from "@tanstack/solid-query";
 import { type Agent, type AgentProblem, orchestratorAgent } from "@vibevalley/protocol";
-import { api } from "../../base/api";
-import { createSettled } from "../../base/util";
-import { ready, useAgents, useQuery } from "../../base/query";
+import { api } from "./api";
+import { createSettled } from "./util";
+import { ready, useAgents, useQuery } from "./query";
 
 /** The profiles work is sent to: the orchestrator's is apart; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {

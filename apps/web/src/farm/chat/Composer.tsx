@@ -16,7 +16,7 @@ import { AgentFace } from "../../ui/Face";
 import { DictationButton } from "../../features/voice/DictationButton";
 import { SpriteIcon } from "../../ui/pixel";
 
-import { useAgent } from "../../features/agent/data";
+import { useAgent } from "../../base/agents";
 import { setPick, usePrefs } from "../../base/prefs";
 
 /** Who the next line goes to, with a button to stop picking. */

@@ -4,7 +4,7 @@ import type { ChatMessage, Phase } from "@vibevalley/protocol";
 import { type DotTone, phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
-import { useAgent } from "../agent/data";
+import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
 const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };

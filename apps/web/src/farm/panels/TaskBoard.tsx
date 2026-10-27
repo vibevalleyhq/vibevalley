@@ -21,7 +21,7 @@ import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, Sprite
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "../../features/task/data";
-import { useAgent, useWorkAgents } from "../../features/agent/data";
+import { useAgent, useWorkAgents } from "../../base/agents";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],

@@ -5,7 +5,7 @@ import { type IssueStatus, orchestratorAgent, type Priority } from "@vibevalley/
 import type { BoardCard, Tone } from "./cards";
 import { cardAgent } from "./cards";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { useAgent } from "../agent/data";
+import { useAgent } from "../../base/agents";
 
 export const toneVar = (t: Tone) => `var(--color-${t})`;
 

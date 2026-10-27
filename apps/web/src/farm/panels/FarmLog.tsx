@@ -8,7 +8,7 @@ import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/pr
 import { generalOf, spentText } from "../../features/channel/rules";
 import { useCore } from "../../base/frame";
 import { useReports, useRoom } from "../../features/channel/rooms";
-import { useAgent } from "../../features/agent/data";
+import { useAgent } from "../../base/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../../ui/pixel";
 

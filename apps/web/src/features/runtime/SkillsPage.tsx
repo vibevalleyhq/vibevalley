@@ -12,7 +12,7 @@ import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { Keyed } from "../../base/util";
 import { ready, useAgents, useQuery, useRuntimes } from "../../base/query";
-import { RuntimeIcon } from "../../ui/RuntimeIcon";
+import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";

@@ -5,7 +5,7 @@
 
 import { appWording } from "../../base/words";
 import type { RtcLine } from "@vibevalley/protocol/host";
-import { currentHost } from "../../host";
+import { currentHost } from "../../base/host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import { api, reasonOf } from "../../base/api";

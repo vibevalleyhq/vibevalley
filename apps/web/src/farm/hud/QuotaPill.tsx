@@ -11,7 +11,7 @@ import { ready, useRuntimes } from "../../base/query";
 import { CardColors, PxButton, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { HudCard } from "./HudCard";
-import { RuntimeIcon } from "../../ui/RuntimeIcon";
+import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
 
