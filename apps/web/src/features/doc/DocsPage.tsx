@@ -24,7 +24,7 @@ import {
 import { api, reasonOf } from "../../base/api";
 import { DocEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../ui/cast";
-import { knownTypes } from "../../rules/docBlocks";
+import { knownTypes } from "./blocks";
 import { useRouter } from "../../base/router";
 import { aria, Keyed } from "../../base/util";
 import { createExternal } from "../../base/external";

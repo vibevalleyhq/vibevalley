@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { blockHeading, blockNumbered, blockParagraph, type DocSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
-import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./docBlocks";
+import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./blocks";
 
 const span = (t: string, bold = false): DocSpan => ({ t, marks: bold ? { bold: true } : {} });
 

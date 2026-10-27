@@ -8,7 +8,7 @@ import { FarmPage } from "../farm/FarmPage";
 import { TreePage } from "../tree/TreePage";
 import { AgentsRoute } from "../features/agent/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
-import { DocsPage } from "../pages/docs/DocsPage";
+import { DocsPage } from "../features/doc/DocsPage";
 import { IssuesPage } from "../features/issue/IssuesPage";
 import { OrchestratorPage } from "../features/orchestrator/OrchestratorPage";
 import { PairPage } from "../pages/pair/PairPage";

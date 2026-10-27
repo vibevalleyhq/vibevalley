@@ -20,18 +20,7 @@ import {
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { reasonOf } from "../../base/api";
-import {
-  codePointOffset,
-  editSpans,
-  hasText,
-  knownTypes,
-  listNumbers,
-  listTypes,
-  markdownShortcut,
-  normalSpans,
-  plainOf,
-  splitSpans,
-} from "../../rules/docBlocks";
+import { codePointOffset, editSpans, hasText, knownTypes, listNumbers, listTypes, markdownShortcut, normalSpans, plainOf, splitSpans } from "./blocks";
 
 /** Text edits wait this long after the last key, and no longer than maxWait while typing goes on. */
 export const idleWait = 500;
