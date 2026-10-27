@@ -1,5 +1,4 @@
-// A file said with a message (attachmentPath): the one read that is a GET, since a page's <img src> can only GET. It is
-// immutable (named by its sha256), so it is cached for good.
+// The one read that is a GET, since a page's <img src> can only GET. Named by its sha256, a file never changes: cached for good.
 
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";

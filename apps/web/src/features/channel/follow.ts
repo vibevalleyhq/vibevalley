@@ -19,7 +19,6 @@ export interface Followed {
 
 const empty: Followed = { messages: [], complete: false, ready: false };
 
-/** Of two copies of a message, the one with the higher revision is how it is now. */
 export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]): ChatMessage[] {
   const by = new Map(was.map((m) => [m.number, m]));
   for (const m of more) {

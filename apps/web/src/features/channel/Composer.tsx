@@ -40,7 +40,6 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       if (id) drafts.clear(id);
     },
   });
-  /** Files picked or pasted go up at once; the line carries them once they are there. */
   const attach = async (files: readonly File[]) => {
     const id = props.channel?.id;
     if (!id || files.length === 0) return;

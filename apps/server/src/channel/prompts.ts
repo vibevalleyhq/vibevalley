@@ -3,8 +3,7 @@
 
 import { summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./rules.ts";
 
-/** The words' own line breaks are marked, so no message can pass for a header; what it answers, a change, a deletion and
- * its files are said in the line. */
+/** Line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: InboxMessage): string {
   const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
   const head = `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
@@ -13,7 +12,6 @@ export function messageLine(m: InboxMessage): string {
   return `${head}${m.edited ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}`;
 }
 
-/** One line each, in order: how the orchestrator and a session read what came to them. */
 export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");
 
 const rowText = (r: UnreadRow) => `${r.target} ${r.unread} 条` + (r.mentionsYou ? "（提到了你）" : "") + (r.latest ? "，最后是 " + r.latest : "");

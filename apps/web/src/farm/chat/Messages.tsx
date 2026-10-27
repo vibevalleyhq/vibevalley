@@ -154,7 +154,6 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
   );
 }
 
-/** The line a message answers, as its channel has it now. */
 function Answers(props: { channel: string; number: number }) {
   const m = useMessage(() => ({ channel: props.channel, number: props.number }));
   return (

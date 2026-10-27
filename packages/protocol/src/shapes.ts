@@ -255,7 +255,7 @@ export interface Reaction {
   by: string[];
 }
 
-/** A file said with a message: id is the sha256 of its bytes, served at attachmentPath. */
+/** id is the sha256 of its bytes, served at attachmentPath. */
 export interface Attachment {
   id: string;
   name: string;
@@ -2411,13 +2411,11 @@ export interface DocAck {
 }
 
 export interface MessageEdit {
-  /** The message. */
   id: string;
   text: string;
 }
 
 export interface ReactionToggle {
-  /** The message. */
   id: string;
   emoji: string;
 }

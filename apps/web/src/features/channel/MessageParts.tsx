@@ -1,6 +1,4 @@
-// What a message shows beside its words, and what the owner does to it in the workbench's chat: the line it answers,
-// a deletion or an edit, its files, its reactions, and the row of tools on hover (react, reply, open a thread, pin, edit,
-// delete). Every change is the server's (channel.*): the list shows it once the channel's follower hears it back.
+// Every change to a message is the server's (channel.*): the list shows it once the channel's follower hears it back.
 
 import { chatWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
@@ -14,7 +12,7 @@ import { aria, autofocus } from "../../base/util";
 import { drafts } from "./draft";
 import { useMessage } from "./follow";
 
-/** The reactions offered at a press; any other can still come from an agent. */
+// What a press offers; an agent can still react with any other.
 export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
 
 const sizeText = (bytes: number) =>
@@ -22,10 +20,8 @@ const sizeText = (bytes: number) =>
 
 const nameOf = (m: ChatMessage) => (m.from === ownerId ? chatWording().messages.owner : m.name);
 
-/** A server call whose result the follower brings back; a refusal shows as a toast. */
 const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(reasonOf(e), "bad"));
 
-/** The line a message answers, from its channel, as it is now. */
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
   return (
@@ -52,7 +48,6 @@ export function ReplyQuote(props: { channel: string; number: number }) {
   );
 }
 
-/** Its words, or that it is gone; an edit says so after the words. */
 export function MessageBody(props: { m: ChatMessage }) {
   return (
     <Show when={props.m.deleted === undefined} fallback={<p class="text-sm text-muted italic">{chatWording().messages.deleted}</p>}>
@@ -66,7 +61,6 @@ export function MessageBody(props: { m: ChatMessage }) {
   );
 }
 
-/** Pictures shown as they are; any other file a chip to open it by. */
 export function Attachments(props: { files: readonly Attachment[] }) {
   return (
     <div class="mt-1 flex flex-wrap gap-2">
@@ -99,7 +93,6 @@ export function Attachments(props: { files: readonly Attachment[] }) {
   );
 }
 
-/** Each reaction with how many; the owner's own is marked, and pressing one takes the owner's back or adds it. */
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string }) {
   return (
     <div class="mt-1 flex flex-wrap gap-1">
@@ -129,7 +122,6 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
 
 const tool = "inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-hover";
 
-/** The row of tools over a message on hover: react, reply, open a thread (in a channel), pin, and edit and delete. */
 export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit: () => void }) {
   const router = useRouter();
   const [picking, setPicking] = createSignal(false);
@@ -221,7 +213,6 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   );
 }
 
-/** The owner's own words, changed in place: Enter saves, Esc keeps them as they were. */
 export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
   // The words as they were when editing began: a change heard meanwhile does not move the box under the owner's hands.
   const { id, text: was } = untrack(() => props.m);

@@ -12,7 +12,6 @@ test("a message is answered, changed, reacted to, pinned and deleted from the to
   // By its paragraph: a reply quotes the same words.
   const first = log.locator("p", { hasText: /^苹果要(多)?浇水$/ });
   await expect(first).toBeVisible();
-  // The orchestrator it woke says it has it.
   await expect(log.getByRole("button", { name: /👀/ })).toBeVisible();
   const tools = page.getByRole("toolbar", { name: "这条消息能做的" });
 

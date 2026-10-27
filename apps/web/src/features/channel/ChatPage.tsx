@@ -357,7 +357,7 @@ const mood: Record<OrchestratorState, string> = {
   speaking: chatWording().mood.speaking,
 };
 
-/** A channel's pinned messages, read as the panel opens, newest pinned first. */
+/** Newest pinned first. */
 function Pins(props: { channel: Channel }) {
   const [pinned, setPinned] = createSignal<readonly ChatMessage[] | undefined>();
   createEffect(
@@ -389,7 +389,6 @@ function Pins(props: { channel: Channel }) {
   );
 }
 
-/** Who is in a channel: the owner, the orchestrator, and the helpers working there; a direct channel has its two. */
 function Members(props: { channel: Channel }) {
   const core = useCore();
   const now = useNow();

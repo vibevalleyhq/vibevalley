@@ -1,6 +1,3 @@
-// What the box under a channel carries beside its words: the message it answers and the files said with it. A message's
-// reply button sets it, the box shows it and sends it, and it is cleared once the line is sent.
-
 import { createSignal } from "solid-js";
 import type { Attachment, ChatMessage } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -24,7 +21,6 @@ export const drafts = {
   clear: (channel: string) => put(channel, () => none),
 };
 
-/** A file the owner picked or pasted, uploaded as it is. */
 export async function upload(file: File): Promise<Attachment> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";

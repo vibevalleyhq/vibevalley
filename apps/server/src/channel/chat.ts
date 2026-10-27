@@ -80,9 +80,7 @@ import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 
 const reportMax = 1500;
-/** How many messages a search answers with. */
 const searchMax = 50;
-/** A reaction is one emoji or a short word, without spaces. */
 const emojiPattern = /^\S{1,16}$/u;
 /** What a participant says by reacting when a message that wakes it is handed to it. */
 const handedEmoji = "👀";
@@ -127,7 +125,6 @@ export interface SpeakOptions {
   readonly reply?: number;
 }
 
-/** What the owner says beside the words: the message it answers and files from attachments. */
 export interface SayMore {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
@@ -235,7 +232,6 @@ function toMessage(row: MsgRow): ChatMessage {
   };
 }
 
-/** What an agent reads of a message beside its words: what it answers, a change or a deletion, and its files' paths. */
 const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: number | null; deleted_at?: number | null }, filesAt: (id: string) => string) => {
   const files = metaOf(row.meta).attachments ?? [];
   return {
@@ -325,7 +321,6 @@ export interface ChannelShape {
   readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
   readonly search: (text: string, channel?: string) => Effect.Effect<MessageHit[], ApiError>;
   readonly attach: (upload: AttachmentUpload) => Effect.Effect<Attachment, ApiError>;
-  /** A file said with a message, as kept: where it is and what it is. */
   readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
   /** Words to a session in its thread; with no thread the session hears them straight. */
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
@@ -1181,13 +1176,11 @@ export const make = Effect.gen(function* () {
     ...inboxMore(row, filesAt),
   });
 
-  /** What a reply answers is a message already there. */
   const answered = Effect.fnUntraced(function* (channel: string, number: number | undefined) {
     if (number === undefined) return;
     if (!(yield* one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(channelWording().noMessage(number)));
   });
 
-  /** Files said with a message are ones uploaded before, each said once. */
   const attachmentsOf = Effect.fnUntraced(function* (ids: readonly string[]) {
     const out: Attachment[] = [];
     for (const id of new Set(ids)) {
@@ -1198,7 +1191,6 @@ export const make = Effect.gen(function* () {
     return out;
   });
 
-  /** A message as it is, or refused when it is not there. */
   const messageOf = Effect.fnUntraced(function* (id: string) {
     const row = yield* one(qm.messageByID({ id }));
     if (!row) return yield* Effect.fail(missing(channelWording().noMessageId(id), [lookIn.channel]));
@@ -1221,7 +1213,7 @@ export const make = Effect.gen(function* () {
     return message;
   });
 
-  /** A participant's reaction on a message: added, or taken back when there and add is not asked. */
+  /** add only adds: a reaction already there is then kept. */
   const reacting = Effect.fnUntraced(function* (id: string, who: string, emoji: string, add: boolean) {
     const e = emoji.trim();
     if (!emojiPattern.test(e)) return yield* Effect.fail(refused(channelWording().badEmoji));
@@ -1236,7 +1228,6 @@ export const make = Effect.gen(function* () {
     return yield* change(row, (revision) => db(qm.setReactions({ reactions: reactionsText(r), revision, id })));
   });
 
-  /** Handed to who it was to wake: it says so with 👀, unless it already did. */
   const received = (recipient: string, message: string) =>
     reacting(message, recipient, handedEmoji, true).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: 👀 on ${message}: ${String(c)}`)));
 

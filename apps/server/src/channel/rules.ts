@@ -173,7 +173,6 @@ export interface InboxMessage {
   readonly fromKind: ActorKind;
   readonly name: string;
   readonly text: string;
-  /** The number of the message there it answers. */
   readonly replyTo?: number;
   readonly edited?: boolean;
   readonly deleted?: boolean;

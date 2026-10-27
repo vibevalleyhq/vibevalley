@@ -134,7 +134,6 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   );
 }
 
-/** A search waits this long after the last key before it asks the server. */
 const searchWaitMs = 200;
 
 function DayLine(props: { label: string; tone?: "new" }) {
@@ -219,7 +218,6 @@ function Dispatch(props: { text: string }) {
 function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel; inChannel?: boolean; where?: string | undefined }) {
   const core = useCore();
   const [editing, setEditing] = createSignal(false);
-  /** Who a participant is, as a reaction's tooltip names it. */
   const nameOf = (who: string) =>
     who === ownerId
       ? chatWording().messages.owner

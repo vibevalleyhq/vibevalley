@@ -605,7 +605,6 @@ describe("the chat", () => {
         Effect.gen(function* () {
           const general = f.chat.defaultChannel();
           const first = (yield* f.chat.say("先这样", undefined, "")).message;
-          // Handed to the orchestrator it woke: it says so.
           expect((yield* f.chat.history(general))[0]!.reactions).toEqual([{ emoji: "👀", by: [orchestratorAgent] }]);
           const reply = (yield* f.chat.say("补一句", undefined, "", { replyTo: first.number })).message;
           expect(reply.replyTo).toBe(first.number);
@@ -625,7 +624,6 @@ describe("the chat", () => {
           yield* f.chat.remove(theirs.id);
           expect(yield* Effect.flip(f.chat.remove(theirs.id))).toMatchObject({ _tag: "Refused" });
 
-          // What changed after since, each as it now is, in the order it changed.
           const caught = yield* Stream.runCollect(Stream.take(f.chat.follow(general, since), 3));
           expect(caught.map((e) => (e._tag === "Message" ? [e.message.number, e.message.text, e.message.deleted !== undefined] : e._tag))).toEqual([
             [first.number, "改成这样", false],
