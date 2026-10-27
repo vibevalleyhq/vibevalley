@@ -1,0 +1,119 @@
+{
+ "coding": [
+  {
+   "name": "read_file",
+   "description": "读一个文本文件，每行前面带行号。大文件用 offset（从第几行开始，1 起）和 limit（读几行）分段读。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"offset\":{\"type\":\"integer\"},\"limit\":{\"type\":\"integer\"}},\"additionalProperties\":true,\"required\":[\"path\"]}"
+  },
+  {
+   "name": "write_file",
+   "description": "写一个文件（整个覆盖；没有的目录会建好）。改已有文件的一部分用 edit_file。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"path\",\"content\"]}"
+  },
+  {
+   "name": "edit_file",
+   "description": "把文件里的一段原文换成新的。old_text 要和文件里一字不差、而且只出现一次（不唯一就多带几行上下文），要全换就把 replace_all 设成 true。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"old_text\":{\"type\":\"string\"},\"new_text\":{\"type\":\"string\"},\"replace_all\":{\"type\":\"boolean\"}},\"additionalProperties\":true,\"required\":[\"path\",\"old_text\",\"new_text\"]}"
+  },
+  {
+   "name": "list_dir",
+   "description": "列一个目录里有什么（目录后面带 /）。depth 是往下看几层，默认 1。不进 .git、node_modules。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"depth\":{\"type\":\"integer\"}},\"additionalProperties\":true}"
+  },
+  {
+   "name": "grep",
+   "description": "在文件里搜一个正则，返回「文件:行号:那一行」。path 默认工作目录；glob 只搜某些文件，比如 *.ts。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"pattern\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"glob\":{\"type\":\"string\"},\"ignore_case\":{\"type\":\"boolean\"}},\"additionalProperties\":true,\"required\":[\"pattern\"]}"
+  },
+  {
+   "name": "bash",
+   "description": "在工作目录里跑一条 shell 命令，返回它的输出和退出码。默认 120 秒超时，可以用 timeout_seconds 改。不要用它读写文件（用 read_file、edit_file），不要起不会结束的进程。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"timeout_seconds\":{\"type\":\"number\"}},\"additionalProperties\":true,\"required\":[\"command\"]}"
+  },
+  {
+   "name": "web_fetch",
+   "description": "打开一个网页，返回它的正文（HTML 变成纯文本）。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"url\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"url\"]}"
+  }
+ ],
+ "self": [
+  {
+   "name": "load_skill",
+   "description": "读一个技能的全文（系统提示里「技能」列着有哪些）。要用某个技能之前先读它，再照着做。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"name\"]}"
+  },
+  {
+   "name": "remember",
+   "description": "记下一条以后的对话也要知道的事：用户的偏好、约定、项目的关键事实。一句话，不记临时的事。记下的在下一次整理对话后进系统提示；在那之前，这次的结果就在对话里。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"note\"]}"
+  },
+  {
+   "name": "rewrite_memory",
+   "description": "整个重写你的记性（MEMORY.md）：合并重复的、删掉过时或错的。先看系统提示里的「记性」，再给出完整的新内容。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"content\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"content\"]}"
+  },
+  {
+   "name": "search_archive",
+   "description": "在压缩掉的旧对话原文里搜一个词（不分大小写），返回出现的地方和前后几行。摘要里缺了细节时用。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"query\"]}"
+  }
+ ],
+ "subagent": [
+  {
+   "name": "spawn_agent",
+   "description": "派一个帮手去做一件独立的事（查资料、读一片代码、改一个模块、跑一组检查），它做完把结果汇报给你。它看不到你们的对话：brief 里写清楚要做什么、在哪、做到什么程度算完、汇报什么。几件互不相干的事可以在同一步里派几个，它们会同时做。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"brief\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"brief\"]}"
+  }
+ ],
+ "reminders": [
+  {
+   "name": "reminder",
+   "description": "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"at\":{\"type\":\"string\"},\"every_minutes\":{\"type\":\"number\"},\"cron\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"name\",\"message\"]}"
+  },
+  {
+   "name": "list_reminders",
+   "description": "列出定好的事。",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  },
+  {
+   "name": "cancel_reminder",
+   "description": "取消一件定好的事（id 从 list_reminders 看）。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"additionalProperties\":true,\"required\":[\"id\"]}"
+  }
+ ],
+ "tasks": [
+  {
+   "name": "task_add",
+   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"by\":{\"type\":\"string\",\"enum\":[\"self\",\"subagent\"]}},\"additionalProperties\":true,\"required\":[\"id\",\"brief\"]}}},\"additionalProperties\":true,\"required\":[\"tasks\"]}"
+  },
+  {
+   "name": "task_update",
+   "description": "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"state\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\",\"skipped\",\"waiting\"]},\"result\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":true,\"required\":[\"id\"]}"
+  },
+  {
+   "name": "task_graph",
+   "description": "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  }
+ ],
+ "tasks on its own": [
+  {
+   "name": "task_add",
+   "description": "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"by\":{\"type\":\"string\",\"enum\":[\"self\"]}},\"additionalProperties\":true,\"required\":[\"id\",\"brief\"]}}},\"additionalProperties\":true,\"required\":[\"tasks\"]}"
+  },
+  {
+   "name": "task_update",
+   "description": "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
+   "parameters": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"state\":{\"type\":\"string\",\"enum\":[\"done\",\"failed\",\"skipped\",\"waiting\"]},\"result\":{\"type\":\"string\"},\"brief\":{\"type\":\"string\"},\"after\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":true,\"required\":[\"id\"]}"
+  },
+  {
+   "name": "task_graph",
+   "description": "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
+   "parameters": "{\"type\":\"object\",\"properties\":{}}"
+  }
+ ]
+}

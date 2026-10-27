@@ -17,7 +17,8 @@ import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
 import { AgentTaskRunner } from "./agentTaskTools.ts";
 import { answered, fauxLLM, lastUser, type Request, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
-import { objectSchema, textTool } from "./tool.ts";
+import { textTool } from "./tool.ts";
+import { objectSchema } from "../../ai/tools.ts";
 import { wallTime } from "../../base/time.ts";
 import { plainLog } from "../../base/log.ts";
 

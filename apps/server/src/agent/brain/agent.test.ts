@@ -12,7 +12,8 @@ import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
-import { objectSchema, stopped, textTool } from "./tool.ts";
+import { stopped, textTool } from "./tool.ts";
+import { objectSchema } from "../../ai/tools.ts";
 import { timeHere, wallTime } from "../../base/time.ts";
 import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
 

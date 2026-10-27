@@ -4,7 +4,7 @@
 // Schema too (additionalProperties false).
 
 import { Schema } from "effect";
-import type { Schema as JsonSchema } from "../agent/brain/tool.ts";
+import type { JsonSchema } from "../ai/tools.ts";
 
 /** The orchestrator's, by name; read_chat is a session's too. */
 export const parameters = {

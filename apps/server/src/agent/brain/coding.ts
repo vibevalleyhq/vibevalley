@@ -5,7 +5,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
-import { booleanSchema, integerSchema, numberSchema, objectSchema, stopped, stringSchema, textTool } from "./tool.ts";
+import { schemaTool, stopped } from "./tool.ts";
+import { Schema } from "effect";
 import { afterRealTime } from "../../base/time.ts";
 
 export interface CodingOptions {
@@ -124,10 +125,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     return r !== "" && r !== "." && !r.startsWith("..") ? r : path;
   };
 
-  const read = textTool<{ path: string; offset?: number; limit?: number }>({
+  const read = schemaTool({
     name: "read_file",
     description: "读一个文本文件，每行前面带行号。大文件用 offset（从第几行开始，1 起）和 limit（读几行）分段读。",
-    parameters: objectSchema({ path: stringSchema(), offset: integerSchema(), limit: integerSchema() }, "path"),
+    parameters: Schema.Struct({ path: Schema.String, offset: Schema.optionalKey(Schema.Int), limit: Schema.optionalKey(Schema.Int) }),
     run: (p) => {
       let data: string;
       try {
@@ -145,10 +146,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const write = textTool<{ path: string; content: string }>({
+  const write = schemaTool({
     name: "write_file",
     description: "写一个文件（整个覆盖；没有的目录会建好）。改已有文件的一部分用 edit_file。",
-    parameters: objectSchema({ path: stringSchema(), content: stringSchema() }, "path", "content"),
+    parameters: Schema.Struct({ path: Schema.String, content: Schema.String }),
     run: (p) => {
       const file = at(p.path);
       try {
@@ -161,25 +162,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const edit = textTool<{
-    path: string;
-    old_text: string;
-    new_text: string;
-    replace_all?: boolean;
-  }>({
+  const edit = schemaTool({
     name: "edit_file",
     description: "把文件里的一段原文换成新的。old_text 要和文件里一字不差、而且只出现一次（不唯一就多带几行上下文），要全换就把 replace_all 设成 true。",
-    parameters: objectSchema(
-      {
-        path: stringSchema(),
-        old_text: stringSchema(),
-        new_text: stringSchema(),
-        replace_all: booleanSchema(),
-      },
-      "path",
-      "old_text",
-      "new_text",
-    ),
+    parameters: Schema.Struct({ path: Schema.String, old_text: Schema.String, new_text: Schema.String, replace_all: Schema.optionalKey(Schema.Boolean) }),
     run: (p) => {
       const file = at(p.path);
       let text: string;
@@ -202,10 +188,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const list = textTool<{ path?: string; depth?: number }>({
+  const list = schemaTool({
     name: "list_dir",
     description: "列一个目录里有什么（目录后面带 /）。depth 是往下看几层，默认 1。不进 .git、node_modules。",
-    parameters: objectSchema({ path: stringSchema(), depth: integerSchema() }),
+    parameters: Schema.Struct({ path: Schema.optionalKey(Schema.String), depth: Schema.optionalKey(Schema.Int) }),
     run: (p) => {
       const path = p.path ?? ".";
       const depth = p.depth ?? 1;
@@ -230,18 +216,15 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const grep = textTool<{ pattern: string; path?: string; glob?: string; ignore_case?: boolean }>({
+  const grep = schemaTool({
     name: "grep",
     description: "在文件里搜一个正则，返回「文件:行号:那一行」。path 默认工作目录；glob 只搜某些文件，比如 *.ts。",
-    parameters: objectSchema(
-      {
-        pattern: stringSchema(),
-        path: stringSchema(),
-        glob: stringSchema(),
-        ignore_case: booleanSchema(),
-      },
-      "pattern",
-    ),
+    parameters: Schema.Struct({
+      pattern: Schema.String,
+      path: Schema.optionalKey(Schema.String),
+      glob: Schema.optionalKey(Schema.String),
+      ignore_case: Schema.optionalKey(Schema.Boolean),
+    }),
     run: async (p, tc) => {
       const argv = [
         "rg",
@@ -267,10 +250,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const bash = textTool<{ command: string; timeout_seconds?: number }>({
+  const bash = schemaTool({
     name: "bash",
     description: `在工作目录里跑一条 shell 命令，返回它的输出和退出码。默认 ${formatSeconds(timeout)} 秒超时，可以用 timeout_seconds 改。不要用它读写文件（用 read_file、edit_file），不要起不会结束的进程。`,
-    parameters: objectSchema({ command: stringSchema(), timeout_seconds: numberSchema() }, "command"),
+    parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Number) }),
     run: async (p, tc) => {
       const limit = p.timeout_seconds ? p.timeout_seconds * 1000 : timeout;
       const ran = await runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv, tc.signal);
@@ -280,10 +263,10 @@ export function codingTools(o: CodingOptions): AgentTool[] {
     },
   });
 
-  const fetchTool = textTool<{ url: string }>({
+  const fetchTool = schemaTool({
     name: "web_fetch",
     description: "打开一个网页，返回它的正文（HTML 变成纯文本）。",
-    parameters: objectSchema({ url: stringSchema() }, "url"),
+    parameters: Schema.Struct({ url: Schema.String }),
     run: async (p, tc) => {
       const timeoutSignal = AbortSignal.timeout(30_000);
       let res: Response;

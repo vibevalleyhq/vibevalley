@@ -9,7 +9,8 @@ import { head } from "../../base/text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
-import { objectSchema, type Schema, stringSchema, textTool } from "./tool.ts";
+import { schemaTool } from "./tool.ts";
+import { Schema } from "effect";
 
 /** Every change, whoever makes it, is told to changed. */
 export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => void): AgentTaskStore {
@@ -25,33 +26,22 @@ export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTas
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
 export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () => void): AgentTool[] {
-  const ids: Schema = { type: "array", items: stringSchema() };
-  const task = textTool<{
-    tasks: { id: string; title?: string; brief: string; after?: string[]; by?: engine.By }[];
-  }>({
+  const task = schemaTool({
     name: "task_add",
     description:
       "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
       "可以一次写一张图，也可以往已有的图里加；有一件不对（id 重复、等的不存在、互相等成了圈）整批都不收，回答里说哪条错。做完一件用 task_update 标上。",
-    parameters: objectSchema(
-      {
-        tasks: {
-          type: "array",
-          items: objectSchema(
-            {
-              id: stringSchema(),
-              title: stringSchema(),
-              brief: stringSchema(),
-              after: ids,
-              by: { type: "string", enum: canHelp ? ["self", "subagent"] : ["self"] },
-            },
-            "id",
-            "brief",
-          ),
-        },
-      },
-      "tasks",
-    ),
+    parameters: Schema.Struct({
+      tasks: Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          title: Schema.optionalKey(Schema.String),
+          brief: Schema.String,
+          after: Schema.optionalKey(Schema.Array(Schema.String)),
+          by: Schema.optionalKey(Schema.Literals(canHelp ? (["self", "subagent"] as const) : (["self"] as const))),
+        }),
+      ),
+    }),
     run: async (p) => {
       let problems: string[] = [];
       const g = await store.change((g) => {
@@ -64,27 +54,18 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
       return engine.text(g);
     },
   });
-  const update = textTool<{
-    id: string;
-    state?: engine.State;
-    result?: string;
-    brief?: string;
-    after?: string[];
-  }>({
+  const update = schemaTool({
     name: "task_update",
     description:
       "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。" +
       "没做的可以改 brief 和 after；没做成的改了 brief 再把 state 写回 waiting 重来。全部做完，这张图就收起来了。",
-    parameters: objectSchema(
-      {
-        id: stringSchema(),
-        state: { type: "string", enum: ["done", "failed", "skipped", "waiting"] },
-        result: stringSchema(),
-        brief: stringSchema(),
-        after: ids,
-      },
-      "id",
-    ),
+    parameters: Schema.Struct({
+      id: Schema.String,
+      state: Schema.optionalKey(Schema.Literals(["done", "failed", "skipped", "waiting"])),
+      result: Schema.optionalKey(Schema.String),
+      brief: Schema.optionalKey(Schema.String),
+      after: Schema.optionalKey(Schema.Array(Schema.String)),
+    }),
     run: async (p) => {
       const c: engine.Change = {
         ...(p.state != null ? { state: p.state } : {}),
@@ -98,10 +79,10 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
       return engine.text(g);
     },
   });
-  const list = textTool<object>({
+  const list = schemaTool({
     name: "task_graph",
     description: "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
-    parameters: objectSchema(),
+    parameters: Schema.Struct({}),
     run: async () => engine.text(await store.load()),
   });
   return [task, update, list];
