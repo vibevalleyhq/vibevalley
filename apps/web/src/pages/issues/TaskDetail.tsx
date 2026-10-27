@@ -1,19 +1,19 @@
-import { issuesWording } from "./words";
+import { issuesWording } from "../../features/issue/words";
 import { createSignal, For, Show } from "solid-js";
 
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
 import { reasonOf } from "../../base/api";
-import type { Tone } from "../../rules/cards";
-import { taskLine } from "../../rules/issues";
+import type { Tone } from "../../features/issue/cards";
+import { taskLine } from "../../features/issue/rules";
 import { wallClockText } from "../../base/format";
 import { ready } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { useNameOf } from "./hooks";
-import { Fold, IssueSheet, More, Note, Property } from "./Sheet";
+import { ChangesBody, ChangesHead } from "../../features/issue/CloseDialog";
+import { useNameOf } from "../../features/issue/hooks";
+import { Fold, IssueSheet, More, Note, Property } from "../../features/issue/Sheet";
 import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
 
 const spentText = (s: Spent) =>

@@ -1,8 +1,8 @@
 import { issuesWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import type { Tone } from "../../rules/cards";
-import { type Stage, stageLabel, stages } from "../../rules/issues";
+import type { Tone } from "./cards";
+import { type Stage, stageLabel, stages } from "./rules";
 import { aria, useSelectValue } from "../../base/util";
 import { Icon } from "../../ui/Icon";
 import { toneVar } from "./Marks";

@@ -3,11 +3,11 @@
 // which open the box first, which open a dialog, what a reopen tells, and keeps the box, its words and the busy flag.
 // A page only says how it runs an act its own way (the farm's commands with their effects) and how it shows a failure.
 
-import { issuesWording } from "../pages/issues/words";
+import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct } from "@vibevalley/protocol";
-import { api, newSendKey } from "../base/api";
+import { api, newSendKey } from "../../base/api";
 
 /** The box under an issue's ask: the findings of 打回, or a word to the helper. */
 export type ActBox = "reject" | "tell";

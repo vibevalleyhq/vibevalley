@@ -1,9 +1,9 @@
 import { createEffect, createMemo, deep } from "solid-js";
 
 import type { Issue, IssueHistory } from "@vibevalley/protocol";
-import { api } from "../base/api";
-import { useCore } from "../base/frame";
-import { queries, ready, useQuery } from "../base/query";
+import { api } from "../../base/api";
+import { useCore } from "../../base/frame";
+import { queries, ready, useQuery } from "../../base/query";
 
 /** Every issue with its real sessions (issue.history), read again whenever the frame's issues change. */
 export function useIssueHistory(older: () => boolean) {

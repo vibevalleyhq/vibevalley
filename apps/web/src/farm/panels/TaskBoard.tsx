@@ -12,7 +12,7 @@ import { doingOf } from "../hud/rules";
 import { farm } from "../store";
 import { stationOfSession } from "../world/plots";
 import { spentText } from "../../rules/chat";
-import { lineCounts } from "../../rules/issueState";
+import { lineCounts } from "../../features/issue/state";
 import { aria, Keyed } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useProjects, useQuery } from "../../base/query";

@@ -2,12 +2,12 @@
 // it is against its criteria; and what a bug on its plot is, and the changes to look at before completing. Where it stands (and what the
 // owner may do) is the server's Issue.attention; this only words it.
 
-import { rulesWording } from "../base/words/rules";
+import { rulesWording } from "../../base/words/rules";
 import { wording } from "@vibevalley/protocol/words";
 import type { Changes, Doing, Issue, IssueAttention, Session, SessionEvent, Attention, TaskGraph } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
-import { endedAt, issueInTask, issueTitle } from "./issues";
-import { tookText } from "../base/format";
+import { endedAt, issueInTask, issueTitle } from "./rules";
+import { tookText } from "../../base/format";
 import type { Tone } from "./cards";
 
 export const attentionTone: Record<Attention, Tone> = {

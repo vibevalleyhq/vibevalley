@@ -9,7 +9,7 @@ import { TreePage } from "../tree/TreePage";
 import { AgentsRoute } from "../pages/agents/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../pages/docs/DocsPage";
-import { IssuesPage } from "../pages/issues/IssuesPage";
+import { IssuesPage } from "../features/issue/IssuesPage";
 import { OrchestratorPage } from "../pages/orchestrator/OrchestratorPage";
 import { PairPage } from "../pages/pair/PairPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";

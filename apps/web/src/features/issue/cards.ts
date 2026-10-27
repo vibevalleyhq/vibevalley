@@ -1,10 +1,10 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import { rulesWording } from "../base/words/rules";
+import { rulesWording } from "../../base/words/rules";
 import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
-import { type Ordering, orderRows, type RowFacts } from "./board";
+import { type Ordering, orderRows, type RowFacts } from "./display";
 import {
   endedAt,
   issueSession,
@@ -21,10 +21,10 @@ import {
   tagText,
   tagOpen,
   taskLine,
-} from "./issues";
-import { ago, tookText } from "../base/format";
+} from "./rules";
+import { ago, tookText } from "../../base/format";
 import { shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
-import { attentionTone } from "./issueState";
+import { attentionTone } from "./state";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
 export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";

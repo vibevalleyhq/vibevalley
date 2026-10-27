@@ -11,7 +11,7 @@ import { api, reasonOf } from "../../base/api";
 import { fire } from "../commands";
 import { playSound } from "../../ui/pixel/sound";
 import { newSendKey } from "../../base/api";
-import { writeIssue } from "../../pages/issues/write";
+import { writeIssue } from "../../features/issue/write";
 import { aria } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { ready, useProjects, useQuery } from "../../base/query";

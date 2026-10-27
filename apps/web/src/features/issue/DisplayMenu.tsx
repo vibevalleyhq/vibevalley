@@ -1,6 +1,6 @@
 import { issuesWording } from "./words";
 import { createEffect, createSignal, Show } from "solid-js";
-import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "../../rules/board";
+import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "./display";
 import { aria } from "../../base/util";
 import { Button } from "../../ui/Button";
 import { Segmented } from "../../ui/Segmented";

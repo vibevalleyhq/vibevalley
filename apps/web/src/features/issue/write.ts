@@ -2,7 +2,7 @@
 
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { newIssueTitle } from "../../rules/issues";
+import { newIssueTitle } from "./rules";
 
 const pickKey = "vibevalley.board.pick";
 

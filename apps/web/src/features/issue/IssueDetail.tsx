@@ -15,10 +15,10 @@ import {
   type SessionEvent,
 } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { createIssueActs } from "../../data/issueActs";
-import type { Tone } from "../../rules/cards";
-import { issueTag, runText, tagOpen, tagText } from "../../rules/issues";
-import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
+import { createIssueActs } from "./acts";
+import type { Tone } from "./cards";
+import { issueTag, runText, tagOpen, tagText } from "./rules";
+import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "./state";
 import { closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
@@ -31,7 +31,7 @@ import { Markdown } from "../../ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
-import { useIssueChanges, useIssueRuns, useIssueTimeline } from "../../data/issues";
+import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
 import { useAgent } from "../../data/agents";
 import { createSessionEvents } from "../../data/sessions";
 
