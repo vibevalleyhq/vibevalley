@@ -1,7 +1,7 @@
 # apps/desktop
 
 The desktop app: Electron starts the server (`apps/server`) on its own Node and opens the page it serves. The page
-reaches the machine only through `@vibevalley/host`, which the preload gives it. How it starts, quits and is packaged:
+reaches the machine only through the host interface (`@vibevalley/protocol/host`), which the preload gives it. How it starts, quits and is packaged:
 [the client](docs/subsystems/app.md).
 
 ```

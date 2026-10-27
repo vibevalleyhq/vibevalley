@@ -2,7 +2,7 @@
 
 import { rulesWording } from "./words";
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
-import type { TraySummary } from "@vibevalley/host";
+import type { TraySummary } from "@vibevalley/protocol/host";
 import { unreadTotal } from "./chat";
 
 /** The tray's title (working helpers, calls waiting) and its lines. */

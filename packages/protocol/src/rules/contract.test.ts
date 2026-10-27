@@ -8,7 +8,7 @@ import { expect, test } from "vite-plus/test";
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;
 /** What runs beside the server: the page and the shells around it. */
-const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/host/src", "packages/engine/src"];
+const outside = ["apps/web/src", "apps/web/test", "apps/mobile/src", "apps/desktop/src", "packages/engine/src"];
 
 function files(dir: string): string[] {
   let names: string[];

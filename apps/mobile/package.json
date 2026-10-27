@@ -7,7 +7,6 @@
     "start": "expo start"
   },
   "dependencies": {
-    "@vibevalley/host": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "expo": "catalog:expo",
     "expo-build-properties": "catalog:expo",

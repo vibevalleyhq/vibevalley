@@ -1,12 +1,12 @@
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
-// through the host interface the preload gives it (@vibevalley/host); nothing of Electron or Node reaches it otherwise.
+// through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
 import { currentLocale, setLocale } from "@vibevalley/protocol/words";
 import { desktopWording, followSavedLocale } from "./words";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Notice, TraySummary } from "@vibevalley/host";
+import type { Notice, TraySummary } from "@vibevalley/protocol/host";
 import { watchForDev } from "./dev";
 import { startIsland } from "./island";
 import { loginShellPath, type RunningServer, startServer } from "./server";

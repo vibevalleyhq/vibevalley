@@ -3,7 +3,7 @@
 
 import { mobileWording } from "./words";
 import * as Notifications from "expo-notifications";
-import type { Notice } from "@vibevalley/host";
+import type { Notice } from "@vibevalley/protocol/host";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),

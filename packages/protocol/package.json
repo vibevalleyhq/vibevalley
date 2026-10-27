@@ -8,7 +8,8 @@
     "./schema": "./src/schema.ts",
     "./api": "./src/api.ts",
     "./rpc": "./src/rpc.ts",
-    "./words": "./src/words/index.ts"
+    "./words": "./src/words/index.ts",
+    "./host": "./src/host.ts"
   },
   "dependencies": {
     "effect": "catalog:"

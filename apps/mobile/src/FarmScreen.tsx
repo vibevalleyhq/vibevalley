@@ -1,11 +1,11 @@
-// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/host's mobile
+// The farm: the page the paired computer serves, in a WebView, with this phone as its host (@vibevalley/protocol/host's mobile
 // bridge): the page posts what it asks, the shell answers by id and sends the call's events back.
 
 import { type ComponentType, type Ref, useEffect, useRef } from "react";
 import { StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
-import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/host";
+import { type FromNative, fromNativeKey, type ToNative } from "@vibevalley/protocol/host";
 import type { Farm } from "./farm";
 import { nativeHost } from "./host";
 import { isPairPage, keyScript } from "./rules";

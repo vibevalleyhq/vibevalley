@@ -1,8 +1,8 @@
 // A call's line on Agora's Web SDK, loaded when a call starts: the page's own, where the host carries none (the desktop,
-// a browser). The phone's shell carries its own (@vibevalley/host's rtc), which goes on with the screen locked.
+// a browser). The phone's shell carries its own (@vibevalley/protocol/host's rtc), which goes on with the screen locked.
 
 import { appWording } from "../app/words";
-import type { Rtc } from "@vibevalley/host";
+import type { Rtc } from "@vibevalley/protocol/host";
 
 export const webRtc: Rtc = async (grant, on) => {
   const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
