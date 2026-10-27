@@ -199,3 +199,40 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   await expect(view.getByRole("button", { name: "勾上后重开浏览器还登着" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: test.info().outputPath("plot.png") });
 });
+
+test("a message in 田头 is reacted to, answered, changed and deleted from its ⋯", async ({ page }) => {
+  await openFarm(page);
+  const chat = await openChat(page);
+  const box = chat.getByRole("textbox", { name: "对管家说，@ 叫帮工…" });
+  await box.fill("南边的地要翻");
+  await box.press("Enter");
+  const mine = chat.getByText("南边的地要翻", { exact: true });
+  await expect(mine).toBeVisible();
+  const menu = chat.getByRole("menu", { name: "这条消息能做的" });
+  const open = async () => {
+    await mine.hover();
+    await chat.getByRole("button", { name: "这条消息能做的" }).first().click();
+  };
+
+  await open();
+  await menu.getByRole("button", { name: "🎉" }).click();
+  await expect(chat.getByText("🎉 1")).toBeVisible();
+
+  await open();
+  await menu.getByRole("menuitem", { name: "回复" }).click();
+  await expect(chat.getByText("回复 主人：南边的地要翻")).toBeVisible();
+  await chat.getByRole("button", { name: "不回复了" }).click();
+
+  await open();
+  await menu.getByRole("menuitem", { name: "改" }).click();
+  const editing = chat.getByRole("textbox", { name: "改" });
+  await editing.fill("北边的地要翻");
+  await editing.press("Enter");
+  await expect(chat.getByText("北边的地要翻", { exact: true })).toBeVisible();
+
+  await chat.getByText("北边的地要翻", { exact: true }).hover();
+  await chat.getByRole("button", { name: "这条消息能做的" }).first().click();
+  await menu.getByRole("menuitem", { name: "删掉" }).click();
+  await menu.getByRole("menuitem", { name: "再点一次删掉" }).click();
+  await expect(chat.getByText("这条消息已删除")).toBeVisible();
+});

@@ -23,12 +23,47 @@ export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => 
 
 export const channelOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
-export function topsOf(chat: Chat | undefined): Channel[] {
-  return (chat?.channels.filter((c) => c.type === "channel") ?? []).sort((a, b) => {
-    if (a.default) return -1;
-    if (b.default) return 1;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
+/** As the sidebar lists them, the server's order: the default first, then by position (the unplaced after), then by id. */
+const bySidebar = (a: Channel, b: Channel) => {
+  if (a.default !== b.default) return a.default ? -1 : 1;
+  const pa = a.position ?? Number.MAX_SAFE_INTEGER;
+  const pb = b.position ?? Number.MAX_SAFE_INTEGER;
+  if (pa !== pb) return pa - pb;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+};
+
+/** The channels in the sidebar: not archived. */
+export const topsOf = (chat: Chat | undefined): Channel[] =>
+  (chat?.channels.filter((c) => c.type === "channel" && c.archived === undefined) ?? []).sort(bySidebar);
+
+/** The archived channels, newest archived first. */
+export const archivedOf = (chat: Chat | undefined): Channel[] =>
+  (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).sort((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
+
+export interface ChannelGroup {
+  /** None for the channels in no group, which come first. */
+  readonly category?: string;
+  readonly channels: readonly Channel[];
+}
+
+/** The sidebar's groups in the order their first channel comes. */
+export function groupsOf(channels: readonly Channel[]): ChannelGroup[] {
+  const loose = channels.filter((c) => !c.category);
+  const named = new Map<string, Channel[]>();
+  for (const c of channels) if (c.category) named.set(c.category, [...(named.get(c.category) ?? []), c]);
+  return [...(loose.length > 0 || named.size === 0 ? [{ channels: loose }] : []), ...[...named].map(([category, cs]) => ({ category, channels: cs }))];
+}
+
+/** A channel's threads, newest message first; archived ones only when asked. */
+export const threadsIn = (chat: Chat | undefined, channel: Channel, archived = false): Channel[] =>
+  (chat?.channels.filter((c) => c.type === "thread" && c.parent === channel.id && (c.archived !== undefined) === archived) ?? []).sort(
+    (a, b) => (b.last?.at ?? b.at) - (a.last?.at ?? a.at),
+  );
+
+/** The number a message address points at, from the page's path. */
+export function pointedAt(path: string): number | undefined {
+  const m = /[?&]m=(\d+)/.exec(path);
+  return m ? Number(m[1]) : undefined;
 }
 
 /** The channel a channel is in: itself, or a thread's channel; the default when none is given. */
@@ -47,6 +82,9 @@ export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? (
 export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
 
 export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
+
+/** Where a message is: its channel's address and its number, which the list scrolls to and lights up. */
+export const messagePath = (c: Channel | undefined, number: number) => `${chatPath(c)}?m=${number}`;
 
 const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;

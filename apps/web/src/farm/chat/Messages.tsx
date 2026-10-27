@@ -4,10 +4,13 @@
 import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome } from "@vibevalley/protocol";
-import { useMessage } from "../../features/channel";
+import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
+import { channelOf, drafts, messagePath, quickReactions, useMessage } from "../../features/channel";
+import { api, reasonOf } from "../../base/api";
+import { toast } from "../../ui/toasts";
+import { aria, autofocus } from "../../base/util";
 import { farmClock, readsLong } from "./text";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
@@ -81,9 +84,18 @@ export function SenderName(props: { m: ChatMessage }) {
   );
 }
 
-export function ChatRow(props: { mine: boolean; first: boolean; face?: JSX.Element; name?: JSX.Element; title?: string; children: JSX.Element }) {
+export function ChatRow(props: {
+  mine: boolean;
+  first: boolean;
+  face?: JSX.Element;
+  name?: JSX.Element;
+  title?: string;
+  actions?: JSX.Element;
+  children: JSX.Element;
+}) {
   return (
-    <div class={["flex items-start gap-2", { "pt-1": props.first, "justify-end": props.mine }]}>
+    <div class={["group/m relative flex items-start gap-2", { "pt-1": props.first, "justify-end": props.mine }]}>
+      <Show when={props.mine}>{props.actions}</Show>
       <Show when={!props.mine}>
         <span class="w-[30px] shrink-0">{props.first ? props.face : null}</span>
       </Show>
@@ -104,20 +116,163 @@ export function ChatRow(props: { mine: boolean; first: boolean; face?: JSX.Eleme
           {props.children}
         </div>
       </div>
+      <Show when={!props.mine}>{props.actions}</Show>
+    </div>
+  );
+}
+
+const menuItem = "w-full cursor-pointer px-2 py-1 text-left text-[12px] text-bark-900 hover:bg-leaf-300/40";
+
+/** What the owner can do to a message from the farm's window: the same requests as the workbench's tools. */
+function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
+  const core = useCore();
+  const [open, setOpen] = createSignal(false);
+  const [sure, setSure] = createSignal(false);
+  const run = (call: () => Promise<unknown>) => {
+    setOpen(false);
+    void call().catch((e) => toast(reasonOf(e), "bad"));
+  };
+  const editable = () => props.m.from === ownerId && props.m.kind === "chat";
+  return (
+    <div class="relative self-center">
+      <button
+        type="button"
+        aria-label={farmWording().chat.actions.open}
+        title={farmWording().chat.actions.open}
+        aria-expanded={aria(open())}
+        onClick={() => {
+          setOpen(!open());
+          setSure(false);
+        }}
+        class="cursor-pointer p-0.5 opacity-0 group-hover/m:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+      >
+        <SpriteIcon name="button-more" size={16} />
+      </button>
+      <Show when={open()}>
+        <div
+          role="menu"
+          aria-label={farmWording().chat.actions.open}
+          class="absolute top-full right-0 z-30 mt-1 w-40 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
+        >
+          <div role="group" aria-label={farmWording().chat.actions.react} class="flex flex-wrap gap-0.5 px-1 pb-1">
+            <For each={quickReactions}>
+              {(emoji) => (
+                <button
+                  type="button"
+                  aria-label={emoji}
+                  class="cursor-pointer px-1 text-[14px] hover:bg-leaf-300/40"
+                  onClick={() => run(() => api.channel.reaction.toggle({ id: props.m.id, emoji }))}
+                >
+                  {emoji}
+                </button>
+              )}
+            </For>
+          </div>
+          <button type="button" role="menuitem" class={menuItem} onClick={() => run(async () => drafts.reply(props.m.channel, props.m))}>
+            {farmWording().chat.actions.reply}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class={menuItem}
+            onClick={() =>
+              run(async () => {
+                await navigator.clipboard.writeText(location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number));
+                toast(farmWording().chat.actions.copied);
+              })
+            }
+          >
+            {farmWording().chat.actions.copyLink}
+          </button>
+          <Show when={editable()}>
+            <button
+              type="button"
+              role="menuitem"
+              class={menuItem}
+              onClick={() => {
+                setOpen(false);
+                untrack(() => props.onEdit)();
+              }}
+            >
+              {farmWording().chat.actions.edit}
+            </button>
+          </Show>
+          <button
+            type="button"
+            role="menuitem"
+            class={[menuItem, "text-berry"]}
+            onClick={() => (sure() ? run(() => api.channel.message.delete({ id: props.m.id })) : setSure(true))}
+          >
+            {sure() ? farmWording().chat.actions.sure : farmWording().chat.actions.remove}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
+  const { id, text: was } = untrack(() => props.m);
+  const done = () => untrack(() => props.onDone)();
+  const [text, setText] = createSignal(was);
+  const save = () => {
+    const words = text().trim();
+    if (!words || words === was) return done();
+    void api.channel.message
+      .update({ id, text: words })
+      .then(done)
+      .catch((e) => toast(reasonOf(e), "bad"));
+  };
+  return (
+    <div class="flex flex-col gap-1">
+      <textarea
+        ref={autofocus()}
+        value={text()}
+        aria-label={farmWording().chat.actions.edit}
+        onInput={(e) => setText(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.isComposing) return;
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            save();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            done();
+          }
+        }}
+        class="min-w-48 resize-none bg-cream-50 px-1.5 py-1 font-pixel text-[12px] text-bark-900 outline-none [field-sizing:content] shadow-[inset_0_0_0_2px_#c8a46e]"
+      />
+      <span class={small}>{farmWording().chat.actions.editHint}</span>
     </div>
   );
 }
 
 export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolean; face?: JSX.Element; tag?: string; folded?: boolean; after?: JSX.Element }) {
+  const [editing, setEditing] = createSignal(false);
   return (
-    <ChatRow mine={props.mine} first={props.first} face={props.face} name={<SenderName m={props.m} />} title={farmClock(props.m.at)}>
+    <ChatRow
+      mine={props.mine}
+      first={props.first}
+      face={props.face}
+      name={<SenderName m={props.m} />}
+      title={farmClock(props.m.at)}
+      actions={props.m.deleted === undefined ? <MessageMenu m={props.m} onEdit={() => setEditing(true)} /> : undefined}
+    >
       <Show when={props.tag}>
         <span class="mb-1 inline-block bg-wheat/40 px-1.5 text-[12px] text-bark-800">{props.tag}</span>
       </Show>
       <Show when={props.m.replyTo}>{(n) => <Answers channel={props.m.channel} number={n()} />}</Show>
       <Show when={props.m.deleted === undefined} fallback={<p class={["italic", small]}>{farmWording().chat.deleted}</p>}>
-        <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
-          <DispatchNote text={props.m.text} />
+        <Show
+          when={editing()}
+          fallback={
+            <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
+              <DispatchNote text={props.m.text} />
+            </Show>
+          }
+        >
+          <FarmEdit m={props.m} onDone={() => setEditing(false)} />
         </Show>
         <Show when={props.m.edited !== undefined}>
           <span class={small}>{farmWording().chat.edited}</span>

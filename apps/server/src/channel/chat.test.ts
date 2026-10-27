@@ -314,6 +314,7 @@ describe("the chat", () => {
 
         const said = (yield* f.chat.say("一句话", a, "")).message;
         const thread = yield* f.chat.threadUnder(said.id);
+        expect(f.channel(thread)?.title).toBe("一句话");
         yield* f.chat.updateChannel(thread, { name: "细说" });
         expect(f.channel(thread)?.title).toBe("细说");
         expect(yield* Effect.flip(f.chat.updateChannel(thread, { category: "x" }))).toMatchObject({ _tag: "Refused" });

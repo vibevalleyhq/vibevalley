@@ -7,7 +7,7 @@ import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { createComposer, threadOwnerOf } from "../../features/channel";
+import { createComposer, draftOf, drafts, threadOwnerOf } from "../../features/channel";
 
 import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
@@ -61,75 +61,100 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
         : farmWording().chat.toOrchestrator;
 
   const box = createComposer(core, () => input, {
-    target: () => ({ id: props.channel?.id ?? "", agent: props.thread || pick() === "auto" ? undefined : pick() }),
+    target: () => {
+      const reply = draftOf(props.channel?.id).reply;
+      return { id: props.channel?.id ?? "", agent: props.thread || pick() === "auto" ? undefined : pick(), ...(reply ? { replyTo: reply.number } : {}) };
+    },
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
     failed: (reason) => props.onProblem(farmWording().chat.notSent(reason)),
     edited: () => props.onProblem(undefined),
+    sent: () => {
+      const id = props.channel?.id;
+      if (id) drafts.reply(id, undefined);
+    },
   });
+  const replying = () => draftOf(props.channel?.id).reply;
 
   return (
-    <div class="relative flex items-end gap-1.5 border-t border-cream-200 p-1.5">
-      <Show when={box.offered().length > 0}>
-        <div
-          class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
-          role="listbox"
-          aria-label={farmWording().chat.who}
-        >
-          <For each={box.offered()} keyed={(n) => n.token}>
-            {(n, i) => (
-              <button
-                type="button"
-                role="option"
-                aria-selected={aria(i() === box.active())}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => box.choose(n())}
-                class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === box.active() }]}
-              >
-                <span class="text-bark-900">{n().name}</span>
-                <span class="truncate text-bark-500">{n().note}</span>
-              </button>
-            )}
-          </For>
-        </div>
+    <div class="relative flex flex-col border-t border-cream-200 p-1.5">
+      <Show when={replying()}>
+        {(m) => (
+          <div class="mb-1 flex items-center gap-1.5 bg-cream-100 px-2 py-1">
+            <span class="min-w-0 flex-1 truncate font-pixel text-[12px] text-bark-500">{farmWording().chat.replyTo(m().name, m().text)}</span>
+            <button
+              type="button"
+              aria-label={farmWording().chat.actions.cancelReply}
+              onClick={() => drafts.reply(m().channel, undefined)}
+              class="cursor-pointer p-0.5"
+            >
+              <SpriteIcon name="button-close" size={12} />
+            </button>
+          </div>
+        )}
       </Show>
-      <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
-        <Show when={!props.thread}>
-          <PickChip named />
+      <div class="relative flex items-end gap-1.5">
+        <Show when={box.offered().length > 0}>
+          <div
+            class="absolute right-2 bottom-full left-2 mb-1 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
+            role="listbox"
+            aria-label={farmWording().chat.who}
+          >
+            <For each={box.offered()} keyed={(n) => n.token}>
+              {(n, i) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={aria(i() === box.active())}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => box.choose(n())}
+                  class={["flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px]", { "bg-leaf-300/40": i() === box.active() }]}
+                >
+                  <span class="text-bark-900">{n().name}</span>
+                  <span class="truncate text-bark-500">{n().note}</span>
+                </button>
+              )}
+            </For>
+          </div>
         </Show>
-        <textarea
-          ref={(el) => (input = el)}
-          rows={1}
-          value={box.text()}
-          placeholder={placeholder()}
-          aria-label={placeholder()}
-          onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
-          onKeyUp={box.follow}
-          onClick={box.follow}
-          onKeyDown={box.onKey}
-          class="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 font-pixel text-[12px] leading-4 text-bark-900 outline-none placeholder:text-bark-400"
-        />
-        <Show when={box.stoppable()}>
+        <div class="flex min-h-11 min-w-0 flex-1 items-center bg-cream-50 px-1 shadow-[inset_0_0_0_2px_#c8a46e]">
+          <Show when={!props.thread}>
+            <PickChip named />
+          </Show>
+          <textarea
+            ref={(el) => (input = el)}
+            rows={1}
+            value={box.text()}
+            placeholder={placeholder()}
+            aria-label={placeholder()}
+            onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onKeyUp={box.follow}
+            onClick={box.follow}
+            onKeyDown={box.onKey}
+            class="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 font-pixel text-[12px] leading-4 text-bark-900 outline-none placeholder:text-bark-400"
+          />
+          <Show when={box.stoppable()}>
+            <button
+              type="button"
+              aria-label={farmWording().chat.stop}
+              title={farmWording().chat.stopHint}
+              onClick={() => void api.orchestrator.stop().catch(() => {})}
+              class="cursor-pointer p-1"
+            >
+              <SpriteIcon name="button-stop" size={24} />
+            </button>
+          </Show>
+          <DictationButton field={() => input} value={box.text()} onValue={box.edit} />
           <button
             type="button"
-            aria-label={farmWording().chat.stop}
-            title={farmWording().chat.stopHint}
-            onClick={() => void api.orchestrator.stop().catch(() => {})}
-            class="cursor-pointer p-1"
+            aria-label={farmWording().chat.send}
+            disabled={!box.canSend()}
+            onClick={() => void box.send()}
+            class="cursor-pointer p-1 disabled:opacity-40"
           >
-            <SpriteIcon name="button-stop" size={24} />
+            <SpriteIcon name="button-send" size={20} />
           </button>
-        </Show>
-        <DictationButton field={() => input} value={box.text()} onValue={box.edit} />
-        <button
-          type="button"
-          aria-label={farmWording().chat.send}
-          disabled={!box.canSend()}
-          onClick={() => void box.send()}
-          class="cursor-pointer p-1 disabled:opacity-40"
-        >
-          <SpriteIcon name="button-send" size={20} />
-        </button>
+        </div>
       </div>
     </div>
   );

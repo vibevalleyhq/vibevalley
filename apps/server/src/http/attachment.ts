@@ -6,6 +6,7 @@ import { attachmentPath } from "@vibevalley/protocol";
 import { Channels } from "../channel/chat.ts";
 
 const prefix = attachmentPath("");
+const inline = (type: string) => /^(image|video|audio)\//.test(type) || type === "application/pdf";
 const notFound = () => HttpServerResponse.text("404 page not found\n", { status: 404 });
 
 export const attachments = HttpRouter.add(
@@ -18,14 +19,16 @@ export const attachments = HttpRouter.add(
     if (!/^[0-9a-f]{64}$/.test(id)) return notFound();
     const found = yield* chat.attachment(id);
     if (!found) return notFound();
+    const pdf = found.type === "application/pdf";
     return yield* HttpServerResponse.file(found.path, {
       contentType: found.type,
       headers: {
         "cache-control": "private, max-age=31536000, immutable",
-        // Shown in the page as an image or a file, never run as one of the farm's own pages.
-        "content-disposition": `${found.type.startsWith("image/") ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(found.name)}`,
+        // Shown in the page (an image, a video, a sound) or a tab of its own (a PDF), else saved: never run as one of the
+        // farm's own pages. The browser's PDF viewer does not open under a sandbox; nosniff keeps a PDF a PDF.
+        "content-disposition": `${inline(found.type) ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(found.name)}`,
         "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
+        ...(pdf ? {} : { "content-security-policy": "sandbox" }),
       },
     });
   }).pipe(Effect.orElseSucceed(notFound)),

@@ -609,8 +609,8 @@ export const make = Effect.gen(function* () {
     if (row.type === "thread" && row.name) title = row.name;
     else if (row.type === "direct" && row.peer_id) title = model.participant(row.peer_id)?.name ?? "";
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
-    else if (row.type === "thread" && sk === undefined && row.root_id)
-      title = oneLine((yield* one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
+    // Any other thread (one opened under a message, with no session of its own) by the message it hangs under.
+    if (!title && row.type === "thread" && row.root_id) title = oneLine((yield* one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
     const last = row.last_number ? yield* one(qm.messageByNumber({ channel_id: row.id, number: row.last_number })) : undefined;
     return toChannel(row, n ?? 0, title, last);
   });

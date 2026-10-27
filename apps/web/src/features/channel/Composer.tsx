@@ -1,8 +1,11 @@
 import { mentionOf } from "./rules";
 import { orchestratorAgent, ownerId } from "@vibevalley/protocol";
-import { draftOf, drafts, upload } from "./draft";
+import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
+import { emojiGroups } from "./emoji";
+import { followed } from "./follow";
 import { chatWording } from "./words";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { Channel } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { createComposer } from "./composing";
@@ -19,9 +22,13 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const core = useCore();
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
-  const [uploading, setUploading] = createSignal(0);
+  const [emoji, setEmoji] = createSignal(false);
   const draft = () => draftOf(props.channel?.id);
+  const uploading = () => uploadsIn(props.channel?.id);
+  // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
+  const at = untrack(() => props.channel?.id);
   const box = createComposer(core, () => input, {
+    initial: at ? untrack(() => draftOf(at).text) : undefined,
     target: () => {
       const d = draft();
       return {
@@ -34,25 +41,48 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       setProblem(reason);
       toast(chatWording().composer.notSent(reason), "bad");
     },
-    edited: () => setProblem(undefined),
+    edited: (value) => {
+      setProblem(undefined);
+      if (at) drafts.text(at, value);
+    },
     sent: () => {
       const id = props.channel?.id;
       if (id) drafts.clear(id);
     },
   });
-  const attach = async (files: readonly File[]) => {
+  const attach = (files: readonly File[]) => {
     const id = props.channel?.id;
-    if (!id || files.length === 0) return;
-    setUploading((n) => n + files.length);
-    for (const file of files) {
-      try {
-        drafts.add(id, await upload(file));
-      } catch (e) {
-        toast(chatWording().composer.uploadFailed(reasonOf(e)), "bad");
-      } finally {
-        setUploading((n) => n - 1);
+    if (id && files.length > 0) void attachFiles(id, files, uploadFailed);
+  };
+  const insert = (emojiText: string) => {
+    const el = input;
+    const from = el?.selectionStart ?? box.text().length;
+    const to = el?.selectionEnd ?? from;
+    const next = box.text().slice(0, from) + emojiText + box.text().slice(to);
+    box.edit(next, from + emojiText.length);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(from + emojiText.length, from + emojiText.length);
+    });
+  };
+  // ↑ in an empty box changes the owner's last message here; Esc lets go of the message being answered.
+  const onKey = (e: KeyboardEvent) => {
+    const id = props.channel?.id;
+    if (!e.isComposing && id && box.offered().length === 0) {
+      if (e.key === "ArrowUp" && box.text() === "") {
+        const mine = [...followed.get(id).messages].reverse().find((m) => m.from === ownerId && m.kind === "chat" && m.deleted === undefined);
+        if (mine) {
+          e.preventDefault();
+          return setEditingId(mine.id);
+        }
+      }
+      if (e.key === "Escape" && draft().reply) {
+        e.preventDefault();
+        e.stopPropagation();
+        return drafts.reply(id, undefined);
       }
     }
+    box.onKey(e);
   };
   let picker: HTMLInputElement | undefined;
   const stop = () => api.orchestrator.stop().catch((e) => toast(reasonOf(e), "bad"));
@@ -107,7 +137,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </div>
         )}
       </Show>
-      <Show when={draft().files.length > 0 || uploading() > 0}>
+      <Show when={draft().files.length > 0 || uploading().length > 0}>
         <div class="mb-1.5 flex flex-wrap gap-1.5">
           <For each={draft().files} keyed={(f) => f.id}>
             {(f) => (
@@ -125,9 +155,21 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               </span>
             )}
           </For>
-          <Show when={uploading() > 0}>
-            <span class="px-1 py-1 text-xs text-muted">{chatWording().composer.uploading}</span>
-          </Show>
+          <For each={uploading()} keyed={(u) => u.key}>
+            {(u) => (
+              <span
+                role="progressbar"
+                aria-label={u().name}
+                aria-valuenow={u().percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                class="relative flex items-center overflow-hidden rounded-md border border-line bg-page px-2 py-1 text-xs text-muted"
+              >
+                <span class="absolute inset-y-0 left-0 bg-leaf/20" style={{ width: `${u().percent}%` }} />
+                <span class="relative max-w-48 truncate">{chatWording().media.uploadingFile(u().name, u().percent)}</span>
+              </span>
+            )}
+          </For>
         </div>
       </Show>
       <div class="rounded-lg border border-line bg-page focus-within:border-focus">
@@ -140,14 +182,14 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           onInput={(e) => box.edit(e.currentTarget.value, e.currentTarget.selectionStart)}
           onKeyUp={box.follow}
           onClick={box.follow}
-          onKeyDown={box.onKey}
+          onKeyDown={onKey}
           onBlur={box.blur}
           onFocus={box.focus}
           onPaste={(e) => {
             const files = [...(e.clipboardData?.files ?? [])];
             if (files.length === 0) return;
             e.preventDefault();
-            void attach(files);
+            attach(files);
           }}
           class="block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none [field-sizing:content] placeholder:text-faint"
         />
@@ -166,7 +208,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             onChange={(e) => {
               const files = [...(e.currentTarget.files ?? [])];
               e.currentTarget.value = "";
-              void attach(files);
+              attach(files);
             }}
           />
           <button
@@ -179,6 +221,27 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           >
             <Icon name="button-folder" size={16} />
           </button>
+          <div class="relative">
+            <button
+              type="button"
+              onClick={() => setEmoji(!emoji())}
+              disabled={!props.channel}
+              aria-label={chatWording().emoji.open}
+              aria-expanded={aria(emoji())}
+              title={chatWording().emoji.open}
+              class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
+            >
+              <span class="text-base leading-none grayscale-[0.4]">🙂</span>
+            </button>
+            <Show when={emoji()}>
+              <EmojiPicker
+                onPick={(e) => {
+                  setEmoji(false);
+                  insert(e);
+                }}
+              />
+            </Show>
+          </div>
           <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="rounded-md hover:bg-hover" />
           <Show when={box.stoppable()}>
             <button
@@ -209,3 +272,72 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     </div>
   );
 }
+
+function EmojiPicker(props: { onPick: (emoji: string) => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-label={chatWording().emoji.open}
+      class="absolute right-0 bottom-full z-30 mb-1 flex max-h-72 w-80 flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
+    >
+      <For each={emojiGroups}>
+        {(g) => (
+          <section aria-label={chatWording().emoji.groups[g.id] ?? g.id}>
+            <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().emoji.groups[g.id]}</p>
+            <div class="grid grid-cols-8 gap-0.5">
+              <For each={g.emoji}>
+                {(e) => (
+                  <button
+                    type="button"
+                    aria-label={e}
+                    // Keeps the focus, and with it the caret, in the box.
+                    onMouseDown={(ev) => ev.preventDefault()}
+                    onClick={() => props.onPick(e)}
+                    class="inline-flex size-8 cursor-pointer items-center justify-center rounded text-lg hover:bg-hover"
+                  >
+                    {e}
+                  </button>
+                )}
+              </For>
+            </div>
+          </section>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** A channel's pane taking files dropped on it into the channel's draft; a sidebar row dragged over it is not a file. */
+export function FileDrop(props: { channel: Channel | undefined; children: JSX.Element }) {
+  const [over, setOver] = createSignal(false);
+  const files = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
+  return (
+    <div
+      class="relative flex min-w-0 flex-1 flex-col"
+      onDragOver={(e) => {
+        if (!files(e) || !props.channel) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={(e) => {
+        setOver(false);
+        const id = props.channel?.id;
+        if (!files(e) || !id) return;
+        e.preventDefault();
+        void attachFiles(id, [...(e.dataTransfer?.files ?? [])], uploadFailed);
+      }}
+    >
+      {props.children}
+      <Show when={over()}>
+        <div class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent">
+          {chatWording().media.drop}
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+const uploadFailed = (reason: string) => toast(chatWording().composer.uploadFailed(reason), "bad");

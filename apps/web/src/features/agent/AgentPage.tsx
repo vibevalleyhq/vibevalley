@@ -160,6 +160,17 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
           {(saved) => (
             <>
               <DeleteButton agent={saved()} />
+              <Button
+                icon="button-thread"
+                onClick={() =>
+                  void api.channel.direct
+                    .create({ agent: saved().id })
+                    .then((id) => router.navigate(`/chat/${id}`))
+                    .catch((e) => toast(reasonOf(e), "bad"))
+                }
+              >
+                {agentsWording().talk}
+              </Button>
               <Show when={dirty()}>
                 <Button onClick={() => setDraft(saved())}>{agentsWording().discard}</Button>
               </Show>

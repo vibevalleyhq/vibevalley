@@ -125,24 +125,33 @@ export const followed = {
     const shown = entries.get(channel)?.followed.messages.find((m) => m.number === number);
     if (shown) return shown;
     const key = `${channel}:${number}`;
-    if (!singles.has(key)) {
-      singles.set(key, undefined);
+    // Everyone who asks while it is read is told once it is in, not only the first.
+    const waiting = waiters.get(key);
+    if (waiting) waiting.add(listener);
+    else if (!singles.has(key)) {
+      waiters.set(key, new Set([listener]));
       void api.channel.message
         .list({ id: channel, before: number + 1, limit: 1 })
-        .then((page) => {
-          singles.set(
-            key,
-            page.find((m) => m.number === number),
-          );
-          listener();
-        })
-        .catch(() => singles.delete(key));
+        .then(
+          (page) =>
+            singles.set(
+              key,
+              page.find((m) => m.number === number),
+            ),
+          () => {},
+        )
+        .finally(() => {
+          const told = waiters.get(key) ?? new Set();
+          waiters.delete(key);
+          for (const l of told) l();
+        });
     }
     return singles.get(key);
   },
 };
 
 const singles = new Map<string, ChatMessage | undefined>();
+const waiters = new Map<string, Set<() => void>>();
 
 /** A channel's messages while it is shown; empty with none. */
 export function useFollowed(id: Accessor<string | undefined>): Accessor<Followed> {
