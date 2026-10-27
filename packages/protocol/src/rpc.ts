@@ -11,4 +11,7 @@ export const roomsPath = "/api/v1/rooms";
 export class Rooms extends RpcGroup.make(
   /** What is said in a conversation after the message numbered after, then what is said there from now on. */
   Rpc.make("rooms.follow", { payload: { room: Schema.String, after: Schema.Number }, success: S.RoomEvent, error: ApiError, stream: true }),
+  /** The turn reports anywhere on the farm after the one with this id (by message id, which sorts by time), or the newest
+   * when absent, then each report from now on. */
+  Rpc.make("rooms.reports", { payload: { after: Schema.optionalKey(Schema.String) }, success: S.RoomEvent, error: ApiError, stream: true }),
 ) {}

@@ -511,6 +511,9 @@ importers:
       agora-rtc-sdk-ng:
         specifier: 'catalog:'
         version: 4.24.9(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.5
       hast-util-to-dom:
         specifier: 'catalog:'
         version: 4.0.1

@@ -225,6 +225,8 @@ export const Conversation: Codec<T.Conversation> = Schema.Struct({
   replies: Schema.Number,
   read: Schema.optionalKey(Schema.Number),
   unread: Schema.optionalKey(Schema.Number),
+  title: Schema.optionalKey(Schema.String),
+  last: Schema.optionalKey(Schema.Struct({ from: Schema.String, name: Schema.String, text: Schema.String, at: Schema.Number })),
   at: Schema.Number,
 });
 

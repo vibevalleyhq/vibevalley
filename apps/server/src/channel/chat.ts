@@ -73,6 +73,13 @@ const reportMax = 1500;
 const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
 export const catchUpMax = 200;
+/** The reports a new reader of the farm's log starts from. */
+export const logKeep = 80;
+/** A thread named by the message it hangs under shows this much of it. */
+const threadTitleMax = 24;
+/** How much of a conversation's newest message a list shows. */
+const lastMax = 80;
+const oneLine = (text: string, n: number) => head(text.replace(/\s+/g, " ").trim(), n);
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
@@ -274,6 +281,8 @@ export interface ChannelShape {
   /** What is said in a conversation after the message numbered after, then what is said there from now on; Reset when
    * more than catchUpMax were missed. A follower too slow for what is said ends, and comes back with its number. */
   readonly follow: (conversation: string, after: number) => Stream.Stream<RoomEvent, ApiError>;
+  /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
+  readonly reports: (after?: string) => Stream.Stream<RoomEvent>;
   /** Subscribed before it returns. */
   readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
   /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
@@ -445,7 +454,7 @@ export const make = Effect.gen(function* () {
   };
   const targetOfConv = (row: ConvRow) => targetOfRow(row.kind, row.parent_number, row.name, row.channel_id, null);
 
-  const toConversation = (row: ConvRow, unread = 0): Conversation => {
+  const toConversation = (row: ConvRow, unread = 0, title = "", last?: MsgRow): Conversation => {
     const read = model.ownerReadIn(row.id);
     const sk = subjectKind(row.subject_kind);
     return {
@@ -463,13 +472,23 @@ export const make = Effect.gen(function* () {
       replies: row.reply_count,
       ...(read !== undefined ? { read } : {}),
       ...(unread > 0 ? { unread } : {}),
+      ...(title ? { title } : {}),
+      ...(last ? { last: { from: last.sender_id, name: last.sender_name, text: oneLine(last.body, lastMax), at: last.created_at } } : {}),
       at: row.created_at,
     };
   };
 
+  /** What a page lists a conversation with: the owner's unread there, and a thread's title when its subject does not
+   * name it (a page keeps no messages to name it by). */
   const counted = Effect.fnUntraced(function* (row: ConvRow) {
     const { n } = yield* db(qm.ownerUnread({ conversation_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }));
-    return toConversation(row, n ?? 0);
+    const sk = subjectKind(row.subject_kind);
+    let title = "";
+    if (row.kind === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
+    else if (row.kind === "thread" && sk === undefined && row.parent_id)
+      title = oneLine((yield* one(qm.messageByID({ id: row.parent_id })))?.body ?? "", threadTitleMax);
+    const last = row.last_number ? yield* one(qm.messageByNumber({ conversation_id: row.id, number: row.last_number })) : undefined;
+    return toConversation(row, n ?? 0, title, last);
   });
 
   const publishConversation = Effect.fnUntraced(function* (id: string) {
@@ -1040,6 +1059,18 @@ export const make = Effect.gen(function* () {
           if (missed.length > catchUpMax) return Stream.succeed<RoomEvent>({ _tag: "Reset" });
           const upto = missed.at(-1)?.number ?? after;
           const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.conversation === conversation && m.number > upto)), "chat.follow");
+          return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): RoomEvent => ({ _tag: "Message", message })));
+        }),
+      ),
+    reports: (after) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const live = yield* PubSub.subscribe(said);
+          const missed =
+            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].reverse() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
+          if (missed.length > catchUpMax) return Stream.succeed<RoomEvent>({ _tag: "Reset" });
+          const upto = missed.at(-1)?.id ?? after ?? "";
+          const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.kind === "report" && m.id > upto)), "chat.reports");
           return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): RoomEvent => ({ _tag: "Message", message })));
         }),
       ),

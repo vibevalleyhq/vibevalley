@@ -18,7 +18,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 ## 在哪
 
 - **组合**：`apps/web/src/main.tsx`：没配对的远端浏览器先去 `/pair`，再画 `app/App.tsx`：`Root`（路由、状态流、农场的 store、查询的缓存、一个 `<Loading>`）里是 `Follow`（通知、菜单栏、快捷键）、路由和 `ToastHost`。
-- **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`sessionLogs.ts`（每个 Session 的快照、增量与重连补读）、`sessions.ts`（页面的日志订阅）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
+- **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`gateway.ts`（房间的那条 WebSocket：Effect RPC 的 `Rooms`，页面里只有这里用 Effect）、`rooms.ts`（按房间存说的话：最新一页、订阅、往前翻页、串的头一条、全农场的汇报；`useRoom`、`useMessage`、`useReports`）、`sessionLogs.ts`（每个 Session 的快照、增量与重连补读）、`sessions.ts`（页面的日志订阅）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
 - **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`、`locale`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。

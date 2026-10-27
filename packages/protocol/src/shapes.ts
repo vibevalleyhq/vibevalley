@@ -258,6 +258,18 @@ export interface Conversation {
   read?: number;
   /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
   unread?: number;
+  /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
+  title?: string;
+  /** The newest message, as a list shows it under the conversation. */
+  last?: ConversationLast;
+  at: number;
+}
+
+export interface ConversationLast {
+  from: string;
+  name: string;
+  /** Its head, on one line. */
+  text: string;
   at: number;
 }
 

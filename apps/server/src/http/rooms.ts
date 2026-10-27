@@ -22,7 +22,10 @@ export const fromTheFarm = (headers: Headers.Headers): boolean => {
 const handlers = Rooms.toLayer(
   Effect.gen(function* () {
     const chat = yield* Channels;
-    return Rooms.of({ "rooms.follow": ({ room, after }) => chat.follow(room, after) });
+    return Rooms.of({
+      "rooms.follow": ({ room, after }) => chat.follow(room, after),
+      "rooms.reports": ({ after }) => chat.reports(after),
+    });
   }),
 );
 

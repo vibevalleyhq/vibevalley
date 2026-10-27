@@ -41,6 +41,15 @@ where m.conversation_id = sqlc.arg(conversation_id) and m.number < sqlc.arg(numb
 select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.conversation_id = sqlc.arg(conversation_id) and m.number > sqlc.arg(number) order by m.number limit sqlc.arg(n)::int;
 
+-- name: RecentReports :many
+-- Newest first: the turn reports anywhere on the farm, for its log.
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+where m.kind = 'report' order by m.id desc limit sqlc.arg(n)::int;
+
+-- name: ReportsAfter :many
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+where m.kind = 'report' and m.id > sqlc.arg(after) order by m.id limit sqlc.arg(n)::int;
+
 -- name: RecentDuplicate :one
 select id from channel_message
 where sender_id = sqlc.arg(sender_id) and conversation_id = sqlc.arg(conversation_id) and body = sqlc.arg(body) and created_at > sqlc.arg(since)

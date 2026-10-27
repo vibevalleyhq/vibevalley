@@ -14,6 +14,7 @@
     "@vibevalley/host": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "agora-rtc-sdk-ng": "catalog:",
+    "effect": "catalog:",
     "hast-util-to-dom": "catalog:",
     "pixi.js": "catalog:",
     "remark-gfm": "catalog:",

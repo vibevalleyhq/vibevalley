@@ -13,6 +13,8 @@ import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession }
 import type { Village } from "../world/load";
 import { plotH } from "../world/world";
 import { useFrames } from "../../data/frame";
+import { useRoom } from "../../data/rooms";
+import { generalOf } from "../../rules/chat";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../kit";
 import { useFarm } from "../state";
 import { useVillage } from "../support";
@@ -87,6 +89,7 @@ function PinView(props: { pin: Pin }) {
 
 export function Overlay() {
   const frames = useFrames();
+  const general = useRoom(() => generalOf(frames.frame?.state.chat)?.id);
   const loaded = useVillage();
   const screen = useFarm((s) => s.screen);
   const tool = useFarm((s) => s.tool);
@@ -209,7 +212,7 @@ export function Overlay() {
             y={p().orchestrator.y}
             hidden={chatOpen() || reveal()}
             sessions={frames.frame?.state.sessions.length ?? 0}
-            said={lastOrchestratorSaid(frames.frame?.state.chat)}
+            said={lastOrchestratorSaid(general().messages)}
           />
           <Heads sessions={frames.frame?.state.sessions ?? []} village={p().village} />
           <For each={p().front} keyed={(pin) => pin.key}>

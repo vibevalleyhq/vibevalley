@@ -552,6 +552,21 @@ describe("the chat", () => {
     ),
   );
 
+  it.live("the farm's log hears every report: the newest ones first, then each as it is written", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w21", "写 hello", "chat-k");
+        const first = yield* Stream.runCollect(Stream.take(f.chat.reports(), 1));
+        const was = first[0]!._tag === "Message" ? first[0]!.message : undefined;
+        expect([was?.kind, was?.from]).toEqual(["report", "w21"]);
+        const next = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.reports(was!.id), 1)));
+        yield* hireAndRun(f, x, "w22", "写 world", "chat-k");
+        const got = yield* Fiber.join(next);
+        expect(got.map((e) => e._tag === "Message" && e.message.from)).toEqual(["w22"]);
+      }),
+    ),
+  );
+
   it.live("a follower too far behind is told to reload the room", () =>
     run((f) =>
       Effect.gen(function* () {
