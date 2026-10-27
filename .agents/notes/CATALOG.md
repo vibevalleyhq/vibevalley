@@ -2,11 +2,10 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（25 篇）
+## proposed（24 篇）
 
 ### feature
 
-- 2026-10-27 [聊天照 Discord 补全：回复、改删、回应、附件、置顶、搜索、成员](.agents/notes/proposed/feature/2026-10-27-discord-chat.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [电话就是管家的嘴：默认由管家自己接电话，验证这条线真的接上了](.agents/notes/proposed/feature/2026-10-21-voice-is-the-orchestrators-mouth.md)
 - 2026-10-21 [管家以工单为单位，照主人的意图记下、指派、开工、叫停和换人](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)
