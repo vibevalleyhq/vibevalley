@@ -527,7 +527,7 @@ export const make = (options: IssueOptions = {}) =>
       if (issue.queuedAt !== undefined) [where, trigger] = yield* queuedDispatch(id);
       const full = sessions.noRoom(agent.runtime, project);
       if (full) {
-        yield* queueRow(issue.id, true, (yield* chat.channelOf(where)).id, trigger);
+        yield* queueRow(issue.id, true, (yield* chat.topOf(where)).id, trigger);
         return { queued: issueWording().queued(full) };
       }
       return { session: yield* send(issue, agent, project, where, trigger) };
@@ -590,7 +590,7 @@ export const make = (options: IssueOptions = {}) =>
     /** A recurrence has one issue, for the session it names or for the orchestrator; each time it comes due is a run of that issue. */
     const scheduled = Effect.fn("Issues.scheduled")(function* (due: Due) {
       const s = due.recurrence;
-      const channel = yield* chat.channelOf(s.channel);
+      const channel = yield* chat.topOf(s.channel);
       const by: RunTrigger = { kind: "recurrence", recurrence: s.id, ...(due.missed ? { missed: true } : {}) };
       const found = yield* ofRecurrence(s.id);
       let issue = found;

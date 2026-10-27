@@ -7,7 +7,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { channelLabel, channelsOf } from "../channel";
+import { channelLabel, topsOf } from "../channel";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../base/util";
@@ -208,7 +208,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const [error, setError] = createSignal<string>();
   const options = () => {
-    const all = channelsOf(core()?.chat).map((c) => ({ value: c.name ?? generalName, label: channelLabel(c) }));
+    const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? generalName, label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
     if (!all.some((o) => o.value === props.current)) all.push({ value: props.current, label: props.current });
     return all;

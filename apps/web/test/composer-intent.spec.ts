@@ -63,7 +63,7 @@ test("the same words sent to another channel after a lost reply have a new ident
   await chooseChannel(page, "intent-second");
   await box.press("Enter");
   await expect(box).toHaveValue("");
-  expect(sent.map((s) => s.conversation)).toEqual([first, second]);
+  expect(sent.map((s) => s.channel)).toEqual([first, second]);
   expect(sent[1]!.sendKey).not.toBe(sent[0]!.sendKey);
   for (const id of [first, second]) expect((await api.channel.history({ id })).filter((m) => m.text === "两个频道都要收到")).toHaveLength(1);
   await page.screenshot({ path: test.info().outputPath("new-channel-intent.png") });

@@ -5,7 +5,7 @@
 
 import { farmWording } from "../words";
 import { For, Show } from "solid-js";
-import type { Conversation } from "@vibevalley/protocol";
+import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { createComposer, threadOwnerOf } from "../../features/channel";
 
@@ -46,16 +46,16 @@ function PickChip(props: { named: boolean }) {
 
 export type ChatPhase = "off" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 
-export function FarmComposer(props: { conversation: Conversation | undefined; thread: boolean; onProblem: (p: string | undefined) => void }) {
+export function FarmComposer(props: { channel: Channel | undefined; thread: boolean; onProblem: (p: string | undefined) => void }) {
   const core = useCore();
   const pick = usePrefs((p) => p.pick);
   let input: HTMLTextAreaElement | undefined;
-  const owner = () => (props.thread && props.conversation ? threadOwnerOf(props.conversation, core()?.sessions ?? []) : undefined);
+  const owner = () => (props.thread && props.channel ? threadOwnerOf(props.channel, core()?.sessions ?? []) : undefined);
   const placeholder = () =>
     props.thread ? (owner() ? farmWording().chat.inThread(owner()!.name) : farmWording().chat.inThreadAnyone) : farmWording().chat.toOrchestrator;
 
   const box = createComposer(core, () => input, {
-    target: () => ({ conversation: props.conversation?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
+    target: () => ({ channel: props.channel?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
     failed: (reason) => props.onProblem(farmWording().chat.notSent(reason)),

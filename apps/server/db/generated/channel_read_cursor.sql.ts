@@ -6,26 +6,26 @@ import { SqlClient, SqlSchema } from "effect/sql"
 
 export const SetReadCursorParams = Schema.Struct({
   ["participant_id"]: Schema.String,
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
   ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
   ["updated_at"]: Schema.Number,
 })
 export type SetReadCursorParams = typeof SetReadCursorParams.Type
 
 
-export const SetReadCursorSql = "-- How far each participant has read in each conversation, by message number; it only moves on (channel/store.ts).\n\n-- name: SetReadCursor :exec\ninsert into channel_read_cursor (participant_id, conversation_id, read_number, updated_at)\nvalues ($1, $2, $3, $4)\non conflict (participant_id, conversation_id) do update set read_number = greatest(channel_read_cursor.read_number, excluded.read_number), updated_at = excluded.updated_at;"
+export const SetReadCursorSql = "-- How far each participant has read in each channel, by message number; it only moves on (channel/store.ts).\n\n-- name: SetReadCursor :exec\ninsert into channel_read_cursor (participant_id, channel_id, read_number, updated_at)\nvalues ($1, $2, $3, $4)\non conflict (participant_id, channel_id) do update set read_number = greatest(channel_read_cursor.read_number, excluded.read_number), updated_at = excluded.updated_at;"
 
 export const setReadCursor = Effect.fn("SetReadCursor")(function* (params: SetReadCursorParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: SetReadCursorParams,
-    execute: (p) => sql.unsafe(SetReadCursorSql, [p["participant_id"], p["conversation_id"], p["read_number"], p["updated_at"]]),
+    execute: (p) => sql.unsafe(SetReadCursorSql, [p["participant_id"], p["channel_id"], p["read_number"], p["updated_at"]]),
   })(params)
 })
 
 export const ReadCursorParams = Schema.Struct({
   ["participant_id"]: Schema.String,
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
 })
 export type ReadCursorParams = typeof ReadCursorParams.Type
 
@@ -36,14 +36,14 @@ export const ReadCursorResult = Schema.Struct({
 export type ReadCursorResult = typeof ReadCursorResult.Type
 
 
-export const ReadCursorSql = "-- name: ReadCursor :one\nselect read_number from channel_read_cursor where participant_id = $1 and conversation_id = $2;"
+export const ReadCursorSql = "-- name: ReadCursor :one\nselect read_number from channel_read_cursor where participant_id = $1 and channel_id = $2;"
 
 export const readCursor = Effect.fn("ReadCursor")(function* (params: ReadCursorParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
     Request: ReadCursorParams,
     Result: ReadCursorResult,
-    execute: (p) => sql.unsafe(ReadCursorSql, [p["participant_id"], p["conversation_id"]]),
+    execute: (p) => sql.unsafe(ReadCursorSql, [p["participant_id"], p["channel_id"]]),
   })(params)
 })
 
@@ -54,13 +54,13 @@ export type ReadCursorsOfParams = typeof ReadCursorsOfParams.Type
 
 
 export const ReadCursorsOfResult = Schema.Struct({
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
   ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type ReadCursorsOfResult = typeof ReadCursorsOfResult.Type
 
 
-export const ReadCursorsOfSql = "-- name: ReadCursorsOf :many\nselect conversation_id, read_number from channel_read_cursor where participant_id = $1;"
+export const ReadCursorsOfSql = "-- name: ReadCursorsOf :many\nselect channel_id, read_number from channel_read_cursor where participant_id = $1;"
 
 export const readCursorsOf = Effect.fn("ReadCursorsOf")(function* (params: ReadCursorsOfParams) {
   const sql = yield* SqlClient.SqlClient

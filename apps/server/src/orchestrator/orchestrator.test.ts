@@ -516,7 +516,7 @@ describe("the orchestrator", () => {
       offset = 3.5 * 3_600_000;
       yield* notices.patrol;
       yield* marked(f);
-      // Each request carries the whole conversation: count this work's patrol lines in the latest.
+      // Each request carries the whole channel: count this work's patrol lines in the latest.
       const latest = f.requests.at(-1)!;
       expect(latest.messages.filter((m) => patrolLine.test(words(userText(m) ?? ""))).length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

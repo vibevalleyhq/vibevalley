@@ -6,7 +6,7 @@ import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
+import type { Agent, ChatMessage, Channel, Outcome } from "@vibevalley/protocol";
 import { farmClock, readsLong } from "./text";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
@@ -141,7 +141,7 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
   );
 }
 
-export function ThreadChip(props: { thread: Conversation; unread: number; onOpen: () => void }) {
+export function ThreadChip(props: { thread: Channel; unread: number; onOpen: () => void }) {
   return (
     <button
       type="button"

@@ -1,41 +1,41 @@
-// What the chat keeps in memory of what it wrote: every conversation, every participant, how far the owner has read in
-// each conversation. The database stays the record: chat.ts writes there first and tells the model the same change right
+// What the chat keeps in memory of what it wrote: every channel, every participant, how far the owner has read in
+// each channel. The database stays the record: chat.ts writes there first and tells the model the same change right
 // after, each update here doing what its query does (the comments name it); a transaction that fails reloads the model,
 // since the changes told inside it are gone from the database. Only the chat writes these tables, one change at a time.
 
-import type * as qc from "../../db/generated/channel_conversation.sql.ts";
+import type * as qc from "../../db/generated/channel.sql.ts";
 import type * as qp from "../../db/generated/channel_participant.sql.ts";
 
-export type ConvRow = qc.AllConversationsResult;
+export type ChannelRow = qc.AllChannelsResult;
 export type ParticipantRow = qp.ParticipantsResult;
 
 const subjectKey = (kind: string, id: string) => kind + ":" + id;
 
 export class ChatModel {
-  private conversations = new Map<string, ConvRow>();
-  private threadByParent = new Map<string, string>();
+  private byId = new Map<string, ChannelRow>();
+  private threadByRoot = new Map<string, string>();
   private threadBySubject = new Map<string, string>();
   private people = new Map<string, ParticipantRow>();
   private ownerRead = new Map<string, number>();
 
-  load(conversations: readonly ConvRow[], participants: readonly ParticipantRow[], ownerRead: readonly { conversation_id: string; read_number: number }[]) {
-    this.conversations.clear();
-    this.threadByParent.clear();
+  load(channels: readonly ChannelRow[], participants: readonly ParticipantRow[], ownerRead: readonly { channel_id: string; read_number: number }[]) {
+    this.byId.clear();
+    this.threadByRoot.clear();
     this.threadBySubject.clear();
     this.people.clear();
     this.ownerRead.clear();
-    for (const c of conversations) this.created(c);
+    for (const c of channels) this.created(c);
     for (const p of participants) this.people.set(p.id, { ...p });
-    for (const r of ownerRead) this.ownerRead.set(r.conversation_id, r.read_number);
+    for (const r of ownerRead) this.ownerRead.set(r.channel_id, r.read_number);
   }
 
-  conversation(id: string): ConvRow | undefined {
-    return this.conversations.get(id);
+  channel(id: string): ChannelRow | undefined {
+    return this.byId.get(id);
   }
 
   /** The thread under a message: there is one at most. */
-  threadOfParent(parent: string): string | undefined {
-    return this.threadByParent.get(parent);
+  threadOfRoot(root: string): string | undefined {
+    return this.threadByRoot.get(root);
   }
 
   /** A subject's newest thread, as ids sort by when they were made. */
@@ -44,21 +44,21 @@ export class ChatModel {
   }
 
   /** A channel, 田头 among them, by its name. */
-  channelByName(name: string): ConvRow | undefined {
-    for (const c of this.conversations.values()) if (c.name === name && c.kind !== "thread") return c;
+  channelByName(name: string): ChannelRow | undefined {
+    for (const c of this.byId.values()) if (c.name === name && c.type !== "thread") return c;
     return undefined;
   }
 
   /** 田头 first, then the channels as they were made. */
-  channels(): ConvRow[] {
-    const all = [...this.conversations.values()].filter((c) => c.kind !== "thread");
-    return all.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  channels(): ChannelRow[] {
+    const all = [...this.byId.values()].filter((c) => c.type !== "thread");
+    return all.sort((a, b) => (a.type === "general" ? -1 : b.type === "general" ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
   /** CreateGeneral, CreateChannel, CreateThread. */
-  created(row: ConvRow) {
-    this.conversations.set(row.id, { ...row });
-    if (row.parent_id !== null) this.threadByParent.set(row.parent_id, row.id);
+  created(row: ChannelRow) {
+    this.byId.set(row.id, { ...row });
+    if (row.root_id !== null) this.threadByRoot.set(row.root_id, row.id);
     if (row.subject_kind !== null && row.subject_id !== null) {
       const key = subjectKey(row.subject_kind, row.subject_id);
       const held = this.threadBySubject.get(key);
@@ -68,18 +68,18 @@ export class ChatModel {
 
   /** UpdateChannel. */
   channelUpdated(id: string, description: string | null, project: string | null) {
-    const c = this.conversations.get(id);
-    if (c && c.kind !== "thread") this.conversations.set(id, { ...c, description, project });
+    const c = this.byId.get(id);
+    if (c && c.type !== "thread") this.byId.set(id, { ...c, description, project });
   }
 
-  /** TouchConversation. */
+  /** TouchChannel. */
   touched(id: string, number: number) {
-    const c = this.conversations.get(id);
+    const c = this.byId.get(id);
     if (c)
-      this.conversations.set(id, {
+      this.byId.set(id, {
         ...c,
         last_number: Math.max(c.last_number ?? 0, number),
-        reply_count: c.reply_count + (c.kind === "thread" ? 1 : 0),
+        reply_count: c.reply_count + (c.type === "thread" ? 1 : 0),
       });
   }
 
@@ -104,12 +104,12 @@ export class ChatModel {
   }
 
   /** ReadCursor for the owner. */
-  ownerReadIn(conversation: string): number | undefined {
-    return this.ownerRead.get(conversation);
+  ownerReadIn(channel: string): number | undefined {
+    return this.ownerRead.get(channel);
   }
 
   /** SetReadCursor for the owner: it only moves on. */
-  ownerReadTo(conversation: string, number: number) {
-    this.ownerRead.set(conversation, Math.max(this.ownerRead.get(conversation) ?? number, number));
+  ownerReadTo(channel: string, number: number) {
+    this.ownerRead.set(channel, Math.max(this.ownerRead.get(channel) ?? number, number));
   }
 }

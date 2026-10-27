@@ -13,7 +13,7 @@ import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession }
 import type { Village } from "../world/load";
 import { plotH } from "../world/world";
 import { useFrames } from "../../base/frame";
-import { useRoom, generalOf } from "../../features/channel";
+import { useFollowed, generalOf } from "../../features/channel";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { useVillage } from "../support";
@@ -88,7 +88,7 @@ function PinView(props: { pin: Pin }) {
 
 export function Overlay() {
   const frames = useFrames();
-  const general = useRoom(() => generalOf(frames.frame?.state.chat)?.id);
+  const general = useFollowed(() => generalOf(frames.frame?.state.chat)?.id);
   const loaded = useVillage();
   const screen = useFarm((s) => s.screen);
   const tool = useFarm((s) => s.tool);

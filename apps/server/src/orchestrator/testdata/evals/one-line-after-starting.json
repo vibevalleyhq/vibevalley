@@ -40,7 +40,7 @@
     "content": "[来源：主人]\n主人说：派个人去 clock-in 的登录页加「记住我」，勾上后 token 存 30 天，不勾就关浏览器失效，登录相关的测试要过",
     "display": true,
     "details": {
-      "conversation": "general"
+      "channel": "general"
     },
     "timestamp": 1792270860000
   },

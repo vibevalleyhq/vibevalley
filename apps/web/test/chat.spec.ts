@@ -70,7 +70,7 @@ test("a channel made in the dialog is shown at its own address", async ({ page }
   await expect(page.locator("header").getByText("打卡小程序")).toBeVisible();
   await expect(page.getByRole("complementary").getByRole("button", { name: "clock-in" })).toHaveAttribute("aria-current", "page");
   const id = page.url().split("/").at(-1);
-  const made = (await stateOf(new URL(page.url()).origin)).chat?.conversations.find((c) => c.id === id);
+  const made = (await stateOf(new URL(page.url()).origin)).chat?.channels.find((c) => c.id === id);
   expect(made?.name).toBe("clock-in");
 });
 
@@ -93,14 +93,14 @@ test("the channel's settings save its description", async ({ page, api }) => {
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator("header").getByText("放设置的地方")).toBeVisible();
-  const saved = (await stateOf(new URL(page.url()).origin)).chat?.conversations.find((c) => c.id === id);
+  const saved = (await stateOf(new URL(page.url()).origin)).chat?.channels.find((c) => c.id === id);
   expect(saved?.description).toBe("放设置的地方");
 });
 
 test("search keeps the messages that contain it", async ({ page, api }) => {
   const id = await newChannel(api, "找");
-  await api.channel.say({ body: { text: "苹果要浇水", conversation: id } });
-  await api.channel.say({ body: { text: "香蕉该收了", conversation: id } });
+  await api.channel.say({ body: { text: "苹果要浇水", channel: id } });
+  await api.channel.say({ body: { text: "香蕉该收了", channel: id } });
   await page.goto(`/chat/${id}`);
   const log = page.getByRole("log", { name: "消息" });
   await expect(log.getByText("香蕉该收了")).toBeVisible();
@@ -134,7 +134,7 @@ test("the recurrences tab turns a recurrence off and deletes it on the second pr
 test("the chat page as it looks", async ({ page, api }) => {
   const id = await newChannel(api, "clock", "打卡小程序的活");
   await api.channel.update({ id, body: { description: "打卡小程序的活", project: "clock-in" } });
-  await api.channel.say({ body: { text: "帮我看看 @管家 打卡页为什么**白屏**", conversation: id } });
+  await api.channel.say({ body: { text: "帮我看看 @管家 打卡页为什么**白屏**", channel: id } });
   await page.goto(`/chat/${id}`);
   await expect(page.getByRole("log", { name: "消息" }).getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
   // Shown, the orchestrator's answer is read: no count on the channel.

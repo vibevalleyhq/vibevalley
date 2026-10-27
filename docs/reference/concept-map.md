@@ -24,8 +24,8 @@
 | 干活过程 | 干活过程 | `features/session/WorkLog.tsx`、`features/session/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
 | 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `features/issue/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
 | 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `features/issue/state.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `features/issue/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/act`（验收通过是 `act: "accept"`，打回是 `act: "reject"`）；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
-| 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`features/channel`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
-| 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
+| 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`features/channel`） | `Channel`（`type`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
+| 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Channel`（`type: thread`，挂在 `parent` 频道的 `root` 消息下）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrences` |
 | 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/projects/{id}/templates` |
 | 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/notice/inbox.ts` 从核心状态现算） | |
@@ -54,7 +54,7 @@
 | 一次干活（run） | `Sessions`（帮工的 run 在 `session/session.ts`；进程内 agent 的 run 在 `session/execution.ts`）；`session/facts.ts` 把会话事件读成事实 | `session_run` 表 | 帮工的一次 run 包着一个 oar turn（开始到结束），结束时交一份 `SubagentReport` |
 | 干活过程 | `Sessions`（`session/journal.ts`） | `session` 表、`events/<id>.json`；原始记录在 `logs/` | oar 的事件：文字、思考、工具调用的开始和结束…… |
 | 改动、完成 | `Issues`（挪到 `done`、合并、提 PR；`project/project.ts` 管分支和 worktree） | 开 worktree 时的工单分支和 worktree；直接在项目目录干活的没有这两项 | |
-| 田头、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel_conversation`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
+| 田头、频道、工单串 | `Channels`（`channel/chat.ts`）；帮工在频道里说话经 `/mcp`（`Mcp`、`Tools`） | `channel`、`channel_message`、`channel_participant`、`channel_delivery`、`channel_read_cursor`、`channel_mention`、`channel_follow`、`channel_seen_mark` 表 | 送到帮工的话是 oar 的 `prompt`、`steer`、`queue` |
 | 定时 | `Recurrences` | `recurrence` 表 | |
 | 巡查 | `Notices`（`notice/notice.ts`；规则在 `notice/rules.ts`） | 不存：每轮从核心状态算 | |
 | 来电 | `Notices`（`notice/notice.ts`、`notice/inbox.ts`） | 不存：`StateFrame.inbox` 从核心状态现算 | |

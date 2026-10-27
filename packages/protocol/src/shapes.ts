@@ -218,7 +218,7 @@ export interface Spent {
 export interface ChatMessage {
   id: string;
   number: number;
-  conversation: string;
+  channel: string;
   from: string;
   fromKind: ActorKind;
   name: string;
@@ -236,21 +236,24 @@ export interface ChatMessage {
   at: number;
 }
 
-export const ConversationKindValues = ["general", "channel", "thread"] as const;
-export type ConversationKind = (typeof ConversationKindValues)[number];
+export const ChannelTypeValues = ["general", "channel", "thread"] as const;
+export type ChannelType = (typeof ChannelTypeValues)[number];
 
 export const SubjectKindValues = ["issue", "graph", "talk"] as const;
 export type SubjectKind = (typeof SubjectKindValues)[number];
 
-export interface Conversation {
+/** Anywhere something is said: 田头 (general), a channel, or a thread under a message of one (as Discord's). */
+export interface Channel {
   id: string;
-  kind: ConversationKind;
+  type: ChannelType;
+  /** A thread's channel; absent for a thread in 田头. */
   parent?: string;
-  parentNumber?: number;
+  /** The message a thread hangs under, and its number there. */
+  root?: string;
+  rootNumber?: number;
   name?: string;
   description?: string;
   project?: string;
-  channel?: string;
   subjectKind?: SubjectKind;
   subjectId?: string;
   lastNumber?: number;
@@ -260,12 +263,12 @@ export interface Conversation {
   unread?: number;
   /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
   title?: string;
-  /** The newest message, as a list shows it under the conversation. */
-  last?: ConversationLast;
+  /** The newest message, as a list shows it under the channel. */
+  last?: ChannelLast;
   at: number;
 }
 
-export interface ConversationLast {
+export interface ChannelLast {
   from: string;
   name: string;
   /** Its head, on one line. */
@@ -468,21 +471,21 @@ export interface OwnerMention {
   address: string;
 }
 
-/** The conversations, not what is said in them: a page follows a conversation's room for that (rpc.ts). */
+/** The channels, not what is said in them: a page follows a channel for that (rpc.ts). */
 export interface Chat {
-  conversations: Conversation[];
+  channels: Channel[];
   ownerMentions?: OwnerMention[];
 }
 
-/** What a room's subscriber gets: each message said there, by its number; Reset when it is too far behind to catch up. */
-export type RoomEvent = RoomMessage | RoomReset;
+/** What a channel's follower gets: each message said there, by its number; Reset when it is too far behind to catch up. */
+export type ChannelEvent = ChannelMessage | ChannelReset;
 
-export interface RoomMessage {
+export interface ChannelMessage {
   _tag: "Message";
   message: ChatMessage;
 }
 
-export interface RoomReset {
+export interface ChannelReset {
   _tag: "Reset";
 }
 
@@ -491,7 +494,7 @@ export interface WorkspaceState {
   callReason?: string;
   orchestrator: OrchestratorState;
   /** Where the orchestrator is thinking or writing, as its last orchestrator fact says. */
-  orchestratorConversation?: string;
+  orchestratorChannel?: string;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -1370,7 +1373,7 @@ export interface CommentRequest {
 export interface SayRequest {
   text: string;
   station?: number;
-  conversation?: string;
+  channel?: string;
   agent?: string;
   project?: string;
   sendKey?: string;
@@ -1627,7 +1630,7 @@ export interface InboxTargetGraph {
 
 export interface InboxTargetChat {
   kind: "chat";
-  conversation: string;
+  channel: string;
 }
 
 export interface Badge {
@@ -1897,7 +1900,7 @@ export type Fact =
   | FactCall
   | FactOrchestrator
   | FactMessage
-  | FactConversation
+  | FactChannel
   | FactOwnerMentions
   | FactHired
   | FactStation
@@ -1928,8 +1931,8 @@ export interface FactOrchestrator {
   type: "orchestrator";
   at: number;
   state: OrchestratorState;
-  /** The conversation it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
-  conversation?: string;
+  /** The channel it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  channel?: string;
 }
 
 export interface FactMessage {
@@ -1940,10 +1943,10 @@ export interface FactMessage {
   answers?: SessionId;
 }
 
-export interface FactConversation {
-  type: "conversation";
+export interface FactChannel {
+  type: "channel";
   at: number;
-  conversation: Conversation;
+  channel: Channel;
 }
 
 export interface FactOwnerMentions {
@@ -2079,7 +2082,7 @@ export type SideEvent =
   | FactCall
   | FactOrchestrator
   | FactMessage
-  | FactConversation
+  | FactChannel
   | FactOwnerMentions
   | FactHired
   | FactStation

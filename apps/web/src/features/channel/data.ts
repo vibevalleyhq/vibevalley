@@ -1,18 +1,18 @@
-// The chat page's reads beyond the rooms (features/channel/rooms.ts).
+// The chat page's reads beyond the channels it follows (features/channel/follow.ts).
 
 import { type Accessor, createEffect } from "solid-js";
 
-import type { Conversation } from "@vibevalley/protocol";
+import type { Channel } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { newestUnread } from "./rules";
 
-/** A shown conversation is read: the newest unread number goes to the server once it is drawn. */
-export function useMarkRead(conversation: Accessor<Conversation | undefined>) {
+/** A shown channel is read: the newest unread number goes to the server once it is drawn. */
+export function useMarkRead(channel: Accessor<Channel | undefined>) {
   createEffect(
     () => {
-      const c = conversation();
+      const c = channel();
       const number = c ? newestUnread(c) : undefined;
-      // A string, so the same conversation and number again is equal and posts nothing.
+      // A string, so the same channel and number again is equal and posts nothing.
       return c && number !== undefined ? JSON.stringify([c.id, number]) : undefined;
     },
     (read) => {

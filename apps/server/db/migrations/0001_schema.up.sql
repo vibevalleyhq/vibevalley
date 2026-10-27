@@ -15,11 +15,11 @@ CREATE TABLE channel_participant (
   seq        integer generated always as identity,
   check ((kind = 'session') = (agent_id is not null))
 );
-CREATE TABLE channel_conversation (
+CREATE TABLE channel (
   id            text primary key,
-  kind          text not null check (kind in ('general', 'channel', 'thread')),
-  parent_id     text unique,
-  parent_number integer,
+  type          text not null check (type in ('general', 'channel', 'thread')),
+  root_id       text unique,
+  root_number   integer,
   subject_kind  text check (subject_kind in ('issue', 'graph', 'talk')),
   subject_id    text,
   last_number   integer,
@@ -28,13 +28,13 @@ CREATE TABLE channel_conversation (
   name          text,
   description   text,
   project       text,
-  channel_id    text references channel_conversation (id),
-  check ((kind = 'thread') = (parent_id is not null)),
-  check ((subject_kind is null) or kind = 'thread')
+  parent_id     text references channel (id),
+  check ((type = 'thread') = (root_id is not null)),
+  check ((subject_kind is null) or type = 'thread')
 );
 CREATE TABLE channel_message (
   id              text primary key,
-  conversation_id text not null references channel_conversation (id),
+  channel_id text not null references channel (id),
   number          integer not null,
   sender_id       text not null references channel_participant (id),
   kind            text not null check (kind in ('chat', 'dispatch', 'report', 'notice')),
@@ -42,7 +42,7 @@ CREATE TABLE channel_message (
   meta            text,
   send_key        text,
   created_at      double precision not null,
-  unique (conversation_id, number)
+  unique (channel_id, number)
 );
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,
@@ -51,19 +51,19 @@ CREATE TABLE channel_mention (
   primary key (message_id, target_id)
 );
 CREATE TABLE channel_follow (
-  conversation_id  text not null references channel_conversation (id),
+  channel_id  text not null references channel (id),
   participant_id   text not null references channel_participant (id),
   reason           text not null check (reason in ('owner', 'replied', 'mentioned', 'manual')),
   from_number      integer not null,
   unfollowed_at    double precision,
-  primary key (conversation_id, participant_id)
+  primary key (channel_id, participant_id)
 );
 CREATE TABLE channel_read_cursor (
   participant_id   text not null references channel_participant (id),
-  conversation_id  text not null references channel_conversation (id),
+  channel_id  text not null references channel (id),
   read_number      integer not null,
   updated_at       double precision not null,
-  primary key (participant_id, conversation_id)
+  primary key (participant_id, channel_id)
 );
 CREATE TABLE channel_seen_mark (
   participant_id  text not null references channel_participant (id),
@@ -153,7 +153,7 @@ CREATE TABLE recurrence (
   id          text primary key,
   name        text not null,
   body        text not null,
-  channel_id  text not null references channel_conversation (id) on delete cascade,
+  channel_id  text not null references channel (id) on delete cascade,
   agent       text,
   project     text,
   spec        text not null,
@@ -210,7 +210,7 @@ CREATE TABLE connector_account (
   last_inbound   double precision,
   paused_until   double precision,
   connected_at   double precision not null,
-  channel_id     text references channel_conversation (id)
+  channel_id     text references channel (id)
 );
 CREATE TABLE connector_inbound (
   connector   text not null,
@@ -250,11 +250,11 @@ CREATE TABLE lan_device (
   last_seen  double precision
 );
 CREATE INDEX issue_session_by_issue on issue_session (issue, started_at);
-CREATE UNIQUE INDEX channel_conversation_by_name on channel_conversation (name) where name is not null;
-CREATE INDEX channel_conversation_by_subject on channel_conversation (subject_kind, subject_id);
-CREATE UNIQUE INDEX channel_conversation_one_general on channel_conversation (kind) where kind = 'general';
+CREATE UNIQUE INDEX channel_by_name on channel (name) where name is not null;
+CREATE INDEX channel_by_subject on channel (subject_kind, subject_id);
+CREATE UNIQUE INDEX channel_one_general on channel (type) where type = 'general';
 CREATE INDEX channel_mention_by_target on channel_mention (target_id, message_id);
-CREATE INDEX channel_message_by_conversation on channel_message (conversation_id, number);
+CREATE INDEX channel_message_by_channel on channel_message (channel_id, number);
 CREATE INDEX channel_message_by_sender on channel_message (sender_id, id);
 CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
 CREATE INDEX channel_delivery_open on channel_delivery (recipient_id, message_id) where state in ('pending', 'announced', 'handed');
@@ -351,5 +351,5 @@ CREATE TABLE doc_change (
   primary key (doc_id, seq)
 );
 
--- A thread hangs under a message, which is made after its conversation.
-ALTER TABLE channel_conversation ADD FOREIGN KEY (parent_id) REFERENCES channel_message (id);
+-- A thread hangs under a message, which is made after its channel.
+ALTER TABLE channel ADD FOREIGN KEY (root_id) REFERENCES channel_message (id);

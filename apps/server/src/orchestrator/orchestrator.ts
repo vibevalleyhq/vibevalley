@@ -54,7 +54,7 @@ export interface Pick {
 
 /** Where an input's answer goes and what it is worth; kept with it in the transcript. */
 interface Route {
-  readonly conversation: string;
+  readonly channel: string;
   /** The profile the owner picked beside the words. */
   readonly agent?: string;
   readonly quiet?: boolean;
@@ -69,7 +69,7 @@ interface Route {
 interface Intake {
   readonly source: Source;
   readonly line: string;
-  readonly conversation: string;
+  readonly channel: string;
   readonly agent?: string;
   readonly owner?: boolean;
   readonly issue?: string;
@@ -79,9 +79,9 @@ interface Intake {
 }
 
 export interface OrchestratorShape {
-  /** The owner's words in a conversation, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
+  /** The owner's words in a channel, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
    * the client's key for this send, a retry with the same key is the message already said. */
-  readonly say: (text: string, pick: Pick, conversation: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
+  readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in 田头
@@ -132,7 +132,7 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     const selected = new Map<string, Pick>();
     let latestCall: Caller | undefined;
-    /** What the orchestrator last said it cannot start for, per conversation: said once, not to every line, until it starts. */
+    /** What the orchestrator last said it cannot start for, per channel: said once, not to every line, until it starts. */
     const cannot = new Map<string, string>();
     /** The farm's situation as the model last saw it in an input; "" when it should see the whole of it next. */
     let shown = "";
@@ -146,7 +146,7 @@ export const make = (options: OrchestratorOptions = {}) =>
     const toolsFor = (current: () => Route) =>
       tool.orchestrator(() => {
         const at = current();
-        return { agent: orchestratorAgent, session: "", project: "", here: at.conversation, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
+        return { agent: orchestratorAgent, session: "", project: "", here: at.channel, picked: at.agent ?? "", actor: orchestrator(at.owner ?? false) };
       });
 
     // One of its own recurrences (not a helper's) comes due within that long: it will be woken then.
@@ -168,11 +168,11 @@ export const make = (options: OrchestratorOptions = {}) =>
       llm: llmOf,
       tools: toolsFor,
       wakeSoon,
-      first: { conversation: general, source: "owner" },
+      first: { channel: general, source: "owner" },
       quiet: (r) => r.quiet ?? false,
-      say: (r, text, runId) => go(chat.orchestratorSays(r.conversation, text, runId)),
+      say: (r, text, runId) => go(chat.orchestratorSays(r.channel, text, runId)),
       // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
-      state: (s, r) => go(core.setOrchestrator(s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.conversation : undefined)),
+      state: (s, r) => go(core.setOrchestrator(s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.channel : undefined)),
       fresh: () => {
         shown = "";
       },
@@ -199,12 +199,12 @@ export const make = (options: OrchestratorOptions = {}) =>
       return lines;
     };
 
-    // conversation is where the input it goes with will be answered. Said last and on a line of its own, so that
+    // channel is where the input it goes with will be answered. Said last and on a line of its own, so that
     // answering in another channel changes one line of it.
-    const situation = async (conversation: string) => {
+    const situation = async (channel: string) => {
       const sessions = await agentLines();
       const roster = run.roster();
-      const here = await go(chat.channelOf(conversation));
+      const here = await go(chat.topOf(channel));
       const byChannel = (await go(chat.channels())).map((c) => {
         const theirs = roster.filter((w) => (w.session.channel ?? general) === c.id).map((w) => tool.sessionLine(w));
         const head = channelLine(c);
@@ -219,8 +219,8 @@ export const make = (options: OrchestratorOptions = {}) =>
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while
     // the agent is busy may be taken after one given later, so it carries the whole, and the one after it does too.
-    const situationNow = async (busy: boolean, conversation: string) => {
-      const now = await situation(conversation);
+    const situationNow = async (busy: boolean, channel: string) => {
+      const now = await situation(channel);
       const shownNow = !busy && shown !== "" ? situationDelta(shown, now) : now;
       shown = busy ? "" : now;
       return shownNow;
@@ -232,7 +232,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       return [situationWords.news(orchestratorInboxLines(digest)), digest.map((m) => m.id)];
     };
 
-    /** Every input comes in here. false: the orchestrator could not start, and the conversation was told why, once. It
+    /** Every input comes in here. false: the orchestrator could not start, and the channel was told why, once. It
      * never rejects: an input that could not be taken is logged, and a caller waiting on it is failed instead of left open. */
     const take = (i: Intake): Promise<boolean> =>
       taking(i).catch((err: unknown) => {
@@ -245,7 +245,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const rule = intake[i.source];
       const asked = rule.head + i.line;
       const route: Route = {
-        conversation: i.conversation,
+        channel: i.channel,
         ...(i.agent ? { agent: i.agent } : {}),
         source: i.source,
         ...(i.issue ? { issue: i.issue } : {}),
@@ -257,7 +257,7 @@ export const make = (options: OrchestratorOptions = {}) =>
           // The log shows the line; the model also gets the time, the farm and the news before it.
           const text = [
             situationWords.now(localeMinute(new Date(clock.currentTimeMillisUnsafe()))),
-            await situationNow(busy, i.conversation),
+            await situationNow(busy, i.channel),
             memoryNews,
             heard,
             asked,
@@ -274,9 +274,9 @@ export const make = (options: OrchestratorOptions = {}) =>
         return true;
       }
       const words = taken.why === noDeepSeekKey() ? orchestratorWording().noKey : orchestratorWording().cannotStart(taken.why);
-      const again = cannot.get(i.conversation) === words;
-      cannot.set(i.conversation, words);
-      if (!again) await go(chat.orchestratorSays(i.conversation, words, taken.run));
+      const again = cannot.get(i.channel) === words;
+      cannot.set(i.channel, words);
+      if (!again) await go(chat.orchestratorSays(i.channel, words, taken.run));
       return false;
     };
 
@@ -300,15 +300,15 @@ export const make = (options: OrchestratorOptions = {}) =>
         }
       }
       const line =
-        fromPerson && n.conversation === general
+        fromPerson && n.channel === general
           ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
           : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
-      await take({ source: fromPerson ? "owner" : "chat", line, conversation: n.conversation, ...(picked.agent ? { agent: picked.agent } : {}), owner });
+      await take({ source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
     };
 
     // A run of an issue for the orchestrator lasts until the orchestrator's run that takes the line settles.
     const onWork = async (w: OrchestratorWork) => {
-      const channel = await go(chat.channelOf(w.channel));
+      const channel = await go(chat.topOf(w.channel));
       const again = w.said ? lineWords.again(w.said) : "";
       let line = lineWords.issue(w.issue.title, w.issue.description ?? "", again, channel.name);
       const s = w.recurrence;
@@ -316,7 +316,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const missed = (w.by as RunTrigger & { missed?: boolean }).missed ? lineWords.missed : "";
         line = lineWords.recurrence(s.name, missed, s.text, channel.name, s.id);
       }
-      await take({ source: s ? "recurrence" : "issue", line, conversation: channel.id, issue: w.issue.id, by: w.by });
+      await take({ source: s ? "recurrence" : "issue", line, channel: channel.id, issue: w.issue.id, by: w.by });
     };
 
     // One answer streams at a time, the call's or chat/completions': a newer line ends the one before.
@@ -337,7 +337,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         },
         { once: true },
       );
-      void take({ source: "owner", line, conversation: general, owner: true, caller: me });
+      void take({ source: "owner", line, channel: general, owner: true, caller: me });
       return me.words(signal);
     };
 
@@ -352,15 +352,15 @@ export const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(Stream.runForEach(yield* issue.forOrchestrator, handled("an issue", onWork)));
       yield* Effect.forkScoped(
         Stream.runForEach(yield* notices.overdue, (o: Overdue) =>
-          Effect.flatMap(chat.channelOf(o.channel), (c) =>
-            handled("the patrol", (line: string) => take({ source: "patrol", line, conversation: o.channel }))(patrolText(c.name, o.notes)),
+          Effect.flatMap(chat.topOf(o.channel), (c) =>
+            handled("the patrol", (line: string) => take({ source: "patrol", line, channel: o.channel }))(patrolText(c.name, o.notes)),
           ),
         ),
       );
       yield* Effect.forkScoped(
         Stream.runForEach(
           yield* tasks.news,
-          handled("a task graph's line", (line: string) => take({ source: "graph", line, conversation: general })),
+          handled("a task graph's line", (line: string) => take({ source: "graph", line, channel: general })),
         ),
       );
       if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
@@ -377,11 +377,11 @@ export const make = (options: OrchestratorOptions = {}) =>
     };
 
     return Orchestrator.of({
-      say: Effect.fn("Orchestrator.say")(function* (text, pick, conversation, sendKey) {
+      say: Effect.fn("Orchestrator.say")(function* (text, pick, channel, sendKey) {
         const a = pick.agent ? store.agent(pick.agent) : undefined;
         const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
         yield* core.open();
-        const { message, again } = yield* chat.say(text, conversation, sendKey);
+        const { message, again } = yield* chat.say(text, channel, sendKey);
         if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {
@@ -391,7 +391,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         void take({
           source: "owner",
           line: pickedNote(picked ? { agent: picked } : {}) + lineWords.dictated + lineWords.owner(text),
-          conversation: general,
+          channel: general,
           ...(picked ? { agent: picked } : {}),
           owner: true,
         });
@@ -402,7 +402,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const stop = () => me.end();
         signal?.addEventListener("abort", stop, { once: true });
         try {
-          if (!signal?.aborted) void take({ source: "issue", line, conversation: general, caller: me });
+          if (!signal?.aborted) void take({ source: "issue", line, channel: general, caller: me });
           let said = "";
           for await (const w of me.words(signal)) said += w;
           return said.trim();

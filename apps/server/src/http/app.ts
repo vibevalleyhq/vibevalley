@@ -13,11 +13,11 @@ import { Sessions } from "../session/session.ts";
 import { api } from "./api.ts";
 import { mcpRoute } from "./mcp.ts";
 import { page } from "./page.ts";
-import { rooms } from "./rooms.ts";
+import { subscriptions } from "./rpc.ts";
 import { streams } from "./streams.ts";
 
 const routes = (config: Config) =>
-  Layer.mergeAll(Layer.unwrap(Effect.map(handlers, (h) => api(h))), streams, rooms, mcpRoute, config.web ? page(config.web) : Layer.empty);
+  Layer.mergeAll(Layer.unwrap(Effect.map(handlers, (h) => api(h))), streams, subscriptions, mcpRoute, config.web ? page(config.web) : Layer.empty);
 
 /** The address it listens on, once it does; told to who needs it, then to listening. */
 const ready = (listening: (address: string) => Effect.Effect<void>) =>

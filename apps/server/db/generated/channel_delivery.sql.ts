@@ -147,19 +147,19 @@ export const rollbackAnnounced = Effect.fn("RollbackAnnounced")(function* (param
 export const SeenUpToParams = Schema.Struct({
   ["at"]: Schema.NullOr(Schema.Number),
   ["recipient"]: Schema.String,
-  ["conversation"]: Schema.String,
+  ["channel"]: Schema.String,
   ["upto"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type SeenUpToParams = typeof SeenUpToParams.Type
 
 
-export const SeenUpToSql = "-- name: SeenUpTo :exec\nupdate channel_delivery set state = 'seen', seen_at = $1\nwhere recipient_id = $2 and message_id in (\n    select id from channel_message where conversation_id = $3 and number <= $4)\n  and state in ('pending', 'announced', 'handed');"
+export const SeenUpToSql = "-- name: SeenUpTo :exec\nupdate channel_delivery set state = 'seen', seen_at = $1\nwhere recipient_id = $2 and message_id in (\n    select id from channel_message where channel_id = $3 and number <= $4)\n  and state in ('pending', 'announced', 'handed');"
 
 export const seenUpTo = Effect.fn("SeenUpTo")(function* (params: SeenUpToParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: SeenUpToParams,
-    execute: (p) => sql.unsafe(SeenUpToSql, [p["at"], p["recipient"], p["conversation"], p["upto"]]),
+    execute: (p) => sql.unsafe(SeenUpToSql, [p["at"], p["recipient"], p["channel"], p["upto"]]),
   })(params)
 })
 
@@ -198,27 +198,27 @@ export const dropOpen = Effect.fn("DropOpen")(function* (params: DropOpenParams)
   })(params)
 })
 
-export const AgentWakesByConversationParams = Schema.Struct({
+export const AgentWakesByChannelParams = Schema.Struct({
 
 })
-export type AgentWakesByConversationParams = typeof AgentWakesByConversationParams.Type
+export type AgentWakesByChannelParams = typeof AgentWakesByChannelParams.Type
 
 
-export const AgentWakesByConversationResult = Schema.Struct({
-  ["conversation_id"]: Schema.String,
+export const AgentWakesByChannelResult = Schema.Struct({
+  ["channel_id"]: Schema.String,
   ["n"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
-export type AgentWakesByConversationResult = typeof AgentWakesByConversationResult.Type
+export type AgentWakesByChannelResult = typeof AgentWakesByChannelResult.Type
 
 
-export const AgentWakesByConversationSql = "-- name: AgentWakesByConversation :many\n-- Agents waking agents in each conversation since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.conversation_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = m.conversation_id and u.sender_id = 'owner'), '')\n  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.conversation_id;"
+export const AgentWakesByChannelSql = "-- name: AgentWakesByChannel :many\n-- Agents waking agents in each channel since the owner last spoke there, held ones not counted: what the chat\n-- keeps in memory (channel/audience.ts) when it starts.\nselect m.channel_id, count(*)::int as n from channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant s on s.id = m.sender_id\njoin channel_participant r on r.id = d.recipient_id\nwhere m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = m.channel_id and u.sender_id = 'owner'), '')\n  and s.kind in ('session', 'orchestrator') and r.kind in ('session', 'orchestrator') and d.wakes and d.held_by is null\ngroup by m.channel_id;"
 
-export const agentWakesByConversation = Effect.fn("AgentWakesByConversation")(function* () {
+export const agentWakesByChannel = Effect.fn("AgentWakesByChannel")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
-    Request: AgentWakesByConversationParams,
-    Result: AgentWakesByConversationResult,
-    execute: () => sql.unsafe(AgentWakesByConversationSql, []),
+    Request: AgentWakesByChannelParams,
+    Result: AgentWakesByChannelResult,
+    execute: () => sql.unsafe(AgentWakesByChannelSql, []),
   })({})
 })
 
@@ -261,16 +261,16 @@ export const AllOpenDeliveriesResult = Schema.Struct({
   ["held_by"]: Schema.NullOr(Schema.String),
   ["state"]: Schema.String,
   ["launch"]: Schema.NullOr(Schema.String),
-  ["conversation_id"]: Schema.String,
+  ["channel_id"]: Schema.String,
   ["sender_id"]: Schema.String,
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["created_at"]: Schema.Number,
   ["name"]: Schema.String,
   ["sender_kind"]: Schema.String,
-  ["conversation_kind"]: Schema.String,
-  ["parent_id"]: Schema.NullOr(Schema.String),
-  ["parent_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["channel_type"]: Schema.String,
+  ["root_id"]: Schema.NullOr(Schema.String),
+  ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["subject_kind"]: Schema.NullOr(Schema.String),
   ["subject_id"]: Schema.NullOr(Schema.String),
   ["channel_name"]: Schema.NullOr(Schema.String),
@@ -278,7 +278,7 @@ export const AllOpenDeliveriesResult = Schema.Struct({
 export type AllOpenDeliveriesResult = typeof AllOpenDeliveriesResult.Type
 
 
-export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.conversation_id, m.sender_id, m.kind, m.body,\n       m.created_at, p.name, p.kind as sender_kind, c.kind as conversation_kind, c.parent_id, c.parent_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
+export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,\n       m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
 
 export const allOpenDeliveries = Effect.fn("AllOpenDeliveries")(function* () {
   const sql = yield* SqlClient.SqlClient

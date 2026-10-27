@@ -12,7 +12,7 @@ import { connectorWording } from "./words.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { conversationOf, generalOf } from "../channel/state.ts";
+import { channelOf, generalOf } from "../channel/state.ts";
 import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
@@ -278,7 +278,7 @@ export interface ConnectorOptions {
   readonly retryFirstMs?: number;
   readonly retryMostMs?: number;
   /** What the owner said, to the orchestrator; the orchestrator's say when absent. */
-  readonly say?: (text: string, conversation: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
+  readonly say?: (text: string, channel: string | undefined, chat: Channels["Service"]) => Effect.Effect<void, ApiError>;
 }
 
 /** Until woken or ms on the Clock: "wake" or "timeout". The wake is registered each time it runs. */
@@ -310,8 +310,7 @@ export const make = (options: ConnectorOptions = {}) =>
     const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
     const general = chat.general();
     let closing = false;
-    const say = (text: string, conversation: string | undefined) =>
-      options.say ? options.say(text, conversation, chat) : orchestrator.say(text, {}, conversation, "");
+    const say = (text: string, channel: string | undefined) => (options.say ? options.say(text, channel, chat) : orchestrator.say(text, {}, channel, ""));
 
     const bridgeOf = (adapter: Adapter) => {
       const id = adapter.id;
@@ -401,7 +400,7 @@ export const make = (options: ConnectorOptions = {}) =>
         if (err) s.error = err;
         const a = account;
         if (a) {
-          const where = a.channel ? conversationOf(state, a.channel) : generalOf(state);
+          const where = a.channel ? channelOf(state, a.channel) : generalOf(state);
           if (where?.name) s.channel = where.name;
         }
         if (progress) return { ...s, state: progress.state, ...(progress.qr ? { qr: progress.qr } : {}) };
@@ -439,12 +438,12 @@ export const make = (options: ConnectorOptions = {}) =>
         ),
       );
 
-      const quotedConversation = Effect.fnUntraced(function* (ext: string | undefined) {
+      const quotedChannel = Effect.fnUntraced(function* (ext: string | undefined) {
         if (!ext) return undefined;
         const rows = yield* run(outboxQ.messageOfExt({ connector: id, ext_id: ext }));
         const message = rows[0]?.message_id;
         if (!message) return undefined;
-        return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.conversation.id;
+        return (yield* Effect.mapError(chat.messageLocation(message), bridgeError))?.channel.id;
       });
 
       const send = (secrets: Record<string, string>, to: string, text: string, reply: string) =>
@@ -506,8 +505,8 @@ export const make = (options: ConnectorOptions = {}) =>
         const added = yield* Effect.result(
           Effect.gen(function* () {
             const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
-            if (!place || place.channel !== (a.channel ?? general)) return 0;
-            const pieces = splitText(ownerLine(m, place.conversation), maxChars[id]);
+            if (!place || place.top !== (a.channel ?? general)) return 0;
+            const pieces = splitText(ownerLine(m, place.channel), maxChars[id]);
             const at = now();
             yield* inTx(
               Effect.forEach(pieces, (piece) => db(outboxQ.addOutbox({ id: newId(), connector: id, message_id: m.id, body: piece, created_at: at })), {
@@ -567,8 +566,8 @@ export const make = (options: ConnectorOptions = {}) =>
         // A fresh reply opens the platform's delivery window; older messages precede its answer.
         yield* drain(true);
         if (!m.text) return;
-        const conversation = (yield* quotedConversation(m.quoted)) ?? snapshot()?.channel;
-        yield* Effect.mapError(say(m.text, conversation), (e) => new BridgeError({ message: reasonOf(e) }));
+        const channel = (yield* quotedChannel(m.quoted)) ?? snapshot()?.channel;
+        yield* Effect.mapError(say(m.text, channel), (e) => new BridgeError({ message: reasonOf(e) }));
       });
 
       // The inbox: what the app handed over, delivered to the orchestrator in order.

@@ -1,6 +1,6 @@
 import { request } from "node:http";
 import { describe, expect, it } from "@effect/vitest";
-import { Rooms, roomsPath } from "@vibevalley/protocol/rpc";
+import { Subscriptions, rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Fiber, Layer, Stream } from "effect";
 import { Headers } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
@@ -9,7 +9,7 @@ import { Channels } from "../channel/chat.ts";
 import { testConfig } from "../testing/layers.ts";
 import { quietApp } from "../testing/world.ts";
 import { app } from "./app.ts";
-import { fromTheFarm } from "./rooms.ts";
+import { fromTheFarm } from "./rpc.ts";
 
 /** The whole farm on a free port: its address once it listens, and its chat. */
 const farm = Effect.gen(function* () {
@@ -23,12 +23,12 @@ const client = (address: string) =>
   Effect.flatMap(
     Layer.build(
       RpcClient.layerProtocolSocket().pipe(
-        Layer.provide(Socket.layerWebSocket(`ws://${address}${roomsPath}`)),
+        Layer.provide(Socket.layerWebSocket(`ws://${address}${rpcPath}`)),
         Layer.provide(Socket.layerWebSocketConstructorGlobal),
         Layer.provide(RpcSerialization.layerJson),
       ),
     ),
-    (protocol) => RpcClient.make(Rooms).pipe(Effect.provide(protocol)),
+    (protocol) => RpcClient.make(Subscriptions).pipe(Effect.provide(protocol)),
   );
 
 /** An upgrade asked with these headers, and the status it got. */
@@ -41,7 +41,7 @@ const upgrade = (address: string, headers: Record<string, string>) =>
         const req = request({
           host,
           port: Number(port),
-          path: roomsPath,
+          path: rpcPath,
           agent: false,
           headers: { connection: "Upgrade", upgrade: "websocket", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==", ...headers },
         });
@@ -58,18 +58,18 @@ const upgrade = (address: string, headers: Record<string, string>) =>
       }),
   );
 
-describe("the rooms", () => {
-  it.live("a page follows a room over the WebSocket: what it missed, then what is said", () =>
+describe("the subscriptions", () => {
+  it.live("a page follows a channel over the WebSocket: what it missed, then what is said", () =>
     Effect.gen(function* () {
       const { address, chat } = yield* farm;
       const general = chat.general();
       for (const text of ["早", "在吗"]) yield* chat.say(text, undefined, "");
-      const rooms = yield* client(address);
-      const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(rooms["rooms.follow"]({ room: general, after: 1 }), 2)));
+      const rpc = yield* client(address);
+      const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(rpc["channel.follow"]({ id: general, after: 1 }), 2)));
       yield* chat.say("看看进度", undefined, "");
       const got = yield* Fiber.join(following);
       expect(got.map((e) => (e._tag === "Message" ? e.message.text : e._tag))).toEqual(["在吗", "看看进度"]);
-      expect(yield* Effect.flip(Stream.runDrain(rooms["rooms.follow"]({ room: "no-such-room", after: 0 })))).toMatchObject({ _tag: "Refused" });
+      expect(yield* Effect.flip(Stream.runDrain(rpc["channel.follow"]({ id: "no-such-channel", after: 0 })))).toMatchObject({ _tag: "Refused" });
     }).pipe(Effect.scoped),
   );
 

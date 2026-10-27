@@ -2,7 +2,7 @@
 // recorded cases (rules.test.ts).
 
 import { channelWording } from "./words.ts";
-import { type Conversation, everyone, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
+import { type Channel, everyone, orchestratorAgent, ownerId, type MessageKind, type Outcome, type ActorKind } from "@vibevalley/protocol";
 
 // The chat's own names for who is not a helper, as people and models write them: in Chinese, and in English.
 const chatNamed: Readonly<Record<string, string>> = {
@@ -42,7 +42,7 @@ export function channelNameProblem(name: string, taken: readonly string[]): stri
   return "";
 }
 
-export type ChatTarget = { readonly kind: "channel"; readonly name: string } | { readonly kind: "thread"; readonly parent: number };
+export type ChatTarget = { readonly kind: "channel"; readonly name: string } | { readonly kind: "thread"; readonly root: number };
 
 const int64Max = 9223372036854775807n;
 
@@ -50,7 +50,7 @@ const int64Max = 9223372036854775807n;
 export function parseChatTarget(target: string): ChatTarget | undefined {
   const t = target.trim().replace(/^#/, "");
   const m = chatThreadTarget.exec(t);
-  if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", parent: Number(m[1]) };
+  if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
   return channelNamePattern.test(t) ? { kind: "channel", name: t } : undefined;
 }
 
@@ -69,8 +69,8 @@ export interface AudienceInput {
   readonly fromKind: ActorKind;
   readonly kind: MessageKind;
   readonly mentions: readonly string[];
-  /** Only its kind is read. */
-  readonly conversation: Pick<Conversation, "kind">;
+  /** Only its type is read. */
+  readonly channel: Pick<Channel, "type">;
   /** In a thread, the session its words are for: the one working the thread's issue now, "" when none is. */
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
@@ -113,7 +113,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
       if (i.fromKind === "owner") for (const h of i.sessions ?? []) add(h, "everyone", true);
     } else if (m !== ownerId) add(m, "mention", true);
   }
-  const thread = i.conversation.kind === "thread";
+  const thread = i.channel.type === "thread";
   const owner = thread ? (i.threadOwner ?? "") : "";
   if (i.fromKind === "owner") {
     if (owner) add(owner, "own_thread", true);
@@ -135,7 +135,7 @@ export interface UnreadRow {
   readonly latest?: string;
 }
 
-/** Counted since the person last spoke in the conversation. */
+/** Counted since the person last spoke in the channel. */
 export const hopLimit = 4;
 
 export const agentWakeCooldownMs = 60_000;
@@ -145,7 +145,7 @@ export const wakeBreaker = 3;
 
 export const wakeMessages = 3;
 
-export const summaryConversations = 20;
+export const summaryChannels = 20;
 
 /** The same words from the same sender in the same place this soon again are a retry, not a new message. */
 export const retryWindowMs = 60_000;

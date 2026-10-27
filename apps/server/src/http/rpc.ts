@@ -1,6 +1,6 @@
-// The rooms over one WebSocket: the Rooms RPCs (packages/protocol/src/rpc.ts) at /api/v1/rooms, for the farm's own page.
+// The page's one WebSocket: the Subscriptions RPCs (packages/protocol/src/rpc.ts) at rpcPath, for the farm's own page.
 
-import { Rooms, roomsPath } from "@vibevalley/protocol/rpc";
+import { rpcPath, Subscriptions } from "@vibevalley/protocol/rpc";
 import { Effect, Layer } from "effect";
 import { type Headers, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
@@ -19,22 +19,22 @@ export const fromTheFarm = (headers: Headers.Headers): boolean => {
   return headers.origin === undefined || headers.origin === `http://${host}`;
 };
 
-const handlers = Rooms.toLayer(
+const handlers = Subscriptions.toLayer(
   Effect.gen(function* () {
     const chat = yield* Channels;
-    return Rooms.of({
-      "rooms.follow": ({ room, after }) => chat.follow(room, after),
-      "rooms.reports": ({ after }) => chat.reports(after),
+    return Subscriptions.of({
+      "channel.follow": ({ id, after }) => chat.follow(id, after),
+      "channel.reports": ({ after }) => chat.reports(after),
     });
   }),
 );
 
-export const rooms = HttpRouter.use((router) =>
+export const subscriptions = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    const upgrade = yield* RpcServer.toHttpEffectWebsocket(Rooms);
+    const upgrade = yield* RpcServer.toHttpEffectWebsocket(Subscriptions);
     yield* router.add(
       "GET",
-      roomsPath,
+      rpcPath,
       Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
         fromTheFarm(request.headers) ? upgrade : Effect.succeed(HttpServerResponse.text("not the farm's page", { status: 403 })),
       ),

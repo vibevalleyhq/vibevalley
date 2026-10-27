@@ -149,7 +149,7 @@ function gathered(state: WorkspaceState): Unworded[] {
         from: orchestrator,
         text: cut(sc.name, 40),
         at: sc.created,
-        target: { kind: "chat", conversation: sc.channel },
+        target: { kind: "chat", channel: sc.channel },
       },
       channel: sc.channel,
       since: sc.created,
@@ -160,7 +160,7 @@ function gathered(state: WorkspaceState): Unworded[] {
   for (const { message: m, channel, address } of chat?.ownerMentions ?? []) {
     const from: InboxFrom = m.fromKind === "session" ? { kind: "session", id: m.from, name: m.name, agent: m.agent ?? "" } : orchestrator;
     out.push({
-      item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", conversation: m.conversation } },
+      item: { id: m.id, kind: "mention", from, text: cut(m.text, 40), at: m.at, target: { kind: "chat", channel: m.channel } },
       channel,
       since: m.at,
       brief: patrolBrief.mention(m.name, address, slice(oneLine(m.text), 0, 80)),

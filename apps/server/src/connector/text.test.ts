@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation } from "@vibevalley/protocol";
+import type { ChatMessage, Channel } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { forOwner } from "../notice/rules.ts";
@@ -23,7 +23,7 @@ describe("the connector's words", () => {
         case "shortId":
           return shortId(c.in as string);
         case "ownerLine": {
-          const given = c.in as { m: ChatMessage; where: Conversation | null };
+          const given = c.in as { m: ChatMessage; where: Channel | null };
           return {
             line: ownerLine(given.m, given.where ?? undefined),
             forOwner: forOwner(given.m),

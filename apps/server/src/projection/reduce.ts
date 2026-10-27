@@ -2,7 +2,7 @@
 // facts (core/testdata/reduce.jsonl.gz) hold it to the same answers. It never changes what it is given.
 
 import type { WorkspaceState, Fact, Outcome, Phase, Session } from "@vibevalley/protocol";
-import { withConversation, withMessage, withOwnerMentions } from "../channel/state.ts";
+import { withChannel, withMessage, withOwnerMentions } from "../channel/state.ts";
 import { withIssue, withIssueStatuses } from "../issue/state.ts";
 import { farmOf, same } from "@vibevalley/protocol/rules";
 import { freeStation, playedDoing, playedRun, playOf, stationed } from "../game/play.ts";
@@ -24,17 +24,17 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       return [{ ...state, call: f.state, callReason: reason }, true];
     }
     case "orchestrator": {
-      if (state.orchestrator === f.state && state.orchestratorConversation === f.conversation) return [state, false];
-      const { orchestratorConversation: _was, ...rest } = state;
-      return [{ ...rest, orchestrator: f.state, ...(f.conversation ? { orchestratorConversation: f.conversation } : {}) }, true];
+      if (state.orchestrator === f.state && state.orchestratorChannel === f.channel) return [state, false];
+      const { orchestratorChannel: _was, ...rest } = state;
+      return [{ ...rest, orchestrator: f.state, ...(f.channel ? { orchestratorChannel: f.channel } : {}) }, true];
     }
     case "message": {
       const [chat, news] = withMessage(state.chat, f.message);
       return [chat === state.chat ? state : { ...state, ...(chat ? { chat } : {}) }, news];
     }
-    case "conversation":
-      if (state.chat?.conversations?.some((c) => c.id === f.conversation.id && same(c, f.conversation))) return [state, false];
-      return [{ ...state, chat: withConversation(state.chat, f.conversation) }, true];
+    case "channel":
+      if (state.chat?.channels?.some((c) => c.id === f.channel.id && same(c, f.channel))) return [state, false];
+      return [{ ...state, chat: withChannel(state.chat, f.channel) }, true];
     case "ownerMentions":
       return same(state.chat?.ownerMentions ?? [], f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
     case "hired": {

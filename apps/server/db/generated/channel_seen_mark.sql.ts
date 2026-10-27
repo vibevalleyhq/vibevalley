@@ -23,18 +23,18 @@ export const addSeenMark = Effect.fn("AddSeenMark")(function* (params: AddSeenMa
 
 export const PruneSeenMarksParams = Schema.Struct({
   ["participant"]: Schema.String,
-  ["conversation"]: Schema.String,
+  ["channel"]: Schema.String,
   ["upto"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type PruneSeenMarksParams = typeof PruneSeenMarksParams.Type
 
 
-export const PruneSeenMarksSql = "-- name: PruneSeenMarks :exec\ndelete from channel_seen_mark where participant_id = $1\n  and message_id in (select id from channel_message where conversation_id = $2 and number <= $3);"
+export const PruneSeenMarksSql = "-- name: PruneSeenMarks :exec\ndelete from channel_seen_mark where participant_id = $1\n  and message_id in (select id from channel_message where channel_id = $2 and number <= $3);"
 
 export const pruneSeenMarks = Effect.fn("PruneSeenMarks")(function* (params: PruneSeenMarksParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: PruneSeenMarksParams,
-    execute: (p) => sql.unsafe(PruneSeenMarksSql, [p["participant"], p["conversation"], p["upto"]]),
+    execute: (p) => sql.unsafe(PruneSeenMarksSql, [p["participant"], p["channel"], p["upto"]]),
   })(params)
 })

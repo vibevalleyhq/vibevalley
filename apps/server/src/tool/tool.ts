@@ -71,7 +71,7 @@ export interface Caller {
   /** The session working as agent, and the project it works in; both empty for the orchestrator. */
   readonly session: string;
   readonly project: string;
-  /** The conversation the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
+  /** The channel the orchestrator is answering. A session's default is its own issue thread, which the channel service knows. */
   readonly here: string;
   /** The profile the owner picked for this input, if any: dispatch prefers it. */
   readonly picked: string;
@@ -320,7 +320,7 @@ export const make = Effect.gen(function* () {
         const c = yield* callerOf(who);
         let where = p.target ?? "";
         // A session's default is its own thread, which the channel service fills in.
-        if (where === "" && c.session === "") where = "#" + (yield* chat.channelOf(c.here)).name;
+        if (where === "" && c.session === "") where = "#" + (yield* chat.topOf(c.here)).name;
         const read = yield* Effect.result(
           chat.read(participant(c), {
             target: where,
@@ -454,7 +454,7 @@ export const make = Effect.gen(function* () {
           const byName = yield* chat.channelByName(p.channel);
           if (!byName) return answers.issueCreate.noChannel(p.channel);
           channel = byName;
-        } else channel = yield* chat.channelOf(c.here);
+        } else channel = yield* chat.topOf(c.here);
         const project = (p.project ?? "").trim() || channel.project;
         if (p.start && !project) return answers.issueCreate.noDefaultProject(channel.name);
         const priority = p.priority ? priorityOf(p.priority) : undefined;
@@ -584,7 +584,7 @@ export const make = Effect.gen(function* () {
       Effect.fn("Tools.recurrence")(
         function* (p: Orchestrator<"recurrence">) {
           const c = yield* callerOf(who);
-          let channel = yield* chat.channelOf(c.here);
+          let channel = yield* chat.topOf(c.here);
           if (p.channel) {
             const byName = yield* chat.channelByName(p.channel);
             if (!byName) return yield* refuse(answers.recurrence.noChannelShort(p.channel));

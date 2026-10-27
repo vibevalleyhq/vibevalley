@@ -60,8 +60,8 @@ export class Deliveries {
   }
 
   /** SeenUpTo. */
-  seenUpTo(recipient: string, conversation: string, upto: number) {
-    for (const r of this.of(recipient)) if (r.conversation_id === conversation && r.number <= upto) this.seen(recipient, r.message_id);
+  seenUpTo(recipient: string, channel: string, upto: number) {
+    for (const r of this.of(recipient)) if (r.channel_id === channel && r.number <= upto) this.seen(recipient, r.message_id);
   }
 
   /** DropOpen. */

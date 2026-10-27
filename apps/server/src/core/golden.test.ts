@@ -19,7 +19,7 @@ import { graphText } from "../task/prompts.ts";
 import { recurrenceProblem } from "../recurrence/rules.ts";
 import { yuan } from "../runtime/money.ts";
 import { graphChanges, graphEventText } from "../task/changes.ts";
-import type { Conversation, WorkspaceState, Fact, Issue, Recurrence, RecurrenceRequest, Session, TaskGraph } from "@vibevalley/protocol";
+import type { Channel, WorkspaceState, Fact, Issue, Recurrence, RecurrenceRequest, Session, TaskGraph } from "@vibevalley/protocol";
 
 const testdata = new URL("./testdata/", import.meta.url);
 
@@ -128,7 +128,7 @@ describe("the golden files", () => {
       const input = row.in as Record<string, unknown>;
       switch (row.fn) {
         case "targetOf":
-          return f.check(i + 1, "targetOf", targetOf(input.c as Conversation, (input.channelName as string | null) ?? undefined), row, "out");
+          return f.check(i + 1, "targetOf", targetOf(input.c as Channel, (input.channelName as string | null) ?? undefined), row, "out");
         case "phaseText":
           return f.check(i + 1, "phaseText", phaseText(input.session as Session, input.now as number) || null, row, "out");
         case "yuan":

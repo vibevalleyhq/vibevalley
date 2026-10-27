@@ -13,7 +13,7 @@ test("the recorded cases", () => {
       case "parseTarget": {
         // As Go writes it: a zero parent is left out.
         const t = parseChatTarget(c.in as string);
-        return t?.kind === "thread" && t.parent === 0 ? { kind: "thread" } : (t ?? null);
+        return t?.kind === "thread" && t.root === 0 ? { kind: "thread" } : (t ?? null);
       }
       case "channelNameProblem": {
         const i = c.in as { name: string; taken: string[] | null };

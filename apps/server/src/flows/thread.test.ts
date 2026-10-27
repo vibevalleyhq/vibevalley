@@ -1,7 +1,7 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { describe, expect, it } from "@effect/vitest";
-import type { ChatMessage, Conversation } from "@vibevalley/protocol";
-import { conversationOf } from "../channel/state.ts";
+import type { ChatMessage, Channel } from "@vibevalley/protocol";
+import { channelOf } from "../channel/state.ts";
 import { Said } from "../testing/said.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
@@ -33,8 +33,8 @@ describe("an issue's thread", () => {
       const first = sent.session!;
       expect(first).toBeDefined();
       const thread = yield* await_(
-        () => Effect.map(channels.jobThread(first), (id) => (id ? conversationOf(core.state().chat, id) : undefined)),
-        (c): c is Conversation => c !== undefined,
+        () => Effect.map(channels.jobThread(first), (id) => (id ? channelOf(core.state().chat, id) : undefined)),
+        (c): c is Channel => c !== undefined,
         "the issue's thread",
       );
       expect([thread!.subjectKind, thread!.subjectId]).toEqual(["issue", issue.id]);
@@ -66,7 +66,7 @@ describe("an issue's thread", () => {
       yield* until(() => reportsBy(second) === 2, "the person's words wake the second session");
       expect(reportsBy(first)).toBe(2);
 
-      const threads = (core.state().chat?.conversations ?? []).filter((c) => c.subjectKind === "issue" && c.subjectId === issue.id).map((c) => c.id);
+      const threads = (core.state().chat?.channels ?? []).filter((c) => c.subjectKind === "issue" && c.subjectId === issue.id).map((c) => c.id);
       expect(threads).toEqual([thread!.id]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
