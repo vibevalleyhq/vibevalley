@@ -16,7 +16,7 @@ import {
   spentText,
   threadOwnerOf,
   unreadIn,
-  waitingForOrchestrator,
+  orchestratorTyping,
   workbenchClock,
 } from "../../rules/chat";
 import { aria, useNow } from "../../app/util";
@@ -25,7 +25,7 @@ import { useCore } from "../../data/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
-import { Dot, PhaseGlyph, SenderFace, StreamingCaret, Tag, ThinkingDots } from "./bits";
+import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead, useHistory } from "./data";
 import { TurnSteps } from "./WorkLog";
 import { useAgent } from "../../data/agents";
@@ -63,7 +63,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
   const parent = () => (props.conversation?.kind === "thread" ? parentOf(core()?.chat, props.conversation, more()) : undefined);
   const searching = () => (props.filter ?? "").trim() !== "";
   const hasOlder = () => !!id() && all().length > 0 && !(more()?.complete ?? false);
-  const waiting = () => waitingForOrchestrator(core()?.orchestrator, props.conversation, all());
+  const typing = () => orchestratorTyping(core(), props.conversation);
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
@@ -106,8 +106,12 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
             </div>
           )}
         </For>
-        <Show when={waiting()}>
-          <Frame face={<OrchestratorFace size={36} />} name={chatWording().orchestrator} meta={chatWording().messages.thinking}>
+        <Show when={typing()}>
+          <Frame
+            face={<OrchestratorFace size={36} />}
+            name={chatWording().orchestrator}
+            meta={typing() === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
+          >
             <div class="flex h-5 items-center">
               <ThinkingDots />
             </div>
@@ -211,13 +215,8 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
           <Tag icon={outcome().icon} label={outcome().label} fill={outcome().fill} />
         </div>
       </Show>
-      <div class={props.m.final ? "" : "opacity-70"}>
-        <Show when={props.m.kind === "dispatch"} fallback={<Markdown text={props.m.text} mentions />}>
-          <Dispatch text={props.m.text} />
-        </Show>
-      </div>
-      <Show when={!props.m.final}>
-        <StreamingCaret />
+      <Show when={props.m.kind === "dispatch"} fallback={<Markdown text={props.m.text} mentions />}>
+        <Dispatch text={props.m.text} />
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (
@@ -227,10 +226,10 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
           </div>
         )}
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
+      <Show when={props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch"}>
         <TurnSteps session={orchestratorAgent} run={props.m.run} orchestrator />
       </Show>
-      <Show when={props.m.final && props.m.fromKind === "session" && props.m.kind === "report"}>
+      <Show when={props.m.fromKind === "session" && props.m.kind === "report"}>
         <TurnSteps session={props.m.from} run={props.m.run} />
       </Show>
       <Show when={props.thread}>{(thread) => <ThreadPreview thread={thread()} />}</Show>

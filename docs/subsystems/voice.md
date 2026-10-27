@@ -53,7 +53,7 @@
    - 成功：记下通话，回 `agentId`；`Core.did` 让账本记一笔语音。
 4. 令牌快过期时（SDK 的 `token-privilege-will-expire`）`POST /api/v1/voice/renew` 换同一组 `channel + uid` 的新令牌；失败在通话上显示原因。
 
-**字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。说着的时候就画在田头最下面（`liveCaptions`，淡色、带光标）：主人这一轮还在说的字随说随长；这一轮说完了留着，等田头有了同样的字（`spoken` 的那一条）就换成它，最多留 `captionLinger`（8 秒）。管家的字只在快嘴模式画：语音线路上管家的话本来就边说边进田头，再画一遍就是两份；开通话的回答 `VoiceAgent.answeredBy`（`orchestrator` 或 `agora`）告诉页面是哪种。
+**字幕**：页面从 data stream 收分块的消息，`captions.ts` 拼齐一轮再解，只留最近几轮。说着的时候就画在田头最下面（`liveCaptions`，淡色、带光标）：主人这一轮还在说的字随说随长；这一轮说完了留着，等田头有了同样的字（`spoken` 的那一条）就换成它，最多留 `captionLinger`（8 秒）。管家的字两种模式都画：不管谁接电话，它的话都要一段说完才进田头。
 
 - 主人的一句定稿时，连同 `agentId`、档案选择和 `sendKey` 交 `POST /api/v1/voice/agent/heard`。快嘴模式下服务端把农场设成开着、交给 `Orchestrator.heard`：记成主人在主频道的发言，提示管家「语音那边已经回答了」，派了活才说一句派给了谁。管家模式下收下不转。
 - 快嘴的一轮说完或被打断时（`turn_status` 不为 0），页面把说到的部分交 `POST /api/v1/voice/agent/said`，服务端经田头的 `spoken` 记成管家的话。
@@ -118,7 +118,7 @@
 
 - `apps/server/src/voice/voice.test.ts`（假的声网对端）：通话中一张工单交回来，管家的话经 `speak`（`APPEND`，带会话的 ConvoAI token）念出来，没通话时不念；两张接连交回来只问管家一次、只念一段；交给管家的那条把等着的事合成一段；接听来电开的电话不念开场白、管家先说那件事；brief 拒绝后能处理下一件，brief 未完成时关闭 Voice 会取消等待，多段播报中挂断不再发后面的段；长话在句末切到 512 字节以下；说缺哪个 key；只有凭据时才签授予、续签；管家在自己的线路上接通和挂断；一通电话的凭据和线路不随之后的设置变；挂断中的电话不收字幕；没带通话 id 的字幕只在只有一通电话时转；听写没设好时说为什么。
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
-- 页面：`apps/web/src/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
+- 页面：`apps/web/src/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮、两边的字都画到田头有了那一句）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
 - `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
 - 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；点「管家」就拨，打不通时通话屏和田头都说原因）。
 - 真人说话、听到声音要人在桌面版上亲自打一通（`acceptance/page.md`）；没有连真的声网的自动测试。`speak` 在真电话上念出来、不打断主人，要在真电话上验。

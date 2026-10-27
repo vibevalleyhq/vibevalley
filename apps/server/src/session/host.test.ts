@@ -1,9 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { testConfig } from "../testing/layers.ts";
-import { aTurn } from "../testing/until.ts";
+import { aTurn, until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { scriptedLLM } from "../agent/brain/testing.ts";
+import { answer, text, toolCall } from "../ai/testing.ts";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
 
@@ -47,6 +48,61 @@ describe("Caller", () => {
 });
 
 describe("AgentHost", () => {
+  it.live("says each answer once, whole, while the caller gets its words as they grow", () => {
+    const config = testConfig();
+    return Effect.gen(function* () {
+      const sessions = yield* Sessions;
+      const { llm } = scriptedLLM([answer([text("我看一下"), toolCall("missing", {})]), answer("看完了，一切正常")]);
+      const said: string[] = [];
+      const states: string[] = [];
+      const host = sessions.host({
+        name: "orchestrator",
+        label: "管家",
+        inputType: "testInput",
+        home: config.home,
+        cwd: config.workRoot,
+        instructions: "",
+        llm: () => llm,
+        tools: () => [],
+        first: "first",
+        quiet: () => false,
+        say: async (_route, words) => void said.push(words),
+        state: async (s, route) => void states.push(route ? `${s} ${route}` : s),
+        fresh: () => {},
+        restored: () => ({ by: { kind: "" } }),
+        toolStart: (tool) => ({ text: tool, action: "other", tool }),
+        notice: () => {},
+        log: () => {},
+        go: <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e),
+        scope: yield* Effect.scope,
+      });
+      const caller = new Caller();
+      const heard: string[] = [];
+      const reading = (async () => {
+        for await (const w of caller.words()) heard.push(w);
+      })();
+      const result = yield* Effect.promise(() => host.submit(async () => ({ text: "看看" }), { route: "r", run: { by: { kind: "" } }, caller }, true));
+      expect(result.ok).toBe(true);
+      yield* until(() => states.at(-1) === "listening" && said.length === 2, "the run settled");
+      yield* Effect.promise(() => reading);
+      expect(said).toEqual(["我看一下", "看完了，一切正常"]);
+      // A character at a time from the script: more pushes than answers.
+      expect(heard.length).toBeGreaterThan(2);
+      expect(heard.join("")).toBe("我看一下\n看完了，一切正常\n");
+      // Where it works is said once it takes the input, and kept until it is done.
+      expect(states.filter((s, i) => s !== states[i - 1])).toEqual([
+        "thinking",
+        "thinking r",
+        "speaking r",
+        "thinking r",
+        "speaking r",
+        "thinking r",
+        "listening",
+      ]);
+      yield* Effect.promise(() => host.close());
+    }).pipe(Effect.scoped, Effect.provide(world({ config })));
+  });
+
   it.live("waits for an input build before closing, without delivering it late", () => {
     const config = testConfig();
     let started = () => {};

@@ -29,16 +29,9 @@ export interface SpokenLine {
 export const captionLinger = 8_000;
 
 /** The captions to draw live in 田头 during a call, before their turns are lines there: every turn still being said, and a
- * finished one until 田头 has its words or captionLinger passes. The orchestrator's are left out when it answers on the
- * line: its words go into 田头 as it says them, and would show twice. */
-export function liveCaptions(
-  turns: readonly Caption[],
-  answeredBy: "orchestrator" | "agora" | undefined,
-  spoken: readonly SpokenLine[],
-  now: number,
-): Caption[] {
+ * finished one until 田头 has its words or captionLinger passes. Whoever answers, its words reach 田头 only once said. */
+export function liveCaptions(turns: readonly Caption[], spoken: readonly SpokenLine[], now: number): Caption[] {
   return turns.filter((c) => {
-    if (c.speaker === "orchestrator" && answeredBy !== "agora") return false;
     if (!c.text.trim()) return false;
     if (!c.done) return true;
     if (c.doneAt !== undefined && now - c.doneAt > captionLinger) return false;

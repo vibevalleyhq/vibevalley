@@ -63,7 +63,8 @@ export interface CoreShape {
   readonly session: (id: string) => Session | undefined;
   /** Folds the facts in as one commit: readers see the whole batch, each transition its own before and after. */
   readonly apply: (...facts: FactIn[]) => Effect.Effect<void>;
-  readonly setOrchestrator: (state: OrchestratorState) => Effect.Effect<void>;
+  /** conversation: where it thinks or writes, while it does. */
+  readonly setOrchestrator: (state: OrchestratorState, conversation?: string) => Effect.Effect<void>;
   readonly setCommits: (commits: CommitCount) => Effect.Effect<void>;
   /** The farm opens when the owner starts it or says something: the call goes live unless it is already. */
   readonly open: () => Effect.Effect<void>;
@@ -99,7 +100,7 @@ const toKeep = ({
 
 /** Started again, nobody is on the call and the orchestrator is not mid-sentence. */
 const restarted = (kept: WorkspaceState): WorkspaceState => {
-  const { callReason: _callReason, ...rest } = toKeep(kept);
+  const { callReason: _callReason, orchestratorConversation: _where, ...rest } = toKeep(kept);
   return { ...rest, call: "idle", orchestrator: "idle" };
 };
 
@@ -224,7 +225,7 @@ export const make = Effect.gen(function* () {
     state: () => state,
     session: (id) => state.sessions.find((h) => h.id === id),
     apply,
-    setOrchestrator: (orchestrator) => apply({ type: "orchestrator", state: orchestrator }),
+    setOrchestrator: (orchestrator, conversation) => apply({ type: "orchestrator", state: orchestrator, ...(conversation ? { conversation } : {}) }),
     setCommits: (commits) => apply({ type: "commits", commits }),
     open: () => Effect.suspend(() => (state.call === "live" ? Effect.void : apply({ type: "call", state: "live" }))),
     sessionEvent: (id, activity) => Effect.suspend(() => side({ type: "event", at: clock.currentTimeMillisUnsafe(), id, activity })),

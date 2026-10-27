@@ -21,7 +21,7 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
 };
 
 /** The turn reports, newest first. */
-const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report" && m.final).sort((a, b) => b.at - a.at);
+const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report").sort((a, b) => b.at - a.at);
 
 const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>
   (s?.issues ?? []).find((i) => i.sessions.some((s) => s === session));
@@ -77,7 +77,7 @@ function Said(props: { m: ChatMessage; look: string }) {
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
           <span class="text-[13px]">{you() ? farmWording().log.you : farmWording().orchestrator}</span>
-          <FarmTag text={you() ? farmWording().log.said : props.m.final ? farmWording().log.answered : farmWording().log.saying} ink="#67482d" />
+          <FarmTag text={you() ? farmWording().log.said : farmWording().log.answered} ink="#67482d" />
         </div>
         <div class={["mt-0.5 text-[13px]", you() ? "text-bark-900" : "text-bark-800"]}>
           <PxMarkdown text={props.m.text} />

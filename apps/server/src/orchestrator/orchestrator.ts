@@ -170,8 +170,9 @@ export const make = (options: OrchestratorOptions = {}) =>
       wakeSoon,
       first: { conversation: general, source: "owner" },
       quiet: (r) => r.quiet ?? false,
-      say: (r, key, text, final, runId) => go(chat.orchestratorSays(r.conversation, key, text, final, runId)),
-      state: (s) => go(core.setOrchestrator(s)),
+      say: (r, text, runId) => go(chat.orchestratorSays(r.conversation, text, runId)),
+      // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
+      state: (s, r) => go(core.setOrchestrator(s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.conversation : undefined)),
       fresh: () => {
         shown = "";
       },
@@ -275,7 +276,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       const words = taken.why === noDeepSeekKey() ? orchestratorWording().noKey : orchestratorWording().cannotStart(taken.why);
       const again = cannot.get(i.conversation) === words;
       cannot.set(i.conversation, words);
-      if (!again) await go(chat.orchestratorSays(i.conversation, `failed${clock.currentTimeMillisUnsafe()}`, words, true, taken.run));
+      if (!again) await go(chat.orchestratorSays(i.conversation, words, taken.run));
       return false;
     };
 

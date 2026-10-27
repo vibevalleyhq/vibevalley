@@ -379,19 +379,16 @@ describe("the chat", () => {
     ),
   );
 
-  it.live("the orchestrator's words grow, then are delivered once final", () =>
+  it.live("the orchestrator's words are written once, whole, and delivered", () =>
     run((f, x) =>
       Effect.gen(function* () {
         yield* hireAndRun(f, x, "w11", "写 hello", "chat-k");
         const general = f.chat.general();
-        yield* f.chat.orchestratorSays(general, "k1", "", false, "");
-        yield* f.chat.orchestratorSays(general, "k1", "好的，", false, "");
-        yield* f.chat.orchestratorSays(general, "k1", "好的，我叫 @w11 去", false, "");
+        yield* f.chat.orchestratorSays(general, "  ", "");
         const ours = () => f.messagesOf(general).filter((m) => m.from === orchestratorAgent && m.kind === "chat");
-        expect(ours().map((m) => [m.final, m.text])).toEqual([[false, "好的，我叫 @w11 去"]]);
-        expect(yield* Effect.promise(() => f.deliveryOf("w11", ours()[0]!.id))).toBeUndefined();
-        yield* f.chat.orchestratorSays(general, "k1", "好的，我叫 @w11 去看看", true, "");
-        expect(ours().map((m) => [m.final, m.mentions])).toEqual([[true, ["w11"]]]);
+        expect(ours()).toEqual([]);
+        yield* f.chat.orchestratorSays(general, "好的，我叫 @w11 去看看", "");
+        expect(ours().map((m) => [m.text, m.mentions])).toEqual([["好的，我叫 @w11 去看看", ["w11"]]]);
         yield* until(() => x.runsOf("w11").length >= 2 && x.runsOf("w11")[1]!.includes("我叫 @w11 去看看"), "w11 woken");
         yield* f.chat.notice(general, "定时到了", "recurrence");
         const last = f.messagesOf(general).at(-1)!;
@@ -508,9 +505,8 @@ describe("the chat", () => {
     run((f, x) =>
       Effect.gen(function* () {
         const general = f.chat.general();
-        yield* f.chat.orchestratorSays(general, "first-run", "partial", false, "run-first");
-        yield* f.chat.orchestratorSays(general, "first-run", "complete", true, "run-second");
-        yield* f.chat.orchestratorSays(general, "legacy", "unlinked", true, "");
+        yield* f.chat.orchestratorSays(general, "complete", "run-first");
+        yield* f.chat.orchestratorSays(general, "unlinked", "");
         const saved = yield* f.chat.history(general);
         expect(saved.map((m) => [m.text, m.run])).toEqual([
           ["complete", "run-first"],
@@ -559,7 +555,7 @@ describe("the chat", () => {
     run((f) =>
       Effect.gen(function* () {
         const general = f.chat.general();
-        yield* f.chat.orchestratorSays(general, "read", "hello", true, "");
+        yield* f.chat.orchestratorSays(general, "hello", "");
         const [message] = yield* f.chat.history(general);
         yield* f.sql`insert into channel_seen_mark (participant_id, message_id) values ('owner', ${message!.id})`.pipe(Effect.orDie);
         yield* trigger(f.sql, "fail_receipt", "before delete on channel_seen_mark");
@@ -614,21 +610,6 @@ describe("the chat", () => {
         expect(
           (yield* f.sql`select participant_id from channel_follow where conversation_id = ${thread}`.pipe(Effect.orDie)).map((r) => r.participant_id),
         ).toEqual(["w1"]);
-      }),
-    ),
-  );
-
-  it.live("a streamed message whose end could not be written ends on the next try", () =>
-    run((f) =>
-      Effect.gen(function* () {
-        const general = f.chat.general();
-        yield* f.chat.orchestratorSays(general, "stream", "partial", false, "");
-        yield* trigger(f.sql, "fail_final", "before update on channel_message", "when (new.final)");
-        yield* f.chat.orchestratorSays(general, "stream", "complete", true, "");
-        expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[false, "partial"]]);
-        yield* drop(f.sql, "fail_final", "channel_message");
-        yield* f.chat.orchestratorSays(general, "stream", "complete", true, "");
-        expect((yield* f.chat.history(general)).map((m) => [m.final, m.text])).toEqual([[true, "complete"]]);
       }),
     ),
   );

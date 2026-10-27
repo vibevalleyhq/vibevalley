@@ -225,7 +225,6 @@ export interface ChatMessage {
   agent?: string;
   kind: MessageKind;
   text: string;
-  final: boolean;
   mentions?: string[];
   session?: SessionId;
   run?: string;
@@ -463,6 +462,8 @@ export interface WorkspaceState {
   call: CallState;
   callReason?: string;
   orchestrator: OrchestratorState;
+  /** Where the orchestrator is thinking or writing, as its last orchestrator fact says. */
+  orchestratorConversation?: string;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -772,9 +773,6 @@ export interface ConnectorLogin {
 
 export interface VoiceAgent {
   agentId: string;
-  /** Who answers on the call, as the call started: the orchestrator on the voice line, whose words go into 田头 as it
-   * says them, or Agora's model, whose words reach 田头 only when its turn is over. Set on start. */
-  answeredBy?: "orchestrator" | "agora";
 }
 
 export interface AgoraGrant {
@@ -1902,6 +1900,8 @@ export interface FactOrchestrator {
   type: "orchestrator";
   at: number;
   state: OrchestratorState;
+  /** The conversation it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  conversation?: string;
 }
 
 export interface FactMessage {

@@ -55,9 +55,9 @@ export function patrolStep(state: WorkspaceState, now: number, memory: PatrolMem
 }
 
 /** What of the farm's talk reaches the owner off the farm (the chat apps): reports, dispatches, the orchestrator's words
- * and what names the owner or everyone, once said in full (the orchestrator's words grow while he speaks). */
+ * and what names the owner or everyone. */
 export function forOwner(m: ChatMessage): boolean {
-  if (!m.final || m.from === ownerId) return false;
+  if (m.from === ownerId) return false;
   switch (m.kind) {
     case "report":
     case "dispatch":

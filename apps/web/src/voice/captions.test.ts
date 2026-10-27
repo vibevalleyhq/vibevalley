@@ -51,14 +51,13 @@ test("the agent's state is what it last said; only the last few turns are kept; 
 });
 
 // What a call shows in 田头 as it is said: turns still being said, and a finished one until 田头 has its line.
-test("live captions draw what is being said until 田头 has the line, and not the orchestrator's twice", () => {
+test("live captions draw what is being said until 田头 has the line", () => {
   const c = new LiveCaptions();
   c.apply({ object: "user.transcription", turn_id: 1, text: "帮我看看", final: false });
   c.apply({ object: "assistant.transcription", turn_id: 1, text: "好，我看", turn_status: 0 });
   const said = (turns: typeof c.turns) => turns.map((t) => [t.speaker, t.text]);
-  // On the line the orchestrator's own words go into 田头 as it says them; Agora's model's only when its turn is over.
-  expect(said(liveCaptions(c.turns, "orchestrator", [], Date.now()))).toEqual([["you", "帮我看看"]]);
-  expect(said(liveCaptions(c.turns, "agora", [], Date.now()))).toEqual([
+  // Whoever answers, its words reach 田头 only once said: both sides are drawn as they are said.
+  expect(said(liveCaptions(c.turns, [], Date.now()))).toEqual([
     ["you", "帮我看看"],
     ["orchestrator", "好，我看"],
   ]);
@@ -66,7 +65,8 @@ test("live captions draw what is being said until 田头 has the line, and not t
   const done = c.turns.find((t) => t.speaker === "you")!;
   expect([done.done, done.doneAt !== undefined]).toEqual([true, true]);
   // Finished, it stays until 田头 has the line, or for captionLinger at most.
-  expect(said(liveCaptions(c.turns, "orchestrator", [], Date.now()))).toEqual([["you", "帮我看看进度"]]);
-  expect(liveCaptions(c.turns, "orchestrator", [{ speaker: "you", text: "帮我看看进度" }], Date.now())).toEqual([]);
-  expect(liveCaptions(c.turns, "orchestrator", [], done.doneAt! + captionLinger + 1)).toEqual([]);
+  const you = (turns: typeof c.turns) => said(turns.filter((t) => t.speaker === "you"));
+  expect(you(liveCaptions(c.turns, [], Date.now()))).toEqual([["you", "帮我看看进度"]]);
+  expect(you(liveCaptions(c.turns, [{ speaker: "you", text: "帮我看看进度" }], Date.now()))).toEqual([]);
+  expect(you(liveCaptions(c.turns, [], done.doneAt! + captionLinger + 1))).toEqual([]);
 });

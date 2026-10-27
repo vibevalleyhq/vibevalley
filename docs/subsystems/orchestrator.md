@@ -10,7 +10,7 @@
 | 管家的对话、压缩、记性的快照、提示的开头 | 帮工档案的记性、想起和外面的来源（[记性](docs/subsystems/memory.md)）；管家的 `memory_search`、`memory_add` 只是那边的入口 |
 | 管家的工具（`tool` 的管家那张表）和谁能让它合并 | 工具背后的规则：派活、验收、收获归[工单](docs/subsystems/issue.md)，定时归 `recurrence`（[定时](docs/subsystems/recurrence.md)），计划归 `task`（[种植计划](docs/subsystems/task.md)） |
 | 挑档案（`session.ChooseAgent`，管家和计划共用） | 派不派得出去（`agentProblems`、同时干活的上限，[额度、花费和上限](docs/subsystems/README.md)） |
-| 管家收什么、每种来源怎么进（意图表）、现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、边说边写、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
+| 管家收什么、每种来源怎么进（意图表）、现状、话回到哪个频道 | 跑这个 agent：起大脑、排输入、把回答写进频道、记 run、重启后接着做、做错的一轮存成评测（`session/host.ts` 的 `AgentHost`，[帮工](docs/subsystems/session.md)） |
 | 巡查：放久了没人管的事叫醒管家 | Inbox 里有什么（`apps/server/src/notice/inbox.ts`，[Inbox](docs/subsystems/README.md)） |
 | VibeValley 自己的 agent：循环、会话、压缩、技能、记性文件、MCP、定时、帮手 | 帮工在农机 `vibevalley` 上的会话怎么接进农场（oar，[帮工](docs/subsystems/session.md)）；界面和农机页（[界面清单](docs/reference/farm-ui.md#界面清单)） |
 | 帮工档案的存储（`agent`）：内置的管家档案、事务 | 捏帮工、技能书、农具这些页面（[界面清单](docs/reference/farm-ui.md#界面清单)） |
@@ -67,7 +67,7 @@
 - 语音转来的话（`/api/v1/voice/agent/heard`）已经在电话里答过了：管家按需派活，派了说一句派给了谁，没派就不说。电话里的话（`answerer("phone")`）带一句口语、一两句、先说结论的提示，回答边长边念。
 - **OpenAI 的协议**：`POST /v1/chat/completions` 只听 127.0.0.1，「连接到本机」不放；`model` 是 `vibevalley-orchestrator`，别的回 404 `model_not_found`。只取最后一条 `user` 的话，当作主人在田头说的，回答也进田头；`system`、前面的几轮和 `tools` 不读，只回字。`stream` 为真回 `chat.completion.chunk` 的 SSE，否则一个 `chat.completion`。电话和它共用一个输出流：新的请求（或一通电话里的新一句）结束上一个的流；电话断开只关自己的流，那一轮照常做完。MCP 和 OpenAI 的入口由 `HttpEffect.fromWebHandler` 适配，平台转发请求的中断和 typed failure；客户端断开时，等待中的请求处理器收到取消；在管家开工前就已经断开的请求（电话线同样）不开工，什么都不交给模型。一句话没能交给管家（拼它要的现状时读失败了），等它的流以那个错误结束，不一直开着；`take` 不抛，失败记进日志。MCP SDK 已启动的工作能否随之取消由 SDK 的取消接口决定。
 
-**说话**：管家说的字边长边进它回话的那个频道（至多每 120 毫秒推一次），一句说完写成定稿；空的不发。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
+**说话**：管家每回答一次，说完整条写进它回话的那个频道；空的不发。想和写的时候，核心状态记着它在哪个对话（`orchestratorConversation`），不进田头的回答（本机的 `chat/completions`）不记。字照样边长边交给电话的语音线路和本机的 `chat/completions`。被叫醒就在那个频道里说，不另设「有话才说」的工具；没什么值得说时提示让它什么也不说。帮工的汇报以帮工自己的名义贴进它的工单串，管家不转述；叫停的不贴。
 
 **用量**：每次回答在管家的日志里记一条 `llm/usage`：「缓存命中 82%：读缓存 41 200，没命中 8 900，输出 310」（命中率 = 读缓存 ÷（读缓存 + 没命中）），一个 token 都没有的不记。大脑每次请求按段（`instructions`、`env`、`skills`、`memory`、`tools`）算 sha256 和上一次请求比，两次压缩之间某段变了就发 `prefixChanged`，那条用量后面接「；开头变了：工具」，服务端日志也记一行。哈希只在内存里，重启后的第一次请求不比。
 
@@ -113,7 +113,7 @@
 
 ## 为什么这样
 
-- **管家叫 orchestrator，跑它的机器归执行。** 它在系统里的位置是编排者（收活、派给帮工、盯进度、转告），「助理」只说了它跟主人说话。起大脑、排输入、边说边写、记 run、重启接着做、存评测是任何进程内 agent 都要的，放在执行模块的 `AgentHost`；`orchestrator.ts` 只剩编排的策略，测编排不用碰 agent 的机器。放弃了「只改名」：边界不动，名字说的和代码做的对不上。
+- **管家叫 orchestrator，跑它的机器归执行。** 它在系统里的位置是编排者（收活、派给帮工、盯进度、转告），「助理」只说了它跟主人说话。起大脑、排输入、写回答、记 run、重启接着做、存评测是任何进程内 agent 都要的，放在执行模块的 `AgentHost`；`orchestrator.ts` 只剩编排的策略，测编排不用碰 agent 的机器。放弃了「只改名」：边界不动，名字说的和代码做的对不上。
 - **每种来源怎么进只在一张表里。** 原来「马上还是排队、算不算主人的话、记成什么触发、开头那行」分在田头、几个入口函数和重启的代码里，加一种来源要改四处。现在是 `intake: Record<Source, …>`，加一种编译器逼你填齐；通话、HTTP、连接器只交「来源 + 话 + 回答到哪」。
 - **自己的 agent，管家和帮工同一份代码，模型和循环也是自己的。** 我们只用一家模型（DeepSeek 的 `chat/completions`）和一个循环，所以把 pi-ai、pi-agent-core 的这两块照它们的接口、形状和事件次序用 Effect 重写成 `ai` 和 `agent/loop`：叫停、插话、等一轮完是纤程和 `Deferred`，不用在库的回调里对齐时机；测试用照脚本回答的 `Llm`。和 pi 一致由从 pi 录下的黄金数据（请求体、流读出的消息、参数的改法和不收时的话）和钉住循环的 `loop.test.ts` 守着；代价是 DeepSeek 的新东西要自己跟，只有一家，跟得上。pi-ai 只剩 `runtime/price.ts` 用它自带的价目给 pi 农机算钱。放弃了包一层 Effect、把 pi 留在里面：中间的适配永远要维护，叫停、插话的时机还是库的。放弃了 Effect 自带的 `effect/ai` 和 `@effect/ai-openai-compat`：整个标着 unstable，compat 不发 DeepSeek 的 `thinking`、`reasoning_effort`、不读 `prompt_cache_hit_tokens`，`LanguageModel` 默认替你跑工具，`Chat` 的历史和我们的压缩、提示开头要互相让。放弃了照搬整个 pi-ai：十几家模型、OAuth、价目表，只是多维护。定时、子 agent、MCP、按需技能、压缩、对话文件是我们自己的，在 `agent/brain` 里。没用 nanobot（Python，自己的总线和渠道会和田头、连接器重复）和 Vercel AI SDK、LangChain.js 这类框架（压缩、前缀缓存和取消都要绕过它们）。先当管家再当帮工：管家要的是受控的工具和低延迟，在这里先把循环、会话、压缩磨稳。大脑放在服务端里：它要和档案、计划一起长。DeepSeek 的工具调用不如 Claude 稳，靠步数上限（40）、坏参数时给模型一句看得懂的错兜住。
 - **管家是档案，但不用捏帮工页。** 模型、记性都按档案走，派活时排除它；管家的大半配置（农机、技能、人设交给农机的方式、worktree）对它没有意义，所以另开一页，只放它真有的：记性、轨迹、旧账、声音。记性不搬进数据库：`remember`、`rewrite_memory` 和系统提示都写死了 `MEMORY.md`，页面直接读写那个文件。
@@ -145,6 +145,6 @@
 - `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束、照 OpenAI 的样子拒绝）、`tools.test.ts`；`loop.test.ts` 钉着循环的样子（事件的次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序）。
 - `agent/loop/agent.test.ts`：同样的情形，外加流里、工具里、准备请求时叫停，叫停以后不再开工具，模型出错、经线路的回答被截断、被拒的请求，跑着时再开一轮被拒。
 - `ai/deepseek.test.ts`、`ai/tools.test.ts`：发出的请求体、流读出的消息、参数的改法和不收时的话，逐字对照从 pi-ai 录下的黄金数据（`ai/testdata`）；`ai/llm.test.ts`：钥匙和地址、被拒的状态、断掉的流。
-- `session/host.test.ts`：Caller 的监听器随 push、end、abort 清理；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 共享清理结果。
+- `session/host.test.ts`：每个回答整条说一次，Caller 边长边拿到字，状态在拿到输入后带上它的去处；Caller 的监听器随 push、end、abort 清理；Build 期间关闭会等 Build 放行，迟到输入不投递，重复 close 共享清理结果。
 - `agent/agent.test.ts`：管家是内置的档案。
 - 页面：`apps/web/test/orchestrator.spec.ts`（记性、轨迹、「这一轮做错了」、旧账、声音）；`farm-chat.spec.ts`（管家回答田头的话）。

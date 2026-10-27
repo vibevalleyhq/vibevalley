@@ -726,10 +726,7 @@ export const make = (options: VoiceOptions = {}) =>
           });
           committed = true;
           if (about) tell([], about);
-          return {
-            agentId: id,
-            answeredBy: callLine === undefined ? "agora" : "orchestrator",
-          } as const;
+          return { agentId: id };
         });
         const agent = yield* started.pipe(
           Effect.onError(() =>

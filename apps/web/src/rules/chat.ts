@@ -14,6 +14,7 @@ import {
   type Phase,
   type Session,
   type Spent,
+  type WorkspaceState,
 } from "@vibevalley/protocol";
 
 export const isChannel = (c: Conversation) => c.kind !== "thread";
@@ -105,14 +106,14 @@ export function threadTitle(chat: Chat | undefined, thread: Conversation, issues
 export const messagesIn = (chat: Chat | undefined, conversation: string) => chat?.messages.filter((m) => m.conversation === conversation) ?? [];
 
 export const unreadIn = (chat: Chat | undefined, c: Conversation) =>
-  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice" && m.final).length;
+  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice").length;
 
 export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(chat, c), 0);
 
 /** The number a receipt for this conversation carries, or undefined with nothing unread. */
 export function newestUnread(chat: Chat | undefined, c: Conversation) {
   if (unreadIn(chat, c) === 0) return undefined;
-  return findLast(messagesIn(chat, c.id), (m) => m.final && m.number > (c.read ?? 0))?.number;
+  return findLast(messagesIn(chat, c.id), (m) => m.number > (c.read ?? 0))?.number;
 }
 
 /** A channel's own unread and its threads'; threads without a channel count under the general. */
@@ -187,9 +188,11 @@ export function feedOf(chat: Chat | undefined, conversation: string, more?: Load
   });
 }
 
-/** The orchestrator's dots: it thinks, in a channel, and has not answered the last word yet. */
-export const waitingForOrchestrator = (orchestrator: string | undefined, conversation: Conversation | undefined, messages: ChatMessage[]) =>
-  orchestrator === "thinking" && conversation?.kind !== "thread" && messages.length > 0 && messages[messages.length - 1]!.from !== orchestratorAgent;
+/** The orchestrator's dots in a conversation: it is thinking or writing its answer there, as the server says. */
+export function orchestratorTyping(state: WorkspaceState | undefined, conversation: Conversation | undefined): "thinking" | "speaking" | undefined {
+  if (!state || !conversation || state.orchestratorConversation !== conversation.id) return undefined;
+  return state.orchestrator === "thinking" || state.orchestrator === "speaking" ? state.orchestrator : undefined;
+}
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 

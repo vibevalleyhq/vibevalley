@@ -16,11 +16,11 @@ import { usePrefs } from "../../data/prefs";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
-/** A message's text; a long one shows its first lines until opened. One still streaming is shown whole. */
-export function ChatText(props: { text: string; folds?: boolean; link?: string }) {
+/** A message's text; a long one shows its first lines until opened. */
+export function ChatText(props: { text: string; link?: string }) {
   const [open, setOpen] = createSignal(false);
   return (
-    <Show when={(props.folds ?? true) && readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
+    <Show when={readsLong(props.text)} fallback={<PxMarkdown text={props.text} mentions />}>
       <div class="flex flex-col items-start">
         <div class={open() ? "" : "max-h-[117px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_70%,transparent)]"}>
           <PxMarkdown text={props.text} mentions />
@@ -113,11 +113,8 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
       <Show when={props.tag}>
         <span class="mb-1 inline-block bg-wheat/40 px-1.5 text-[12px] text-bark-800">{props.tag}</span>
       </Show>
-      <Show when={props.folded} fallback={<ChatText text={props.m.text} folds={props.m.final} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
+      <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
         <DispatchNote text={props.m.text} />
-      </Show>
-      <Show when={!props.m.final}>
-        <span class="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current align-middle" aria-hidden="true" />
       </Show>
       {props.after}
     </ChatRow>
@@ -137,7 +134,7 @@ export function ChatReport(props: { m: ChatMessage; first: boolean; face: JSX.El
       <span class="mb-1 inline-block px-1.5 text-[12px]" style={{ background: tag()[1], color: tag()[2] }}>
         {tag()[0]}
       </span>
-      <ChatText text={props.m.text} folds={props.m.final} />
+      <ChatText text={props.m.text} />
       <Show when={props.m.spent}>{(spent) => <p class={["mt-1", small]}>{farmWording().chat.spent(spentText(spent()))}</p>}</Show>
       {props.steps}
     </ChatRow>
@@ -170,7 +167,7 @@ export function ParentMessage(props: { m: ChatMessage; face: JSX.Element }) {
           <SenderName m={props.m} /> · {farmClock(props.m.at)}
         </p>
         <div class="text-[12px] text-bark-800">
-          <ChatText text={props.m.text} folds={props.m.final} />
+          <ChatText text={props.m.text} />
         </div>
       </div>
     </div>

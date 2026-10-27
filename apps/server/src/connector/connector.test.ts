@@ -159,7 +159,6 @@ const feishuMsg = (from: string, text: string, chatType = "p2p"): FeishuMessage 
   parentId: "",
 });
 
-let says = 0;
 /** The orchestrator, played: what it hears goes into the channel, and it answers 收到 at once. */
 const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: number; retryMostMs?: number } = {}) =>
   layer({
@@ -168,9 +167,7 @@ const farm = (script: Script, config = testConfig(), retry: { retryFirstMs?: num
     qq: script.qq,
     ...retry,
     say: (text, conversation, chat) =>
-      Effect.flatMap(chat.say(text, conversation, ""), ({ message }) =>
-        chat.orchestratorSays(message.conversation, `k${++says}`, "收到：**" + text + "**", true, ""),
-      ),
+      Effect.flatMap(chat.say(text, conversation, ""), ({ message }) => chat.orchestratorSays(message.conversation, "收到：**" + text + "**", "")),
   }).pipe(Layer.provideMerge(orchestrator({ listen: false }).pipe(Layer.provideMerge(world({ config })))));
 
 const statusOf = (id: ConnectorID) =>
@@ -292,7 +289,7 @@ describe("the chat apps", () => {
       expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({
         reason: expect.stringContaining("没有叫"),
       });
-      yield* chat.orchestratorSays(chat.general(), "sq", "田头上的话", true, "");
+      yield* chat.orchestratorSays(chat.general(), "田头上的话", "");
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       expect(yield* nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
         app: "weixin",
@@ -592,7 +589,7 @@ describe("the chat apps", () => {
         const chat = yield* Channels;
         expect(chat.now()?.conversations.some((c) => c.id === thread)).toBe(false);
         yield* qqPaired(second);
-        yield* chat.orchestratorSays(thread, "old-thread-answer", "在旧串里继续答复", true, "");
+        yield* chat.orchestratorSays(thread, "在旧串里继续答复", "");
         expect((yield* nth(second, "weixin", 0, "the old thread's new answer sent")).text).toBe("【管家 · 在工单串里】\n在旧串里继续答复");
         expect(second.by("weixin")).toHaveLength(1);
         expect(second.by("qq").map((m) => m.text)).toEqual(["配对好了：以后在这里说的话，就是你在田头上说的。"]);

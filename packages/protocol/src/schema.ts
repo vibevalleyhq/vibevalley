@@ -196,7 +196,6 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   agent: Schema.optionalKey(Schema.String),
   kind: MessageKind,
   text: Schema.String,
-  final: Schema.Boolean,
   mentions: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   session: Schema.optionalKey(SessionId),
   run: Schema.optionalKey(Schema.String),
@@ -659,6 +658,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
   orchestrator: OrchestratorState,
+  orchestratorConversation: Schema.optionalKey(Schema.String),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -1077,7 +1077,6 @@ export const ConnectorLogin: Codec<T.ConnectorLogin> = Schema.Struct({
 
 export const VoiceAgent: Codec<T.VoiceAgent> = Schema.Struct({
   agentId: Schema.String,
-  answeredBy: Schema.optionalKey(Schema.Literals(["orchestrator", "agora"])),
 });
 
 export const AgoraGrant: Codec<T.AgoraGrant> = Schema.Struct({
@@ -1590,6 +1589,7 @@ export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
   at: Schema.Number,
   state: OrchestratorState,
+  conversation: Schema.optionalKey(Schema.String),
 });
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({

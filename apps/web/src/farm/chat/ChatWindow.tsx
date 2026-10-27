@@ -11,7 +11,19 @@ import { arrived, pending, say } from "../../data/composer";
 import { liveCaptions, type SpokenLine } from "../../voice/captions";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { channelLabel, channelOf, conversationOf, feedOf, generalOf, parentOf, phaseText, threadOwnerOf, threadTitle, unreadIn } from "../../rules/chat";
+import {
+  channelLabel,
+  channelOf,
+  conversationOf,
+  feedOf,
+  generalOf,
+  orchestratorTyping,
+  parentOf,
+  phaseText,
+  threadOwnerOf,
+  threadTitle,
+  unreadIn,
+} from "../../rules/chat";
 import { voiceCall, type VoiceCall } from "../../voice/call";
 import { useRouter } from "../../app/router";
 import { useNow } from "../../app/util";
@@ -174,9 +186,10 @@ function Window() {
     const spoken: SpokenLine[] = (chat()?.messages ?? [])
       .filter((m) => m.spoken && m.conversation === here.id)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
-    return liveCaptions(c.captions.turns, c.answeredBy, spoken, tick()).map((t) => ({ ...t }));
+    return liveCaptions(c.captions.turns, spoken, tick()).map((t) => ({ ...t }));
   });
-  const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "orchestrator";
+  // On a call the captions show what is being said; the dots are for the chat.
+  const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
   const showSuggestions = () => !thread() && (core()?.call === "live" || (chat()?.messages ?? []).length === 0);
 
   return (
@@ -391,9 +404,7 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
   };
   // The dispatch note is the farm's, under the orchestrator's name: its words say the same turn.
   const turn = () =>
-    props.m.final && props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? (
-      <TurnSteps session="orchestrator" run={props.m.run} orchestrator />
-    ) : undefined;
+    props.m.fromKind === "orchestrator" && props.m.kind !== "dispatch" ? <TurnSteps session="orchestrator" run={props.m.run} orchestrator /> : undefined;
   return (
     <Switch
       fallback={
@@ -421,7 +432,7 @@ function Item(props: { m: ChatMessage; thread?: Conversation; first: boolean; ag
           m={props.m}
           first={props.first}
           face={face()}
-          steps={props.m.final && props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
+          steps={props.m.fromKind === "session" ? <TurnSteps session={props.m.from} run={props.m.run} /> : undefined}
         />
       </Match>
       <Match when={props.m.fromKind === "owner"}>

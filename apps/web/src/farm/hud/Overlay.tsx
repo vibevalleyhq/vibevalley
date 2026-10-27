@@ -285,7 +285,7 @@ function OrchestratorWords(props: { x: number; y: number; hidden: boolean; sessi
   const doneAt = createMemo(() => {
     const said = props.said;
     if (said && said.key !== finished.key) finished = { key: said.key };
-    if (said?.final && finished.at === undefined) finished.at = Date.now();
+    if (said && finished.at === undefined) finished.at = Date.now();
     return finished.at;
   });
   createEffect(doneAt, (at) => {

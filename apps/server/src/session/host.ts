@@ -28,8 +28,6 @@ import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
 import type { Time } from "../base/time.ts";
 
-const streamEveryMs = 120;
-
 /** One answer streamed to a caller (a call's line, a chat/completions request). A newer one ends the one before. */
 export class Caller {
   private readonly queue: string[] = [];
@@ -111,9 +109,10 @@ export interface HostOptions<R> {
   readonly first: R;
   /** Words are not said for this route (the caller still gets them). */
   readonly quiet: (route: R) => boolean;
-  /** Where words go: growing (final false, at most every streamEveryMs) and said in full. */
-  readonly say: (route: R, key: string, text: string, final: boolean, run: string) => Promise<void>;
-  readonly state: (state: OrchestratorState) => Promise<void>;
+  /** Where words go: each of the model's answers in full, as one message; the caller has them as they grow. */
+  readonly say: (route: R, text: string, run: string) => Promise<void>;
+  /** route: the input it works for, once it has taken one in this run; its words go there. */
+  readonly state: (state: OrchestratorState, route?: R) => Promise<void>;
   /** The agent started, or folded its conversation: what the model saw before is gone from it. */
   readonly fresh: () => void;
   /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
@@ -139,9 +138,8 @@ export class AgentHost<R> {
   private readonly transcript: string;
   private input: Hosted<R>;
   private toCaller = 0;
-  private said = 0;
+  /** An answer is being written: its words have begun and it is not yet said. */
   private open = false;
-  private lastPush = 0;
   private prefixChanged: string[] = [];
   private closing = false;
   private closePromise: Promise<void> | undefined;
@@ -158,7 +156,7 @@ export class AgentHost<R> {
     private readonly o: HostOptions<R>,
     journal: Journal,
     runs: RunStore,
-    /** The service's Clock: the streaming window and an eval case's time. */
+    /** The service's Clock: an input's time, and an eval case's. */
     private readonly time: Time,
   ) {
     this.journal = journal;
@@ -353,25 +351,17 @@ export class AgentHost<R> {
     return next;
   }
 
-  private keyNow() {
-    if (!this.open) {
-      this.open = true;
-      this.said++;
-    }
-    return `m${this.said}`;
-  }
-
+  // The caller (a call's line, the local chat/completions) gets the words as they grow; the chat gets the answer once
+  // it is whole, and meanwhile only that it is being written.
   private async grow(text: string) {
     const input = this.input;
     if (input.caller && text.length > this.toCaller) {
       input.caller.push(text.slice(this.toCaller));
       this.toCaller = text.length;
     }
-    const key = this.keyNow();
-    if (this.o.quiet(input.route) || this.time.now() - this.lastPush < streamEveryMs) return;
-    this.lastPush = this.time.now();
-    await this.o.state("speaking");
-    await this.o.say(input.route, key, text, false, this.execution.currentRun());
+    if (this.open) return;
+    this.open = true;
+    await this.o.state("speaking", input.route);
   }
 
   private async done(text: string) {
@@ -379,9 +369,11 @@ export class AgentHost<R> {
     if (input.caller && text.length > this.toCaller) input.caller.push(text.slice(this.toCaller));
     if (input.caller && text) input.caller.push("\n");
     this.toCaller = 0;
-    const key = this.keyNow();
+    const wrote = this.open;
     this.open = false;
-    if (text && !this.o.quiet(input.route)) await this.o.say(input.route, key, text, true, this.execution.currentRun());
+    if (text && !this.o.quiet(input.route)) await this.o.say(input.route, text, this.execution.currentRun());
+    // The run goes on (its tools, another answer) until it settles.
+    if (wrote) await this.o.state("thinking", input.route);
   }
 
   // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
@@ -425,9 +417,12 @@ export class AgentHost<R> {
           if (this.input.caller && this.input.caller !== next.caller) this.input.caller.end();
           this.input = next;
           this.toCaller = 0;
+          // It works for this input from here on, wherever the run began.
+          await this.o.state("thinking", next.route);
         }
         return;
       case "agent_start":
+        // The input it starts on is taken next (message_start), and says where.
         return this.o.state("thinking");
       case "message_update": {
         if (e.message.role !== "assistant") return;
