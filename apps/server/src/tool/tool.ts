@@ -54,6 +54,7 @@ import {
   tail,
 } from "./prompts.ts";
 import { parameters, schemas, sessionParameters, sessionSchemas } from "./schemas.ts";
+import { toolWording } from "./words.ts";
 
 /** A tool's arguments as its Schema reads them. */
 type Orchestrator<K extends keyof typeof parameters> = (typeof parameters)[K]["Type"];
@@ -91,42 +92,6 @@ export interface ToolShape {
 
 export class Tools extends Context.Service<Tools, ToolShape>()("vibevalley/Tool") {}
 
-export const labels: Record<string, string> = {
-  projects: "项目",
-  channels: "频道",
-  open_channel: "开频道",
-  channel_settings: "改频道",
-  recurrence: "定时",
-  list_recurrences: "看定时",
-  cancel_recurrence: "取消定时",
-  accept: "验收",
-  changes: "看改动",
-  roster: "花名册",
-  check: "看进度",
-  tell: "带话",
-  read_chat: "看对话",
-  stop: "叫停",
-  dismiss: "收工",
-  issues: "找工单",
-  issue_create: "记一张工单",
-  issue_update: "改工单",
-  issue_status: "挪工单",
-  graph_split: "拆计划",
-  graphs: "看计划",
-  task_edit: "改计划",
-  graph_action: "计划",
-  task_action: "计划的一件",
-  issue_split: "拆工单",
-  remember: "记一条",
-  rewrite_memory: "整理记性",
-  search_archive: "翻旧账",
-  memory_search: "翻记性",
-  memory_add: "替帮工记",
-  doc_read: "读文档",
-  doc_append: "往文档里加一块",
-  doc_update: "改文档的一块",
-};
-
 const named = ["issue", "agent", "session", "project", "name", "title", "query", "note", "goal"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
@@ -139,9 +104,10 @@ export function toolStart(name: string, args: unknown): ToolStart {
       break;
     }
   }
-  const label = labels[name] ?? name;
+  const w = toolWording();
+  const label = w.labels[name] ?? name;
   if (about.length > 40) about = head(about, 40) + "…";
-  return { text: about ? label + "：" + about : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
+  return { text: about ? w.about(label, about) : label, action: "other", tool: name, input: args === undefined || args === null ? "{}" : JSON.stringify(args) };
 }
 
 const appendTypes = ["paragraph", "heading", "bulleted", "numbered", "todo", "quote", "code"];
