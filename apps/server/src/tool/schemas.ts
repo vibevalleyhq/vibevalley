@@ -162,6 +162,7 @@ const sessionOwn = {
   channel_say: Schema.Struct({
     anyway: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelSay.anyway })),
     confirm: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelSay.confirm })),
+    reply: Schema.optionalKey(Schema.Int.annotate({ description: params.channelSay.reply })),
     target: Schema.optionalKey(Schema.String),
     text: Schema.String,
   }),

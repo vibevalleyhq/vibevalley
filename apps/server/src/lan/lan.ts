@@ -15,7 +15,17 @@ import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
+import {
+  attachmentPath,
+  eventsPath,
+  type LanDevice,
+  lanKeyCookie,
+  type LanPaired,
+  type LanStatus,
+  livePath,
+  type Preview,
+  statePath,
+} from "@vibevalley/protocol";
 import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
@@ -110,13 +120,13 @@ const keyOf = (req: IncomingMessage) => {
 /** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
 const dropped = new Set(["host", "connection", "cookie", "authorization", deviceHeader]);
 
-/** The endpoints a device may call, and the three streams; any other request is refused. */
+/** The endpoints a device may call, the three streams and the files said in the chat; any other request is refused. */
 const remote = new Set([
   ...endpoints.filter((e) => e.can.includes("remote")).map((e) => "POST " + pathOf(e.op)),
   ...[statePath, eventsPath, livePath].map((path) => "GET " + path),
 ]);
 
-export const remoteMay = (method: string, path: string) => remote.has(method + " " + path);
+export const remoteMay = (method: string, path: string) => remote.has(method + " " + path) || (method === "GET" && path.startsWith(attachmentPath("")));
 
 export interface LanOptions {
   readonly address?: () => string;

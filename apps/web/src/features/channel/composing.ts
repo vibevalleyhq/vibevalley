@@ -34,6 +34,8 @@ export interface ComposerWays {
   readonly failed: (reason: string) => void;
   /** After every edit: the text and the caret. */
   readonly edited?: (value: string, at: number) => void;
+  /** Once a line went through: what it carried beside its words (a reply, files) is spent. */
+  readonly sent?: () => void;
 }
 
 export function createComposer(core: () => WorkspaceState | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
@@ -85,7 +87,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
   const send = async () => {
     if (disposed || sending) return;
     const body = intent();
-    if (!body.text) return;
+    if (!body.text && !(body.attachments?.length ?? 0)) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
     const sent = attempt;
     const shown = ways.echo ? channelOf(body.id) : undefined;
@@ -100,6 +102,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     try {
       await api.channel.message.send({ ...sent.body, sendKey: sent.key });
       attempt = undefined;
+      if (!disposed) ways.sent?.();
       // The window hides it once its copy is in the channel; the list lets it go a while after.
       if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);
       // The user may have edited, or chosen another destination, while this response was in flight.
@@ -160,7 +163,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     /** The menu closes when the box loses the focus and comes back with it. */
     blur: () => setClosed(true),
     focus: () => setClosed(false),
-    canSend: () => text().trim() !== "" && !busy(),
+    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     /** The orchestrator is in a round the owner may stop. */
     stoppable: () => core()?.orchestrator === "thinking" || core()?.orchestrator === "speaking",
   };

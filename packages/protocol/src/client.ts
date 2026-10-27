@@ -90,10 +90,33 @@ export class VibeValleyApi {
       send: (a: T.SayRequest): Promise<void> => this.call("/api/v1/channel/message/send", a) as Promise<void>,
       list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
         this.call("/api/v1/channel/message/list", a) as Promise<T.ChatMessage[]>,
+      /** The owner's own words, changed; nobody is told again. */
+      update: (a: T.MessageEdit): Promise<T.ChatMessage> => this.call("/api/v1/channel/message/update", a) as Promise<T.ChatMessage>,
+      /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
+      delete: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/message/delete", a) as Promise<void>,
+      /** What channel.message.delete would do, refused as it would be; nothing changes. */
+      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/channel/message/previewDelete", a) as Promise<T.Preview>,
+      search: (a: T.MessageSearch): Promise<T.MessageHit[]> => this.call("/api/v1/channel/message/search", a) as Promise<T.MessageHit[]>,
     },
     default: {
       /** The channel what names none goes to from now on: a connector's, a call's. */
       set: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/default/set", a) as Promise<void>,
+    },
+    reaction: {
+      /** The owner's reaction added, or taken back when it is there. */
+      toggle: (a: T.ReactionToggle): Promise<T.ChatMessage> => this.call("/api/v1/channel/reaction/toggle", a) as Promise<T.ChatMessage>,
+    },
+    pin: {
+      toggle: (a: { id: string }): Promise<T.ChatMessage> => this.call("/api/v1/channel/pin/toggle", a) as Promise<T.ChatMessage>,
+      /** A channel's pinned messages, newest pinned first. */
+      list: (a: { id: string }): Promise<T.ChatMessage[]> => this.call("/api/v1/channel/pin/list", a) as Promise<T.ChatMessage[]>,
+    },
+    thread: {
+      /** The thread under a message, made if it has none: its id. */
+      create: (a: { id: string }): Promise<string> => this.call("/api/v1/channel/thread/create", a) as Promise<string>,
+    },
+    attachment: {
+      create: (a: T.AttachmentUpload): Promise<T.Attachment> => this.call("/api/v1/channel/attachment/create", a) as Promise<T.Attachment>,
     },
   };
 

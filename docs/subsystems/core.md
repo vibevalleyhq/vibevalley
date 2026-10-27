@@ -62,10 +62,10 @@
 
 **接口和能力表**
 
-- **一个操作是 `endpoints` 的一行**：操作名（`模块[.名词].动词`，页面里是 `api.issue.status.update(…)`）、`about`（输入里认出说的是哪一个的字段，多是 `id`；命令行把它们当位置参数）、输入和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。成功和拒绝的答复都按同一个 Schema 编码，处理函数返回不合形状的值是服务端错误（500），不发给客户端。读写不另标，动词已经说明（`readsOnly`：`get`、`list`、`check`、`recall` 和试跑只读）。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
+- **一个操作是 `endpoints` 的一行**：操作名（`模块[.名词].动词`，页面里是 `api.issue.status.update(…)`）、`about`（输入里认出说的是哪一个的字段，多是 `id`；命令行把它们当位置参数）、输入和回答的 Schema、`can`（谁能调）。`can` 的取值封闭：`owner`（这台电脑上的页面、命令行）、`remote`（「连接到本机」后配对过的设备）、`orchestrator`。`Handlers` 由这张表推出，`handlers.ts` 少实现一个就编不过。成功和拒绝的答复都按同一个 Schema 编码，处理函数返回不合形状的值是服务端错误（500），不发给客户端。读写不另标，动词已经说明（`readsOnly`：`get`、`list`、`check`、`recall`、`search` 和试跑只读）。全部操作见 [capabilities.md](docs/reference/capabilities.md)。
 - **「连接到本机」只放 `can` 有 `remote` 的操作和流**（`remoteMay`），没有匹配的路径一律拒绝；`/mcp` 和 `/v1/chat/completions`（`chatCompletionsPath`，管家的 OpenAI 协议入口，放在 `/api/v1` 外面）永远不放。`can` 写错就是权限写错，改 `remote` 时在改动里单独列出。
 - **`orchestrator` 一列只是记录**：代码不按它放行，管家和帮工能调什么由 `apps/server/src/tool` 的工具表定。
-- **都是 POST，路径就是操作名**：`POST /api/v1/<模块>[/<名词>]/<动词>`，操作名的点换成斜杠（`pathOf`），`issue.status.update` 在 `/api/v1/issue/status/update`。输入只有一份，是 JSON 请求体，id 也在里面（`{ "id": "12", … }`）；没有路径参数和查询参数，空的请求体是 `{}`。只有三条 SSE 流用 GET（`statePath`、`eventsPath`、`livePath`）。
+- **都是 POST，路径就是操作名**：`POST /api/v1/<模块>[/<名词>]/<动词>`，操作名的点换成斜杠（`pathOf`），`issue.status.update` 在 `/api/v1/issue/status/update`。输入只有一份，是 JSON 请求体，id 也在里面（`{ "id": "12", … }`）；没有路径参数和查询参数，空的请求体是 `{}`。只有三条 SSE 流和聊天的附件用 GET（`statePath`、`eventsPath`、`livePath`、`attachmentPath`）：`<img src>` 发不了 POST。
 - **都在 `/api/v1` 下**，包括 `/api/v1/server/health/get` 和三条流。`pathOf` 给出的就是最终路径，页面的客户端、命令行、能力表和「连接到本机」都从它来，没有第二处拼前缀。不设 `/api/...` 的别名，旧客户端拿到 404。加字段、加接口留在 v1；不兼容的改动另起 `/api/v2`，v1 留到主人的设备都升上来。`/mcp` 不带版本：MCP 有自己的版本。
 - **命名**：第一段是概念，多是拥有它的 `apps/server/src` 文件夹（`issue`、`channel`、`lan`；计划是 `graph`）；名词是模块下面的一个子概念（`issue.comment`、`channel.message`、`lan.pairing`），说的就是模块本身时省掉；每个词都用单数，和库表一样（`api.test.ts` 查）。动词一套 `list`、`get`、`create`、`update`、`delete`；`set` 换掉一个取值（`channel.default.set`、`game.title.set`）；`check` 只校验；领域动词只给不是增删改查的（`channel.message.send`、`issue.dispatch`、`issue.act`）；试跑是 `preview<动词>`（`issue.previewDelete`、`issue.status.previewUpdate`，`api.test.ts` 查）。工单的生命周期挂在工单上（`issue.status.update`）；一个意图一个操作，不用布尔开关兼两件；`update` 只改给出的字段（档案和技能的 `update` 是带 id 的整份写入）。
 - **一条规则，差别作为参数**：入口之间的差别传进服务，不写成两个方法。例：工单的改动收「谁在看」，主人看才算进游戏。

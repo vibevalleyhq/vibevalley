@@ -17,7 +17,7 @@ import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/prompts.ts";
-import { inboxLines } from "../channel/rules.ts";
+import { inboxLines } from "../channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
 import type { Actor } from "../base/actor.ts";
@@ -305,6 +305,7 @@ export const make = Effect.gen(function* () {
             ...(p.target ? { target: p.target } : {}),
             ...(p.anyway ? { anyway: true } : {}),
             ...(p.confirm ? { confirm: true } : {}),
+            ...(p.reply !== undefined ? { reply: p.reply } : {}),
           }),
         );
       }),

@@ -267,6 +267,7 @@ export const params = {
   channelSay: {
     anyway: "看过新消息、仍要原样发",
     confirm: "确实要发到频道的顶层，而不是刚读的那个串",
+    reply: "回复同一处的哪一条：它的消息号（msg=）",
   },
   docAppend: {
     level: "标题的级别 1–3，只给 heading 用；默认 2",

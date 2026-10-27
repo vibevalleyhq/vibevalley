@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { readFileSync } from "node:fs";
 import { type ChatMessage, type Channel, orchestratorAgent, type Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { channelOf, defaultOf } from "./state.ts";
@@ -577,7 +578,9 @@ describe("the chat", () => {
       Effect.gen(function* () {
         const general = f.chat.defaultChannel();
         for (const text of ["一", "二", "三"]) yield* f.chat.say(text, undefined, "");
-        const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.follow(general, 1), 3)));
+        // Caught up by revision: from where 一 now stands (the orchestrator's 👀 on it is a change too).
+        const one = (yield* f.chat.history(general)).find((m) => m.text === "一")!;
+        const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.follow(general, one.revision), 3)));
         // What is said elsewhere is not this room's.
         const elsewhere = (yield* f.chat.openChannel("别处", "", "")).id;
         yield* f.chat.orchestratorSays(elsewhere, "别处的话", "");
@@ -594,6 +597,60 @@ describe("the chat", () => {
       }),
     ),
   );
+
+  it.live("a message changes: replies, edits, deletions, reactions and pins, each caught up by revision", () => {
+    const config = testConfig();
+    return run(
+      (f) =>
+        Effect.gen(function* () {
+          const general = f.chat.defaultChannel();
+          const first = (yield* f.chat.say("先这样", undefined, "")).message;
+          expect((yield* f.chat.history(general))[0]!.reactions).toEqual([{ emoji: "👀", by: [orchestratorAgent] }]);
+          const reply = (yield* f.chat.say("补一句", undefined, "", { replyTo: first.number })).message;
+          expect(reply.replyTo).toBe(first.number);
+          expect(yield* Effect.flip(f.chat.say("没有这条", undefined, "", { replyTo: 99 }))).toMatchObject({ _tag: "Refused" });
+          const since = (yield* f.chat.history(general)).at(-1)!.revision;
+
+          const edited = yield* f.chat.edit(first.id, "改成这样");
+          expect([edited.text, edited.edited !== undefined, edited.revision > since]).toEqual(["改成这样", true, true]);
+          const theirs = (yield* f.chat.speak(orchestratorAgent, "我来看看", { anyway: true, confirm: true })).message!;
+          expect(yield* Effect.flip(f.chat.edit(theirs.id, "不是你的"))).toMatchObject({ _tag: "Refused" });
+          const liked = yield* f.chat.react(theirs.id, "owner", "👍");
+          expect(liked.reactions).toEqual([{ emoji: "👍", by: ["owner"] }]);
+          expect((yield* f.chat.react(theirs.id, "owner", "👍")).reactions).toBeUndefined();
+          expect((yield* f.chat.pin(reply.id)).pinned).toBeDefined();
+          expect((yield* f.chat.pins(general)).map((m) => m.id)).toEqual([reply.id]);
+          expect((yield* f.chat.previewRemove(theirs.id)).does[0]).toContain(`第 ${theirs.number} 条`);
+          yield* f.chat.remove(theirs.id);
+          expect(yield* Effect.flip(f.chat.remove(theirs.id))).toMatchObject({ _tag: "Refused" });
+
+          const caught = yield* Stream.runCollect(Stream.take(f.chat.follow(general, since), 3));
+          expect(caught.map((e) => (e._tag === "Message" ? [e.message.number, e.message.text, e.message.deleted !== undefined] : e._tag))).toEqual([
+            [first.number, "改成这样", false],
+            [reply.number, "补一句", false],
+            [theirs.number, "", true],
+          ]);
+          const hits = yield* f.chat.search("补一");
+          expect(hits.map((h) => [h.message.id, h.address])).toEqual([[reply.id, "#general"]]);
+          const thread = yield* f.chat.threadUnder(reply.id);
+          expect(f.channel(thread)?.root).toBe(reply.id);
+          expect(yield* f.chat.threadUnder(reply.id)).toBe(thread);
+
+          const file = yield* f.chat.attach({ name: "截图.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") });
+          expect(file).toMatchObject({ name: "截图.png", type: "image/png", size: 9 });
+          expect((yield* f.chat.attach({ name: "again.png", type: "image/png", data: Buffer.from("png bytes").toString("base64") })).id).toBe(file.id);
+          const shown = (yield* f.chat.say("", undefined, "", { attachments: [file.id] })).message;
+          expect(shown.attachments).toEqual([file]);
+          const kept = yield* f.chat.attachment(file.id);
+          expect(readFileSync(kept!.path, "utf8")).toBe("png bytes");
+          expect((yield* f.chat.read(orchestratorAgent, { target: "#general", limit: 1 })).messages[0]!.attachments).toEqual([
+            { name: "截图.png", path: kept!.path },
+          ]);
+          expect(yield* Effect.flip(f.chat.say("", undefined, "", { attachments: ["nope"] }))).toMatchObject({ _tag: "Missing" });
+        }),
+      config,
+    );
+  });
 
   it.live("the farm's log hears every report: the newest ones first, then each as it is written", () =>
     run((f, x) =>

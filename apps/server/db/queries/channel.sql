@@ -57,3 +57,7 @@ where m.sender_id <> sqlc.arg(participant) and m.kind <> 'notice'
 group by c.id, ch.name
 order by max(m.number) desc
 limit 20;
+
+-- name: BumpRevision :one
+-- In the transaction that writes or changes a message there: the revision it is written with.
+update channel set revision = revision + 1 where id = sqlc.arg(id) returning revision;

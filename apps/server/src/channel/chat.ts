@@ -27,6 +27,11 @@ import {
   type Spent,
   type SubjectKind,
   type SessionId,
+  type Attachment,
+  attachmentMax,
+  type AttachmentUpload,
+  type MessageHit,
+  type Preview,
 } from "@vibevalley/protocol";
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
@@ -50,6 +55,9 @@ import {
   type UnreadRow,
 } from "./rules.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, Layer, PubSub, Schema, type Scope, Semaphore, Stream } from "effect";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
@@ -66,11 +74,16 @@ import * as qd from "../../db/generated/channel_delivery.sql.ts";
 import * as qf from "../../db/generated/channel_follow.sql.ts";
 import * as qmn from "../../db/generated/channel_mention.sql.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
+import * as qa from "../../db/generated/channel_attachment.sql.ts";
 import * as qp from "../../db/generated/channel_participant.sql.ts";
 import * as qr from "../../db/generated/channel_read_cursor.sql.ts";
 import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 
 const reportMax = 1500;
+const searchMax = 50;
+const emojiPattern = /^\S{1,16}$/u;
+/** What a participant says by reacting when a message that wakes it is handed to it. */
+const handedEmoji = "👀";
 const readLimit = 30;
 /** A follower further behind than this reads the room's newest page instead of every message since. */
 export const catchUpMax = 200;
@@ -108,6 +121,13 @@ export interface SpeakOptions {
   readonly target?: string;
   readonly anyway?: boolean;
   readonly confirm?: boolean;
+  /** The number of the message there it answers. */
+  readonly reply?: number;
+}
+
+export interface SayMore {
+  readonly replyTo?: number;
+  readonly attachments?: readonly string[];
 }
 
 export interface ReadOptions {
@@ -141,6 +161,7 @@ interface Meta {
   code?: string;
   /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
   spoken?: boolean;
+  attachments?: Attachment[];
 }
 
 const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
@@ -152,6 +173,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   forTask: Schema.optionalKey(Schema.Boolean),
   code: Schema.optionalKey(Schema.String),
   spoken: Schema.optionalKey(Schema.Boolean),
+  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
 });
 
 /** Anything unreadable is no meta. */
@@ -166,6 +188,14 @@ const metaText = (m: Meta | undefined) =>
       );
 
 type MsgRow = qm.MessageByIDResult;
+
+/** {"emoji": [participant, …]}, as a message keeps them; anything unreadable is none. */
+const ReactionsSchema = Schema.Record(Schema.String, Schema.mutable(Schema.Array(Schema.String)));
+const reactionsOf = (raw: string | null): Record<string, string[]> => jsonOrNone(ReactionsSchema)(raw) ?? {};
+const reactionsText = (r: Record<string, string[]>) => {
+  const kept = Object.entries(r).filter(([, by]) => by.length > 0);
+  return kept.length > 0 ? JSON.stringify(Object.fromEntries(kept)) : null;
+};
 
 const senderKind = (kind: string): ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
 const messageKind = (kind: string): MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
@@ -192,18 +222,25 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(meta.spoken ? { spoken: true } : {}),
     ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
     at: row.created_at,
+    revision: row.revision,
+    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
+    ...(row.edited_at !== null ? { edited: row.edited_at } : {}),
+    ...(row.deleted_at !== null ? { deleted: row.deleted_at } : {}),
+    ...(row.pinned_at !== null ? { pinned: row.pinned_at } : {}),
+    ...(row.reactions !== null ? { reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })) } : {}),
+    ...(meta.attachments && meta.attachments.length > 0 ? { attachments: meta.attachments } : {}),
   };
 }
 
-const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
-  id: row.id,
-  number: row.number,
-  target,
-  from: row.sender_id,
-  fromKind: senderKind(row.sender_kind),
-  name: row.sender_name,
-  text: row.body,
-});
+const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: number | null; deleted_at?: number | null }, filesAt: (id: string) => string) => {
+  const files = metaOf(row.meta).attachments ?? [];
+  return {
+    ...(row.reply_number !== null ? { replyTo: row.reply_number } : {}),
+    ...(row.edited_at ? { edited: true } : {}),
+    ...(row.deleted_at ? { deleted: true } : {}),
+    ...(files.length > 0 ? { attachments: files.map((f) => ({ name: f.name, path: filesAt(f.id) })) } : {}),
+  };
+};
 
 const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" | "is_default">): Info => ({
   id: row.id,
@@ -239,6 +276,8 @@ interface Write {
   readonly follow?: string;
   /** The client's key for one send: the same key from the same sender again is that message, not a new one. */
   readonly sendKey?: string;
+  /** The number of the message in the same channel it answers. */
+  readonly replyTo?: number;
   /** Who has read up to this message once it is written (the owner, of its own words), in the same transaction. */
   readonly readBy?: string;
 }
@@ -263,7 +302,26 @@ export interface ChannelShape {
   readonly defaultChannel: () => string;
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
   /** The owner's words; again: sendKey was sent before, and the message is that one. */
-  readonly say: (text: string, channel: string | undefined, sendKey: string) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
+  readonly say: (
+    text: string,
+    channel: string | undefined,
+    sendKey: string,
+    more?: SayMore,
+  ) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
+  /** The owner's own chat words, changed. Changes tell and wake nobody. */
+  readonly edit: (id: string, text: string) => Effect.Effect<ChatMessage, ApiError>;
+  /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
+  readonly remove: (id: string) => Effect.Effect<void, ApiError>;
+  readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
+  /** A participant's reaction added, or taken back when it is there and add is not asked. */
+  readonly react: (id: string, who: string, emoji: string, add?: boolean) => Effect.Effect<ChatMessage, ApiError>;
+  readonly pin: (id: string) => Effect.Effect<ChatMessage, ApiError>;
+  readonly pins: (channel: string) => Effect.Effect<ChatMessage[], ApiError>;
+  /** The thread under a channel's message, opened if it has none. */
+  readonly threadUnder: (id: string) => Effect.Effect<string, ApiError>;
+  readonly search: (text: string, channel?: string) => Effect.Effect<MessageHit[], ApiError>;
+  readonly attach: (upload: AttachmentUpload) => Effect.Effect<Attachment, ApiError>;
+  readonly attachment: (id: string) => Effect.Effect<{ readonly path: string; readonly type: string; readonly name: string } | undefined>;
   /** Words to a session in its thread; with no thread the session hears them straight. */
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
   /** A session's or the orchestrator's words, through channel_say. */
@@ -585,6 +643,7 @@ export const make = Effect.gen(function* () {
       description: null,
       project: null,
       peer_id: null,
+      revision: 0,
     });
     if (subject.owner) yield* follow(id, subject.owner, "owner", root.number);
     return id;
@@ -691,6 +750,8 @@ export const make = Effect.gen(function* () {
         sender_id: row.sender_id,
         kind: row.kind,
         body: row.body,
+        meta: row.meta,
+        reply_number: row.reply_number,
         created_at: row.created_at,
         name: row.sender_name,
         sender_kind: row.sender_kind,
@@ -736,6 +797,7 @@ export const make = Effect.gen(function* () {
         const id = newId();
         const meta = metaText(w.meta);
         const created_at = yield* Clock.currentTimeMillis;
+        const { revision } = yield* db(qc.bumpRevision({ id: w.channel }));
         const { number } = yield* db(
           qm.insertMessage({
             id,
@@ -746,6 +808,8 @@ export const make = Effect.gen(function* () {
             meta,
             send_key: w.sendKey || null,
             created_at,
+            revision,
+            reply_number: w.replyTo ?? null,
           }),
         );
         yield* db(qc.touchChannel({ number, id: w.channel }));
@@ -764,6 +828,12 @@ export const make = Effect.gen(function* () {
           sender_name: sender.name,
           sender_kind: sender.kind,
           sender_agent: sender.agent_id,
+          revision,
+          reply_number: w.replyTo ?? null,
+          edited_at: null,
+          deleted_at: null,
+          pinned_at: null,
+          reactions: null,
         };
         const out: Written = yield* settle(row);
         if (w.readBy) yield* readUpTo(w.readBy, w.channel, number);
@@ -795,6 +865,7 @@ export const make = Effect.gen(function* () {
     fromKind: senderKind(r.sender_kind),
     name: r.name,
     text: r.body,
+    ...inboxMore(r, filesAt),
   });
 
   const groupRows = (rows: readonly DeliveryRow[]) => {
@@ -845,6 +916,7 @@ export const make = Effect.gen(function* () {
         for (const r of rs) {
           yield* db(qd.seenOne({ seen_at: now, recipient_id: orchestratorAgent, message_id: r.message_id }));
           open.seen(orchestratorAgent, r.message_id);
+          yield* received(orchestratorAgent, r.message_id);
         }
       }
       return;
@@ -868,6 +940,7 @@ export const make = Effect.gen(function* () {
     for (const r of waking) {
       yield* db(qd.markHanded({ launch: delivered.launch ?? "", handed_at: now, recipient_id: recipient, message_id: r.message_id }));
       open.handed(recipient, r.message_id, delivered.launch ?? "");
+      yield* received(recipient, r.message_id);
     }
   });
 
@@ -1090,19 +1163,87 @@ export const make = Effect.gen(function* () {
     return thread;
   });
 
+  const filesDir = join(config.home, "attachments");
+  const filesAt = (id: string) => join(filesDir, id);
+  const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
+    id: row.id,
+    number: row.number,
+    target,
+    from: row.sender_id,
+    fromKind: senderKind(row.sender_kind),
+    name: row.sender_name,
+    text: row.body,
+    ...inboxMore(row, filesAt),
+  });
+
+  const answered = Effect.fnUntraced(function* (channel: string, number: number | undefined) {
+    if (number === undefined) return;
+    if (!(yield* one(qm.messageByNumber({ channel_id: channel, number })))) return yield* Effect.fail(refused(channelWording().noMessage(number)));
+  });
+
+  const attachmentsOf = Effect.fnUntraced(function* (ids: readonly string[]) {
+    const out: Attachment[] = [];
+    for (const id of new Set(ids)) {
+      const a = yield* one(qa.attachmentByID({ id }));
+      if (!a) return yield* Effect.fail(missing(channelWording().noAttachment(id), [lookIn.channel]));
+      out.push(a);
+    }
+    return out;
+  });
+
+  const messageOf = Effect.fnUntraced(function* (id: string) {
+    const row = yield* one(qm.messageByID({ id }));
+    if (!row) return yield* Effect.fail(missing(channelWording().noMessageId(id), [lookIn.channel]));
+    return row;
+  });
+
+  /** One message changed, in one transaction with the channel's next revision; then it goes to whoever follows its
+   * channel as it now is. A change is not news: no fact, no delivery, no wake. */
+  const change = Effect.fnUntraced(function* (row: MsgRow, work: (revision: number, now: number) => Effect.Effect<void, unknown>) {
+    const now = yield* Clock.currentTimeMillis;
+    yield* tx(
+      Effect.gen(function* () {
+        const { revision } = yield* db(qc.bumpRevision({ id: row.channel_id }));
+        yield* Effect.orDie(work(revision, now));
+      }),
+    );
+    const message = toMessage((yield* one(qm.messageByID({ id: row.id })))!);
+    yield* PubSub.publish(said, message);
+    yield* publishChannel(row.channel_id);
+    return message;
+  });
+
+  /** add only adds: a reaction already there is then kept. */
+  const reacting = Effect.fnUntraced(function* (id: string, who: string, emoji: string, add: boolean) {
+    const e = emoji.trim();
+    if (!emojiPattern.test(e)) return yield* Effect.fail(refused(channelWording().badEmoji));
+    const row = yield* messageOf(id);
+    if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+    const r = reactionsOf(row.reactions);
+    const by = r[e] ?? [];
+    if (by.includes(who)) {
+      if (add) return toMessage(row);
+      r[e] = by.filter((x) => x !== who);
+    } else r[e] = [...by, who];
+    return yield* change(row, (revision) => db(qm.setReactions({ reactions: reactionsText(r), revision, id })));
+  });
+
+  const received = (recipient: string, message: string) =>
+    reacting(message, recipient, handedEmoji, true).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: 👀 on ${message}: ${String(c)}`)));
+
   const shape: ChannelShape = {
     now: () => core.state().chat,
     follow: (channel, after) =>
       Stream.unwrap(
         Effect.gen(function* () {
           if (!model.channel(channel)) return yield* Effect.fail(refused(channelWording().channelGone));
-          // Subscribed before the missed ones are read: nothing said in between falls through, and what both have is
-          // dropped by its number.
+          // Subscribed before the missed ones are read: nothing changed in between falls through, and what both have is
+          // dropped by its revision.
           const live = yield* PubSub.subscribe(said);
-          const missed = yield* db(qm.messagesAfter({ channel_id: channel, number: after, n: catchUpMax + 1 }));
+          const missed = yield* db(qm.messagesChangedAfter({ channel_id: channel, revision: after, n: catchUpMax + 1 }));
           if (missed.length > catchUpMax) return Stream.succeed<ChannelEvent>({ _tag: "Reset" });
-          const upto = missed.at(-1)?.number ?? after;
-          const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.channel === channel && m.number > upto)), "chat.follow");
+          const upto = missed.at(-1)?.revision ?? after;
+          const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.channel === channel && m.revision > upto)), "chat.follow");
           return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): ChannelEvent => ({ _tag: "Message", message })));
         }),
       ),
@@ -1125,19 +1266,121 @@ export const make = Effect.gen(function* () {
       const row = model.channel(message.channel_id);
       return row ? { channel: toChannel(row), top: channelIdOf(row) } : undefined;
     }),
-    say: (text, channel, sendKey) =>
+    say: (text, channel, sendKey, more = {}) =>
       locked(
         Effect.gen(function* () {
-          if (!text.trim()) return yield* Effect.fail(refused(channelWording().empty));
+          const files = yield* attachmentsOf(more.attachments ?? []);
+          if (!text.trim() && files.length === 0) return yield* Effect.fail(refused(channelWording().empty));
           if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
           const where = channel ?? defaultId;
           if (!model.channel(where)) return yield* Effect.fail(missing(channelWording().noChannel(where), [lookIn.channel]));
-          const written = yield* write({ channel: where, from: ownerId, kind: "chat", text: text.trim(), sendKey, readBy: ownerId });
+          yield* answered(where, more.replyTo);
+          const written = yield* write({
+            channel: where,
+            from: ownerId,
+            kind: "chat",
+            text: text.trim(),
+            sendKey,
+            readBy: ownerId,
+            ...(more.replyTo !== undefined ? { replyTo: more.replyTo } : {}),
+            ...(files.length > 0 ? { meta: { attachments: files } } : {}),
+          });
           if (written.again) return { message: toMessage(written.row), again: true };
           if (written.absent.length > 0) yield* core.notice("warn", channelWording().absent(written.absent.map((m) => mentionOf(m) ?? "@" + m)));
           return { message: toMessage(written.row), again: false };
         }),
       ),
+    edit: (id, text) =>
+      locked(
+        Effect.gen(function* () {
+          const row = yield* messageOf(id);
+          if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().notYours));
+          const words = text.trim();
+          if (!words) return yield* Effect.fail(refused(channelWording().empty));
+          if (words === row.body) return toMessage(row);
+          return yield* change(row, (revision, now) => db(qm.editMessage({ body: words, at: now, revision, id })));
+        }),
+      ),
+    remove: (id) =>
+      locked(
+        Effect.gen(function* () {
+          const row = yield* messageOf(id);
+          if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+          yield* change(row, (revision, now) =>
+            Effect.gen(function* () {
+              yield* db(qm.deleteMessage({ at: now, revision, id }));
+              for (const d of yield* db(qd.dropOpenOf({ message_id: id }))) open.seen(d.recipient_id, id);
+            }),
+          );
+        }),
+      ),
+    previewRemove: (id) =>
+      Effect.gen(function* () {
+        const row = yield* messageOf(id);
+        if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+        const ch = model.channel(row.channel_id);
+        const waiting = (yield* db(qd.waitingOn({ message_id: id }))).length;
+        return {
+          does: [
+            channelWording().deletes(ch ? targetOfChannel(ch) : "", row.number, row.sender_name, oneLine(row.body, lastMax)),
+            ...(waiting > 0 ? [channelWording().deletesDeliveries(waiting)] : []),
+          ],
+        };
+      }),
+    react: (id, who, emoji, add = false) => locked(reacting(id, who, emoji, add)),
+    pin: (id) =>
+      locked(
+        Effect.gen(function* () {
+          const row = yield* messageOf(id);
+          if (row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().messageGone));
+          return yield* change(row, (revision, now) => db(qm.setPinned({ pinned_at: row.pinned_at === null ? now : null, revision, id })));
+        }),
+      ),
+    pins: (channel) =>
+      Effect.gen(function* () {
+        if (!model.channel(channel)) return yield* Effect.fail(missing(channelWording().noChannel(channel), [lookIn.channel]));
+        return (yield* db(qm.pinnedIn({ channel_id: channel }))).map(toMessage);
+      }),
+    threadUnder: (id) =>
+      locked(
+        Effect.gen(function* () {
+          const row = yield* messageOf(id);
+          if (model.channel(row.channel_id)?.type !== "channel") return yield* Effect.fail(refused(channelWording().threadOnlyInChannel));
+          const thread = yield* tx(threadFor({ id: row.id, number: row.number, channel: row.channel_id }, { kind: "talk", id: "", owner: "" }));
+          yield* publishChannel(thread);
+          return thread;
+        }),
+      ),
+    search: (text, channel) =>
+      Effect.gen(function* () {
+        const words = text.trim();
+        if (!words) return yield* Effect.fail(refused(channelWording().empty));
+        const rows = yield* db(qm.searchMessages({ text: words, channel: channel ?? "", n: searchMax }));
+        return rows.map((r) => ({
+          message: toMessage(r),
+          channel: r.top_id ?? r.channel_id,
+          address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
+        }));
+      }),
+    attach: (upload) =>
+      Effect.gen(function* () {
+        const name = upload.name.trim() || "file";
+        const bytes = Buffer.from(upload.data, "base64");
+        if (bytes.length === 0) return yield* Effect.fail(refused(channelWording().emptyFile));
+        if (bytes.length > attachmentMax) return yield* Effect.fail(refused(channelWording().fileTooBig(attachmentMax)));
+        const id = createHash("sha256").update(bytes).digest("hex");
+        yield* Effect.tryPromise(async () => {
+          await mkdir(filesDir, { recursive: true });
+          // The same bytes are the same file: a second upload leaves the first.
+          await writeFile(filesAt(id), bytes, { flag: "wx" }).catch((e: NodeJS.ErrnoException) => {
+            if (e.code !== "EEXIST") throw e;
+          });
+        }).pipe(Effect.mapError((e) => refused(String(e))));
+        const type = upload.type.trim() || "application/octet-stream";
+        yield* db(qa.insertAttachment({ id, name, type, size: bytes.length, created_at: yield* Clock.currentTimeMillis }));
+        return { id, name, type, size: bytes.length };
+      }),
+    attachment: (id) => Effect.map(one(qa.attachmentByID({ id })), (a) => (a ? { path: filesAt(a.id), type: a.type, name: a.name } : undefined)),
     tellSession: (from, session, text, sendKey) =>
       locked(
         Effect.gen(function* () {
@@ -1201,12 +1444,14 @@ export const make = Effect.gen(function* () {
           const caller = from !== orchestratorAgent ? (yield* one(qm.calledBy({ speaker: from, channel, before: afterAll })))?.sender_id : undefined;
           const answers = caller === undefined ? undefined : sessionId(caller);
           const run = helpers?.currentRun(from);
+          yield* answered(channel, opt.reply);
           const written = yield* write({
             channel,
             from,
             kind: "chat",
             text: words,
             ...(answers ? { answers } : {}),
+            ...(opt.reply !== undefined ? { replyTo: opt.reply } : {}),
             meta: run ? { run } : {},
           });
           yield* setRead(from, channel, written.number, yield* Clock.currentTimeMillis);
@@ -1321,6 +1566,7 @@ export const make = Effect.gen(function* () {
             project: proj,
             parent_id: null,
             peer_id: null,
+            revision: 0,
           });
           yield* publishChannel(id);
           return infoOf({ id, name: clean, description: desc, project: proj, is_default: false });

@@ -173,13 +173,9 @@ export interface InboxMessage {
   readonly fromKind: ActorKind;
   readonly name: string;
   readonly text: string;
+  readonly replyTo?: number;
+  readonly edited?: boolean;
+  readonly deleted?: boolean;
+  /** Files said with it, where they are on this computer. */
+  readonly attachments?: readonly { readonly name: string; readonly path: string }[];
 }
-
-/** The words' own line breaks are marked, so no message can pass for a header. */
-export function messageLine(m: InboxMessage): string {
-  const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
-  return `[target=${m.target} msg=${m.number} from=${from}] ${m.text.trim().replaceAll("\n", "\n  │ ")}`;
-}
-
-/** One line each, in order: how the orchestrator and a session read what came to them. */
-export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");

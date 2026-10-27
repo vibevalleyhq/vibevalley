@@ -160,6 +160,21 @@ export interface Handlers<R = never> {
     readonly limit?: number;
   }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
   readonly "channel.markRead": (a: { readonly id: string } & T.ChatReadRequest) => Effect.Effect<void, ApiError, R>;
+  /** The owner's own words, changed; nobody is told again. */
+  readonly "channel.message.update": (a: T.MessageEdit) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
+  readonly "channel.message.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What channel.message.delete would do, refused as it would be; nothing changes. */
+  readonly "channel.message.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "channel.message.search": (a: T.MessageSearch) => Effect.Effect<T.MessageHit[], ApiError, R>;
+  /** The owner's reaction added, or taken back when it is there. */
+  readonly "channel.reaction.toggle": (a: T.ReactionToggle) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  readonly "channel.pin.toggle": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage, ApiError, R>;
+  /** A channel's pinned messages, newest pinned first. */
+  readonly "channel.pin.list": (a: { readonly id: string }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
+  /** The thread under a message, made if it has none: its id. */
+  readonly "channel.thread.create": (a: { readonly id: string }) => Effect.Effect<string, ApiError, R>;
+  readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
   readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   readonly "graph.event.list": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
   readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
@@ -270,7 +285,7 @@ export const commandOf = (op: keyof Handlers, about: readonly string[] = [], inp
 ];
 
 /** Only get, list, check, recall and preview read; every other verb may change something. */
-export const readsOnly = (op: string) => /^(get|list|check|recall|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
+export const readsOnly = (op: string) => /^(get|list|check|recall|search|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
 export const fieldsOf = (e: Endpoint): readonly string[] => Object.keys((e.input as unknown as { fields?: object } | undefined)?.fields ?? {});
@@ -281,6 +296,8 @@ const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.
 /** The inputs an op and its dry run share: the dry run takes exactly what the op takes. */
 const recurrenceDeleteInput = input({ id: Schema.String });
 const issueDeleteInput = input({ id: Schema.String });
+/** A message, or a channel, by its id. */
+const messageInput = input({ id: Schema.String });
 const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
 const graphTaskDeleteInput = input({ id: Schema.String, task: Schema.String });
 const agentDeleteInput = input({ id: Schema.String });
@@ -585,6 +602,70 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String }, S.ChatReadRequest),
     result: undefined,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.message.update",
+    about: ["id"],
+    input: S.MessageEdit,
+    result: S.ChatMessage,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.message.delete",
+    about: ["id"],
+    input: messageInput,
+    result: undefined,
+    can: ["owner", "remote"],
+    dryRun: "channel.message.previewDelete",
+  },
+  {
+    op: "channel.message.previewDelete",
+    about: ["id"],
+    input: messageInput,
+    result: S.Preview,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.message.search",
+    about: [],
+    input: S.MessageSearch,
+    result: Schema.mutable(Schema.Array(S.MessageHit)),
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "channel.reaction.toggle",
+    about: ["id"],
+    input: S.ReactionToggle,
+    result: S.ChatMessage,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.pin.toggle",
+    about: ["id"],
+    input: messageInput,
+    result: S.ChatMessage,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.pin.list",
+    about: ["id"],
+    input: messageInput,
+    result: Schema.mutable(Schema.Array(S.ChatMessage)),
+    can: ["owner", "remote", "orchestrator"],
+  },
+  {
+    op: "channel.thread.create",
+    about: ["id"],
+    input: messageInput,
+    result: Schema.String,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.attachment.create",
+    about: [],
+    input: S.AttachmentUpload,
+    result: S.Attachment,
     can: ["owner", "remote"],
   },
   {

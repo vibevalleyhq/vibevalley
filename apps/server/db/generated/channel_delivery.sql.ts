@@ -265,6 +265,8 @@ export const AllOpenDeliveriesResult = Schema.Struct({
   ["sender_id"]: Schema.String,
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["created_at"]: Schema.Number,
   ["name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -278,7 +280,7 @@ export const AllOpenDeliveriesResult = Schema.Struct({
 export type AllOpenDeliveriesResult = typeof AllOpenDeliveriesResult.Type
 
 
-export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,\n       m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
+export const AllOpenDeliveriesSql = "-- name: AllOpenDeliveries :many\n-- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).\nselect d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,\n       m.meta, m.reply_number, m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_delivery d\njoin channel_message m on m.id = d.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere d.state in ('pending', 'announced', 'handed')\norder by m.id;"
 
 export const allOpenDeliveries = Effect.fn("AllOpenDeliveries")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -287,4 +289,50 @@ export const allOpenDeliveries = Effect.fn("AllOpenDeliveries")(function* () {
     Result: AllOpenDeliveriesResult,
     execute: () => sql.unsafe(AllOpenDeliveriesSql, []),
   })({})
+})
+
+export const DropOpenOfParams = Schema.Struct({
+  ["message_id"]: Schema.String,
+})
+export type DropOpenOfParams = typeof DropOpenOfParams.Type
+
+
+export const DropOpenOfResult = Schema.Struct({
+  ["recipient_id"]: Schema.String,
+})
+export type DropOpenOfResult = typeof DropOpenOfResult.Type
+
+
+export const DropOpenOfSql = "-- name: DropOpenOf :many\n-- A message deleted: what it was still waiting to hand goes.\nupdate channel_delivery set state = 'dropped', dropped_why = 'deleted'\nwhere message_id = $1 and state in ('pending', 'announced', 'handed')\nreturning recipient_id;"
+
+export const dropOpenOf = Effect.fn("DropOpenOf")(function* (params: DropOpenOfParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: DropOpenOfParams,
+    Result: DropOpenOfResult,
+    execute: (p) => sql.unsafe(DropOpenOfSql, [p["message_id"]]),
+  })(params)
+})
+
+export const WaitingOnParams = Schema.Struct({
+  ["message_id"]: Schema.String,
+})
+export type WaitingOnParams = typeof WaitingOnParams.Type
+
+
+export const WaitingOnResult = Schema.Struct({
+  ["recipient_id"]: Schema.String,
+})
+export type WaitingOnResult = typeof WaitingOnResult.Type
+
+
+export const WaitingOnSql = "-- name: WaitingOn :many\n-- Who a message is still waiting to be handed to.\nselect recipient_id from channel_delivery where message_id = $1 and state in ('pending', 'announced', 'handed');"
+
+export const waitingOn = Effect.fn("WaitingOn")(function* (params: WaitingOnParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: WaitingOnParams,
+    Result: WaitingOnResult,
+    execute: (p) => sql.unsafe(WaitingOnSql, [p["message_id"]]),
+  })(params)
 })
