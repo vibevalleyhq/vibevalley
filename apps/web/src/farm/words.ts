@@ -255,6 +255,9 @@ const zh = {
   conflictTag: "冲突",
   binary: "二进制",
   chat: {
+    replyTo: (name: string, text: string) => (text ? `回复 ${name}：${text}` : `回复 ${name}`),
+    edited: "（已编辑）",
+    deleted: "这条消息已删除",
     suggestions: ["让阿郑做字幕面板", "让小吴跑测试", "进度怎么样？", "大家收工"],
     greeting:
       "这里是田头，你、管家和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每个活下面挂着它的工单串。",
@@ -744,6 +747,9 @@ const en: typeof zh = {
   conflictTag: "Conflict",
   binary: "binary",
   chat: {
+    replyTo: (name, text) => (text ? `Replying to ${name}: ${text}` : `Replying to ${name}`),
+    edited: "(edited)",
+    deleted: "This message was deleted",
     suggestions: ["Have the writer make the captions panel", "Have the tester run the tests", "How is it going?", "Everyone, call it a day"],
     greeting:
       'This is the farm chat, where you, the manager and the helpers talk. Tell me a job to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each job has its ticket thread under it.',

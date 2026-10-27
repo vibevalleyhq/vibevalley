@@ -1,9 +1,11 @@
 import { spentText } from "../../base/format";
 import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ChatMessage, type Channel, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, type MessageHit, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
+import { api } from "../../base/api";
+import { Attachments, EditBox, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { chatPath, feedOf, parentAt, phaseDot, phaseText, roleShort, runtimeLabel, threadOwnerOf, unreadIn, orchestratorTyping, workbenchClock } from "./rules";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
@@ -32,9 +34,31 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   // Rows newer than this arrived while the list was shown: they rise in; the rest just appear.
   const shownAt = Date.now();
 
-  const items = createMemo(() => feedOf(core()?.chat, said().messages, props.filter ?? ""));
-  const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
+  // Where the owner had read to as the list opened: the new ones below a line.
+  const readTo = untrack(() => props.channel?.read ?? 0);
   const searching = () => (props.filter ?? "").trim() !== "";
+  // A search is the server's, over the whole channel and its threads, not only the pages read here.
+  const [hits, setHits] = createSignal<readonly MessageHit[] | undefined>();
+  createEffect(
+    () => ({ text: (props.filter ?? "").trim(), at: id() }),
+    ({ text, at }) => {
+      setHits(undefined);
+      if (!text || !at) return;
+      const wait = setTimeout(() => void api.channel.message.search({ text, channel: at }).then(setHits, () => setHits([])), searchWaitMs);
+      return () => clearTimeout(wait);
+    },
+  );
+  const items = createMemo(() =>
+    searching()
+      ? feedOf(
+          core()?.chat,
+          [...(hits() ?? [])].reverse().map((h) => h.message),
+        )
+      : feedOf(core()?.chat, said().messages),
+  );
+  const addressOf = (m: ChatMessage) => (m.channel === id() ? undefined : hits()?.find((h) => h.message.id === m.id)?.address);
+  const firstNew = () => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== ownerId)?.id);
+  const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
   const typing = () => orchestratorTyping(core(), props.channel);
 
@@ -47,7 +71,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             when={hasOlder() && !searching()}
             fallback={
               <span class="text-xs text-muted">
-                {searching() ? chatWording().messages.containing((props.filter ?? "").trim()) : chatWording().messages.start}
+                {searching()
+                  ? hits() === undefined
+                    ? chatWording().messages.searching
+                    : chatWording().messages.containing((props.filter ?? "").trim())
+                  : chatWording().messages.start}
               </span>
             }
           >
@@ -63,16 +91,27 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             </div>
           )}
         </Show>
-        <Show when={items().length === 0}>
+        <Show when={items().length === 0 && (!searching() || hits() !== undefined)}>
           <p class="py-8 text-center text-sm text-muted">{searching() ? chatWording().messages.notFound : props.emptyText}</p>
         </Show>
         <For each={items()} keyed={(item) => item.message.id}>
           {(item) => (
             <div class={item().message.at > shownAt ? "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0" : ""}>
               <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
+              <Show when={item().message.id === firstNew()}>
+                <DayLine label={chatWording().messages.newMessages} tone="new" />
+              </Show>
               <Show
                 when={item().message.kind === "notice" || item().message.fromKind === "system"}
-                fallback={<MessageRow m={item().message} continues={item().continues} thread={item().thread} />}
+                fallback={
+                  <MessageRow
+                    m={item().message}
+                    continues={item().continues && item().message.id !== firstNew()}
+                    thread={item().thread}
+                    inChannel={props.channel?.type === "channel"}
+                    where={addressOf(item().message)}
+                  />
+                }
               >
                 <p class="px-6 py-2 text-center text-xs leading-relaxed text-muted">{item().message.text}</p>
               </Show>
@@ -95,35 +134,53 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   );
 }
 
-function DayLine(props: { label: string }) {
+/** A search waits this long after the last key before it asks the server. */
+const searchWaitMs = 200;
+
+function DayLine(props: { label: string; tone?: "new" }) {
   return (
-    <div class="flex items-center gap-3 py-3 text-xs text-muted" role="separator">
-      <span class="h-px flex-1 bg-line" />
+    <div class={["flex items-center gap-3 py-3 text-xs", props.tone === "new" ? "text-berry" : "text-muted"]} role="separator">
+      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
       {props.label}
-      <span class="h-px flex-1 bg-line" />
+      <span class={["h-px flex-1", props.tone === "new" ? "bg-berry" : "bg-line"]} />
     </div>
   );
 }
 
-function Frame(props: { face: JSX.Element; dot?: JSX.Element; name: string; meta: string; continues?: boolean; children: JSX.Element }) {
+function Frame(props: {
+  face: JSX.Element;
+  dot?: JSX.Element;
+  name: string;
+  meta: string;
+  continues?: boolean;
+  above?: JSX.Element;
+  tools?: JSX.Element;
+  children: JSX.Element;
+}) {
   return (
-    <div class={["flex gap-3 rounded-md px-1 hover:bg-hover", props.continues ? "pt-0.5" : "mt-3 pt-1"]}>
-      <div class="relative w-10 shrink-0">
-        <Show when={!props.continues}>
-          {props.face}
-          <Show when={props.dot}>
-            <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
+    <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues ? "pt-0.5" : "mt-3 pt-1"]}>
+      {props.tools}
+      <Show when={props.above}>
+        <div class="pl-[52px]">{props.above}</div>
+      </Show>
+      <div class="flex gap-3">
+        <div class="relative w-10 shrink-0">
+          <Show when={!props.continues}>
+            {props.face}
+            <Show when={props.dot}>
+              <span class="absolute top-[26px] left-[26px]">{props.dot}</span>
+            </Show>
           </Show>
-        </Show>
-      </div>
-      <div class="min-w-0 flex-1 pb-0.5">
-        <Show when={!props.continues}>
-          <div class="flex items-baseline gap-2">
-            <span class="text-sm font-semibold">{props.name}</span>
-            <span class="truncate text-xs text-muted">{props.meta}</span>
-          </div>
-        </Show>
-        {props.children}
+        </div>
+        <div class="min-w-0 flex-1 pb-0.5">
+          <Show when={!props.continues}>
+            <div class="flex items-baseline gap-2">
+              <span class="text-sm font-semibold">{props.name}</span>
+              <span class="truncate text-xs text-muted">{props.meta}</span>
+            </div>
+          </Show>
+          {props.children}
+        </div>
       </div>
     </div>
   );
@@ -159,8 +216,20 @@ function Dispatch(props: { text: string }) {
   );
 }
 
-function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel }) {
+function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel; inChannel?: boolean; where?: string | undefined }) {
   const core = useCore();
+  const [editing, setEditing] = createSignal(false);
+  /** Who a participant is, as a reaction's tooltip names it. */
+  const nameOf = (who: string) =>
+    who === ownerId
+      ? chatWording().messages.owner
+      : who === orchestratorAgent
+        ? chatWording().orchestrator
+        : ((core()?.sessions ?? []).find((h) => h.id === who)?.name ?? who);
+  const meta = () =>
+    [props.where ? chatWording().messages.inThread(props.where) : "", props.m.pinned !== undefined ? chatWording().messages.pinned : ""]
+      .filter(Boolean)
+      .join(" · ");
   const agentOf = useAgent(() => props.m.agent);
   const session = () => (props.m.fromKind === "session" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
   const who = () => {
@@ -175,8 +244,12 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
       face={<SenderFace m={props.m} />}
       dot={session() && <Dot tone={phaseDot(session()!.phase)} size={11} />}
       name={props.m.fromKind === "owner" ? chatWording().messages.owner : props.m.name}
-      meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}`}
+      meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
+      above={props.m.replyTo !== undefined ? <ReplyQuote channel={props.m.channel} number={props.m.replyTo} /> : undefined}
+      tools={
+        props.m.deleted === undefined && !props.where ? <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} /> : undefined
+      }
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
@@ -188,8 +261,19 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
           <Tag icon={outcome().icon} label={outcome().label} fill={outcome().fill} />
         </div>
       </Show>
-      <Show when={props.m.kind === "dispatch"} fallback={<Markdown text={props.m.text} mentions />}>
+      <Show
+        when={props.m.kind === "dispatch" && props.m.deleted === undefined}
+        fallback={
+          <Show when={editing()} fallback={<MessageBody m={props.m} />}>
+            <EditBox m={props.m} onDone={() => setEditing(false)} />
+          </Show>
+        }
+      >
         <Dispatch text={props.m.text} />
+      </Show>
+      <Show when={props.m.attachments}>{(files) => <Attachments files={files()} />}</Show>
+      <Show when={(props.m.reactions ?? []).length > 0}>
+        <Reactions m={props.m} names={nameOf} />
       </Show>
       <Show when={props.m.spent && props.m.kind === "report" ? props.m.spent : undefined}>
         {(spent) => (

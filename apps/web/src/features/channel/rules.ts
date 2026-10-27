@@ -151,7 +151,14 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
     const item: FeedItem = {
       message: m,
       thread: threads.get(m.id),
-      continues: !!before && senderOf(before) === senderOf(m) && senderOf(m) !== "" && m.at - before.at < runMs && dayLabel(before.at, now) === label,
+      // A reply shows who says it above the line it answers.
+      continues:
+        !!before &&
+        m.replyTo === undefined &&
+        senderOf(before) === senderOf(m) &&
+        senderOf(m) !== "" &&
+        m.at - before.at < runMs &&
+        dayLabel(before.at, now) === label,
     };
     if (label !== day) {
       day = label;

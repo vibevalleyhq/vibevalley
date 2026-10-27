@@ -4,9 +4,10 @@
 import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
-import { createSignal, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import type { Agent, ChatMessage, Channel, Outcome } from "@vibevalley/protocol";
+import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome } from "@vibevalley/protocol";
+import { useMessage } from "../../features/channel";
 import { farmClock, readsLong } from "./text";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
@@ -113,11 +114,53 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
       <Show when={props.tag}>
         <span class="mb-1 inline-block bg-wheat/40 px-1.5 text-[12px] text-bark-800">{props.tag}</span>
       </Show>
-      <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
-        <DispatchNote text={props.m.text} />
+      <Show when={props.m.replyTo}>{(n) => <Answers channel={props.m.channel} number={n()} />}</Show>
+      <Show when={props.m.deleted === undefined} fallback={<p class={["italic", small]}>{farmWording().chat.deleted}</p>}>
+        <Show when={props.folded} fallback={<ChatText text={props.m.text} link={props.mine ? "text-cream-50" : "text-leaf-700"} />}>
+          <DispatchNote text={props.m.text} />
+        </Show>
+        <Show when={props.m.edited !== undefined}>
+          <span class={small}>{farmWording().chat.edited}</span>
+        </Show>
+        <Show when={props.m.attachments}>
+          {(files) => (
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              <For each={files()} keyed={(f) => f.id}>
+                {(f) => (
+                  <a href={attachmentPath(f().id)} target="_blank" rel="noreferrer" class="block text-[13px] underline">
+                    <Show when={f().type.startsWith("image/")} fallback={f().name}>
+                      <img src={attachmentPath(f().id)} alt={f().name} class="max-h-40 max-w-56 object-contain" loading="lazy" />
+                    </Show>
+                  </a>
+                )}
+              </For>
+            </div>
+          )}
+        </Show>
+      </Show>
+      <Show when={(props.m.reactions ?? []).length > 0}>
+        <div class="mt-1 flex flex-wrap gap-1">
+          <For each={props.m.reactions ?? []} keyed={(r) => r.emoji}>
+            {(r) => (
+              <span class="bg-cream-200 px-1.5 text-[12px] text-bark-800">
+                {r().emoji} {r().by.length}
+              </span>
+            )}
+          </For>
+        </div>
       </Show>
       {props.after}
     </ChatRow>
+  );
+}
+
+/** The line a message answers, as its channel has it now. */
+function Answers(props: { channel: string; number: number }) {
+  const m = useMessage(() => ({ channel: props.channel, number: props.number }));
+  return (
+    <p class={["mb-0.5 truncate", small]}>
+      {farmWording().chat.replyTo(m()?.name ?? `#${props.number}`, m()?.deleted === undefined ? (m()?.text ?? "") : farmWording().chat.deleted)}
+    </p>
   );
 }
 

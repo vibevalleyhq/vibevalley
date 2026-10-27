@@ -1,7 +1,8 @@
 import { chatWording } from "./words";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type Channel, type OrchestratorState, type Session } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type OrchestratorState, ownerId, type Session } from "@vibevalley/protocol";
+import { api } from "../../base/api";
 import {
   channelLabel,
   channelName,
@@ -17,6 +18,8 @@ import {
   threadTitle,
   unreadIn,
   unreadUnder,
+  defaultOf,
+  workbenchClock,
 } from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
@@ -95,6 +98,8 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
   const [tab, setTab] = createSignal<Tab>("chat");
   const [search, setSearch] = createSignal<string>();
   const [settings, setSettings] = createSignal(false);
+  const [pinsOpen, setPinsOpen] = createSignal(false);
+  const [membersOpen, setMembersOpen] = createSignal(false);
   const name = () => channelName(props.channel);
   const about = () =>
     [props.channel?.description, props.channel?.project ? chatWording().defaultProject(props.channel.project) : ""].filter(Boolean).join(" · ");
@@ -140,6 +145,29 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
         >
           <Icon name="act-search" size={18} />
         </button>
+        <div class="relative">
+          <button
+            type="button"
+            class={[iconButton, { "bg-selected": pinsOpen() }]}
+            aria-label={chatWording().pins.open}
+            aria-expanded={aria(pinsOpen())}
+            title={chatWording().pins.open}
+            disabled={!props.channel}
+            onClick={() => setPinsOpen(!pinsOpen())}
+          >
+            <Icon name="icon-star" size={18} />
+          </button>
+          <Show when={pinsOpen() ? props.channel : undefined}>{(c) => <Pins channel={c()} />}</Show>
+        </div>
+        <button
+          type="button"
+          class={[iconButton, "w-auto px-2 text-sm", { "bg-selected": membersOpen() }]}
+          aria-pressed={aria(membersOpen())}
+          disabled={!props.channel}
+          onClick={() => setMembersOpen(!membersOpen())}
+        >
+          {chatWording().members.open}
+        </button>
         <button
           type="button"
           class={iconButton}
@@ -171,8 +199,13 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
         </For>
       </div>
       <Show when={tab() === "chat"}>
-        <MessageList channel={props.channel} filter={search()} emptyText={chatWording().empty(channelLabel(props.channel))} />
-        <Composer channel={props.channel} placeholder={chatWording().sendTo(channelLabel(props.channel))} />
+        <div class="flex min-h-0 flex-1">
+          <div class="flex min-w-0 flex-1 flex-col">
+            <MessageList channel={props.channel} filter={search()} emptyText={chatWording().empty(channelLabel(props.channel))} />
+            <Composer channel={props.channel} placeholder={chatWording().sendTo(channelLabel(props.channel))} />
+          </div>
+          <Show when={membersOpen() ? props.channel : undefined}>{(c) => <Members channel={c()} />}</Show>
+        </div>
       </Show>
       <Show when={props.channel}>
         {(c) => (
@@ -323,6 +356,78 @@ const mood: Record<OrchestratorState, string> = {
   thinking: chatWording().mood.thinking,
   speaking: chatWording().mood.speaking,
 };
+
+/** A channel's pinned messages, read as the panel opens, newest pinned first. */
+function Pins(props: { channel: Channel }) {
+  const [pinned, setPinned] = createSignal<readonly ChatMessage[] | undefined>();
+  createEffect(
+    () => props.channel.id,
+    (id) => void api.channel.pin.list({ id }).then(setPinned, () => setPinned([])),
+  );
+  return (
+    <div
+      role="dialog"
+      aria-label={chatWording().pins.title}
+      class="absolute top-full right-0 z-30 mt-1 flex max-h-96 w-80 flex-col gap-1 overflow-y-auto rounded-lg border border-line bg-page p-2 shadow-float"
+    >
+      <p class="px-1 text-xs font-semibold text-muted">{chatWording().pins.title}</p>
+      <Show when={pinned()?.length === 0}>
+        <p class="px-1 py-2 text-sm text-muted">{chatWording().pins.none}</p>
+      </Show>
+      <For each={pinned() ?? []} keyed={(m) => m.id}>
+        {(m) => (
+          <div class="rounded-md px-2 py-1.5 hover:bg-hover">
+            <div class="flex items-baseline gap-2 text-xs">
+              <span class="font-semibold">{m().from === ownerId ? chatWording().messages.owner : m().name}</span>
+              <span class="text-muted">{workbenchClock(m().at)}</span>
+            </div>
+            <p class="line-clamp-3 text-sm">{m().text}</p>
+          </div>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** Who is in a channel: the owner, the orchestrator, and the helpers working there; a direct channel has its two. */
+function Members(props: { channel: Channel }) {
+  const core = useCore();
+  const now = useNow();
+  const helpers = () => {
+    if (props.channel.type === "direct") return [];
+    const fallback = defaultOf(core()?.chat)?.id;
+    return (core()?.sessions ?? []).filter((h) => (h.channel ?? fallback) === props.channel.id);
+  };
+  return (
+    <aside aria-label={chatWording().members.title} class="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-l border-line bg-side p-3 md:flex">
+      <p class="px-1 pb-1 text-xs font-semibold text-muted">{chatWording().members.title}</p>
+      <div class="flex items-center gap-2 px-1 py-1 text-sm">
+        <span class="flex size-7 items-center justify-center rounded-full bg-wheat text-xs font-semibold">{chatWording().members.owner.slice(0, 1)}</span>
+        {chatWording().members.owner}
+      </div>
+      <div class="flex items-center gap-2 px-1 py-1 text-sm">
+        <OrchestratorFace size={28} />
+        <span class="flex-1">{chatWording().orchestrator}</span>
+        <span class="text-xs text-muted">{mood[core()?.orchestrator ?? "idle"]}</span>
+      </div>
+      <For each={helpers()} keyed={(h) => h.id}>
+        {(h) => (
+          <div class="flex items-center gap-2 px-1 py-1 text-sm">
+            <HelperFace agent={h().agent} runtime={h().runtime} size={28} />
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate">{h().name}</span>
+              <span class="truncate text-xs text-muted">{phaseText(h(), now())}</span>
+            </span>
+            <PhaseGlyph phase={h().phase} />
+          </div>
+        )}
+      </For>
+      <Show when={props.channel.type !== "direct" && helpers().length === 0}>
+        <p class="px-1 pt-1 text-xs text-muted">{chatWording().members.none}</p>
+      </Show>
+    </aside>
+  );
+}
 
 function OrchestratorLine(props: { mood: OrchestratorState }) {
   return (
