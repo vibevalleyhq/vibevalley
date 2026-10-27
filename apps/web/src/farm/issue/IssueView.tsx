@@ -30,7 +30,7 @@ import { farmActWords } from "../../ui/pixel/labels";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
 import { useVillage } from "../support";
-import { useAgent } from "../../data/agents";
+import { useAgent } from "../../features/agent/data";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";

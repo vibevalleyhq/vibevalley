@@ -25,7 +25,7 @@ import {
 import { toast } from "../../ui/toasts";
 import { useRouter } from "../../base/router";
 import { autofocus, useNow } from "../../base/util";
-import { useWorkAgents } from "../../data/agents";
+import { useWorkAgents } from "../../features/agent/data";
 import { ready, useProjects, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";

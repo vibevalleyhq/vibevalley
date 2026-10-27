@@ -6,7 +6,7 @@ import type { JSX } from "@solidjs/web";
 import { ChatPage } from "../features/channel/ChatPage";
 import { FarmPage } from "../farm/FarmPage";
 import { TreePage } from "../tree/TreePage";
-import { AgentsRoute } from "../pages/agents/AgentsPage";
+import { AgentsRoute } from "../features/agent/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../pages/docs/DocsPage";
 import { IssuesPage } from "../features/issue/IssuesPage";

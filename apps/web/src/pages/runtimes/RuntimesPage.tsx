@@ -24,7 +24,7 @@ import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { Keyed } from "../../base/util";
-import { useWorkAgents } from "../../data/agents";
+import { useWorkAgents } from "../../features/agent/data";
 import { ready, useRuntimes } from "../../base/query";
 import { RuntimeIcon } from "../../ui/RuntimeIcon";
 import { Button } from "../../ui/Button";

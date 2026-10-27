@@ -18,7 +18,7 @@ import { ready, useProjects, useQuery } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../../ui/pixel";
 import { commands, useFarm } from "../state";
-import { useWorkAgents } from "../../data/agents";
+import { useWorkAgents } from "../../features/agent/data";
 import { useCore } from "../../base/frame";
 import { issueOf } from "../world/plots";
 import { usePrefs } from "../../base/prefs";

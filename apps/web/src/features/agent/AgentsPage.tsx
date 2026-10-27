@@ -10,12 +10,12 @@ import { api, reasonOf } from "../../base/api";
 import { hexColor } from "../../ui/cast";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
-import { useAgentProblems, useWorkAgents } from "../../data/agents";
+import { useAgentProblems, useWorkAgents } from "./data";
 import { useCore } from "../../base/frame";
 import { ready, useRuntimes } from "../../base/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
-import { useSkills } from "../settings/SkillsPage";
+import { useSkills } from "../../pages/settings/SkillsPage";
 import { AgentPage } from "./AgentPage";
 import { usePrefs } from "../../base/prefs";
 

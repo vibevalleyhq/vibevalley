@@ -32,7 +32,7 @@ import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
-import { useAgent } from "../../data/agents";
+import { useAgent } from "../agent/data";
 import { createSessionEvents } from "../session/data";
 
 function Dot(props: { tone: Tone }) {

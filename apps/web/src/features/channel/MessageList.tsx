@@ -27,7 +27,7 @@ import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
 import { rooms, useMessage, useRoom } from "./rooms";
 import { TurnSteps } from "../session/WorkLog";
-import { useAgent } from "../../data/agents";
+import { useAgent } from "../agent/data";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
   completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "icon-harvest" },

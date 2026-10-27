@@ -8,7 +8,7 @@ import { isRefined, newIssueTitle } from "./rules";
 import { ago, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { autofocus } from "../../base/util";
-import { useWorkAgents } from "../../data/agents";
+import { useWorkAgents } from "../agent/data";
 import { ready, queries, useProjects } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
