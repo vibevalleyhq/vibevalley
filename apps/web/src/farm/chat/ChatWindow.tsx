@@ -186,7 +186,7 @@ function Window() {
     const spoken: SpokenLine[] = (chat()?.messages ?? [])
       .filter((m) => m.spoken && m.conversation === here.id)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
-    return liveCaptions(c.captions.turns, c.answeredBy, spoken, tick()).map((t) => ({ ...t }));
+    return liveCaptions(c.captions.turns, spoken, tick()).map((t) => ({ ...t }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
   const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
