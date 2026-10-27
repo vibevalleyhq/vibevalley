@@ -25,7 +25,7 @@ const zh = {
     root: "不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON",
     state: (path: string) => `核心状态（GET ${path}）`,
     events: (path: string) => `副作用，一行一条（GET ${path}）`,
-    issueRun: "备选的挪到待办，等它交回来，打出改动；经过的每个状态写到 stderr",
+    issueWork: "备选的挪到待办，等它交回来，打出改动；经过的每个状态写到 stderr",
     group: (group: string) => `${group} 的接口`,
   },
   next: {
@@ -85,7 +85,7 @@ const en: typeof zh = {
     root: "With no command, talk to VibeValley's own agent; every other command calls one of VibeValley's endpoints and answers JSON",
     state: (path) => `The core state (GET ${path})`,
     events: (path) => `Side effects, one per line (GET ${path})`,
-    issueRun: "Move a backlog ticket to To do, wait for it to come back and print its changes; each status passed goes to stderr",
+    issueWork: "Move a backlog ticket to To do, wait for it to come back and print its changes; each status passed goes to stderr",
     group: (group) => `The ${group} endpoints`,
   },
   next: {

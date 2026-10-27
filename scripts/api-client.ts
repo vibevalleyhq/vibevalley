@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { endpoints } from "../packages/protocol/src/api.ts";
+import { endpoints, pathOf } from "../packages/protocol/src/api.ts";
 
 const protocol = join(import.meta.dirname, "..", "packages/protocol/src");
 const out = join(protocol, "client.ts");
@@ -27,7 +27,7 @@ function handlers(source: string) {
       continue;
     }
     member += (member ? " " : "") + t;
-    if (!member.endsWith(";")) continue;
+    if (!member.endsWith("ApiError, R>;")) continue;
     const m = /^readonly "([\w.]+)": \((.*)\) => Effect\.Effect<(.+), ApiError, R>;$/.exec(member);
     if (!m) throw new Error(`api-client: cannot read the Handlers member: ${member}`);
     found.set(m[1]!, { args: m[2]!, result: m[3]!, doc });
@@ -39,35 +39,36 @@ function handlers(source: string) {
 
 const signatures = handlers(readFileSync(join(protocol, "api.ts"), "utf8"));
 
-function method(e: (typeof endpoints)[number]): string {
+function method(e: (typeof endpoints)[number], indent: string): string {
   const sig = signatures.get(e.op);
   if (!sig) throw new Error(`api-client: ${e.op} is in endpoints but not in Handlers`);
-  const name = e.op.split(".")[1]!;
-  // "/api/v1/issues/{id}/runs" → "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/runs"
-  const path = e.path
-    .split(/(\{\w+\})/)
-    .filter((p) => p !== "")
-    .map((p) => (p.startsWith("{") ? `encodeURIComponent(String(a.${p.slice(1, -1)}))` : JSON.stringify(p)))
-    .join(" + ");
-  const query = e.query.length === 0 ? "undefined" : `{ ${e.query.map((q) => `${q.name}: a.${q.name}`).join(", ")} }`;
-  const body = e.body === undefined ? "undefined" : "a.body";
+  const name = e.op.split(".").at(-1)!;
   const args = sig.args.replaceAll("readonly ", "");
   const doc = sig.doc
     ? sig.doc
         .split("\n")
         .map((l, i) => (i === 0 ? l : " " + l))
-        .join("\n    ") + "\n    "
+        .join("\n" + indent) +
+      "\n" +
+      indent
     : "";
-  const result = sig.result;
-  return `    ${doc}${name}: (${args}): Promise<${result}> => this.call(${JSON.stringify(e.method)}, ${path}, ${query}, ${body}) as Promise<${result}>,`;
+  const input = e.input === undefined ? "undefined" : "a";
+  return `${indent}${doc}${name}: (${args}): Promise<${sig.result}> => this.call(${JSON.stringify(pathOf(e.op))}, ${input}) as Promise<${sig.result}>,`;
 }
 
-const groups = new Map<string, string[]>();
+// module → its own ops and its nouns' (issue.create, issue.status.update).
+const groups = new Map<string, { own: string[]; nouns: Map<string, string[]> }>();
 for (const e of endpoints) {
-  const g = e.op.split(".")[0]!;
-  groups.set(g, [...(groups.get(g) ?? []), method(e)]);
+  const [g, ...rest] = e.op.split(".");
+  const group = groups.get(g!) ?? { own: [], nouns: new Map<string, string[]>() };
+  groups.set(g!, group);
+  if (rest.length === 1) group.own.push(method(e, "    "));
+  else group.nouns.set(rest[0]!, [...(group.nouns.get(rest[0]!) ?? []), method(e, "      ")]);
 }
 for (const op of signatures.keys()) if (!endpoints.some((e) => e.op === op)) throw new Error(`api-client: ${op} is in Handlers but not in endpoints`);
+
+const groupText = ([g, { own, nouns }]: [string, { own: string[]; nouns: Map<string, string[]> }]) =>
+  `\n  readonly ${g} = {\n${[...own, ...[...nouns].map(([n, ms]) => `    ${n}: {\n${ms.join("\n")}\n    },`)].join("\n")}\n  };\n`;
 
 const text = `// Written by scripts/api-client.ts from api.ts (Handlers and endpoints); do not edit: vp run api:client.
 
@@ -118,22 +119,19 @@ function apiErrorOf(value: unknown): ApiError | undefined {
   }
 }
 
-/** The server's HTTP API, one object per group: \`api.issue.create({ body })\`. */
+/** The server's HTTP API, one object per module and noun, a method per op: \`api.issue.status.update({ id, status })\`. */
 export class VibeValleyApi {
   /** base: the server's address; empty is the page's own origin, which serves it. */
   constructor(
     readonly base = "",
     private readonly fetcher: (url: string, init: RequestInit) => Promise<Response> = (url, init) => fetch(url, init),
   ) {}
-${[...groups].map(([g, ms]) => `\n  readonly ${g} = {\n${ms.join("\n")}\n  };\n`).join("")}
-  private async call(method: string, path: string, query: Record<string, string | number | boolean | undefined> | undefined, body: unknown): Promise<unknown> {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined) params.set(k, String(v));
-    const url = this.base + path + (params.size > 0 ? "?" + params.toString() : "");
-    const res = await this.fetcher(url, {
-      method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+${[...groups].map(groupText).join("")}
+  private async call(path: string, input: unknown): Promise<unknown> {
+    const res = await this.fetcher(this.base + path, {
+      method: "POST",
+      headers: input === undefined ? undefined : { "content-type": "application/json" },
+      body: input === undefined ? undefined : JSON.stringify(input),
     });
     const text = await res.text();
     if (!res.ok) {

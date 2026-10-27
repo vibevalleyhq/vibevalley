@@ -11,7 +11,7 @@ import { api, newSendKey, reasonOf } from "../../base/api";
 
 /** Says a line in a channel (the general one when it is undefined), with the picked helper. */
 export async function say(text: string, channel: Channel | undefined, sendKey: string, agent: string | undefined) {
-  await api.channel.say({ body: { text, channel: channel?.type === "general" ? undefined : channel?.id, agent, sendKey } });
+  await api.channel.message.send({ text, channel: channel?.type === "general" ? undefined : channel?.id, agent, sendKey });
 }
 
 /** A line sent and not yet in its channel: a window shows it at once, until the server's copy comes (the
@@ -99,7 +99,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     sending = true;
     setBusy(true);
     try {
-      await api.channel.say({ body: { ...sent.body, sendKey: sent.key } });
+      await api.channel.message.send({ ...sent.body, sendKey: sent.key });
       attempt = undefined;
       // The window hides it once its copy is in the channel; the list lets it go a while after.
       if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);

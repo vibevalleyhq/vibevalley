@@ -445,7 +445,7 @@ function SowHere(props: { project: string; onDone: () => void }) {
     const project = props.project;
     setBusy(true);
     try {
-      await api.channel.say({ body: { text: text().trim(), project, sendKey: newSendKey() } });
+      await api.channel.message.send({ text: text().trim(), project, sendKey: newSendKey() });
       props.onDone();
     } catch (e) {
       toast(reasonOf(e));

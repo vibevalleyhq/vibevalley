@@ -39,7 +39,7 @@ function setup() {
 }
 
 test("every routing field participates in a send identity, while unchanged retries keep it", async () => {
-  const send = vi.spyOn(api.channel, "say").mockRejectedValue(new Error("response lost"));
+  const send = vi.spyOn(api.channel.message, "send").mockRejectedValue(new Error("response lost"));
   const s = setup();
   try {
     s.edit("同一句");
@@ -52,15 +52,15 @@ test("every routing field participates in a send identity, while unchanged retri
     ]) {
       s.target(target);
       await s.box.send();
-      const first = send.mock.calls.at(-1)![0].body;
+      const first = send.mock.calls.at(-1)![0];
       await s.box.send();
-      expect(send.mock.calls.at(-1)![0].body).toEqual(first);
+      expect(send.mock.calls.at(-1)![0]).toEqual(first);
     }
-    const keys = send.mock.calls.filter((_, i) => i % 2 === 0).map(([request]) => request.body.sendKey);
+    const keys = send.mock.calls.filter((_, i) => i % 2 === 0).map(([request]) => request.sendKey);
     expect(new Set(keys).size).toBe(5);
     s.edit("改了文字");
     await s.box.send();
-    expect(keys).not.toContain(send.mock.calls.at(-1)![0].body.sendKey);
+    expect(keys).not.toContain(send.mock.calls.at(-1)![0].sendKey);
   } finally {
     s.dispose();
   }
@@ -68,7 +68,7 @@ test("every routing field participates in a send identity, while unchanged retri
 
 test("editing back to the original words while sending still keeps the later draft", async () => {
   let complete!: () => void;
-  const send = vi.spyOn(api.channel, "say").mockImplementation(
+  const send = vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;
@@ -94,7 +94,7 @@ test("editing back to the original words while sending still keeps the later dra
 
 test("a response for the previous destination cannot clear the current destination's draft", async () => {
   let complete!: () => void;
-  vi.spyOn(api.channel, "say").mockImplementation(
+  vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;
@@ -116,7 +116,7 @@ test("a response for the previous destination cannot clear the current destinati
 
 test("closing a composer releases its target before a pending response arrives", async () => {
   let complete!: () => void;
-  vi.spyOn(api.channel, "say").mockImplementation(
+  vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;

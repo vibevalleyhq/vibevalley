@@ -9,7 +9,7 @@ import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
 import { type HttpClientError, HttpClient, HttpClientRequest } from "effect/http";
 import { eventsPath, type IssueStatusValues, statePath } from "@vibevalley/protocol";
-import { ApiError, type Endpoint, endpoints, type Handlers } from "@vibevalley/protocol/api";
+import { ApiError, type Endpoint, endpoints, fieldsOf, type Handlers, kebab, pathOf, readsOnly } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 import { err, exit, Failure, out, printBody, stdinText } from "./output.ts";
 
@@ -75,31 +75,17 @@ const send = (base: string, request: HttpClientRequest.HttpClientRequest) =>
   Effect.flatMap(HttpClient.HttpClient, (client) => client.execute(request)).pipe(Effect.mapError(unreachable(base)));
 
 /** One call: its answer's text, or the failure the server answered with. */
-export const request = Effect.fn("Cli.request")(function* (base: string, method: Endpoint["method"], path: string, body?: string) {
-  const plain = HttpClientRequest.make(method)(base + path);
+export const request = Effect.fn("Cli.request")(function* (base: string, path: string, body?: string) {
+  const plain = HttpClientRequest.post(base + path);
   const res = yield* send(base, body === undefined ? plain : HttpClientRequest.bodyText(plain, body, "application/json"));
   const text = yield* res.text.pipe(Effect.mapError(unreachable(base)));
   if (res.status < 200 || res.status >= 300) return yield* Effect.fail(failureOf(res.status, text));
   return text;
 });
 
-const endpointOf = (op: keyof Handlers) => endpoints.find((e) => e.op === op)!;
-
-/** The endpoint's path with its parameters filled in, and its query. */
-function urlOf(e: Endpoint, given: Readonly<Record<string, unknown>>) {
-  const path = e.path.replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(String(given[k])));
-  const q = new URLSearchParams();
-  for (const p of e.query) {
-    const v = given[p.name] as Option.Option<unknown> | undefined;
-    if (v && Option.isSome(v)) q.set(p.name, String(v.value));
-  }
-  return path + (q.size > 0 ? "?" + q.toString() : "");
-}
-
-const call = (base: string, op: keyof Handlers, given: Readonly<Record<string, unknown>>, body?: string) => {
-  const e = endpointOf(op);
-  return request(base, e.method, urlOf(e, given), body);
-};
+/** One op with its input, as a command calls another. */
+const call = (base: string, op: keyof Handlers, input?: Readonly<Record<string, unknown>>) =>
+  request(base, pathOf(op), input === undefined ? undefined : JSON.stringify(input));
 
 /** An answer read by its Schema; one that is not is the server's fault, not the command's. */
 const answer =
@@ -108,9 +94,6 @@ const answer =
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
       Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: cliWording().failure.shape(issue.message) })),
     );
-
-/** How a command writes an op: editNode is edit-node. */
-export const kebab = (op: string) => op.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
 const usage = (path: readonly string[], text: string, tag = "InvalidValue") =>
   new Failure({ code: exit.usage, tag, text, next: [{ say: cliWording().next.help, run: [...path, "--help"] }] });
@@ -127,40 +110,39 @@ const bodyText = (given: string, path: readonly string[]) =>
 
 const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
-/** The body checked against the endpoint's Schema here, so a wrong field is named before anything is sent. */
-const checkedBody = Effect.fnUntraced(function* (e: Endpoint, given: string, path: readonly string[]) {
+/** The input, --json's fields and the arguments together, checked against the endpoint's Schema here, so a wrong field is
+ * named before anything is sent. */
+const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, args: Readonly<Record<string, unknown>>, path: readonly string[]) {
   const text = given === "" ? "{}" : yield* bodyText(given, path);
-  const value = yield* json(text).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.notJson(issue.message), "InvalidJson")));
-  yield* Schema.decodeUnknownEffect(e.body!)(value).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.body(e.op, issue.message))));
-  return text;
+  const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.notJson(issue.message), "InvalidJson")));
+  const value = { ...(fields as Record<string, unknown>), ...args };
+  yield* Schema.decodeUnknownEffect(e.input!)(value).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.body(e.op, issue.message))));
+  return JSON.stringify(value);
 });
 
-const param = (name: string, number: boolean) => (number ? Argument.Int(name) : Argument.String(name));
-const queryFlag = (name: string, number: boolean): Flag.Flag<Option.Option<unknown>> =>
-  number ? Flag.optional(Flag.Int(name)) : Flag.optional(Flag.String(name));
-
-/** One endpoint as a command. The config is built from the table, so it is typed loosely here and read back by name. */
+/** One endpoint as a command, `<module> [<noun>] <verb>`: what it is about as arguments, the rest of its input as --json. The
+ * config is built from the table, so it is typed loosely here and read back by name. */
 function endpointCommand(e: Endpoint) {
-  const [group, op] = e.op.split(".") as [string, string];
-  const name = kebab(op);
-  const path = [group, name];
+  const path = e.op.split(".").map(kebab);
   const config: Record<string, Argument.Argument<unknown> | Flag.Flag<unknown>> = {};
-  for (const p of e.pathParams) config[p.name] = param(p.name, p.number);
-  for (const q of e.query) config[q.name] = queryFlag(q.name, q.number);
-  if (e.body) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(cliWording().flag.json));
-  return Command.make(name, config as never, (given: Record<string, unknown>) =>
+  for (const name of e.about) config[name] = Argument.String(name);
+  // Only an input with more than what it is about takes --json.
+  if (fieldsOf(e).some((f) => !e.about.includes(f))) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(cliWording().flag.json));
+  return Command.make(path.at(-1)!, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
-      const body = e.body
-        ? yield* checkedBody(
+      const args = Object.fromEntries(e.about.map((name) => [name, given[name]]));
+      const body = e.input
+        ? yield* checkedInput(
             e,
-            Option.getOrElse(given.json as Option.Option<string>, () => ""),
+            Option.getOrElse((given.json as Option.Option<string> | undefined) ?? Option.none(), () => ""),
+            args,
             path,
           )
         : undefined;
       if (yield* DryRunFlag) {
-        if (e.dryRun) return yield* printBody(yield* call(base, e.dryRun, given, body));
-        if (e.method !== "GET")
+        if (e.dryRun) return yield* printBody(yield* request(base, pathOf(e.dryRun), body));
+        if (!readsOnly(e.op))
           return yield* Effect.fail(
             new Failure({
               code: exit.usage,
@@ -170,9 +152,9 @@ function endpointCommand(e: Endpoint) {
             }),
           );
       }
-      yield* printBody(yield* request(base, e.method, urlOf(e, given), body));
+      yield* printBody(yield* request(base, pathOf(e.op), body));
     }),
-  ).pipe(Command.withDescription(`${e.method} ${e.path}`));
+  ).pipe(Command.withDescription(`POST ${pathOf(e.op)}`));
 }
 
 /** /api/v1/state or /api/v1/events: each frame's data as it comes. */
@@ -215,14 +197,14 @@ const IssuesOfFrame = Schema.fromJsonString(
 );
 const settled = new Set<string>(["in_review", "done", "canceled"] satisfies (typeof IssueStatusValues)[number][]);
 
-/** `issue run <id>`: a backlog issue to todo, then follows it in the core state while it waits for room or is worked, and
+/** `issue work <id>`: a backlog issue to todo, then follows it in the core state while it waits for room or is worked, and
  * prints its changes. One already sent is only followed. It ends in review, done or canceled; each status it passes goes
  * to stderr. */
-export const issueRunCommand = Command.make("run", { id: Argument.String("id") }, ({ id }) =>
+export const issueWorkCommand = Command.make("work", { id: Argument.String("id") }, ({ id }) =>
   Effect.gen(function* () {
     const base = yield* ServerFlag;
     const issue = yield* call(base, "issue.get", { id }).pipe(Effect.flatMap(answer(S.Issue)));
-    if (issue.status === "backlog") yield* call(base, "issue.status", { id: issue.id }, JSON.stringify({ status: "todo" }));
+    if (issue.status === "backlog") yield* call(base, "issue.status.update", { id: issue.id, status: "todo" });
     yield* frames(base, statePath).pipe(
       Stream.mapEffect((data) =>
         Schema.decodeUnknownEffect(IssuesOfFrame)(data).pipe(Effect.mapError((e) => new Failure({ code: exit.other, tag: "Server", text: e.message }))),
@@ -239,19 +221,21 @@ export const issueRunCommand = Command.make("run", { id: Argument.String("id") }
       Stream.takeUntil((status) => settled.has(status)),
       Stream.runDrain,
     );
-    yield* printBody(yield* call(base, "issue.changes", { id: issue.id }));
+    yield* printBody(yield* call(base, "issue.diff.get", { id: issue.id }));
   }),
-).pipe(Command.withDescription(cliWording().command.issueRun));
+).pipe(Command.withDescription(cliWording().command.issueWork));
 
-/** Every endpoint as `<group> <op>`, with the hand-written commands of a group (issue run, runtime chat) beside them. */
+/** Every endpoint as `<module> [<noun>] <verb>`, with the hand-written commands of a module (issue work, runtime chat) beside them. */
 export function groupCommands(extra: Readonly<Record<string, readonly Command.Command.Any[]>>) {
-  const groups = new Map<string, Command.Command.Any[]>();
+  const modules = new Map<string, { own: Command.Command.Any[]; nouns: Map<string, Command.Command.Any[]> }>();
+  const of = (m: string) => modules.get(m) ?? (modules.set(m, { own: [], nouns: new Map() }), modules.get(m)!);
   for (const e of endpoints) {
-    const group = e.op.split(".")[0]!;
-    groups.set(group, [...(groups.get(group) ?? []), endpointCommand(e)]);
+    const [m, ...rest] = e.op.split(".").map(kebab);
+    if (rest.length === 1) of(m!).own.push(endpointCommand(e));
+    else of(m!).nouns.set(rest[0]!, [...(of(m!).nouns.get(rest[0]!) ?? []), endpointCommand(e)]);
   }
-  for (const [group, commands] of Object.entries(extra)) groups.set(group, [...(groups.get(group) ?? []), ...commands]);
-  return [...groups].map(([group, commands]) =>
-    Command.make(group).pipe(Command.withSubcommands(commands as never), Command.withDescription(cliWording().command.group(group))),
-  ) as Command.Command.Any[];
+  for (const [m, commands] of Object.entries(extra)) of(m).own.push(...commands);
+  const group = (name: string, commands: readonly Command.Command.Any[]) =>
+    Command.make(name).pipe(Command.withSubcommands(commands as never), Command.withDescription(cliWording().command.group(name)));
+  return [...modules].map(([m, { own, nouns }]) => group(m, [...own, ...[...nouns].map(([n, cs]) => group(n, cs))])) as Command.Command.Any[];
 }

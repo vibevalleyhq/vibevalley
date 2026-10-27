@@ -1,8 +1,9 @@
-// The farm's endpoints: each one's path, parameters, body, answer and who may call it. The server routes and the
-// clients call by this list (apps/server/src/http/api.ts, VibeValleyApi).
+// The farm's endpoints: each one's op, input, answer and who may call it. Each is a POST at its op's path (pathOf);
+// the server routes and the clients call by this list (apps/server/src/http/api.ts, VibeValleyApi).
 
 import { type Effect, Schema } from "effect";
 import type * as T from "./shapes";
+import { pathOf } from "./shapes";
 import * as S from "./schema";
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
@@ -94,86 +95,90 @@ export const errorStatus: Readonly<Record<ApiError["_tag"], number>> = {
 
 /** One answer per route: the server's Handlers. */
 export interface Handlers<R = never> {
-  readonly "server.health": () => Effect.Effect<T.Health, ApiError, R>;
+  readonly "server.health.get": () => Effect.Effect<T.Health, ApiError, R>;
   readonly "orchestrator.open": () => Effect.Effect<void, ApiError, R>;
   /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
   readonly "orchestrator.stop": () => Effect.Effect<void, ApiError, R>;
-  readonly "setting.load": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
+  readonly "setting.get": () => Effect.Effect<T.SettingsStatus, ApiError, R>;
   /** The first thing Save would refuse in these settings, without saving them. */
-  readonly "setting.check": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.Check, ApiError, R>;
-  readonly "setting.save": (a: { readonly body: T.SettingsUpdate }) => Effect.Effect<T.SettingsStatus, ApiError, R>;
-  readonly "channel.say": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
-  readonly "channel.create": (a: { readonly body: T.ChannelRequest }) => Effect.Effect<string, ApiError, R>;
-  readonly "recurrence.create": (a: { readonly body: T.RecurrenceRequest }) => Effect.Effect<T.Recurrence, ApiError, R>;
+  readonly "setting.check": (a: T.SettingsUpdate) => Effect.Effect<T.Check, ApiError, R>;
+  readonly "setting.update": (a: T.SettingsUpdate) => Effect.Effect<T.SettingsStatus, ApiError, R>;
+  readonly "channel.message.send": (a: T.SayRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "channel.create": (a: T.ChannelRequest) => Effect.Effect<string, ApiError, R>;
+  readonly "recurrence.create": (a: T.RecurrenceRequest) => Effect.Effect<T.Recurrence, ApiError, R>;
   readonly "recurrence.list": () => Effect.Effect<T.Recurrence[], ApiError, R>;
   /** Only what the body gives changes. */
-  readonly "recurrence.update": (a: { readonly id: string; readonly body: T.RecurrenceUpdate }) => Effect.Effect<void, ApiError, R>;
+  readonly "recurrence.update": (a: { readonly id: string } & T.RecurrenceUpdate) => Effect.Effect<void, ApiError, R>;
   readonly "recurrence.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "recurrence.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "channel.update": (a: { readonly id: string; readonly body: T.ChannelUpdate }) => Effect.Effect<void, ApiError, R>;
+  readonly "channel.update": (a: { readonly id: string } & T.ChannelUpdate) => Effect.Effect<void, ApiError, R>;
   /** The v1 caption relay without a call id is accepted only with one active call. */
-  readonly "orchestrator.hear": (a: { readonly body: T.SayRequest }) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.hear": (a: T.SayRequest) => Effect.Effect<void, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-  readonly "issue.comment": (a: { readonly id: string; readonly body: T.CommentRequest }) => Effect.Effect<void, ApiError, R>;
-  readonly "issue.changes": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
+  readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   /** Stops a session's turn; it stays, and a comment starts the next. */
   readonly "session.stop": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   readonly "session.list": (a: { readonly agent?: string }) => Effect.Effect<T.Session[], ApiError, R>;
   readonly "session.get": (a: { readonly id: string }) => Effect.Effect<T.Session, ApiError, R>;
   /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
-  readonly "session.events": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
+  readonly "session.event.list": (a: { readonly id: string; readonly run?: string }) => Effect.Effect<T.SessionEvent[], ApiError, R>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
-  readonly "issue.history": () => Effect.Effect<T.IssueHistory[], ApiError, R>;
+  readonly "issue.history.list": () => Effect.Effect<T.IssueHistory[], ApiError, R>;
   readonly "issue.list": () => Effect.Effect<T.Issue[], ApiError, R>;
   readonly "issue.get": (a: { readonly id: string }) => Effect.Effect<T.Issue, ApiError, R>;
-  readonly "issue.runs": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
+  readonly "issue.run.list": (a: { readonly id: string }) => Effect.Effect<T.Run[], ApiError, R>;
   /** The issue's milestones, newest first, and what all its runs cost. */
-  readonly "issue.timeline": (a: { readonly id: string }) => Effect.Effect<T.IssueTimeline, ApiError, R>;
-  readonly "issue.create": (a: { readonly body: T.IssueRequest }) => Effect.Effect<T.Issue, ApiError, R>;
-  readonly "issue.update": (a: { readonly id: string; readonly body: T.IssueUpdate }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.timeline.get": (a: { readonly id: string }) => Effect.Effect<T.IssueTimeline, ApiError, R>;
+  readonly "issue.create": (a: T.IssueRequest) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.update": (a: { readonly id: string } & T.IssueUpdate) => Effect.Effect<T.Issue, ApiError, R>;
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What issue.delete would do, refused as it would be; nothing changes. */
   readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "issue.move": (a: { readonly id: string; readonly body: T.MoveIssueRequest }) => Effect.Effect<T.Issue[], ApiError, R>;
+  readonly "issue.move": (a: { readonly id: string } & T.MoveIssueRequest) => Effect.Effect<T.Issue[], ApiError, R>;
   /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
    * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
-  readonly "issue.status": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Issue, ApiError, R>;
-  /** What issue.status would do with the same body, refused as it would be; nothing changes. */
-  readonly "issue.previewStatus": (a: { readonly id: string; readonly body: T.IssueStatusRequest }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Issue, ApiError, R>;
+  /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
+  readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Preview, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
    * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-  readonly "issue.refine": (a: { readonly id: string; readonly body: T.IssueRefineRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Effect.Effect<T.Issue, ApiError, R>;
   /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
-  readonly "issue.dispatch": (a: { readonly id: string; readonly body: T.IssueDispatchRequest }) => Effect.Effect<T.Dispatched, ApiError, R>;
+  readonly "issue.dispatch": (a: { readonly id: string } & T.IssueDispatchRequest) => Effect.Effect<T.Dispatched, ApiError, R>;
   /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
-  readonly "issue.act": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Issue, ApiError, R>;
+  readonly "issue.act": (a: { readonly id: string } & T.IssueActRequest) => Effect.Effect<T.Issue, ApiError, R>;
   /** What issue.act would do with the same body, refused as it would be; nothing changes. */
-  readonly "issue.previewAct": (a: { readonly id: string; readonly body: T.IssueActRequest }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "graph.split": (a: { readonly body: T.GraphSplitRequest }) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.updateTask": (a: { readonly id: string; readonly task: string; readonly body: T.TaskEdit }) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.deleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
+  readonly "issue.previewAct": (a: { readonly id: string } & T.IssueActRequest) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "graph.split": (a: T.GraphSplitRequest) => Effect.Effect<string, ApiError, R>;
+  readonly "graph.task.update": (a: { readonly id: string; readonly task: string } & T.TaskEdit) => Effect.Effect<string, ApiError, R>;
+  readonly "graph.task.delete": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
   /** What deleteTask would do, refused as it would be; nothing changes. */
-  readonly "graph.previewDeleteTask": (a: { readonly id: string; readonly task: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "graph.act": (a: { readonly id: string; readonly body: T.GraphActRequest }) => Effect.Effect<string, ApiError, R>;
-  readonly "graph.taskAct": (a: { readonly id: string; readonly task: string; readonly body: T.TaskActRequest }) => Effect.Effect<string, ApiError, R>;
-  readonly "channel.history": (a: { readonly id: string; readonly before?: number; readonly limit?: number }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
-  readonly "channel.markRead": (a: { readonly id: string; readonly body: T.ChatReadRequest }) => Effect.Effect<void, ApiError, R>;
-  readonly "graph.changes": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
-  readonly "graph.events": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
-  readonly "game.achievements": () => Effect.Effect<T.Achievement[], ApiError, R>;
-  readonly "game.chooseTitle": (a: { readonly body: T.ChooseTitleRequest }) => Effect.Effect<void, ApiError, R>;
+  readonly "graph.task.previewDelete": (a: { readonly id: string; readonly task: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "graph.act": (a: { readonly id: string } & T.GraphActRequest) => Effect.Effect<string, ApiError, R>;
+  readonly "graph.task.act": (a: { readonly id: string; readonly task: string } & T.TaskActRequest) => Effect.Effect<string, ApiError, R>;
+  readonly "channel.message.list": (a: {
+    readonly id: string;
+    readonly before?: number;
+    readonly limit?: number;
+  }) => Effect.Effect<T.ChatMessage[], ApiError, R>;
+  readonly "channel.markRead": (a: { readonly id: string } & T.ChatReadRequest) => Effect.Effect<void, ApiError, R>;
+  readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
+  readonly "graph.event.list": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
+  readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
+  readonly "game.title.set": (a: T.ChooseTitleRequest) => Effect.Effect<void, ApiError, R>;
   readonly "runtime.list": () => Effect.Effect<T.RuntimeInfo[], ApiError, R>;
-  readonly "github.status": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
+  readonly "github.get": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
   readonly "github.refresh": () => Effect.Effect<T.GitHubStatus, ApiError, R>;
   readonly "runtime.refresh": (a: { readonly id: string }) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
-  readonly "runtime.update": (a: { readonly id: string; readonly body: T.RuntimeSettings }) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
+  readonly "runtime.setting.update": (a: { readonly id: string } & T.RuntimeSettings) => Effect.Effect<T.RuntimeInfo, ApiError, R>;
   readonly "agent.list": () => Effect.Effect<T.Agent[], ApiError, R>;
   /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-  readonly "agent.check": (a: { readonly body: T.AgentCheckRequest }) => Effect.Effect<T.AgentCheck[], ApiError, R>;
+  readonly "agent.check": (a: T.AgentCheckRequest) => Effect.Effect<T.AgentCheck[], ApiError, R>;
   /** Create allocates an identity; callers with an existing identity use save. */
-  readonly "agent.create": (a: { readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
-  readonly "agent.save": (a: { readonly id: string; readonly body: T.Agent }) => Effect.Effect<T.Agent, ApiError, R>;
+  readonly "agent.create": (a: T.Agent) => Effect.Effect<T.Agent, ApiError, R>;
+  readonly "agent.update": (a: T.Agent) => Effect.Effect<T.Agent, ApiError, R>;
   readonly "agent.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "agent.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
@@ -182,1201 +187,878 @@ export interface Handlers<R = never> {
   readonly "memory.list": (a: { readonly agent: string }) => Effect.Effect<T.MemoryList, ApiError, R>;
   /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
   readonly "memory.recall": (a: { readonly agent: string; readonly project?: string; readonly text?: string }) => Effect.Effect<T.RecallPreview, ApiError, R>;
-  readonly "memory.create": (a: { readonly agent: string; readonly body: T.MemoryRequest }) => Effect.Effect<T.Memory, ApiError, R>;
+  readonly "memory.create": (a: { readonly agent: string } & T.MemoryRequest) => Effect.Effect<T.Memory, ApiError, R>;
   readonly "memory.delete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "memory.previewDelete": (a: { readonly agent: string; readonly memory: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "orchestrator.listArchive": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
-  readonly "orchestrator.getArchive": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
+  readonly "orchestrator.archive.list": (a: { readonly q?: string }) => Effect.Effect<T.ArchiveListing, ApiError, R>;
+  readonly "orchestrator.archive.get": (a: { readonly name: string }) => Effect.Effect<string, ApiError, R>;
   /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
-  readonly "orchestrator.markWrong": (a: { readonly body: T.OrchestratorEvalRequest }) => Effect.Effect<T.OrchestratorEval, ApiError, R>;
+  readonly "orchestrator.eval.create": (a: T.OrchestratorEvalRequest) => Effect.Effect<T.OrchestratorEval, ApiError, R>;
   readonly "skill.list": () => Effect.Effect<T.Skill[], ApiError, R>;
   /** Create allocates an identity; callers with an existing identity use save. */
-  readonly "skill.create": (a: { readonly body: T.Skill }) => Effect.Effect<T.Skill, ApiError, R>;
-  readonly "skill.save": (a: { readonly id: string; readonly body: T.Skill }) => Effect.Effect<T.Skill, ApiError, R>;
+  readonly "skill.create": (a: T.Skill) => Effect.Effect<T.Skill, ApiError, R>;
+  readonly "skill.update": (a: T.Skill) => Effect.Effect<T.Skill, ApiError, R>;
   readonly "skill.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "skill.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "project.list": () => Effect.Effect<T.ProjectSummary[], ApiError, R>;
   /** The first thing Create would refuse in this project, without making it. */
-  readonly "project.check": (a: { readonly body: T.NewProject }) => Effect.Effect<T.Check, ApiError, R>;
-  readonly "project.create": (a: { readonly body: T.NewProject }) => Effect.Effect<T.ProjectSummary, ApiError, R>;
-  readonly "project.languages": (a: { readonly id: string }) => Effect.Effect<T.ProjectLanguages, ApiError, R>;
+  readonly "project.check": (a: T.NewProject) => Effect.Effect<T.Check, ApiError, R>;
+  readonly "project.create": (a: T.NewProject) => Effect.Effect<T.ProjectSummary, ApiError, R>;
+  readonly "project.language.list": (a: { readonly id: string }) => Effect.Effect<T.ProjectLanguages, ApiError, R>;
   /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
-  readonly "project.templates": (a: { readonly id: string }) => Effect.Effect<T.ProjectTemplates, ApiError, R>;
-  readonly "project.activity": (a: { readonly id: string }) => Effect.Effect<T.ProjectActivity, ApiError, R>;
-  readonly "voice.session": () => Effect.Effect<T.AgoraGrant, ApiError, R>;
-  readonly "voice.renew": (a: { readonly body: T.RenewRequest }) => Effect.Effect<T.AgoraGrant, ApiError, R>;
-  readonly "voice.start": (a: { readonly body: T.StartRequest }) => Effect.Effect<T.VoiceAgent, ApiError, R>;
-  readonly "voice.stop": (a: { readonly body: T.VoiceAgent }) => Effect.Effect<void, ApiError, R>;
-  readonly "voice.heard": (a: { readonly body: T.VoiceHeard }) => Effect.Effect<void, ApiError, R>;
-  readonly "voice.said": (a: { readonly body: T.VoiceSaid }) => Effect.Effect<void, ApiError, R>;
-  readonly "voice.dictate": (a: { readonly body: T.DictateRequest }) => Effect.Effect<T.Dictated, ApiError, R>;
+  readonly "project.template.list": (a: { readonly id: string }) => Effect.Effect<T.ProjectTemplates, ApiError, R>;
+  readonly "project.activity.get": (a: { readonly id: string }) => Effect.Effect<T.ProjectActivity, ApiError, R>;
+  readonly "voice.session.create": () => Effect.Effect<T.AgoraGrant, ApiError, R>;
+  readonly "voice.session.renew": (a: T.RenewRequest) => Effect.Effect<T.AgoraGrant, ApiError, R>;
+  readonly "voice.agent.start": (a: T.StartRequest) => Effect.Effect<T.VoiceAgent, ApiError, R>;
+  readonly "voice.agent.stop": (a: T.VoiceAgent) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.agent.hear": (a: T.VoiceHeard) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.agent.say": (a: T.VoiceSaid) => Effect.Effect<void, ApiError, R>;
+  readonly "voice.dictate": (a: T.DictateRequest) => Effect.Effect<T.Dictated, ApiError, R>;
   readonly "connector.list": () => Effect.Effect<T.ConnectorStatus[], ApiError, R>;
-  readonly "connector.login": (a: { readonly id: T.ConnectorID; readonly body: T.ConnectorLogin }) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
-  readonly "connector.verify": (a: { readonly id: T.ConnectorID; readonly body: T.VerifyRequest }) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
+  readonly "connector.login": (a: { readonly id: T.ConnectorID } & T.ConnectorLogin) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
+  readonly "connector.verify": (a: { readonly id: T.ConnectorID } & T.VerifyRequest) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
   readonly "connector.logout": (a: { readonly id: T.ConnectorID }) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
-  readonly "connector.channel": (a: { readonly id: T.ConnectorID; readonly body: T.ConnectorsChannelRequest }) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
-  readonly "lan.status": () => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.update": (a: { readonly body: T.SetOpenRequest }) => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.startPairing": () => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.stopPairing": () => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "connector.channel.set": (a: { readonly id: T.ConnectorID } & T.ConnectorsChannelRequest) => Effect.Effect<T.ConnectorStatus, ApiError, R>;
+  readonly "lan.get": () => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "lan.update": (a: T.SetOpenRequest) => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "lan.pairing.start": () => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "lan.pairing.stop": () => Effect.Effect<T.LanStatus, ApiError, R>;
   /** What stopPairing would do, refused as it would be; nothing changes. */
-  readonly "lan.previewStopPairing": () => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "lan.answerPairing": (a: { readonly body: T.AnswerPairingRequest }) => Effect.Effect<T.LanStatus, ApiError, R>;
-  readonly "lan.deleteDevice": (a: { readonly id: string }) => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "lan.pairing.previewStop": () => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "lan.pairing.answer": (a: T.AnswerPairingRequest) => Effect.Effect<T.LanStatus, ApiError, R>;
+  readonly "lan.device.delete": (a: { readonly id: string }) => Effect.Effect<T.LanStatus, ApiError, R>;
   /** What deleteDevice would do, refused as it would be; nothing changes. */
-  readonly "lan.previewDeleteDevice": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "lan.pair": (a: { readonly body: T.LanPairRequest }) => Effect.Effect<T.LanPaired, ApiError, R>;
-  readonly "lan.me": () => Effect.Effect<T.LanDevice, ApiError, R>;
+  readonly "lan.device.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "lan.pair": (a: T.LanPairRequest) => Effect.Effect<T.LanPaired, ApiError, R>;
+  readonly "lan.me.get": () => Effect.Effect<T.LanDevice, ApiError, R>;
   /** The documents, the newest change first; their blocks are in doc.get. */
   readonly "doc.list": () => Effect.Effect<T.Document[], ApiError, R>;
-  readonly "doc.create": (a: { readonly body: T.DocRequest }) => Effect.Effect<T.DocSnapshot, ApiError, R>;
+  readonly "doc.create": (a: T.DocRequest) => Effect.Effect<T.DocSnapshot, ApiError, R>;
   /** A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored. */
-  readonly "doc.import": (a: { readonly body: T.DocImport }) => Effect.Effect<T.DocSnapshot, ApiError, R>;
+  readonly "doc.import": (a: T.DocImport) => Effect.Effect<T.DocSnapshot, ApiError, R>;
   /** The document and every live block (no tombstones), in order. */
   readonly "doc.get": (a: { readonly id: string }) => Effect.Effect<T.DocSnapshot, ApiError, R>;
   /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
-  readonly "doc.submit": (a: { readonly id: string; readonly body: T.DocSubmit }) => Effect.Effect<T.DocAck, ApiError, R>;
-  readonly "doc.markdown": (a: { readonly id: string }) => Effect.Effect<T.DocMarkdown, ApiError, R>;
+  readonly "doc.submit": (a: { readonly id: string } & T.DocSubmit) => Effect.Effect<T.DocAck, ApiError, R>;
+  readonly "doc.markdown.get": (a: { readonly id: string }) => Effect.Effect<T.DocMarkdown, ApiError, R>;
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
   readonly "doc.demo": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
 }
 
-export interface Param {
-  readonly name: string;
-  /** Parsed as a number: one that is not a number is a 404 in the path, none in the query. */
-  readonly number: boolean;
-}
-
 export interface Endpoint {
   readonly op: keyof Handlers;
-  readonly method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  readonly path: string;
-  readonly pathParams: readonly Param[];
-  readonly query: readonly Param[];
-  readonly body: Schema.Codec<unknown> | undefined;
+  /** The input's fields that say what it is about (the issue's id…): the command line takes them as its arguments. */
+  readonly about: readonly string[];
+  /** The one argument, ids and all, sent as the POST's JSON body; none when it takes nothing. */
+  readonly input: Schema.Codec<unknown> | undefined;
   readonly result: Schema.Codec<unknown> | undefined;
   readonly can: readonly Caller[];
   /** It changes what cannot be taken back (deletes, merges, closes, sends helpers home): its dry run is this endpoint,
-   * which takes the same parameters and body and answers a Preview without changing anything (the command line's
-   * --dry-run). */
+   * which takes the same input and answers a Preview without changing anything (the command line's --dry-run). */
   readonly dryRun?: keyof Handlers;
 }
 
+export { pathOf };
+
+/** How the command line writes a word of an op: previewDelete is preview-delete. */
+export const kebab = (word: string) => word.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
+
+/** An op as the command line runs it: its words, what it is about, and the rest of its input as --json. */
+export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: unknown): string[] => [
+  ...op.split(".").map(kebab),
+  ...about,
+  ...(input === undefined ? [] : ["--json", JSON.stringify(input)]),
+];
+
+/** An op that only reads: its verb gets, lists, checks or previews; every other one may change something. */
+export const readsOnly = (op: string) => /^(get|list|check|recall|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
+
+/** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
+export const fieldsOf = (e: Endpoint): readonly string[] => Object.keys((e.input as unknown as { fields?: object } | undefined)?.fields ?? {});
+
+/** What an input is about, beside its body's fields, as one object. */
+const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
+  Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
+
+/** The inputs an op and its dry run share: the dry run takes exactly what the op takes. */
+const recurrenceDeleteInput = input({ id: Schema.String });
+const issueDeleteInput = input({ id: Schema.String });
+const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
+const issueActInput = input({ id: Schema.String }, S.IssueActRequest);
+const graphTaskDeleteInput = input({ id: Schema.String, task: Schema.String });
+const agentDeleteInput = input({ id: Schema.String });
+const memoryDeleteInput = input({ agent: Schema.String, memory: Schema.String });
+const skillDeleteInput = input({ id: Schema.String });
+const lanDeviceDeleteInput = input({ id: Schema.String });
+
 export const endpoints: readonly Endpoint[] = [
   {
-    op: "server.health",
-    method: "GET",
-    path: "/api/v1/health",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "server.health.get",
+    about: [],
+    input: undefined,
     result: S.Health,
     can: ["owner", "remote"],
   },
   {
     op: "orchestrator.open",
-    method: "POST",
-    path: "/api/v1/orchestrator/open",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
     op: "orchestrator.stop",
-    method: "POST",
-    path: "/api/v1/orchestrator/stop",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "setting.load",
-    method: "GET",
-    path: "/api/v1/settings",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "setting.get",
+    about: [],
+    input: undefined,
     result: S.SettingsStatus,
     can: ["owner", "remote"],
   },
   {
     op: "setting.check",
-    method: "POST",
-    path: "/api/v1/settings/check",
-    pathParams: [],
-    query: [],
-    body: S.SettingsUpdate,
+    about: [],
+    input: S.SettingsUpdate,
     result: S.Check,
     can: ["owner", "remote"],
   },
   {
-    op: "setting.save",
-    method: "PUT",
-    path: "/api/v1/settings",
-    pathParams: [],
-    query: [],
-    body: S.SettingsUpdate,
+    op: "setting.update",
+    about: [],
+    input: S.SettingsUpdate,
     result: S.SettingsStatus,
     can: ["owner"],
   },
   {
-    op: "channel.say",
-    method: "POST",
-    path: "/api/v1/say",
-    pathParams: [],
-    query: [],
-    body: S.SayRequest,
+    op: "channel.message.send",
+    about: [],
+    input: S.SayRequest,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
     op: "channel.create",
-    method: "POST",
-    path: "/api/v1/channels",
-    pathParams: [],
-    query: [],
-    body: S.ChannelRequest,
+    about: [],
+    input: S.ChannelRequest,
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.create",
-    method: "POST",
-    path: "/api/v1/recurrences",
-    pathParams: [],
-    query: [],
-    body: S.RecurrenceRequest,
+    about: [],
+    input: S.RecurrenceRequest,
     result: S.Recurrence,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.list",
-    method: "GET",
-    path: "/api/v1/recurrences",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Recurrence)),
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "recurrence.update",
-    method: "PUT",
-    path: "/api/v1/recurrences/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.RecurrenceUpdate,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.RecurrenceUpdate),
     result: undefined,
     can: ["owner", "remote"],
   },
   {
     op: "recurrence.delete",
-    method: "DELETE",
-    path: "/api/v1/recurrences/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: recurrenceDeleteInput,
     result: undefined,
     can: ["owner", "remote", "orchestrator"],
     dryRun: "recurrence.previewDelete",
   },
   {
     op: "recurrence.previewDelete",
-    method: "POST",
-    path: "/api/v1/recurrences/{id}/delete/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: recurrenceDeleteInput,
     result: S.Preview,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.update",
-    method: "PUT",
-    path: "/api/v1/channels/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.ChannelUpdate,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.ChannelUpdate),
     result: undefined,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "orchestrator.hear",
-    method: "POST",
-    path: "/api/v1/orchestrator/hear",
-    pathParams: [],
-    query: [],
-    body: S.SayRequest,
+    op: "voice.hear",
+    about: [],
+    input: S.SayRequest,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "issue.comment",
-    method: "POST",
-    path: "/api/v1/issues/{id}/comment",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.CommentRequest,
+    op: "issue.comment.create",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.CommentRequest),
     result: undefined,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "issue.changes",
-    method: "GET",
-    path: "/api/v1/issues/{id}/changes",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "issue.diff.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.Changes,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "session.stop",
-    method: "POST",
-    path: "/api/v1/sessions/{id}/stop",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: undefined,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "session.list",
-    method: "GET",
-    path: "/api/v1/sessions",
-    pathParams: [],
-    query: [{ name: "agent", number: false }],
-    body: undefined,
+    about: [],
+    input: input({ agent: Schema.optionalKey(Schema.String) }),
     result: Schema.mutable(Schema.Array(S.Session)),
     can: ["owner", "remote"],
   },
   {
     op: "session.get",
-    method: "GET",
-    path: "/api/v1/sessions/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.Session,
     can: ["owner", "remote"],
   },
   {
-    op: "session.events",
-    method: "GET",
-    path: "/api/v1/sessions/{id}/events",
-    pathParams: [{ name: "id", number: false }],
-    query: [{ name: "run", number: false }],
-    body: undefined,
+    op: "session.event.list",
+    about: ["id"],
+    input: input({ id: Schema.String, run: Schema.optionalKey(Schema.String) }),
     result: Schema.mutable(Schema.Array(S.SessionEvent)),
     can: ["owner", "remote"],
   },
   {
-    op: "issue.history",
-    method: "GET",
-    path: "/api/v1/issues/history",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "issue.history.list",
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.IssueHistory)),
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "issue.list",
-    method: "GET",
-    path: "/api/v1/issues",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Issue)),
     can: ["owner", "remote"],
   },
   {
     op: "issue.get",
-    method: "GET",
-    path: "/api/v1/issues/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.Issue,
     can: ["owner", "remote"],
   },
   {
-    op: "issue.runs",
-    method: "GET",
-    path: "/api/v1/issues/{id}/runs",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "issue.run.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: Schema.mutable(Schema.Array(S.Run)),
     can: ["owner", "remote"],
   },
   {
-    op: "issue.timeline",
-    method: "GET",
-    path: "/api/v1/issues/{id}/timeline",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "issue.timeline.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.IssueTimeline,
     can: ["owner", "remote"],
   },
   {
     op: "issue.create",
-    method: "POST",
-    path: "/api/v1/issues",
-    pathParams: [],
-    query: [],
-    body: S.IssueRequest,
+    about: [],
+    input: S.IssueRequest,
     result: S.Issue,
     can: ["owner", "remote"],
   },
   {
     op: "issue.update",
-    method: "PUT",
-    path: "/api/v1/issues/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueUpdate,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueUpdate),
     result: S.Issue,
     can: ["owner", "remote"],
   },
   {
     op: "issue.delete",
-    method: "DELETE",
-    path: "/api/v1/issues/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: issueDeleteInput,
     result: undefined,
     can: ["owner", "remote"],
     dryRun: "issue.previewDelete",
   },
   {
     op: "issue.previewDelete",
-    method: "POST",
-    path: "/api/v1/issues/{id}/delete/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: issueDeleteInput,
     result: S.Preview,
     can: ["owner", "remote"],
   },
   {
     op: "issue.move",
-    method: "PUT",
-    path: "/api/v1/issues/{id}/move",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.MoveIssueRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.MoveIssueRequest),
     result: Schema.mutable(Schema.Array(S.Issue)),
     can: ["owner", "remote"],
   },
   {
-    op: "issue.status",
-    method: "PUT",
-    path: "/api/v1/issues/{id}/status",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueStatusRequest,
+    op: "issue.status.update",
+    about: ["id"],
+    input: issueStatusUpdateInput,
     result: S.Issue,
     can: ["owner", "remote"],
-    dryRun: "issue.previewStatus",
+    dryRun: "issue.status.previewUpdate",
   },
   {
-    op: "issue.previewStatus",
-    method: "POST",
-    path: "/api/v1/issues/{id}/status/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueStatusRequest,
+    op: "issue.status.previewUpdate",
+    about: ["id"],
+    input: issueStatusUpdateInput,
     result: S.Preview,
     can: ["owner", "remote"],
   },
   {
     op: "issue.refine",
-    method: "POST",
-    path: "/api/v1/issues/{id}/refine",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueRefineRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueRefineRequest),
     result: S.Issue,
     can: ["owner", "remote"],
   },
   {
     op: "issue.dispatch",
-    method: "POST",
-    path: "/api/v1/issues/{id}/dispatch",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueDispatchRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.IssueDispatchRequest),
     result: S.Dispatched,
     can: ["owner", "remote"],
   },
   {
     op: "issue.act",
-    method: "POST",
-    path: "/api/v1/issues/{id}/act",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueActRequest,
+    about: ["id"],
+    input: issueActInput,
     result: S.Issue,
     can: ["owner", "remote"],
     dryRun: "issue.previewAct",
   },
   {
     op: "issue.previewAct",
-    method: "POST",
-    path: "/api/v1/issues/{id}/act/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.IssueActRequest,
+    about: ["id"],
+    input: issueActInput,
     result: S.Preview,
     can: ["owner", "remote"],
   },
   {
     op: "graph.split",
-    method: "POST",
-    path: "/api/v1/graphs",
-    pathParams: [],
-    query: [],
-    body: S.GraphSplitRequest,
+    about: [],
+    input: S.GraphSplitRequest,
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "graph.updateTask",
-    method: "PUT",
-    path: "/api/v1/graphs/{id}/tasks/{task}",
-    pathParams: [
-      { name: "id", number: false },
-      { name: "task", number: false },
-    ],
-    query: [],
-    body: S.TaskEdit,
+    op: "graph.task.update",
+    about: ["id", "task"],
+    input: input({ id: Schema.String, task: Schema.String }, S.TaskEdit),
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "graph.deleteTask",
-    method: "DELETE",
-    path: "/api/v1/graphs/{id}/tasks/{task}",
-    pathParams: [
-      { name: "id", number: false },
-      { name: "task", number: false },
-    ],
-    query: [],
-    body: undefined,
+    op: "graph.task.delete",
+    about: ["id", "task"],
+    input: graphTaskDeleteInput,
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
-    dryRun: "graph.previewDeleteTask",
+    dryRun: "graph.task.previewDelete",
   },
   {
-    op: "graph.previewDeleteTask",
-    method: "POST",
-    path: "/api/v1/graphs/{id}/tasks/{task}/delete/preview",
-    pathParams: [
-      { name: "id", number: false },
-      { name: "task", number: false },
-    ],
-    query: [],
-    body: undefined,
+    op: "graph.task.previewDelete",
+    about: ["id", "task"],
+    input: graphTaskDeleteInput,
     result: S.Preview,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "graph.act",
-    method: "POST",
-    path: "/api/v1/graphs/{id}/act",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.GraphActRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.GraphActRequest),
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "graph.taskAct",
-    method: "POST",
-    path: "/api/v1/graphs/{id}/tasks/{task}/act",
-    pathParams: [
-      { name: "id", number: false },
-      { name: "task", number: false },
-    ],
-    query: [],
-    body: S.TaskActRequest,
+    op: "graph.task.act",
+    about: ["id", "task"],
+    input: input({ id: Schema.String, task: Schema.String }, S.TaskActRequest),
     result: Schema.String,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "channel.history",
-    method: "GET",
-    path: "/api/v1/channels/{id}/messages",
-    pathParams: [{ name: "id", number: false }],
-    query: [
-      { name: "before", number: true },
-      { name: "limit", number: true },
-    ],
-    body: undefined,
+    op: "channel.message.list",
+    about: ["id"],
+    input: input({ id: Schema.String, before: Schema.optionalKey(Schema.Number), limit: Schema.optionalKey(Schema.Number) }),
     result: Schema.mutable(Schema.Array(S.ChatMessage)),
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "channel.markRead",
-    method: "POST",
-    path: "/api/v1/channels/{id}/read",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.ChatReadRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.ChatReadRequest),
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "graph.changes",
-    method: "GET",
-    path: "/api/v1/graphs/{id}/changes",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "graph.diff.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.Changes,
     can: ["owner", "remote"],
   },
   {
-    op: "graph.events",
-    method: "GET",
-    path: "/api/v1/graphs/{id}/events",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "graph.event.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: Schema.mutable(Schema.Array(S.GraphEvent)),
     can: ["owner", "remote"],
   },
   {
-    op: "game.achievements",
-    method: "GET",
-    path: "/api/v1/game/achievements",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "game.achievement.list",
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Achievement)),
     can: ["owner", "remote"],
   },
   {
-    op: "game.chooseTitle",
-    method: "POST",
-    path: "/api/v1/game/title",
-    pathParams: [],
-    query: [],
-    body: S.ChooseTitleRequest,
+    op: "game.title.set",
+    about: [],
+    input: S.ChooseTitleRequest,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
     op: "runtime.list",
-    method: "GET",
-    path: "/api/v1/runtimes",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.RuntimeInfo)),
     can: ["owner", "remote"],
   },
   {
-    op: "github.status",
-    method: "GET",
-    path: "/api/v1/github",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "github.get",
+    about: [],
+    input: undefined,
     result: S.GitHubStatus,
     can: ["owner", "remote"],
   },
   {
     op: "github.refresh",
-    method: "POST",
-    path: "/api/v1/github/refresh",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: S.GitHubStatus,
     can: ["owner", "remote"],
   },
   {
     op: "runtime.refresh",
-    method: "POST",
-    path: "/api/v1/runtimes/{id}/refresh",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.RuntimeInfo,
     can: ["owner", "remote"],
   },
   {
-    op: "runtime.update",
-    method: "PUT",
-    path: "/api/v1/runtimes/{id}/settings",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.RuntimeSettings,
+    op: "runtime.setting.update",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.RuntimeSettings),
     result: S.RuntimeInfo,
     can: ["owner"],
   },
   {
     op: "agent.list",
-    method: "GET",
-    path: "/api/v1/agents",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Agent)),
     can: ["owner", "remote"],
   },
   {
     op: "agent.check",
-    method: "POST",
-    path: "/api/v1/agents/check",
-    pathParams: [],
-    query: [],
-    body: S.AgentCheckRequest,
+    about: [],
+    input: S.AgentCheckRequest,
     result: Schema.mutable(Schema.Array(S.AgentCheck)),
     can: ["owner", "remote"],
   },
   {
     op: "agent.create",
-    method: "POST",
-    path: "/api/v1/agents",
-    pathParams: [],
-    query: [],
-    body: S.Agent,
+    about: [],
+    input: S.Agent,
     result: S.Agent,
     can: ["owner", "orchestrator"],
   },
   {
-    op: "agent.save",
-    method: "PUT",
-    path: "/api/v1/agents/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.Agent,
+    op: "agent.update",
+    about: ["id"],
+    input: S.Agent,
     result: S.Agent,
     can: ["owner"],
   },
   {
     op: "agent.delete",
-    method: "DELETE",
-    path: "/api/v1/agents/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: agentDeleteInput,
     result: undefined,
     can: ["owner"],
     dryRun: "agent.previewDelete",
   },
   {
     op: "agent.previewDelete",
-    method: "POST",
-    path: "/api/v1/agents/{id}/delete/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: agentDeleteInput,
     result: S.Preview,
     can: ["owner"],
   },
   {
     op: "memory.list",
-    method: "GET",
-    path: "/api/v1/memories/{agent}",
-    pathParams: [{ name: "agent", number: false }],
-    query: [],
-    body: undefined,
+    about: ["agent"],
+    input: input({ agent: Schema.String }),
     result: S.MemoryList,
     can: ["owner", "remote"],
   },
   {
     op: "memory.recall",
-    method: "GET",
-    path: "/api/v1/memories/{agent}/recall",
-    pathParams: [{ name: "agent", number: false }],
-    query: [
-      { name: "project", number: false },
-      { name: "text", number: false },
-    ],
-    body: undefined,
+    about: ["agent"],
+    input: input({ agent: Schema.String, project: Schema.optionalKey(Schema.String), text: Schema.optionalKey(Schema.String) }),
     result: S.RecallPreview,
     can: ["owner", "remote"],
   },
   {
     op: "memory.create",
-    method: "POST",
-    path: "/api/v1/memories/{agent}",
-    pathParams: [{ name: "agent", number: false }],
-    query: [],
-    body: S.MemoryRequest,
+    about: ["agent"],
+    input: input({ agent: Schema.String }, S.MemoryRequest),
     result: S.Memory,
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "memory.delete",
-    method: "DELETE",
-    path: "/api/v1/memories/{agent}/{memory}",
-    pathParams: [
-      { name: "agent", number: false },
-      { name: "memory", number: false },
-    ],
-    query: [],
-    body: undefined,
+    about: ["agent", "memory"],
+    input: memoryDeleteInput,
     result: undefined,
     can: ["owner", "remote"],
     dryRun: "memory.previewDelete",
   },
   {
     op: "memory.previewDelete",
-    method: "POST",
-    path: "/api/v1/memories/{agent}/{memory}/delete/preview",
-    pathParams: [
-      { name: "agent", number: false },
-      { name: "memory", number: false },
-    ],
-    query: [],
-    body: undefined,
+    about: ["agent", "memory"],
+    input: memoryDeleteInput,
     result: S.Preview,
     can: ["owner", "remote"],
   },
   {
-    op: "orchestrator.listArchive",
-    method: "GET",
-    path: "/api/v1/orchestrator/archive",
-    pathParams: [],
-    query: [{ name: "q", number: false }],
-    body: undefined,
+    op: "orchestrator.archive.list",
+    about: [],
+    input: input({ q: Schema.optionalKey(Schema.String) }),
     result: S.ArchiveListing,
     can: ["owner", "remote", "orchestrator"],
   },
   {
-    op: "orchestrator.getArchive",
-    method: "GET",
-    path: "/api/v1/orchestrator/archive/{name}",
-    pathParams: [{ name: "name", number: false }],
-    query: [],
-    body: undefined,
+    op: "orchestrator.archive.get",
+    about: ["name"],
+    input: input({ name: Schema.String }),
     result: Schema.String,
     can: ["owner", "remote"],
   },
   {
-    op: "orchestrator.markWrong",
-    method: "POST",
-    path: "/api/v1/orchestrator/evals",
-    pathParams: [],
-    query: [],
-    body: S.OrchestratorEvalRequest,
+    op: "orchestrator.eval.create",
+    about: [],
+    input: S.OrchestratorEvalRequest,
     result: S.OrchestratorEval,
     can: ["owner", "remote"],
   },
   {
     op: "skill.list",
-    method: "GET",
-    path: "/api/v1/skills",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Skill)),
     can: ["owner", "remote"],
   },
   {
     op: "skill.create",
-    method: "POST",
-    path: "/api/v1/skills",
-    pathParams: [],
-    query: [],
-    body: S.Skill,
+    about: [],
+    input: S.Skill,
     result: S.Skill,
     can: ["owner", "orchestrator"],
   },
   {
-    op: "skill.save",
-    method: "PUT",
-    path: "/api/v1/skills/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.Skill,
+    op: "skill.update",
+    about: ["id"],
+    input: S.Skill,
     result: S.Skill,
     can: ["owner"],
   },
   {
     op: "skill.delete",
-    method: "DELETE",
-    path: "/api/v1/skills/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: skillDeleteInput,
     result: undefined,
     can: ["owner"],
     dryRun: "skill.previewDelete",
   },
   {
     op: "skill.previewDelete",
-    method: "POST",
-    path: "/api/v1/skills/{id}/delete/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: skillDeleteInput,
     result: S.Preview,
     can: ["owner"],
   },
   {
     op: "project.list",
-    method: "GET",
-    path: "/api/v1/projects",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.ProjectSummary)),
     can: ["owner", "remote", "orchestrator"],
   },
   {
     op: "project.check",
-    method: "POST",
-    path: "/api/v1/projects/check",
-    pathParams: [],
-    query: [],
-    body: S.NewProject,
+    about: [],
+    input: S.NewProject,
     result: S.Check,
     can: ["owner", "remote"],
   },
   {
     op: "project.create",
-    method: "POST",
-    path: "/api/v1/projects",
-    pathParams: [],
-    query: [],
-    body: S.NewProject,
+    about: [],
+    input: S.NewProject,
     result: S.ProjectSummary,
     can: ["owner", "remote"],
   },
   {
-    op: "project.languages",
-    method: "GET",
-    path: "/api/v1/projects/{id}/languages",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "project.language.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.ProjectLanguages,
     can: ["owner", "remote"],
   },
   {
-    op: "project.templates",
-    method: "GET",
-    path: "/api/v1/projects/{id}/templates",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "project.template.list",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.ProjectTemplates,
     can: ["owner", "remote"],
   },
   {
-    op: "project.activity",
-    method: "GET",
-    path: "/api/v1/projects/{id}/activity",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "project.activity.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.ProjectActivity,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.session",
-    method: "POST",
-    path: "/api/v1/voice/session",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "voice.session.create",
+    about: [],
+    input: undefined,
     result: S.AgoraGrant,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.renew",
-    method: "POST",
-    path: "/api/v1/voice/renew",
-    pathParams: [],
-    query: [],
-    body: S.RenewRequest,
+    op: "voice.session.renew",
+    about: [],
+    input: S.RenewRequest,
     result: S.AgoraGrant,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.start",
-    method: "POST",
-    path: "/api/v1/voice/agent",
-    pathParams: [],
-    query: [],
-    body: S.StartRequest,
+    op: "voice.agent.start",
+    about: [],
+    input: S.StartRequest,
     result: S.VoiceAgent,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.stop",
-    method: "POST",
-    path: "/api/v1/voice/agent/stop",
-    pathParams: [],
-    query: [],
-    body: S.VoiceAgent,
+    op: "voice.agent.stop",
+    about: [],
+    input: S.VoiceAgent,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.heard",
-    method: "POST",
-    path: "/api/v1/voice/agent/heard",
-    pathParams: [],
-    query: [],
-    body: S.VoiceHeard,
+    op: "voice.agent.hear",
+    about: [],
+    input: S.VoiceHeard,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
-    op: "voice.said",
-    method: "POST",
-    path: "/api/v1/voice/agent/said",
-    pathParams: [],
-    query: [],
-    body: S.VoiceSaid,
+    op: "voice.agent.say",
+    about: [],
+    input: S.VoiceSaid,
     result: undefined,
     can: ["owner", "remote"],
   },
   {
     op: "voice.dictate",
-    method: "POST",
-    path: "/api/v1/voice/dictate",
-    pathParams: [],
-    query: [],
-    body: S.DictateRequest,
+    about: [],
+    input: S.DictateRequest,
     result: S.Dictated,
     can: ["owner", "remote"],
   },
   {
     op: "connector.list",
-    method: "GET",
-    path: "/api/v1/connectors",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.ConnectorStatus)),
     can: ["owner", "remote"],
   },
   {
     op: "connector.login",
-    method: "POST",
-    path: "/api/v1/connectors/{id}/login",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.ConnectorLogin,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.ConnectorLogin),
     result: S.ConnectorStatus,
     can: ["owner"],
   },
   {
     op: "connector.verify",
-    method: "POST",
-    path: "/api/v1/connectors/{id}/verify",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.VerifyRequest,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.VerifyRequest),
     result: S.ConnectorStatus,
     can: ["owner"],
   },
   {
     op: "connector.logout",
-    method: "POST",
-    path: "/api/v1/connectors/{id}/logout",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.ConnectorStatus,
     can: ["owner"],
   },
   {
-    op: "connector.channel",
-    method: "PUT",
-    path: "/api/v1/connectors/{id}/channel",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.ConnectorsChannelRequest,
+    op: "connector.channel.set",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.ConnectorsChannelRequest),
     result: S.ConnectorStatus,
     can: ["owner"],
   },
   {
-    op: "lan.status",
-    method: "GET",
-    path: "/api/v1/lan",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "lan.get",
+    about: [],
+    input: undefined,
     result: S.LanStatus,
     can: ["owner"],
   },
   {
     op: "lan.update",
-    method: "PUT",
-    path: "/api/v1/lan",
-    pathParams: [],
-    query: [],
-    body: S.SetOpenRequest,
+    about: [],
+    input: S.SetOpenRequest,
     result: S.LanStatus,
     can: ["owner"],
   },
   {
-    op: "lan.startPairing",
-    method: "POST",
-    path: "/api/v1/lan/pairing",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "lan.pairing.start",
+    about: [],
+    input: undefined,
     result: S.LanStatus,
     can: ["owner"],
   },
   {
-    op: "lan.stopPairing",
-    method: "DELETE",
-    path: "/api/v1/lan/pairing",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "lan.pairing.stop",
+    about: [],
+    input: undefined,
     result: S.LanStatus,
     can: ["owner"],
-    dryRun: "lan.previewStopPairing",
+    dryRun: "lan.pairing.previewStop",
   },
   {
-    op: "lan.previewStopPairing",
-    method: "POST",
-    path: "/api/v1/lan/pairing/stop/preview",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "lan.pairing.previewStop",
+    about: [],
+    input: undefined,
     result: S.Preview,
     can: ["owner"],
   },
   {
-    op: "lan.answerPairing",
-    method: "POST",
-    path: "/api/v1/lan/pairing/answer",
-    pathParams: [],
-    query: [],
-    body: S.AnswerPairingRequest,
+    op: "lan.pairing.answer",
+    about: [],
+    input: S.AnswerPairingRequest,
     result: S.LanStatus,
     can: ["owner"],
   },
   {
-    op: "lan.deleteDevice",
-    method: "DELETE",
-    path: "/api/v1/lan/devices/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "lan.device.delete",
+    about: ["id"],
+    input: lanDeviceDeleteInput,
     result: S.LanStatus,
     can: ["owner"],
-    dryRun: "lan.previewDeleteDevice",
+    dryRun: "lan.device.previewDelete",
   },
   {
-    op: "lan.previewDeleteDevice",
-    method: "POST",
-    path: "/api/v1/lan/devices/{id}/delete/preview",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "lan.device.previewDelete",
+    about: ["id"],
+    input: lanDeviceDeleteInput,
     result: S.Preview,
     can: ["owner"],
   },
   {
     op: "lan.pair",
-    method: "POST",
-    path: "/api/v1/lan/pair",
-    pathParams: [],
-    query: [],
-    body: S.LanPairRequest,
+    about: [],
+    input: S.LanPairRequest,
     result: S.LanPaired,
     can: ["owner", "remote"],
   },
   {
-    op: "lan.me",
-    method: "GET",
-    path: "/api/v1/lan/me",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    op: "lan.me.get",
+    about: [],
+    input: undefined,
     result: S.LanDevice,
     can: ["owner", "remote"],
   },
   {
     op: "doc.list",
-    method: "GET",
-    path: "/api/v1/docs",
-    pathParams: [],
-    query: [],
-    body: undefined,
+    about: [],
+    input: undefined,
     result: Schema.mutable(Schema.Array(S.Document)),
     can: ["owner", "remote"],
   },
   {
     op: "doc.create",
-    method: "POST",
-    path: "/api/v1/docs",
-    pathParams: [],
-    query: [],
-    body: S.DocRequest,
+    about: [],
+    input: S.DocRequest,
     result: S.DocSnapshot,
     can: ["owner", "remote"],
   },
   {
     op: "doc.import",
-    method: "POST",
-    path: "/api/v1/docs/import",
-    pathParams: [],
-    query: [],
-    body: S.DocImport,
+    about: [],
+    input: S.DocImport,
     result: S.DocSnapshot,
     can: ["owner", "remote"],
   },
   {
     op: "doc.get",
-    method: "GET",
-    path: "/api/v1/docs/{id}",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.DocSnapshot,
     can: ["owner", "remote"],
   },
   {
     op: "doc.submit",
-    method: "POST",
-    path: "/api/v1/docs/{id}/submit",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: S.DocSubmit,
+    about: ["id"],
+    input: input({ id: Schema.String }, S.DocSubmit),
     result: S.DocAck,
     can: ["owner", "remote"],
   },
   {
-    op: "doc.markdown",
-    method: "GET",
-    path: "/api/v1/docs/{id}/markdown",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    op: "doc.markdown.get",
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: S.DocMarkdown,
     can: ["owner", "remote"],
   },
   {
     op: "doc.demo",
-    method: "POST",
-    path: "/api/v1/docs/{id}/demo",
-    pathParams: [{ name: "id", number: false }],
-    query: [],
-    body: undefined,
+    about: ["id"],
+    input: input({ id: Schema.String }),
     result: undefined,
     can: ["owner"],
   },

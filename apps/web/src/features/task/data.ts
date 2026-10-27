@@ -22,13 +22,13 @@ const answer = async (call: () => Promise<string>): Promise<Answer> => {
 };
 
 export const graphs = {
-  split: (request: GraphSplitRequest) => answer(() => api.graph.split({ body: request })),
-  act: (graph: string, action: GraphAction) => answer(() => api.graph.act({ id: graph, body: { action } })),
-  taskAct: (graph: string, task: string, action: TaskAction) => answer(() => api.graph.taskAct({ id: graph, task, body: { action } })),
-  editTask: (graph: string, task: string, edit: TaskEdit) => answer(() => api.graph.updateTask({ id: graph, task, body: edit })),
-  removeTask: (graph: string, task: string) => answer(() => api.graph.deleteTask({ id: graph, task })),
+  split: (request: GraphSplitRequest) => answer(() => api.graph.split(request)),
+  act: (graph: string, action: GraphAction) => answer(() => api.graph.act({ id: graph, action })),
+  taskAct: (graph: string, task: string, action: TaskAction) => answer(() => api.graph.task.act({ id: graph, task, action })),
+  editTask: (graph: string, task: string, edit: TaskEdit) => answer(() => api.graph.task.update({ id: graph, task, ...edit })),
+  removeTask: (graph: string, task: string) => answer(() => api.graph.task.delete({ id: graph, task })),
 };
 
 /** What the task graph's branch would bring into the main branch. */
 export const useGraphChanges = (id: () => string) =>
-  useQuery(() => ({ queryKey: ["issues", "graph-changes", id()], queryFn: () => api.graph.changes({ id: id() }) }));
+  useQuery(() => ({ queryKey: ["issues", "graph-changes", id()], queryFn: () => api.graph.diff.get({ id: id() }) }));

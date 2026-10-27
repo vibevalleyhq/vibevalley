@@ -4,7 +4,7 @@
 
 import type { Page, Route } from "@playwright/test";
 import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
-import { readStream, statePath } from "@vibevalley/protocol";
+import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -56,11 +56,11 @@ async function openIssue(
   await page.route("**/api/v1/state", (route) =>
     route.fulfill({ status: 200, headers: { "content-type": "text/event-stream" }, body: `data: ${JSON.stringify(fixture)}\n\n` }),
   );
-  await page.route("**/api/v1/issues/history", json(history));
-  await page.route(`**/api/v1/issues/${made.id}/timeline`, json(timeline));
-  await page.route(`**/api/v1/issues/${made.id}/changes`, json(changes));
-  await page.route(`**/api/v1/issues/${made.id}/runs`, json([]));
-  await page.route("**/api/v1/sessions/w1/events*", json([]));
+  await page.route(`**${pathOf("issue.history.list")}`, json(history));
+  await page.route(`**${pathOf("issue.timeline.get")}`, json(timeline));
+  await page.route(`**${pathOf("issue.diff.get")}`, json(changes));
+  await page.route(`**${pathOf("issue.run.list")}`, json([]));
+  await page.route(`**${pathOf("session.event.list")}`, json([]));
   await page.goto(`/issues/${made.id}`);
   return page.getByRole("dialog", { name: "工单" });
 }
@@ -87,11 +87,11 @@ const scripted: Agent = {
 };
 
 test("a real round: the helper asks with options, one click answers, and it hands back with its word on each criterion", async ({ page, api }) => {
-  const fox = await api.agent.create({ body: scripted });
-  const project = await api.project.create({ body: { name: "clock" } });
-  const made = await api.issue.create({ body: { title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id } });
-  await api.issue.update({ id: made.id, body: { criteria: ["打卡能用"] } });
-  await api.issue.status({ id: made.id, body: { status: "todo" } });
+  const fox = await api.agent.create(scripted);
+  const project = await api.project.create({ name: "clock" });
+  const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id });
+  await api.issue.update({ id: made.id, criteria: ["打卡能用"] });
+  await api.issue.status.update({ id: made.id, status: "todo" });
   await page.goto(`/issues/${made.id}`);
   const view = page.getByRole("dialog", { name: "工单" });
   await expect(view.getByLabel("现在怎样")).toContainText("等你回答", { timeout: 20_000 });
@@ -112,7 +112,7 @@ test("a real round: the helper asks with options, one click answers, and it hand
 const longJob = "通读 farm-site 项目，给主人一份整体架构和当前进度的评估。1）技术栈和代码量 2）模块和数据流 3）测试和构建现状 4）最该推进的三件事";
 
 test("a helper waiting on a question: 等你回答, its options answer it, and nothing offers to complete it", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: longJob } });
+  const made = await api.issue.create({ title: longJob });
   const now = Date.now();
   const view = await openIssue(
     page,
@@ -155,7 +155,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
 
   let said: unknown;
   // An option is the answer act, done by the server (issue.act).
-  await page.route(`**/api/v1/issues/${made.id}/act`, async (route) => {
+  await page.route(`**${pathOf("issue.act")}`, async (route) => {
     said = route.request().postDataJSON();
     await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
   });
@@ -167,7 +167,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
 });
 
 test("work handed back: 等你验收, the helper's word on each criterion, and 打回 asks what failed", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: "把登录页的记住我做完" } });
+  const made = await api.issue.create({ title: "把登录页的记住我做完" });
   const now = Date.now();
   const view = await openIssue(
     page,
@@ -209,7 +209,7 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
 });
 
 test("an answer handed back: its conclusion on the page, 知道了 completes it, nothing to merge", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: "查一下打卡为什么慢", deliver: "answer" } });
+  const made = await api.issue.create({ title: "查一下打卡为什么慢", deliver: "answer" });
   expect(made.deliver).toBe("answer");
   const now = Date.now();
   const answer = { conclusion: "打卡慢是因为每次都重读配置", evidence: ["clock.ts:1 每次调用都读一遍配置"], unsure: [], next: ["把配置读一次缓存起来"] };
@@ -234,7 +234,7 @@ test("an answer handed back: its conclusion on the page, 知道了 completes it,
 });
 
 test("a failed round: 卡住了, says why and leads with 接着修", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: "修好打卡页的夜间模式" } });
+  const made = await api.issue.create({ title: "修好打卡页的夜间模式" });
   const now = Date.now();
   const view = await openIssue(
     page,
@@ -254,7 +254,7 @@ test("a failed round: 卡住了, says why and leads with 接着修", async ({ pa
 });
 
 test("a done issue asks nothing: 已完成, and says it went into main", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: "给工单加上验收标准的模板" } });
+  const made = await api.issue.create({ title: "给工单加上验收标准的模板" });
   const now = Date.now();
   const view = await openIssue(
     page,

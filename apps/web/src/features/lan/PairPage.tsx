@@ -19,7 +19,7 @@ export function PairPage() {
     setAsking(true);
     setProblem("");
     try {
-      const paired = await api.lan.pair({ body: { code: code().trim(), name: name().trim() } });
+      const paired = await api.lan.pair({ code: code().trim(), name: name().trim() });
       document.cookie = keyCookie(paired.key);
       location.replace("/");
     } catch (e) {

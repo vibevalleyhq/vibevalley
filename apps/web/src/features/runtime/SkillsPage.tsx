@@ -178,7 +178,7 @@ function SkillEditor(props: { skill?: Skill }) {
   const save = () => {
     const body = { ...draft(), name: draft().name.trim() };
     return act(async () => {
-      const saved = skill ? await api.skill.save({ id: skill.id, body }) : await api.skill.create({ body });
+      const saved = skill ? await api.skill.update(body) : await api.skill.create(body);
       await refresh();
       setDraft(saved);
       if (!skill) router.navigate(skillPath(saved.id));

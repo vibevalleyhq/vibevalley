@@ -13,7 +13,7 @@ import { Cause, Console, Effect, Exit, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { DryRunFlag, eventsCommand, groupCommands, issueRunCommand, ServerFlag, stateCommand } from "./cli/api.ts";
+import { DryRunFlag, eventsCommand, groupCommands, issueWorkCommand, ServerFlag, stateCommand } from "./cli/api.ts";
 import { ownChat, runtimeChat } from "./cli/chat.ts";
 import { err, exit, Failure, out, printFailure } from "./cli/output.ts";
 
@@ -66,7 +66,7 @@ const root = Command.make(
     chat(() => ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
   Command.withDescription(cliWording().command.root),
-  Command.withSubcommands([...groupCommands({ issue: [issueRunCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
+  Command.withSubcommands([...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
   Command.withGlobalFlags([ServerFlag, DryRunFlag]),
 );
 

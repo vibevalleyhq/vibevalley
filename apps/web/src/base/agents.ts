@@ -24,7 +24,7 @@ export function useAgentProblems(agents: () => readonly Agent[]) {
   const json = createSettled(() => JSON.stringify(agents()));
   const got = useQuery(() => ({
     queryKey: ["agent-check", json()],
-    queryFn: () => api.agent.check({ body: { agents: JSON.parse(json()) as Agent[] } }),
+    queryFn: () => api.agent.check({ agents: JSON.parse(json()) as Agent[] }),
     placeholderData: keepPreviousData,
   }));
   return (): Record<string, AgentProblem[]> => Object.fromEntries(ready(got, []).map((c) => [c.id, c.problems]));

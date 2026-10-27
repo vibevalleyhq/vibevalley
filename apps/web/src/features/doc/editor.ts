@@ -511,7 +511,7 @@ export class DocEditor {
         }
         let ack;
         try {
-          ack = await this.api.doc.submit({ id: this.docId, body: { batchId: batch.id, lastSeq: this.seq, ops: batch.ops } });
+          ack = await this.api.doc.submit({ id: this.docId, batchId: batch.id, lastSeq: this.seq, ops: batch.ops });
         } catch (e) {
           // Kept with its batch id, so sending it again cannot take it twice.
           this.error = docWording().docs.notSaved(reasonOf(e));

@@ -23,8 +23,6 @@ const zh = {
   projectRef: (id: string) => "项目 " + id,
   helperRef: (id: string) => "帮工 " + id,
   archiveRef: (name: string) => "旧账 " + name,
-  agentMismatch: (path: string, body: string) => `路径里的档案 ${path} 和请求里的 ${body} 不是一个`,
-  skillMismatch: (path: string, body: string) => `路径里的技能 ${path} 和请求里的 ${body} 不是一个`,
 };
 
 const en: typeof zh = {
@@ -46,8 +44,6 @@ const en: typeof zh = {
   projectRef: (id) => "project " + id,
   helperRef: (id) => "helper " + id,
   archiveRef: (name) => "archive " + name,
-  agentMismatch: (path, body) => `The profile ${path} in the path is not the one in the request, ${body}`,
-  skillMismatch: (path, body) => `The skill ${path} in the path is not the one in the request, ${body}`,
 };
 
 export const gatewayWording = localized({ zh, en });

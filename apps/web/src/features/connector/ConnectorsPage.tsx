@@ -134,7 +134,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   };
   const login = (input: ConnectorLogin = {}) => {
     const id = props.id;
-    return run(() => api.connector.login({ id, body: input }));
+    return run(() => api.connector.login({ id, ...input }));
   };
   const logout = () => {
     const id = props.id;
@@ -142,7 +142,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   };
   const verify = (code: string) => {
     const id = props.id;
-    return run(() => api.connector.verify({ id, body: { code } }));
+    return run(() => api.connector.verify({ id, code }));
   };
   const label = () => connectorLabel[props.id];
   const disconnect = () => (
@@ -218,7 +218,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
     const id = props.id;
     setError(undefined);
     try {
-      await act(() => api.connector.channel({ id, body: { channel } }), true);
+      await act(() => api.connector.channel.set({ id, channel }), true);
     } catch (e) {
       setError(reasonOf(e));
     }

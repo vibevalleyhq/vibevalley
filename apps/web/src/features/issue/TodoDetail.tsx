@@ -133,7 +133,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const text = word().trim();
     const edit = unsaved();
     return busyWith(async () => {
-      saved(await api.issue.refine({ id, body: { text, edit } }));
+      saved(await api.issue.refine({ id, text, edit }));
       setWord("");
     });
   };
@@ -143,7 +143,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     rememberPick(x.agent, x.project);
     const told = dispatchedNotice(props.onDone);
     return busyWith(async () => {
-      told(saved(await api.issue.status({ id, body: { status: "todo", edit: update(x) } })));
+      told(saved(await api.issue.status.update({ id, status: "todo", edit: update(x) })));
     });
   };
   const tryNow = () => {
@@ -151,14 +151,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const edit = unsaved();
     const done = props.onDone;
     return busyWith(async () => {
-      const got = saved(await api.issue.dispatch({ id, body: { edit } }));
+      const got = saved(await api.issue.dispatch({ id, edit }));
       if (got.queued) throw new Error(got.queued);
       done(id);
     });
   };
   const unqueue = () => {
     const id = props.item.id;
-    return busyWith(() => api.issue.status({ id, body: { status: "backlog" } }));
+    return busyWith(() => api.issue.status.update({ id, status: "backlog" }));
   };
   const remove = () => {
     const id = props.item.id;
@@ -350,7 +350,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           onClick={() => {
             const id = props.item.id;
             const edit = unsaved();
-            if (edit) void busyWith(async () => saved(await api.issue.update({ id, body: edit })));
+            if (edit) void busyWith(async () => saved(await api.issue.update({ id, ...edit })));
           }}
         >
           {issuesWording().todo.save}
@@ -377,7 +377,7 @@ function NewProjectDialog(props: { onClose: () => void; onMade: (name: string) =
   const [name, setName] = createSignal("");
   const make = async () => {
     const wanted = name().trim();
-    const made = await run(() => api.project.create({ body: { name: wanted } }));
+    const made = await run(() => api.project.create({ name: wanted }));
     if (!made) return;
     await queries.invalidateQueries({ queryKey: ["projects"] });
     props.onMade(made.name);

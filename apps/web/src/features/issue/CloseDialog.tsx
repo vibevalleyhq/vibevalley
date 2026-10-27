@@ -25,7 +25,7 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   const cancel = async () => {
     if (!acts().includes("close")) return;
     const id = props.issue.id;
-    const closed = await run(() => api.issue.act({ id, body: { act: "close" } }));
+    const closed = await run(() => api.issue.act({ id, act: "close" }));
     if (closed) props.onClose();
   };
   return (
@@ -66,13 +66,13 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
   const take = async () => {
     if (!acts().includes("complete")) return;
     const id = props.issue;
-    const completed = await run(() => api.issue.act({ id, body: { act: "complete" } }));
+    const completed = await run(() => api.issue.act({ id, act: "complete" }));
     if (completed) props.onDone();
   };
   const resolve = async () => {
     if (!acts().includes("resolve")) return;
     const id = props.issue;
-    const resolving = await run(() => api.issue.act({ id, body: { act: "resolve" } }));
+    const resolving = await run(() => api.issue.act({ id, act: "resolve" }));
     if (resolving) props.onDone();
   };
   return (
@@ -272,7 +272,7 @@ export function ReopenDialog(props: { issue: Issue; onClose: () => void; onReope
   const reopen = async () => {
     const id = props.issue.id;
     const words = text().trim();
-    const got = await run(() => api.issue.status({ id, body: { status: "todo", text: words } }));
+    const got = await run(() => api.issue.status.update({ id, status: "todo", text: words }));
     props.onClose();
     if (got) props.onReopened();
   };

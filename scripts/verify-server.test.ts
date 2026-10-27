@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { runVerification, readyAddress } from "./verify-server";
+import { pathOf } from "../packages/protocol/src/shapes.ts";
 
 test("only a machine receipt from the owned process announces readiness", () => {
   expect(readyAddress("listening on http://127.0.0.1:9999", 17)).toBeUndefined();
@@ -20,7 +21,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     `
     import { spawn, spawnSync } from "node:child_process";
     const server = process.env.VIBEVALLEY_SERVER;
-    const created = await fetch(server + '/api/v1/issues', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
+    const created = await fetch(server + '/api/v1/issue/create', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
     const issue = await created.json();
     const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['state'], {env:process.env, encoding:'utf8'});
@@ -51,7 +52,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     expect(descendantAlive).toBe(false);
     for (const path of ["home", "work", "bin"]) expect(existsSync(join(result.evidence, path))).toBe(false);
     expect(
-      await fetch(result.address + "/api/v1/health", { signal: AbortSignal.timeout(500) }).then(
+      await fetch(result.address + pathOf("server.health.get"), { method: "POST", signal: AbortSignal.timeout(500) }).then(
         () => true,
         () => false,
       ),

@@ -50,7 +50,7 @@ test("each panel opens from the HUD and Esc closes it", async ({ page }) => {
 });
 
 test("a project's farm names it on the sign; an empty plot sows in it, and 草稿 makes the issue in the backlog", async ({ page, api }) => {
-  await api.project.create({ body: { name: "farm-hud" } });
+  await api.project.create({ name: "farm-hud" });
   await openFarm(page, "farm-hud");
   // The farm is the project's: its sign says so, and goes back to the map.
   await expect(page.getByRole("button", { name: "项目牌：farm-hud" })).toBeVisible();
@@ -88,7 +88,7 @@ test("a project's farm names it on the sign; an empty plot sows in it, and 草�
 });
 
 test("/ opens the farm entered last, and a farm with no project sends sowing to the map", async ({ page, api }) => {
-  await api.project.create({ body: { name: "farm-home" } });
+  await api.project.create({ name: "farm-home" });
   // A device that never entered a farm still lands on one: 回农场 never strands it on the map.
   await page.goto("/");
   await expect(page).toHaveURL(/\/farm\/.+/);

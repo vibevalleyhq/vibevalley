@@ -108,7 +108,7 @@ function Heading(props: { text: string; aside?: string }) {
 export function Achievements() {
   const core = useCore();
   const frames = useFrames();
-  const catalogQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievements(), staleTime: Infinity }));
+  const catalogQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievement.list(), staleTime: Infinity }));
   const catalog = () => ready(catalogQuery, []);
   const p = () => core()?.progress ?? emptyProgress;
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);

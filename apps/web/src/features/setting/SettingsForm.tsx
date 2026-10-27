@@ -346,7 +346,7 @@ export function GitHub() {
   const [refreshed, setRefreshed] = createSignal<GitHubStatus>();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
-  const status = useQuery(() => ({ queryKey: ["github"], queryFn: () => api.github.status() }));
+  const status = useQuery(() => ({ queryKey: ["github"], queryFn: () => api.github.get() }));
   const lines = () => {
     const s = refreshed() ?? ready(status, undefined);
     return !s

@@ -33,10 +33,10 @@ export async function writeIssue(text: string, agent: string, project: string): 
   const who = agent || last.agent;
   const where = project || last.project;
   const words = text.trim();
-  const made = await api.issue.create({ body: { title: words || newIssueTitle, project: where || undefined, assignee: who || undefined } });
+  const made = await api.issue.create({ title: words || newIssueTitle, project: where || undefined, assignee: who || undefined });
   if (!words) return { issue: made, refused: "" };
   try {
-    return { issue: await api.issue.refine({ id: made.id, body: { text: words } }), refused: "" };
+    return { issue: await api.issue.refine({ id: made.id, text: words }), refused: "" };
   } catch (e) {
     if (e instanceof VibeValleyApiError) return { issue: made, refused: e.reason };
     throw e;

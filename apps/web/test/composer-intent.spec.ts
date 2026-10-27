@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { orchestratorAgent, type SayRequest } from "@vibevalley/protocol";
+import { orchestratorAgent, type SayRequest, pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "composer-intent" });
@@ -24,7 +24,7 @@ async function chooseChannel(page: Page, name: string) {
 
 async function loseFirstReply(page: Page) {
   const sent: SayRequest[] = [];
-  await page.route("**/api/v1/say", async (route) => {
+  await page.route(`**${pathOf("channel.message.send")}`, async (route) => {
     sent.push(route.request().postDataJSON() as SayRequest);
     if (sent.length > 1) return route.continue();
     await route.fetch();
@@ -41,7 +41,7 @@ async function sendAndLoseReply(page: Page, box: Locator, text: string) {
 }
 
 test("retrying the same words to the same channel reuses its accepted message", async ({ page, api }) => {
-  const channel = await api.channel.create({ body: { name: "retry-same" } });
+  const channel = await api.channel.create({ name: "retry-same" });
   const sent = await loseFirstReply(page);
   const box = await openFarmChat(page);
   await chooseChannel(page, "retry-same");
@@ -50,12 +50,12 @@ test("retrying the same words to the same channel reuses its accepted message", 
   await expect(box).toHaveValue("");
   expect(sent).toHaveLength(2);
   expect(sent[1]!.sendKey).toBe(sent[0]!.sendKey);
-  expect((await api.channel.history({ id: channel })).filter((m) => m.text === "这句话重试一次")).toHaveLength(1);
+  expect((await api.channel.message.list({ id: channel })).filter((m) => m.text === "这句话重试一次")).toHaveLength(1);
 });
 
 test("the same words sent to another channel after a lost reply have a new identity", async ({ page, api }) => {
-  const first = await api.channel.create({ body: { name: "intent-first" } });
-  const second = await api.channel.create({ body: { name: "intent-second" } });
+  const first = await api.channel.create({ name: "intent-first" });
+  const second = await api.channel.create({ name: "intent-second" });
   const sent = await loseFirstReply(page);
   const box = await openFarmChat(page);
   await chooseChannel(page, "intent-first");
@@ -65,12 +65,12 @@ test("the same words sent to another channel after a lost reply have a new ident
   await expect(box).toHaveValue("");
   expect(sent.map((s) => s.channel)).toEqual([first, second]);
   expect(sent[1]!.sendKey).not.toBe(sent[0]!.sendKey);
-  for (const id of [first, second]) expect((await api.channel.history({ id })).filter((m) => m.text === "两个频道都要收到")).toHaveLength(1);
+  for (const id of [first, second]) expect((await api.channel.message.list({ id })).filter((m) => m.text === "两个频道都要收到")).toHaveLength(1);
   await page.screenshot({ path: test.info().outputPath("new-channel-intent.png") });
 });
 
 test("changing the picked helper after a lost reply makes a new send intent", async ({ page, api }) => {
-  const channel = await api.channel.create({ body: { name: "intent-helper" } });
+  const channel = await api.channel.create({ name: "intent-helper" });
   const helpers = (await api.agent.list()).filter((a) => a.id !== orchestratorAgent && a.enabled).slice(0, 2);
   expect(helpers).toHaveLength(2);
   const sent = await loseFirstReply(page);
@@ -90,17 +90,17 @@ test("changing the picked helper after a lost reply makes a new send intent", as
   await expect(box).toHaveValue("");
   expect(sent.map((s) => s.agent)).toEqual(helpers.map((a) => a.id));
   expect(sent[1]!.sendKey).not.toBe(sent[0]!.sendKey);
-  expect((await api.channel.history({ id: channel })).filter((m) => m.text === "请这个帮工看看")).toHaveLength(2);
+  expect((await api.channel.message.list({ id: channel })).filter((m) => m.text === "请这个帮工看看")).toHaveLength(2);
 });
 
 test("a late successful response keeps the draft written while it was in flight", async ({ page, api }) => {
-  const channel = await api.channel.create({ body: { name: "intent-edit" } });
+  const channel = await api.channel.create({ name: "intent-edit" });
   let release!: () => void;
   const reply = new Promise<void>((resolve) => {
     release = resolve;
   });
   let accepted = false;
-  await page.route("**/api/v1/say", async (route) => {
+  await page.route(`**${pathOf("channel.message.send")}`, async (route) => {
     const response = await route.fetch();
     accepted = true;
     await reply;
@@ -115,6 +115,6 @@ test("a late successful response keeps the draft written while it was in flight"
   release();
   await expect(page.getByRole("button", { name: "发送", exact: true })).toBeEnabled();
   await expect(box).toHaveValue("后来写的这一稿不能清掉");
-  expect((await api.channel.history({ id: channel })).filter((m) => m.text === "已经送出去的那句话")).toHaveLength(1);
+  expect((await api.channel.message.list({ id: channel })).filter((m) => m.text === "已经送出去的那句话")).toHaveLength(1);
   await page.screenshot({ path: test.info().outputPath("later-draft-kept.png") });
 });

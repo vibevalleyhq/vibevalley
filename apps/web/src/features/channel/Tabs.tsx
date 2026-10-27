@@ -73,7 +73,7 @@ export function Recurrences(props: { channel: Channel }) {
 function RecurrenceCard(props: { s: Recurrence }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, body: { enabled } }));
+  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, enabled }));
   const remove = () => act(api.recurrence.delete({ id: props.s.id }));
   // The second press deletes; a press anywhere else takes the first back.
   createEffect(deleting, (on) => {

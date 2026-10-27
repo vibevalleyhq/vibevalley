@@ -14,203 +14,203 @@
 
 ## server
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `server.health` | `GET /api/v1/health` | ✓ | ✓ |   |
+| `server.health.get` | `/api/v1/server/health/get` | ✓ | ✓ |   |
 
 ## orchestrator
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `orchestrator.open` | `POST /api/v1/orchestrator/open` | ✓ | ✓ |   |
-| `orchestrator.stop` | `POST /api/v1/orchestrator/stop` | ✓ | ✓ |   |
-| `orchestrator.hear` | `POST /api/v1/orchestrator/hear` | ✓ | ✓ |   |
-| `orchestrator.listArchive` | `GET /api/v1/orchestrator/archive` | ✓ | ✓ | ✓ |
-| `orchestrator.getArchive` | `GET /api/v1/orchestrator/archive/{name}` | ✓ | ✓ |   |
-| `orchestrator.markWrong` | `POST /api/v1/orchestrator/evals` | ✓ | ✓ |   |
+| `orchestrator.open` | `/api/v1/orchestrator/open` | ✓ | ✓ |   |
+| `orchestrator.stop` | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |
+| `orchestrator.archive.list` | `/api/v1/orchestrator/archive/list` | ✓ | ✓ | ✓ |
+| `orchestrator.archive.get` | `/api/v1/orchestrator/archive/get` | ✓ | ✓ |   |
+| `orchestrator.eval.create` | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |
 
 ## setting
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `setting.load` | `GET /api/v1/settings` | ✓ | ✓ |   |
-| `setting.check` | `POST /api/v1/settings/check` | ✓ | ✓ |   |
-| `setting.save` | `PUT /api/v1/settings` | ✓ |   |   |
+| `setting.get` | `/api/v1/setting/get` | ✓ | ✓ |   |
+| `setting.check` | `/api/v1/setting/check` | ✓ | ✓ |   |
+| `setting.update` | `/api/v1/setting/update` | ✓ |   |   |
 
 ## channel
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `channel.say` | `POST /api/v1/say` | ✓ | ✓ |   |
-| `channel.create` | `POST /api/v1/channels` | ✓ | ✓ | ✓ |
-| `channel.update` | `PUT /api/v1/channels/{id}` | ✓ | ✓ | ✓ |
-| `channel.history` | `GET /api/v1/channels/{id}/messages` | ✓ | ✓ | ✓ |
-| `channel.markRead` | `POST /api/v1/channels/{id}/read` | ✓ | ✓ |   |
+| `channel.message.send` | `/api/v1/channel/message/send` | ✓ | ✓ |   |
+| `channel.create` | `/api/v1/channel/create` | ✓ | ✓ | ✓ |
+| `channel.update` | `/api/v1/channel/update` | ✓ | ✓ | ✓ |
+| `channel.message.list` | `/api/v1/channel/message/list` | ✓ | ✓ | ✓ |
+| `channel.markRead` | `/api/v1/channel/markRead` | ✓ | ✓ |   |
 
 ## recurrence
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `recurrence.create` | `POST /api/v1/recurrences` | ✓ | ✓ | ✓ |
-| `recurrence.list` | `GET /api/v1/recurrences` | ✓ | ✓ | ✓ |
-| `recurrence.update` | `PUT /api/v1/recurrences/{id}` | ✓ | ✓ |   |
-| `recurrence.delete` | `DELETE /api/v1/recurrences/{id}` | ✓ | ✓ | ✓ |
-| `recurrence.previewDelete` | `POST /api/v1/recurrences/{id}/delete/preview` | ✓ | ✓ | ✓ |
-
-## issue
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `issue.comment` | `POST /api/v1/issues/{id}/comment` | ✓ | ✓ | ✓ |
-| `issue.changes` | `GET /api/v1/issues/{id}/changes` | ✓ | ✓ | ✓ |
-| `issue.history` | `GET /api/v1/issues/history` | ✓ | ✓ | ✓ |
-| `issue.list` | `GET /api/v1/issues` | ✓ | ✓ |   |
-| `issue.get` | `GET /api/v1/issues/{id}` | ✓ | ✓ |   |
-| `issue.runs` | `GET /api/v1/issues/{id}/runs` | ✓ | ✓ |   |
-| `issue.timeline` | `GET /api/v1/issues/{id}/timeline` | ✓ | ✓ |   |
-| `issue.create` | `POST /api/v1/issues` | ✓ | ✓ |   |
-| `issue.update` | `PUT /api/v1/issues/{id}` | ✓ | ✓ |   |
-| `issue.delete` | `DELETE /api/v1/issues/{id}` | ✓ | ✓ |   |
-| `issue.previewDelete` | `POST /api/v1/issues/{id}/delete/preview` | ✓ | ✓ |   |
-| `issue.move` | `PUT /api/v1/issues/{id}/move` | ✓ | ✓ |   |
-| `issue.status` | `PUT /api/v1/issues/{id}/status` | ✓ | ✓ |   |
-| `issue.previewStatus` | `POST /api/v1/issues/{id}/status/preview` | ✓ | ✓ |   |
-| `issue.refine` | `POST /api/v1/issues/{id}/refine` | ✓ | ✓ |   |
-| `issue.dispatch` | `POST /api/v1/issues/{id}/dispatch` | ✓ | ✓ |   |
-| `issue.act` | `POST /api/v1/issues/{id}/act` | ✓ | ✓ |   |
-| `issue.previewAct` | `POST /api/v1/issues/{id}/act/preview` | ✓ | ✓ |   |
-
-## session
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `session.stop` | `POST /api/v1/sessions/{id}/stop` | ✓ | ✓ | ✓ |
-| `session.list` | `GET /api/v1/sessions` | ✓ | ✓ |   |
-| `session.get` | `GET /api/v1/sessions/{id}` | ✓ | ✓ |   |
-| `session.events` | `GET /api/v1/sessions/{id}/events` | ✓ | ✓ |   |
-
-## graph
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `graph.split` | `POST /api/v1/graphs` | ✓ | ✓ | ✓ |
-| `graph.updateTask` | `PUT /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |
-| `graph.deleteTask` | `DELETE /api/v1/graphs/{id}/tasks/{task}` | ✓ | ✓ | ✓ |
-| `graph.previewDeleteTask` | `POST /api/v1/graphs/{id}/tasks/{task}/delete/preview` | ✓ | ✓ | ✓ |
-| `graph.act` | `POST /api/v1/graphs/{id}/act` | ✓ | ✓ | ✓ |
-| `graph.taskAct` | `POST /api/v1/graphs/{id}/tasks/{task}/act` | ✓ | ✓ | ✓ |
-| `graph.changes` | `GET /api/v1/graphs/{id}/changes` | ✓ | ✓ |   |
-| `graph.events` | `GET /api/v1/graphs/{id}/events` | ✓ | ✓ |   |
-
-## game
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `game.achievements` | `GET /api/v1/game/achievements` | ✓ | ✓ |   |
-| `game.chooseTitle` | `POST /api/v1/game/title` | ✓ | ✓ |   |
-
-## runtime
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `runtime.list` | `GET /api/v1/runtimes` | ✓ | ✓ |   |
-| `runtime.refresh` | `POST /api/v1/runtimes/{id}/refresh` | ✓ | ✓ |   |
-| `runtime.update` | `PUT /api/v1/runtimes/{id}/settings` | ✓ |   |   |
-
-## github
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `github.status` | `GET /api/v1/github` | ✓ | ✓ |   |
-| `github.refresh` | `POST /api/v1/github/refresh` | ✓ | ✓ |   |
-
-## agent
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `agent.list` | `GET /api/v1/agents` | ✓ | ✓ |   |
-| `agent.check` | `POST /api/v1/agents/check` | ✓ | ✓ |   |
-| `agent.create` | `POST /api/v1/agents` | ✓ |   | ✓ |
-| `agent.save` | `PUT /api/v1/agents/{id}` | ✓ |   |   |
-| `agent.delete` | `DELETE /api/v1/agents/{id}` | ✓ |   |   |
-| `agent.previewDelete` | `POST /api/v1/agents/{id}/delete/preview` | ✓ |   |   |
-
-## memory
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `memory.list` | `GET /api/v1/memories/{agent}` | ✓ | ✓ |   |
-| `memory.recall` | `GET /api/v1/memories/{agent}/recall` | ✓ | ✓ |   |
-| `memory.create` | `POST /api/v1/memories/{agent}` | ✓ | ✓ | ✓ |
-| `memory.delete` | `DELETE /api/v1/memories/{agent}/{memory}` | ✓ | ✓ |   |
-| `memory.previewDelete` | `POST /api/v1/memories/{agent}/{memory}/delete/preview` | ✓ | ✓ |   |
-
-## skill
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `skill.list` | `GET /api/v1/skills` | ✓ | ✓ |   |
-| `skill.create` | `POST /api/v1/skills` | ✓ |   | ✓ |
-| `skill.save` | `PUT /api/v1/skills/{id}` | ✓ |   |   |
-| `skill.delete` | `DELETE /api/v1/skills/{id}` | ✓ |   |   |
-| `skill.previewDelete` | `POST /api/v1/skills/{id}/delete/preview` | ✓ |   |   |
-
-## project
-
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
-|---|---|---|---|---|
-| `project.list` | `GET /api/v1/projects` | ✓ | ✓ | ✓ |
-| `project.check` | `POST /api/v1/projects/check` | ✓ | ✓ |   |
-| `project.create` | `POST /api/v1/projects` | ✓ | ✓ |   |
-| `project.languages` | `GET /api/v1/projects/{id}/languages` | ✓ | ✓ |   |
-| `project.templates` | `GET /api/v1/projects/{id}/templates` | ✓ | ✓ |   |
-| `project.activity` | `GET /api/v1/projects/{id}/activity` | ✓ | ✓ |   |
+| `recurrence.create` | `/api/v1/recurrence/create` | ✓ | ✓ | ✓ |
+| `recurrence.list` | `/api/v1/recurrence/list` | ✓ | ✓ | ✓ |
+| `recurrence.update` | `/api/v1/recurrence/update` | ✓ | ✓ |   |
+| `recurrence.delete` | `/api/v1/recurrence/delete` | ✓ | ✓ | ✓ |
+| `recurrence.previewDelete` | `/api/v1/recurrence/previewDelete` | ✓ | ✓ | ✓ |
 
 ## voice
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `voice.session` | `POST /api/v1/voice/session` | ✓ | ✓ |   |
-| `voice.renew` | `POST /api/v1/voice/renew` | ✓ | ✓ |   |
-| `voice.start` | `POST /api/v1/voice/agent` | ✓ | ✓ |   |
-| `voice.stop` | `POST /api/v1/voice/agent/stop` | ✓ | ✓ |   |
-| `voice.heard` | `POST /api/v1/voice/agent/heard` | ✓ | ✓ |   |
-| `voice.said` | `POST /api/v1/voice/agent/said` | ✓ | ✓ |   |
-| `voice.dictate` | `POST /api/v1/voice/dictate` | ✓ | ✓ |   |
+| `voice.hear` | `/api/v1/voice/hear` | ✓ | ✓ |   |
+| `voice.session.create` | `/api/v1/voice/session/create` | ✓ | ✓ |   |
+| `voice.session.renew` | `/api/v1/voice/session/renew` | ✓ | ✓ |   |
+| `voice.agent.start` | `/api/v1/voice/agent/start` | ✓ | ✓ |   |
+| `voice.agent.stop` | `/api/v1/voice/agent/stop` | ✓ | ✓ |   |
+| `voice.agent.hear` | `/api/v1/voice/agent/hear` | ✓ | ✓ |   |
+| `voice.agent.say` | `/api/v1/voice/agent/say` | ✓ | ✓ |   |
+| `voice.dictate` | `/api/v1/voice/dictate` | ✓ | ✓ |   |
+
+## issue
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `issue.comment.create` | `/api/v1/issue/comment/create` | ✓ | ✓ | ✓ |
+| `issue.diff.get` | `/api/v1/issue/diff/get` | ✓ | ✓ | ✓ |
+| `issue.history.list` | `/api/v1/issue/history/list` | ✓ | ✓ | ✓ |
+| `issue.list` | `/api/v1/issue/list` | ✓ | ✓ |   |
+| `issue.get` | `/api/v1/issue/get` | ✓ | ✓ |   |
+| `issue.run.list` | `/api/v1/issue/run/list` | ✓ | ✓ |   |
+| `issue.timeline.get` | `/api/v1/issue/timeline/get` | ✓ | ✓ |   |
+| `issue.create` | `/api/v1/issue/create` | ✓ | ✓ |   |
+| `issue.update` | `/api/v1/issue/update` | ✓ | ✓ |   |
+| `issue.delete` | `/api/v1/issue/delete` | ✓ | ✓ |   |
+| `issue.previewDelete` | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |
+| `issue.move` | `/api/v1/issue/move` | ✓ | ✓ |   |
+| `issue.status.update` | `/api/v1/issue/status/update` | ✓ | ✓ |   |
+| `issue.status.previewUpdate` | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ |   |
+| `issue.refine` | `/api/v1/issue/refine` | ✓ | ✓ |   |
+| `issue.dispatch` | `/api/v1/issue/dispatch` | ✓ | ✓ |   |
+| `issue.act` | `/api/v1/issue/act` | ✓ | ✓ |   |
+| `issue.previewAct` | `/api/v1/issue/previewAct` | ✓ | ✓ |   |
+
+## session
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `session.stop` | `/api/v1/session/stop` | ✓ | ✓ | ✓ |
+| `session.list` | `/api/v1/session/list` | ✓ | ✓ |   |
+| `session.get` | `/api/v1/session/get` | ✓ | ✓ |   |
+| `session.event.list` | `/api/v1/session/event/list` | ✓ | ✓ |   |
+
+## graph
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `graph.split` | `/api/v1/graph/split` | ✓ | ✓ | ✓ |
+| `graph.task.update` | `/api/v1/graph/task/update` | ✓ | ✓ | ✓ |
+| `graph.task.delete` | `/api/v1/graph/task/delete` | ✓ | ✓ | ✓ |
+| `graph.task.previewDelete` | `/api/v1/graph/task/previewDelete` | ✓ | ✓ | ✓ |
+| `graph.act` | `/api/v1/graph/act` | ✓ | ✓ | ✓ |
+| `graph.task.act` | `/api/v1/graph/task/act` | ✓ | ✓ | ✓ |
+| `graph.diff.get` | `/api/v1/graph/diff/get` | ✓ | ✓ |   |
+| `graph.event.list` | `/api/v1/graph/event/list` | ✓ | ✓ |   |
+
+## game
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `game.achievement.list` | `/api/v1/game/achievement/list` | ✓ | ✓ |   |
+| `game.title.set` | `/api/v1/game/title/set` | ✓ | ✓ |   |
+
+## runtime
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `runtime.list` | `/api/v1/runtime/list` | ✓ | ✓ |   |
+| `runtime.refresh` | `/api/v1/runtime/refresh` | ✓ | ✓ |   |
+| `runtime.setting.update` | `/api/v1/runtime/setting/update` | ✓ |   |   |
+
+## github
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `github.get` | `/api/v1/github/get` | ✓ | ✓ |   |
+| `github.refresh` | `/api/v1/github/refresh` | ✓ | ✓ |   |
+
+## agent
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `agent.list` | `/api/v1/agent/list` | ✓ | ✓ |   |
+| `agent.check` | `/api/v1/agent/check` | ✓ | ✓ |   |
+| `agent.create` | `/api/v1/agent/create` | ✓ |   | ✓ |
+| `agent.update` | `/api/v1/agent/update` | ✓ |   |   |
+| `agent.delete` | `/api/v1/agent/delete` | ✓ |   |   |
+| `agent.previewDelete` | `/api/v1/agent/previewDelete` | ✓ |   |   |
+
+## memory
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `memory.list` | `/api/v1/memory/list` | ✓ | ✓ |   |
+| `memory.recall` | `/api/v1/memory/recall` | ✓ | ✓ |   |
+| `memory.create` | `/api/v1/memory/create` | ✓ | ✓ | ✓ |
+| `memory.delete` | `/api/v1/memory/delete` | ✓ | ✓ |   |
+| `memory.previewDelete` | `/api/v1/memory/previewDelete` | ✓ | ✓ |   |
+
+## skill
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `skill.list` | `/api/v1/skill/list` | ✓ | ✓ |   |
+| `skill.create` | `/api/v1/skill/create` | ✓ |   | ✓ |
+| `skill.update` | `/api/v1/skill/update` | ✓ |   |   |
+| `skill.delete` | `/api/v1/skill/delete` | ✓ |   |   |
+| `skill.previewDelete` | `/api/v1/skill/previewDelete` | ✓ |   |   |
+
+## project
+
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
+|---|---|---|---|---|
+| `project.list` | `/api/v1/project/list` | ✓ | ✓ | ✓ |
+| `project.check` | `/api/v1/project/check` | ✓ | ✓ |   |
+| `project.create` | `/api/v1/project/create` | ✓ | ✓ |   |
+| `project.language.list` | `/api/v1/project/language/list` | ✓ | ✓ |   |
+| `project.template.list` | `/api/v1/project/template/list` | ✓ | ✓ |   |
+| `project.activity.get` | `/api/v1/project/activity/get` | ✓ | ✓ |   |
 
 ## connector
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `connector.list` | `GET /api/v1/connectors` | ✓ | ✓ |   |
-| `connector.login` | `POST /api/v1/connectors/{id}/login` | ✓ |   |   |
-| `connector.verify` | `POST /api/v1/connectors/{id}/verify` | ✓ |   |   |
-| `connector.logout` | `POST /api/v1/connectors/{id}/logout` | ✓ |   |   |
-| `connector.channel` | `PUT /api/v1/connectors/{id}/channel` | ✓ |   |   |
+| `connector.list` | `/api/v1/connector/list` | ✓ | ✓ |   |
+| `connector.login` | `/api/v1/connector/login` | ✓ |   |   |
+| `connector.verify` | `/api/v1/connector/verify` | ✓ |   |   |
+| `connector.logout` | `/api/v1/connector/logout` | ✓ |   |   |
+| `connector.channel.set` | `/api/v1/connector/channel/set` | ✓ |   |   |
 
 ## lan
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `lan.status` | `GET /api/v1/lan` | ✓ |   |   |
-| `lan.update` | `PUT /api/v1/lan` | ✓ |   |   |
-| `lan.startPairing` | `POST /api/v1/lan/pairing` | ✓ |   |   |
-| `lan.stopPairing` | `DELETE /api/v1/lan/pairing` | ✓ |   |   |
-| `lan.previewStopPairing` | `POST /api/v1/lan/pairing/stop/preview` | ✓ |   |   |
-| `lan.answerPairing` | `POST /api/v1/lan/pairing/answer` | ✓ |   |   |
-| `lan.deleteDevice` | `DELETE /api/v1/lan/devices/{id}` | ✓ |   |   |
-| `lan.previewDeleteDevice` | `POST /api/v1/lan/devices/{id}/delete/preview` | ✓ |   |   |
-| `lan.pair` | `POST /api/v1/lan/pair` | ✓ | ✓ |   |
-| `lan.me` | `GET /api/v1/lan/me` | ✓ | ✓ |   |
+| `lan.get` | `/api/v1/lan/get` | ✓ |   |   |
+| `lan.update` | `/api/v1/lan/update` | ✓ |   |   |
+| `lan.pairing.start` | `/api/v1/lan/pairing/start` | ✓ |   |   |
+| `lan.pairing.stop` | `/api/v1/lan/pairing/stop` | ✓ |   |   |
+| `lan.pairing.previewStop` | `/api/v1/lan/pairing/previewStop` | ✓ |   |   |
+| `lan.pairing.answer` | `/api/v1/lan/pairing/answer` | ✓ |   |   |
+| `lan.device.delete` | `/api/v1/lan/device/delete` | ✓ |   |   |
+| `lan.device.previewDelete` | `/api/v1/lan/device/previewDelete` | ✓ |   |   |
+| `lan.pair` | `/api/v1/lan/pair` | ✓ | ✓ |   |
+| `lan.me.get` | `/api/v1/lan/me/get` | ✓ | ✓ |   |
 
 ## doc
 
-| 操作 | 方法和路径 | 主人 | 连进来的设备 | 管家 |
+| 操作 | 路径（POST） | 主人 | 连进来的设备 | 管家 |
 |---|---|---|---|---|
-| `doc.list` | `GET /api/v1/docs` | ✓ | ✓ |   |
-| `doc.create` | `POST /api/v1/docs` | ✓ | ✓ |   |
-| `doc.import` | `POST /api/v1/docs/import` | ✓ | ✓ |   |
-| `doc.get` | `GET /api/v1/docs/{id}` | ✓ | ✓ |   |
-| `doc.submit` | `POST /api/v1/docs/{id}/submit` | ✓ | ✓ |   |
-| `doc.markdown` | `GET /api/v1/docs/{id}/markdown` | ✓ | ✓ |   |
-| `doc.demo` | `POST /api/v1/docs/{id}/demo` | ✓ |   |   |
+| `doc.list` | `/api/v1/doc/list` | ✓ | ✓ |   |
+| `doc.create` | `/api/v1/doc/create` | ✓ | ✓ |   |
+| `doc.import` | `/api/v1/doc/import` | ✓ | ✓ |   |
+| `doc.get` | `/api/v1/doc/get` | ✓ | ✓ |   |
+| `doc.submit` | `/api/v1/doc/submit` | ✓ | ✓ |   |
+| `doc.markdown.get` | `/api/v1/doc/markdown/get` | ✓ | ✓ |   |
+| `doc.demo` | `/api/v1/doc/demo` | ✓ |   |   |

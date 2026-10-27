@@ -4,6 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { inspect } from "node:util";
+import { pathOf } from "../packages/protocol/src/shapes.ts";
 
 export interface VerificationResult {
   code: number;
@@ -176,7 +177,7 @@ export async function runVerification(command: string[] = [], options: Verificat
       if (outputFailure) throw new Error(`server output failed: ${outputFailure instanceof Error ? outputFailure.message : inspect(outputFailure)}`);
       if (address) {
         try {
-          const response = await fetch(address + "/api/v1/health", { signal: AbortSignal.timeout(1_000) });
+          const response = await fetch(address + pathOf("server.health.get"), { method: "POST", signal: AbortSignal.timeout(1_000) });
           if (response.ok) {
             const health = await response.json();
             if (health.ok === true) {

@@ -80,7 +80,7 @@ function onEvent(id: string, e: Entry, ev: ChannelEvent) {
 async function start(id: string, e: Entry) {
   const epoch = ++e.epoch;
   if (!e.followed.ready) {
-    const page = await api.channel.history({ id, limit: chatPage }).catch(() => undefined);
+    const page = await api.channel.message.list({ id, limit: chatPage }).catch(() => undefined);
     if (epoch !== e.epoch) return;
     if (!page) return again(id, e);
     set(e, { messages: merged(e.followed.messages, page), complete: page.length < chatPage, ready: true });
@@ -108,7 +108,7 @@ export const followed = {
   async loadOlder(id: string) {
     const e = entryOf(id);
     if (e.followed.complete) return;
-    const page = await api.channel.history({ id, before: e.followed.messages[0]?.number, limit: chatPage });
+    const page = await api.channel.message.list({ id, before: e.followed.messages[0]?.number, limit: chatPage });
     set(e, { ...e.followed, messages: merged(e.followed.messages, page), complete: page.length < chatPage });
   },
   /** A message by its place, from a channel followed or read once for it: a thread's root. */
@@ -118,8 +118,8 @@ export const followed = {
     const key = `${channel}:${number}`;
     if (!singles.has(key)) {
       singles.set(key, undefined);
-      void api.channel
-        .history({ id: channel, before: number + 1, limit: 1 })
+      void api.channel.message
+        .list({ id: channel, before: number + 1, limit: 1 })
         .then((page) => {
           singles.set(
             key,

@@ -33,6 +33,9 @@ export const dayMs = 86400000;
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;
 
+/** Every endpoint is a POST at its op (api.ts): issue.status.update at /api/v1/issue/status/update. */
+export const pathOf = (op: string) => "/api/v1/" + op.replaceAll(".", "/");
+
 /** The three long-lived streams; the client asks for them by path. */
 export const statePath = "/api/v1/state";
 

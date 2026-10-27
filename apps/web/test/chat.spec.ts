@@ -12,7 +12,7 @@ async function stateOf(baseURL: string) {
 }
 
 async function newChannel(api: VibeValleyApi, name: string, description?: string) {
-  return api.channel.create({ body: { name, description } });
+  return api.channel.create({ name, description });
 }
 
 test("the general shows with its empty words, the orchestrator resting", async ({ page }) => {
@@ -99,8 +99,8 @@ test("the channel's settings save its description", async ({ page, api }) => {
 
 test("search keeps the messages that contain it", async ({ page, api }) => {
   const id = await newChannel(api, "找");
-  await api.channel.say({ body: { text: "苹果要浇水", channel: id } });
-  await api.channel.say({ body: { text: "香蕉该收了", channel: id } });
+  await api.channel.message.send({ text: "苹果要浇水", channel: id });
+  await api.channel.message.send({ text: "香蕉该收了", channel: id });
   await page.goto(`/chat/${id}`);
   const log = page.getByRole("log", { name: "消息" });
   await expect(log.getByText("香蕉该收了")).toBeVisible();
@@ -117,7 +117,7 @@ test("search keeps the messages that contain it", async ({ page, api }) => {
 
 test("the recurrences tab turns a recurrence off and deletes it on the second press", async ({ page, api }) => {
   const id = await newChannel(api, "定时");
-  await api.recurrence.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
+  await api.recurrence.create({ name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } });
   await page.goto(`/chat/${id}`);
   await page.getByRole("tab", { name: "任务" }).click();
   await expect(page.getByText("这个频道里还没有活")).toBeVisible();
@@ -133,8 +133,8 @@ test("the recurrences tab turns a recurrence off and deletes it on the second pr
 
 test("the chat page as it looks", async ({ page, api }) => {
   const id = await newChannel(api, "clock", "打卡小程序的活");
-  await api.channel.update({ id, body: { description: "打卡小程序的活", project: "clock-in" } });
-  await api.channel.say({ body: { text: "帮我看看 @管家 打卡页为什么**白屏**", channel: id } });
+  await api.channel.update({ id, description: "打卡小程序的活", project: "clock-in" });
+  await api.channel.message.send({ text: "帮我看看 @管家 打卡页为什么**白屏**", channel: id });
   await page.goto(`/chat/${id}`);
   await expect(page.getByRole("log", { name: "消息" }).getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
   // Shown, the orchestrator's answer is read: no count on the channel.

@@ -1,6 +1,7 @@
 // The call and dictation as far as a test server goes: it has no Agora keys and no transcriber, so a call is refused by
 // the server before any SDK is loaded, and dictation waits to be set up.
 
+import { pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
@@ -15,7 +16,7 @@ test("a call without Agora's keys says why, offers 设置, and the line tries ag
   const phone = page.getByRole("region", { name: "农场手机" });
   await phone.getByRole("button", { name: "管家" }).click();
   await expect(phone.getByText(/^没接通：/)).toBeVisible({ timeout: 10_000 });
-  const again = page.waitForRequest((r) => r.url().endsWith("/api/v1/voice/session") && r.method() === "POST");
+  const again = page.waitForRequest((r) => r.url().endsWith(pathOf("voice.session.create")) && r.method() === "POST");
   await phone.getByRole("button", { name: "打给管家" }).click();
   await again;
   // The reason under the chat's head, with the way to the setting that fixes it.

@@ -1,8 +1,7 @@
-// The API over HTTP: every endpoint in @vibevalley/protocol/api
-// is routed to its handler. A path parameter that should be a number and is not is a 404, a query one is none; a body
-// that does not decode is a 400 with why; no answer is a 204; a refusal is its tagged JSON at its status.
+// The API over HTTP: every endpoint in @vibevalley/protocol/api is a POST at its op's path, routed to its handler. An input
+// that does not decode is a 400 with why (an empty body is {}); no answer is a 204; a refusal is its tagged JSON at its status.
 
-import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers } from "@vibevalley/protocol/api";
+import { ApiError, type Endpoint, endpoints, errorStatus, type Handlers, pathOf } from "@vibevalley/protocol/api";
 import { Cause, Effect, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { wireOf } from "../base/wire.ts";
@@ -10,51 +9,25 @@ import { wireOf } from "../base/wire.ts";
 // The same Schema the clients read it back with: a refusal that does not fit it is the server's bug, a 500.
 const isApiError = Schema.is(ApiError);
 
-const notFound = HttpServerResponse.text("404 page not found\n", { status: 404 });
-
 const badRequest = (why: string) => HttpServerResponse.text(why + "\n", { status: 400 });
 
-type Args = Record<string, unknown>;
-
-function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, ApiError>) {
+function serve(endpoint: Endpoint, handle: (input: unknown) => Effect.Effect<unknown, ApiError>) {
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const params = yield* HttpRouter.params;
-    const args: Args = {};
-    for (const p of endpoint.pathParams) {
-      const raw = params[p.name] ?? "";
-      if (!p.number) {
-        args[p.name] = raw;
-        continue;
-      }
-      const n = /^-?\d+$/.test(raw) ? Number(raw) : NaN;
-      if (!Number.isSafeInteger(n)) return notFound;
-      args[p.name] = n;
-    }
-    const query = new URL(request.url, "http://farm").searchParams;
-    for (const p of endpoint.query) {
-      if (!query.has(p.name)) continue;
-      const raw = query.get(p.name)!;
-      if (!p.number) {
-        args[p.name] = raw;
-      } else if (/^-?\d+$/.test(raw)) {
-        const n = Number(raw);
-        if (Number.isSafeInteger(n)) args[p.name] = n;
-      }
-    }
-    if (endpoint.body) {
+    let input: unknown;
+    if (endpoint.input) {
       const text = yield* request.text;
       let json: unknown;
       try {
-        json = JSON.parse(text);
+        json = JSON.parse(text === "" ? "{}" : text);
       } catch (e) {
         return badRequest((e as Error).message);
       }
-      const decoded = Schema.decodeUnknownExit(endpoint.body)(json);
+      const decoded = Schema.decodeUnknownExit(endpoint.input)(json);
       if (decoded._tag === "Failure") return badRequest(Cause.pretty(decoded.cause));
-      args.body = decoded.value;
+      input = decoded.value;
     }
-    const out = yield* handle(args).pipe(Effect.result);
+    const out = yield* handle(input).pipe(Effect.result);
     if (out._tag === "Failure") {
       const e = out.failure;
       return yield* HttpServerResponse.schemaJson(ApiError)(e, { status: errorStatus[e._tag] });
@@ -77,14 +50,12 @@ function serve(endpoint: Endpoint, handle: (a: Args) => Effect.Effect<unknown, A
   );
 }
 
-const pathOf = (path: string) => path.replace(/\{(\w+)\}/g, ":$1") as HttpRouter.PathInput;
-
 /** Routes every endpoint, or only those a caller may call (the lan listener's). The handlers have their services already. */
 export function api(handlers: Handlers, only?: (e: Endpoint) => boolean) {
   return HttpRouter.use((router) =>
     Effect.forEach(
       endpoints.filter((e) => !only || only(e)),
-      (e) => router.add(e.method, pathOf(e.path), serve(e, handlers[e.op] as (a: Args) => Effect.Effect<unknown, ApiError>)),
+      (e) => router.add("POST", pathOf(e.op) as HttpRouter.PathInput, serve(e, handlers[e.op] as (input: unknown) => Effect.Effect<unknown, ApiError>)),
       { discard: true },
     ),
   );

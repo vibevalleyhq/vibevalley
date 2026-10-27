@@ -76,7 +76,7 @@ function useProblem(update: () => SettingsUpdate) {
   const asked = createSettled(() => JSON.stringify(update()));
   const check = useQuery(() => ({
     queryKey: ["settings-check", asked()],
-    queryFn: () => api.setting.check({ body: JSON.parse(asked()) as SettingsUpdate }),
+    queryFn: () => api.setting.check(JSON.parse(asked()) as SettingsUpdate),
     placeholderData: keepPreviousData,
   }));
   return () => ready(check, undefined)?.problem;

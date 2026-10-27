@@ -405,7 +405,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
     const id = props.info.id;
     const body = draft();
     try {
-      props.onSaved(await api.runtime.update({ id, body }));
+      props.onSaved(await api.runtime.setting.update({ id, ...body }));
     } catch (e) {
       toast(reasonOf(e));
     }

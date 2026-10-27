@@ -20,9 +20,9 @@ test("without a code it asks for one", async ({ page }) => {
 });
 
 test("a device the owner lets in opens the farm through the lan listener", async ({ browser, api }) => {
-  await api.lan.update({ body: { open: true } });
+  await api.lan.update({ open: true });
   try {
-    const { pairing, url } = await api.lan.startPairing();
+    const { pairing, url } = await api.lan.pairing.start();
     expect(pairing?.link.startsWith(url + "/pair?c=")).toBe(true);
     const phone = await browser.newContext({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X)" });
     const page = await phone.newPage();
@@ -33,15 +33,15 @@ test("a device the owner lets in opens the farm through the lan listener", async
     await expect(page.getByLabel("这台设备叫")).toHaveValue("iPhone");
     await page.getByRole("button", { name: "请主人放行" }).click();
     await expect(page.getByRole("status")).toContainText("等那台电脑上的主人点头");
-    await expect.poll(async () => (await api.lan.status()).pairing?.asking).toBe("iPhone");
-    await api.lan.answerPairing({ body: { allow: true } });
+    await expect.poll(async () => (await api.lan.get()).pairing?.asking).toBe("iPhone");
+    await api.lan.pairing.answer({ allow: true });
     await expect(page).toHaveURL(url + "/");
     await page.goto(url + "/issues");
     await expect(page.getByRole("region", { name: "待办", exact: true })).toBeVisible();
     await phone.close();
-    const { devices } = await api.lan.status();
-    for (const d of devices) await api.lan.deleteDevice({ id: d.id });
+    const { devices } = await api.lan.get();
+    for (const d of devices) await api.lan.device.delete({ id: d.id });
   } finally {
-    await api.lan.update({ body: { open: false } });
+    await api.lan.update({ open: false });
   }
 });

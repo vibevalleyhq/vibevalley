@@ -121,9 +121,9 @@ function ios(): Device {
 let farmUrl = "http";
 const phone = platform === "ios" ? ios() : android();
 const api = new VibeValleyApi(server);
-await api.lan.update({ body: { open: true } });
+await api.lan.update({ open: true });
 try {
-  const { pairing } = await api.lan.startPairing();
+  const { pairing } = await api.lan.pairing.start();
   if (!pairing) throw new Error("no pairing: the farm found no address on the network");
   const farm = new URL(pairing.link).origin;
   farmUrl = farm;
@@ -131,13 +131,13 @@ try {
   phone.install();
   phone.open(`vibevalley://pair?u=${encodeURIComponent(farm)}&c=${encodeURIComponent(pairing.code)}`);
 
-  const asking = await until(async () => (await api.lan.status()).pairing?.asking, "the phone asks to pair");
+  const asking = await until(async () => (await api.lan.get()).pairing?.asking, "the phone asks to pair");
   console.log("asking", asking);
-  await api.lan.answerPairing({ body: { allow: true } });
-  const paired = await until(async () => (await api.lan.status()).devices.find((d) => d.name === asking), "the phone paired");
+  await api.lan.pairing.answer({ allow: true });
+  const paired = await until(async () => (await api.lan.get()).devices.find((d) => d.name === asking), "the phone paired");
   // Its page's requests through the lan listener carry the key: the farm has heard from it since.
   await until(
-    async () => ((await api.lan.status()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.pairedAt || undefined,
+    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > paired.pairedAt || undefined,
     "the phone's page reaching the farm",
   );
   console.log("paired and seen", paired.name);
@@ -174,16 +174,16 @@ try {
   } else console.log("bridge: not checked (not an end-to-end build)");
 
   // Started again with no link: the key from the keychain, straight to the farm, nothing asked.
-  const before = (await api.lan.status()).devices.find((d) => d.id === paired.id)!.lastSeen ?? 0;
+  const before = (await api.lan.get()).devices.find((d) => d.id === paired.id)!.lastSeen ?? 0;
   await sleep(1100);
   phone.restart();
   await until(
-    async () => ((await api.lan.status()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > before || undefined,
+    async () => ((await api.lan.get()).devices.find((d) => d.id === paired.id)?.lastSeen ?? 0) > before || undefined,
     "the phone back on the farm after a restart",
   );
-  if ((await api.lan.status()).pairing) throw new Error("it asked to pair again");
+  if ((await api.lan.get()).pairing) throw new Error("it asked to pair again");
   console.log("back after a restart");
 } finally {
-  for (const d of (await api.lan.status()).devices) await api.lan.deleteDevice({ id: d.id });
-  await api.lan.update({ body: { open: false } });
+  for (const d of (await api.lan.get()).devices) await api.lan.device.delete({ id: d.id });
+  await api.lan.update({ open: false });
 }

@@ -72,7 +72,7 @@ export function IssuesPage(props: { rest: string }) {
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
-    await run(() => api.issue.move({ id: c.id, body: { before } }));
+    await run(() => api.issue.move({ id: c.id, before }));
   };
 
   /** Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last. */
@@ -85,7 +85,7 @@ export function IssuesPage(props: { rest: string }) {
         toast(issuesWording().page.pickFirst);
         return;
       }
-      const got = await run(() => api.issue.status({ id: c.id, body: { status: "todo" } }));
+      const got = await run(() => api.issue.status.update({ id: c.id, status: "todo" }));
       if (got) notice(got);
     } else if (move === "close" && c.kind === "issue" && c.session) setClosing({ issue: c.issue, session: c.session, review: false });
     else if (move === "reopen" && c.kind === "issue") setReopening(() => c.issue);

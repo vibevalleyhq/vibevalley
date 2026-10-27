@@ -3,6 +3,7 @@
 // step is settled. A graph's sessions are followed through the core state's facts: a session's run ending is the cue.
 // Everything here runs one at a time.
 
+import { commandOf } from "@vibevalley/protocol/api";
 import {
   type Agent,
   type Changes,
@@ -92,13 +93,13 @@ const EventPayloadSchema: Schema.Codec<EventPayload, Wire<EventPayload>> = Schem
 
 /** What the graph allows now, as the commands that do it: what a refusal of one of its acts offers instead. */
 const graphNext = (graph: TaskGraph): Next[] =>
-  graphActions(graph).map((action) => ({ say: taskWording().graphAction[action], run: ["graph", "act", graph.id, "--json", JSON.stringify({ action })] }));
+  graphActions(graph).map((action) => ({ say: taskWording().graphAction[action], run: commandOf("graph.act", [graph.id], { action }) }));
 
 /** What the step allows now, as commands. */
 const stepNext = (graph: TaskGraph, task: Task): Next[] =>
   taskActions(graph, task).map((action) => ({
     say: taskWording().act.stepAct(taskWording().taskAction[action], task.title),
-    run: ["graph", "task-act", graph.id, task.id, "--json", JSON.stringify({ action })],
+    run: commandOf("graph.task.act", [graph.id, task.id], { action }),
   }));
 
 export interface TaskShape {

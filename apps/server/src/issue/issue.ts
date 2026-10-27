@@ -1,4 +1,5 @@
 import { needsOwner } from "./prompts.ts";
+import { commandOf } from "@vibevalley/protocol/api";
 import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import {
@@ -491,7 +492,7 @@ export const make = (options: IssueOptions = {}) =>
     /** Starting it and its dry run ask the same, so neither refuses what the other allows. */
     const readyOf = Effect.fn("Issues.readyOf")(function* (issue: Issue) {
       if (issue.refining) return yield* Effect.fail(refused(issueWording().drafting(issue.refining.name)));
-      const pick = [lookIn.agent, { say: issueWording().pickHint(issue.number) }];
+      const pick = [lookIn.agent, { say: issueWording().pickHint(commandOf("issue.status.update", [String(issue.number)]).join(" ")) }];
       if (!issue.assignee) return yield* Effect.fail(refused(issueWording().noAssignee, pick));
       const agent = store.agent(issue.assignee);
       if (!agent) return yield* Effect.fail(refused(issueWording().profileGone(issue.assignee), pick));

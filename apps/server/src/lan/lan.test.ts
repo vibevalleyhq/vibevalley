@@ -1,4 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
+import { pathOf } from "@vibevalley/protocol/api";
 import { createServer, request as httpRequest } from "node:http";
 import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -33,8 +34,10 @@ const request = async (method: string, url: string, key: string, body?: unknown)
   return { status: res.status, body: await res.text() };
 };
 
+const healthPath = pathOf("server.health.get");
+
 const ask = (addr: string, code: string, name: string) =>
-  fetch(addr + "/api/v1/lan/pair", { method: "POST", body: JSON.stringify({ code, name }) }).then((r) => r.text());
+  fetch(addr + pathOf("lan.pair"), { method: "POST", body: JSON.stringify({ code, name }) }).then((r) => r.text());
 
 const open = (lan: Lan["Service"]) =>
   Effect.map(lan.setOpen(true), (s) => {
@@ -84,7 +87,7 @@ describe("lan access", () => {
       expect(lan.status().url).toBeUndefined();
       expect(yield* Effect.flip(lan.startPairing())).toMatchObject({ _tag: "LanRefused" });
       const addr = yield* open(lan);
-      expect((yield* Effect.promise(() => request("GET", addr + "/api/v1/health", ""))).status).toBe(401);
+      expect((yield* Effect.promise(() => request("POST", addr + healthPath, ""))).status).toBe(401);
       // The page holds nothing of the farm's: a device not paired yet gets it, to pair on.
       for (const path of ["/", "/pair"]) {
         const page = yield* Effect.promise(() => request("GET", addr + path, ""));
@@ -93,7 +96,7 @@ describe("lan access", () => {
       yield* lan.setOpen(false);
       expect(
         yield* Effect.promise(() =>
-          fetch(addr + "/api/v1/health").then(
+          fetch(addr + healthPath, { method: "POST" }).then(
             () => "answered",
             () => "shut",
           ),
@@ -126,33 +129,35 @@ describe("lan access", () => {
       const s = lan.status();
       expect(s.pairing).toBeUndefined();
       expect(s.devices.map((d) => d.name)).toEqual(["小明的 iPhone"]);
-      const health = yield* Effect.promise(() => request("GET", addr + "/api/v1/health", paired.key));
+      const health = yield* Effect.promise(() => request("POST", addr + healthPath, paired.key));
       expect([health.status, health.body]).toEqual([200, expect.stringContaining(`"ok":true`)]);
-      const me = yield* Effect.promise(() => request("GET", addr + "/api/v1/lan/me", paired.key));
+      const me = yield* Effect.promise(() => request("POST", addr + pathOf("lan.me.get"), paired.key));
       expect(me.status).toBe(200);
       expect(JSON.parse(me.body)).toMatchObject({ id: paired.device, lastSeen: expect.any(Number) });
       // A paired browser's cookie is a key as the header is.
-      const byCookie = yield* Effect.promise(() => fetch(addr + "/api/v1/lan/me", { headers: { cookie: `other=1; ${lanKeyCookie}=${paired.key}` } }));
+      const byCookie = yield* Effect.promise(() =>
+        fetch(addr + pathOf("lan.me.get"), { method: "POST", headers: { cookie: `other=1; ${lanKeyCookie}=${paired.key}` } }),
+      );
       expect(byCookie.status).toBe(200);
-      expect((yield* Effect.promise(() => fetch(addr + "/api/v1/health", { headers: { cookie: `${lanKeyCookie}=nope` } }))).status).toBe(401);
+      expect((yield* Effect.promise(() => fetch(addr + healthPath, { method: "POST", headers: { cookie: `${lanKeyCookie}=nope` } }))).status).toBe(401);
       for (const path of ["/mcp", "/mcp/x"]) expect((yield* Effect.promise(() => request("GET", addr + path, paired.key))).status).toBe(404);
       expect((yield* Effect.promise(() => request("POST", addr + "/pair", ""))).status).toBe(404);
       // What configures the farm stays on this computer: keys, a runtime's command, profiles, skills, chat accounts.
-      for (const [method, path] of [
-        ["GET", "/api/v1/lan"],
-        ["PUT", "/api/v1/lan"],
-        ["POST", "/api/v1/lan/pairing"],
-        ["DELETE", "/api/v1/lan/devices/" + paired.device],
-        ["PUT", "/api/v1/settings"],
-        ["PUT", "/api/v1/runtimes/codex/settings"],
-        ["POST", "/api/v1/agents"],
-        ["PUT", "/api/v1/skills/s1"],
-        ["POST", "/api/v1/connectors/weixin/login"],
+      for (const op of [
+        "lan.get",
+        "lan.update",
+        "lan.pairing.start",
+        "lan.device.delete",
+        "setting.update",
+        "runtime.setting.update",
+        "agent.create",
+        "skill.update",
+        "connector.login",
       ] as const) {
-        const got = yield* Effect.promise(() => request(method, addr + path, paired.key, { open: false }));
-        expect([method, path, got.status, got.body.includes("LanRefused")]).toEqual([method, path, 403, true]);
+        const got = yield* Effect.promise(() => request("POST", addr + pathOf(op), paired.key, { open: false }));
+        expect([op, got.status, got.body.includes("LanRefused")]).toEqual([op, 403, true]);
       }
-      expect((yield* Effect.promise(() => request("GET", addr + "/api/v1/health", paired.key + "x"))).status).toBe(401);
+      expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key + "x"))).status).toBe(401);
       expect(yield* Effect.flip(lan.me(undefined))).toMatchObject({ _tag: "LanRefused" });
     }).pipe(Effect.scoped),
   );
@@ -203,7 +208,7 @@ describe("lan access", () => {
       })();
       yield* lan.forget(paired.device);
       expect(yield* Effect.promise(() => ended)).toBe("ended");
-      expect((yield* Effect.promise(() => request("GET", addr + "/api/v1/health", paired.key))).status).toBe(401);
+      expect((yield* Effect.promise(() => request("POST", addr + healthPath, paired.key))).status).toBe(401);
     }).pipe(Effect.scoped),
   );
   it.live("hands a paired device's WebSocket to the farm, and forgetting the device ends it", () =>

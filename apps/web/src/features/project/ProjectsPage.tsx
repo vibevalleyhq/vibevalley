@@ -41,12 +41,12 @@ type Asked<A> = QueryObserverResult<A>;
 const useSurvey = (project: () => string) => ({
   languages: useQuery(() => ({
     queryKey: ["project-languages", project()],
-    queryFn: () => api.project.languages({ id: project() }),
+    queryFn: () => api.project.language.list({ id: project() }),
     placeholderData: (p: ProjectLanguages | undefined) => p,
   })),
   activity: useQuery(() => ({
     queryKey: ["project-activity", project()],
-    queryFn: () => api.project.activity({ id: project() }),
+    queryFn: () => api.project.activity.get({ id: project() }),
     placeholderData: (p: ProjectActivity | undefined) => p,
   })),
 });
@@ -501,12 +501,12 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
     setBusy(true);
     setError(undefined);
     try {
-      const problem = (await api.project.check({ body: request })).problem;
+      const problem = (await api.project.check(request)).problem;
       if (problem) {
         setError(problem);
         return;
       }
-      const made = await api.project.create({ body: request });
+      const made = await api.project.create(request);
       await client.invalidateQueries({ queryKey: ["projects"] });
       props.onDone(made);
     } catch (e) {

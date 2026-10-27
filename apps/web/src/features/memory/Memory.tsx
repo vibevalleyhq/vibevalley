@@ -30,7 +30,7 @@ function memoryActions(agent: string) {
     /** The refusal in words, or undefined once written. */
     write: async (text: string, project?: string) => {
       try {
-        await api.memory.create({ agent, body: { text, ...(project ? { project } : {}) } });
+        await api.memory.create({ agent, text, ...(project ? { project } : {}) });
         await reload();
         return undefined;
       } catch (e) {
@@ -292,14 +292,14 @@ export function ArchivePanel() {
   const [open, setOpen] = createSignal<{ name: string; text: string }>();
   const listing = useQuery(() => ({
     queryKey: ["archive", asked() ?? ""],
-    queryFn: () => api.orchestrator.listArchive(asked() ? { q: asked() } : {}),
+    queryFn: () => api.orchestrator.archive.list(asked() ? { q: asked() } : {}),
   }));
   const now = useNow();
   const show = async (name: string) => {
     if (open()?.name === name) return setOpen(undefined);
     let text: string;
     try {
-      text = await api.orchestrator.getArchive({ name });
+      text = await api.orchestrator.archive.get({ name });
     } catch (e) {
       text = reasonOf(e);
     }

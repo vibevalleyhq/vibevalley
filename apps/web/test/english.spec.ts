@@ -4,7 +4,7 @@ import { expect, test } from "./fixtures";
 test.use({ farm: "english" });
 
 test("the farm speaks English once the owner picks it, and Chinese again", async ({ page, api }) => {
-  await api.issue.create({ body: { title: "Add paging to clock-in" } });
+  await api.issue.create({ title: "Add paging to clock-in" });
   await page.goto("/settings/language");
   await page.getByRole("button", { name: "English" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -22,7 +22,7 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   await page.screenshot({ path: test.info().outputPath("issues-en.png") });
 
   // The server's own words follow: the voice line's default greeting, the machines' blurbs.
-  const settings = await api.setting.load();
+  const settings = await api.setting.get();
   expect(settings.locale).toBe("en");
   expect(settings.voiceDefaults.greeting).toBe("Hey there! What shall we grow today?");
   // The general channel keeps its stored name; the owner reads its label.

@@ -78,7 +78,11 @@ export function SowForm(props: { station: number; onDone: () => void }) {
   const [refused, setRefused] = createSignal<string>();
   let words: HTMLTextAreaElement | undefined;
 
-  const templates = useQuery(() => ({ queryKey: ["templates", project()], queryFn: () => api.project.templates({ id: project()! }), enabled: !!project() }));
+  const templates = useQuery(() => ({
+    queryKey: ["templates", project()],
+    queryFn: () => api.project.template.list({ id: project()! }),
+    enabled: !!project(),
+  }));
   const sower = () => who() ?? (agents().some((a) => a.id === pick()) ? pick() : byOrchestrator);
   const agentOf = (w: string) => (w === byOrchestrator ? undefined : w);
   const canSow = () => text().trim() !== "";
