@@ -152,7 +152,7 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
         <div
           role="menu"
           aria-label={farmWording().chat.actions.open}
-          class="absolute top-full right-0 z-30 mt-1 w-40 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
+          class="absolute right-0 bottom-full z-30 mb-1 w-40 border-2 border-cream-300 bg-cream-50 py-1 shadow-px"
         >
           <div role="group" aria-label={farmWording().chat.actions.react} class="flex flex-wrap gap-0.5 px-1 pb-1">
             <For each={quickReactions}>

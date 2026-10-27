@@ -274,7 +274,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <div
             role="menu"
             aria-label={chatWording().more.label}
-            class="absolute top-full right-0 z-20 mt-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
+            class="absolute right-0 bottom-full z-20 mb-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
           >
             <button type="button" role="menuitem" class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover" onClick={copyLink}>
               {chatWording().more.copyLink}

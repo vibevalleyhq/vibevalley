@@ -206,12 +206,13 @@ test("a message in 田头 is reacted to, answered, changed and deleted from its 
   const box = chat.getByRole("textbox", { name: "对管家说，@ 叫帮工…" });
   await box.fill("南边的地要翻");
   await box.press("Enter");
-  const mine = chat.getByText("南边的地要翻", { exact: true });
-  await expect(mine).toBeVisible();
+  await expect(chat.getByText("南边的地要翻", { exact: true })).toBeVisible();
   const menu = chat.getByRole("menu", { name: "这条消息能做的" });
-  const open = async () => {
-    await mine.hover();
-    await chat.getByRole("button", { name: "这条消息能做的" }).first().click();
+  // Its own row's: the shared farm has other messages, each with a menu.
+  const rowOf = (text: string) => chat.locator('[class*="group/m"]').filter({ has: page.getByText(text, { exact: true }) });
+  const open = async (text = "南边的地要翻") => {
+    await rowOf(text).hover();
+    await rowOf(text).getByRole("button", { name: "这条消息能做的" }).click();
   };
 
   await open();
@@ -230,8 +231,7 @@ test("a message in 田头 is reacted to, answered, changed and deleted from its 
   await editing.press("Enter");
   await expect(chat.getByText("北边的地要翻", { exact: true })).toBeVisible();
 
-  await chat.getByText("北边的地要翻", { exact: true }).hover();
-  await chat.getByRole("button", { name: "这条消息能做的" }).first().click();
+  await open("北边的地要翻");
   await menu.getByRole("menuitem", { name: "删掉" }).click();
   await menu.getByRole("menuitem", { name: "再点一次删掉" }).click();
   await expect(chat.getByText("这条消息已删除")).toBeVisible();
