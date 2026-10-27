@@ -1,7 +1,7 @@
 // A helper's look: the words for its animal and clothes, a random
 // one for a new profile, and the drawing for each pose.
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {

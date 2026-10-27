@@ -4,7 +4,7 @@
 import { farmWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import type { IssueActRequest, Session, StateFrame } from "@vibevalley/protocol";
-import { api, newSendKey } from "../data/api";
+import { api, newSendKey } from "../base/api";
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";

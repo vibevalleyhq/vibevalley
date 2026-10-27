@@ -1,6 +1,6 @@
 import { omit, onSettled } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useRouter } from "./router";
+import { useRouter } from "../base/router";
 
 /** A link inside the page: a plain click moves the router, a click with a modifier (a new tab) is the browser's. */
 export function A(props: { href: string; replace?: boolean } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {

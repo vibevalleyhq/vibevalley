@@ -24,15 +24,15 @@ import {
   SpeciesValues,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../rules/cast";
 import { runtimeName } from "../../rules/skills";
 import { toast } from "../../ui/toasts";
 import { A } from "../../app/A";
-import { useRouter, useSearch } from "../../app/router";
-import { aria } from "../../app/util";
+import { useRouter, useSearch } from "../../base/router";
+import { aria } from "../../base/util";
 import { useAgentProblems } from "../../data/agents";
-import { ready, useAgents, useRuntimes, useSprites } from "../../data/query";
+import { ready, useAgents, useRuntimes, useSprites } from "../../base/query";
 import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { ChipsInput, KeyValueEditor } from "../../ui/Chips";

@@ -8,11 +8,11 @@ import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { aria } from "../../app/util";
+import { aria } from "../../base/util";
 import { PixelCard } from "../kit";
 import { useFarm } from "../state";
 import { phoneState } from "../support";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 import { unreadTotal } from "../../rules/chat";
 
 export function PhoneButton(props: { height: number }) {

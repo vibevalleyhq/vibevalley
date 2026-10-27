@@ -4,7 +4,7 @@
 import { settingsWording } from "./words";
 import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../app/A";
-import { Keyed } from "../../app/util";
+import { Keyed } from "../../base/util";
 import { Card, ListCard, ListRow } from "../kit";
 import { ConnectorsPage } from "./ConnectorsPage";
 import { LanPage } from "./LanPage";

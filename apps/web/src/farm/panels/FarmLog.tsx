@@ -6,14 +6,14 @@ import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
 import { generalOf, spentText } from "../../rules/chat";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 import { useReports, useRoom } from "../../data/rooms";
 import { useAgent } from "../../data/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../kit";
 
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [wording().outcome.completed, "#efcf92", "#2f1f13"],

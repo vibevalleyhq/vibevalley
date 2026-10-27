@@ -1,7 +1,7 @@
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 import { type PickOption, pickItems } from "./pick";
 import { pxDrop, pxRing, pxText } from "./style";
-import { aria } from "../../app/util";
+import { aria } from "../../base/util";
 import { PxWindow } from "./base";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";

@@ -17,8 +17,8 @@ import {
   type SettingsStatus,
   type SettingsUpdate,
 } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
-import { queries, ready, useQuery, useSettings } from "../../data/query";
+import { api, reasonOf } from "../../base/api";
+import { queries, ready, useQuery, useSettings } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Segmented } from "../../ui/Segmented";

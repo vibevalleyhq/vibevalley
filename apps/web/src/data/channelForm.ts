@@ -4,7 +4,7 @@
 
 import { createSignal, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { api, reasonOf } from "./api";
+import { api, reasonOf } from "../base/api";
 
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Conversation) {

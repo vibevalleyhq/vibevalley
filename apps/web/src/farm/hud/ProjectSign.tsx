@@ -3,7 +3,7 @@
 
 import { farmWording } from "../words";
 import { Show } from "solid-js";
-import { useRouter } from "../../app/router";
+import { useRouter } from "../../base/router";
 import { playSound } from "../sound";
 import { useFarm } from "../state";
 

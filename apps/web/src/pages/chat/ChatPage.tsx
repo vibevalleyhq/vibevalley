@@ -17,9 +17,9 @@ import {
   unreadIn,
   unreadUnder,
 } from "../../rules/chat";
-import { aria, autofocus, Keyed, useNow } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
+import { aria, autofocus, Keyed, useNow } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";

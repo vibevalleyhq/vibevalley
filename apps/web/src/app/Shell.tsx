@@ -2,17 +2,17 @@
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
 
-import { appWording } from "./words";
+import { appWording } from "../base/words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
-import { useCore, useFrames } from "../data/frame";
+import { useCore, useFrames } from "../base/frame";
 import { AgentFace, OrchestratorFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
 import { A } from "./A";
-import { useRouter } from "./router";
+import { useRouter } from "../base/router";
 import { titleBar } from "./TitleBar";
-import { usePrefs } from "../data/prefs";
+import { usePrefs } from "../base/prefs";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;

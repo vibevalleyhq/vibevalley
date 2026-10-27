@@ -2,19 +2,19 @@ import { issuesWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import type { ChangedFile, Changes, Issue, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { issueTitle } from "../../rules/issues";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../../rules/issueState";
-import { ago } from "../../rules/time";
-import { aria, autofocus } from "../../app/util";
-import { ready } from "../../data/query";
+import { ago } from "../../base/format";
+import { aria, autofocus } from "../../base/util";
+import { ready } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { TextArea } from "../../ui/Field";
 import { run } from "./hooks";
 import { Note } from "./Sheet";
 import { useIssueChanges } from "../../data/issues";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {

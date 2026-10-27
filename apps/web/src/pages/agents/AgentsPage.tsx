@@ -6,18 +6,18 @@ import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { Agent, AgentTally, RuntimeInfo } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { hexColor } from "../../rules/cast";
 import { toast } from "../../ui/toasts";
 import { A } from "../../app/A";
 import { useAgentProblems, useWorkAgents } from "../../data/agents";
-import { useCore } from "../../data/frame";
-import { ready, useRuntimes } from "../../data/query";
+import { useCore } from "../../base/frame";
+import { ready, useRuntimes } from "../../base/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useSkills } from "../settings/SkillsPage";
 import { AgentPage } from "./AgentPage";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 /** `rest` is the path after /agents/. */
 export function AgentsRoute(props: { rest: string }) {

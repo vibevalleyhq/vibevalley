@@ -1,7 +1,7 @@
 // The page opened from another device, through the farm's lan listener (连接到本机): it pairs once on /pair and keeps
 // its key in a cookie the listener reads (lanKeyCookie); on the farm's own computer it needs none.
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import { lanKeyCookie } from "@vibevalley/protocol";
 
 const loopback = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);

@@ -12,7 +12,7 @@ import { yardPlaces } from "../world/places";
 import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession } from "../world/plots";
 import type { Village } from "../world/load";
 import { plotH } from "../world/world";
-import { useFrames } from "../../data/frame";
+import { useFrames } from "../../base/frame";
 import { useRoom } from "../../data/rooms";
 import { generalOf } from "../../rules/chat";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../kit";

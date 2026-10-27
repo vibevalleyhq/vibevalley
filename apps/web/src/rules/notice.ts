@@ -1,6 +1,6 @@
 // The farm at a glance in the tray (traySummary); each inbox item comes worded for it (InboxItem.words).
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
 import type { TraySummary } from "@vibevalley/protocol/host";
 import { unreadTotal } from "./chat";

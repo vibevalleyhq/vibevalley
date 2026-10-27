@@ -2,7 +2,7 @@
 // helper's phase. Nothing here folds facts: it only reads the chat the server sent.
 
 import { wording } from "@vibevalley/protocol/words";
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import {
   type Chat,
   type ChatMessage,

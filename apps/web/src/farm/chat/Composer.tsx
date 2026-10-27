@@ -6,18 +6,18 @@
 import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { createComposer } from "../../data/composer";
 
 import { threadOwnerOf } from "../../rules/chat";
-import { aria } from "../../app/util";
-import { useCore } from "../../data/frame";
+import { aria } from "../../base/util";
+import { useCore } from "../../base/frame";
 import { AgentFace } from "../../ui/Face";
 import { DictationButton } from "../../voice/DictationButton";
 import { SpriteIcon } from "../kit";
 
 import { useAgent } from "../../data/agents";
-import { setPick, usePrefs } from "../../data/prefs";
+import { setPick, usePrefs } from "../../base/prefs";
 
 /** Who the next line goes to, with a button to stop picking. */
 function PickChip(props: { named: boolean }) {

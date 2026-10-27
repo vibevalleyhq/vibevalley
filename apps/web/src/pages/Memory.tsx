@@ -1,17 +1,17 @@
 // What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
 
-import { pagesWording } from "./words";
+import { pagesWording } from "../base/words/pages";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import { type Memory, type MemorySourceInfo, orchestratorAgent, memoryKeep } from "@vibevalley/protocol";
-import { api, reasonOf } from "../data/api";
-import { ago } from "../rules/time";
+import { api, reasonOf } from "../base/api";
+import { ago } from "../base/format";
 import { toast } from "../ui/toasts";
-import { aria, useNow } from "../app/util";
-import { useCore } from "../data/frame";
-import { queries, ready, useProjects, useQuery } from "../data/query";
+import { aria, useNow } from "../base/util";
+import { useCore } from "../base/frame";
+import { queries, ready, useProjects, useQuery } from "../base/query";
 import { Button } from "../ui/Button";
 import { Select, TextArea, TextInput } from "../ui/Field";
 import { Quiet } from "./kit";

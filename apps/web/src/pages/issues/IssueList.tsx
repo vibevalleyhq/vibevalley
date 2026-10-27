@@ -5,7 +5,7 @@ import { orchestratorAgent } from "@vibevalley/protocol";
 import { type Grouping, groupRows, type Ordering, orderRows, type RowGroup } from "../../rules/board";
 import { type BoardCard, cardLook, cardProject, laneOrder, rowFacts } from "../../rules/cards";
 import { closedShown, laneLabel, laneStatus } from "../../rules/issues";
-import { ago } from "../../rules/time";
+import { ago } from "../../base/format";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { EmptyNote, IconButton, OlderLink, QuickAdd } from "./Board";

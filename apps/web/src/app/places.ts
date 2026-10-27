@@ -1,4 +1,4 @@
-import { appWording } from "./words";
+import { appWording } from "../base/words";
 // The workbench's places, in the rail's order; 设置 sits at the rail's bottom.
 
 export interface Place {

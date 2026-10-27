@@ -17,9 +17,9 @@ import {
   orchestratorTyping,
   workbenchClock,
 } from "../../rules/chat";
-import { aria, useNow } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
+import { aria, useNow } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";

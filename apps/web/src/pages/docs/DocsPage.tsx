@@ -2,7 +2,7 @@
 // helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
 // and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
 
-import { pagesWording } from "../words";
+import { pagesWording } from "../../base/words/pages";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -21,14 +21,14 @@ import {
   type DocSpan,
   docOwner,
 } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { DocEditor, type EditBlock } from "./editor";
 import { hexColor, swatches } from "../../rules/cast";
 import { knownTypes } from "../../rules/docBlocks";
-import { useRouter } from "../../app/router";
-import { aria, Keyed } from "../../app/util";
-import { createExternal } from "../../data/external";
-import { ready, useAgents, useQuery } from "../../data/query";
+import { useRouter } from "../../base/router";
+import { aria, Keyed } from "../../base/util";
+import { createExternal } from "../../base/external";
+import { ready, useAgents, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { TextInput } from "../../ui/Field";

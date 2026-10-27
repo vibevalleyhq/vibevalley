@@ -14,16 +14,16 @@ import {
   type Session,
   type SessionEvent,
 } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
 import { issueTag, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
 import { closedText } from "@vibevalley/protocol/rules";
-import { tookText, wallClockText } from "../../rules/time";
+import { tookText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
-import { ready } from "../../data/query";
-import { useNow } from "../../app/util";
+import { ready } from "../../base/query";
+import { useNow } from "../../base/util";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";

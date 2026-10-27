@@ -5,14 +5,14 @@
 
 import { farmWording } from "../words";
 import { createSignal, For, onSettled, Show } from "solid-js";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { hasFarm, orchestratorReady } from "./rules";
 import { startScene } from "./scene";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
-import { ready, useSettings } from "../../data/query";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
+import { ready, useSettings } from "../../base/query";
 import { TitleStage } from "./TitleStage";
 
 type Item = "start" | "continue" | "settings";

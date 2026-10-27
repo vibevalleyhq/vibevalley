@@ -9,10 +9,10 @@ import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/prot
 import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 import { PxMarkdown, SpriteIcon } from "../kit";
 
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 

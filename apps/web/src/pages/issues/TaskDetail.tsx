@@ -2,11 +2,11 @@ import { issuesWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph, TaskState } from "@vibevalley/protocol";
-import { reasonOf } from "../../data/api";
+import { reasonOf } from "../../base/api";
 import type { Tone } from "../../rules/cards";
 import { taskLine } from "../../rules/issues";
-import { wallClockText } from "../../rules/time";
-import { ready } from "../../data/query";
+import { wallClockText } from "../../base/format";
+import { ready } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { Icon } from "../../ui/Icon";

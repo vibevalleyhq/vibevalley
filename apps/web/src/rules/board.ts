@@ -1,6 +1,6 @@
 // The issue board's look: how its list is grouped and ordered.
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import type { Priority } from "@vibevalley/protocol";
 import { type Lane, lanes } from "./issues";
 

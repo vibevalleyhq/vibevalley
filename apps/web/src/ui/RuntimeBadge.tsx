@@ -1,5 +1,5 @@
-import { appWording } from "../app/words";
-import { ready, useRuntimes, useSprites } from "../data/query";
+import { appWording } from "../base/words";
+import { ready, useRuntimes, useSprites } from "../base/query";
 import { runtimeName } from "../rules/skills";
 
 /** The execution tool named by a profile or session, using the server's catalog label. */

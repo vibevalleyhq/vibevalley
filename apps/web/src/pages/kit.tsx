@@ -1,11 +1,11 @@
 // What the workbench's list-and-detail pages share: a list card of rows on the left, the open one's card on the right,
 // and the few controls their forms use.
 
-import { pagesWording } from "./words";
+import { pagesWording } from "../base/words/pages";
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "../app/A";
-import { aria } from "../app/util";
+import { aria } from "../base/util";
 import { TextInput } from "../ui/Field";
 
 /** A list beside its detail; under md the list stacks over it. */

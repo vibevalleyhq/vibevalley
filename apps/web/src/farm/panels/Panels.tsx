@@ -7,8 +7,8 @@ import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../kit/looks";
-import { aria, Keyed } from "../../app/util";
-import { useCore } from "../../data/frame";
+import { aria, Keyed } from "../../base/util";
+import { useCore } from "../../base/frame";
 import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 import { useVillage } from "../support";
@@ -19,7 +19,7 @@ import { Menu } from "./Menu";
 import { SowForm, WaterForm } from "./SeedForms";
 import { TaskBoard } from "./TaskBoard";
 import { tint } from "./bits";
-import { setOrchestratorLook, setPet, usePrefs } from "../../data/prefs";
+import { setOrchestratorLook, setPet, usePrefs } from "../../base/prefs";
 
 const panelTitle: Record<FarmPanel, [title: string, icon: string, size: FarmDialogSize]> = {
   shop: [farmWording().panel.shop, "icon-shop", "sm"],

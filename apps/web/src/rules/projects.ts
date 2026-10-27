@@ -3,7 +3,7 @@
 // helpers' worktrees. The room on an island is roomLeft, the rule the server refuses a start by: an open plot is one
 // more that may start now, a shut one waits for the farm to free up.
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "./cast";

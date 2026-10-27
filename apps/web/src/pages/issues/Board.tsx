@@ -5,7 +5,7 @@ import { maxRunning } from "@vibevalley/protocol";
 import type { Ordering } from "../../rules/board";
 import { type BoardCard, cardLook, cardMove, cardProject, laneOrder } from "../../rules/cards";
 import { closedShown, type Lane, laneLabel, lanes, laneStatus } from "../../rules/issues";
-import { autofocus } from "../../app/util";
+import { autofocus } from "../../base/util";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { useGraphs, useNameOf } from "./hooks";

@@ -18,8 +18,8 @@ import {
   spansOf,
   turnLabel,
 } from "../../rules/rounds";
-import { ago, tookText } from "../../rules/time";
-import { aria, useNow } from "../../app/util";
+import { ago, tookText } from "../../base/format";
+import { aria, useNow } from "../../base/util";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { createSessionEvents } from "../../data/sessions";

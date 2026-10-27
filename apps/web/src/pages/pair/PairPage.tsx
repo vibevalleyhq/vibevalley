@@ -1,9 +1,9 @@
 // /pair: another device joins the farm (连接到本机). The owner's QR code opens it with the code; the device names itself
 // and questions, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
 
-import { pagesWording } from "../words";
+import { pagesWording } from "../../base/words/pages";
 import { createSignal, Show } from "solid-js";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { deviceGuess, keyCookie } from "../../rules/lan";
 import { Button } from "../../ui/Button";
 import { Field, TextInput } from "../../ui/Field";

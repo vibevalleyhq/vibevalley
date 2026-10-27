@@ -3,13 +3,13 @@
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
 
-import { rulesWording } from "../../rules/words";
+import { rulesWording } from "../../base/words/rules";
 import { farmWording } from "../words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { createIssueActs } from "../../data/issueActs";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
@@ -17,14 +17,14 @@ import { castPrefix } from "../../rules/cast";
 import { issueThreadOf } from "../../rules/chat";
 import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../rules/issueState";
 import { runText } from "../../rules/issues";
-import { tookText, wallClockText } from "../../rules/time";
-import { aria, useNow } from "../../app/util";
-import { useRouter } from "../../app/router";
+import { tookText, wallClockText } from "../../base/format";
+import { aria, useNow } from "../../base/util";
+import { useRouter } from "../../base/router";
 import { createSessionEvents } from "../../data/sessions";
 import { WorkLog } from "../../pages/chat/WorkLog";
-import { useCore, useFrames } from "../../data/frame";
+import { useCore, useFrames } from "../../base/frame";
 import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";
-import { ready } from "../../data/query";
+import { ready } from "../../base/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { farmActWords } from "../kit/labels";
 import { tint } from "../panels/bits";

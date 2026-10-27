@@ -2,7 +2,7 @@
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
-import { pagesWording } from "../words";
+import { pagesWording } from "../../base/words/pages";
 import {
   type Block,
   type BlockAttrs,
@@ -19,7 +19,7 @@ import {
   type VibeValleyApi,
 } from "@vibevalley/protocol";
 import { keyBetween } from "@vibevalley/protocol/rules";
-import { reasonOf } from "../../data/api";
+import { reasonOf } from "../../base/api";
 import {
   codePointOffset,
   editSpans,

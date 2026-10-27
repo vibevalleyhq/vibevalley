@@ -6,7 +6,7 @@ import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
 import { changeKind, patchLines, patchMarkOf } from "../../rules/issueState";
-import { aria } from "../../app/util";
+import { aria } from "../../base/util";
 import { SpriteIcon } from "../kit";
 
 /** A colour at `alpha` of its strength over cream. */

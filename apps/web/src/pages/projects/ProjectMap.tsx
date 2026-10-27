@@ -7,7 +7,7 @@ import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "s
 import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
-import { api, newSendKey, reasonOf } from "../../data/api";
+import { api, newSendKey, reasonOf } from "../../base/api";
 import { badgeColors, CardColors } from "../../farm/kit/card";
 import type { SpriteAtlas, SpriteInfo } from "../../farm/world/sprites";
 import { castOf, castSprite, cropSprite } from "../../rules/cast";
@@ -30,10 +30,10 @@ import {
 } from "../../rules/projects";
 import { toast } from "../../ui/toasts";
 import { writeIssue } from "../issues/write";
-import { useRouter } from "../../app/router";
-import { autofocus } from "../../app/util";
-import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents, useProjects } from "../../data/query";
+import { useRouter } from "../../base/router";
+import { autofocus } from "../../base/util";
+import { useCore, useFrames } from "../../base/frame";
+import { ready, useAgents, useProjects } from "../../base/query";
 import { PixelCard } from "../../farm/kit";
 import { useVillage } from "../../farm/support";
 import { Button } from "../../ui/Button";

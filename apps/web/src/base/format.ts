@@ -1,4 +1,4 @@
-import { rulesWording } from "./words";
+import { rulesWording } from "./words/rules";
 // Times and numbers in words: how long ago, how long it took, the time of day, a moment.
 
 export function ago(at: number, now: number) {

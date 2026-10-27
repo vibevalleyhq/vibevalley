@@ -1,10 +1,10 @@
 import { issuesWording } from "./words";
 import { createMemo } from "solid-js";
 import { orchestratorAgent, type TaskGraph } from "@vibevalley/protocol";
-import { reasonOf } from "../../data/api";
+import { reasonOf } from "../../base/api";
 import { toast } from "../../ui/toasts";
-import { useFrames } from "../../data/frame";
-import { ready, queries, useAgents } from "../../data/query";
+import { useFrames } from "../../base/frame";
+import { ready, queries, useAgents } from "../../base/query";
 
 const noGraphs: TaskGraph[] = [];
 

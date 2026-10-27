@@ -1,19 +1,19 @@
 // 管家: who the orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong),
 // 旧账 (the conversation it folded away) and 声音 (what it says on a call); /orchestrator/<tab>.
 
-import { pagesWording } from "../words";
+import { pagesWording } from "../../base/words/pages";
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { orchestratorLooks } from "../../farm/kit/looks";
 import { A } from "../../app/A";
-import { useRouter } from "../../app/router";
-import { aria } from "../../app/util";
+import { useRouter } from "../../base/router";
+import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "../Memory";
 import { VoiceForm } from "../settings/VoiceForm";
 import { TrajectoryLog } from "../Trajectory";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const tabs = [
   { id: "memory", label: pagesWording().orchestrator.tab.memory },

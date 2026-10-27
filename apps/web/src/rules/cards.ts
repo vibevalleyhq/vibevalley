@@ -1,7 +1,7 @@
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import { wording } from "@vibevalley/protocol/words";
 import type { WorkspaceState, Issue, IssueHistory, IssueStatus, Priority, Session, TaskGraph } from "@vibevalley/protocol";
 import { type Ordering, orderRows, type RowFacts } from "./board";
@@ -22,7 +22,7 @@ import {
   tagOpen,
   taskLine,
 } from "./issues";
-import { ago, tookText } from "./time";
+import { ago, tookText } from "../base/format";
 import { shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
 import { attentionTone } from "./issueState";
 

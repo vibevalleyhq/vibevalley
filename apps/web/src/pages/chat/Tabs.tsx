@@ -1,12 +1,12 @@
 import { chatWording } from "./words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Conversation, Recurrence } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { chatPath, jobThreadOf, phaseText } from "../../rules/chat";
 import { toast } from "../../ui/toasts";
-import { useNow } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
+import { useNow } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
 import { Empty, HelperFace, PhaseGlyph } from "./bits";

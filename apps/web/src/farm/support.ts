@@ -9,7 +9,7 @@ import { type FarmSoundInput, farmCues, inTurn, isMuted, playSound, setMuted, su
 import { farm, farmState, subscribeFarm } from "./store";
 import { farmKey, typing } from "./tools";
 import { loadVillage, type Village } from "./world/load";
-import { createExternal } from "../data/external";
+import { createExternal } from "../base/external";
 
 /** The level and the atlas: undefined while loading; `error` when they could not be loaded. */
 export function useVillage(): Accessor<{ village?: Village; error?: string }> {

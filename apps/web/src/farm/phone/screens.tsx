@@ -9,7 +9,7 @@ import type { GlyphCell } from "../kit/card";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
-import { aria } from "../../app/util";
+import { aria } from "../../base/util";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { SpriteIcon } from "../kit";
 import { phoneState } from "../support";
@@ -18,7 +18,7 @@ import { voiceCall } from "../../voice/call";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
 import { useAgent } from "../../data/agents";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 

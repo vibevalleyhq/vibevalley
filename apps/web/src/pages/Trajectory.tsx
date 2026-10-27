@@ -2,12 +2,12 @@
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
-import { pagesWording } from "./words";
+import { pagesWording } from "../base/words/pages";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
-import { api, reasonOf } from "../data/api";
+import { api, reasonOf } from "../base/api";
 import {
   cacheHit,
   farmToolText,
@@ -25,11 +25,11 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "../rules/rounds";
-import { ago } from "../rules/time";
+import { ago } from "../base/format";
 import { toast } from "../ui/toasts";
-import { aria, autofocus, Keyed, useNow } from "../app/util";
+import { aria, autofocus, Keyed, useNow } from "../base/util";
 import { createSessionEvents } from "../data/sessions";
-import { ready, useQuery } from "../data/query";
+import { ready, useQuery } from "../base/query";
 import { TextInput } from "../ui/Field";
 import { Icon } from "../ui/Icon";
 import { Markdown } from "../ui/Markdown";

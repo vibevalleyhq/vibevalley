@@ -21,7 +21,7 @@ import {
   VoiceTTSMinimaxModelValues,
   VoiceValues,
 } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import {
   answerLabel,
   answerStart,
@@ -42,8 +42,8 @@ import {
   withPart,
 } from "../../rules/voice";
 import { A } from "../../app/A";
-import { aria, createSettled, Keyed } from "../../app/util";
-import { ready, useQuery, useSettings } from "../../data/query";
+import { aria, createSettled, Keyed } from "../../base/util";
+import { ready, useQuery, useSettings } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";

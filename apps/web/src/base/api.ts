@@ -1,4 +1,4 @@
-import { appWording } from "../app/words";
+import { appWording } from "./words";
 import { VibeValleyApi, VibeValleyApiError } from "@vibevalley/protocol";
 
 /** The page is served by the server it talks to: the same origin. */

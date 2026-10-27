@@ -7,7 +7,7 @@ import { createMemo, createSignal, onSettled } from "solid-js";
 import { type ChatMessage, type Conversation, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "../rules/chat";
-import { api, newSendKey, reasonOf } from "./api";
+import { api, newSendKey, reasonOf } from "../base/api";
 
 /** Says a line in a conversation (the general one when it is undefined), with the picked helper. */
 export async function say(text: string, conversation: Conversation | undefined, sendKey: string, agent: string | undefined) {

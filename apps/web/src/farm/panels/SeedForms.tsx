@@ -7,21 +7,21 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import { type ProjectTemplates, type Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { fire } from "../commands";
 import { playSound } from "../sound";
-import { newSendKey } from "../../data/api";
+import { newSendKey } from "../../base/api";
 import { writeIssue } from "../../pages/issues/write";
-import { aria } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { ready, useProjects, useQuery } from "../../data/query";
+import { aria } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { ready, useProjects, useQuery } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
 import { commands, useFarm } from "../state";
 import { useWorkAgents } from "../../data/agents";
-import { useCore } from "../../data/frame";
+import { useCore } from "../../base/frame";
 import { issueOf } from "../world/plots";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const xs = "text-[12px] text-bark-600";
 /** Who picks the helper when the owner does not. */

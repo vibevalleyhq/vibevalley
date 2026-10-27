@@ -5,7 +5,7 @@ import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import {
   calendarOf,
   type CalendarDay,
@@ -23,10 +23,10 @@ import {
   streaksOf,
 } from "../../rules/projects";
 import { toast } from "../../ui/toasts";
-import { useRouter } from "../../app/router";
-import { autofocus, useNow } from "../../app/util";
+import { useRouter } from "../../base/router";
+import { autofocus, useNow } from "../../base/util";
 import { useWorkAgents } from "../../data/agents";
-import { ready, useProjects, useQuery } from "../../data/query";
+import { ready, useProjects, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { AgentFace } from "../../ui/Face";

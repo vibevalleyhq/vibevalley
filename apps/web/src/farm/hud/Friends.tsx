@@ -9,15 +9,15 @@ import { bottleSprite, quotaOf } from "../../rules/quota";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
 import { webRoutes } from "../world/places";
-import { aria, useClickAway } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore, useFrames } from "../../data/frame";
-import { ready, useAgents, useRuntimes } from "../../data/query";
+import { aria, useClickAway } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore, useFrames } from "../../base/frame";
+import { ready, useAgents, useRuntimes } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
 import { PxButton, SpriteIcon } from "../kit";
 import { useFarm } from "../state";
 import { HudCard } from "./HudCard";
-import { setPick, usePrefs } from "../../data/prefs";
+import { setPick, usePrefs } from "../../base/prefs";
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
   bug: { dot: "#c84a3a", label: farmWording().friends.status.bug },

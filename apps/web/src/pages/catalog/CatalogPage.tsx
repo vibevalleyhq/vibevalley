@@ -7,11 +7,11 @@ import type { JSX } from "@solidjs/web";
 
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../farm/sound";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, remakeOf, shelfOf, shelves } from "../../rules/catalog";
-import { numberText } from "../../rules/time";
+import { numberText } from "../../base/format";
 import { A } from "../../app/A";
-import { useRouter } from "../../app/router";
-import { aria } from "../../app/util";
-import { ready, useQuery } from "../../data/query";
+import { useRouter } from "../../base/router";
+import { aria } from "../../base/util";
+import { ready, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";

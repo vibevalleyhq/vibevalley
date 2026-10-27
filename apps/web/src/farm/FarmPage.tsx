@@ -6,7 +6,7 @@ import { farmWording } from "./words";
 import { createEffect, Show } from "solid-js";
 import type { FarmSoundInput } from "./sound";
 import { farm } from "./store";
-import { FramesContext, useFrames } from "../data/frame";
+import { FramesContext, useFrames } from "../base/frame";
 import { VillageCanvas } from "./canvas/VillageCanvas";
 import { DebugPanel } from "./debug/DebugPanel";
 import { Hud } from "./hud/Hud";

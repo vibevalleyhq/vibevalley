@@ -49,7 +49,7 @@ import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
-import { prefsNow } from "../../data/prefs";
+import { prefsNow } from "../../base/prefs";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;

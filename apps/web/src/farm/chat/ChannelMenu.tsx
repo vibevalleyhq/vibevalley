@@ -8,10 +8,10 @@ import { createChannelForm } from "../../data/channelForm";
 import { playSound } from "../sound";
 import { farm } from "../store";
 import { channelLabel, channelsOf, chatPath, unreadUnder } from "../../rules/chat";
-import { aria, useClickAway } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
-import { ready, useProjects } from "../../data/query";
+import { aria, useClickAway } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
+import { ready, useProjects } from "../../base/query";
 import { PxButton, PxTextInput, SpriteIcon } from "../kit";
 
 type Mode = "list" | "create" | "settings";

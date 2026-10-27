@@ -3,15 +3,15 @@
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
-import { appWording } from "../app/words";
+import { appWording } from "../base/words";
 import type { RtcLine } from "@vibevalley/protocol/host";
 import { currentHost } from "../host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
-import { api, reasonOf } from "../data/api";
+import { api, reasonOf } from "../base/api";
 import { webRtc } from "./agora";
 import { LiveCaptions } from "./captions";
-import { prefsNow } from "../data/prefs";
+import { prefsNow } from "../base/prefs";
 
 export type CallPhase = "idle" | "connecting" | "live" | "ending";
 

@@ -6,7 +6,7 @@ import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import type { GameEffect, GameEffectAchievement } from "@vibevalley/protocol";
 import { localEffects } from "../effects";
 import { clearingLevels } from "./rules";
-import { subscribeLive } from "../../data/live";
+import { subscribeLive } from "../../base/live";
 import { EarnedMedal, noticeTitle, type ToastData, ToastViewport, toasts, ToastType } from "../kit";
 import { rawFarmFrame } from "../state";
 import { useVillage } from "../support";

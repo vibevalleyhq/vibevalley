@@ -19,11 +19,11 @@ import { ToastHost } from "../ui/ToastHost";
 import { Navigate } from "./A";
 import { Follow } from "./Follow";
 import { Root } from "./Root";
-import { Keyed } from "./util";
-import { ready, useProjects } from "../data/query";
+import { Keyed } from "../base/util";
+import { ready, useProjects } from "../base/query";
 import { sortProjects } from "../rules/projects";
 import { farmState } from "../farm/store";
-import { useRouter } from "./router";
+import { useRouter } from "../base/router";
 import { Shell } from "./Shell";
 import { WindowStrip } from "./TitleBar";
 

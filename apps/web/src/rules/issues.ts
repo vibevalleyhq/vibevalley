@@ -1,6 +1,6 @@
 // An issue's lane, title and status and priority words.
 
-import { rulesWording } from "./words";
+import { rulesWording } from "../base/words/rules";
 import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
 import {

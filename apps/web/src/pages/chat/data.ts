@@ -3,7 +3,7 @@
 import { type Accessor, createEffect } from "solid-js";
 
 import type { Conversation } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { newestUnread } from "../../rules/chat";
 
 /** A shown conversation is read: the newest unread number goes to the server once it is drawn. */

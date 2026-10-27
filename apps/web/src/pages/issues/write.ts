@@ -1,7 +1,7 @@
 // Writing an issue from a sentence and remembering the last pick: framework-free, for the board and the farm.
 
 import { type Issue, VibeValleyApiError } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { newIssueTitle } from "../../rules/issues";
 
 const pickKey = "vibevalley.board.pick";
