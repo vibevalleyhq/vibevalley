@@ -1,4 +1,4 @@
-// The chat: the general channel 田头, the channels, and a thread under any message; every
+// The chat: the channels, the default one among them, and a thread under any message; every
 // session's work is talked about in its issue's thread. Every message is written to the database first, in one
 // transaction with who it goes to; only then does it become a fact. A delivery goes pending → announced → handed → seen;
 // a session that closes or a turn that ends without a word puts what it was handed back to pending: given twice rather
@@ -14,8 +14,8 @@ import {
   everyone,
   type FactLeft,
   type FactReport,
-  generalName,
   orchestratorAgent,
+  firstChannelName,
   ownerId,
   type ActorKind,
   type MessageKind,
@@ -90,6 +90,8 @@ export interface Info {
   readonly name: string;
   readonly description: string;
   readonly project: string;
+  /** The farm's default channel. */
+  readonly default: boolean;
 }
 
 export interface Spoken {
@@ -166,7 +168,7 @@ type MsgRow = qm.MessageByIDResult;
 
 const senderKind = (kind: string): ActorKind => (kind === "owner" || kind === "orchestrator" || kind === "session" ? kind : "system");
 const messageKind = (kind: string): MessageKind => (kind === "dispatch" || kind === "report" || kind === "notice" ? kind : "chat");
-const channelType = (kind: string): ChannelType => (kind === "thread" || kind === "channel" ? kind : "general");
+const channelType = (type: string): ChannelType => (type === "thread" ? "thread" : "channel");
 const subjectKind = (kind: string | null): SubjectKind | undefined => (kind === "issue" || kind === "graph" || kind === "talk" ? kind : undefined);
 
 function toMessage(row: MsgRow): ChatMessage {
@@ -202,11 +204,12 @@ const inboxOf = (row: MsgRow, target: string): InboxMessage => ({
   text: row.body,
 });
 
-const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project">): Info => ({
+const infoOf = (row: Pick<ChannelRow, "id" | "name" | "description" | "project" | "is_default">): Info => ({
   id: row.id,
-  name: row.name ?? generalName,
+  name: row.name ?? "",
   description: row.description ?? "",
   project: row.project ?? "",
+  default: row.is_default,
 });
 
 const optional = (s: string | undefined) => {
@@ -255,14 +258,17 @@ interface Written {
 }
 
 export interface ChannelShape {
-  readonly general: () => string;
+  /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
+  readonly defaultChannel: () => string;
+  /** This channel is the default from now on. */
+  readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
   /** The owner's words; again: sendKey was sent before, and the message is that one. */
   readonly say: (text: string, channel: string | undefined, sendKey: string) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
   /** Words to a session in its thread; with no thread the session hears them straight. */
   readonly tellSession: (from: string, session: string, text: string, sendKey: string) => Effect.Effect<ChatMessage | undefined, ApiError>;
   /** A session's or the orchestrator's words, through channel_say. */
   readonly speak: (from: string, text: string, opt?: SpeakOptions) => Effect.Effect<Spoken, ApiError>;
-  /** Words said on a call, kept in 田头 as they were said; they wake no one. */
+  /** Words said on a call, kept in the default channel as they were said; they wake no one. */
   readonly spoken: (from: string, text: string, sendKey: string) => Effect.Effect<boolean, ApiError>;
   /** The orchestrator's words, one whole message each: it shows once said in full. */
   readonly orchestratorSays: (channel: string, text: string, run: string) => Effect.Effect<void>;
@@ -419,10 +425,19 @@ export const make = Effect.gen(function* () {
     ["system", "system", "VibeValley"],
   ] as const)
     yield* db(qp.upsertParticipant({ id, kind, name, agent_id: null, runtime: null, joined_at: yield* Clock.currentTimeMillis }));
-  let general = (yield* one(qc.generalID()))?.id ?? "";
-  if (!general) {
-    general = newId();
-    yield* db(qc.createGeneral({ id: general, name: generalName, created_at: yield* Clock.currentTimeMillis }));
+  let defaultId = (yield* one(qc.defaultID()))?.id ?? "";
+  if (!defaultId) {
+    defaultId = newId();
+    yield* db(
+      qc.createChannel({
+        id: defaultId,
+        is_default: true,
+        name: firstChannelName,
+        description: null,
+        project: null,
+        created_at: yield* Clock.currentTimeMillis,
+      }),
+    );
   }
   yield* reload;
 
@@ -437,8 +452,8 @@ export const make = Effect.gen(function* () {
       .flatMap((c) => (c.name !== null ? [c] : []))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map((c) => "#" + c.name);
-  const channelOfSession = (h: Session) => (h.channel && channelName(h.channel) !== undefined ? h.channel : general);
-  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? (row.parent_id ?? general) : row.id);
+  const channelOfSession = (h: Session) => (h.channel && channelName(h.channel) !== undefined ? h.channel : defaultId);
+  const channelIdOf = (row: ChannelRow) => (row.type === "thread" ? row.parent_id! : row.id);
   // Before the helpers are back there are none: a job opens for each once they are.
   const sessionOf = (id: string) => helpers?.sessionOf(id);
   const presentSessions = () => helpers?.presentSessions() ?? [];
@@ -450,7 +465,7 @@ export const make = Effect.gen(function* () {
       ...((name ?? channelNameOf) !== null ? { name: (name ?? channelNameOf)! } : {}),
     } as Channel;
     const channel = channelNameOf ?? (channelId ? channelName(channelId) : undefined) ?? undefined;
-    return targetOf(ch, channel || undefined);
+    return targetOf(ch, channel ?? "");
   };
   const targetOfChannel = (row: ChannelRow) => targetOfRow(row.type, row.root_number, row.name, row.parent_id, null);
 
@@ -460,6 +475,7 @@ export const make = Effect.gen(function* () {
     return {
       id: row.id,
       type: channelType(row.type),
+      ...(row.is_default ? { default: true } : {}),
       ...(row.root_id !== null ? { root: row.root_id } : {}),
       ...(row.root_number !== null ? { rootNumber: row.root_number } : {}),
       ...(row.name !== null ? { name: row.name } : {}),
@@ -502,7 +518,7 @@ export const make = Effect.gen(function* () {
       type: "ownerMentions",
       mentions: rows.map((r) => ({
         message: toMessage(r),
-        channel: r.top_id ?? general,
+        channel: r.top_id ?? defaultId,
         address: targetOfRow(r.channel_type, r.root_number, null, r.top_id, r.channel_name),
       })),
     });
@@ -547,7 +563,17 @@ export const make = Effect.gen(function* () {
       parent_id: root.channel,
     };
     yield* db(qc.createThread({ ...thread, created_at }));
-    model.created({ ...thread, type: "thread", last_number: null, reply_count: 0, created_at, name: null, description: null, project: null });
+    model.created({
+      ...thread,
+      type: "thread",
+      is_default: false,
+      last_number: null,
+      reply_count: 0,
+      created_at,
+      name: null,
+      description: null,
+      project: null,
+    });
     if (subject.owner) yield* follow(id, subject.owner, "owner", root.number);
     return id;
   });
@@ -776,7 +802,7 @@ export const make = Effect.gen(function* () {
 
   const inboxRows = Effect.fn("Channels.inboxRows")(function* (who: string) {
     const h = sessionOf(who);
-    const channel = h ? channelOfSession(h) : general;
+    const channel = h ? channelOfSession(h) : defaultId;
     const rows = yield* db(qc.inboxOf({ participant: who, channel }));
     const out: UnreadRow[] = [];
     for (const r of rows.slice(0, summaryChannels)) {
@@ -861,7 +887,7 @@ export const make = Effect.gen(function* () {
           if (rolled.length > 0) {
             const { count: failed, tripped } = breaker.failed(a.id);
             if (tripped) {
-              const where = (yield* threadOfSession(a.id)) ?? general;
+              const where = (yield* threadOfSession(a.id)) ?? defaultId;
               const name = sessionOf(a.id)?.name ?? a.id;
               yield* write({
                 channel: where,
@@ -1020,18 +1046,18 @@ export const make = Effect.gen(function* () {
     }),
   );
 
-  /** A target as who would mean it: empty is a session's own thread (or 田头), a channel by name, or a thread by its parent's number. */
+  /** A target as who would mean it: empty is a session's own thread (or the default channel), a channel by name, or a thread by its parent's number. */
   const resolveTarget = Effect.fnUntraced(function* (who: string, target: string): Effect.fn.Return<string, ApiError> {
     if (!target.trim()) {
       if (who !== orchestratorAgent && who !== ownerId) {
         const own = yield* threadOfSession(who);
         if (own) return own;
       }
-      return general;
+      return defaultId;
     }
     const parsed = parseChatTarget(target);
     if (!parsed) return yield* Effect.fail(refused(channelWording().badTarget(target)));
-    let channel = general;
+    let channel = defaultId;
     const name = parsed.kind === "channel" ? parsed.name : target.trim().replace(/^#/, "").split(":")[0]!;
     if (name) {
       const found = model.channelByName(name);
@@ -1074,7 +1100,7 @@ export const make = Effect.gen(function* () {
           return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): ChannelEvent => ({ _tag: "Message", message })));
         }),
       ),
-    general: () => general,
+    defaultChannel: () => defaultId,
     messageLocation: Effect.fn("Channels.messageLocation")(function* (id) {
       const message = yield* one(qm.messageByID({ id }));
       if (!message) return undefined;
@@ -1086,7 +1112,7 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           if (!text.trim()) return yield* Effect.fail(refused(channelWording().empty));
           if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
-          const where = channel ?? general;
+          const where = channel ?? defaultId;
           if (!model.channel(where)) return yield* Effect.fail(missing(channelWording().noChannel(where), [lookIn.channel]));
           const written = yield* write({ channel: where, from: ownerId, kind: "chat", text: text.trim(), sendKey, readBy: ownerId });
           if (written.again) return { message: toMessage(written.row), again: true };
@@ -1175,7 +1201,7 @@ export const make = Effect.gen(function* () {
           if (sendKey.length > sendKeyMax) return yield* Effect.fail(refused(channelWording().sendKeyLong));
           if (!text.trim()) return false;
           const written = yield* write({
-            channel: general,
+            channel: defaultId,
             from,
             kind: "chat",
             text: text.trim(),
@@ -1260,10 +1286,11 @@ export const make = Effect.gen(function* () {
           const proj = optional(project);
           const id = newId();
           const created_at = yield* Clock.currentTimeMillis;
-          yield* db(qc.createChannel({ id, name: clean, description: desc, project: proj, created_at }));
+          yield* db(qc.createChannel({ id, is_default: false, name: clean, description: desc, project: proj, created_at }));
           model.created({
             id,
             type: "channel",
+            is_default: false,
             root_id: null,
             root_number: null,
             subject_kind: null,
@@ -1277,7 +1304,7 @@ export const make = Effect.gen(function* () {
             parent_id: null,
           });
           yield* publishChannel(id);
-          return infoOf({ id, name: clean, description: desc, project: proj });
+          return infoOf({ id, name: clean, description: desc, project: proj, is_default: false });
         }),
       ),
     updateChannel: (id, description, project) =>
@@ -1292,11 +1319,25 @@ export const make = Effect.gen(function* () {
           yield* publishChannel(id);
         }),
       ),
+    makeDefault: (id) =>
+      locked(
+        Effect.gen(function* () {
+          const row = model.channel(id);
+          if (!row || row.type !== "channel") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (id === defaultId) return;
+          const was = defaultId;
+          yield* tx(Effect.andThen(db(qc.clearDefault()), db(qc.makeDefault({ id }))));
+          model.defaultMoved(was, id);
+          defaultId = id;
+          yield* publishChannel(was);
+          yield* publishChannel(id);
+        }),
+      ),
     topOf: (channel) =>
       Effect.sync(() => {
         const row = model.channel(channel);
-        const top = model.channel(row ? channelIdOf(row) : general);
-        return top ? infoOf(top) : { id: general, name: generalName, description: "", project: "" };
+        const top = model.channel(row ? channelIdOf(row) : defaultId);
+        return infoOf(top ?? model.channel(defaultId)!);
       }),
     channelByName: (name) =>
       Effect.sync(() => {

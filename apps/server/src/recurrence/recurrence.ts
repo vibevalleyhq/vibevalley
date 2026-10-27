@@ -123,7 +123,7 @@ export const make = Effect.gen(function* () {
       const at = now();
       const problem = recurrenceProblem(req, at);
       if (problem) return yield* Effect.fail(refused(problem));
-      const want = req.channel ?? chat.general();
+      const want = req.channel ?? chat.defaultChannel();
       const channel = (yield* chat.channels()).find((c) => c.id === want);
       if (!channel) return yield* Effect.fail(refused(recurrenceWording().noChannel(want), [lookIn.channel]));
       const named = (req.agent ?? "").trim();

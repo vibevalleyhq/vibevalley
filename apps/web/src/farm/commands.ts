@@ -80,7 +80,9 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;
-      await api.channel.message.send({ text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() });
+      const id = frame()?.state.chat?.channels.find((c) => c.default)?.id;
+      if (!id) return;
+      await api.channel.message.send({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() });
     },
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {

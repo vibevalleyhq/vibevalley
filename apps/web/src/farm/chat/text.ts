@@ -1,4 +1,12 @@
-// The farm chat window's words about a message: its clock time, and whether it is long enough to fold.
+// The farm chat window's words: a channel's name as the farm says it, a message's clock time, and whether it is long
+// enough to fold.
+
+import type { Channel } from "@vibevalley/protocol";
+import { channelLabel } from "../../features/channel";
+import { farmWording } from "../words";
+
+/** A channel as the farm names it: the default one is the farm's 田头 (its words' chat.label), any other its #name. */
+export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? farmWording().chat.label : channelLabel(c));
 
 export const farmClock = (at: number) => {
   const d = new Date(Math.round(at));

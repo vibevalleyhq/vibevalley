@@ -22,6 +22,6 @@ test("two pages on one channel each get a line said in it, once", async ({ page,
   }
 
   // Said from elsewhere (the command line, a chat app), it reaches both too.
-  await api.channel.message.send({ text: "从别处说一句", channel: id });
+  await api.channel.message.send({ id, text: "从别处说一句" });
   for (const p of [page, other]) await expect(p.getByRole("log", { name: "消息" }).getByText("从别处说一句")).toHaveCount(1);
 });

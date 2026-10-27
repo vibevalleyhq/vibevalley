@@ -6,7 +6,6 @@ import {
   type Agent,
   type BlockAttrs,
   DeliverableValues,
-  generalName,
   type Issue,
   IssueStatusValues,
   orchestratorAgent,
@@ -299,7 +298,7 @@ export const make = Effect.gen(function* () {
   const channelSay = (who: Who) =>
     sessionSchemaTool(
       "channel_say",
-      descriptions.channelSay(generalName),
+      descriptions.channelSay,
       Effect.fn("Tools.channel_say")(function* (p: Session<"channel_say">) {
         const c = yield* callerOf(who);
         return spokenText(

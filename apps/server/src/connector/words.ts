@@ -11,7 +11,7 @@ const zh = {
   qqKeys: "要填 QQ 机器人的 AppID 和 AppSecret（在 q.qq.com 的机器人管理页里）。",
   unreadSecrets: "存着的登录信息读不出来，断开重新连一次",
   expired: "登录过期了，一小时后再试；也可以断开重新连。",
-  paired: "配对好了：以后在这里说的话，就是你在田头上说的。",
+  paired: "配对好了：以后在这里说的话，就是你在默认频道里说的。",
   inboundMismatch: "收件记录的编号不一致",
   stopped: "收消息停了",
   switched: "换了账号",
@@ -20,7 +20,7 @@ const zh = {
   noChannel: (name: string) => `没有叫 ${name} 的频道`,
   /** A farm's message as the owner reads it in the chat app (text.ts ownerLine). */
   line: { orchestrator: "管家", dispatch: "派活", thread: "在工单串里", head: (who: string, what: string) => (what ? `【${who} · ${what}】` : `【${who}】`) },
-  digest: (n: number, lines: readonly string[]) => `你不在的时候有 ${n} 条消息：\n${lines.join("\n")}\n\n完整的在田头里。`,
+  digest: (n: number, lines: readonly string[]) => `你不在的时候有 ${n} 条消息：\n${lines.join("\n")}\n\n完整的在默认频道里。`,
   /** What the owner may type before a pairing code. */
   pairWord: "配对",
   feishu: {
@@ -67,7 +67,7 @@ const en: typeof zh = {
   qqKeys: "Fill in the QQ bot's AppID and AppSecret (on the bot management page at q.qq.com).",
   unreadSecrets: "The saved login cannot be read: disconnect and connect again",
   expired: "The login expired: try again in an hour, or disconnect and connect again.",
-  paired: "Paired: what you say here from now on is what you say in the farm chat.",
+  paired: "Paired: what you say here from now on is what you say in the default channel.",
   inboundMismatch: "The inbound record's id does not match",
   stopped: "receiving stopped",
   switched: "the account changed",
@@ -75,7 +75,7 @@ const en: typeof zh = {
   noConnector: (id) => `There is no connection ${id}`,
   noChannel: (name) => `There is no channel called ${name}`,
   line: { orchestrator: "Manager", dispatch: "sent", thread: "in a ticket's thread", head: (who, what) => (what ? `[${who} · ${what}]` : `[${who}]`) },
-  digest: (n, lines) => `${n} messages while you were away:\n${lines.join("\n")}\n\nThe whole of them is in the farm chat.`,
+  digest: (n, lines) => `${n} messages while you were away:\n${lines.join("\n")}\n\nThe whole of them is in the default channel.`,
   pairWord: "pair",
   feishu: {
     register: (why) => "Feishu registration: " + why,

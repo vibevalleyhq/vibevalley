@@ -2,7 +2,6 @@ import { chatWording } from "./words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Channel, type OrchestratorState, type Session } from "@vibevalley/protocol";
-import { wording } from "@vibevalley/protocol/words";
 import { channelName, topOf, topsOf, chatPath, channelOf, jobThreadOf, phaseDot, phaseText, threadOwnerOf, threadTitle, unreadIn, unreadUnder } from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
@@ -92,7 +91,7 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
         </button>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">#</span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <h1 class="truncate text-lg font-semibold" title={props.channel?.type === "general" ? chatWording().general : undefined}>
+          <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? chatWording().defaultHint : undefined}>
             {name()}
           </h1>
           <Show when={about()}>
@@ -206,10 +205,6 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
             </button>
           }
         >
-          {/* Before the first frame the general is not there yet: it is still where you talk. */}
-          <Show when={channels().length === 0}>
-            <ChannelRow label={wording().general} here unread={0} />
-          </Show>
           <For each={channels()}>
             {(c) => <ChannelRow label={channelName(c)} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
           </For>

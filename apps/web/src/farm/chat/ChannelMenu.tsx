@@ -1,10 +1,11 @@
 // The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, a
 // new channel, the current one's settings, and the way to its full page (its recurrences are there).
 
+import { farmChannelLabel } from "./text";
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
-import { createChannelForm, channelLabel, topsOf, chatPath, unreadUnder } from "../../features/channel";
+import { createChannelForm, topsOf, chatPath, unreadUnder } from "../../features/channel";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import { aria, useClickAway } from "../../base/util";
@@ -32,7 +33,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
     <div ref={box} class="relative min-w-0">
       <button
         type="button"
-        aria-label={farmWording().chat.channel(channelLabel(props.current))}
+        aria-label={farmWording().chat.channel(farmChannelLabel(props.current))}
         aria-expanded={aria(open())}
         onClick={() => {
           if (!open()) playSound("open");
@@ -41,7 +42,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         }}
         class="flex max-w-full cursor-pointer items-center gap-1.5 px-1 hover:bg-cream-200"
       >
-        <span class="truncate text-[13px]">{channelLabel(props.current)}</span>
+        <span class="truncate text-[13px]">{farmChannelLabel(props.current)}</span>
         <Show when={elsewhere() > 0}>
           <span class="text-[12px] text-berry">{elsewhere()}</span>
         </Show>
@@ -62,7 +63,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
                         aria-current={c.id === props.current?.id ? "true" : undefined}
                         onClick={() => {
                           close();
-                          farm.showChat(c.type === "general" ? null : c.id);
+                          farm.showChat(c.default ? null : c.id);
                         }}
                         class={[
                           "flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left",
@@ -70,7 +71,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
                         ]}
                       >
                         <span class="min-w-0 flex-1">
-                          <span class="block truncate text-[13px]">{channelLabel(c)}</span>
+                          <span class="block truncate text-[13px]">{farmChannelLabel(c)}</span>
                           <Show when={line()}>
                             <span class="block truncate text-[12px] text-bark-500">{line()}</span>
                           </Show>
@@ -173,7 +174,7 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">{farmWording().chat.settingsOf(channelLabel(props.channel))}</p>
+      <p class="text-[13px]">{farmWording().chat.settingsOf(farmChannelLabel(props.channel))}</p>
       <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={farmWording().chat.what} label={farmWording().chat.description} />
       <PxTextInput
         value={form.project()}

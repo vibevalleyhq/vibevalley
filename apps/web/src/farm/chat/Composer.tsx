@@ -55,7 +55,7 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
     props.thread ? (owner() ? farmWording().chat.inThread(owner()!.name) : farmWording().chat.inThreadAnyone) : farmWording().chat.toOrchestrator;
 
   const box = createComposer(core, () => input, {
-    target: () => ({ channel: props.channel?.id, agent: props.thread || pick() === "auto" ? undefined : pick() }),
+    target: () => ({ id: props.channel?.id ?? "", agent: props.thread || pick() === "auto" ? undefined : pick() }),
     // The farm's window draws the line at once (ChatWindow), so the box empties as it is sent.
     echo: true,
     failed: (reason) => props.onProblem(farmWording().chat.notSent(reason)),

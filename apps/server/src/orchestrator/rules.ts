@@ -14,7 +14,7 @@ export const chatCompletionsPath = "/v1/chat/completions";
 
 /** Who woke the orchestrator: what the input's words are worth. */
 export type Source =
-  /** The owner's words alone: in 田头, on a call, over chat/completions, from a connector. */
+  /** The owner's words alone: in a channel, on a call, over chat/completions, from a connector. */
   | "owner"
   /** A channel or a thread with a helper's words in it. */
   | "chat"

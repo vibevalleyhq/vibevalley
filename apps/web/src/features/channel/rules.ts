@@ -19,33 +19,33 @@ import {
 
 export const isTop = (c: Channel) => c.type !== "thread";
 
-export const generalOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.type === "general");
+export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => c.default);
 
 export const channelOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
-/** The general first, then by id. */
+/** The default first, then by id. */
 export function topsOf(chat: Chat | undefined): Channel[] {
   return (chat?.channels.filter(isTop) ?? []).sort((a, b) => {
-    if (a.type === "general") return -1;
-    if (b.type === "general") return 1;
+    if (a.default) return -1;
+    if (b.default) return 1;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
 
-/** The channel a channel is in: itself, a thread's channel, else the general. */
+/** The channel a channel is in: itself, or a thread's channel; the default when none is given. */
 export function topOf(chat: Chat | undefined, c: Channel | undefined) {
-  if (!c) return generalOf(chat);
+  if (!c) return defaultOf(chat);
   if (isTop(c)) return c;
-  return channelOf(chat, c.parent) ?? generalOf(chat);
+  return channelOf(chat, c.parent) ?? defaultOf(chat);
 }
 
-export const channelName = (c: Channel | undefined) => (c?.type === "channel" ? (c.name ?? "") : wording().general);
+export const channelName = (c: Channel | undefined) => c?.name ?? "";
 
-/** A channel as it is said in a line: #name, the general one by its label (田头, Farm chat). */
-export const channelLabel = (c: Channel | undefined) => (c?.type === "channel" ? `#${c.name ?? ""}` : wording().general);
+/** A channel as it is said in a line: #name. */
+export const channelLabel = (c: Channel | undefined) => `#${channelName(c)}`;
 
-/** Where the page shows a channel: the general is /chat. */
-export const chatPath = (c: Channel | undefined) => (!c || c.type === "general" ? "/chat" : `/chat/${c.id}`);
+/** Where the page shows a channel: the default one is /chat. */
+export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
 
 const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {
   if (!xs) return undefined;
@@ -109,9 +109,7 @@ export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : un
 
 /** A channel's own unread and its threads'; threads without a channel count under the general. */
 export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
-  (chat?.channels ?? [])
-    .filter((c) => c.id === channel.id || c.parent === channel.id || (channel.type === "general" && c.type === "thread" && !c.parent))
-    .reduce((n, c) => n + unreadIn(c), 0);
+  (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
 
 /** A page of a channel read at a time (features/channel/follow.ts). */
 export const chatPage = 50;
@@ -119,7 +117,7 @@ export const chatPage = 50;
 /** Where a thread's parent message is: its channel's, or the general's for a thread without one. */
 export function parentAt(chat: Chat | undefined, thread: Channel) {
   if (thread.type !== "thread" || thread.rootNumber === undefined) return undefined;
-  const channel = thread.parent ?? generalOf(chat)?.id;
+  const channel = thread.parent ?? defaultOf(chat)?.id;
   return channel ? { channel, number: thread.rootNumber } : undefined;
 }
 

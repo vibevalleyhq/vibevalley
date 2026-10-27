@@ -54,7 +54,7 @@ export function parseChatTarget(target: string): ChatTarget | undefined {
   return channelNamePattern.test(t) ? { kind: "channel", name: t } : undefined;
 }
 
-export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "general" | "dispatch" | "addressed" | "graph";
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "dispatch" | "addressed" | "graph";
 export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
 
 export interface Delivery {
@@ -120,7 +120,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     if (thread) for (const f of i.followers ?? []) add(f, "follower", true);
     else {
       if (!mentions.some((m) => m !== ownerId)) add(orchestratorAgent, "addressed", true);
-      for (const h of i.sessions ?? []) add(h, "general", false);
+      for (const h of i.sessions ?? []) add(h, "channel", false);
     }
   } else if (owner) add(owner, "own_thread", true);
   return out;

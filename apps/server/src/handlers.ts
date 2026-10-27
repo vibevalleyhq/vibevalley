@@ -88,7 +88,7 @@ export const handlers = Effect.gen(function* () {
         orchestrator.say(
           body.text,
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
-          body.channel,
+          body.id,
           body.sendKey ?? "",
         ),
       ),
@@ -144,6 +144,7 @@ export const handlers = Effect.gen(function* () {
     "session.event.list": ({ id, run }) => Effect.sync(() => sessions.events(id, run ?? "") ?? []),
     "channel.create": (body) => Effect.map(channels.openChannel(body.name, body.description ?? "", body.project ?? ""), (c) => c.id),
     "channel.update": ({ id, ...body }) => channels.updateChannel(id, body.description, body.project),
+    "channel.default.set": ({ id }) => channels.makeDefault(id),
     "channel.message.list": ({ id, before, limit }) => channels.history(id, before, limit),
     "channel.markRead": ({ id, ...body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
     "recurrence.create": (body) => recurrences.add(body, owner),
@@ -161,7 +162,7 @@ export const handlers = Effect.gen(function* () {
     "issue.move": ({ id: ref, ...body }) => Effect.flatMap(issues.idOf(ref), (id) => issues.move(id, body.before ?? "")),
     "issue.delete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.remove(id)),
     "issue.previewDelete": ({ id: ref }) => Effect.flatMap(issues.idOf(ref), (id) => issues.previewRemove(id)),
-    "issue.act": ({ id, ...body }) => issues.act(id, body, channels.general(), owner),
+    "issue.act": ({ id, ...body }) => issues.act(id, body, channels.defaultChannel(), owner),
     "issue.previewAct": ({ id, ...body }) => issues.previewAct(id, body),
     "issue.status.previewUpdate": ({ id: ref, ...body }) =>
       Effect.flatMap(issues.idOf(ref), (id) =>
@@ -173,11 +174,11 @@ export const handlers = Effect.gen(function* () {
           body.edit,
         ),
       ),
-    "issue.refine": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.general())),
+    "issue.refine": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.refine(id, body.text ?? "", channels.defaultChannel())),
     "issue.dispatch": ({ id: ref, ...body }) => Effect.flatMap(edited(ref, body.edit), (id) => issues.dispatchQueued(id)),
     "issue.status.update": ({ id: ref, ...body }) =>
       Effect.flatMap(edited(ref, body.edit), (id) =>
-        issues.setStatus(id, body.status, body.text ?? "", channels.general(), owner, {
+        issues.setStatus(id, body.status, body.text ?? "", channels.defaultChannel(), owner, {
           ...(body.agent ? { agent: body.agent } : {}),
           ...(body.keepBranch ? { keepBranch: true } : {}),
         }),

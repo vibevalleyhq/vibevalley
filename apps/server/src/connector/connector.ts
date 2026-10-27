@@ -12,7 +12,7 @@ import { connectorWording } from "./words.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
-import { channelOf, generalOf } from "../channel/state.ts";
+import { channelOf, defaultOf } from "../channel/state.ts";
 import { Cause, Clock, Context, Data, Deferred, Effect, Fiber, FiberSet, Layer, Option, Predicate, Schema, Semaphore, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import * as accountQ from "../../db/generated/connector_account.sql.ts";
@@ -308,7 +308,6 @@ export const make = (options: ConnectorOptions = {}) =>
     /** The database's own failures stay failures here: the status says them. */
     const run = <A, E>(e: Effect.Effect<A, E, SqlClient.SqlClient>) => Effect.mapError(db(e), bridgeError);
     const inTx = <A, E>(work: Effect.Effect<A, E>) => Effect.mapError(sql.withTransaction(work), bridgeError);
-    const general = chat.general();
     let closing = false;
     const say = (text: string, channel: string | undefined) => (options.say ? options.say(text, channel, chat) : orchestrator.say(text, {}, channel, ""));
 
@@ -400,7 +399,7 @@ export const make = (options: ConnectorOptions = {}) =>
         if (err) s.error = err;
         const a = account;
         if (a) {
-          const where = a.channel ? channelOf(state, a.channel) : generalOf(state);
+          const where = a.channel ? channelOf(state, a.channel) : defaultOf(state);
           if (where?.name) s.channel = where.name;
         }
         if (progress) return { ...s, state: progress.state, ...(progress.qr ? { qr: progress.qr } : {}) };
@@ -505,7 +504,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const added = yield* Effect.result(
           Effect.gen(function* () {
             const place = yield* Effect.mapError(chat.messageLocation(m.id), bridgeError);
-            if (!place || place.top !== (a.channel ?? general)) return 0;
+            if (!place || place.top !== (a.channel ?? chat.defaultChannel())) return 0;
             const pieces = splitText(ownerLine(m, place.channel), maxChars[id]);
             const at = now();
             yield* inTx(
@@ -869,7 +868,7 @@ export const make = (options: ConnectorOptions = {}) =>
             _tag: "ConnectorRefused",
             reason: connectorWording().noChannel(name),
           });
-        return yield* Effect.mapError(b.setChannel(channel.id !== general ? channel.id : undefined), (e): ApiError => ({
+        return yield* Effect.mapError(b.setChannel(channel.id !== chat.defaultChannel() ? channel.id : undefined), (e): ApiError => ({
           _tag: "ConnectorRefused",
           reason: e.message,
         }));

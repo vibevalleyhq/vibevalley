@@ -113,8 +113,10 @@ export interface Handlers<R = never> {
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "recurrence.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.update": (a: { readonly id: string } & T.ChannelUpdate) => Effect.Effect<void, ApiError, R>;
-  /** The v1 caption relay without a call id is accepted only with one active call. */
-  readonly "voice.hear": (a: T.SayRequest) => Effect.Effect<void, ApiError, R>;
+  /** The channel what names none goes to from now on: a connector's, a call's. */
+  readonly "channel.default.set": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** A line heard on the call that is on, without its id: refused unless one call is. */
+  readonly "voice.hear": (a: { readonly text: string; readonly agent?: string; readonly sendKey?: string }) => Effect.Effect<void, ApiError, R>;
   /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Effect.Effect<void, ApiError, R>;
   readonly "issue.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
@@ -396,9 +398,16 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote", "orchestrator"],
   },
   {
+    op: "channel.default.set",
+    about: ["id"],
+    input: input({ id: Schema.String }),
+    result: undefined,
+    can: ["owner", "remote"],
+  },
+  {
     op: "voice.hear",
     about: [],
-    input: S.SayRequest,
+    input: input({ text: Schema.String, agent: Schema.optionalKey(Schema.String), sendKey: Schema.optionalKey(Schema.String) }),
     result: undefined,
     can: ["owner", "remote"],
   },

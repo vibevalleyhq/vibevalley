@@ -3,6 +3,7 @@
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
 // the phone large.
 
+import { farmChannelLabel } from "./text";
 import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Channel, type WorkspaceState } from "@vibevalley/protocol";
@@ -11,11 +12,10 @@ import {
   arrived,
   pending,
   say,
-  channelLabel,
   topOf,
   channelOf,
   feedOf,
-  generalOf,
+  defaultOf,
   orchestratorTyping,
   parentAt,
   phaseText,
@@ -105,7 +105,7 @@ function NewElsewhere(props: { except: string | undefined }) {
       {(newest) => (
         <button
           type="button"
-          onClick={() => farm.showChat(newest().type === "general" ? null : newest().id)}
+          onClick={() => farm.showChat(newest().default ? null : newest().id)}
           onDblClick={(e) => e.stopPropagation()}
           class="ml-2 shrink-0 cursor-pointer bg-berry/15 px-2 py-px text-[12px] text-berry hover:bg-berry/25"
         >
@@ -113,7 +113,7 @@ function NewElsewhere(props: { except: string | undefined }) {
             ? farmWording().chat.newIn(waiting().length)
             : newest().type === "thread"
               ? farmWording().chat.newInThread
-              : farmWording().chat.newInChannel(channelLabel(newest()))}
+              : farmWording().chat.newInChannel(farmChannelLabel(newest()))}
         </button>
       )}
     </Show>
@@ -129,7 +129,7 @@ export function ChatWindow() {
   const shownId = useFarm((s) => s.chatShown);
   const look = usePrefs((p) => p.orchestratorLook);
   const [problem, setProblem] = createSignal<string>();
-  const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));
+  const shown = createMemo(() => (shownId() ? channelOf(chat(), shownId()!) : undefined) ?? defaultOf(chat()));
   const thread = () => (shown()?.type === "thread" ? shown() : undefined);
   const call = createCall();
   const phase = () => phaseOf(call(), core());
@@ -162,7 +162,7 @@ export function ChatWindow() {
   const captions = createMemo(() => {
     const c = call();
     const here = shown();
-    if (c.phase !== "live" || here?.type !== "general") return [];
+    if (c.phase !== "live" || !here?.default) return [];
     const spoken: SpokenLine[] = said()
       .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
@@ -208,7 +208,7 @@ export function ChatWindow() {
         <CallProblem call={call()} />
         <div
           class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
-          aria-label={thread() ? farmWording().chat.thread : channelLabel(shown())}
+          aria-label={thread() ? farmWording().chat.thread : farmChannelLabel(shown())}
           role="log"
         >
           <div class="flex flex-col gap-2">
@@ -289,7 +289,8 @@ export function ChatWindow() {
                   onClick={() => {
                     setProblem(undefined);
                     const c = shown();
-                    void say(line, c?.type === "general" ? undefined : c, newSendKey(), undefined).catch((e: unknown) =>
+                    if (!c) return;
+                    void say(line, c, newSendKey(), undefined).catch((e: unknown) =>
                       setProblem(farmWording().chat.notSent(e instanceof Error ? e.message : String(e))),
                     );
                   }}
@@ -357,7 +358,7 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   };
   return (
     <div onDblClick={(e) => props.onDouble(e)} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-1">
-      <HeadButton label={farmWording().chat.back(channelLabel(channel()))} sprite="button-back" onClick={() => farm.showChat(backTo())} />
+      <HeadButton label={farmWording().chat.back(farmChannelLabel(channel()))} sprite="button-back" onClick={() => farm.showChat(backTo())} />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px]">{title()}</span>

@@ -10,7 +10,7 @@ export {
   chatPath,
   channelOf,
   feedOf,
-  generalOf,
+  defaultOf,
   issueThreadOf,
   orchestratorTyping,
   parentAt,

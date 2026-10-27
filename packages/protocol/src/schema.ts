@@ -213,6 +213,7 @@ export const SubjectKind: Codec<T.SubjectKind> = Schema.Literals(T.SubjectKindVa
 export const Channel: Codec<T.Channel> = Schema.Struct({
   id: Schema.String,
   type: ChannelType,
+  default: Schema.optionalKey(Schema.Boolean),
   parent: Schema.optionalKey(Schema.String),
   root: Schema.optionalKey(Schema.String),
   rootNumber: Schema.optionalKey(Schema.Number),
@@ -1382,9 +1383,9 @@ export const CommentRequest: Codec<T.CommentRequest> = Schema.Struct({
 });
 
 export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
+  id: Schema.String,
   text: Schema.String,
   station: Schema.optionalKey(Schema.Number),
-  channel: Schema.optionalKey(Schema.String),
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   sendKey: Schema.optionalKey(Schema.String),

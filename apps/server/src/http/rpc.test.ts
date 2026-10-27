@@ -62,7 +62,7 @@ describe("the subscriptions", () => {
   it.live("a page follows a channel over the WebSocket: what it missed, then what is said", () =>
     Effect.gen(function* () {
       const { address, chat } = yield* farm;
-      const general = chat.general();
+      const general = chat.defaultChannel();
       for (const text of ["早", "在吗"]) yield* chat.say(text, undefined, "");
       const rpc = yield* client(address);
       const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(rpc["channel.follow"]({ id: general, after: 1 }), 2)));

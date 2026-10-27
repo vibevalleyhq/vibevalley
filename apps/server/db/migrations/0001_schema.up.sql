@@ -17,7 +17,8 @@ CREATE TABLE channel_participant (
 );
 CREATE TABLE channel (
   id            text primary key,
-  type          text not null check (type in ('general', 'channel', 'thread')),
+  type          text not null check (type in ('channel', 'thread')),
+  is_default    boolean not null default false,
   root_id       text unique,
   root_number   integer,
   subject_kind  text check (subject_kind in ('issue', 'graph', 'talk')),
@@ -30,7 +31,9 @@ CREATE TABLE channel (
   project       text,
   parent_id     text references channel (id),
   check ((type = 'thread') = (root_id is not null)),
-  check ((subject_kind is null) or type = 'thread')
+  check ((type = 'thread') = (parent_id is not null)),
+  check ((subject_kind is null) or type = 'thread'),
+  check (not is_default or type = 'channel')
 );
 CREATE TABLE channel_message (
   id              text primary key,
@@ -73,7 +76,7 @@ CREATE TABLE channel_seen_mark (
 CREATE TABLE channel_delivery (
   recipient_id   text not null references channel_participant (id),
   message_id     text not null references channel_message (id) on delete cascade,
-  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'general', 'dispatch', 'addressed', 'graph')),
+  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'dispatch', 'addressed', 'graph')),
   wakes          boolean not null,
   held_by        text check (held_by in ('hop_limit', 'cooldown', 'wake_breaker')),
   state          text not null default 'pending' check (state in ('pending', 'announced', 'handed', 'seen', 'dropped')),
@@ -252,7 +255,7 @@ CREATE TABLE lan_device (
 CREATE INDEX issue_session_by_issue on issue_session (issue, started_at);
 CREATE UNIQUE INDEX channel_by_name on channel (name) where name is not null;
 CREATE INDEX channel_by_subject on channel (subject_kind, subject_id);
-CREATE UNIQUE INDEX channel_one_general on channel (type) where type = 'general';
+CREATE UNIQUE INDEX channel_one_default on channel (is_default) where is_default;
 CREATE INDEX channel_mention_by_target on channel_mention (target_id, message_id);
 CREATE INDEX channel_message_by_channel on channel_message (channel_id, number);
 CREATE INDEX channel_message_by_sender on channel_message (sender_id, id);

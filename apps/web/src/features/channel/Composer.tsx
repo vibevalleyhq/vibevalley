@@ -19,7 +19,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
   const box = createComposer(core, () => input, {
-    target: () => ({ channel: props.channel?.id }),
+    target: () => ({ id: props.channel?.id ?? "" }),
     failed: (reason) => {
       setProblem(reason);
       toast(chatWording().composer.notSent(reason), "bad");

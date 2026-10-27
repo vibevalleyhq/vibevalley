@@ -91,6 +91,10 @@ export class VibeValleyApi {
       list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
         this.call("/api/v1/channel/message/list", a) as Promise<T.ChatMessage[]>,
     },
+    default: {
+      /** The channel what names none goes to from now on: a connector's, a call's. */
+      set: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/default/set", a) as Promise<void>,
+    },
   };
 
   readonly recurrence = {
@@ -104,8 +108,8 @@ export class VibeValleyApi {
   };
 
   readonly voice = {
-    /** The v1 caption relay without a call id is accepted only with one active call. */
-    hear: (a: T.SayRequest): Promise<void> => this.call("/api/v1/voice/hear", a) as Promise<void>,
+    /** A line heard on the call that is on, without its id: refused unless one call is. */
+    hear: (a: { text: string; agent?: string; sendKey?: string }): Promise<void> => this.call("/api/v1/voice/hear", a) as Promise<void>,
     dictate: (a: T.DictateRequest): Promise<T.Dictated> => this.call("/api/v1/voice/dictate", a) as Promise<T.Dictated>,
     session: {
       create: (): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/create", undefined) as Promise<T.AgoraGrant>,

@@ -553,7 +553,7 @@ export const make = (options: IssueOptions = {}) =>
             continue;
           }
           const why = reasonOf(sent.failure);
-          const left = yield* Effect.result(queueRow(issue.id, false, chat.general()));
+          const left = yield* Effect.result(queueRow(issue.id, false, chat.defaultChannel()));
           if (left._tag === "Failure") {
             yield* core.notice("warn", issueWording().queuedStuck(title, why));
             continue;
@@ -922,7 +922,7 @@ export const make = (options: IssueOptions = {}) =>
         for (const each of order) yield* publish(each);
         return yield* list;
       }),
-      queue: (id, queued) => queueRow(id, queued, chat.general()),
+      queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
       start: (id, channel) => start(id, channel),
       /** Under the queue's lock; without room it keeps its place. */
       dispatchQueued: Effect.fn("Issues.dispatchQueued")(function* (id) {
@@ -1010,7 +1010,7 @@ export const make = (options: IssueOptions = {}) =>
             yield* start(id, channel);
             break;
           case "unqueue":
-            yield* queueRow(id, false, chat.general());
+            yield* queueRow(id, false, chat.defaultChannel());
             break;
           // Handed over: its session leaves first, so that one session at a time works the issue's branch.
           case "round":

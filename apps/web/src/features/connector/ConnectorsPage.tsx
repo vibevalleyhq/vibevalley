@@ -5,9 +5,9 @@ import { connectorWording } from "./words";
 import { appWording } from "../../base/words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
+import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { channelLabel, topsOf } from "../channel";
+import { channelLabel, defaultOf, topsOf } from "../channel";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../base/util";
@@ -123,6 +123,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 }
 
 function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
+  const core = useCore();
   const [busy, setBusy] = createSignal(false);
   const run = async (call: () => Promise<ConnectorStatus>) => {
     setBusy(true);
@@ -182,7 +183,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
         <Match when={state() === "connected" || state() === "paused"}>
           <Row label={connectorWording().connectors.owner}>{props.status.owner ?? ""}</Row>
           <Row label={connectorWording().connectors.channel}>
-            <ChannelPick id={props.id} current={props.status.channel ?? generalName} />
+            <ChannelPick id={props.id} current={props.status.channel ?? defaultOf(core()?.chat)?.name ?? ""} />
           </Row>
           <Show when={props.status.since}>{(since) => <Row label={connectorWording().connectors.since}>{momentText(since())}</Row>}</Show>
           <Row label={connectorWording().connectors.lastInbound}>
@@ -208,7 +209,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const [error, setError] = createSignal<string>();
   const options = () => {
-    const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? generalName, label: channelLabel(c) }));
+    const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? "", label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
     if (!all.some((o) => o.value === props.current)) all.push({ value: props.current, label: props.current });
     return all;

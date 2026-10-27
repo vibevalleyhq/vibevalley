@@ -4,49 +4,32 @@
 import { Effect, Schema } from "effect"
 import { SqlClient, SqlSchema } from "effect/sql"
 
-export const GeneralIDParams = Schema.Struct({
+export const DefaultIDParams = Schema.Struct({
 
 })
-export type GeneralIDParams = typeof GeneralIDParams.Type
+export type DefaultIDParams = typeof DefaultIDParams.Type
 
 
-export const GeneralIDResult = Schema.Struct({
+export const DefaultIDResult = Schema.Struct({
   ["id"]: Schema.String,
 })
-export type GeneralIDResult = typeof GeneralIDResult.Type
+export type DefaultIDResult = typeof DefaultIDResult.Type
 
 
-export const GeneralIDSql = "-- The general channel, the channels and the threads under their messages (channel/store.ts).\n\n-- name: GeneralID :one\nselect id from channel where type = 'general';"
+export const DefaultIDSql = "-- The channels, the default one among them, and the threads under their messages (channel/chat.ts).\n\n-- name: DefaultID :one\nselect id from channel where is_default;"
 
-export const generalID = Effect.fn("GeneralID")(function* () {
+export const defaultID = Effect.fn("DefaultID")(function* () {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
-    Request: GeneralIDParams,
-    Result: GeneralIDResult,
-    execute: () => sql.unsafe(GeneralIDSql, []),
+    Request: DefaultIDParams,
+    Result: DefaultIDResult,
+    execute: () => sql.unsafe(DefaultIDSql, []),
   })({})
-})
-
-export const CreateGeneralParams = Schema.Struct({
-  ["id"]: Schema.String,
-  ["name"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
-})
-export type CreateGeneralParams = typeof CreateGeneralParams.Type
-
-
-export const CreateGeneralSql = "-- name: CreateGeneral :exec\ninsert into channel (id, type, name, created_at) values ($1, 'general', $2, $3);"
-
-export const createGeneral = Effect.fn("CreateGeneral")(function* (params: CreateGeneralParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.void({
-    Request: CreateGeneralParams,
-    execute: (p) => sql.unsafe(CreateGeneralSql, [p["id"], p["name"], p["created_at"]]),
-  })(params)
 })
 
 export const CreateChannelParams = Schema.Struct({
   ["id"]: Schema.String,
+  ["is_default"]: Schema.Boolean,
   ["name"]: Schema.NullOr(Schema.String),
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
@@ -55,13 +38,45 @@ export const CreateChannelParams = Schema.Struct({
 export type CreateChannelParams = typeof CreateChannelParams.Type
 
 
-export const CreateChannelSql = "-- name: CreateChannel :exec\ninsert into channel (id, type, name, description, project, created_at)\nvalues ($1, 'channel', $2, $3, $4, $5);"
+export const CreateChannelSql = "-- name: CreateChannel :exec\ninsert into channel (id, type, is_default, name, description, project, created_at)\nvalues ($1, 'channel', $2, $3, $4, $5, $6);"
 
 export const createChannel = Effect.fn("CreateChannel")(function* (params: CreateChannelParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.void({
     Request: CreateChannelParams,
-    execute: (p) => sql.unsafe(CreateChannelSql, [p["id"], p["name"], p["description"], p["project"], p["created_at"]]),
+    execute: (p) => sql.unsafe(CreateChannelSql, [p["id"], p["is_default"], p["name"], p["description"], p["project"], p["created_at"]]),
+  })(params)
+})
+
+export const ClearDefaultParams = Schema.Struct({
+
+})
+export type ClearDefaultParams = typeof ClearDefaultParams.Type
+
+
+export const ClearDefaultSql = "-- name: ClearDefault :exec\n-- Before MakeDefault, in its transaction: one default at a time (channel_one_default).\nupdate channel set is_default = false where is_default;"
+
+export const clearDefault = Effect.fn("ClearDefault")(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: ClearDefaultParams,
+    execute: () => sql.unsafe(ClearDefaultSql, []),
+  })({})
+})
+
+export const MakeDefaultParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type MakeDefaultParams = typeof MakeDefaultParams.Type
+
+
+export const MakeDefaultSql = "-- name: MakeDefault :exec\nupdate channel set is_default = true where id = $1 and type = 'channel';"
+
+export const makeDefault = Effect.fn("MakeDefault")(function* (params: MakeDefaultParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: MakeDefaultParams,
+    execute: (p) => sql.unsafe(MakeDefaultSql, [p["id"]]),
   })(params)
 })
 
@@ -73,7 +88,7 @@ export const UpdateChannelParams = Schema.Struct({
 export type UpdateChannelParams = typeof UpdateChannelParams.Type
 
 
-export const UpdateChannelSql = "-- name: UpdateChannel :exec\nupdate channel set description = $1, project = $2 where id = $3 and type in ('general', 'channel');"
+export const UpdateChannelSql = "-- name: UpdateChannel :exec\nupdate channel set description = $1, project = $2 where id = $3 and type = 'channel';"
 
 export const updateChannel = Effect.fn("UpdateChannel")(function* (params: UpdateChannelParams) {
   const sql = yield* SqlClient.SqlClient
@@ -114,6 +129,7 @@ export type AllChannelsParams = typeof AllChannelsParams.Type
 export const AllChannelsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["type"]: Schema.String,
+  ["is_default"]: Schema.Boolean,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["subject_kind"]: Schema.NullOr(Schema.String),
@@ -129,7 +145,7 @@ export const AllChannelsResult = Schema.Struct({
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -149,6 +165,7 @@ export type RecentChannelsParams = typeof RecentChannelsParams.Type
 export const RecentChannelsResult = Schema.Struct({
   ["id"]: Schema.String,
   ["type"]: Schema.String,
+  ["is_default"]: Schema.Boolean,
   ["root_id"]: Schema.NullOr(Schema.String),
   ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
   ["subject_kind"]: Schema.NullOr(Schema.String),
@@ -164,7 +181,7 @@ export const RecentChannelsResult = Schema.Struct({
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
 
 
-export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
+export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
 
 export const recentChannels = Effect.fn("RecentChannels")(function* (params: RecentChannelsParams) {
   const sql = yield* SqlClient.SqlClient

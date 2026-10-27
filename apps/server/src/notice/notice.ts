@@ -59,7 +59,7 @@ export const make = Effect.gen(function* () {
     memory = next;
     const byChannel = new Map<string, PatrolNote[]>();
     for (const f of report) {
-      const c = f.channel ?? chat.general();
+      const c = f.channel ?? chat.defaultChannel();
       byChannel.set(c, [...(byChannel.get(c) ?? []), f]);
     }
     for (const [channel, notes] of byChannel) yield* PubSub.publish(overdueHub, { channel, notes });
