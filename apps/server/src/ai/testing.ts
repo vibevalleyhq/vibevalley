@@ -1,9 +1,7 @@
-// A model for tests: it answers each request from a script, streamed as the real one streams (llm.ts), and keeps every
-// request as it was asked. No network.
-
 import { Effect, Layer, Ref, Stream } from "effect";
+import { HttpClient, HttpClientResponse } from "effect/http";
 import { Llm, type LlmShape } from "./llm.ts";
-import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall } from "./messages.ts";
+import type { AssistantMessage, Context, StopReason, TextContent, ThinkingContent, ToolCall, Usage } from "./messages.ts";
 import { zeroUsage } from "./messages.ts";
 import type { Model } from "./models.ts";
 import { models } from "./models.ts";
@@ -19,6 +17,24 @@ export const toolCall = (name: string, args: Record<string, unknown>, id?: strin
   arguments: args,
 });
 
+export const assistantMessage = (
+  content: string | readonly (TextContent | ThinkingContent | ToolCall)[],
+  more: Partial<Omit<AssistantMessage, "role" | "content">> = {},
+): AssistantMessage => {
+  const blocks = typeof content === "string" ? [text(content)] : content;
+  return {
+    role: "assistant",
+    content: blocks,
+    api: testModel.api,
+    provider: testModel.provider,
+    model: testModel.id,
+    usage: zeroUsage(),
+    stopReason: blocks.some((c) => c.type === "toolCall") ? "toolUse" : "stop",
+    timestamp: 0,
+    ...more,
+  };
+};
+
 /** What the script answers one request with: an answer's content (a string is its text), or how the answer stops. */
 export interface Answer {
   readonly content: readonly (TextContent | ThinkingContent | ToolCall)[];
@@ -26,6 +42,8 @@ export interface Answer {
   readonly errorMessage?: string;
   /** The answer streams this many characters of its text, then waits until the request is stopped. */
   readonly hangAfter?: number;
+  /** On every event from its start, so an answer cut off has it too. */
+  readonly usage?: { readonly input: number; readonly output: number; readonly cacheRead?: number };
 }
 
 export const answer = (content: string | readonly (TextContent | ThinkingContent | ToolCall)[], more: Omit<Answer, "content"> = {}): Answer => ({
@@ -33,12 +51,12 @@ export const answer = (content: string | readonly (TextContent | ThinkingContent
   ...more,
 });
 
-/** A step of the script: an answer, or one made from the request. */
-export type Step = Answer | ((request: Request) => Answer);
+export type Reply = (request: Request) => Answer | Promise<Answer>;
 
-export interface Request {
+export type Step = Answer | Reply;
+
+export interface Request extends Context {
   readonly model: Model;
-  readonly context: Context;
   readonly options: RequestOptions;
 }
 
@@ -49,13 +67,18 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
   const content: (TextContent | ThinkingContent | ToolCall)[] = [];
   const calls = a.content.some((c) => c.type === "toolCall");
   const stopReason: StopReason = a.stopReason ?? (calls ? "toolUse" : "stop");
+  const cacheRead = a.usage?.cacheRead ?? 0;
+  const usage = (): Usage =>
+    a.usage
+      ? { ...zeroUsage(), input: a.usage.input, output: a.usage.output, cacheRead, totalTokens: a.usage.input + a.usage.output + cacheRead }
+      : zeroUsage();
   const message = (): AssistantMessage => ({
     role: "assistant",
     content: content.map((c) => ({ ...c })),
     api: model.api,
     provider: model.provider,
     model: model.id,
-    usage: zeroUsage(),
+    usage: usage(),
     stopReason,
     timestamp,
     ...(a.errorMessage !== undefined ? { errorMessage: a.errorMessage } : {}),
@@ -88,26 +111,30 @@ function eventsOf(model: Model, a: Answer, timestamp: number): { events: Assista
   return { events, hangsAt };
 }
 
-/** A scripted model: each request takes the next step; one past the script is a failed answer saying so. */
+/** Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer
+ * saying so. */
 export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) {
+  const script = [...steps];
   const next = yield* Ref.make(0);
   const requests: Request[] = [];
   const llm: LlmShape = {
     stream: (model, context, options) =>
       Stream.unwrap(
         Effect.gen(function* () {
-          const request: Request = { model, context: structuredClone(context), options };
+          const request: Request = { ...structuredClone(context), model, options };
           requests.push(request);
           const i = yield* Ref.getAndUpdate(next, (n) => n + 1);
-          const step = steps[i];
-          const a =
+          const step = script[i];
+          const made =
             step === undefined
               ? answer("", { stopReason: "error", errorMessage: `the script has no answer ${i + 1}` })
               : typeof step === "function"
                 ? step(request)
                 : step;
+          const a = made instanceof Promise ? yield* Effect.promise(() => made) : made;
           const { events, hangsAt } = eventsOf(model, a, 0);
-          return hangsAt === undefined ? Stream.fromIterable(events) : Stream.concat(Stream.fromIterable(events.slice(0, hangsAt)), Stream.never);
+          const told = Stream.mapEffect(Stream.fromIterable(hangsAt === undefined ? events : events.slice(0, hangsAt)), (e) => Effect.as(Effect.yieldNow, e));
+          return hangsAt === undefined ? told : Stream.concat(told, Stream.never);
         }),
       ),
     // The script never fails on the wire: its failures are error answers, as a model's are.
@@ -122,5 +149,36 @@ export const scriptedLlm = Effect.fnUntraced(function* (steps: readonly Step[]) 
         }),
       ),
   };
-  return { llm, requests, layer: Layer.succeed(Llm, llm) };
+  return {
+    llm,
+    requests,
+    layer: Layer.succeed(Llm, llm),
+    append: (...more: readonly Step[]) => void script.push(...more),
+    /** Steps no request has taken yet. */
+    pending: Effect.map(Ref.get(next), (n) => Math.max(script.length - n, 0)),
+  };
 });
+
+/** One chat/completions stream chunk, as DeepSeek writes it. */
+export const chunk = (delta: Record<string, unknown>, finish: string | null = null, more: Record<string, unknown> = {}) =>
+  `data: ${JSON.stringify({ id: "r", model: "deepseek-flash", choices: [{ index: 0, delta, finish_reason: finish }], ...more })}\n\n`;
+
+export interface Sent {
+  url: string;
+  authorization: string | undefined;
+  body: unknown;
+}
+
+export const http = (sent: Sent[], body: string | ReadableStream<Uint8Array>, status = 200) =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request, url) => {
+      const b = request.body;
+      sent.push({
+        url: url.toString(),
+        authorization: request.headers.authorization,
+        body: b._tag === "Uint8Array" ? JSON.parse(new TextDecoder().decode(b.body)) : undefined,
+      });
+      return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body, { status })));
+    }),
+  );

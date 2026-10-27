@@ -5,12 +5,13 @@
 
 import { sessionWording } from "./words.ts";
 import { agentWording } from "../agent/words.ts";
-import type { AgentEvent } from "@earendil-works/pi-agent-core";
+import type { CoreEvent } from "../agent/brain/agent.ts";
 import { messageText } from "../agent/brain/messages.ts";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { newId } from "../base/ids.ts";
 import type { ToolStart } from "./facts.ts";
+import type { ToolResult } from "../agent/loop/agent.ts";
 import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 
@@ -23,25 +24,8 @@ export interface RunInput {
   readonly asked?: string;
 }
 
-interface Part {
-  readonly type: string;
-  readonly text?: string;
-  readonly thinking?: string;
-  readonly redacted?: boolean;
-}
-
-interface Message {
-  readonly role: string;
-  readonly content?: string | readonly Part[];
-  readonly stopReason?: string;
-  readonly errorMessage?: string;
-}
-
 /** A tool result's text. */
-const resultText = (result: unknown) => {
-  const content = (result as { content?: readonly Part[] } | undefined)?.content ?? [];
-  return content.flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("\n");
-};
+const resultText = (result: ToolResult) => result.content.flatMap((p) => (p.type === "text" && p.text ? [p.text] : [])).join("\n");
 
 export class AgentExecution {
   private run = "";
@@ -102,7 +86,7 @@ export class AgentExecution {
   }
 
   /** The loop's events, in order; input only for a consumed input's message_start. */
-  observe(e: AgentEvent, input?: RunInput): Effect.Effect<void, Error> {
+  observe(e: CoreEvent, input?: RunInput): Effect.Effect<void, Error> {
     const self = this;
     return Effect.gen(function* () {
       if (self.closed) return;
@@ -118,17 +102,16 @@ export class AgentExecution {
       }
       switch (e.type) {
         case "agent_end": {
-          const last = e.messages.at(-1) as Message | undefined;
+          const last = e.messages.at(-1);
           if (last?.role === "assistant" && last.stopReason === "aborted" && !self.ending) self.outcome = "interrupted";
           return yield* self.finish();
         }
         case "message_end": {
-          const m = e.message as Message;
+          const m = e.message;
           if (m.role !== "assistant") return;
           yield* self.begin({ by: { kind: "" } });
-          for (const part of typeof m.content === "string" ? [] : (m.content ?? []))
-            if (part.type === "thinking" && !part.redacted && part.thinking) self.journal.thought(part.thinking);
-          const text = messageText(e.message).trim();
+          for (const part of m.content) if (part.type === "thinking" && part.thinking) self.journal.thought(part.thinking);
+          const text = messageText(m).trim();
           self.journal.said(text);
           self.summary = text;
           if (m.stopReason === "error") {

@@ -1,7 +1,7 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Tool } from "../loop/agent.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -50,7 +50,7 @@ export function mcpContentText(content: readonly Block[]): string {
 export const mcpToolName = (server: string, tool: string) => (server + "__" + tool).replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
 
 export interface McpConnection {
-  readonly tools: AgentTool[];
+  readonly tools: Tool[];
   close(): Promise<void>;
 }
 
@@ -114,7 +114,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   };
   try {
     await timeout(client.connect(transport), callTimeoutMs, signal);
-    const tools: AgentTool[] = [];
+    const tools: Tool[] = [];
     let cursor: string | undefined;
     do {
       const page = await timeout(client.listTools(cursor ? { cursor } : {}), callTimeoutMs, signal);
@@ -128,11 +128,10 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
   }
 }
 
-function mcpTool(client: Client, server: string, t: { name: string; description?: string; inputSchema?: object }): AgentTool {
+function mcpTool(client: Client, server: string, t: { name: string; description?: string; inputSchema?: object }): Tool {
   const parameters = (t.inputSchema as JsonSchema | undefined) ?? { type: "object", properties: {} };
   return textTool<Record<string, unknown> | null>({
     name: mcpToolName(server, t.name),
-    label: server + " · " + t.name,
     description: "（" + server + "）" + (t.description || t.name),
     parameters,
     run: async (params, tc) => {
@@ -154,7 +153,7 @@ function mcpTool(client: Client, server: string, t: { name: string; description?
 }
 
 export interface McpConnections {
-  readonly tools: AgentTool[];
+  readonly tools: Tool[];
   readonly failed: string[];
   close(): Promise<void>;
 }

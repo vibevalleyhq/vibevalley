@@ -1,6 +1,6 @@
 // The tools every agent has on itself. They touch only the agent's own folder; a subagent (spawn_agent) cannot send subagents.
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Tool } from "../loop/agent.ts";
 import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
 import { schemaTool } from "./tool.ts";
@@ -23,7 +23,7 @@ export function searchIn(home: string, query: string): string {
   return hits.map((h) => `${h.file}:${h.line}\n${h.text}`).join("\n\n---\n\n");
 }
 
-export function selfTools(o: SelfOptions): AgentTool[] {
+export function selfTools(o: SelfOptions): Tool[] {
   const loadSkill = schemaTool({
     name: "load_skill",
     description: "读一个技能的全文（系统提示里「技能」列着有哪些）。要用某个技能之前先读它，再照着做。",

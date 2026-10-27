@@ -1,12 +1,12 @@
 import type { Event, Session } from "@botiverse/oar";
-import { fauxAssistantMessage, type FauxResponseStep, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { helperInstructions, vibevalleyRuntimeOf } from "./runtime.ts";
-import { fauxLLM, lastUser, type Request, systemPrompt, tempHome, toolsOf, until } from "./testing.ts";
+import { answer, text as words, toolCall } from "../../ai/testing.ts";
+import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
 import { plainLog } from "../../base/log.ts";
 
@@ -31,9 +31,8 @@ interface Opened {
   readonly home: string;
 }
 
-async function open(steps: FauxResponseStep[], extra: { resume?: string; home?: string; cwd?: string; mcp?: string; append?: string } = {}): Promise<Opened> {
-  const { faux, llm, requests } = fauxLLM({ tokensPerSecond: 2_000 });
-  faux.appendResponses(steps);
+async function open(steps: readonly Step[], extra: { resume?: string; home?: string; cwd?: string; mcp?: string; append?: string } = {}): Promise<Opened> {
+  const { llm, requests, pending } = scriptedLLM(steps);
   const h = extra.home ?? home();
   const cwd = extra.cwd ?? home();
   const runtime = vibevalleyRuntimeOf({ time: wallTime, log: plainLog, home: () => h, llm: () => llm });
@@ -49,7 +48,7 @@ async function open(steps: FauxResponseStep[], extra: { resume?: string; home?: 
   sessions.push(session);
   const events: Event[] = [];
   session.events((e) => events.push(e), { cursor: { sessionId: session.id, afterSeq: -1 } });
-  return { session, events, requests, pending: () => faux.getPendingResponseCount(), cwd, home: h };
+  return { session, events, requests, pending, cwd, home: h };
 }
 
 const ended = (r: Opened) => r.events.flatMap((e) => (e.kind === "turn_ended" ? [e.outcome] : []));
@@ -58,10 +57,9 @@ const toolStarted = (r: Opened) => r.events.some((e) => e.kind === "tool_call_st
 
 describe("VibeValley's runtime", () => {
   it("runs a prompt's tools and ends the turn completed", async () => {
-    const r = await open(
-      [fauxAssistantMessage([fauxText("我来写"), fauxToolCall("write_file", { path: "hello.txt", content: "hi" })]), fauxAssistantMessage("写好了 hello.txt")],
-      { append: "你是后端老周。" },
-    );
+    const r = await open([answer([words("我来写"), toolCall("write_file", { path: "hello.txt", content: "hi" })]), answer("写好了 hello.txt")], {
+      append: "你是后端老周。",
+    });
     expect((await r.session.prompt("写个 hello.txt")).kind).toBe("accepted");
     await until(() => ended(r).length === 1);
     expect(readFileSync(join(r.cwd, "hello.txt"), "utf8")).toBe("hi");
@@ -82,9 +80,9 @@ describe("VibeValley's runtime", () => {
 
   it("joins a steer, waits a queued input and drops a withdrawn one", async () => {
     const r = await open([
-      fauxAssistantMessage([fauxToolCall("bash", { command: "sleep 0.2" })]),
-      (c) => fauxAssistantMessage("听到：" + lastUser(c)),
-      (c) => fauxAssistantMessage("排到了：" + lastUser(c)),
+      answer([toolCall("bash", { command: "sleep 0.2" })]),
+      (c) => answer("听到：" + lastUser(c)),
+      (c) => answer("排到了：" + lastUser(c)),
     ]);
     await r.session.prompt("开始");
     await until(() => toolStarted(r));
@@ -100,7 +98,7 @@ describe("VibeValley's runtime", () => {
   });
 
   it("ends the turn aborted", async () => {
-    const r = await open([fauxAssistantMessage([fauxToolCall("bash", { command: "sleep 5" })])]);
+    const r = await open([answer([toolCall("bash", { command: "sleep 5" })])]);
     await r.session.prompt("睡");
     await until(() => toolStarted(r));
     expect((await r.session.abort()).kind).toBe("accepted");
@@ -110,7 +108,7 @@ describe("VibeValley's runtime", () => {
   });
 
   it("goes on with a resumed session", async () => {
-    const count = (c: unknown) => fauxAssistantMessage(`第 ${(c as Request).messages.filter((m) => m.role === "user").length} 句`);
+    const count: Step = (c) => answer(`第 ${c.messages.filter((m) => m.role === "user").length} 句`);
     const first = await open([count]);
     await first.session.prompt("一");
     await until(() => ended(first).length === 1);
@@ -139,13 +137,9 @@ rl.on('line', (line) => {
   else if (m.method === 'tools/call') send({ id: m.id, result: { content: [{ type: 'text', text: '说了：' + m.params.arguments.text }] } })
 })`,
     );
-    const r = await open(
-      [
-        fauxAssistantMessage([fauxToolCall("farm__say", { text: "做完了" })]),
-        (c) => fauxAssistantMessage((c as unknown as Request).messages.at(-1)?.role === "toolResult" ? "好" : "没调到"),
-      ],
-      { mcp: join(dir, "farm.cjs") },
-    );
+    const r = await open([answer([toolCall("farm__say", { text: "做完了" })]), (c) => answer(c.messages.at(-1)?.role === "toolResult" ? "好" : "没调到")], {
+      mcp: join(dir, "farm.cjs"),
+    });
     await r.session.prompt("汇报");
     await until(() => ended(r).length === 1);
     expect(toolsOf(r.requests[0]!).map((t) => t.name)).toContain("farm__say");
@@ -155,14 +149,14 @@ rl.on('line', (line) => {
   });
 
   it("fails the turn when the model fails", async () => {
-    const r = await open([fauxAssistantMessage("", { stopReason: "error", errorMessage: "DeepSeek 回了 503" })]);
+    const r = await open([answer("", { stopReason: "error", errorMessage: "DeepSeek 回了 503" })]);
     await r.session.prompt("试试");
     await until(() => ended(r).length === 1);
     expect(ended(r)[0]).toMatchObject({ kind: "failed", reason: "DeepSeek 回了 503" });
   });
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
-    const { llm } = fauxLLM();
+    const { llm } = scriptedLLM();
     const runtime = vibevalleyRuntimeOf({ time: wallTime, log: plainLog, llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels?.join(",") === "high,max" && m.default)).toBe(true);

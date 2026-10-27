@@ -3,16 +3,16 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
-import { coerceArguments, type JsonSchema } from "../ai/tools.ts";
+import { coerceArguments } from "../ai/tools.ts";
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 import { session } from "../base/actor.ts";
-import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, FiberSet, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { Sessions } from "../session/session.ts";
+import type { Tool } from "../agent/loop/agent.ts";
 import { type Caller, Tools } from "../tool/tool.ts";
 
 export interface McpShape {
@@ -36,6 +36,8 @@ export const make = (options: McpOptions = {}) =>
     const sessions = yield* Sessions;
     const tools = yield* Tools;
     const who = options.who ?? sessions.who;
+    // A call runs on this service's fibers: it ends with the service.
+    const runHere = yield* FiberSet.makeRuntimePromise<never>();
 
     // A session no longer in the fields still talks; its profile and project are empty.
     const callerOf = (id: string): Caller => {
@@ -43,10 +45,10 @@ export const make = (options: McpOptions = {}) =>
       return { agent: h?.agent ?? "", session: id, project: h?.project ?? "", here: "", picked: "", actor: session(id) };
     };
 
-    const call = async (tool: AgentTool, args: unknown): Promise<string> => {
+    const call = async (tool: Tool, args: unknown): Promise<string> => {
       try {
         // Coerced as the brain's calls are; each tool's Schema then reads or refuses them.
-        const r = await tool.execute("", coerceArguments(args ?? {}, tool.parameters as JsonSchema));
+        const r = await runHere(tool.execute(coerceArguments(args ?? {}, tool.parameters), { id: "" }));
         return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
       } catch (e) {
         return failedCall(e instanceof Error ? e.message : String(e));
@@ -61,7 +63,7 @@ export const make = (options: McpOptions = {}) =>
         if (!id) throw new Error(unknownCaller);
         return callerOf(id);
       });
-      // The tools come with pi's JSON Schema and McpServer.registerTool takes zod only: the low-level Server is the SDK's
+      // The tools come with JSON Schema and McpServer.registerTool takes zod only: the low-level Server is the SDK's
       // own exception for this.
       // oxlint-disable-next-line typescript/no-deprecated
       const server = new Server({ name: "vibevalley", version: config.version }, { capabilities: { tools: {} } });

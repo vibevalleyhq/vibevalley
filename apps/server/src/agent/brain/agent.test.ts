@@ -1,18 +1,17 @@
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { type AssistantMessage, fauxAssistantMessage, type FauxResponseFactory, fauxText, fauxThinking, fauxToolCall } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { it as effectIt } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Exit, FiberSet, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { resumedUnknown, sessionUnfinished } from "./agent.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
-import { type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
+import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
-import { answered, lastUser, type Request, results, type Rig, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
+import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
 import { stopped, textTool } from "./tool.ts";
+import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "../../ai/testing.ts";
 import { objectSchema } from "../../ai/tools.ts";
 import { timeHere, wallTime } from "../../base/time.ts";
 import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
@@ -27,68 +26,98 @@ afterEach(() => {
   for (const done of homes.splice(0)) done();
 });
 
-const step =
-  (f: (r: Request) => AssistantMessage): FauxResponseFactory =>
-  (context) =>
-    f({ messages: context.messages, options: undefined });
+const step = (f: (r: Request) => Answer): Step => f;
 const roles = (text: string) =>
   text
     .trim()
     .split("\n")
     .map((l) => (JSON.parse(l) as { role: string }).role);
-const said = (messages: readonly AgentMessage[]) => messages.map((m) => m.role + ":" + messageText(m));
-const summarizing = (r: { messages: Request["messages"] }) => lastUser(r) === summaryInPlace;
+const said = (messages: readonly BrainMessage[]) => messages.map((m) => m.role + ":" + messageText(m));
+const summarizing = (r: Pick<Request, "messages">) => lastUser(r) === summaryInPlace;
 const prefixChanges = (r: Rig) => r.events.flatMap((e) => (e.type === "prefix_changed" ? [e.parts.join(",")] : []));
 const settled = (r: Rig) => r.events.find((e) => e.type === "agent_settled") as { run: { aborted: boolean } } | undefined;
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
-  it("does not start an ask or a tool for an already aborted signal", async () => {
+  it("does not start an ask for an already aborted signal", async () => {
     const dir = home();
     await withAgent(dir, [], async (r) => {
       const ended = new AbortController();
       ended.abort();
       await expect(r.agent.ask(userMessage("不该开始", wallTime.now()), ended.signal)).rejects.toThrow("aborted");
       expect(r.requests).toHaveLength(0);
-      let runs = 0;
-      const tool = textTool({
-        name: "count",
-        description: "count",
-        parameters: objectSchema(),
-        run: () => String(++runs),
-      });
-      await expect(tool.execute("t", {}, ended.signal)).rejects.toThrow(stopped);
-      expect(runs).toBe(0);
     });
   });
 
   it("shares the actual close with every concurrent caller", async () => {
     const dir = home();
-    await withAgent(dir, [], async (r) => {
-      let release!: () => void;
-      const gate = new Promise<void>((resolve) => (release = resolve));
-      const waitForIdle = r.agent.core.waitForIdle.bind(r.agent.core);
-      r.agent.core.waitForIdle = () => gate;
-      try {
-        const first = r.agent.close();
-        const second = r.agent.close();
-        expect(second).toBe(first);
-        let done = false;
-        void second.then(() => {
-          done = true;
-        });
-        // A close that did not wait for the gate would have ended by the next turn.
-        await nextTurn();
-        expect(done).toBe(false);
-        release();
-        await Promise.all([first, second]);
-        expect(done).toBe(true);
-      } finally {
-        release();
-        r.agent.core.waitForIdle = waitForIdle;
-      }
-    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { llm } = scriptedLLM();
+    const held = {
+      ...llm,
+      service: { ...llm.service, stream: () => Stream.fromEffect(Effect.uninterruptible(Effect.promise(() => gate))).pipe(Stream.drain) },
+    };
+    await withAgent(
+      dir,
+      [],
+      async (r) => {
+        r.agent.send(userMessage("说", wallTime.now()));
+        await until(() => r.has("message_end"));
+        try {
+          const first = r.agent.close();
+          const second = r.agent.close();
+          expect(second).toBe(first);
+          let done = false;
+          void second.then(() => {
+            done = true;
+          });
+          // A close that did not wait for the gate would have ended by the next turn.
+          await nextTurn();
+          expect(done).toBe(false);
+          release();
+          await Promise.all([first, second]);
+          expect(done).toBe(true);
+        } finally {
+          release();
+        }
+      },
+      { llm: held },
+    );
   });
+
+  effectIt.effect("cuts off a run under way when its owner's fibers end", () =>
+    Effect.gen(function* () {
+      let [started, cut] = [false, false];
+      const owner = yield* Scope.make();
+      const { llm } = scriptedLLM();
+      const asked = Effect.onInterrupt(
+        Effect.andThen(
+          Effect.sync(() => (started = true)),
+          Effect.never,
+        ),
+        () => Effect.sync(() => (cut = true)),
+      );
+      const held = {
+        ...llm,
+        run: yield* Scope.provide(FiberSet.makeRuntimePromise<never>(), owner),
+        service: { ...llm.service, stream: () => Stream.fromEffect(asked) },
+      };
+      yield* Effect.promise(() =>
+        withAgent(
+          home(),
+          [],
+          async (r) => {
+            r.agent.send(userMessage("说", wallTime.now()));
+            await until(() => started);
+            await Effect.runPromise(Scope.close(owner, Exit.void));
+            await until(() => cut);
+          },
+          { llm: held },
+        ),
+      );
+    }),
+  );
 
   it("runs a tool and gives its result back", async () => {
     const dir = home();
@@ -96,8 +125,8 @@ describe("the agent", () => {
     await withAgent(
       dir,
       [
-        fauxAssistantMessage([fauxThinking("先读文件"), fauxToolCall("read_file", { path: "notes.txt" })]),
-        step((c) => fauxAssistantMessage(results(c)[0]?.text.includes("第二行") ? "读到了：两行" : "读到了：没读到")),
+        answer([thinking("先读文件"), toolCall("read_file", { path: "notes.txt" })]),
+        step((c) => answer(results(c)[0]?.text.includes("第二行") ? "读到了：两行" : "读到了：没读到")),
       ],
       async (r) => {
         expect(await r.ask("看看 notes.txt")).toBe("读到了：两行");
@@ -122,9 +151,9 @@ describe("the agent", () => {
     await withAgent(
       dir,
       [
-        fauxAssistantMessage([fauxToolCall("edit_file", { path: "a.txt", old_text: "x", new_text: "y" }), fauxToolCall("read_file", { file: "oops" })]),
+        answer([toolCall("edit_file", { path: "a.txt", old_text: "x", new_text: "y" }), toolCall("read_file", { file: "oops" })]),
         step((c) =>
-          fauxAssistantMessage(
+          answer(
             results(c)
               .map((x) => `${x.failed}:${[...x.text].slice(0, 12).join("")}`)
               .join("|"),
@@ -154,11 +183,7 @@ describe("the agent", () => {
     });
     await withAgent(
       dir,
-      [
-        fauxAssistantMessage([fauxToolCall("nap", {})]),
-        step((c) => fauxAssistantMessage("第二次听到：" + lastUser(c))),
-        step((c) => fauxAssistantMessage("第三次听到：" + lastUser(c))),
-      ],
+      [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
       async (r) => {
         r.agent.send(userMessage("开始", wallTime.now()));
         await until(() => napping);
@@ -184,7 +209,7 @@ describe("the agent", () => {
     const dir = home();
     await withAgent(
       dir,
-      repeat(4, fauxAssistantMessage([fauxToolCall("list_dir", {})])),
+      repeat(4, answer([toolCall("list_dir", {})])),
       async (r) => {
         await r.ask("一直列");
         expect(r.requests.length).toBe(3);
@@ -195,14 +220,14 @@ describe("the agent", () => {
 
   it("goes on with its session when started again", async () => {
     const dir = home();
-    const countUsers = step((c) => fauxAssistantMessage(`第 ${c.messages.filter((m) => m.role === "user").length} 句`));
+    const countUsers = step((c) => answer(`第 ${c.messages.filter((m) => m.role === "user").length} 句`));
     await withAgent(dir, [countUsers], async (r) => expect(await r.ask("一")).toBe("第 1 句"));
     await withAgent(dir, [countUsers], async (r) => expect(await r.ask("二")).toBe("第 2 句"));
   });
 
   it("folds a long conversation", async () => {
     const dir = home();
-    const long = step((c) => fauxAssistantMessage(summarizing(c) ? "摘要：说了五件事" : "好的。".repeat(150)));
+    const long = step((c) => answer(summarizing(c) ? "摘要：说了五件事" : "好的。".repeat(150)));
     const options = { contextTokens: 900, keepRecent: 2 };
     await withAgent(
       dir,
@@ -211,7 +236,7 @@ describe("the agent", () => {
         for (let n = 1; n <= 5; n++) await r.ask(`第 ${n} 件事`);
         await until(() => r.events.some((e) => e.type === "compaction_end" && e.compaction !== undefined));
         const last = r.requests.filter((c) => !summarizing(c)).at(-1)!;
-        expect(messageText(last.messages[1]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
+        expect(messageText(last.messages[0]!)).toMatch(/^【之前的对话压成了下面的摘要，原文在 .*archive.*】\n<summary>\n摘要：说了五件事/);
         expect(r.agent.history()[0]!.role).toBe("compactionSummary");
       },
       options,
@@ -235,7 +260,7 @@ describe("the agent", () => {
     writeFileSync(join(dir, "skills", "tidy", "SKILL.md"), "---\nname: tidy\ndescription: 整理代码时用\n---\n先跑 lint");
     await withAgent(
       dir,
-      [fauxAssistantMessage([fauxToolCall("load_skill", { name: "tidy" })]), step((c) => fauxAssistantMessage(results(c)[0]!.text.split("\n").at(-1)!))],
+      [answer([toolCall("load_skill", { name: "tidy" })]), step((c) => answer(results(c)[0]!.text.split("\n").at(-1)!))],
       async (r) => {
         expect(await r.ask("整理一下")).toBe("先跑 lint");
         expect(systemPrompt(r.requests[0]!)).toContain("- tidy：整理代码时用");
@@ -261,10 +286,9 @@ describe("the agent", () => {
       },
     });
     const subagentOrNot = step((c) => {
-      if (systemPrompt(c).includes("派出去的帮手"))
-        return answered(c) ? fauxAssistantMessage(messageText(c.messages[1]!) + " 做完了") : fauxAssistantMessage([fauxToolCall("nap", {})]);
-      if (!answered(c)) return fauxAssistantMessage([fauxToolCall("spawn_agent", { brief: "查 A" }), fauxToolCall("spawn_agent", { brief: "查 B" })]);
-      return fauxAssistantMessage(
+      if (systemPrompt(c).includes("派出去的帮手")) return answered(c) ? answer(messageText(c.messages[0]!) + " 做完了") : answer([toolCall("nap", {})]);
+      if (!answered(c)) return answer([toolCall("spawn_agent", { brief: "查 A" }), toolCall("spawn_agent", { brief: "查 B" })]);
+      return answer(
         results(c)
           .map((x) => x.text)
           .join("；"),
@@ -287,7 +311,7 @@ describe("the agent", () => {
       join(dir, "reminders.json"),
       `[{"id":"reminder-1","name":"早报","message":"汇总昨天的进展","at":"2026-01-01T00:00:00.000Z","created":"2026-01-01T00:00:00.000Z"}]`,
     );
-    await withAgent(dir, [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))], async (r) => {
+    await withAgent(dir, [step((c) => answer("收到：" + lastUser(c)))], async (r) => {
       await until(() => r.has("agent_settled"));
       const history = r.agent.history();
       expect(history[0]!.role).toBe("custom");
@@ -310,7 +334,7 @@ describe("the agent", () => {
       yield* Effect.promise(() =>
         withAgent(
           dir,
-          [step((c) => fauxAssistantMessage("收到：" + lastUser(c)))],
+          [step((c) => answer("收到：" + lastUser(c)))],
           async (r) => {
             await move(TestClock.adjust(59 * 60_000));
             expect(r.has("agent_start")).toBe(false);
@@ -327,7 +351,7 @@ describe("the agent", () => {
   it("keeps the same system prompt between folds and tells memory news in the input", async () => {
     const dir = home();
     writeFileSync(memoryFile(dir), "- 2026-10-01 主人叫阿周\n- 2026-10-02 用中文\n");
-    await withAgent(dir, [fauxAssistantMessage("一"), fauxAssistantMessage("二")], async (r) => {
+    await withAgent(dir, [answer("一"), answer("二")], async (r) => {
       expect(r.agent.memoryNews()).toBe("");
       await r.ask("a");
       remember(dir, "主人喜欢短句", new Date(2026, 9, 18, 9));
@@ -345,7 +369,7 @@ describe("the agent", () => {
 
   it("makes the system prompt anew after a fold", async () => {
     const dir = home();
-    const long = step((c) => fauxAssistantMessage(summarizing(c) ? "摘要" : "好的。".repeat(150)));
+    const long = step((c) => answer(summarizing(c) ? "摘要" : "好的。".repeat(150)));
     await withAgent(
       dir,
       repeat(12, long),
@@ -369,7 +393,7 @@ describe("the agent", () => {
     const dir = home();
     await withAgent(
       dir,
-      [fauxAssistantMessage([fauxText("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))])],
+      [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })],
       async (r) => {
         r.agent.send(userMessage("说", wallTime.now()));
         await until(() => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"));
@@ -379,14 +403,12 @@ describe("the agent", () => {
         const last = r.agent.history().at(-1)!;
         expect(last.role === "assistant" && last.stopReason).toBe("aborted");
       },
-      {},
-      { tokensPerSecond: 50 },
     );
   });
 
   it("is stopped while a tool runs", async () => {
     const dir = home();
-    await withAgent(dir, [fauxAssistantMessage([fauxToolCall("bash", { command: "sleep 5" })])], async (r) => {
+    await withAgent(dir, [answer([toolCall("bash", { command: "sleep 5" })])], async (r) => {
       r.agent.send(userMessage("睡", wallTime.now()));
       await until(() => r.has("tool_execution_start"));
       await r.agent.stop();
@@ -414,11 +436,11 @@ describe("the agent", () => {
 
   it("tells a changed tool as a changed prefix", async () => {
     const dir = home();
-    await withAgent(dir, [fauxAssistantMessage("一"), fauxAssistantMessage("二")], async (r) => {
+    await withAgent(dir, [answer("一"), answer("二")], async (r) => {
       await r.ask("a");
       await until(() => r.has("agent_settled"));
       expect(prefixChanges(r)).toEqual([]);
-      r.agent.core.state.tools = r.agent.core.state.tools.slice(1);
+      (r.agent.tools()[0] as { description: string }).description = "改过的说明";
       await r.ask("b");
       await until(() => prefixChanges(r).length > 0);
       expect(prefixChanges(r)[0]).toContain("tools");
@@ -428,21 +450,22 @@ describe("the agent", () => {
   describe("an idle conversation", () => {
     const idleRig = async (
       wakeSoon: ((ms: number) => boolean) | undefined,
-      summary: FauxResponseFactory,
+      summary: (c: Request) => Answer,
       body: (r: Rig, choices: Map<number, unknown>) => Promise<void>,
     ) => {
       const dir = home();
       const choices = new Map<number, unknown>();
-      const answer: FauxResponseFactory = (context, options, state, model) => {
-        const c = { messages: context.messages };
+      let calls = 0;
+      const reply = (c: Request): Answer => {
+        calls++;
         if (summarizing(c)) {
-          choices.set(state.callCount, options?.toolChoice);
-          return summary(context, options, state, model);
+          choices.set(calls, c.options.toolChoice);
+          return summary(c);
         }
-        if (systemPrompt(c).startsWith(summaryInstructions)) return fauxAssistantMessage("另起的摘要");
-        return fauxAssistantMessage("好的。".repeat(150));
+        if (systemPrompt(c).startsWith(summaryInstructions)) return answer("另起的摘要");
+        return answer("好的。".repeat(150));
       };
-      await withAgent(dir, repeat(8, answer), (r) => body(r, choices), {
+      await withAgent(dir, repeat(8, reply), (r) => body(r, choices), {
         keepRecent: 2,
         idleFoldAt: 300,
         idleFoldAfterMs: 50,
@@ -454,7 +477,7 @@ describe("the agent", () => {
     it("is folded with the same start", async () => {
       await idleRig(
         undefined,
-        () => fauxAssistantMessage("就地的摘要"),
+        () => answer("就地的摘要"),
         async (r, choices) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
           expect(r.requests.length).toBe(3);
@@ -476,7 +499,7 @@ describe("the agent", () => {
     it("asks again on its own when a tool is called instead of a summary", async () => {
       await idleRig(
         undefined,
-        () => fauxAssistantMessage([fauxToolCall("list_dir", {})]),
+        () => answer([toolCall("list_dir", {})]),
         async (r) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await until(() => idleFolded(r));
@@ -493,11 +516,11 @@ describe("the agent", () => {
           asked++;
           return true;
         },
-        () => fauxAssistantMessage("摘要"),
+        () => answer("摘要"),
         async (r) => {
           for (const words of ["一", "二", "三"]) await r.ask(words);
           await until(() => asked > 0);
-          await r.agent.core.waitForIdle();
+          await until(() => !r.agent.busy());
           expect(asked).toBe(1);
           expect(r.requests.length).toBe(3);
           expect(r.agent.history()[0]!.role).toBe("user");
@@ -508,9 +531,9 @@ describe("the agent", () => {
 
   it("cuts where the last words stay", () => {
     const u = (text: string) => userMessage(text, wallTime.now());
-    const a = (text: string) => fauxAssistantMessage(text);
-    const call = fauxAssistantMessage([fauxToolCall("x", {})]);
-    const result: AgentMessage = {
+    const a = (words: string) => assistantMessage(words);
+    const call = assistantMessage([toolCall("x", {})]);
+    const result: BrainMessage = {
       role: "toolResult",
       toolCallId: "",
       toolName: "x",
@@ -529,12 +552,12 @@ describe("the agent", () => {
 
   describe("a run cut off", () => {
     const now = Date.now();
-    const asked: AgentMessage = { role: "user", content: "列一下", timestamp: now };
-    const call = fauxAssistantMessage([fauxToolCall("list_dir", {}, { id: "call-1" })], {
+    const asked: BrainMessage = { role: "user", content: "列一下", timestamp: now };
+    const call = assistantMessage([toolCall("list_dir", {}, "call-1")], {
       timestamp: now,
       stopReason: "toolUse",
     });
-    const result: AgentMessage = {
+    const result: BrainMessage = {
       role: "toolResult",
       toolCallId: "call-1",
       toolName: "list_dir",
@@ -543,16 +566,16 @@ describe("the agent", () => {
       timestamp: now,
     };
     const old = { ...result, timestamp: now - 2 * 3_600_000 };
-    const stop: AgentMessage = {
+    const stop: BrainMessage = {
       ...result,
       content: [{ type: "text", text: stopped }],
       isError: true,
     };
-    const answer = fauxAssistantMessage("列完了");
-    const cases: [string, AgentMessage[], boolean, boolean][] = [
+    const done = assistantMessage("列完了");
+    const cases: [string, BrainMessage[], boolean, boolean][] = [
       ["a tool done, not answered", [asked, call, result], true, true],
       ["cut off in a tool", [asked, call], true, true],
-      ["answered", [asked, call, result, answer], false, false],
+      ["answered", [asked, call, result, done], false, false],
       ["two hours ago", [asked, call, old], true, false],
       ["stopped", [asked, call, stop], false, false],
     ];
@@ -562,7 +585,7 @@ describe("the agent", () => {
         const file = join(dir, "test.jsonl");
         writeFileSync(file, lines.map((m) => JSON.stringify(m)).join("\n") + "\n");
         expect(sessionUnfinished(file)).toBe(isUnfinished);
-        await withAgent(dir, [step((c) => fauxAssistantMessage(JSON.stringify(results(c))))], async (r) => {
+        await withAgent(dir, [step((c) => answer(JSON.stringify(results(c))))], async (r) => {
           expect(r.agent.resume(30 * 60_000)).toBe(resumed);
           if (!resumed) {
             // Not resumed: nothing was started to wait for.
@@ -587,7 +610,7 @@ describe("the agent", () => {
       dir,
       [],
       async (r) => {
-        const names = r.agent.core.state.tools.map((t) => t.name);
+        const names = r.agent.tools().map((t) => t.name);
         for (const b of blocked) expect(names).not.toContain(b);
         expect(names).toContain("remember");
         expect(names).toContain("search_archive");

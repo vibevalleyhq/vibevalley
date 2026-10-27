@@ -1,11 +1,10 @@
-// The agent's own messages, named as pi-coding-agent names them: `custom` and `compactionSummary`. Both are kept in the
-// transcript; the model reads them as a user's words (convertToLlm). The transcript's system messages (pi-agent-core's
-// tool declarations) are never kept: the request's start is made fresh each time from the prompt and the tools.
+// The roles as pi-coding-agent names them, `custom` and `compactionSummary`, so its transcripts (through oar) read the
+// same; the model reads both as a user's words.
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { ImageContent, Message, SystemMessage, TextContent, Tool, UserMessage } from "@earendil-works/pi-ai";
+import type { Context, ImageContent, Message, TextContent, ToolDeclaration, UserMessage } from "../../ai/messages.ts";
+import type { AgentMessage } from "../loop/agent.ts";
 
-export type UserContent = string | (TextContent | ImageContent)[];
+export type UserContent = string | readonly (TextContent | ImageContent)[];
 
 export interface CustomMessage {
   readonly role: "custom";
@@ -28,8 +27,7 @@ export interface CompactionSummaryMessage {
   readonly kept: number;
 }
 
-// pi-coding-agent (through oar) already adds `custom` and `compactionSummary` to pi-agent-core's AgentMessage, in
-// shapes these extend: a compactionSummary read from the transcript is this file's once it is known to be the agent's.
+export type BrainMessage = AgentMessage<CustomMessage | CompactionSummaryMessage>;
 
 export const customMessage = (customType: string, content: UserContent, now: number, options: { hidden?: boolean; details?: unknown } = {}): CustomMessage => ({
   role: "custom",
@@ -51,8 +49,7 @@ export function summaryText(m: { readonly summary: string; readonly archive?: st
   return "【之前的对话压成了下面的摘要" + where + "】\n<summary>\n" + m.summary + "\n</summary>";
 }
 
-/** The conversation as the model reads it, without the system messages in it. */
-export function llmMessages(messages: readonly AgentMessage[]): Message[] {
+export function llmMessages(messages: readonly BrainMessage[]): Message[] {
   const out: Message[] = [];
   for (const m of messages) {
     switch (m.role) {
@@ -67,25 +64,16 @@ export function llmMessages(messages: readonly AgentMessage[]): Message[] {
       case "toolResult":
         out.push(m);
         break;
-      case "bashExecution":
-      case "branchSummary":
-      case "system":
-        break;
     }
   }
   return out;
 }
 
-/** One system message leads: the prompt and every tool, the same start for every request until either changes. */
-export function withPrefix(prefix: string, tools: readonly Tool[], messages: readonly AgentMessage[]): Message[] {
-  const head: SystemMessage = {
-    role: "system",
-    content: prefix,
-    ...(tools.length > 0 ? { toolsAdded: [...tools] } : {}),
-    timestamp: 0,
-  };
-  return [head, ...llmMessages(messages)];
-}
+export const requestContext = (prefix: string, tools: readonly ToolDeclaration[], messages: readonly BrainMessage[]): Context => ({
+  system: prefix,
+  tools,
+  messages: llmMessages(messages),
+});
 
 function blocksText(blocks: readonly { type: string; text?: string }[]): string {
   let out = "";
@@ -98,25 +86,20 @@ function blocksText(blocks: readonly { type: string; text?: string }[]): string 
 
 const contentWords = (c: UserContent | readonly { type: string; text?: string }[]) => (typeof c === "string" ? c : blocksText(c));
 
-export function messageText(m: AgentMessage): string {
+export function messageText(m: BrainMessage): string {
   switch (m.role) {
     case "compactionSummary":
       return m.summary;
     case "custom":
-    case "system":
     case "user":
       return contentWords(m.content);
     case "assistant":
     case "toolResult":
       return blocksText(m.content);
-    case "bashExecution":
-    case "branchSummary":
-      break;
   }
-  return "";
 }
 
-export function transcript(messages: readonly AgentMessage[]): string {
+export function transcript(messages: readonly BrainMessage[]): string {
   const out: string[] = [];
   for (const m of messages) {
     switch (m.role) {
@@ -138,14 +121,7 @@ export function transcript(messages: readonly AgentMessage[]): string {
       case "toolResult":
         out.push("## " + m.toolName + " 的结果" + (m.isError ? "（失败）" : "") + "\n" + messageText(m));
         break;
-      case "bashExecution":
-      case "branchSummary":
-      case "system":
-        break;
     }
   }
   return out.join("\n\n");
 }
-
-/** What the agent keeps and shows: the transcript without pi-agent-core's system messages. */
-export const kept = (messages: readonly AgentMessage[]) => messages.filter((m) => m.role !== "system");

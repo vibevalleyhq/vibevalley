@@ -1,7 +1,7 @@
 // Tools to read and change a work directory and run commands in it. No sandbox: a host gives these only to agents that
 // are meant to change things (not the orchestrator).
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Tool } from "../loop/agent.ts";
 import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
@@ -115,7 +115,7 @@ const localeLess = (a: string, b: string) => {
 
 const formatSeconds = (ms: number) => String(ms / 1000);
 
-export function codingTools(o: CodingOptions): AgentTool[] {
+export function codingTools(o: CodingOptions): Tool[] {
   const cwd = o.cwd;
   const timeout = o.commandTimeoutMs ?? 120_000;
   const runEnv = withEnv(o.env);

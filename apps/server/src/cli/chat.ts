@@ -2,7 +2,7 @@
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
-import { standaloneStream } from "./llm.ts";
+import { standaloneLlm } from "./llm.ts";
 import { cliWording } from "./words.ts";
 import { instructions } from "./prompts.ts";
 import { currentLocale } from "@vibevalley/protocol/words";
@@ -10,7 +10,6 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
-import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { promptAndWait } from "@botiverse/oar/observe";
 import { Brain, type BrainEvent } from "../agent/brain/agent.ts";
 import { codingTools } from "../agent/brain/coding.ts";
@@ -51,11 +50,7 @@ function show(e: BrainEvent, prompt: () => void) {
       console.log(dim("→ " + e.toolName + " " + short(JSON.stringify(e.args ?? {}))));
       return;
     case "tool_execution_end":
-      console.log(
-        dim(
-          (e.isError ? "✗ " : "✓ ") + short(((e.result as AgentToolResult | undefined)?.content ?? []).map((c) => (c.type === "text" ? c.text : "")).join("")),
-        ),
-      );
+      console.log(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))));
       return;
     case "compaction_end":
       if (e.compaction) console.log(dim(cliWording().chat.compacted(e.compaction.archive ?? "")));
@@ -98,7 +93,7 @@ export interface OwnChat {
 /** The conversation with VibeValley's own agent. */
 export async function ownChat(values: OwnChat) {
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey, standaloneStream());
+  const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey, standaloneLlm());
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homedir(), ".vibevalley", "agent", values.name);
   const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
@@ -190,9 +185,9 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const stream = standaloneStream();
+  const on = standaloneLlm();
   const registry = registryOf([
-    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey, stream), time: wallTime, log: plainLog }),
+    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey, on), time: wallTime, log: plainLog }),
     dshRuntime,
   ]);
   const runtime = registry.get(id);

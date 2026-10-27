@@ -1,22 +1,15 @@
-import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
-import {
-  type AssistantMessage,
-  createAssistantMessageEventStream,
-  fauxAssistantMessage,
-  type FauxContentBlock,
-  fauxText,
-  fauxToolCall,
-} from "@earendil-works/pi-ai";
+import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "../../ai/messages.ts";
+import { type Answer, answer, assistantMessage, text, toolCall } from "../../ai/testing.ts";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
 import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
-import { messageText, userMessage } from "./messages.ts";
+import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
 import { AgentTaskRunner } from "./agentTaskTools.ts";
-import { answered, fauxLLM, lastUser, type Request, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
+import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { textTool } from "./tool.ts";
 import { objectSchema } from "../../ai/tools.ts";
 import { wallTime } from "../../base/time.ts";
@@ -32,20 +25,18 @@ afterEach(() => {
   for (const done of homes.splice(0)) done();
 });
 
-const billed = (content: string | FauxContentBlock | FauxContentBlock[], input: number, output: number, cache: number): AssistantMessage => {
-  const m = fauxAssistantMessage(content);
-  return {
-    ...m,
-    usage: {
-      input,
-      output,
-      cacheRead: cache,
-      cacheWrite: 0,
-      totalTokens: input + output + cache,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    },
-  };
-};
+type Said = string | readonly (TextContent | ToolCall)[];
+const used = (input: number, output: number, cache: number): Usage => ({
+  ...zeroUsage(),
+  input,
+  output,
+  cacheRead: cache,
+  totalTokens: input + output + cache,
+});
+const billed = (content: Said, input: number, output: number, cache: number, more: Omit<Answer, "content" | "usage"> = {}): Answer =>
+  answer(content, { usage: { input, output, cacheRead: cache }, ...more });
+const billedMessage = (content: Said, input: number, output: number, cache: number): AssistantMessage =>
+  assistantMessage(content, { usage: used(input, output, cache) });
 const echo = textTool<object>({
   name: "echo",
   description: "",
@@ -53,30 +44,8 @@ const echo = textTool<object>({
   run: () => "ok",
 });
 
-/** Answers as given, usage and all (the faux provider counts its own); hang: the last answer starts and never ends. */
-function scripted(steps: AssistantMessage[], hang = false) {
-  const { llm } = fauxLLM();
-  const stream: StreamFn = (_model, _context, options) => {
-    const out = createAssistantMessageEventStream();
-    const m = steps.shift()!;
-    const last = steps.length === 0;
-    queueMicrotask(() => {
-      out.push({ type: "start", partial: m });
-      if (hang && last) {
-        out.push({ type: "text_delta", contentIndex: 0, delta: messageText(m), partial: m });
-        options?.signal?.addEventListener("abort", () => out.push({ type: "error", reason: "aborted", error: { ...m, stopReason: "aborted" } }));
-        return;
-      }
-      if (m.stopReason === "error" || m.stopReason === "aborted") out.push({ type: "error", reason: m.stopReason, error: m });
-      else out.push({ type: "done", reason: m.stopReason as "stop", message: m });
-    });
-    return out;
-  };
-  return { ...llm, stream };
-}
-
-async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptions> = {}) {
-  const llm = scripted(steps);
+async function receiptAgent(steps: readonly Step[], extra: Partial<BrainOptions> = {}) {
+  const { llm } = scriptedLLM(steps);
   const dir = home();
   const agent = await Brain.start({
     time: wallTime,
@@ -102,7 +71,7 @@ async function receiptAgent(steps: AssistantMessage[], extra: Partial<BrainOptio
 
 describe("a run's receipt", () => {
   it("takes in its tool turns, and each run its own usage", async () => {
-    const tool = fauxToolCall("echo", {});
+    const tool = toolCall("echo", {});
     const { agent, receipts } = await receiptAgent(
       [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
       { tools: [echo] },
@@ -123,12 +92,8 @@ describe("a run's receipt", () => {
   });
 
   it("keeps a failure's words and goes by the last answer", async () => {
-    const failed = {
-      ...billed("failed words", 7, 2, 1),
-      stopReason: "error" as const,
-      errorMessage: "broken",
-    };
-    const { agent, receipts } = await receiptAgent([failed, billed("recovered", 3, 1, 0)]);
+    const failed = { stopReason: "error", errorMessage: "broken" } as const;
+    const { agent, receipts } = await receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
     expect(await agent.ask(userMessage("fail", wallTime.now()))).toBe("failed words");
     await until(() => receipts.length === 1);
     expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
@@ -138,8 +103,8 @@ describe("a run's receipt", () => {
     await agent.close();
     const accounting = new RunAccounting();
     accounting.begin();
-    accounting.message(failed);
-    accounting.message(billed("ok", 3, 1, 0));
+    accounting.message({ ...billedMessage("failed words", 7, 2, 1), ...failed });
+    accounting.message(billedMessage("ok", 3, 1, 0));
     expect(accounting.settle(false)).toMatchObject({ error: "", usage: { input: 10 } });
   });
 
@@ -161,7 +126,7 @@ describe("a run's receipt", () => {
       },
     });
     const { agent, receipts } = await receiptAgent(
-      [billed([fauxText("A"), fauxToolCall("echo", {})], 2, 1, 0), billed("A done", 3, 1, 0), billed([fauxToolCall("echo", {})], 4, 1, 0)],
+      [billed([text("A"), toolCall("echo", {})], 2, 1, 0), billed("A done", 3, 1, 0), billed([toolCall("echo", {})], 4, 1, 0)],
       {
         tools: [slow],
         maxSteps: 3,
@@ -179,7 +144,7 @@ describe("a run's receipt", () => {
 
   it("shows usage from an answer that has only started, and does not count it twice", () => {
     const accounting = new RunAccounting();
-    const message = billed("reported at start", 9, 2, 3);
+    const message = billedMessage("reported at start", 9, 2, 3);
     accounting.begin();
     accounting.partial(message);
     expect(accounting.snapshot().current).toMatchObject({ usage: { input: 9 }, settled: false });
@@ -191,7 +156,7 @@ describe("a run's receipt", () => {
   });
 
   it("keeps an answer cut off by closing, with what it used", async () => {
-    const llm = scripted([billed("partial", 7, 3, 2)], true);
+    const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
     const dir = home();
     const agent = await Brain.start({
       time: wallTime,
@@ -210,7 +175,7 @@ describe("a run's receipt", () => {
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
     agent.send(userMessage("start", wallTime.now()));
-    await until(() => events.some((e) => e.type === "message_update"));
+    await until(() => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"));
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
     expect(agent.progress()).toMatchObject({
@@ -228,13 +193,13 @@ describe("a run's receipt", () => {
 describe("a compaction", () => {
   it("replays its whole kept tail", () => {
     const dir = home();
-    const messages: AgentMessage[] = [
+    const messages: BrainMessage[] = [
       userMessage("old", wallTime.now()),
-      fauxAssistantMessage("old answer"),
+      assistantMessage("old answer"),
       userMessage("keep", wallTime.now()),
-      fauxAssistantMessage("a"),
-      fauxAssistantMessage("b"),
-      fauxAssistantMessage("c"),
+      assistantMessage("a"),
+      assistantMessage("b"),
+      assistantMessage("c"),
     ];
     const options = { budget: 1, keepRecent: 2, keepSaid: 0 };
     const initial = planCompaction(messages, options)!;
@@ -245,7 +210,7 @@ describe("a compaction", () => {
       timestamp: 0,
       kept: messages.length - initial.cut,
     };
-    messages.push(fauxAssistantMessage("late tail"));
+    messages.push(assistantMessage("late tail"));
     const plan = planCompaction(messages, options)!;
     expect(plan.cut).toBe(initial.cut);
     const result = applyPlan(plan, cached);
@@ -258,7 +223,7 @@ describe("a compaction", () => {
   });
 });
 
-const subagentBrief = (c: Request) => messageText(c.messages[1]!);
+const subagentBrief = (c: Request) => messageText(c.messages[0]!);
 
 describe("the agent's own tasks", () => {
   // A and B go out together; C waits for both, then goes; each comes back to the agent as an input.
@@ -267,21 +232,20 @@ describe("the agent's own tasks", () => {
     const store = memoryStore();
     const sent: string[] = [];
     let told = 0;
-    const reply = (context: { messages: unknown[] }) => {
-      const c = context as Request;
+    const reply = (c: Request): Answer => {
       if (systemPrompt(c).includes("派出去的帮手")) {
         const brief = subagentBrief(c);
         if (brief === "查 C") expect(sent).toEqual(expect.arrayContaining(["查 A", "查 B"]));
         sent.push(brief);
-        return fauxAssistantMessage(brief + " 做完了");
+        return answer(brief + " 做完了");
       }
       if (messageText(c.messages.at(-1)!).includes("〔任务〕")) {
         told++;
-        return fauxAssistantMessage("收到");
+        return answer("收到");
       }
       if (!answered(c))
-        return fauxAssistantMessage([
-          fauxToolCall("task_add", {
+        return answer([
+          toolCall("task_add", {
             tasks: [
               { id: "a", brief: "查 A", by: "subagent" },
               { id: "b", brief: "查 B", by: "subagent" },
@@ -289,7 +253,7 @@ describe("the agent's own tasks", () => {
             ],
           }),
         ]);
-      return fauxAssistantMessage("派好了");
+      return answer("派好了");
     };
     await withAgent(
       dir,
@@ -317,11 +281,10 @@ describe("the agent's own tasks", () => {
           tc.signal.addEventListener("abort", () => reject(new Error("aborted")));
         }),
     });
-    const reply = (context: { messages: unknown[] }) => {
-      const c = context as Request;
-      if (systemPrompt(c).includes("派出去的帮手")) return fauxAssistantMessage([fauxToolCall("wait", {})]);
-      if (!answered(c)) return fauxAssistantMessage([fauxToolCall("task_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
-      return fauxAssistantMessage("派好了");
+    const reply = (c: Request): Answer => {
+      if (systemPrompt(c).includes("派出去的帮手")) return answer([toolCall("wait", {})]);
+      if (!answered(c)) return answer([toolCall("task_add", { tasks: [{ id: "a", brief: "查 A", by: "subagent" }] })]);
+      return answer("派好了");
     };
     await withAgent(
       dir,
@@ -342,22 +305,21 @@ describe("the agent's own tasks", () => {
   it("reminds a stopped run of its own tasks a few times", async () => {
     const dir = home();
     let nudged = 0;
-    const reply = (context: { messages: unknown[] }) => {
-      const c = context as Request;
+    const reply = (c: Request): Answer => {
       if (lastUser(c).includes("这一轮停了，还有 2 件你可以做：a、b")) {
         nudged++;
-        return fauxAssistantMessage("还没空");
+        return answer("还没空");
       }
       if (!answered(c))
-        return fauxAssistantMessage([
-          fauxToolCall("task_add", {
+        return answer([
+          toolCall("task_add", {
             tasks: [
               { id: "a", brief: "读" },
               { id: "b", brief: "写" },
             ],
           }),
         ]);
-      return fauxAssistantMessage("先这样");
+      return answer("先这样");
     };
     let events: BrainEvent[] = [];
     await withAgent(
@@ -366,7 +328,7 @@ describe("the agent's own tasks", () => {
       async (r) => {
         await r.ask("拆一下");
         await until(() => nudged >= 2);
-        await r.agent.core.waitForIdle();
+        await until(() => !r.agent.busy());
         expect(nudged).toBe(2);
         events = [...r.events];
       },

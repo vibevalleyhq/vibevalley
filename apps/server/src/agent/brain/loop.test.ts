@@ -1,8 +1,8 @@
 // How a run goes, turn by turn, as the brain's loop has gone: the spec the loop is held to when it changes
 // (.agents/notes/proposed/architecture/2026-10-27-pi-in-effect.md, step 3).
 
-import { fauxAssistantMessage, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { answer, text, toolCall } from "../../ai/testing.ts";
 import { objectSchema } from "../../ai/tools.ts";
 import { wallTime } from "../../base/time.ts";
 import { gate } from "../../testing/until.ts";
@@ -29,7 +29,7 @@ const shape = (r: Rig) =>
 
 describe("a run's turns", () => {
   it("goes through its events in one order", async () => {
-    await withAgent(home(), [fauxAssistantMessage([fauxToolCall("list_dir", {})]), fauxAssistantMessage("好了")], async (r) => {
+    await withAgent(home(), [answer([toolCall("list_dir", {})]), answer("好了")], async (r) => {
       await r.ask("列一下");
       await until(() => r.has("agent_settled"));
       expect(shape(r)).toEqual([
@@ -61,7 +61,7 @@ describe("a run's turns", () => {
     const counted = textTool<object>({ name: "counted", description: "", parameters: objectSchema(), run: () => String(++ran) });
     await withAgent(
       home(),
-      [fauxAssistantMessage([fauxToolCall("counted", {})], { stopReason: "length" }), fauxAssistantMessage("再来")],
+      [answer([toolCall("counted", {})], { stopReason: "length" }), answer("再来")],
       async (r) => {
         await r.ask("数");
         expect(ran).toBe(0);
@@ -77,17 +77,13 @@ describe("a run's turns", () => {
   });
 
   it("answers a tool that is not there, and arguments a tool refuses, as failed calls", async () => {
-    await withAgent(
-      home(),
-      [fauxAssistantMessage([fauxToolCall("no_such_tool", {}), fauxToolCall("read_file", { path: ["a"] })]), fauxAssistantMessage("知道了")],
-      async (r) => {
-        await r.ask("试试");
-        expect(results(r.requests[1]!)).toEqual([
-          { failed: true, text: "Tool no_such_tool not found" },
-          { failed: true, text: 'Validation failed for tool "read_file":\n  - path: must be string\n\nReceived arguments:\n{\n  "path": [\n    "a"\n  ]\n}' },
-        ]);
-      },
-    );
+    await withAgent(home(), [answer([toolCall("no_such_tool", {}), toolCall("read_file", { path: ["a"] })]), answer("知道了")], async (r) => {
+      await r.ask("试试");
+      expect(results(r.requests[1]!)).toEqual([
+        { failed: true, text: "Tool no_such_tool not found" },
+        { failed: true, text: 'Validation failed for tool "read_file":\n  - path: must be string\n\nReceived arguments:\n{\n  "path": [\n    "a"\n  ]\n}' },
+      ]);
+    });
   });
 
   it("takes the lines sent while it works one a turn", async () => {
@@ -105,7 +101,7 @@ describe("a run's turns", () => {
     });
     await withAgent(
       home(),
-      [fauxAssistantMessage([fauxToolCall("nap", {})]), fauxAssistantMessage("一"), fauxAssistantMessage("二")],
+      [answer([toolCall("nap", {})]), answer("一"), answer("二")],
       async (r) => {
         r.agent.send(userMessage("开始", wallTime.now()));
         await until(() => napping);
@@ -135,7 +131,7 @@ describe("a run's turns", () => {
     const fast = textTool<object>({ name: "fast", description: "", parameters: objectSchema(), run: () => "快的" });
     await withAgent(
       home(),
-      [fauxAssistantMessage([fauxText("两个"), fauxToolCall("slow", {}), fauxToolCall("fast", {})]), fauxAssistantMessage("都好了")],
+      [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],
       async (r) => {
         r.agent.send(userMessage("一起", wallTime.now()));
         await until(() => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"));

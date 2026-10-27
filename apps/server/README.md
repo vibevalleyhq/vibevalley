@@ -29,8 +29,8 @@ db/                migrations/0001_schema.up.sql (the one schema), queries/<tabl
   services; a line logged from a callback goes through `callbackLog` (`src/base/log.ts`): lint refuses `console.*`
   outside the command line, the brain and the journal.
 - **Facts are read typed**: a subscriber switches on `SideEvent`'s `type`, without casting its fields.
-- **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, pi-ai's faux
-  provider the model, `gh` answers that it is not there.
+- **Tests never reach a model or this machine's runtimes**: oar's `scriptedRuntime` plays the helpers, a scripted `Llm`
+  (`src/ai/testing.ts`) the model, `gh` answers that it is not there.
 
 ## Commands
 

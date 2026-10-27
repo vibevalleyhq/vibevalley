@@ -1,20 +1,21 @@
-// VibeValley's own agent, on pi-agent-core's Agent. A message is saved before its message_end is passed on. Past its
+// VibeValley's own agent, on the farm's loop (agent/loop). A message is saved before its message_end is passed on. Past its
 // budget the older part of the conversation is folded into a summary: for a request as soon as it is too long, in the
 // file once the run is over; past idleFoldAt, once it has been idle idleFoldAfterMs. The system prompt is made when the
 // agent starts and after each fold, never per request: what changes meanwhile (the time, the host's situation, new
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
-import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core";
-import type { Api, Model as AgentModel } from "@earendil-works/pi-ai";
-import { type Tool, toToolDeclaration, type ToolCall, type Usage } from "@earendil-works/pi-ai";
+import { Effect, Exit, Ref, Scope } from "effect";
 import { join } from "node:path";
+import type { ToolCall, ToolDeclaration, Usage } from "../../ai/messages.ts";
+import type { ThinkingLevel } from "../../ai/models.ts";
+import { type Agent, type AgentEvent, make, type Tool } from "../loop/agent.ts";
 import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
-import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction } from "./compaction.ts";
-import type { LLM, McpServer } from "./config.ts";
+import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
+import type { LLM, McpServer, RunWithSignal } from "./config.ts";
 import { connectAll, type McpConnections } from "./mcp.ts";
 import { memoryFileLines, readMemory } from "./memory.ts";
-import { type CompactionSummaryMessage, customMessage, kept, messageText, userMessage, withPrefix } from "./messages.ts";
+import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
 import { changedParts, joinParts, prefixHashes, type PromptPart } from "./prefix.ts";
 import { RunAccounting, type RunResult, type RunSnapshot } from "./run.ts";
 import { Reminders } from "./reminders.ts";
@@ -26,9 +27,12 @@ import { stopped } from "./tool.ts";
 import type { CallbackLog } from "../../base/log.ts";
 import type { Time } from "../../base/time.ts";
 
-/** A pi-agent-core event, or one of this agent's own. */
+type Own = CustomMessage | CompactionSummaryMessage;
+
+export type CoreEvent = AgentEvent<Own>;
+
 export type BrainEvent =
-  | AgentEvent
+  | CoreEvent
   | { readonly type: "agent_settled"; readonly run: RunResult }
   | { readonly type: "compaction_start"; readonly reason: FoldReason }
   /** compaction is absent when no summary was produced; usage is the summary request's, absent when none was made. */
@@ -53,7 +57,7 @@ export interface BrainOptions {
   readonly thinkingLevel?: ThinkingLevel;
   readonly home: string;
   readonly cwd: string;
-  readonly tools?: readonly AgentTool[];
+  readonly tools?: readonly Tool[];
   /** Applied after all built-in, host and scheduled tools have been assembled. */
   readonly disallowedTools?: readonly string[];
   readonly mcpServers?: readonly McpServer[];
@@ -108,11 +112,18 @@ export const resumedUnknown = "服务端在这个工具做完之前重启了，�
 
 const taskMessage = (text: string, now: number) => customMessage("task", text, now);
 
-const allowed = (tools: readonly AgentTool[], disallowed: readonly string[] = []) => tools.filter((t) => !disallowed.includes(t.name));
+const allowed = (tools: readonly Tool[], disallowed: readonly string[] = []) => tools.filter((t) => !disallowed.includes(t.name));
+
+const declared = (tools: readonly Tool[]): ToolDeclaration[] => tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
+
+interface Folded {
+  readonly result?: Compacted;
+  readonly fresh: boolean;
+}
 
 /** The calls of the last answer that have no result; ok is false when there is nothing to go on with: the model spoke
  * last with nothing left to do, or the run was stopped or failed. */
-export function unfinished(messages: readonly AgentMessage[]): {
+export function unfinished(messages: readonly BrainMessage[]): {
   missing: ToolCall[];
   ok: boolean;
 } {
@@ -141,23 +152,26 @@ export function unfinished(messages: readonly AgentMessage[]): {
     case "user":
     case "custom":
       return { missing: [], ok: true };
-    case "bashExecution":
-    case "branchSummary":
     case "compactionSummary":
-    case "system":
-      break;
+      return { missing: [], ok: false };
   }
-  return { missing: [], ok: false };
 }
 
 /** Reads the file only, without making an agent. */
 export const sessionUnfinished = (file: string) => unfinished(new SessionFile(file).load()).ok;
 
-const sameMessages = (a: readonly AgentMessage[], b: readonly AgentMessage[]) =>
+const sameMessages = (a: readonly BrainMessage[], b: readonly BrainMessage[]) =>
   a.length === b.length && (a.length === 0 || a.at(-1)!.timestamp === b.at(-1)!.timestamp);
 
 export class Brain {
-  readonly core: Agent;
+  private readonly core: Agent<Own>;
+  /** The loop's: closed with the agent. */
+  private readonly scope = Scope.makeUnsafe();
+  /** The owner's fibers (LLM.run): runs start, and the agent's own Effects run, on them. */
+  private readonly run: RunWithSignal;
+  /** Holds a fiber of the owner's that closes the loop's scope when the owner's fibers end; closing the agent lets it go. */
+  private readonly tether = new AbortController();
+  private readonly toolset: readonly Tool[];
 
   private readonly life = new AbortController();
   private readonly session: SessionFile | undefined;
@@ -180,7 +194,7 @@ export class Brain {
   private parts: PromptPart[] = [];
   /** What the request under way starts with. */
   private requestPrefix = "";
-  private requestTools: Tool[] = [];
+  private requestTools: ToolDeclaration[] = [];
   /** The lines of MEMORY.md the model knows: the snapshot's, then as memoryNews told it. */
   private knownMemory: string[] = [];
   /** What cancels the pending idle fold and the next reminder tick. */
@@ -208,6 +222,7 @@ export class Brain {
     private readonly mcp: McpConnections,
   ) {
     this.maxSteps = options.maxSteps ?? 40;
+    this.run = options.llm.run;
     const sessionName = options.session || options.name;
     if (!options.noSession) this.session = new SessionFile(join(options.home, sessionName + ".jsonl"));
     this.skillDirs = options.noSkills ? [] : (options.skills ?? defaultSkillDirs(options.cwd));
@@ -276,7 +291,7 @@ export class Brain {
       const runner = this.tasks;
       own.push(...taskTools(store, subagent !== undefined, () => void runner.advance()));
       // A fold replaces the turns that showed the graph: the summary carries it on.
-      this.folding = { ...this.folding, append: () => runner.summary() };
+      this.folding = { ...this.folding, append: () => Effect.promise(() => runner.summary()) };
     }
 
     this.refreshPrefix();
@@ -292,51 +307,36 @@ export class Brain {
       );
       tools = allowed([...tools, ...reminders.tools], options.disallowedTools);
     }
-    this.core = new Agent({
-      initialState: {
-        // pi-agent-core's Model type, the same fields, until the loop is the farm's own.
-        model: options.llm.model as unknown as AgentModel<Api>,
-        thinkingLevel: options.thinkingLevel ?? "off",
-        tools,
-        messages: this.session?.load() ?? [],
-      },
-      streamFn: options.llm.stream,
-      getApiKey: () => options.llm.apiKey?.(),
-      convertToLlm: (messages) => withPrefix(this.requestPrefix, this.requestTools, messages),
-      // The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it.
-      prepareRequest: async ({ context }, signal) => {
-        const tools = (context.tools ?? []).map(toToolDeclaration);
-        const { result, fresh } = await this.fold(kept(context.messages), tools, this.folding, "threshold", signal);
-        if (result && fresh) this.refreshPrefix();
-        this.requestPrefix = this.prefix;
-        this.requestTools = tools;
-        this.noteChanges(this.parts, tools);
-        return result ? { context: { ...context, messages: result.messages } } : undefined;
-      },
-      // A stop that came while the tools ran ends the run with their results, as the model's answer would.
-      finishTurn: (_turn, signal) => {
-        this.steps++;
-        return this.steps >= this.maxSteps || signal?.aborted ? { action: "end" } : undefined;
-      },
-    });
-
-    // The core's events, in order: each message saved before it is passed on; after a run's end, what follows it.
-    this.core.subscribe((e) => {
-      if ((e.type === "message_start" || e.type === "message_end" || e.type === "message_update") && e.message.role === "system") return;
-      this.observeRun(e);
-      // Not what closing it made (the answer cut off, its tools' "stopped"): the file ends where the run was cut, as
-      // after a crash, and resume goes on from there.
-      if (e.type === "message_end" && this.session && !this.life.signal.aborted) {
-        try {
-          this.session.append(e.message);
-        } catch (err) {
-          options.log.error(`agent ${options.name}: cannot save the conversation:`, err);
-        }
-      }
-      this.publish(e);
-      // The run is idle only once every listener of agent_end has returned.
-      if (e.type === "agent_end") void this.core.waitForIdle().then(() => this.ended());
-    });
+    this.toolset = tools;
+    // Made at once: the loop's state is Refs, and its runs are forked later, from the owner's fibers.
+    this.core = Effect.runSync(
+      Scope.provide(
+        make<Own>({
+          llm: options.llm.service,
+          model: options.llm.model,
+          thinkingLevel: options.thinkingLevel ?? "off",
+          tools,
+          messages: this.session?.load() ?? [],
+          apiKey: () => options.llm.apiKey?.() ?? "",
+          toLlm: (messages) => requestContext(this.requestPrefix, this.requestTools, messages),
+          prepareRequest: (messages, stopped) => this.prepare(messages, stopped),
+          // A stop that came while the tools ran ends the run with their results, as the model's answer would.
+          finishTurn: (turn) =>
+            Effect.sync(() => {
+              this.steps++;
+              return this.steps >= this.maxSteps || turn.stopped ? "end" : undefined;
+            }),
+          onEvent: (e) => Effect.sync(() => this.follow(e)),
+          stoppedText: stopped,
+        }),
+        this.scope,
+      ),
+    );
+    // The owner gone, a run under way is cut off with it.
+    this.run(
+      Effect.onInterrupt(Effect.never, () => Scope.close(this.scope, Exit.void)),
+      { signal: this.tether.signal },
+    ).catch(() => undefined);
 
     if (reminders) {
       const s = reminders;
@@ -353,6 +353,41 @@ export class Brain {
     }
     // What a process that went left out goes out again, now that the agent can be told.
     void this.tasks?.recover();
+  }
+
+  /** The loop's events, in order: each message saved before it is passed on; after a run's end, what follows it. */
+  private follow(e: CoreEvent) {
+    this.observeRun(e);
+    // Not what closing it made (the answer cut off, its tools' "stopped"): the file ends where the run was cut, as
+    // after a crash, and resume goes on from there.
+    if (e.type === "message_end" && this.session && !this.life.signal.aborted) {
+      try {
+        this.session.append(e.message);
+      } catch (err) {
+        this.options.log.error(`agent ${this.options.name}: cannot save the conversation:`, err);
+      }
+    }
+    this.publish(e);
+    // The run is idle once its fiber has ended, after this event; the owner's fibers gone, nothing follows.
+    if (e.type === "agent_end")
+      this.run(this.core.idle).then(
+        () => this.ended(),
+        () => undefined,
+      );
+  }
+
+  /** The fold before the prompt: a fold makes the prompt anew, and this request is the first to start with it. A stopped
+   * run asks for no summary: its request ends at once. */
+  private prepare(messages: readonly BrainMessage[], stoppedRun: boolean): Effect.Effect<readonly BrainMessage[] | undefined> {
+    const tools = declared(this.toolset);
+    const folded: Effect.Effect<Folded> = stoppedRun ? Effect.succeed({ fresh: false }) : this.fold(messages, tools, this.folding, "threshold");
+    return Effect.map(folded, ({ result, fresh }) => {
+      if (result && fresh) this.refreshPrefix();
+      this.requestPrefix = this.prefix;
+      this.requestTools = tools;
+      this.noteChanges(this.parts, tools);
+      return result?.messages;
+    });
   }
 
   private publish(e: BrainEvent) {
@@ -396,7 +431,7 @@ export class Brain {
   }
 
   /** Told as prefix_changed; the first request, and the first after a compaction, set what the next is compared with. */
-  private noteChanges(parts: readonly PromptPart[], tools: readonly Tool[]) {
+  private noteChanges(parts: readonly PromptPart[], tools: readonly ToolDeclaration[]) {
     const hashes = prefixHashes(parts, tools);
     const changed = changedParts(this.sent, hashes);
     this.sent = hashes;
@@ -415,49 +450,59 @@ export class Brain {
   }
 
   /** The summary is asked with the request's own start, the one the request before was sent with: its cache is read.
-   * fresh: the summary was made now, not taken from an earlier request; whoever uses it makes the prompt anew. */
-  private async fold(
-    messages: readonly AgentMessage[],
-    tools: readonly Tool[],
-    folding: CompactionOptions,
-    reason: FoldReason,
-    signal?: AbortSignal,
-  ): Promise<{ result?: Compacted; fresh: boolean }> {
-    const plan = planCompaction(messages, folding);
-    if (!plan) return { fresh: false };
-    const key = `${plan.cut}:${messages[plan.cut]?.timestamp ?? 0}`;
-    const known = this.folds.get(key);
-    if (known) return { result: applyPlan(plan, known), fresh: false };
-    this.publish({ type: "compaction_start", reason });
-    let summary: CompactionSummaryMessage | undefined;
-    let usage: Usage | undefined;
-    try {
-      ({ summary, usage } = await compactInPlace(plan, folding, this.prefix, tools, signal));
-    } catch (err) {
-      this.options.log.error(`agent ${this.options.name}: cannot fold the conversation:`, err);
-    }
-    this.publish({
-      type: "compaction_end",
-      reason,
-      ...(summary ? { compaction: summary } : {}),
-      ...(usage ? { usage } : {}),
+   * fresh: the summary was made now, not taken from an earlier request; whoever uses it makes the prompt anew.
+   * Interrupted, it ends with no summary. */
+  private fold(messages: readonly BrainMessage[], tools: readonly ToolDeclaration[], folding: CompactionOptions, reason: FoldReason): Effect.Effect<Folded> {
+    return Effect.suspend(() => {
+      const plan = planCompaction(messages, folding);
+      if (!plan) return Effect.succeed({ fresh: false });
+      const key = `${plan.cut}:${messages[plan.cut]?.timestamp ?? 0}`;
+      const known = this.folds.get(key);
+      if (known) return Effect.succeed({ result: applyPlan(plan, known), fresh: false });
+      this.publish({ type: "compaction_start", reason });
+      return compactInPlace(plan, folding, this.prefix, tools).pipe(
+        Effect.catchDefect((err) =>
+          Effect.sync((): Summarized => {
+            this.options.log.error(`agent ${this.options.name}: cannot fold the conversation:`, err);
+            return {};
+          }),
+        ),
+        Effect.onInterrupt(() => Effect.sync(() => this.publish({ type: "compaction_end", reason }))),
+        Effect.map(({ summary, usage }): Folded => {
+          this.publish({
+            type: "compaction_end",
+            reason,
+            ...(summary ? { compaction: summary } : {}),
+            ...(usage ? { usage } : {}),
+          });
+          if (!summary) return { fresh: false };
+          this.folds.set(key, summary);
+          return { result: applyPlan(plan, summary), fresh: true };
+        }),
+      );
     });
-    if (!summary) return { fresh: false };
-    this.folds.set(key, summary);
-    return { result: applyPlan(plan, summary), fresh: true };
   }
 
   /** A run that folded for a request keeps the fold: the summary it was answered with is saved. */
   private async settleFold() {
-    const { result, fresh } = await this.fold(this.history(), this.core.state.tools.map(toToolDeclaration), this.folding, "threshold");
+    const { result, fresh } = await this.run(this.fold(this.history(), declared(this.toolset), this.folding, "threshold"));
     if (!result) return;
     if (fresh) this.refreshPrefix();
     this.folds = new Map();
-    this.core.state.messages = result.messages;
+    this.setMessages(result.messages);
     this.save(result.summary);
   }
 
-  private save(message: AgentMessage) {
+  /** The loop's state is Refs: read and set at once, in the order the agent's callers come. */
+  private runNow<A>(effect: Effect.Effect<A>): A {
+    return Effect.runSync(effect);
+  }
+
+  private setMessages(messages: readonly BrainMessage[]) {
+    this.runNow(Ref.set(this.core.messages, messages));
+  }
+
+  private save(message: BrainMessage) {
     try {
       this.session?.append(message);
     } catch (err) {
@@ -465,7 +510,7 @@ export class Brain {
     }
   }
 
-  private observeRun(e: AgentEvent) {
+  private observeRun(e: CoreEvent) {
     switch (e.type) {
       case "agent_start":
         this.accounting.begin();
@@ -485,18 +530,19 @@ export class Brain {
 
   private continueRun() {
     this.steps = 0;
-    // Stop can clear the queue after its check: then no core run starts, and no end event will follow.
-    this.core.continue().catch(() => this.ended());
+    // Stop can clear the queue after its check: then no run starts, and no end event will follow.
+    this.run(this.core.continue).catch(() => this.ended());
   }
 
   private async ended() {
     const alive = () => !this.life.signal.aborted;
-    if (alive() && this.core.hasQueuedMessages()) return this.continueRun();
+    if (alive() && this.queued()) return this.continueRun();
     // Only a fold a request already used is saved now; otherwise the conversation stays as it was until it is idle.
     const folded = this.folds.size > 0;
-    if (alive() && folded) await this.settleFold();
+    if (alive() && folded)
+      await this.settleFold().catch((err: unknown) => this.options.log.error(`agent ${this.options.name}: cannot fold the conversation:`, err));
     // Admission stays attached to this logical run until compaction and all queued input are settled.
-    if (alive() && this.core.hasQueuedMessages()) return this.continueRun();
+    if (alive() && this.queued()) return this.continueRun();
     if (!this.accounting.active()) return;
     const result = this.accounting.settle(this.stopping || !alive());
     this.stopping = false;
@@ -511,31 +557,30 @@ export class Brain {
     }
   }
 
-  private deliver(message: AgentMessage, steer: boolean) {
+  private deliver(message: BrainMessage, steer: boolean) {
     if (this.life.signal.aborted) return;
     if (this.accounting.active()) {
-      if (steer) this.core.steer(message);
-      else this.core.followUp(message);
+      this.runNow(steer ? this.core.steer(message) : this.core.followUp(message));
       return;
     }
     this.stopIdle();
     this.accounting.begin();
     this.steps = 0;
-    this.core.prompt(message).catch((err) => this.options.log.error(`agent ${this.options.name}: cannot start a run:`, err));
+    this.run(this.core.prompt([message])).catch((err: unknown) => this.options.log.error(`agent ${this.options.name}: cannot start a run:`, err));
   }
 
   /** Starts a run when idle, steers the one under way otherwise. */
-  send(message: AgentMessage) {
+  send(message: BrainMessage) {
     this.deliver(message, true);
   }
 
   /** Taken when the run would stop (a follow-up); starts a run when idle. */
-  later(message: AgentMessage) {
+  later(message: BrainMessage) {
     this.deliver(message, false);
   }
 
   /** What the run it starts or joins ends up saying. */
-  ask(message: AgentMessage, signal?: AbortSignal): Promise<string> {
+  ask(message: BrainMessage, signal?: AbortSignal): Promise<string> {
     return new Promise((resolve, reject) => {
       if (this.life.signal.aborted) return reject(new Error("the agent is closed"));
       if (signal?.aborted) return reject(signal.reason ?? new Error("aborted"));
@@ -570,19 +615,28 @@ export class Brain {
   /** Stops the run under way and calls back the subagents out on its tasks. */
   async stop() {
     await this.tasks?.stop();
-    this.core.clearAllQueues();
+    this.runNow(this.core.clearQueues);
     if (this.accounting.active()) this.stopping = true;
-    this.core.abort();
+    this.runNow(this.core.abort);
   }
 
-  history(): AgentMessage[] {
-    return kept(this.core.state.messages);
+  history(): BrainMessage[] {
+    return [...this.runNow(Ref.get(this.core.messages))];
+  }
+
+  /** Lines sent while it works that no turn has taken yet. */
+  queued(): boolean {
+    return this.runNow(this.core.hasQueued);
+  }
+
+  tools(): readonly Tool[] {
+    return this.toolset;
   }
 
   /** The memory stays. */
   reset() {
     this.stopIdle();
-    this.core.reset();
+    this.runNow(Effect.andThen(this.core.clearQueues, Ref.set(this.core.messages, [])));
     this.session?.clear();
   }
 
@@ -603,7 +657,7 @@ export class Brain {
     const { missing, ok } = unfinished(messages);
     if (!ok || this.options.time.now() - messages.at(-1)!.timestamp > maxAgeMs) return false;
     if (missing.length > 0) {
-      const more: AgentMessage[] = missing.map((call) => ({
+      const more: BrainMessage[] = missing.map((call) => ({
         role: "toolResult",
         toolCallId: call.id,
         toolName: call.name,
@@ -612,7 +666,7 @@ export class Brain {
         timestamp: this.options.time.now(),
       }));
       for (const m of more) this.save(m);
-      this.core.state.messages = [...this.core.state.messages, ...more];
+      this.setMessages([...this.history(), ...more]);
     }
     this.stopIdle();
     this.accounting.begin();
@@ -621,7 +675,7 @@ export class Brain {
   }
 
   private quiet() {
-    return !this.accounting.active() && !this.core.hasQueuedMessages();
+    return !this.accounting.active() && !this.queued();
   }
 
   private idleAfter() {
@@ -651,18 +705,18 @@ export class Brain {
     if (this.life.signal.aborted || !this.quiet()) return;
     if (this.options.wakeSoon?.(this.idleAfter())) return;
     const before = this.history();
-    const { result } = await this.fold(
-      before,
-      this.core.state.tools.map(toToolDeclaration),
-      { ...this.folding, budget: this.idleAt() },
-      "idle",
-      this.life.signal,
-    );
+    let folded: Folded;
+    try {
+      folded = await this.run(this.fold(before, declared(this.toolset), { ...this.folding, budget: this.idleAt() }, "idle"), { signal: this.life.signal });
+    } catch {
+      return;
+    }
+    const { result } = folded;
     if (!result) return;
     this.folds = new Map();
     // What came in while the summary was being made is not lost: the fold is dropped, and done again when it is idle next.
     if (this.life.signal.aborted || !this.quiet() || !sameMessages(this.history(), before)) return;
-    this.core.state.messages = result.messages;
+    this.setMessages(result.messages);
     this.save(result.summary);
     this.refreshPrefix();
   }
@@ -679,12 +733,13 @@ export class Brain {
     this.stopIdle();
     this.scheduleTimer?.();
     this.life.abort();
-    this.core.abort();
-    await this.core.waitForIdle();
+    this.runNow(this.core.abort);
+    await this.run(this.core.idle).catch(() => undefined);
     await this.tasks?.settled();
     await this.mcp.close();
-    // A queued continuation cancelled before it starts has no core end event.
+    // A queued continuation cancelled before it starts has no end event.
     await this.ended();
     this.listeners.clear();
+    this.tether.abort();
   }
 }

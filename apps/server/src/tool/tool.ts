@@ -2,7 +2,6 @@
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   type Agent,
   type Block,
@@ -23,10 +22,11 @@ import { isOpen, maxTasks } from "../task/graph.ts";
 import { head } from "../base/text.ts";
 import { graphText } from "../task/prompts.ts";
 import { inboxLines } from "../channel/rules.ts";
-import { Clock, Context, Data, Effect, FiberSet, Layer, Schema } from "effect";
+import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
 import type { Actor } from "../base/actor.ts";
 import { effectTool } from "../agent/brain/tool.ts";
+import type { Tool } from "../agent/loop/agent.ts";
 import type { JsonSchema } from "../ai/tools.ts";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
 import { Docs } from "../doc/doc.ts";
@@ -81,9 +81,9 @@ export type Who = () => Caller;
 
 export interface ToolShape {
   /** The orchestrator's tools, in the order its prompt has always listed them: the order is part of the prompt's prefix. */
-  readonly orchestrator: (who: Who) => AgentTool[];
+  readonly orchestrator: (who: Who) => Tool[];
   /** A session's tools, served on /mcp. */
-  readonly session: (who: Who) => AgentTool[];
+  readonly session: (who: Who) => Tool[];
   /** How a tool call reads in the orchestrator's trajectory: its label and the first naming argument. */
   readonly start: (name: string, args: unknown) => ToolStart;
   readonly sessionLine: (w: Roster) => string;
@@ -177,8 +177,6 @@ export const make = Effect.gen(function* () {
   const issue = yield* Issues;
   const tasks = yield* Tasks;
 
-  // A tool's work runs on this service's fibers: it ends with the service, and the run's stop interrupts it.
-  const runHere = yield* FiberSet.makeRuntimePromise<never>();
   /** An answer, or "没成：" and why. */
   const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed("没成：" + said(err)));
 
@@ -187,10 +185,7 @@ export const make = Effect.gen(function* () {
     <All extends { readonly [name: string]: Schema.Codec<unknown, unknown, never, never> }>(all: All, shown: Record<keyof All & string, JsonSchema>) =>
     <K extends keyof All & string>(name: K, description: string, body: (p: All[K]["Type"]) => Effect.Effect<string, unknown>) => {
       const read: (args: unknown) => Effect.Effect<All[K]["Type"], Schema.SchemaError> = Schema.decodeUnknownEffect<All[K]>(all[name]);
-      return effectTool<unknown>(
-        { name, label: labels[name] ?? name, description, parameters: shown[name], run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError) },
-        runHere,
-      );
+      return effectTool<unknown>({ name, description, parameters: shown[name], run: (args) => Effect.mapError(Effect.flatMap(read(args), body), toError) });
     };
   const tool = toolOf(parameters, schemas);
   const sessionSchemaTool = toolOf(sessionParameters, sessionSchemas);

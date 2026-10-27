@@ -2,8 +2,8 @@
 // (vp run evals in apps/server), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
 
-import { standaloneStream } from "../cli/llm.ts";
-import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
+import { standaloneLlm } from "../cli/llm.ts";
+import type { Tool } from "../agent/loop/agent.ts";
 import { orchestrator } from "../base/actor.ts";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { Effect } from "effect";
@@ -14,7 +14,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { Brain } from "../agent/brain/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
 import { memoryFile } from "../agent/brain/memory.ts";
-import { transcript } from "../agent/brain/messages.ts";
+import { type BrainMessage, transcript } from "../agent/brain/messages.ts";
 import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
@@ -39,23 +39,24 @@ const orchestratorTools = () =>
 
 /** Every farm tool answers with what the case recorded for it, in the order it was called; none touches the farm. Its own
  * tools (memory, archive) work on the replay's own home. */
-function stubbed(tools: readonly AgentTool[], did: readonly AgentMessage[]): AgentTool[] {
-  const recorded = new Map<string, Extract<AgentMessage, { role: "toolResult" }>[]>();
+function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
+  const recorded = new Map<string, Extract<BrainMessage, { role: "toolResult" }>[]>();
   for (const m of did) if (m.role === "toolResult") recorded.set(m.toolName, [...(recorded.get(m.toolName) ?? []), m]);
   return tools.map((t) => ({
     ...t,
-    execute: async () => {
-      const next = recorded.get(t.name)?.shift();
-      if (!next) return { content: [{ type: "text", text: noResult }], details: undefined };
-      if (next.isError) throw new Error(next.content.map((c) => (c.type === "text" ? c.text : "")).join(""));
-      return { content: next.content, details: undefined };
-    },
+    execute: () =>
+      Effect.suspend(() => {
+        const next = recorded.get(t.name)?.shift();
+        if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
+        if (next.isError) return Effect.fail(new Error(next.content.map((c) => (c.type === "text" ? c.text : "")).join("")));
+        return Effect.succeed({ content: next.content });
+      }),
   }));
 }
 
 /** One sample: the brain as the orchestrator makes it, with the case's memory and conversation; the turn the input begins, and
  * the tokens it took. */
-async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): Promise<{ turn: AgentMessage[]; tokens: number }> {
+async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promise<{ turn: BrainMessage[]; tokens: number }> {
   const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, orchestratorAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
@@ -64,7 +65,7 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
     log: plainLog,
     name: orchestratorAgent,
     instructions: systemPrompt + agentPrompt,
-    llm: deepseek(model, key, standaloneStream()),
+    llm: deepseek(model, key, standaloneLlm()),
     home,
     cwd: home,
     tools: stubbed(tools, c.did),
@@ -73,7 +74,7 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
     reminders: false,
   });
   try {
-    const turn: AgentMessage[] = [];
+    const turn: BrainMessage[] = [];
     let tokens = 0;
     await new Promise<void>((done, fail) => {
       // A real model's turn: the deadline is the point.

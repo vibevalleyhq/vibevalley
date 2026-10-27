@@ -1,7 +1,7 @@
 // What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
 
 import { agentWording } from "../words.ts";
-import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
+import { type AssistantMessage, type Usage, zeroUsage } from "../../ai/messages.ts";
 import { messageText } from "./messages.ts";
 
 /** usage leaves out earlier runs; contextTokens is the newest request's. */
@@ -22,17 +22,8 @@ export interface RunSnapshot {
   readonly lifetime: Usage;
 }
 
-export const zeroUsage = (): Usage => ({
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-});
-
 export function addUsage(a: Usage, b: Usage): Usage {
-  const out: Usage = {
+  const sum: Usage = {
     input: a.input + b.input,
     output: a.output + b.output,
     cacheRead: a.cacheRead + b.cacheRead,
@@ -46,8 +37,7 @@ export function addUsage(a: Usage, b: Usage): Usage {
       total: a.cost.total + b.cost.total,
     },
   };
-  if (a.reasoning !== undefined || b.reasoning !== undefined) out.reasoning = (a.reasoning ?? 0) + (b.reasoning ?? 0);
-  return out;
+  return a.reasoning !== undefined || b.reasoning !== undefined ? { ...sum, reasoning: (a.reasoning ?? 0) + (b.reasoning ?? 0) } : sum;
 }
 
 const blank = (id: number): RunResult => ({

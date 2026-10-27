@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { testConfig } from "../testing/layers.ts";
 import { aTurn } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
-import { fauxLLM } from "../agent/brain/testing.ts";
+import { scriptedLLM } from "../agent/brain/testing.ts";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
 
@@ -59,7 +59,7 @@ describe("AgentHost", () => {
     });
     return Effect.gen(function* () {
       const sessions = yield* Sessions;
-      const { llm } = fauxLLM();
+      const { llm } = scriptedLLM();
       const host = sessions.host({
         name: "orchestrator",
         label: "管家",

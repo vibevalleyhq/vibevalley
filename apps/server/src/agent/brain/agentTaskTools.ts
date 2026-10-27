@@ -3,7 +3,7 @@
 // subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
 // own tasks are its to do; nothing here does them.
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Tool } from "../loop/agent.ts";
 import type { CallbackLog } from "../../base/log.ts";
 import { head } from "../../base/text.ts";
 import * as engine from "./agentTask.ts";
@@ -25,7 +25,7 @@ export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTas
 }
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
-export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () => void): AgentTool[] {
+export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () => void): Tool[] {
   const task = schemaTool({
     name: "task_add",
     description:
