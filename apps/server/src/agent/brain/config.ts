@@ -14,29 +14,21 @@ export const defaultModel = "deepseek-flash";
 /** Said for the command line; the farm says where to put one in the app. */
 export const noDeepSeekKey = () => agentWording().noDeepSeekKey;
 
-/** On fibers someone owns, so what it runs ends with them. */
-export type RunWithSignal = <A, E>(effect: Effect.Effect<A, E>, options?: { readonly signal?: AbortSignal }) => Promise<A>;
-
-/** The farm's Llm, and the fibers of whoever owns the agent: its runs and requests end with them. */
-export interface LlmOn {
-  readonly service: LlmShape;
-  readonly run: RunWithSignal;
-}
-
-export interface LLM extends LlmOn {
+export interface LLM {
   readonly model: Model;
+  readonly service: LlmShape;
   /** Asked before each request (and each summary), so a key changed meanwhile is used at once. */
   readonly apiKey?: () => string | undefined;
 }
 
 /** id empty is defaultModel; the key is the caller's to find. */
-export function deepseek(id: string, key: string | (() => string | undefined), on: LlmOn): LLM {
+export function deepseek(id: string, key: string | (() => string | undefined), service: LlmShape): LLM {
   const apiKey = typeof key === "string" ? () => key : key;
   if (!apiKey()) throw new Error(noDeepSeekKey());
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const model = known ?? { ...models.find((m) => m.id === defaultModel)!, id: name, name };
-  return { model, apiKey, ...on };
+  return { model, service, apiKey };
 }
 
 /** One answer, whole; a failure is its error message. */

@@ -3,30 +3,25 @@
 // subagent in the background, at most max at once; what the subagent says comes back to the agent as an input. The agent's
 // own tasks are its to do; nothing here does them.
 
+import { Effect, FiberSet, Schema, type Scope } from "effect";
 import type { Tool } from "../loop/agent.ts";
-import type { CallbackLog } from "../../base/log.ts";
 import { head } from "../../base/text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
-import { schemaTool } from "./tool.ts";
-import { Schema } from "effect";
+import { schemaEffectTool } from "./tool.ts";
 
 /** Every change, whoever makes it, is told to changed. */
-export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => void): AgentTaskStore {
+export function watchedStore(store: AgentTaskStore, changed: (g: engine.AgentTask[]) => Effect.Effect<void>): AgentTaskStore {
   return {
     load: store.load,
-    change: async (f) => {
-      const g = await store.change(f);
-      if (g !== undefined) changed(g);
-      return g;
-    },
+    change: (f) => Effect.tap(store.change(f), (g) => (g === undefined ? Effect.void : changed(g))),
   };
 }
 
 /** changed runs after every change the model makes, so that what became ready goes out. */
-export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () => void): Tool[] {
-  const task = schemaTool({
+export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: Effect.Effect<void>): Tool[] {
+  const task = schemaEffectTool({
     name: "task_add",
     description:
       "把一件要分几步、有先后的活写成任务：每件一个简短的英文 id、要做什么（brief：在哪、做到什么程度算完、交回什么）、要等哪几件做完（after）、谁做（by：self 你自己做；subagent 交给帮手，等的做完了就自动派、几件同时做，做完把结果交回给你；帮手看不到你们的对话，brief 要写全）。" +
@@ -42,19 +37,20 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
         }),
       ),
     }),
-    run: async (p) => {
-      let problems: string[] = [];
-      const g = await store.change((g) => {
-        const [next, bad] = engine.add(g, p.tasks ?? []);
-        problems = bad;
-        return next;
-      });
-      if (problems.length > 0) return "没收：" + problems.join("；") + "\n\n" + engine.text(g);
-      changed();
-      return engine.text(g);
-    },
+    run: (p) =>
+      Effect.gen(function* () {
+        let problems: string[] = [];
+        const g = yield* store.change((g) => {
+          const [next, bad] = engine.add(g, p.tasks ?? []);
+          problems = bad;
+          return next;
+        });
+        if (problems.length > 0) return "没收：" + problems.join("；") + "\n\n" + engine.text(g);
+        yield* changed;
+        return engine.text(g);
+      }),
   });
-  const update = schemaTool({
+  const update = schemaEffectTool({
     name: "task_update",
     description:
       "改一件任务：做完了 state 写 done、result 写结果（改了什么、结论、关键的数字）；做不成写 failed 和原因；不用做了写 skipped。" +
@@ -66,177 +62,168 @@ export function taskTools(store: AgentTaskStore, canHelp: boolean, changed: () =
       brief: Schema.optionalKey(Schema.String),
       after: Schema.optionalKey(Schema.Array(Schema.String)),
     }),
-    run: async (p) => {
-      const c: engine.Change = {
-        ...(p.state != null ? { state: p.state } : {}),
-        ...(p.result != null ? { result: p.result } : {}),
-        ...(p.brief != null ? { brief: p.brief } : {}),
-        ...(p.after != null ? { after: p.after } : {}),
-      };
-      const g = await store.change((g) => engine.update(g, p.id, c));
-      if (engine.finished(g)) return engine.text(g) + "\n\n都做完了，这张图收起来了。";
-      changed();
-      return engine.text(g);
-    },
+    run: (p) =>
+      Effect.gen(function* () {
+        const c: engine.Change = {
+          ...(p.state != null ? { state: p.state } : {}),
+          ...(p.result != null ? { result: p.result } : {}),
+          ...(p.brief != null ? { brief: p.brief } : {}),
+          ...(p.after != null ? { after: p.after } : {}),
+        };
+        const g = yield* store.change((g) => engine.update(g, p.id, c));
+        if (engine.finished(g)) return engine.text(g) + "\n\n都做完了，这张图收起来了。";
+        yield* changed;
+        return engine.text(g);
+      }),
   });
-  const list = schemaTool({
+  const list = schemaEffectTool({
     name: "task_graph",
     description: "看现在的任务：每件在等、可以做、做完还是没做成，要等谁，结果的开头。",
     parameters: Schema.Struct({}),
-    run: async () => engine.text(await store.load()),
+    run: () => Effect.map(store.load, engine.text),
   });
   return [task, update, list];
 }
 
-export class AgentTaskRunner {
-  /** The subagents out now, by task id. */
-  private readonly out = new Map<string, AbortController>();
-  private readonly running = new Set<Promise<void>>();
-  /** The graph as last reminded of, and how many times running it stayed so. */
-  private nudged = "";
-  private nudges = 0;
-
-  constructor(
-    private readonly store: AgentTaskStore,
-    /** Undefined: this agent cannot send subagents (a subagent itself, or the orchestrator). */
-    private readonly subagent: Subagent | undefined,
-    private readonly life: AbortSignal,
-    private readonly tell: (text: string) => void,
-    private readonly log: CallbackLog,
-    private readonly max = 3,
-    private readonly maxNudges = 3,
-  ) {}
-
-  /** Sends out what is ready and fits. Called after the graph changes and when a subagent comes back. */
-  async advance() {
-    if (!this.subagent || this.life.aborted) return;
-    let picked: engine.AgentTask[] = [];
-    try {
-      await this.store.change((g) => {
-        picked = [];
-        let room = this.max - this.out.size;
-        let next = g;
-        for (const t of engine.readyTasks(g)) {
-          if (room <= 0) break;
-          if (t.by !== "subagent" || this.out.has(t.id)) continue;
-          next = engine.begin(next, t.id);
-          picked.push(t);
-          room--;
-        }
-        return picked.length === 0 ? undefined : next;
-      });
-    } catch (e) {
-      this.log.error("agent: cannot move its tasks:", e);
-      return;
-    }
-    for (const t of picked) {
-      const c = new AbortController();
-      this.out.set(t.id, c);
-      const p = this.send(c, t).finally(() => this.running.delete(p));
-      this.running.add(p);
-    }
-  }
-
-  private async send(c: AbortController, t: engine.AgentTask) {
-    const stop = () => c.abort();
-    this.life.addEventListener("abort", stop);
-    let said = "";
-    let failed = false;
-    try {
-      said = await this.subagent!(t.brief, t.title, c.signal);
-    } catch (e) {
-      said = e instanceof Error ? e.message : String(e);
-      failed = true;
-    } finally {
-      this.life.removeEventListener("abort", stop);
-      this.out.delete(t.id);
-    }
-    // Stopped: stop puts it back to waiting.
-    if (c.signal.aborted) return;
-    let g: engine.AgentTask[];
-    try {
-      g = await this.store.change((g) => engine.settle(g, t.id, said, failed));
-    } catch (e) {
-      this.log.error(`agent: cannot record task ${t.id}:`, e);
-      return;
-    }
-    const state = g.find((x) => x.id === t.id)?.state ?? "failed";
-    if (state === "done") this.tell("〔任务〕" + t.id + "（" + t.title + "）帮手做完了：\n" + said.trim() + "\n\n" + engine.text(g));
-    else if (state === "failed")
-      this.tell(
-        "〔任务〕" + t.id + "（" + t.title + "）帮手没做成：" + head(said, 400) + "\n改了 brief 把它写回 waiting 重来，或者标 skipped。\n\n" + engine.text(g),
-      );
-    await this.advance();
-  }
-
+export interface AgentTaskRunner {
+  /** Sends out what is ready and fits. Run after the graph changes and when a subagent comes back. */
+  readonly advance: Effect.Effect<void>;
   /** Calls the subagents back; their tasks wait again. The graph stays as it is otherwise. */
-  async stop() {
-    const ids = [...this.out.keys()];
-    for (const c of this.out.values()) c.abort();
-    this.out.clear();
-    await this.settled();
-    if (ids.length === 0) return;
-    try {
-      await this.store.change((g) => engine.requeue(g, ids));
-    } catch (e) {
-      this.log.error("agent: cannot put stopped tasks back:", e);
-    }
-  }
-
-  /** Every subagent out has come back. */
-  async settled() {
-    while (this.running.size > 0) await Promise.allSettled(this.running);
-  }
-
+  readonly stop: Effect.Effect<void>;
+  /** Calls the subagents back and sends no more; their tasks stay working, for recover. */
+  readonly close: Effect.Effect<void>;
   /** At start: a task left working by a process that went is waiting again, and goes out once more. */
-  async recover() {
-    try {
-      await this.store.change((g) => {
-        const next = engine.requeue(g);
-        return engine.states(next).join() === engine.states(g).join() ? undefined : next;
-      });
-    } catch (e) {
-      this.log.error("agent: cannot read its tasks:", e);
-      return;
-    }
-    await this.advance();
-  }
-
+  readonly recover: Effect.Effect<void>;
   /** The open graph for a fold's summary: what the turns it replaces showed. */
-  async summary(): Promise<string> {
-    try {
-      const g = await this.store.load();
-      return g.length === 0 ? "" : "【整理对话时的任务，以 tasks 为准】\n" + engine.text(g);
-    } catch {
-      return "";
-    }
-  }
-
+  readonly summary: Effect.Effect<string>;
   /** What to remind a run that stopped of: its own tasks that are ready, unless the graph has not moved through
    * maxNudges reminders already (it is stuck; the owner or another input will move it). "" for nothing. */
-  async nudge(): Promise<string> {
-    let g: engine.AgentTask[];
-    try {
-      g = await this.store.load();
-    } catch {
-      return "";
-    }
-    const own = engine
-      .readyTasks(g)
-      .filter((t) => t.by === "self")
-      .map((t) => t.id);
-    if (own.length === 0) {
-      this.nudged = "";
-      this.nudges = 0;
-      return "";
-    }
-    const seen = engine.text(g);
-    if (seen !== this.nudged) {
-      this.nudged = seen;
-      this.nudges = 0;
-    }
-    if (this.nudges >= this.maxNudges) return "";
-    this.nudges++;
-    return `〔任务〕这一轮停了，还有 ${own.length} 件你可以做：${own.join("、")}。接着做；做不了的用 task_update 标 failed 或 skipped，写明原因。\n\n${seen}`;
-  }
+  readonly nudge: Effect.Effect<string>;
 }
+
+/** subagent undefined: this agent cannot send subagents (a subagent itself, or the orchestrator). The subagents out are
+ * fibers of the scope. */
+export const makeTaskRunner = (
+  store: AgentTaskStore,
+  subagent: Subagent | undefined,
+  tell: (text: string) => Effect.Effect<void>,
+  max = 3,
+  maxNudges = 3,
+): Effect.Effect<AgentTaskRunner, never, Scope.Scope> =>
+  Effect.gen(function* () {
+    const fibers = yield* FiberSet.make();
+    /** The tasks a subagent is out on, until it answers. */
+    const out = new Set<string>();
+    let closed = false;
+    /** The graph as last reminded of, and how many times running it stayed so. */
+    let nudged = "";
+    let nudges = 0;
+
+    const advance: Effect.Effect<void> = Effect.suspend(() => {
+      if (!subagent || closed) return Effect.void;
+      return Effect.gen(function* () {
+        let picked: engine.AgentTask[] = [];
+        const moved = yield* store
+          .change((g) => {
+            picked = [];
+            let room = max - out.size;
+            let next = g;
+            for (const t of engine.readyTasks(g)) {
+              if (room <= 0) break;
+              if (t.by !== "subagent" || out.has(t.id)) continue;
+              next = engine.begin(next, t.id);
+              picked.push(t);
+              room--;
+            }
+            return picked.length === 0 ? undefined : next;
+          })
+          .pipe(
+            Effect.as(true),
+            Effect.catch((e) => Effect.as(Effect.logError("agent: cannot move its tasks:", e), false)),
+          );
+        if (!moved) return;
+        for (const t of picked) {
+          out.add(t.id);
+          yield* FiberSet.run(fibers, send(t));
+        }
+      });
+    });
+
+    // Called back (stop, close), its fiber is interrupted before anything is recorded: stop puts the task back to waiting.
+    const send = (t: engine.AgentTask): Effect.Effect<void> =>
+      Effect.gen(function* () {
+        const { said, failed } = yield* subagent!(t.brief, t.title).pipe(
+          Effect.map((said) => ({ said, failed: false })),
+          Effect.catch((e) => Effect.succeed({ said: e.message, failed: true })),
+          Effect.ensuring(Effect.sync(() => out.delete(t.id))),
+        );
+        const g = yield* store
+          .change((g) => engine.settle(g, t.id, said, failed))
+          .pipe(Effect.catch((e) => Effect.as(Effect.logError(`agent: cannot record task ${t.id}:`, e), undefined)));
+        if (!g) return;
+        const state = g.find((x) => x.id === t.id)?.state ?? "failed";
+        if (state === "done") yield* tell("〔任务〕" + t.id + "（" + t.title + "）帮手做完了：\n" + said.trim() + "\n\n" + engine.text(g));
+        else if (state === "failed")
+          yield* tell(
+            "〔任务〕" +
+              t.id +
+              "（" +
+              t.title +
+              "）帮手没做成：" +
+              head(said, 400) +
+              "\n改了 brief 把它写回 waiting 重来，或者标 skipped。\n\n" +
+              engine.text(g),
+          );
+        yield* advance;
+      });
+
+    const stop = Effect.gen(function* () {
+      const ids = [...out];
+      yield* FiberSet.clear(fibers);
+      if (ids.length === 0) return;
+      yield* store.change((g) => engine.requeue(g, ids)).pipe(Effect.catch((e) => Effect.logError("agent: cannot put stopped tasks back:", e)));
+    });
+
+    const recover = Effect.gen(function* () {
+      const read = yield* store
+        .change((g) => {
+          const next = engine.requeue(g);
+          return engine.states(next).join() === engine.states(g).join() ? undefined : next;
+        })
+        .pipe(
+          Effect.as(true),
+          Effect.catch((e) => Effect.as(Effect.logError("agent: cannot read its tasks:", e), false)),
+        );
+      if (read) yield* advance;
+    });
+
+    return {
+      advance,
+      stop,
+      close: Effect.suspend(() => {
+        closed = true;
+        return FiberSet.clear(fibers);
+      }),
+      recover,
+      summary: Effect.map(store.load, (g) => (g.length === 0 ? "" : "【整理对话时的任务，以 tasks 为准】\n" + engine.text(g))),
+      nudge: Effect.map(store.load, (g) => {
+        const own = engine
+          .readyTasks(g)
+          .filter((t) => t.by === "self")
+          .map((t) => t.id);
+        if (own.length === 0) {
+          nudged = "";
+          nudges = 0;
+          return "";
+        }
+        const seen = engine.text(g);
+        if (seen !== nudged) {
+          nudged = seen;
+          nudges = 0;
+        }
+        if (nudges >= maxNudges) return "";
+        nudges++;
+        return `〔任务〕这一轮停了，还有 ${own.length} 件你可以做：${own.join("、")}。接着做；做不了的用 task_update 标 failed 或 skipped，写明原因。\n\n${seen}`;
+      }),
+    };
+  });

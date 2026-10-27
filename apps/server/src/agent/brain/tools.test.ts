@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { memoryStore } from "./agentTaskStore.ts";
-import { Brain } from "./agent.ts";
+import { openBrain, standaloneOwner } from "./agent.ts";
 import { codingTools, htmlText } from "./coding.ts";
 import { readMcpConfig } from "./config.ts";
 import { connectAll, mcpContentText, mcpToolName } from "./mcp.ts";
@@ -17,7 +17,6 @@ import { objectSchema, toolArguments } from "../../ai/tools.ts";
 import type { Tool } from "../loop/agent.ts";
 import { scriptedLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
-import { plainLog } from "../../base/log.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -49,7 +48,7 @@ const fails = async (p: Promise<string>) => {
 
 describe("the task tools", () => {
   it("task and mark the agent's own tasks", async () => {
-    const tools = taskTools(memoryStore(), false, () => {});
+    const tools = taskTools(memoryStore(), false, Effect.void);
     expect(await call(tools, "task_add", { tasks: [{ id: "fix", brief: "改", after: ["nope"] }] })).toMatch(/没收：「fix」要等的「nope」不存在/);
     expect(await fails(call(tools, "task_add", { tasks: [{ id: "x", brief: "查", by: "subagent" }] }))).toMatch(/by/);
     const added = await call(tools, "task_add", {
@@ -186,10 +185,9 @@ describe("reminders", () => {
 
   it("run a missed reminder once", async () => {
     const dir = home();
-    const woke: string[] = [];
     // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
     let at = wallTime.now();
-    const s = new Reminders(dir, (text) => woke.push(text), { ...wallTime, now: () => ++at }, plainLog);
+    const s = new Reminders(dir, () => ++at);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
     await call(s.tools, "reminder", { name: "巡检", message: "看看测试", every_minutes: 10 });
@@ -200,21 +198,19 @@ describe("reminders", () => {
     });
     expect(await call(s.tools, "list_reminders", {})).toMatch(/「巡检」每 10 分钟[\s\S]*「提醒」/);
     const later = new Date(Date.now() + 3_600_000);
-    s.tick(later);
+    const woke = s.tick(later);
     expect(woke.length).toBe(2);
     expect(woke[0]).toMatch(/^【提醒「巡检」到点了/);
-    s.tick(later);
-    expect(woke.length).toBe(2);
+    expect(s.tick(later)).toEqual([]);
     const left = JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8")) as Reminder[];
     expect(left.map((j) => j.name)).toEqual(["巡检"]);
     await call(s.tools, "cancel_reminder", { id: left[0]!.id });
     expect(await call(s.tools, "list_reminders", {})).toBe("没有定好的事。");
   });
 
-  it("wake only once the claim is stored", () => {
+  it("come due only once the claim is stored", () => {
     const dir = home();
-    let wakes = 0;
-    const s = new Reminders(dir, () => wakes++, wallTime, plainLog);
+    const s = new Reminders(dir, wallTime.now);
     const now = new Date();
     writeFileSync(
       join(dir, "reminders.json"),
@@ -230,19 +226,16 @@ describe("reminders", () => {
     );
     // A directory at the temporary file's path makes the atomic write fail.
     mkdirSync(join(dir, "reminders.json.tmp"));
-    s.tick(now);
-    s.tick(now);
-    expect(wakes).toBe(0);
+    expect(() => s.tick(now)).toThrow();
+    expect(() => s.tick(now)).toThrow();
     rmdirSync(join(dir, "reminders.json.tmp"));
-    s.tick(now);
-    s.tick(now);
-    expect(wakes).toBe(1);
+    expect(s.tick(now).length).toBe(1);
+    expect(s.tick(now)).toEqual([]);
   });
 
   it("do not run a persisted reminder whose shape is wrong", () => {
     const dir = home();
-    const woke: string[] = [];
-    const s = new Reminders(dir, (text) => woke.push(text), wallTime, plainLog);
+    const s = new Reminders(dir, wallTime.now);
     const damaged = JSON.stringify([
       {
         id: "important",
@@ -253,26 +246,18 @@ describe("reminders", () => {
       },
     ]);
     writeFileSync(join(dir, "reminders.json"), damaged);
-    s.tick(new Date());
-    expect(woke).toEqual([]);
+    expect(() => s.tick(new Date())).toThrow();
     expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
-    const s = new Reminders(
-      dir,
-      () => {
-        throw new Error("unexpected wake");
-      },
-      wallTime,
-      plainLog,
-    );
+    const s = new Reminders(dir, wallTime.now);
     const damaged = `[{"id":"important"`;
     writeFileSync(join(dir, "reminders.json"), damaged);
     await fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));
     await fails(call(s.tools, "list_reminders", {}));
-    s.tick();
+    expect(() => s.tick()).toThrow();
     expect(readFileSync(join(dir, "reminders.json"), "utf8")).toBe(damaged);
   });
 });
@@ -346,9 +331,7 @@ describe("MCP", () => {
   it("belongs to the agent that connected it", async () => {
     const dir = home();
     writeFileSync(join(dir, "mcp.cjs"), fakeMCP);
-    const agent = await Brain.start({
-      time: wallTime,
-      log: plainLog,
+    const agent = await openBrain(standaloneOwner(), {
       name: "test",
       instructions: "",
       llm: scriptedLLM().llm,

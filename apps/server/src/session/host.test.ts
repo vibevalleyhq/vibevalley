@@ -79,6 +79,7 @@ describe("AgentHost", () => {
         notice: () => {},
         log: () => {},
         go: <A, E>(e: Effect.Effect<A, E>) => Effect.runPromise(e),
+        scope: yield* Effect.scope,
       });
       const caller = new Caller();
       const submitting = host.submit(

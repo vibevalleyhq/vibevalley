@@ -11,7 +11,7 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Event, Session } from "@botiverse/oar";
 import { promptAndWait } from "@botiverse/oar/observe";
-import { Brain, type BrainEvent } from "../agent/brain/agent.ts";
+import { type BrainEvent, openBrain, standaloneOwner } from "../agent/brain/agent.ts";
 import { codingTools } from "../agent/brain/coding.ts";
 import { deepseek, readMcpConfig } from "../agent/brain/config.ts";
 import { userMessage } from "../agent/brain/messages.ts";
@@ -23,7 +23,6 @@ import { dshRuntime } from "../runtime/dsh.ts";
 import { registryOf } from "../runtime/runtime.ts";
 import { memoryStore } from "../agent/brain/agentTaskStore.ts";
 import { wallTime } from "../base/time.ts";
-import { plainLog } from "../base/log.ts";
 
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
@@ -99,9 +98,7 @@ export async function ownChat(values: OwnChat) {
   const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
   const asked = values.p !== undefined;
   // A one-off question keeps no reminders running.
-  const agent = await Brain.start({
-    time: wallTime,
-    log: plainLog,
+  const agent = await openBrain(standaloneOwner(), {
     name: values.name,
     instructions: instructions(currentLocale()),
     llm,
@@ -129,11 +126,11 @@ export async function ownChat(values: OwnChat) {
       (text) => {
         if (text === "/exit") return quit();
         if (text === "/reset") {
-          agent.reset();
+          void agent.reset();
           console.log(dim(cliWording().chat.forgot));
           return prompt();
         }
-        if (text) agent.send(userMessage(text, wallTime.now()));
+        if (text) void agent.send(userMessage(text, wallTime.now()));
         else prompt();
       },
       () => {
@@ -185,9 +182,14 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const on = standaloneLlm();
+  const service = standaloneLlm();
   const registry = registryOf([
-    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey, on), time: wallTime, log: plainLog }),
+    vibevalleyRuntimeOf({
+      home: () => config.home,
+      llm: (model) => deepseek(model, config.deepseek.apiKey, service),
+      time: wallTime,
+      owner: standaloneOwner(),
+    }),
     dshRuntime,
   ]);
   const runtime = registry.get(id);

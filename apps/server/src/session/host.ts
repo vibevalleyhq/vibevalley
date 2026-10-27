@@ -13,8 +13,8 @@ import { join } from "node:path";
 import type { Usage } from "../ai/messages.ts";
 import type { Tool } from "../agent/loop/agent.ts";
 import type { OrchestratorState } from "@vibevalley/protocol";
-import { Effect } from "effect";
-import { Brain, type BrainEvent, sessionUnfinished } from "../agent/brain/agent.ts";
+import { Effect, type Scope } from "effect";
+import { type BrainEvent, type BrainHandle, openBrain, sessionUnfinished } from "../agent/brain/agent.ts";
 import type { LLM } from "../agent/brain/config.ts";
 import { memoryFile } from "../agent/brain/memory.ts";
 import { type BrainMessage, type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
@@ -27,7 +27,6 @@ import type { Journal } from "./journal.ts";
 import type { RunStore } from "./session.ts";
 import { tokensOf, usageText } from "./usage.ts";
 import type { Time } from "../base/time.ts";
-import type { CallbackLog } from "../base/log.ts";
 
 const streamEveryMs = 120;
 
@@ -124,7 +123,10 @@ export interface HostOptions<R> {
   readonly toolStart: (tool: string, args: unknown) => ToolStart;
   readonly notice: (level: "info" | "warn" | "error", text: string) => void;
   readonly log: (level: "info" | "error", text: string) => void;
+  /** The owner's fibers, which the agent's run on too. */
   readonly go: <A, E>(e: Effect.Effect<A, E>) => Promise<A>;
+  /** The owner's scope: the agent's own is a child of it, so the agent ends with the owner at the latest. */
+  readonly scope: Scope.Scope;
 }
 
 /** What makes an input's text once it is its turn: whether the agent is busy (an input may be taken after a later one),
@@ -142,10 +144,9 @@ export class AgentHost<R> {
   private lastPush = 0;
   private prefixChanged: string[] = [];
   private closing = false;
-  private readonly life = new AbortController();
   private closePromise: Promise<void> | undefined;
-  private brain: Brain | undefined;
-  private starting: Promise<Brain> | undefined;
+  private brain: BrainHandle | undefined;
+  private starting: Promise<BrainHandle> | undefined;
   private events = Promise.resolve();
   /** Held from building an input to handing it over, so that each input's text follows the one before. */
   private inputs = Promise.resolve();
@@ -159,7 +160,6 @@ export class AgentHost<R> {
     runs: RunStore,
     /** The service's Clock: the streaming window and an eval case's time. */
     private readonly time: Time,
-    private readonly log: CallbackLog,
   ) {
     this.journal = journal;
     this.execution = new AgentExecution(o.name, journal, o.toolStart, runs);
@@ -197,7 +197,7 @@ export class AgentHost<R> {
     if (this.closing) return this.closeInput(input);
     const run: RunInput = { ...input.run, by: input.run.by.kind ? input.run.by : { kind: "comment" } };
     return this.serially(async () => {
-      let b: Brain;
+      let b: BrainHandle;
       try {
         b = await this.start();
       } catch (err) {
@@ -213,12 +213,11 @@ export class AgentHost<R> {
         return { ok: false, why, run: id };
       }
       if (this.closing) return this.closeInput(input);
-      const { text, heard } = await build(b.busy() || b.queued(), b.memoryNews());
+      const { text, heard } = await build(b.busy() || (await b.queued()), b.memoryNews());
       if (this.closing) return this.closeInput(input);
       const message = customMessage(this.o.inputType, text, this.time.now(), { details: input.route });
       this.local.set(message, { ...input, run: { ...run, ...(heard ? { heard } : {}) } });
-      if (now) b.send(message);
-      else b.later(message);
+      await (now ? b.send(message) : b.later(message));
       return { ok: true };
     });
   }
@@ -227,7 +226,7 @@ export class AgentHost<R> {
   async resume(maxAgeMs: number): Promise<void> {
     return this.serially(async () => {
       if (this.closing) return;
-      let b: Brain;
+      let b: BrainHandle;
       try {
         b = await this.start();
       } catch (err) {
@@ -239,7 +238,7 @@ export class AgentHost<R> {
       this.input = at;
       this.toCaller = 0;
       this.execution.resume(this.o.restored(at.route));
-      if (b.resume(maxAgeMs)) return;
+      if (await b.resume(maxAgeMs)) return;
       this.execution.resume(undefined);
       if (!b.busy()) this.journal.note("run/error", sessionWording().log.staleRun);
     });
@@ -253,7 +252,6 @@ export class AgentHost<R> {
   close(): Promise<void> {
     if (!this.closePromise) {
       this.closing = true;
-      this.life.abort();
       this.closePromise = Promise.resolve().then(() => this.closeOnce());
     }
     return this.closePromise;
@@ -310,15 +308,14 @@ export class AgentHost<R> {
   }
 
   // Started on first use: loading it is not free, and a farm without a model works otherwise.
-  private start(): Promise<Brain> {
+  private start(): Promise<BrainHandle> {
     if (this.brain) return Promise.resolve(this.brain);
     if (this.closing) return Promise.reject(new Error(sessionWording().host.stopped(this.o.label)));
     this.starting ??= (async () => {
       const llm = this.o.llm();
-      const b = await Brain.start(
+      const b = await openBrain(
+        { run: this.o.go, scope: this.o.scope },
         {
-          time: this.time,
-          log: this.log,
           name: this.o.name,
           instructions: this.o.instructions,
           llm,
@@ -330,7 +327,6 @@ export class AgentHost<R> {
           reminders: false,
           ...(this.o.wakeSoon ? { wakeSoon: this.o.wakeSoon } : {}),
         },
-        this.life.signal,
       );
       if (this.closing) {
         await b.close();

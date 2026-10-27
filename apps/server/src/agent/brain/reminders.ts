@@ -7,8 +7,6 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import { jsonOf } from "../../base/json.ts";
 import { schemaTool } from "./tool.ts";
-import type { Time } from "../../base/time.ts";
-import type { CallbackLog } from "../../base/log.ts";
 
 export interface Reminder {
   readonly id: string;
@@ -83,10 +81,8 @@ export class Reminders {
 
   constructor(
     private readonly home: string,
-    private readonly wake: (text: string) => void,
-    /** The brain's Time: when a reminder is due. */
-    private readonly time: Time,
-    private readonly log: CallbackLog,
+    /** The brain's clock: when a reminder is due. */
+    private readonly now: () => number,
   ) {
     this.file = join(home, "reminders.json");
     this.tools = this.makeTools();
@@ -103,19 +99,13 @@ export class Reminders {
     renameSync(this.file + ".tmp", this.file);
   }
 
-  /** At most once each. */
-  tick(now = new Date(this.time.now())) {
-    let due: Reminder[];
-    try {
-      const reminders = this.load();
-      due = dueReminders(reminders, now);
-      const isDue = new Set(due.map((j) => j.id));
-      this.store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
-    } catch (e) {
-      this.log.error("agent: cannot claim due reminders:", e);
-      return;
-    }
-    for (const j of due) this.wake(dueMessage(j));
+  /** What came due, each claimed in the file first, so it comes due at most once. Throws when it cannot claim them. */
+  tick(now = new Date(this.now())): string[] {
+    const reminders = this.load();
+    const due = dueReminders(reminders, now);
+    const isDue = new Set(due.map((j) => j.id));
+    this.store(reminders.flatMap((j) => (!isDue.has(j.id) ? [j] : j.at ? [] : [{ ...j, lastRun: now.toISOString() }])));
+    return due.map(dueMessage);
   }
 
   private makeTools(): Tool[] {
@@ -140,7 +130,7 @@ export class Reminders {
         }
         if (p.every_minutes != null && !(p.every_minutes >= 1)) throw new Error("every_minutes 至少是 1。");
         if (p.cron != null) parseCron(p.cron);
-        const now = new Date(this.time.now());
+        const now = new Date(this.now());
         const reminder: Reminder = {
           id: "reminder-" + now.getTime().toString(36),
           name: p.name,

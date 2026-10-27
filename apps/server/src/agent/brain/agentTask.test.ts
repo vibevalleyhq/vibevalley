@@ -113,32 +113,25 @@ describe("an agent's own tasks", () => {
     Effect.gen(function* () {
       for (const [name, open] of Object.entries(yield* stores)) {
         const s = open("s1");
-        const g = yield* Effect.promise(() =>
-          s.change(
-            (g) =>
-              add(g, [
-                { id: "a", brief: "b" },
-                { id: "c", brief: "d", after: ["a"], by: "subagent" },
-              ])[0],
-          ),
+        const g = yield* s.change(
+          (g) =>
+            add(g, [
+              { id: "a", brief: "b" },
+              { id: "c", brief: "d", after: ["a"], by: "subagent" },
+            ])[0],
         );
-        expect(yield* Effect.promise(s.load), name).toEqual(g);
-        const refused = yield* Effect.promise(() =>
-          s
-            .change(() => {
-              throw new AgentTaskError("不改了");
-            })
-            .then(
-              () => undefined,
-              (e: unknown) => e,
-            ),
+        expect(yield* s.load, name).toEqual(g);
+        const refused = yield* Effect.flip(
+          s.change(() => {
+            throw new AgentTaskError("不改了");
+          }),
         );
         expect(refused, name).toBeInstanceOf(AgentTaskError);
-        expect(yield* Effect.promise(() => s.change(() => undefined)), name).toBeUndefined();
-        expect(yield* Effect.promise(s.load), name).toEqual(g);
-        const ended = yield* Effect.promise(() => s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" })));
+        expect(yield* s.change(() => undefined), name).toBeUndefined();
+        expect(yield* s.load, name).toEqual(g);
+        const ended = yield* s.change((g) => update(update(g, "a", { state: "done" }), "c", { state: "skipped" }));
         expect(finished(ended), name).toBe(true);
-        expect(yield* Effect.promise(s.load), name).toEqual([]);
+        expect(yield* s.load, name).toEqual([]);
       }
     }).pipe(Effect.scoped, Effect.provide(database)),
   );
@@ -165,7 +158,7 @@ describe("an agent's own tasks", () => {
             updated_at: 0,
           }),
         );
-      const got = yield* Effect.promise((yield* dbStores)("s1").load);
+      const got = yield* (yield* dbStores)("s1").load;
       expect(got.map((t) => [t.id, t.after])).toEqual([
         ["bad", []],
         ["good", ["bad"]],
@@ -176,8 +169,8 @@ describe("an agent's own tasks", () => {
   it.effect("one keeper's tasks are not another's", () =>
     Effect.gen(function* () {
       const open = yield* dbStores;
-      yield* Effect.promise(() => open("s1").change((g) => add(g, [{ id: "a", brief: "b" }])[0]));
-      expect(yield* Effect.promise(open("s2").load)).toEqual([]);
+      yield* open("s1").change((g) => add(g, [{ id: "a", brief: "b" }])[0]);
+      expect(yield* open("s2").load).toEqual([]);
     }).pipe(Effect.scoped, Effect.provide(database)),
   );
 });

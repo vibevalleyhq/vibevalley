@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
-import { Brain } from "../agent/brain/agent.ts";
+import { openBrain, standaloneOwner } from "../agent/brain/agent.ts";
 import { deepseek } from "../agent/brain/config.ts";
 import { memoryFile } from "../agent/brain/memory.ts";
 import { type BrainMessage, transcript } from "../agent/brain/messages.ts";
@@ -19,8 +19,6 @@ import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
 import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
-import { wallTime } from "../base/time.ts";
-import { plainLog } from "../base/log.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
 const key = process.env.DEEPSEEK_API_KEY ?? "";
@@ -60,9 +58,7 @@ async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promi
   const home = mkdtempSync(join(tmpdir(), "vibevalley-eval-"));
   writeFileSync(memoryFile(home), c.memory);
   writeFileSync(join(home, orchestratorAgent + ".jsonl"), c.before.map((m) => JSON.stringify(m) + "\n").join(""));
-  const brain = await Brain.start({
-    time: wallTime,
-    log: plainLog,
+  const brain = await openBrain(standaloneOwner(), {
     name: orchestratorAgent,
     instructions: systemPrompt + agentPrompt,
     llm: deepseek(model, key, standaloneLlm()),
@@ -93,7 +89,7 @@ async function replay(c: EvalCase, model: string, tools: readonly Tool[]): Promi
           done();
         }
       });
-      brain.send(c.input);
+      void brain.send(c.input);
     });
     return { turn, tokens };
   } finally {
