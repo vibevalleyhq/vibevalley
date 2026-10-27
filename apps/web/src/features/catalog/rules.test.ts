@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { framesOf, groupsOf, naturalCompare, pictureMatches, picturesOf, remakeOf, shelfOf } from "./catalog";
+import { framesOf, groupsOf, naturalCompare, pictureMatches, picturesOf, remakeOf, shelfOf } from "./rules";
 
-const pictures = picturesOf(JSON.parse(readFileSync(join(import.meta.dirname, "../../public/pixel/sprites.json"), "utf8")));
+const pictures = picturesOf(JSON.parse(readFileSync(join(import.meta.dirname, "../../../public/pixel/sprites.json"), "utf8")));
 const byName = new Map(pictures.map((p) => [p.name, p]));
 
 test("the manifest in art pixels, with heads and sheets", () => {
