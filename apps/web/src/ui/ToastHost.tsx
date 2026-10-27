@@ -1,7 +1,7 @@
-import { appWording } from "../app/words";
+import { appWording } from "../base/words";
 import { For } from "solid-js";
 import { toasts } from "./toasts";
-import { createExternal } from "../data/external";
+import { createExternal } from "../base/external";
 
 /** Draws the toasts (ui/toasts.ts) at the bottom of the page. */
 export function ToastHost() {

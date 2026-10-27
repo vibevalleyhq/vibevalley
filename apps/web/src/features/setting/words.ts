@@ -1,0 +1,116 @@
+// What the settings page says: its sections, the keys, the language, memory sources and GitHub. The other panes it
+// shows (connectors, skills, voice, connecting to this machine) have their features' words.
+
+import { localized } from "@vibevalley/protocol/words";
+
+const zh = {
+  sections: {
+    title: "设置",
+    label: "设置的分区",
+    deepseek: { label: "DeepSeek", line: "管家用的钥匙" },
+    language: { label: "语言", line: "界面和管家说哪种话" },
+    agora: { label: "Agora 语音", line: "App ID 和 Certificate" },
+    memory: { label: "记性", line: "Nowledge Mem、EverOS" },
+    github: { label: "GitHub", line: "gh 和登录，能不能提 PR" },
+  },
+  language: {
+    title: "语言",
+    line: "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+    zh: "中文",
+    en: "English",
+    label: "界面语言",
+  },
+  keys: {
+    deepseekHint: "sk-…（不改就空着）",
+    appIdHint: "32 位，比如 0123…cdef",
+    certificateHelp: "和 App ID 在同一个项目里",
+    saved: "存好了，马上就用上。",
+  },
+  source: {
+    title: (label: string) => `记性的来源：${label}`,
+    state: (label: string, state: string) => `记性的来源：${label}（${state}）`,
+    off: "没接",
+    on: "接上了",
+    closed: "关着",
+    change: "改",
+    changeWhich: (label: string) => `改 ${label}`,
+    enabled: "接上",
+    keyCleared: "key 存的时候清掉",
+    keyLine: (line: string) => `key ${line}`,
+    noKey: "本机的不用 key",
+    address: (label: string) => `${label} 的地址`,
+    key: (label: string) => `${label} 的 key`,
+    keyHint: "key（不用或不改就空着）",
+    user: (label: string) => `${label} 的 user_id`,
+    userHint: "你在 EverOS 里的 user_id（空着就是 owner）",
+    read: "读",
+    readHint: "开工想起、帮工翻记性时也问它",
+    write: "写",
+    writeHint: "记下的也送一份过去",
+    everything: "读全部",
+    everythingHint: "不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到",
+  },
+  github: {
+    noGh: "没装 gh",
+    signedIn: (account: string) => `已登录 github.com：${account}`,
+    note: "能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。",
+    recheck: "重新检测",
+  },
+};
+
+const en: typeof zh = {
+  sections: {
+    title: "Settings",
+    label: "Settings sections",
+    deepseek: { label: "DeepSeek", line: "The manager's key" },
+    language: { label: "Language", line: "What language the page and the manager speak" },
+    agora: { label: "Agora voice", line: "App ID and Certificate" },
+    memory: { label: "Memory", line: "Nowledge Mem, EverOS" },
+    github: { label: "GitHub", line: "gh and sign-in, whether PRs can be opened" },
+  },
+  language: {
+    title: "Language",
+    line: "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
+    zh: "中文",
+    en: "English",
+    label: "Page language",
+  },
+  keys: {
+    deepseekHint: "sk-… (leave empty to keep)",
+    appIdHint: "32 characters, such as 0123…cdef",
+    certificateHelp: "In the same project as the App ID",
+    saved: "Saved, in use at once.",
+  },
+  source: {
+    title: (label) => `Memory source: ${label}`,
+    state: (label, state) => `Memory source: ${label} (${state})`,
+    off: "not connected",
+    on: "connected",
+    closed: "off",
+    change: "Change",
+    changeWhich: (label) => `Change ${label}`,
+    enabled: "Connected",
+    keyCleared: "key cleared on save",
+    keyLine: (line) => `key ${line}`,
+    noKey: "A local one needs no key",
+    address: (label) => `${label}'s address`,
+    key: (label) => `${label}'s key`,
+    keyHint: "key (leave empty if none or to keep)",
+    user: (label) => `${label}'s user_id`,
+    userHint: "Your user_id in EverOS (empty means owner)",
+    read: "Read",
+    readHint: "Also asked when recalling at the start and when a helper looks things up",
+    write: "Write",
+    writeHint: "What is remembered is sent there too",
+    everything: "Read everything",
+    everythingHint: "Not only what VibeValley remembered for helpers: every helper reads your own memories there too",
+  },
+  github: {
+    noGh: "gh is not installed",
+    signedIn: (account) => `Signed in to github.com: ${account}`,
+    note: "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
+    recheck: "Check again",
+  },
+};
+
+export const settingsWording = localized({ zh, en });

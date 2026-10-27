@@ -18,7 +18,7 @@
 - 表：`lan`（一行，`open`）、`lan_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `db/queries/lan.sql`、`lan_device.sql`。
 - 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.status`、`lan.update`、`lan.startPairing`、`lan.stopPairing`、`lan.answerPairing`、`lan.deleteDevice` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me`（`GET /api/v1/lan/me`）也给 `remote`。形状是 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。钥匙的 cookie 名是 `packages/protocol` 的 `lanKeyCookie`。
 - 配置：`lan.port`（默认 8790；0 是随便一个）。
-- 页面：`apps/web/src/pages/settings/LanPage.tsx`（开关、二维码、点头、设备列表），`pages/pair/PairPage.tsx`（设备上的配对），`rules/lan.ts`（是不是远端、配没配对、cookie 怎么写、猜设备名），`main.tsx` 把没配对的远端浏览器送去 `/pair`。
+- 页面：`apps/web/src/features/lan/LanPage.tsx`（开关、二维码、点头、设备列表），`features/lan/PairPage.tsx`（设备上的配对），`features/lan/rules.ts`（是不是远端、配没配对、cookie 怎么写、猜设备名），`main.tsx` 把没配对的远端浏览器送去 `/pair`。
 
 ## 模型和不变量
 
@@ -72,5 +72,5 @@
 ## 怎么验证
 
 - `apps/server/src/lan/lan.test.ts`：没开时连不上，开着时没配对的设备拿得到页面（`/`、`/pair`）、拿不到接口；配对、带钥匙或 cookie 用接口，`/mcp` 不放，管理接口和改配置的接口经「连接到本机」答 403，坏钥匙 401；主人不让、第二台设备等着；错 5 次作废；移除断开它的状态流；配对过的设备的房间 WebSocket 转得过去，没配对的 401、别的源 403，移除设备时断开。
-- `apps/web/src/rules/lan.test.ts`：哪些地址是本机、cookie 里有没有钥匙、怎么写 cookie、按浏览器猜设备名。
+- `apps/web/src/features/lan/rules.test.ts`：哪些地址是本机、cookie 里有没有钥匙、怎么写 cookie、按浏览器猜设备名。
 - `apps/web/test/pair.spec.ts`：配对页说服务端的拒绝、没带码时要码；一台「手机」经「连接到本机」打开工单页先被送去配对，请主人放行，主人点头后进农场、打开工单。`settings.spec.ts`：「连接到本机」页打开、出码和链接、关上。

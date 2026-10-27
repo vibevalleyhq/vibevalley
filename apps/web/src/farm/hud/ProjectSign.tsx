@@ -3,8 +3,8 @@
 
 import { farmWording } from "../words";
 import { Show } from "solid-js";
-import { useRouter } from "../../app/router";
-import { playSound } from "../sound";
+import { useRouter } from "../../base/router";
+import { playSound } from "../../ui/pixel/sound";
 import { useFarm } from "../state";
 
 /** Where the sign's post stands, in the village's pixels: on the grass right of the mast (village.ldtk: its top at 18, 73). */

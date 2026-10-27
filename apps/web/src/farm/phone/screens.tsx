@@ -5,20 +5,19 @@ import { phoneWording } from "./words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
-import type { GlyphCell } from "../kit/card";
+import type { GlyphCell } from "../../ui/pixel/card";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
 import { lcd } from "./lcd";
-import { aria } from "../../app/util";
+import { aria } from "../../base/util";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { SpriteIcon } from "../kit";
+import { SpriteIcon } from "../../ui/pixel";
 import { phoneState } from "../support";
-import { createCall } from "../../voice/createCall";
-import { voiceCall } from "../../voice/call";
+import { createCall, voiceCall } from "../../features/voice";
 import { BugSnakeIcon } from "./games/BugSnakeGame";
 import { MergeIcon } from "./games/MergeGame";
-import { useAgent } from "../../data/agents";
-import { useCore } from "../../data/frame";
+import { useAgent } from "../../base/agents";
+import { useCore } from "../../base/frame";
 
 export type PhoneApp = "home" | "missed" | "log" | "orchestrator" | "games" | "blocks" | "dino" | "sokoban" | "bugs" | "merge";
 

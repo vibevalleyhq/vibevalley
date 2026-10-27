@@ -10,7 +10,7 @@
 | `settings.json`：存、读、校验、只给页面看来源和末四位 | 语音设置的每一项、谁接电话（[语音](docs/subsystems/voice.md)「配置」） |
 | 钥匙从哪取：设置 > 配置 | 记性来源怎么接、怎么读写（[记性](docs/subsystems/memory.md)） |
 | 日志和送出农场的文字里抹密钥（`base/redact.ts`） | 档案、技能书、农机的设置：`config.json`（`agent` 包） |
-| | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`apps/web/src/pages/settings/SettingsForm.tsx`） |
+| | 首页、设置页的样子（[farm-ui.md](docs/reference/farm-ui.md) 的「设置」、`apps/web/src/features/setting/SettingsForm.tsx`） |
 | | GitHub 检测（`project`，[工单](docs/subsystems/issue.md)「和谁打交道」） |
 
 ## 在哪
@@ -19,7 +19,7 @@
 - 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`rules.ts`（`settingsProblem`、`keyHint`、记性来源的校验和合并、语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
 - 接口：`setting.load`、`setting.check`、`setting.save`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
-- 页面：`apps/web/src/pages/settings/SettingsPage.tsx`，表单 `SettingsForm.tsx`。
+- 页面：`apps/web/src/features/setting/SettingsPage.tsx`，表单 `SettingsForm.tsx`。
 
 ## 模型和不变量
 

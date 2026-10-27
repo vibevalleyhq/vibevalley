@@ -22,10 +22,10 @@ import {
 } from "@vibevalley/engine/pixi";
 import type { Agent, Crop, Session, StateFrame, SessionId } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "../../rules/cast";
-import { playSound } from "../sound";
+import { castPrefix } from "../../ui/cast";
+import { playSound } from "../../ui/pixel/sound";
 import { clock, farmState } from "../store";
-import { orchestratorLooks, orchestratorSprite } from "../kit/looks";
+import { orchestratorLooks, orchestratorSprite } from "../../features/orchestrator";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
@@ -49,7 +49,7 @@ import { villageDog } from "./dog";
 import { plotFx } from "./fx";
 import { villageLife, type Box as LifeBox, type Place } from "./life";
 import { loadPictures } from "./pictures";
-import { prefsNow } from "../../data/prefs";
+import { prefsNow } from "../../base/prefs";
 
 /** Art pixels a second, and frames of the walk cycle a second. */
 const walkSpeed = 42;

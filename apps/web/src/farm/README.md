@@ -1,9 +1,9 @@
 # src/farm
 
 The pixel farm at `/`. It is full-bleed, outside the workbench's shell; its 工作台 link goes to `/issues`, and the
-shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/data/frame.ts`); this folder
+shell's 农场 link comes back. The farm is the server's (`useFrames()`, `useCore()` in `src/base/frame.ts`); this folder
 only draws it and keeps the page's own state. Its Solid side reads the framework-free modules here through `state.ts`
-(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `data/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
+(`useFarm`, `timeOfDay`, `commands`; the frames as they came are `base/frame.ts`'s `rawFrame`) and `support.ts` (the village, the keys, the phone's calls, the sounds,
 the pad).
 
 ## Its parts
@@ -16,11 +16,12 @@ prop-less. The HUD mounts `Phone` (with the chat in it) over its button, giving 
 |---|---|---|
 | The canvas | `canvas/` | the village on Pixi: the map, plots, walking helpers, the dog, light and life, bed effects |
 | The HUD and the panels | `hud/`, `panels/` | the bars, quota bottle, island cards, the effects layer; harvest, seed forms, achievements, warehouse, task board, menu |
-| The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `src/voice`), a plot's issue and its work log |
+| The chat and the plot | `chat/`, `issue/` | 田头 (with the call and dictation buttons, `features/voice`), a plot's issue and its work log |
 | The phone and the title | `phone/`, `title/` | the farm's phone and its games, the title screen |
 | The debug console | `debug/` | ` opens it: the farm's calls, the clock, local effects, the frames seen |
 
-Shared: `world/`, `kit/`, `store.ts`, `commands.ts`, `tools.ts`, `sound.ts`, `effects.ts` (effects made on the page),
+Shared: `world/`, `store.ts`, `commands.ts`, `tools.ts`, `cues.ts`, `effects.ts` (effects made on the page), the pixel pieces
+(`src/ui/pixel`),
 `packages/engine`.
 
 Which part draws which overlay (`FarmUi.overlays`):
@@ -33,7 +34,7 @@ Which part draws which overlay (`FarmUi.overlays`):
 | `phoneOpen` | `Phone` (its button sits in the HUD, which calls `farm.phoneOpen(true)`) |
 | `titleOpen` | `TitleScreen` (FarmPage mounts it only while open) |
 | `bedFx`, `rewards`, hover, names | the canvas draws bed FX over the plots and sets hover; the HUD's FX layer shows rewards |
-| the farm's toasts (`kit` `toasts`, `ToastViewport`) | the HUD's FX layer (it passes the medal `leading` and `kicker`) |
+| the farm's toasts (`ui/pixel`'s `toasts`, `ToastViewport`) | the HUD's FX layer (it passes the medal `leading` and `kicker`) |
 
 ## The store (`store.ts`)
 
@@ -79,20 +80,23 @@ the top and bottom, bars filled with the dimmed map.
 
 `commands` (`state.ts`, `farmCommands` over the latest frame) is the `FarmCommands`: what a plot does with its effect on the bed
 (`water`, `resolve`, `cure`, `harvest`, `shovel`, `stop`, `plant`, `aim`, `act`), and `chooseTitle`, `refreshRuntime`. Each calls
-the API and then plays the bed's effect. A task graph's calls are `data/graphs.ts`, shared with the workbench.
+the API and then plays the bed's effect. A task graph's calls are `features/task/data.ts`, shared with the workbench.
 `clickBed(commands, bed)` is a plot click as the farm page does it; `openPlace(place, navigate)` a yard place's click
 (a panel, or a workbench page the web page has: `webRoutes`). `fire(promise)`: the server's notice tells a refusal.
 
 ## Pieces to build with
 
-- `world/`: `loadVillage()`, and `useVillage()` in `support.ts` (the level and the atlas, fetched once); `VillageWorld` (plots, places,
+- `world/`: `loadVillage()`, and `useVillage()` in `support.ts` (the level and the atlas, fetched once; the atlas alone is
+  `ui/pixel/atlas.ts`'s `loadAtlas`); `VillageWorld` (plots, places,
   props, gate, queue, lawn, lights, fx boxes, `nav`, `goalOf`, `poseOf`, `spotsFor`, `Whereabouts`); `plots.ts` (beds, `cropOfBed`, `sessionAtStation`, `cropLabel`); `places.ts` (the
-  yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `sprites.ts` (`SpriteAtlas`: sizes and
-  anchors in art pixels, `density` 2, `spriteUrl`); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
+  yard places and `FarmPanel`); `hits.ts` (`villageHitAt`, the click order); `textures.ts` (`loadTextures`, `texture`: Pixi textures at the
   density); `framing.ts`.
-- `kit/`: the pixel components for the DOM over the canvas, from `kit/index.ts`.
-- `sound.ts`: `playSound(name)`, `isMuted`/`setMuted`, `farmCues`, the sounds' recipes; `muted()` and `farmSounds(...)`
-  (FarmPage runs it) in `support.ts`.
+- `src/ui/pixel`, shared with the other skins and the workbench's pixel pages: the pixel components for the DOM over
+  the canvas (its `index.ts`); `atlas.ts` (`SpriteAtlas`: sizes and anchors in art pixels, `density` 2, `spriteUrl`;
+  `loadAtlas`, `useAtlas`); `sound.ts` (`playSound(name)`, `isMuted`/`setMuted`, the sounds' recipes).
+- `cues.ts`: `farmCues` (what plays when the farm changes) and `inTurn`; `muted()` and `farmSounds(...)` (FarmPage runs it)
+  in `support.ts`.
+- `labels.ts`: the farm's own words for an issue's acts (completing is a harvest).
 - `tools.ts`: `Tool`, `tools`, `aimTool`, `farmKey`, `managerSprite`.
 - `@vibevalley/engine`: `/pixi` (`pixelStage` with `frame`, `Walker`, `frameAt`, particles, critters, light, sky),
   `/nav`, `/audio`, `/clock`.
@@ -107,6 +111,6 @@ Served from `public/`: `/village.ldtk`, `/pixel/<name>.png` and `/pixel/sprites.
 
 ## Tests
 
-`vp test run src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the sounds);
+`vp test run src/farm` (the world parsed from the real `village.ldtk` and `sprites.json`, the framing, the cues);
 `test/farm.spec.ts` (Playwright on a real server: the canvas, the links; a screenshot at `test-results/farm.png`).
 Playwright tests on the farm start past the title screen (`localStorage` `vibevalley.title.seen` = `true`).

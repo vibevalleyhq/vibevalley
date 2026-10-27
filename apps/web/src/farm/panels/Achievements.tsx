@@ -6,14 +6,14 @@ import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 
 import type { Achievement, AchievementCategory, AchievementStanding, Progress } from "@vibevalley/protocol";
-import { api } from "../../data/api";
+import { api } from "../../base/api";
 import { fire } from "../commands";
 import { thousands } from "../hud/rules";
 import { beds } from "../world/plots";
-import { aria, useClickAway } from "../../app/util";
-import { useCore, useFrames } from "../../data/frame";
-import { ready, useQuery } from "../../data/query";
-import { numberText, SpriteIcon } from "../kit";
+import { aria, useClickAway } from "../../base/util";
+import { useCore, useFrames } from "../../base/frame";
+import { ready, useQuery } from "../../base/query";
+import { numberText, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { tint, Tinted } from "./bits";
 

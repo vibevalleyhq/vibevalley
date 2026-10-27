@@ -2,12 +2,12 @@
 
 import { type Accessor, createContext, createMemo, useContext } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
-import { type Frames, frames } from "../data/frames";
+import { type Frames, frames } from "../base/frames";
 import { farmOf } from "@vibevalley/protocol/rules";
 import { farmFrameOf } from "./scope";
 import { farmCommands } from "./commands";
 import { clock, type FarmUi, farmState, subscribeFarm } from "./store";
-import { createExternal } from "../data/external";
+import { createExternal } from "../base/external";
 
 export const FarmUiContext = createContext<Accessor<FarmUi>>();
 

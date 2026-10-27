@@ -1,43 +1,51 @@
 // A plot's issue, opened by clicking the plot or its helper: the helper attention on its crop at the side; then, as the
 // workbench's page has it, what it is and where it stands, the one thing asked of the owner (only when there is one),
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
-// Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
+// Where it stands and what may be done is the server's Issue.attention, worded by src/features/issue/state.ts.
 
-import { rulesWording } from "../../rules/words";
+import { appWording } from "../../base/words";
 import { farmWording } from "../words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
 import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
-import { createIssueActs } from "../../data/issueActs";
+import { api, reasonOf } from "../../base/api";
+import {
+  createIssueActs,
+  changesLine,
+  type CriterionRow,
+  issueState,
+  nothingChanged,
+  noStepsText,
+  runText,
+  useIssueChanges,
+  useIssueHistory,
+  useIssueRuns,
+  useIssueTimeline,
+} from "../../features/issue";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
-import { castPrefix } from "../../rules/cast";
-import { issueThreadOf } from "../../rules/chat";
-import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../rules/issueState";
-import { runText } from "../../rules/issues";
-import { tookText, wallClockText } from "../../rules/time";
-import { aria, useNow } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { createSessionEvents } from "../../data/sessions";
-import { WorkLog } from "../../pages/chat/WorkLog";
-import { useCore, useFrames } from "../../data/frame";
-import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../data/issues";
-import { ready } from "../../data/query";
-import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../kit";
-import { farmActWords } from "../kit/labels";
+import { castPrefix } from "../../ui/cast";
+import { issueThreadOf } from "../../features/channel";
+import { tookText, wallClockText } from "../../base/format";
+import { aria, useNow } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { createSessionEvents, WorkLog } from "../../features/session";
+import { useCore, useFrames } from "../../base/frame";
+import { ready } from "../../base/query";
+import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../../ui/pixel";
+import { farmActWords } from "../labels";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
 import { useVillage } from "../support";
-import { useAgent } from "../../data/agents";
+import { useAgent } from "../../base/agents";
 
 const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", water: "#4f8fbd", leaf: "#74a046", faint: "#c8a46e", muted: "#9b7550" };
 const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
-const speciesLabel: Record<string, string> = rulesWording().cast.species;
-const outfitLabel: Record<string, string> = rulesWording().cast.outfit;
+const speciesLabel: Record<string, string> = appWording().cast.species;
+const outfitLabel: Record<string, string> = appWording().cast.outfit;
 
 /** The plot's issue while the store says so (the inspect layer). */
 export function IssueView() {

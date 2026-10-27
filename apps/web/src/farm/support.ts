@@ -1,15 +1,16 @@
 // The farm page's wiring that is not drawn: the village's pictures, the keys, the phone's calls and pad, the sounds.
 // The rules are framework-free in farm/*.ts; these connect them to the page.
 
+import { type FarmSoundInput, farmCues, inTurn } from "./cues";
 import { type Accessor, createEffect, createSignal, onSettled } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
 import { phoneCalls } from "./phone/calls";
 import { type PadButton, type PadHandler, padKeys, typingIn } from "./phone/pad";
-import { type FarmSoundInput, farmCues, inTurn, isMuted, playSound, setMuted, subscribeMuted, unlockSound } from "./sound";
+import { isMuted, playSound, setMuted, subscribeMuted, unlockSound } from "../ui/pixel/sound";
 import { farm, farmState, subscribeFarm } from "./store";
 import { farmKey, typing } from "./tools";
 import { loadVillage, type Village } from "./world/load";
-import { createExternal } from "../data/external";
+import { createExternal } from "../base/external";
 
 /** The level and the atlas: undefined while loading; `error` when they could not be loaded. */
 export function useVillage(): Accessor<{ village?: Village; error?: string }> {
@@ -95,7 +96,7 @@ export function feedPhoneCalls(raw: Accessor<StateFrame | undefined>) {
 /** Whether the sounds are off, kept on this machine and followed across tabs. */
 export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [createExternal(subscribeMuted, isMuted), setMuted];
 
-/** Plays what changed between one input and the next (farm/sound.ts farmCues); the first input is the farm as it was. */
+/** Plays what changed between one input and the next (ui/pixel/sound.ts farmCues); the first input is the farm as it was. */
 export function farmSounds(input: Accessor<FarmSoundInput>) {
   createEffect(input, (next, before) => {
     if (before === undefined || before === next) return;

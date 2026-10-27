@@ -1,10 +1,10 @@
 // Faces cut from the pixel drawings (public/pixel/sprites.json).
 
-import { appWording } from "../app/words";
+import { appWording } from "../base/words";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
-import { castPrefix } from "../rules/cast";
-import { ready, useSprites } from "../data/query";
+import { castPrefix } from "./cast";
+import { ready, useSprites } from "../base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 
 /** A helper's head: its attention drawing, cropped to the head, on a leaf green ground. */

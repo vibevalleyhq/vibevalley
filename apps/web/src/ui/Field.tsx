@@ -1,6 +1,6 @@
 import { For, omit } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { useSelectValue } from "../app/util";
+import { useSelectValue } from "../base/util";
 
 const box = "w-full rounded-md border border-line bg-page px-2.5 py-1.5 text-sm outline-none placeholder:text-faint focus:border-focus";
 

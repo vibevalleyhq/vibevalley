@@ -22,7 +22,7 @@
 - **种子**：`apps/server/src/agent/seeds.json` 的 `agents`（第一次的档案）、`defaultSettings`（农机设置的默认）、`runtimeIds`（农场认的农机和顺序）、`runtimeFacts`、`runtimePresets`、`fallbackPreset`（农机的名字和长相）；`seed.ts` 读它（`seedAgents`、`factsOf`、`runtimeIds`、`presetOf`、`runtimeLabel`）。页面不读它：农机的名字、长相和能做什么随 `runtime.list` 的每个 `RuntimeInfo` 给（`preset`、`facts`）。
 - **家目录**：`$VIBEVALLEY_HOME/config.json`（`agents`、`skills`、`settings` 三块）；今天的花费 `spend.json` 归[帮工](docs/subsystems/session.md)。
 - **接口**：`agent.list`、`agent.check`、`agent.create`、`agent.save`、`agent.delete`，`skill.*`，`runtime.list`、`runtime.refresh`、`runtime.update`（[capabilities.md](docs/reference/capabilities.md)）；处理函数在 `handlers.ts`。农机的新样子不进核心状态，经 `Core.runtime` 发一条侧事件，页面从窄事件流收到。命令行 `vibevalley runtime chat <农机>` 用同一张注册表。
-- **页面**：`apps/web/src/pages/agents/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`pages/runtimes/RuntimesPage.tsx`（农具）、`pages/settings/SkillsPage.tsx`；数据在 `data/query.ts`（`useAgents`、`useRuntimes`）、`data/agents.ts`（`useWorkAgents`、`useAgentProblems` 问 `agent.check`）；`rules/skills.ts`（`installedSkills`、`runtimeName`）、`rules/cast.ts`（`castOf`）。
+- **页面**：`apps/web/src/features/agent/`（帮工列表 `AgentsPage.tsx`、捏帮工和档案页 `AgentPage.tsx`）、`features/runtime/RuntimesPage.tsx`（农具）、`features/runtime/SkillsPage.tsx`；数据在 `base/query.ts`（`useAgents`、`useRuntimes`）、`base/agents.ts`（`useWorkAgents`、`useAgentProblems` 问 `agent.check`）；`features/runtime/skills.ts`（`installedSkills`）、`ui/runtimes.ts`（`runtimeName`）、`ui/cast.ts`（`castOf`）。
 
 ## 模型和不变量
 
@@ -35,7 +35,7 @@
 - **种子只用一次**：没有 `config.json` 时用 `seeds.json` 的 `agents`，技能库空、农机设置空；之后删掉的种子档案不再补回。农机设置没存过的取 `defaultSettings`（启用、命令路径空、默认模型和思考强度空、无环境变量）。
 - **管家档案每个农场都有**：开机时没有 `orchestrator`（`orchestratorAgent`）就补上（名字「管家」、职责「替主人派活、转告结果」、农机 `vibevalley`）；删它回「管家是每个农场都有的，删不了」；保存时把农机换掉拒绝。派活用的档案不含管家；全部档案和按 id 取的含。页面也把 `agent.list` 里的管家分开放。
 - **新建由服务端分 id**：`agent.create`、`skill.create` 的 `id` 要留空（填了回「新档案的 id 要留空；指定 id 请用保存」）。档案取下一个没占用的 `agent-N`；技能取名字转小写、非 `a-z0-9` 换成 `-` 的 slug，空了用 `skill`，重名加 `-2`、`-3`。分配在 `change` 的锁里，两台设备同时建不会撞。编辑和导入指定 id 走 `agent.save`、`skill.save`，路径里的 id 和请求里的不一样就拒绝。
-- **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `rules/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
+- **外观缺的字段在读和存时补上**（`withCast`）：体型 `biped`、头 `rounded`、衣服 `farmer`，动物按 id 的 hash（每个码点取第一个 UTF-16 单元，`h*31+u`，32 位回绕）对 `speciesValues` 取模。页面 `ui/cast.ts` 的 `castOf` 用同一个 hash，所以没存长相的档案补上以后画面不变；接口给出去的必填枚举不会是空字符串。
 - **帮工头像右下角标出运行工具**：档案读 `Agent.runtime`，执行读 `Session.runtime`；现成的像素 logo 放在头像外框上，悬停和辅助阅读给出农机清单里的全名。没有专用 logo 用扳手图标，不按档案 id 猜农机；主人、管家和导航的示意头像不加帮工的标识。
 - **农场认的农机是 `runtimeIds` 的十个**：`claude`、`codex`、`opencode`、`vibevalley`、`pi`、`cursor`、`grok`、`kimi`、`antigravity`、`dsh`；`runtime.list` 照这个顺序给，农具页和捏帮工的农机列表也照它列。每台都有一份 `runtimePresets`，顺序一样。注册表（`registryOf`）是 oar 的内置农机（`defaultRuntimes`）加 VibeValley 自己的 agent（`agent/brain/runtime.ts`，每次开会话现取 DeepSeek 的钥匙；种植计划存在农场的库里）加 DeepSeek Harness（`dsh`）。注册表里没有的报「不支持」：cursor 写明要单独装它的 SDK（`@cursor/sdk`），其余写「oar 不认识这个 runtime」。不认识的 id，`runtime.refresh`、`runtime.update` 回 404。
 - **四种已接通的农机这样承载**：VibeValley 和 pi 在服务端进程里，claude 走命令行，codex 走 app-server。真实项目的验证范围见[其他农机的提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。

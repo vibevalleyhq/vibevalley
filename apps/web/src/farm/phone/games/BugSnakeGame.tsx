@@ -15,7 +15,7 @@ import {
   steerBugSnake,
 } from "./bugSnake";
 import { drawPattern, lcd } from "../lcd";
-import { playSound } from "../../sound";
+import { playSound } from "../../../ui/pixel/sound";
 import { kept, usePad, useTicks } from "../../support";
 
 const game = kept<BugSnake | null>(null);

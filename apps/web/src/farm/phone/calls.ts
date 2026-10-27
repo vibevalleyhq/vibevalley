@@ -1,11 +1,11 @@
 // The phone's calls: the calls are the server's inbox; which were answered or hung up on, the
 // call log, and which rings now are the page's, kept for this page's life. The phone and the chat's call button are one
-// call (voice/call.ts): answering a ring opens it, and while it is on nothing rings: the orchestrator says it on the call.
+// call (features/voice/call.ts): answering a ring opens it, and while it is on nothing rings: the orchestrator says it on the call.
 
 import type { InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
-import { voiceCall } from "../../voice/call";
-import { playSound } from "../sound";
+import { voiceCall } from "../../features/voice";
+import { playSound } from "../../ui/pixel/sound";
 import { farm, farmState } from "../store";
 
 export interface PhoneLogEntry {

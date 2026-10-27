@@ -6,7 +6,7 @@
 flowchart LR
   subgraph Page[页面 apps/web]
     UI[农场和工作台<br/>Solid 2 + PixiJS]
-    RULES[src/rules<br/>帧里没有的摆法]
+    RULES[各 feature 的规则<br/>帧里没有的摆法]
     RTC[Agora Web SDK<br/>字幕走 data stream]
   end
 
@@ -65,7 +65,7 @@ flowchart LR
 - **服务**：`apps/server/src/` 下一块业务一个文件夹，名字用单数；文件夹归进十个模块，从下往上是 Platform（`base`、`core`、`setting`）、Agents（`agent`、`runtime`、`memory`、`ai`）、Source Control（`project`）、Collaboration（`channel`、`doc`）、Agent Sessions（`session`）、Issues（`issue`、`task`、`recurrence`）、Notifications（`notice`）、Orchestrator（`orchestrator`、`tool`）、Gamification（`game`）、Gateway（`http`、`mcp`、`lan`、`connector`、`voice` 和根目录的入口文件），表在 `src/modules.ts`。一个模块只 import 排在它前面的模块，也不读核心状态里别的模块那一块（经那个模块的查询），`src/modules.test.ts` 查。每个文件夹导出一个 Effect 服务（`Context.Service`）和它的 `layer`，反方向的消息走它们给的流（`Stream`）。`services.ts` 按模块组装，分两段：先建好所有模块（建的时候订阅自己要跟的事），再按模块顺序跑开机（第一次看 GitHub、把帮工请回来、整理被打断的种植计划、定时开始走、记下 Inbox 里已有的并开始巡查、数 commit）；测试的 `testing/world.ts` 用同一套组装函数（[理由](docs/subsystems/foundation.md)）。执行由 [oar](https://www.npmjs.com/package/@botiverse/oar) 驱动，管家是 VibeValley 自己的 agent（`agent/brain`，[管家](docs/subsystems/orchestrator.md)）。
 - **HTTP 和 MCP**：`src/http` 在最上面：`api.ts` 照 protocol 的接口表挂路由，`handlers.ts` 答每一个，`streams.ts` 是三条事件流；`/mcp` 是给编码 agent 的另一个入口（`src/mcp`）；`main.ts` 单独跑它，`--web` 时也在 `/` 提供页面（[子系统](docs/subsystems/README.md)）。命令走 HTTP，事件和状态走 server-sent events（[理由](docs/subsystems/core.md)）。
 - **存盘**：PGlite（进程里的 Postgres），表在 `apps/server/db/migrations/`，查询在 `db/queries/`、由 effect-sqlc 生成成 `db/generated/`（[理由](docs/subsystems/foundation.md)）；下文「存了什么」。
-- **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
+- **页面**：只连服务端的接口，用 Solid Query 读一次性的数据，帧由一条流给（[理由](docs/subsystems/app.md)）；按概念分 feature，和服务端的模块对得上，层只往前 import；三个宿主共用：桌面是 Electron 带着服务端起来、打开它的地址，浏览器直接打开（[页面](docs/subsystems/app.md)）。
 
 ## 核心状态
 
@@ -75,7 +75,7 @@ flowchart LR
 
 工单（`Issue`）里开着的和最近关的 50 张（`keepClosedIssues`，连同子工单）在核心状态里，全部在数据库；状态由 `issueStatusOf` 算。种植计划是带 `graph` 的父工单，每一件是带 `task` 的子工单，`graphsOf` 读成 `TaskGraph`（[种植计划](docs/subsystems/task.md)）。田头在核心状态里的只是页面马上要画的：频道、最近的串和最近的消息，更早的用 HTTP 取。定时、账本折出来的进度也在里面（[定时](docs/subsystems/recurrence.md)、[游戏](docs/subsystems/game.md)）。
 
-给页面的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `frameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`reduce` 和 `state.json` 里没有。页面的 `src/rules` 只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在页面。
+给页面的是 `StateFrame`（`GET /api/v1/state`，至多每 200 毫秒一帧）：折好的 `state`，从它推出来的 `inbox`、`graphs`、`view`（地块、等级），和这段时间的效果 `effects`。帧只由纯函数 `frameOf` 拼：给人看的话（帮工在干什么、定时什么时候跑、计划是哪个状态、动作叫什么、现在能做什么）只在这一步填进状态的副本，`reduce` 和 `state.json` 里没有。页面的规则（各 feature 里的纯函数）只是读帧，不重写服务端的规则。帮工在院子里走到哪、一闪而过的效果，只在页面。
 
 ## 事件流
 

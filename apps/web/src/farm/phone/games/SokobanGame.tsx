@@ -5,7 +5,7 @@ import { phoneWording } from "../words";
 import { For, Show } from "solid-js";
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 import { lcd } from "../lcd";
-import { playSound } from "../../sound";
+import { playSound } from "../../../ui/pixel/sound";
 import { kept, usePad } from "../../support";
 
 const warehouse = kept(newWarehouse());

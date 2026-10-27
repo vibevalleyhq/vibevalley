@@ -10,28 +10,28 @@
 
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
-| Workspace | 大地图 | `/projects` 的「全部」（`pages/projects/ProjectMap.tsx`） | `Config.workRoot`、`Config.home`（服务端的配置，不进协议） | |
-| 项目 | 大地图上的一座岛 | `/projects/:project`（`pages/projects`；岛的地和空位是 `ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/projects` |
-| 帮工档案 | 一种小动物 | `/agents`（`pages/agents`） | `Agent` | `/api/v1/agents` |
-| 农机 | 农具 | `/runtimes`（`pages/runtimes`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtimes` |
-| 技能书 | 技能书 | `/settings/skills`（`pages/settings/SkillsPage.tsx`） | `Skill` | `/api/v1/skills` |
-| 记性 | 记性 | 档案页和管家页（`pages/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `orchestrator`） |
-| 管家 | 管家 | `/orchestrator`（`pages/orchestrator`） | `WorkspaceState.orchestrator`（管家的状态） | `/api/v1/say`、`/api/v1/orchestrator/...` |
-| 工单 | 看板上的卡片 | `/issues`（`pages/issues`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issues` |
-| 计划 | 种植计划：图纸桌、计划板 | `farm/panels/TaskBoard.tsx`、工作台 `pages/issues/TaskDetail.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graphs` |
+| Workspace | 大地图 | `/projects` 的「全部」（`features/project/ProjectMap.tsx`） | `Config.workRoot`、`Config.home`（服务端的配置，不进协议） | |
+| 项目 | 大地图上的一座岛 | `/projects/:project`（`features/project`；岛的地和空位是 `ProjectMap.tsx` 的 `IslandDetail`） | `ProjectSummary`、`ProjectActivity`、`ProjectLanguages`；帮工在哪个项目、目录、分支是服务端的 `Workplace` | `/api/v1/projects` |
+| 帮工档案 | 一种小动物 | `/agents`（`features/agent`） | `Agent` | `/api/v1/agents` |
+| 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtimes` |
+| 技能书 | 技能书 | `/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Skill` | `/api/v1/skills` |
+| 记性 | 记性 | 档案页和管家页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memories/{agent}`（管家是 `orchestrator`） |
+| 管家 | 管家 | `/orchestrator`（`features/orchestrator`） | `WorkspaceState.orchestrator`（管家的状态） | `/api/v1/say`、`/api/v1/orchestrator/...` |
+| 工单 | 看板上的卡片 | `/issues`（`features/issue`） | `Issue`、`Issue.sessions`（这张工单用过的帮工） | `/api/v1/issues` |
+| 计划 | 种植计划：图纸桌、计划板 | `farm/panels/TaskBoard.tsx`、工作台 `features/issue/TaskDetail.tsx` | `TaskGraph`（从父工单拼回，`StateFrame.graphs`），每件是 `Task` | `/api/v1/graphs` |
 | 帮工 | 在一块地上干活的小动物 | 地块和地块详情（`farm/issue/IssueView.tsx`） | `Session`（`WorkspaceState.sessions`） | `/api/v1/sessions/{id}/stop`；别的按工单：`/api/v1/issues/{id}/...` |
 | 一次干活（run） | 一季庄稼 | 地里长什么（`Session.phase`）；工单详情的「每次干活」 | `Run`、`RunTrigger`；核心状态里是 `run` 到 `report` 两个事实、`Session.runs`、`lastRun` | `/api/v1/issues/{id}/runs` |
-| 干活过程 | 干活过程 | `pages/chat/WorkLog.tsx`、`pages/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
-| 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `pages/issues/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
-| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `rules/issueState.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `pages/issues/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/act`（验收通过是 `act: "accept"`，打回是 `act: "reject"`）；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
-| 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`pages/chat`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
+| 干活过程 | 干活过程 | `features/session/WorkLog.tsx`、`features/session/Trajectory.tsx` | `Session`（走了的阶段是 `closed`）、`SessionEvent`（它的日志） | `/api/v1/sessions`、`/api/v1/sessions/{id}`、`/api/v1/sessions/{id}/events` |
+| 改动、完成 | 收成清单、收获 | 农场 `farm/panels/Harvest.tsx`、工作台 `features/issue/CloseDialog.tsx` | `Changes` | `/api/v1/issues/{id}/changes`、`/api/v1/issues/{id}/status`（挪到 `done`） |
+| 验收、验收意见、问题 | 抽穗、长草、结果、缺肥 | 工单详情（规则 `features/issue/state.ts`，农场 `farm/issue/IssueView.tsx`、工作台 `features/issue/IssueDetail.tsx`）的状态框、输入框里的验收、意见 | `Issue.review`、`reviewedAt`、`findings`、`questions`；地的样子是 `plotOf`（`apps/server/src/game/view.ts`） | `/api/v1/issues/{id}/act`（验收通过是 `act: "accept"`，打回是 `act: "reject"`）；`questions` 来自帮工汇报（`report` 事实的 `questions`） |
+| 田头、频道 | 田头 | 田头窗口（`farm/chat/ChatWindow.tsx`）、`/chat`（`features/channel`） | `Conversation`（`kind`：`general`、`channel`）、`ChatMessage`、`WorkspaceState.chat` | `/api/v1/channels`、`/api/v1/channels/{id}/messages` |
 | 工单串、评论 | 工单串、浇水 | 派活消息下面的串；地块和工单详情里的「浇水：带句话」 | `Conversation`（`kind: thread`）；评论是对整张工单说的，交给它最新的帮工，不挂在某一步上 | `/api/v1/channels/{id}/messages`、`/api/v1/issues/{id}/comment` |
 | 定时 | 定时 | 频道菜单里；它的工单在看板上，带「定时」标签 | `Recurrence`；它的工单是 `Issue.recurrence` 指着它的那张 | `/api/v1/recurrences` |
 | 工单模板 | 播种袋里的种子 | 播种袋（`farm/panels/SeedForms.tsx`） | `ProjectTemplates`、`TemplateKind`、`IssueTemplate`；目录是 `apps/server/src/agent/template_catalog.json` | `/api/v1/projects/{id}/templates` |
 | 来电 | 手机来电 | `farm/phone/calls.ts` | `InboxItem`（`StateFrame.inbox`，`apps/server/src/notice/inbox.ts` 从核心状态现算） | |
-| 连接器 | 连接器 | `/settings/connectors`（`pages/settings/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connectors` |
-| （不画） | 连接到本机 | `/settings/lan`（`pages/settings/LanPage.tsx`）、连进来的设备的 `/pair`（`pages/pair`） | `LanStatus`、`LanDevice` | `/api/v1/lan` |
-| 语音 | 麦克风 | `/settings/voice`（`pages/settings/VoiceForm.tsx`）、`src/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
+| 连接器 | 连接器 | `/settings/connectors`（`features/connector/ConnectorsPage.tsx`） | `ConnectorStatus` | `/api/v1/connectors` |
+| （不画） | 连接到本机 | `/settings/lan`（`features/lan/LanPage.tsx`）、连进来的设备的 `/pair`（`features/lan/PairPage.tsx`） | `LanStatus`、`LanDevice` | `/api/v1/lan` |
+| 语音 | 麦克风 | `/settings/voice`（`features/voice/VoiceForm.tsx`）、`features/voice/` | `VoiceSettings` | `/api/v1/voice/...` |
 | 进度、成就 | 金币、连胜、任务与成就 | `farm/panels/Achievements.tsx` | `Progress`、`LedgerEntry`、`WorkspaceState.progress` | 帧里的 `progress` 和 `view.achievements`；成就的说法 `game.achievements` |
 | 等级 | 等级、经验 | 农场卡、任务与成就 | `CommitCount`、`FarmView.level` | |
 | 地 | 一块地：一张工单 | 像素村（`farm/canvas`）、地块详情（`farm/issue/IssueView.tsx`） | 干活地点是服务端 `Workplace`；开 worktree 时分支由 `issueBranch` 给出，目录是 `worktrees/<项目>.<工单号>`，否则直接在项目目录且 `branch` 为空；`FarmView.plots` 按帮工的 id 做键（服务端 `game/view.ts` 的 `viewOf`）；帮工站在哪块地是 `SessionPlay.station` | `/api/v1/say` 的 `station` |

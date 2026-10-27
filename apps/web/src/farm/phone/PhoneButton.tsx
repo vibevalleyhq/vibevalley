@@ -6,14 +6,14 @@ import { phoneWording } from "./words";
 import { Show } from "solid-js";
 import { missedOf } from "./calls";
 import { phoneCells } from "./cells";
-import { playSound } from "../sound";
+import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
-import { aria } from "../../app/util";
-import { PixelCard } from "../kit";
+import { aria } from "../../base/util";
+import { PixelCard } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { phoneState } from "../support";
-import { useCore } from "../../data/frame";
-import { unreadTotal } from "../../rules/chat";
+import { useCore } from "../../base/frame";
+import { unreadTotal } from "../../features/channel";
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);

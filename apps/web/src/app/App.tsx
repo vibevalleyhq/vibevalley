@@ -3,29 +3,28 @@
 
 import { Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { ChatPage } from "../pages/chat/ChatPage";
+import { ChatPage } from "../features/channel";
 import { FarmPage } from "../farm/FarmPage";
 import { TreePage } from "../tree/TreePage";
-import { AgentsRoute } from "../pages/agents/AgentsPage";
-import { CatalogPage } from "../pages/catalog/CatalogPage";
-import { DocsPage } from "../pages/docs/DocsPage";
-import { IssuesPage } from "../pages/issues/IssuesPage";
-import { OrchestratorPage } from "../pages/orchestrator/OrchestratorPage";
-import { PairPage } from "../pages/pair/PairPage";
-import { ProjectsPage } from "../pages/projects/ProjectsPage";
-import { RuntimesPage } from "../pages/runtimes/RuntimesPage";
-import { SettingsPage } from "../pages/settings/SettingsPage";
+import { AgentsRoute } from "../features/agent";
+import { CatalogPage } from "../features/catalog";
+import { DocsPage } from "../features/doc";
+import { IssuesPage } from "../features/issue";
+import { OrchestratorPage } from "../features/orchestrator";
+import { PairPage } from "../features/lan";
+import { ProjectsPage, sortProjects } from "../features/project";
+import { RuntimesPage } from "../features/runtime";
+import { SettingsPage } from "../features/setting";
 import { ToastHost } from "../ui/ToastHost";
-import { Navigate } from "./A";
-import { Follow } from "./Follow";
+import { Navigate } from "../ui/A";
+import { Follow } from "../features/notice";
 import { Root } from "./Root";
-import { Keyed } from "./util";
-import { ready, useProjects } from "../data/query";
-import { sortProjects } from "../rules/projects";
+import { Keyed } from "../base/util";
+import { ready, useProjects } from "../base/query";
 import { farmState } from "../farm/store";
-import { useRouter } from "./router";
+import { useRouter } from "../base/router";
 import { Shell } from "./Shell";
-import { WindowStrip } from "./TitleBar";
+import { WindowStrip } from "../ui/TitleBar";
 
 type Rest = () => string;
 

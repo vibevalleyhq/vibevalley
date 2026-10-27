@@ -19,7 +19,7 @@
 - 表：`recurrence`（一个定时一行，时间写法存成 JSON 的 `spec`）；工单表的 `recurrence` 列指着它的定时。
 - 接口：`recurrence.create`、`recurrence.list`、`recurrence.update`、`recurrence.delete`（[capabilities.md](docs/reference/capabilities.md)）；`recurrence.update` 只有主人和「连接到本机」能调，管家不能。管家的工具 `recurrence`、`list_recurrences`、`cancel_recurrence` 在 `tool/tool.ts`。
 - 配置：`recurrence.tick_ms`，默认 20000（20 秒看一遍；0 或更小是每毫秒）。
-- 页面：频道菜单的「定时」（`apps/web/src/farm/chat/ChannelMenu.tsx`）和聊天页的「定时」标签（`apps/web/src/pages/chat/Tabs.tsx`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`apps/web/src/rules/cards.ts`）。
+- 页面：频道菜单的「定时」（`apps/web/src/farm/chat/ChannelMenu.tsx`）和聊天页的「定时」标签（`apps/web/src/features/channel/Tabs.tsx`）列出这个频道的定时，能开关、删、对待批的点「同意」「不要」；看板上定时的工单带「定时」标签（`apps/web/src/features/issue/cards.ts`）。
 
 ## 模型和不变量
 

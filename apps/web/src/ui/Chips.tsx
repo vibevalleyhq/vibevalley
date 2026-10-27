@@ -1,4 +1,4 @@
-import { appWording } from "../app/words";
+import { appWording } from "../base/words";
 import { createSignal, For } from "solid-js";
 
 const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";

@@ -3,25 +3,25 @@
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
+import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import { type GraphAction, type GraphEvent, type GraphState, type Task, type TaskGraph, type TaskState } from "@vibevalley/protocol";
-import { api, reasonOf } from "../../data/api";
+import { api, reasonOf } from "../../base/api";
 import { doingOf } from "../hud/rules";
 import { farm } from "../store";
 import { stationOfSession } from "../world/plots";
-import { spentText } from "../../rules/chat";
-import { lineCounts } from "../../rules/issueState";
-import { aria, Keyed } from "../../app/util";
-import { useCore, useFrames } from "../../data/frame";
-import { ready, useProjects, useQuery } from "../../data/query";
+import { lineCounts } from "../../features/issue";
+import { aria, Keyed } from "../../base/util";
+import { useCore, useFrames } from "../../base/frame";
+import { ready, useProjects, useQuery } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
-import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../kit";
+import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
-import { useAgent, useWorkAgents } from "../../data/agents";
+import { type Answer, graphs, useGraphChanges } from "../../features/task";
+import { useAgent, useWorkAgents } from "../../base/agents";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {
   splitting: ["#d5dcd7", "#46301d"],

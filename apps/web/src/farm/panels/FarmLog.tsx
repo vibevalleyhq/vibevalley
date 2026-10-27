@@ -1,19 +1,19 @@
 // The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
+import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { generalOf, spentText } from "../../rules/chat";
-import { useCore } from "../../data/frame";
-import { useReports, useRoom } from "../../data/rooms";
-import { useAgent } from "../../data/agents";
+import { generalOf, useReports, useRoom } from "../../features/channel";
+import { useCore } from "../../base/frame";
+import { useAgent } from "../../base/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { DashedLine, PxMarkdown } from "../kit";
+import { DashedLine, PxMarkdown } from "../../ui/pixel";
 
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   completed: [wording().outcome.completed, "#efcf92", "#2f1f13"],

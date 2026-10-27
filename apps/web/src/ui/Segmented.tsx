@@ -1,5 +1,5 @@
 import { For } from "solid-js";
-import { aria } from "../app/util";
+import { aria } from "../base/util";
 
 export function Segmented<T extends string>(props: {
   value: T;

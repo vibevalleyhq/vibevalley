@@ -20,11 +20,11 @@
 - 接口：`voice.session`、`voice.renew`、`voice.start`、`voice.stop`、`voice.heard`、`voice.said`、`voice.dictate`，没带通话 id 的 `orchestrator.hear`（[capabilities.md](docs/reference/capabilities.md)）；都带 `remote`，经「连接到本机」连进来的设备也能打电话、听写。语音线路的 `POST /llm/<通话>/chat/completions` 在单独的监听上。
 - 不存表：授予和通话只在进程里；设置在 `$VIBEVALLEY_HOME/settings.json` 的 `voice`、`dictation`、`asrKey`、`llmKey`、`ttsKey`、`dictationKey`、`agoraAppId`、`agoraAppCertificate`。
 - 配置：`agora.app_id`、`agora.app_certificate`（或环境变量 `AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`），`voice.id`（默认的 MiniMax 音色），`voice.line.port`（默认 8788，0 是空闲端口）、`voice.line.url`（`base/config.ts`）。
-- 页面：`apps/web/src/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `pages/settings/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
+- 页面：`apps/web/src/features/voice/`（`call.ts` 的 `VoiceCall`、`VoiceCall`、`useCall`，`captions.ts` 的字幕拼块，`dictation.ts` 的录音和 WAV，`DictationButton.tsx` 的听写键，`createCall.ts` 的 `createCall`，各处读同一通电话）；打电话是农场手机的事（点「管家」就拨），田头和工作台的聊天输入框只有听写；设置页 `features/voice/VoiceForm.tsx`（`part` 是 `line` 或 `agent`），路由 `/settings/voice` 和管家页的 `/orchestrator/voice`；样音 `apps/web/public/voice-samples/`。
 
 ## 模型和不变量
 
-- **Agora 只在三处**：服务端的 `agora-token`、`agora-agents` 只在 `voice/voice.ts`；页面的 `agora-rtc-sdk-ng` 只在 `src/voice/agora.ts`，开始打电话时才动态加载；手机壳的 `react-native-agora` 只在 `apps/mobile/src/rtc.ts`。别处看到的是 `Voice` 的方法、`VoiceCall` 和 `@vibevalley/protocol/host` 的 `Rtc`。
+- **Agora 只在三处**：服务端的 `agora-token`、`agora-agents` 只在 `voice/voice.ts`；页面的 `agora-rtc-sdk-ng` 只在 `src/features/voice/agora.ts`，开始打电话时才动态加载；手机壳的 `react-native-agora` 只在 `apps/mobile/src/rtc.ts`。别处看到的是 `Voice` 的方法、`VoiceCall` 和 `@vibevalley/protocol/host` 的 `Rtc`。
 - **一份授予是一组 `channel + uid`**：签发时生成频道（`vibevalley` 前缀）和数字 uid，签一个 RTC + RTM 通用的令牌（`tokenSeconds` = 3600 秒），同时把这组身份和签发时的 Agora 凭据快照存进授予。续签和启动只认这份授予，不重读当前凭据：中途改 App ID 只影响下一通电话。
 - **授予的期限就是令牌的期限**：没启动的授予与令牌同时过期，续签把两者一起延长；过期的在下一次请求时清掉，服务停止时全部清空。未知、过期或已撤销的 `channel + uid` 续签和启动都回 `VoiceUnavailable`（「这通电话的语音凭据已经失效，请重新接通」），页面重新取 `/session`。
 - **一份授予只有一个启动者**：启动时认领（`starting`），重复启动回「这通电话已经在接通」；启动失败撤销授予；成功后授予归通话，直到挂断。
@@ -43,7 +43,7 @@
 **接通**（页面 `VoiceCall.start`）：
 
 1. 浏览器先要麦克风权限。`POST /api/v1/voice/session` 拿 `AgoraGrant`（`appId`、`channel`、`uid`、`token`）；没凭据回 `VoiceUnavailable`（「还没有 Agora 的凭据」），别的照常。
-2. 用 `host.rtc`（手机壳的声网原生 SDK，`apps/mobile/src/rtc.ts`）或页面自己的声网 Web SDK（`voice/agora.ts`）加入频道、发布麦克风。
+2. 用 `host.rtc`（手机壳的声网原生 SDK，`apps/mobile/src/rtc.ts`）或页面自己的声网 Web SDK（`features/voice/agora.ts`）加入频道、发布麦克风。
 3. `POST /api/v1/voice/agent`（`channel`、`uid`）。服务端认领授予、按当前语音设置建 vendors：
    - 「谁接电话」是管家时先开语音线路，拿到这通电话的地址和钥匙，作为 OpenAI 兼容的大模型交给 Agora，模型名 `vibevalley-orchestrator`；开不了回 `VoiceUnavailable`（「管家的语音线路接不通」）。
    - 快嘴：Agora 托管的模型、DeepSeek（用农场的 DeepSeek key，`https://api.deepseek.com/chat/completions`）或自己的 OpenAI 兼容接口（`llmKey`）。参数固定：最多 15 轮历史、`max_tokens` 512、`temperature` 0.7、`top_p` 0.95，带开场白和出错时说的话。
@@ -100,7 +100,7 @@
 - **实时通话用 Agora 的 ConvoAI，照官方示例搬。** RTC 传输、回声消除、断句、插话打断和把识别、想、合成串成实时链路是难点，自己做成本远超需要；放弃了自己接识别和合成。Agora 的 SDK 参数多、变得快，照能跑通的 `agent-quickstart-nextjs` 搬，比凭记忆写快；服务端用声网的 `agora-agents`，页面用它的 Web SDK。
 - **只把「想」换成我们的管家，经一个只有一个接口的监听。** 声网能接 OpenAI 兼容的自定义大模型，所以识别、断句、合成照用，管家在电话里就是田头上那个，看得到地里、自己派活。放弃了用隧道转发整个服务端：帮工能执行任意命令，派活、改配置的接口都会上公网。放弃了给托管模型塞农场上下文（它调不了我们的工具）和用 Agora 的 think 接口塞指令（措辞不进管家自己的历史）。代价是本机多一个对外口子，只认带钥匙的请求。
 - **协议只取最后一句，历史以管家的会话为准。** 照 OpenAI 的语义读全部 `messages`，管家的会话和 Agora 那边的历史会是两份：插话时没念完的字、田头里说的话 Agora 都不知道。协议放在 `agent/brain`，不留在 `voice`：主服务的本机接口也用它。
-- **Agora 是供应商，不是概念，不开一个 `agora` 模块。** 声网的 SDK 只在 `voice/voice.ts` 和页面的 `voice/call.ts` 里用，翻译设置的适配就在 `voice.ts`。页面的 `VoiceCall` 直接持有声网的 client，不拆出只有一个实现的接口；也不抽 `Transport`、`TTS` 接口，第二家真要接时再抽，能换平台靠 OpenAI 协议。
+- **Agora 是供应商，不是概念，不开一个 `agora` 模块。** 声网的 SDK 只在 `voice/voice.ts` 和页面的 `features/voice/call.ts` 里用，翻译设置的适配就在 `voice.ts`。页面的 `VoiceCall` 直接持有声网的 client，不拆出只有一个实现的接口；也不抽 `Transport`、`TTS` 接口，第二家真要接时再抽，能换平台靠 OpenAI 协议。
 - **听写不走 Agora，转给主人填的 OpenAI 兼容地址。** 走 Agora 要开一通按分钟计费的会话、请一个 agent 进频道，能选的识别也接不上中文准的国内厂商；听写不需要断句和打断。经服务端转一手是为了 key 留在服务端、「连接到本机」进来的手机也能用 Mac 上的本地模型。放弃了服务端打包并拉起本机识别（要管约 1 GB 的模型和它的生命周期）。字去输入框、不叫醒管家；放弃了让管家整理听写：每段草稿都会进管家的会话、叫醒它一轮。
 - **RTC 授予拥有这通电话的应用身份。** 三个请求各读一次当前凭据时，拿令牌后改 App ID 会让启动或续签指向另一个应用，而已经加入频道的 client 换不了身份。现有的 `channel + uid` 已由服务端生成，足以标识授予，不另加 grant id；没启动的授予用令牌的期限，不另设较短的，免得令牌还有效 `start` 却拒绝。
 - **字幕归这通电话，由 `voice` 分流。** 管家按当前设置决定旁不旁听时，中途改「谁接电话」会让同一通电话的两种字幕按两份规则走；页面读设置再决定也一样受影响，还重写了服务端的规则。
@@ -118,7 +118,7 @@
 
 - `apps/server/src/voice/voice.test.ts`（假的声网对端）：通话中一张工单交回来，管家的话经 `speak`（`APPEND`，带会话的 ConvoAI token）念出来，没通话时不念；两张接连交回来只问管家一次、只念一段；交给管家的那条把等着的事合成一段；接听来电开的电话不念开场白、管家先说那件事；brief 拒绝后能处理下一件，brief 未完成时关闭 Voice 会取消等待，多段播报中挂断不再发后面的段；长话在句末切到 512 字节以下；说缺哪个 key；只有凭据时才签授予、续签；管家在自己的线路上接通和挂断；一通电话的凭据和线路不随之后的设置变；挂断中的电话不收字幕；没带通话 id 的字幕只在只有一通电话时转；听写没设好时说为什么。
 - `setting` 的测试：语音设置只存差异、三段的 key 只给提示（`setting/*.test.ts`）。
-- 页面：`apps/web/src/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮、两边的字都画到田头有了那一句）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
+- 页面：`apps/web/src/features/voice/captions.test.ts`（分块乱序也拼齐一轮、一轮的字长大时替换、插话停下那一轮、只留最近几轮、两边的字都画到田头有了那一句）；`apps/web/test/voice.spec.ts`（没有声网的钥匙时说为什么、再点一次重试；听写等「声音」里设好转写地址）。
 - `apps/server/src/notice/inbox.test.ts`（交回来带着问题的是「有问题问你」）。
 - 页面：`apps/web/src/farm/phone/calls.test.ts`（通话中不响铃、记成未接）；`apps/web/test/farm-phone.spec.ts`（接听来电就去开电话；点「管家」就拨，打不通时通话屏和田头都说原因）。
 - 真人说话、听到声音要人在桌面版上亲自打一通（`acceptance/page.md`）；没有连真的声网的自动测试。`speak` 在真电话上念出来、不打断主人，要在真电话上验。

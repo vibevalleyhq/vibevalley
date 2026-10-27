@@ -4,15 +4,14 @@
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { createChannelForm } from "../../data/channelForm";
-import { playSound } from "../sound";
+import { createChannelForm, channelLabel, channelsOf, chatPath, unreadUnder } from "../../features/channel";
+import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
-import { channelLabel, channelsOf, chatPath, unreadUnder } from "../../rules/chat";
-import { aria, useClickAway } from "../../app/util";
-import { useRouter } from "../../app/router";
-import { useCore } from "../../data/frame";
-import { ready, useProjects } from "../../data/query";
-import { PxButton, PxTextInput, SpriteIcon } from "../kit";
+import { aria, useClickAway } from "../../base/util";
+import { useRouter } from "../../base/router";
+import { useCore } from "../../base/frame";
+import { ready, useProjects } from "../../base/query";
+import { PxButton, PxTextInput, SpriteIcon } from "../../ui/pixel";
 
 type Mode = "list" | "create" | "settings";
 

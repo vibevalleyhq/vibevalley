@@ -2,11 +2,11 @@
 // Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
 // frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
 
+import { type FarmSoundInput } from "./cues";
 import { farmWording } from "./words";
 import { createEffect, Show } from "solid-js";
-import type { FarmSoundInput } from "./sound";
 import { farm } from "./store";
-import { FramesContext, useFrames } from "../data/frame";
+import { FramesContext, useFrames } from "../base/frame";
 import { VillageCanvas } from "./canvas/VillageCanvas";
 import { DebugPanel } from "./debug/DebugPanel";
 import { Hud } from "./hud/Hud";
@@ -15,7 +15,7 @@ import { Panels } from "./panels/Panels";
 import { createFarmFrames, rawFarmFrame, useFarm } from "./state";
 import { farmKeys, farmSounds, feedPhoneCalls } from "./support";
 import { TitleScreen } from "./title/TitleScreen";
-import { createCall } from "../voice/createCall";
+import { createCall } from "../features/voice";
 
 /** `project`: whose farm ("" for the sessions without a project). */
 export function FarmPage(props: { project: string }) {

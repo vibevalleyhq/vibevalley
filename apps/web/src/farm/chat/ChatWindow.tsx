@@ -6,12 +6,11 @@
 import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
-import { newSendKey } from "../../data/api";
-import { arrived, pending, say } from "../../data/composer";
-import { liveCaptions, type SpokenLine } from "../../voice/captions";
-import { playSound } from "../sound";
-import { farm } from "../store";
+import { newSendKey } from "../../base/api";
 import {
+  arrived,
+  pending,
+  say,
   channelLabel,
   channelOf,
   conversationOf,
@@ -23,23 +22,26 @@ import {
   threadOwnerOf,
   threadTitle,
   unreadIn,
-} from "../../rules/chat";
-import { voiceCall, type VoiceCall } from "../../voice/call";
-import { useRouter } from "../../app/router";
-import { useNow } from "../../app/util";
-import { useMarkRead } from "../../pages/chat/data";
-import { rooms, useMessage, useRoom } from "../../data/rooms";
-import { TurnSteps } from "../../pages/chat/WorkLog";
-import { useCore } from "../../data/frame";
-import { ready, useAgents } from "../../data/query";
+  useMarkRead,
+  rooms,
+  useMessage,
+  useRoom,
+} from "../../features/channel";
+import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "../../features/voice";
+import { playSound } from "../../ui/pixel/sound";
+import { farm } from "../store";
+import { useRouter } from "../../base/router";
+import { useNow } from "../../base/util";
+import { TurnSteps } from "../../features/session";
+import { useCore } from "../../base/frame";
+import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
-import { createCall } from "../../voice/createCall";
-import { PxButton, SpriteIcon } from "../kit";
+import { PxButton, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";
 import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } from "./Messages";
-import { usePrefs } from "../../data/prefs";
+import { usePrefs } from "../../base/prefs";
 
 const suggestions = farmWording().chat.suggestions;
 
