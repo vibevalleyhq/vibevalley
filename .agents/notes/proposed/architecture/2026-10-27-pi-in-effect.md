@@ -38,7 +38,7 @@ Status: proposed
 
 1. **模型**（做了）：pi-ai 的行为录成了黄金数据（`ai/testdata/deepseek.jsonl.gz`：9 个请求体、8 段流读出的消息），新的 `Llm` 逐字段一样。服务端经它发请求：pi-agent-core 的 `streamFn` 换成 `config.ts` 的 `llmStreamFn`（`Llm` 跑在拥有大脑的服务的纤程上，请求的 signal 打断它），`complete()` 跟着换了；命令行和真模型的评测用 `cli/llm.ts`。测试的假模型留到第 3 步：大脑的测试那时要连着循环一起改。
 2. **工具的参数**（做了）：大脑自己的工具（编码、自己、提醒、任务）的参数是 Effect Schema，`schemaTool` 读；给模型看的 JSON Schema 由它生成，和原来逐字节一样（`agent/brain/testdata/declared.json`）。pi-ai 的 `validateToolArguments` 会先把参数改成对的类型（`"10"` 成 10、`true` 成 1、可选字段的 `null` 去掉），照它录了 47 条（`ai/testdata/arguments.jsonl.gz`），`ai/tools.ts` 的 `coerceArguments` 一样；`mcp/mcp.ts` 换成它。工具的身体还是 Promise：大脑还在 Promise 一侧，身体改成 Effect 要给它一个跑的地方，留到第 3 步和循环一起。
-3. **循环**：`Brain` 换到 `agent/loop` 上，`llmStreamFn` 去掉，工具的身体换成 Effect（`effectTool` 的跑法不要了），循环自己调 `coerceArguments`；`agent.test.ts`、`run.test.ts`、`runtime.test.ts`、`tools.test.ts`、`orchestrator.test.ts`、`host.test.ts` 从 pi-ai 的 faux 换到 `Llm` 的测试 layer，断言的行为不改。
+3. **循环**：先把现在的循环钉成测试（做了：`agent/brain/loop.test.ts`，事件的次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序）；再写 `agent/loop`（做了，还没接上：`agent.test.ts` 跑同样的情形，外加流里叫停、工具里叫停、模型出错、`prepareRequest`、跑着时再开一轮被拒；参数不收时的话照 pi-ai 一字不差，`ai/tools.ts` 的 `toolArguments`；`ai/testing.ts` 是照脚本回答的 `Llm`）。然后 `Brain` 换到 `agent/loop` 上，`llmStreamFn` 去掉，工具的身体换成 Effect（`effectTool` 的跑法不要了）；`agent.test.ts`、`run.test.ts`、`runtime.test.ts`、`tools.test.ts`、`orchestrator.test.ts`、`host.test.ts` 从 pi-ai 的 faux 换到 `Llm` 的测试 layer，断言的行为不改。
 4. **收尾**：`apps/server` 不再依赖 pi-agent-core；pi-ai 只剩 `runtime/price.ts` 给 pi 的农机算钱用它自带的价目。改 [地基](docs/subsystems/foundation.md)、[管家](docs/subsystems/orchestrator.md)、AGENTS.md 和 `apps/server/README.md` 里「模型用 pi-ai 的 faux」的说法；本 Note 沉淀以后删掉。
 
 ## Alternatives considered

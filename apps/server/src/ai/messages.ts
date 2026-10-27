@@ -66,6 +66,10 @@ export interface AssistantMessage {
   /** The provider's own finish_reason. */
   readonly rawStopReason?: string;
   readonly errorMessage?: string;
+  /** The level the loop asked for, off when none. */
+  readonly thinkingLevel?: string;
+  /** From the request to the last of its stream. */
+  readonly durationMs?: number;
 }
 
 export interface ToolResultMessage {
@@ -75,6 +79,8 @@ export interface ToolResultMessage {
   readonly content: readonly (TextContent | ImageContent)[];
   readonly isError: boolean;
   readonly timestamp: number;
+  /** How long the tool ran. */
+  readonly durationMs?: number;
 }
 
 export type Message = UserMessage | AssistantMessage | ToolResultMessage;
