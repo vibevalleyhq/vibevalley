@@ -259,6 +259,7 @@ const zh = {
     actions: {
       open: "这条消息能做的",
       react: "回应",
+      moreEmoji: "更多表情",
       reply: "回复",
       copyLink: "复制链接",
       copied: "链接已复制",
@@ -763,6 +764,7 @@ const en: typeof zh = {
     actions: {
       open: "What this message can do",
       react: "React",
+      moreEmoji: "More emoji",
       reply: "Reply",
       copyLink: "Copy link",
       copied: "Link copied",

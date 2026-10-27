@@ -122,11 +122,11 @@ test("the box keeps its draft across a reload; ↑ edits the last message, Esc l
   await expect(page.getByText("回复 主人：改过的话")).toHaveCount(0);
 
   await box.fill("还没写完");
-  await page.getByRole("button", { name: "表情" }).click();
-  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🎉" }).click();
-  await expect(box).toHaveValue("还没写完🎉");
+  await page.getByRole("button", { name: "表情", exact: true }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🌾" }).click();
+  await expect(box).toHaveValue("还没写完🌾");
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "发送消息至 #输入" })).toHaveValue("还没写完🎉");
+  await expect(page.getByRole("textbox", { name: "发送消息至 #输入" })).toHaveValue("还没写完🌾");
 });
 
 test("a file dropped on the channel goes up; a video plays in place and a PDF opens in its own tab", async ({ page, api }) => {
@@ -199,4 +199,23 @@ test("the owner talks with a helper profile alone, and its answer can be marked 
   await side(page).getByRole("region", { name: "频道" }).locator("button[draggable]").first().click();
   await expect(directs.getByRole("button", { name: /阿狐/ })).toContainText(/\d/);
   await page.screenshot({ path: test.info().outputPath("chat-direct.png") });
+});
+
+test("a reaction can be any emoji, picked from the toolbar or beside the reactions a message has", async ({ page, api }) => {
+  const id = await api.channel.create({ name: "表情" });
+  await api.channel.message.send({ id, text: "种了向日葵" });
+  await page.goto(`/chat/${id}`);
+  const log = page.getByRole("log", { name: "消息" });
+  const said = log.locator("p", { hasText: "种了向日葵" });
+  await said.hover();
+  const tools = page.getByRole("toolbar", { name: "这条消息能做的" });
+  await tools.getByRole("button", { name: "回应" }).click();
+  await tools.getByRole("button", { name: "更多表情" }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🌻" }).click();
+  await expect(log.getByRole("button", { name: /🌻\s*1/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("dialog", { name: "表情" })).toHaveCount(0);
+
+  await log.getByRole("button", { name: "更多表情" }).click();
+  await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🍀" }).click();
+  await expect(log.getByRole("button", { name: /🍀\s*1/ })).toBeVisible();
 });

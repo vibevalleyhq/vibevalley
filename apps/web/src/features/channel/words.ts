@@ -178,7 +178,8 @@ const zh = {
   },
   emoji: {
     open: "表情",
-    groups: { faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" } as Record<string, string>,
+    groups: { frequent: "常用", faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" } as Record<string, string>,
+    more: "更多表情",
   },
   media: {
     pdf: "PDF · 在新标签页里看",
@@ -377,7 +378,8 @@ const en: typeof zh = {
   },
   emoji: {
     open: "Emoji",
-    groups: { faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
+    groups: { frequent: "Frequent", faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
+    more: "More emoji",
   },
   media: {
     pdf: "PDF · opens in a new tab",

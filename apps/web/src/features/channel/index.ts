@@ -3,7 +3,8 @@ export { createChannelForm } from "./channelForm";
 export { arrived, createComposer, pending, say } from "./composing";
 export { markUnread, useMarkRead } from "./data";
 export { draftOf, drafts } from "./draft";
-export { quickReactions } from "./MessageParts";
+export { quickReactions } from "./emoji";
+export { EmojiPicker } from "./EmojiPicker";
 export { followed, useFollowed, useMessage, useReports } from "./follow";
 export {
   channelLabel,

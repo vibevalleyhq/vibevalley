@@ -7,7 +7,7 @@ import { wording } from "@vibevalley/protocol/words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Agent, attachmentPath, type ChatMessage, type Channel, type Outcome, ownerId } from "@vibevalley/protocol";
-import { channelOf, drafts, messagePath, quickReactions, useMessage } from "../../features/channel";
+import { channelOf, drafts, EmojiPicker, messagePath, quickReactions, useMessage } from "../../features/channel";
 import { api, reasonOf } from "../../base/api";
 import { toast } from "../../ui/toasts";
 import { aria, autofocus } from "../../base/util";
@@ -128,8 +128,11 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
   const core = useCore();
   const [open, setOpen] = createSignal(false);
   const [sure, setSure] = createSignal(false);
+  const [every, setEvery] = createSignal(false);
+  let plus: HTMLButtonElement | undefined;
   const run = (call: () => Promise<unknown>) => {
     setOpen(false);
+    setEvery(false);
     void call().catch((e) => toast(reasonOf(e), "bad"));
   };
   const editable = () => props.m.from === ownerId && props.m.kind === "chat";
@@ -167,6 +170,16 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
                 </button>
               )}
             </For>
+            <button
+              type="button"
+              ref={(el) => (plus = el)}
+              aria-label={farmWording().chat.actions.moreEmoji}
+              aria-expanded={aria(every())}
+              class="cursor-pointer px-1 hover:bg-leaf-300/40"
+              onClick={() => setEvery(!every())}
+            >
+              <SpriteIcon name="button-add" size={12} />
+            </button>
           </div>
           <button type="button" role="menuitem" class={menuItem} onClick={() => run(async () => drafts.reply(props.m.channel, props.m))}>
             {farmWording().chat.actions.reply}
@@ -206,6 +219,16 @@ function MessageMenu(props: { m: ChatMessage; onEdit: () => void }) {
             {sure() ? farmWording().chat.actions.sure : farmWording().chat.actions.remove}
           </button>
         </div>
+      </Show>
+      <Show when={every()}>
+        <EmojiPicker
+          anchor={plus}
+          onClose={() => setEvery(false)}
+          onPick={(emoji) => {
+            const id = untrack(() => props.m.id);
+            run(() => api.channel.reaction.toggle({ id, emoji }));
+          }}
+        />
       </Show>
     </div>
   );
