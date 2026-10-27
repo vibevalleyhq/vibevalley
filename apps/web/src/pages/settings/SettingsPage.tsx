@@ -7,7 +7,7 @@ import { Navigate } from "../../ui/A";
 import { Keyed } from "../../base/util";
 import { Card, ListCard, ListRow } from "../../ui/layout";
 import { ConnectorsPage } from "./ConnectorsPage";
-import { LanPage } from "./LanPage";
+import { LanPage } from "../../features/lan/LanPage";
 import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
 import { SkillsPage } from "../../features/runtime/SkillsPage";
 import { VoiceForm } from "../../features/voice/VoiceForm";

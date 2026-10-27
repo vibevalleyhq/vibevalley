@@ -1,7 +1,7 @@
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
-import { settingsWording } from "./words";
+import { settingsWording } from "../../pages/settings/words";
 import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";

@@ -11,7 +11,7 @@ import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../features/doc/DocsPage";
 import { IssuesPage } from "../features/issue/IssuesPage";
 import { OrchestratorPage } from "../features/orchestrator/OrchestratorPage";
-import { PairPage } from "../pages/pair/PairPage";
+import { PairPage } from "../features/lan/PairPage";
 import { ProjectsPage } from "../features/project/ProjectsPage";
 import { RuntimesPage } from "../features/runtime/RuntimesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";

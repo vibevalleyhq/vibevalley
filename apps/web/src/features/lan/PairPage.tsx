@@ -4,7 +4,7 @@
 import { pagesWording } from "../../base/words/pages";
 import { createSignal, Show } from "solid-js";
 import { api, reasonOf } from "../../base/api";
-import { deviceGuess, keyCookie } from "../../rules/lan";
+import { deviceGuess, keyCookie } from "./rules";
 import { Button } from "../../ui/Button";
 import { Field, TextInput } from "../../ui/Field";
 

@@ -1,6 +1,6 @@
 import { render } from "@solidjs/web";
 import { App } from "./app/App";
-import { isPaired, isRemote } from "./rules/lan";
+import { isPaired, isRemote } from "./features/lan/rules";
 import "./style.css";
 
 // A device not paired yet pairs before anything else: without a key the farm's listener answers nothing.

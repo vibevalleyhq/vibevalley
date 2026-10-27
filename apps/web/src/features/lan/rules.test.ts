@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { lanKeyCookie } from "@vibevalley/protocol";
-import { deviceGuess, isPaired, isRemote, keyCookie } from "./lan";
+import { deviceGuess, isPaired, isRemote, keyCookie } from "./rules";
 
 test("only this computer's own addresses are not remote", () => {
   for (const h of ["127.0.0.1", "localhost", "[::1]"]) expect(isRemote(h)).toBe(false);
