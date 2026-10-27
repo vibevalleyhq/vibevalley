@@ -19,7 +19,7 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "../../rules/quota";
-import { yuan } from "../../rules/chat";
+import { yuan } from "../../features/channel/rules";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";

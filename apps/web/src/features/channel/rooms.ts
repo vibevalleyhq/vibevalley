@@ -4,9 +4,9 @@
 
 import type { ChatMessage, RoomEvent } from "@vibevalley/protocol";
 import { type Accessor, createEffect, createSignal } from "solid-js";
-import { chatPage } from "../rules/chat";
-import { api } from "../base/api";
-import { followReports, followRoom } from "../base/gateway";
+import { chatPage } from "./rules";
+import { api } from "../../base/api";
+import { followReports, followRoom } from "../../base/gateway";
 
 export interface Room {
   /** By number, oldest first. */

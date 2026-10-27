@@ -3,7 +3,7 @@
 
 import { Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { ChatPage } from "../pages/chat/ChatPage";
+import { ChatPage } from "../features/channel/ChatPage";
 import { FarmPage } from "../farm/FarmPage";
 import { TreePage } from "../tree/TreePage";
 import { AgentsRoute } from "../pages/agents/AgentsPage";

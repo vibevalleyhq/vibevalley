@@ -1,7 +1,7 @@
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChatMessage, Phase } from "@vibevalley/protocol";
-import { type DotTone, phaseIcon } from "../../rules/chat";
+import { type DotTone, phaseIcon } from "./rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { useAgent } from "../../data/agents";

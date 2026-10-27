@@ -16,7 +16,7 @@ import {
   threadTitle,
   unreadIn,
   unreadUnder,
-} from "../../rules/chat";
+} from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";

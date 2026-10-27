@@ -7,9 +7,9 @@ import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { createComposer } from "../../data/composer";
+import { createComposer } from "../../features/channel/composing";
 
-import { threadOwnerOf } from "../../rules/chat";
+import { threadOwnerOf } from "../../features/channel/rules";
 import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { AgentFace } from "../../ui/Face";

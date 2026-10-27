@@ -5,7 +5,7 @@ import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../rules/quota";
-import { yuan } from "../../rules/chat";
+import { yuan } from "../../features/channel/rules";
 import { aria, useClickAway } from "../../base/util";
 import { ready, useRuntimes } from "../../base/query";
 import { CardColors, PxButton, SpriteIcon } from "../../ui/pixel";

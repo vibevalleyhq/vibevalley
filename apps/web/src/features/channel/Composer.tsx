@@ -1,10 +1,10 @@
-import { mentionOf } from "../../rules/chat";
+import { mentionOf } from "./rules";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { chatWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { createComposer } from "../../data/composer";
+import { createComposer } from "./composing";
 import { toast } from "../../ui/toasts";
 import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";

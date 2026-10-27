@@ -4,10 +4,10 @@
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
-import { createChannelForm } from "../../data/channelForm";
+import { createChannelForm } from "../../features/channel/channelForm";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
-import { channelLabel, channelsOf, chatPath, unreadUnder } from "../../rules/chat";
+import { channelLabel, channelsOf, chatPath, unreadUnder } from "../../features/channel/rules";
 import { aria, useClickAway } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";

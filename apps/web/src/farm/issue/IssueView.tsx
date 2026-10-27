@@ -14,7 +14,7 @@ import { createIssueActs } from "../../features/issue/acts";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
 import { castPrefix } from "../../ui/cast";
-import { issueThreadOf } from "../../rules/chat";
+import { issueThreadOf } from "../../features/channel/rules";
 import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../features/issue/state";
 import { runText } from "../../features/issue/rules";
 import { tookText, wallClockText } from "../../base/format";

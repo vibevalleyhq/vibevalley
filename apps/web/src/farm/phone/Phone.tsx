@@ -10,7 +10,7 @@ import type { InboxItem } from "@vibevalley/protocol";
 import { missedOf, phoneCalls } from "./calls";
 import { ChatWindow } from "../chat/ChatWindow";
 import { useCore } from "../../base/frame";
-import { unreadTotal } from "../../rules/chat";
+import { unreadTotal } from "../../features/channel/rules";
 import { useFarm } from "../state";
 import { voiceCall } from "../../voice/call";
 import { lcd } from "./lcd";

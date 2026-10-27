@@ -2,7 +2,7 @@ import { chatWording } from "./words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { Conversation, Recurrence } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { chatPath, jobThreadOf, phaseText } from "../../rules/chat";
+import { chatPath, jobThreadOf, phaseText } from "./rules";
 import { toast } from "../../ui/toasts";
 import { useNow } from "../../base/util";
 import { useRouter } from "../../base/router";

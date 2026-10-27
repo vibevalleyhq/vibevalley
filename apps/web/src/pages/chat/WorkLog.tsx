@@ -1,4 +1,4 @@
-import { chatWording } from "./words";
+import { chatWording } from "../../features/channel/words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { SessionEvent } from "@vibevalley/protocol";

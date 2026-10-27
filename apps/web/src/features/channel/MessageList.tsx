@@ -16,7 +16,7 @@ import {
   unreadIn,
   orchestratorTyping,
   workbenchClock,
-} from "../../rules/chat";
+} from "./rules";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
@@ -25,8 +25,8 @@ import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
-import { rooms, useMessage, useRoom } from "../../data/rooms";
-import { TurnSteps } from "./WorkLog";
+import { rooms, useMessage, useRoom } from "./rooms";
+import { TurnSteps } from "../../pages/chat/WorkLog";
 import { useAgent } from "../../data/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {

@@ -7,7 +7,7 @@ import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../base/api";
-import { arrived, pending, say } from "../../data/composer";
+import { arrived, pending, say } from "../../features/channel/composing";
 import { liveCaptions, type SpokenLine } from "../../voice/captions";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
@@ -23,12 +23,12 @@ import {
   threadOwnerOf,
   threadTitle,
   unreadIn,
-} from "../../rules/chat";
+} from "../../features/channel/rules";
 import { voiceCall, type VoiceCall } from "../../voice/call";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
-import { useMarkRead } from "../../pages/chat/data";
-import { rooms, useMessage, useRoom } from "../../data/rooms";
+import { useMarkRead } from "../../features/channel/data";
+import { rooms, useMessage, useRoom } from "../../features/channel/rooms";
 import { TurnSteps } from "../../pages/chat/WorkLog";
 import { useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";

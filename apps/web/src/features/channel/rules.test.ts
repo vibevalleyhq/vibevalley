@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { Conversation, WorkspaceState } from "@vibevalley/protocol";
-import { orchestratorTyping } from "./chat";
+import { orchestratorTyping } from "./rules";
 
 const at = (id: string): Conversation => ({ id, kind: "channel", replies: 0, at: 0 });
 const state = (orchestrator: WorkspaceState["orchestrator"], where?: string): WorkspaceState => ({

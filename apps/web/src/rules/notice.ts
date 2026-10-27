@@ -3,7 +3,7 @@
 import { rulesWording } from "../base/words/rules";
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
 import type { TraySummary } from "@vibevalley/protocol/host";
-import { unreadTotal } from "./chat";
+import { unreadTotal } from "../features/channel/rules";
 
 /** The tray's title (working helpers, calls waiting) and its lines. */
 export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]): TraySummary {

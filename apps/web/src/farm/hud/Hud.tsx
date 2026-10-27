@@ -12,7 +12,7 @@ import { farm } from "../store";
 import { tools } from "../tools";
 import { webRoutes } from "../world/places";
 import { nextClearing } from "../world/plots";
-import { unreadTotal } from "../../rules/chat";
+import { unreadTotal } from "../../features/channel/rules";
 import { aria } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore, useFrames } from "../../base/frame";

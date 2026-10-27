@@ -7,7 +7,7 @@ import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
 import { farmClock, readsLong } from "./text";
-import { spentText } from "../../rules/chat";
+import { spentText } from "../../features/channel/rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
 import { PxMarkdown, SpriteIcon } from "../../ui/pixel";
