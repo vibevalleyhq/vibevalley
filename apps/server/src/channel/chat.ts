@@ -20,6 +20,7 @@ import {
   type ActorKind,
   type MessageKind,
   type Outcome,
+  type RoomEvent,
   type RunTrigger,
   type Session,
   type Spent,
@@ -29,7 +30,7 @@ import {
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { keepConversations, keepMessages, targetOf } from "./state.ts";
+import { keepConversations, targetOf } from "./state.ts";
 import { head } from "../base/text.ts";
 import {
   agentWakeCooldownMs,
@@ -52,6 +53,7 @@ import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
+import { bounded } from "../core/bounded.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
 import { Audience } from "./audience.ts";
@@ -69,6 +71,15 @@ import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 
 const reportMax = 1500;
 const readLimit = 30;
+/** A follower further behind than this reads the room's newest page instead of every message since. */
+export const catchUpMax = 200;
+/** The reports a new reader of the farm's log starts from. */
+export const logKeep = 80;
+/** A thread named by the message it hangs under shows this much of it. */
+const threadTitleMax = 24;
+/** How much of a conversation's newest message a list shows. */
+const lastMax = 80;
+const oneLine = (text: string, n: number) => head(text.replace(/\s+/g, " ").trim(), n);
 /** The client's key for one send, so a retry of it is the same message. */
 const sendKeyMax = 64;
 /** Sorts after every uuidv7, for "since the last thing said". */
@@ -176,6 +187,7 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(meta.outcome ? { outcome: meta.outcome } : {}),
     ...(meta.spent ? { spent: meta.spent } : {}),
     ...(meta.spoken ? { spoken: true } : {}),
+    ...(row.send_key && row.sender_id === ownerId ? { sendKey: row.send_key } : {}),
     at: row.created_at,
   };
 }
@@ -264,8 +276,13 @@ export interface ChannelShape {
   readonly markRead: (conversation: string, seq: number) => Effect.Effect<void, ApiError>;
   /** The thread of the issue the session works (a talk thread of its own when it works none). */
   readonly jobThread: (session: string) => Effect.Effect<string | undefined>;
-  /** The conversations and messages the core state holds now. */
+  /** The conversations the core state holds now. */
   readonly now: () => Chat | undefined;
+  /** What is said in a conversation after the message numbered after, then what is said there from now on; Reset when
+   * more than catchUpMax were missed. A follower too slow for what is said ends, and comes back with its number. */
+  readonly follow: (conversation: string, after: number) => Stream.Stream<RoomEvent, ApiError>;
+  /** The turn reports anywhere after the one with this id, or the newest logKeep when absent, then each from now on. */
+  readonly reports: (after?: string) => Stream.Stream<RoomEvent>;
   /** Subscribed before it returns. */
   readonly forOrchestrator: Effect.Effect<Stream.Stream<OrchestratorNews>, never, Scope.Scope>;
   /** The owner's words said in full in a thread, whatever path they took in: what an issue hears its owner by.
@@ -363,6 +380,8 @@ export const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1);
   const locked = <A, E>(e: Effect.Effect<A, E>) => lock.withPermits(1)(e);
   const orchestratorHub = yield* PubSub.unbounded<OrchestratorNews>();
+  // Every message once written, for the rooms: each follower reads it through a bounded relay of its own.
+  const said = yield* PubSub.unbounded<ChatMessage>();
 
   /** Nothing is slipped in while a session compacts its context. */
   const compacting = new Set<string>();
@@ -435,7 +454,7 @@ export const make = Effect.gen(function* () {
   };
   const targetOfConv = (row: ConvRow) => targetOfRow(row.kind, row.parent_number, row.name, row.channel_id, null);
 
-  const toConversation = (row: ConvRow): Conversation => {
+  const toConversation = (row: ConvRow, unread = 0, title = "", last?: MsgRow): Conversation => {
     const read = model.ownerReadIn(row.id);
     const sk = subjectKind(row.subject_kind);
     return {
@@ -452,15 +471,30 @@ export const make = Effect.gen(function* () {
       ...(row.last_number !== null ? { lastNumber: row.last_number } : {}),
       replies: row.reply_count,
       ...(read !== undefined ? { read } : {}),
+      ...(unread > 0 ? { unread } : {}),
+      ...(title ? { title } : {}),
+      ...(last ? { last: { from: last.sender_id, name: last.sender_name, text: oneLine(last.body, lastMax), at: last.created_at } } : {}),
       at: row.created_at,
     };
   };
 
-  const publishConversation = (id: string) =>
-    Effect.suspend(() => {
-      const row = model.conversation(id);
-      return row ? core.apply({ type: "conversation", conversation: toConversation(row) }) : Effect.void;
-    });
+  /** What a page lists a conversation with: the owner's unread there, and a thread's title when its subject does not
+   * name it (a page keeps no messages to name it by). */
+  const counted = Effect.fnUntraced(function* (row: ConvRow) {
+    const { n } = yield* db(qm.ownerUnread({ conversation_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }));
+    const sk = subjectKind(row.subject_kind);
+    let title = "";
+    if (row.kind === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
+    else if (row.kind === "thread" && sk === undefined && row.parent_id)
+      title = oneLine((yield* one(qm.messageByID({ id: row.parent_id })))?.body ?? "", threadTitleMax);
+    const last = row.last_number ? yield* one(qm.messageByNumber({ conversation_id: row.id, number: row.last_number })) : undefined;
+    return toConversation(row, n ?? 0, title, last);
+  });
+
+  const publishConversation = Effect.fnUntraced(function* (id: string) {
+    const row = model.conversation(id);
+    if (row) yield* core.apply({ type: "conversation", conversation: yield* counted(row) });
+  });
 
   const publishOwnerMentions = Effect.gen(function* () {
     const rows = yield* db(qm.ownerMentions());
@@ -477,7 +511,9 @@ export const make = Effect.gen(function* () {
   const publishMessage = Effect.fn("Channels.publishMessage")(function* (row: MsgRow, answers: SessionId | undefined) {
     const conv = model.conversation(row.conversation_id);
     const thread = conv?.kind === "thread" && conv.subject_kind === "issue" && conv.subject_id ? conv.subject_id : undefined;
-    yield* core.apply({ type: "message", message: toMessage(row), ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    const message = toMessage(row);
+    yield* core.apply({ type: "message", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
+    yield* PubSub.publish(said, message);
   });
 
   const threadOf = (subject: ThreadSubject) => Effect.sync(() => model.threadOfSubject(subject.kind, subject.id));
@@ -684,6 +720,7 @@ export const make = Effect.gen(function* () {
           kind: w.kind,
           body: w.text,
           meta,
+          send_key: w.sendKey || null,
           created_at,
           sender_name: sender.name,
           sender_kind: sender.kind,
@@ -947,9 +984,7 @@ export const make = Effect.gen(function* () {
       yield* db(qd.rollbackAll());
       open.load(yield* db(qd.allOpenDeliveries()));
       const convs = yield* db(qc.recentConversations({ n: keepConversations }));
-      for (const c of [...convs].reverse()) yield* core.apply({ type: "conversation", conversation: toConversation(c) });
-      const msgs = yield* db(qm.recentMessages({ n: keepMessages }));
-      for (const m of [...msgs].reverse()) yield* core.apply({ type: "message", message: toMessage(m) });
+      for (const c of [...convs].reverse()) yield* core.apply({ type: "conversation", conversation: yield* counted(c) });
       yield* publishOwnerMentions;
     }),
   );
@@ -1013,6 +1048,32 @@ export const make = Effect.gen(function* () {
 
   const shape: ChannelShape = {
     now: () => core.state().chat,
+    follow: (conversation, after) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          if (!model.conversation(conversation)) return yield* Effect.fail(refused(channelWording().conversationGone));
+          // Subscribed before the missed ones are read: nothing said in between falls through, and what both have is
+          // dropped by its number.
+          const live = yield* PubSub.subscribe(said);
+          const missed = yield* db(qm.messagesAfter({ conversation_id: conversation, number: after, n: catchUpMax + 1 }));
+          if (missed.length > catchUpMax) return Stream.succeed<RoomEvent>({ _tag: "Reset" });
+          const upto = missed.at(-1)?.number ?? after;
+          const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.conversation === conversation && m.number > upto)), "chat.follow");
+          return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): RoomEvent => ({ _tag: "Message", message })));
+        }),
+      ),
+    reports: (after) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const live = yield* PubSub.subscribe(said);
+          const missed =
+            after === undefined ? [...(yield* db(qm.recentReports({ n: logKeep })))].reverse() : yield* db(qm.reportsAfter({ after, n: catchUpMax + 1 }));
+          if (missed.length > catchUpMax) return Stream.succeed<RoomEvent>({ _tag: "Reset" });
+          const upto = missed.at(-1)?.id ?? after ?? "";
+          const here = bounded(Stream.fromSubscription(live).pipe(Stream.filter((m) => m.kind === "report" && m.id > upto)), "chat.reports");
+          return Stream.concat(Stream.fromIterable(missed.map(toMessage)), here).pipe(Stream.map((message): RoomEvent => ({ _tag: "Message", message })));
+        }),
+      ),
     general: () => general,
     messageLocation: Effect.fn("Channels.messageLocation")(function* (id) {
       const message = yield* one(qm.messageByID({ id }));

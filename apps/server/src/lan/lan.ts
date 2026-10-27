@@ -10,12 +10,14 @@
 import { lanWording } from "./words.ts";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { connect, type Socket } from "node:net";
 import { hostname, networkInterfaces } from "node:os";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { type ApiError, endpoints } from "@vibevalley/protocol/api";
+import { roomsPath } from "@vibevalley/protocol/rpc";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
 import { Db } from "../base/db.ts";
@@ -247,11 +249,47 @@ export const make = (options: LanOptions = {}) =>
       });
     };
 
+    /** The rooms' WebSocket from a paired device's page: the upgrade goes to the loopback server as it came, saying which
+     * device asks, and bytes go both ways until either side closes; forgetting the device or shutting ends it. */
+    const tunnel = (req: IncomingMessage, client: Socket, head: Buffer) => {
+      const refuse = (status: string) => void client.end(`HTTP/1.1 ${status}\r\nconnection: close\r\n\r\n`);
+      if (!upstream) return refuse("503 Service Unavailable");
+      if (new URL(req.url ?? "/", "http://lan").pathname !== roomsPath) return refuse("404 Not Found");
+      const d = deviceOf(req);
+      if (!d) return refuse("401 Unauthorized");
+      // Not left to the loopback server, which takes the device header as checked: only the farm's page, as there.
+      if (req.headers.origin !== undefined && req.headers.origin !== `http://${req.headers.host ?? ""}`) return refuse("403 Forbidden");
+      const [host, port] = [upstream.slice(0, upstream.lastIndexOf(":")), Number(upstream.slice(upstream.lastIndexOf(":") + 1))];
+      const lines = [`GET ${req.url ?? roomsPath} HTTP/1.1`, `host: ${upstream}`, "connection: Upgrade", `${deviceHeader}: ${d}`];
+      for (const [k, v] of Object.entries(req.headers)) if (v !== undefined && !dropped.has(k)) for (const one of [v].flat()) lines.push(`${k}: ${one}`);
+      const done = new AbortController();
+      const mine = conns.get(d) ?? new Set();
+      conns.set(d, mine);
+      mine.add(done);
+      const up = connect(port, host, () => {
+        up.write(lines.join("\r\n") + "\r\n\r\n");
+        if (head.length > 0) up.write(head);
+        up.pipe(client);
+        client.pipe(up);
+      });
+      const end = () => {
+        mine.delete(done);
+        client.destroy();
+        up.destroy();
+      };
+      done.signal.addEventListener("abort", end);
+      for (const side of [client, up]) {
+        side.on("error", end);
+        side.on("close", end);
+      }
+    };
+
     // A port taken is said in the status; the farm runs on.
     const listen = () =>
       new Promise<void>((resolve) => {
         if (server) return resolve();
         const s = createServer(guard);
+        s.on("upgrade", tunnel);
         s.once("error", (e) => {
           problem = lanWording().cannotOpen(e.message);
           logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
@@ -272,6 +310,8 @@ export const make = (options: LanOptions = {}) =>
       const current = server;
       server = undefined;
       if (!current) return;
+      // An upgraded socket is no longer the server's to close.
+      for (const mine of conns.values()) for (const c of mine) c.abort();
       current.closeAllConnections();
       await new Promise<void>((resolve) => current.close(() => resolve()));
       logs.info("vibevalley: lan access is shut");

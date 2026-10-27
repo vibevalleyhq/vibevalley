@@ -231,6 +231,8 @@ export interface ChatMessage {
   outcome?: Outcome;
   spent?: Spent;
   spoken?: boolean;
+  /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
+  sendKey?: string;
   at: number;
 }
 
@@ -254,6 +256,20 @@ export interface Conversation {
   lastNumber?: number;
   replies: number;
   read?: number;
+  /** What the owner has not read here: others' messages past read, notices left out; absent when none. */
+  unread?: number;
+  /** A thread not on an issue or a task graph, by the server: a talk thread's session, else the head of the message it hangs under. */
+  title?: string;
+  /** The newest message, as a list shows it under the conversation. */
+  last?: ConversationLast;
+  at: number;
+}
+
+export interface ConversationLast {
+  from: string;
+  name: string;
+  /** Its head, on one line. */
+  text: string;
   at: number;
 }
 
@@ -452,10 +468,22 @@ export interface OwnerMention {
   address: string;
 }
 
+/** The conversations, not what is said in them: a page follows a conversation's room for that (rpc.ts). */
 export interface Chat {
   conversations: Conversation[];
-  messages: ChatMessage[];
   ownerMentions?: OwnerMention[];
+}
+
+/** What a room's subscriber gets: each message said there, by its number; Reset when it is too far behind to catch up. */
+export type RoomEvent = RoomMessage | RoomReset;
+
+export interface RoomMessage {
+  _tag: "Message";
+  message: ChatMessage;
+}
+
+export interface RoomReset {
+  _tag: "Reset";
 }
 
 export interface WorkspaceState {

@@ -4,7 +4,7 @@
 // the phone large.
 
 import { farmWording } from "../words";
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../data/api";
 import { arrived, pending, say } from "../../data/composer";
@@ -18,7 +18,7 @@ import {
   feedOf,
   generalOf,
   orchestratorTyping,
-  parentOf,
+  parentAt,
   phaseText,
   threadOwnerOf,
   threadTitle,
@@ -27,7 +27,8 @@ import {
 import { voiceCall, type VoiceCall } from "../../voice/call";
 import { useRouter } from "../../app/router";
 import { useNow } from "../../app/util";
-import { createHistory, HistoryContext, useHistory, useMarkRead } from "../../pages/chat/data";
+import { useMarkRead } from "../../pages/chat/data";
+import { rooms, useMessage, useRoom } from "../../data/rooms";
 import { TurnSteps } from "../../pages/chat/WorkLog";
 import { useCore } from "../../data/frame";
 import { ready, useAgents } from "../../data/query";
@@ -95,7 +96,7 @@ function NewElsewhere(props: { except: string | undefined }) {
   const core = useCore();
   const waiting = () => {
     const chat = core()?.chat;
-    return (chat?.conversations ?? []).filter((c) => c.id !== props.except && unreadIn(chat, c) > 0);
+    return (chat?.conversations ?? []).filter((c) => c.id !== props.except && unreadIn(c) > 0);
   };
   return (
     <Show when={waiting().length > 0 ? waiting().reduce((a, b) => ((b.lastNumber ?? 0) > (a.lastNumber ?? 0) ? b : a)) : undefined}>
@@ -119,34 +120,19 @@ function NewElsewhere(props: { except: string | undefined }) {
 
 export function ChatWindow() {
   const core = useCore();
-  return (
-    <HistoryContext value={createHistory(core)}>
-      <Window />
-    </HistoryContext>
-  );
-}
-
-function Window() {
-  const core = useCore();
   const chat = () => core()?.chat;
   const agentsQuery = useAgents();
   const agents = createMemo(() => new Map<string, Agent>(ready(agentsQuery, []).map((a) => [a.id, a])));
   const large = useFarm((s) => s.chatLarge);
   const shownId = useFarm((s) => s.chatShown);
   const look = usePrefs((p) => p.orchestratorLook);
-  const history = useHistory();
   const [problem, setProblem] = createSignal<string>();
   const shown = createMemo(() => (shownId() ? conversationOf(chat(), shownId()!) : undefined) ?? generalOf(chat()));
   const thread = () => (shown()?.kind === "thread" ? shown() : undefined);
   const call = createCall();
   const phase = () => phaseOf(call(), core());
-  createEffect(
-    () => shown()?.id,
-    (id) => {
-      if (id) history.ensure(id);
-    },
-  );
-  useMarkRead(core, shown);
+  const room = useRoom(() => shown()?.id);
+  useMarkRead(shown);
 
   const toggleLarge = () => farm.chatLarge(!large());
   const fold = () => {
@@ -158,23 +144,15 @@ function Window() {
     toggleLarge();
   };
 
-  const more = () => {
-    const c = shown();
-    return c ? history.loaded[c.id] : undefined;
-  };
-  const items = createMemo(() => {
-    const c = shown();
-    return c ? feedOf(chat(), c.id, more()) : [];
-  });
-  const parent = () => {
+  const items = createMemo(() => feedOf(chat(), room().messages));
+  const parent = useMessage(() => {
     const t = thread();
-    return t ? parentOf(chat(), t, more()) : undefined;
-  };
-  const hasOlder = () => more() !== undefined && !more()!.complete;
+    return t ? parentAt(chat(), t) : undefined;
+  });
+  const hasOlder = () => room().ready && !room().complete;
   const sending = createMemo(() => {
     const here = shown()?.id;
-    const messages = chat()?.messages ?? [];
-    return pending().filter((p) => p.conversation === here && !arrived(p, messages));
+    return pending().filter((p) => p.conversation === here && !arrived(p, room().messages));
   });
   // What is being said on the call, drawn as it is said: the turns 田头 does not have as lines yet. A copy each time, so
   // the rows read the words they grew to.
@@ -183,14 +161,14 @@ function Window() {
     const c = call();
     const here = shown();
     if (c.phase !== "live" || here?.kind !== "general") return [];
-    const spoken: SpokenLine[] = (chat()?.messages ?? [])
-      .filter((m) => m.spoken && m.conversation === here.id)
+    const spoken: SpokenLine[] = room()
+      .messages.filter((m) => m.spoken)
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, spoken, tick()).map((t) => ({ ...t }));
   });
   // On a call the captions show what is being said; the dots are for the chat.
   const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
-  const showSuggestions = () => !thread() && (core()?.call === "live" || (chat()?.messages ?? []).length === 0);
+  const showSuggestions = () => !thread() && (core()?.call === "live" || (room().ready && room().messages.length === 0));
 
   return (
     <section aria-label={farmWording().chat.label} class="relative h-full w-full">
@@ -235,7 +213,7 @@ function Window() {
             <Show when={hasOlder() && shown()}>
               <button
                 type="button"
-                onClick={() => void history.loadOlder(shown()!.id)}
+                onClick={() => void rooms.loadOlder(shown()!.id)}
                 class={["self-center px-2.5 py-0.5 hover:bg-cream-200 hover:text-bark-800", small]}
               >
                 {farmWording().chat.older}
@@ -257,7 +235,7 @@ function Window() {
                   thread={item().thread}
                   first={i() === 0 || items()[i() - 1]!.message.from !== item().message.from}
                   agents={agents()}
-                  chatUnread={(t) => unreadIn(chat(), t)}
+                  chatUnread={(t) => unreadIn(t)}
                 />
               )}
             </For>
@@ -370,7 +348,7 @@ function ThreadHead(props: { thread: Conversation; large: boolean; onLarge: () =
   const channel = () => channelOf(chat(), props.thread);
   const backTo = () => (channel()?.kind === "channel" ? channel()!.id : null);
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
-  const title = () => threadTitle(chat(), props.thread, core()?.issues ?? [], core()?.sessions ?? []);
+  const title = () => threadTitle(props.thread, core()?.issues ?? [], core()?.sessions ?? []);
   const status = () => {
     const s = session();
     return s ? phaseText(s, now()) : props.thread.subjectKind === "issue" ? farmWording().chat.nobodyOnIt : farmWording().chat.replies(props.thread.replies);

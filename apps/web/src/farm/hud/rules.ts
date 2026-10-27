@@ -2,8 +2,7 @@
 // orchestrator last said. The runtimes' quotas are rules/quota.ts.
 
 import { farmWording } from "../words";
-import type { Chat, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";
-import { generalOf, messagesIn } from "../../rules/chat";
+import type { ChatMessage, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";
 
 import { beds, cropLabel, type Bed } from "../world/plots";
 
@@ -33,12 +32,8 @@ export function plotTitle(bed: Bed, session: Session | undefined, crop: Crop) {
   return `${session.name} · ${cropLabel[crop]}`;
 }
 
-/** The orchestrator's last typed line in the general channel (voice lines are not on the web yet). */
-export function lastOrchestratorSaid(chat: Chat | undefined) {
-  const general = generalOf(chat);
-  if (!general) return undefined;
-  const typed = messagesIn(chat, general.id)
-    .filter((m) => m.fromKind === "orchestrator" && m.kind === "chat")
-    .at(-1);
+/** The orchestrator's last typed line among the general channel's messages (voice lines are not on the web yet). */
+export function lastOrchestratorSaid(general: readonly ChatMessage[]) {
+  const typed = general.filter((m) => m.fromKind === "orchestrator" && m.kind === "chat").at(-1);
   return typed && { key: `m${typed.id}`, text: typed.text, at: typed.at };
 }

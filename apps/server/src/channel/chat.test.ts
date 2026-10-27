@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type ChatMessage, type Conversation, orchestratorAgent, type Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { conversationOf, generalOf, messagesIn } from "./state.ts";
+import { conversationOf, generalOf } from "./state.ts";
+import { Said, said } from "../testing/said.ts";
 import { head } from "../base/text.ts";
 import { wakeBreaker } from "./rules.ts";
-import { Effect, Layer, PubSub, type Scope, Stream } from "effect";
+import { Effect, Fiber, Layer, PubSub, type Scope, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 import { type Config, Settings } from "../base/config.ts";
 import { Database, DbLayer } from "../base/db.ts";
@@ -14,7 +15,7 @@ import { sessionOnIssue } from "../session/state.ts";
 import { layer as projection } from "../projection/projection.ts";
 import { summaryOf } from "../session/rules.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
+import { catchUpMax, Channels, type Delivered, type LaunchActivity, layer as channelLayer, type OrchestratorNews } from "./chat.ts";
 import { until, waitFor } from "../testing/until.ts";
 import * as qm from "../../db/generated/channel_message.sql.ts";
 import { sessionId } from "@vibevalley/protocol/schema";
@@ -122,6 +123,7 @@ const world = (x: FakeSessions, config: Config = testConfig()) => {
   const c: Config = { ...config, chat: { noticeBatchMs: 300, retryWakeMs: 100 } };
   return fakeHelpers(x).pipe(
     Layer.provideMerge(channelLayer),
+    Layer.provideMerge(said),
     Layer.provideMerge(coreLayer.pipe(Layer.provide(projection))),
     Layer.provideMerge(DbLayer),
     Layer.provideMerge(Database),
@@ -134,7 +136,7 @@ const farm = Effect.gen(function* () {
   const core = yield* Core;
   const chat = yield* Channels;
   const sql = yield* SqlClient.SqlClient;
-  const messagesOf = (conversation: string) => messagesIn(core.state().chat, conversation);
+  const messagesOf = (yield* Said).in;
   const conversation = (id: string | undefined) => (id ? conversationOf(core.state().chat, id) : undefined);
   const deliveries = (recipient: string) =>
     Effect.runPromise(
@@ -475,7 +477,8 @@ describe("the chat", () => {
             yield* until(async () => (await g.deliveryOf("w14", said.id))?.state === "seen", "seen after the restart");
             expect(y.runsOf("w14").at(-1)).toContain("再加一个文件");
             expect(yield* g.chat.jobThread("w14")).toBe(thread.id);
-            expect(g.messagesOf(thread.id).some((m) => m.id === said.id)).toBe(true);
+            // The new farm has heard nothing yet: what was said before is in the room's history.
+            expect((yield* g.chat.history(thread.id)).some((m) => m.id === said.id)).toBe(true);
           }),
         config,
       );
@@ -515,9 +518,65 @@ describe("the chat", () => {
         yield* hireAndRun(f, x, "run-helper", "test run metadata", "chat-k");
         yield* f.core.apply({ type: "report", id: sessionId("run-helper"), outcome: "completed", summary: "done", run: "finished-run", runs: 2 });
         yield* until(
-          () => (f.core.state().chat?.messages ?? []).some((m) => m.from === "run-helper" && m.run === "finished-run"),
+          () =>
+            f
+              .messagesOf(f.chat.general())
+              .concat(...(f.core.state().chat?.conversations ?? []).map((c) => f.messagesOf(c.id)))
+              .some((m) => m.from === "run-helper" && m.run === "finished-run"),
           "the report carries its run",
         );
+      }),
+    ),
+  );
+
+  it.live("a room catches a follower up past its number, then tells it what is said there", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        for (const text of ["一", "二", "三"]) yield* f.chat.say(text, undefined, "");
+        const following = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.follow(general, 1), 3)));
+        // What is said elsewhere is not this room's.
+        const elsewhere = (yield* f.chat.openChannel("别处", "", "")).id;
+        yield* f.chat.orchestratorSays(elsewhere, "别处的话", "");
+        yield* until(() => f.messagesOf(elsewhere).length > 0, "said elsewhere");
+        yield* f.chat.say("四", undefined, "send-4");
+        const got = yield* Fiber.join(following);
+        expect(got.map((e) => (e._tag === "Message" ? [e.message.number, e.message.text] : e._tag))).toEqual([
+          [2, "二"],
+          [3, "三"],
+          [4, "四"],
+        ]);
+        // The owner's own line carries its key: a page knows the line it sent.
+        expect(got.map((e) => (e._tag === "Message" ? e.message.sendKey : undefined))).toEqual([undefined, undefined, "send-4"]);
+      }),
+    ),
+  );
+
+  it.live("the farm's log hears every report: the newest ones first, then each as it is written", () =>
+    run((f, x) =>
+      Effect.gen(function* () {
+        yield* hireAndRun(f, x, "w21", "写 hello", "chat-k");
+        const first = yield* Stream.runCollect(Stream.take(f.chat.reports(), 1));
+        const was = first[0]!._tag === "Message" ? first[0]!.message : undefined;
+        expect([was?.kind, was?.from]).toEqual(["report", "w21"]);
+        const next = yield* Effect.forkChild(Stream.runCollect(Stream.take(f.chat.reports(was!.id), 1)));
+        yield* hireAndRun(f, x, "w22", "写 world", "chat-k");
+        const got = yield* Fiber.join(next);
+        expect(got.map((e) => e._tag === "Message" && e.message.from)).toEqual(["w22"]);
+      }),
+    ),
+  );
+
+  it.live("a follower too far behind is told to reload the room", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.general();
+        for (let i = 0; i <= catchUpMax; i++) yield* f.chat.orchestratorSays(general, `第 ${i} 句`, "");
+        const first = yield* Stream.runCollect(Stream.take(f.chat.follow(general, 0), 1));
+        expect(first).toEqual([{ _tag: "Reset" }]);
+        const near = yield* Stream.runCollect(Stream.take(f.chat.follow(general, 1), 1));
+        expect(near.map((e) => e._tag === "Message" && e.message.number)).toEqual([2]);
+        expect(yield* Effect.flip(Stream.runDrain(f.chat.follow("no-such-room", 0)))).toMatchObject({ _tag: "Refused" });
       }),
     ),
   );
@@ -532,8 +591,10 @@ describe("the chat", () => {
         for (let i = 0; i < 2; i++) expect((yield* f.chat.say("晚", undefined, "")).again).toBe(false);
         expect(yield* Effect.flip(f.chat.say("早", undefined, "k".repeat(65)))).toMatchObject({ reason: "sendKey 太长" });
         for (let i = 0; i < 2; i++) yield* f.chat.spoken("owner", "电话里说的", "k3");
+        const owners = () => f.messagesOf(f.chat.general()).filter((m) => m.from === "owner");
+        yield* until(() => owners().length >= 5, "the owner's lines heard");
         const said: Record<string, number> = {};
-        for (const m of f.messagesOf(f.chat.general())) if (m.from === "owner") said[m.text] = (said[m.text] ?? 0) + 1;
+        for (const m of owners()) said[m.text] = (said[m.text] ?? 0) + 1;
         expect(said).toEqual({ 早: 2, 晚: 2, 电话里说的: 1 });
         expect(yield* Effect.promise(() => f.deliveries(orchestratorAgent))).toHaveLength(4);
       }),

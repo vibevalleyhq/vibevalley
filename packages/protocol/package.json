@@ -7,6 +7,7 @@
     "./rules": "./src/rules/index.ts",
     "./schema": "./src/schema.ts",
     "./api": "./src/api.ts",
+    "./rpc": "./src/rpc.ts",
     "./words": "./src/words/index.ts"
   },
   "dependencies": {

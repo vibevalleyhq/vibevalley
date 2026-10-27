@@ -3,7 +3,7 @@ import { owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Issue } from "@vibevalley/protocol";
-import { messagesIn } from "../channel/state.ts";
+import { Said } from "../testing/said.ts";
 import { Effect } from "effect";
 import { Agents } from "../agent/agent.ts";
 import { Core } from "../core/core.ts";
@@ -128,6 +128,7 @@ describe("a refined issue", () => {
     return Effect.gen(function* () {
       const issues = yield* Issues;
       const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       yield* (yield* Agents).saveAgent(lab());
       const issue = yield* issues.add({ title: "新工单", project: "board", assignee: "lab" });
       // Held until the issue's thread is open, as it is before any real draft hands back.
@@ -136,10 +137,7 @@ describe("a refined issue", () => {
       yield* until(() => thread() !== undefined, "the issue's thread");
       yield* releaseHeld();
       yield* until(() => !drafting(core), "the refiner left");
-      yield* until(
-        () => messagesIn(core.state().chat, thread()!).some((m) => m.kind === "notice" && m.text.includes("读不出来")),
-        "the thread says the draft did not read",
-      );
+      yield* until(() => saidIn(thread()!).some((m) => m.kind === "notice" && m.text.includes("读不出来")), "the thread says the draft did not read");
       const after = yield* issues.get(issue.id);
       expect([after.title, after.description, after.criteria, after.status]).toEqual([before.title, before.description, before.criteria, "backlog"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));

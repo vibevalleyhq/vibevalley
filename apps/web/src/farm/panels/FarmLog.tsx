@@ -5,8 +5,9 @@ import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { generalOf, messagesIn, spentText } from "../../rules/chat";
+import { generalOf, spentText } from "../../rules/chat";
 import { useCore } from "../../data/frame";
+import { useReports, useRoom } from "../../data/rooms";
 import { useAgent } from "../../data/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { DashedLine, PxMarkdown } from "../kit";
@@ -20,9 +21,6 @@ const outcomeTag: Record<Outcome, [text: string, fill: string, ink: string]> = {
   interrupted: [wording().outcome.interrupted, "#e2c995", "#67482d"],
 };
 
-/** The turn reports, newest first. */
-const turnReportsOf = (s: WorkspaceState | undefined) => (s?.chat?.messages ?? []).filter((m) => m.kind === "report").sort((a, b) => b.at - a.at);
-
 const issueOfSession = (s: WorkspaceState | undefined, session: string): Issue | undefined =>
   (s?.issues ?? []).find((i) => i.sessions.some((s) => s === session));
 
@@ -31,16 +29,15 @@ type Row = { kind: "said" | "report"; message: ChatMessage };
 export function FarmLog() {
   const core = useCore();
   const look = usePrefs((p) => p.orchestratorLook);
-  const rows = (): Row[] => {
-    const s = core();
-    const chat = s?.chat;
-    return [
-      ...messagesIn(chat, generalOf(chat)?.id ?? "")
-        .filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
+  const general = useRoom(() => generalOf(core()?.chat)?.id);
+  const reports = useReports();
+  const rows = (): Row[] =>
+    [
+      ...general()
+        .messages.filter((m) => m.kind === "chat" && (m.fromKind === "owner" || m.fromKind === "orchestrator"))
         .map((message) => ({ kind: "said" as const, message })),
-      ...turnReportsOf(s).map((message) => ({ kind: "report" as const, message })),
+      ...reports().map((message) => ({ kind: "report" as const, message })),
     ].sort((a, b) => b.message.at - a.message.at);
-  };
   return (
     <Show when={rows().length > 0} fallback={<FarmEmpty text={farmWording().log.empty} />}>
       <div class="flex flex-col">

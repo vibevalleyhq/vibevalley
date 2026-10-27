@@ -16,8 +16,9 @@
 
 ## 在哪
 
-- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置，`audience.ts` 是定一条消息给谁、叫不叫醒要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。`deliveries.ts` 是还开着的投递（待送、提示过、交出去了），每条带着收件箱要显示的；看到了、丢掉了的就不在里面。
-- **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留哪些（`keepMessages` 300 条、`keepConversations` 100 个）。
+- **田头**：`apps/server/src/channel`（`Channels`）。`chat.ts` 是对外的方法（`say`、`speak`、`read`、`tellSession`、`orchestratorSays`、`spoken`、`notice`、`openChannel`……）、写一条消息、算给谁、叫醒和提示、推进已读和「看到了」、开串和开机恢复、房间（`follow`、`reports`）；`rules.ts` 是只有它用的纯规则：`mentionsIn`、`parseChatTarget`、`channelNameProblem`、`chatAudience`、`wakeInput`、`busyNotice`，黄金数据在 `testdata/rules.jsonl.gz`；`model.ts` 是它在内存里记着的对话、参与者和主人的已读位置，`audience.ts` 是定一条消息给谁、叫不叫醒要用的：谁跟着哪个串、主人上次说话后帮工之间来回了几次、每个人上次被帮工叫醒的时间。`deliveries.ts` 是还开着的投递（待送、提示过、交出去了），每条带着收件箱要显示的；看到了、丢掉了的就不在里面。
+- **几处共用的规则在 `apps/server/src/channel/state.ts`**：`targetOf` 写地址，`hopLimit`、`agentWakeCooldownMs`、`wakeBreaker`、`noticeBatchMs`、`wakeMessages`、`summaryConversations`、`retryWindowMs`、`heldShown` 这些常数，核心状态里留多少对话（`keepConversations` 100 个）。
+- **房间**：契约是 `packages/protocol/src/rpc.ts` 的 `Rooms`（Effect RPC），服务端 `apps/server/src/http/rooms.ts` 挂在 `/api/v1/rooms`，页面经 `apps/web/src/data/gateway.ts` 连、`data/rooms.ts` 按房间存。
 - **表**：`channel_participant`、`channel_conversation`（田头、频道、串都是一行）、`channel_message`、`channel_mention`、`channel_follow`、`channel_read_cursor`、`channel_seen_mark`、`channel_delivery`；连接器的 `connector_account`、`connector_inbound`、`connector_outbox`。表结构在 `apps/server/db/migrations/0001_schema.up.sql`。
 - **连接器**：`apps/server/src/connector`（`Connectors`）。`connector.ts` 是桥：账号和它的代际、配对、只认主人、收进来的话交给管家、持久收件、发件表和退避；`text.ts` 是送出去的写法（`ownerLine`、`plainText`、`splitText`、`flushText`）；三家的协议和扫码登录在 `weixin.ts`、`feishu.ts`（飞书用 `@larksuiteoapi/node-sdk`）、`qq.ts`。
 - **接口**：`channel.say`、`channel.create`、`channel.update`、`channel.history`、`channel.markRead`，`orchestrator.hear`、`voice.heard`，`connector.list`、`connector.login`、`connector.verify`、`connector.logout`、`connector.channel`（[capabilities.md](docs/reference/capabilities.md)）。管家的工具 `channels`、`open_channel`、`channel_settings`、`tell`、`read_chat`；帮工的 `channel_say`、`read_chat`、`channel_inbox`、`session_list`（`apps/server/src/tool/tool.ts`）。
@@ -26,11 +27,13 @@
 
 ## 模型和不变量
 
-- **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个对话、300 条消息，挤出去时频道不挤；更早的用 `channel.history` 取。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递不进核心状态：库是它们的家，田头在内存里记着要用的那部分（下一条）。
+- **数据库是家，先写库再成事实**：一条消息和它的 @、跟帖、投递在一个事务里写进库，提交以后才施加 `message`、`conversation` 事实。核心状态 `WorkspaceState.chat` 只放最近的 100 个对话（挤出去时频道不挤），不放消息；每个对话带服务端算好的 `unread`（主人没读的、不是自己说的、不是提示）、`last`（最新一条是谁、开头、什么时候），没挂工单和计划的串带 `title`（帮工说话的串是帮工的名字，别的是它挂着的那条消息的开头）。说的话在房间里。`message` 事实照旧每条都施加：游戏、通知和工单听它，它把对话的 `lastNumber` 推到这条的号码。`state.json` 不存田头，开机从库里放回。帮工的已读位置、跟帖、投递不进核心状态：库是它们的家，田头在内存里记着要用的那部分（下一条）。
 - **消息的去处由库里的身份决定**：连接器引用旧消息时回原对话，发件只送到原对话所属频道接的账号。两条路都由田头的 `messageLocation` 按消息 id 查出对话和频道；消息或串被最近状态挤出、服务端重启，都不改变去处。
-- **没处理的 @主人 留到读过或回复过**：田头从库里的 @、已读位置和主人在同一对话里的后续消息算出完整集合，经 `ownerMentions` 事实写进 `Chat.ownerMentions`；不受最近 300 条消息、100 个对话限制。写出 @主人、主人回复、标记已读和开机时刷新，每次用一条查询带回消息、频道和地址。通知只读这个结论，不再从聊天窗口推测完成条件。
+- **没处理的 @主人 留到读过或回复过**：田头从库里的 @、已读位置和主人在同一对话里的后续消息算出完整集合，经 `ownerMentions` 事实写进 `Chat.ownerMentions`；不受最近 100 个对话限制。写出 @主人、主人回复、标记已读和开机时刷新，每次用一条查询带回消息、频道和地址。通知只读这个结论，不再从聊天窗口推测完成条件。
 - **记着自己写过的，不再读回来**：田头开机时把全部对话、参与者和主人的已读位置读进 `model.ts`，此后每写一次库就把同样的改动告诉它（每个方法照它对应的那条查询算），按 id 找对话、找串、找频道、主人读到哪、谁跟着串、来回了几次、谁刚被叫醒过、谁还有哪些没看都问它们；投递的每次变化（提示、交出、看到、退回、丢掉）先写库再告诉 `deliveries.ts`，开机先把交出去没看到的退回，再读一遍；刚写下的消息也在内存里拼好往下传，不按 id 再读。只有田头写这几张表，所以记着的和库里的一样；一个事务失败时，它在事务里告诉过 `model.ts` 的改动库里没有，就从库重读一遍。主人自己说的话、在串里说的、电话里说的，「读到这一条」和这条消息在同一个事务里。
 - **写库一个一个来**：改田头的都在 `chat.ts` 的一把锁（`Semaphore`）里，数据库一个连接、一个写入方，所以 `number` 的先后就是提交的先后，不用像多写入方那样等「稳定」。不应开连接池。
+- **每个对话是一个房间**：页面经一条 WebSocket 订阅它正看着的对话。`rooms.follow({ room, after })` 先从库里补 `after` 号以后的，再推之后写下的，每条带号码；漏了超过 `catchUpMax`（200）条就回 `Reset`，页面重读最新一页（`channel.history`）再从那里接着订阅。先订阅、后读库，两边都有的按号码去掉，中间写下的不会漏。读得慢的订阅积压到 64 条就结束，页面带着号码重连。`rooms.reports` 是全农场的汇报（农场的日志用）：按消息 id 接着读，没给 id 时从最近 `logKeep`（80）条起。主人自己的消息带它的 `sendKey`，页面的「发送中」那一行按它换成服务端的那条。
+- **只放农场自己的页面**：WebSocket 不受 CORS 管，别的网页也能连本机的端口。upgrade 之前，`Host` 要是回环地址（`127.0.0.1`、`localhost`、`[::1]`），`Origin` 有的话要和 `Host` 同源；只查 `Origin` 不够，一个被解析到本机的名字（DNS rebinding）就是它自己的源。经「连接到本机」转来的带设备头，由那一头查过（[连接到本机](docs/subsystems/lan.md)）。
 - **一个对话一列消息号**：主键是 uuidv7，`number` 在每个对话里从 1 数，对外的消息号就是它。地址是 `#<频道>`、`#<频道>:<消息号>`（田头是 `#田头`）；频道名 1–24 个字母、数字、汉字、`_`、`-`，不能重名，这样地址能读回来。
 - **对话三种**：田头（全库唯一一行）、频道（可以带说明和默认项目）、串（挂在一条消息下，`subject_kind` 是 `issue`、`talk`）。工单串的 `subject_id` 是工单的 id；没挂工单的 Session 开的是 `talk` 串，`subject_id` 是它自己；有人往 `#频道:<号>` 说话时现开的串也是 `talk`，没有 `subject_id`。
 - **一张工单一个串**：重开、换帮工都还是这一个串，前后几个帮工的派活、汇报、主人的话都在里面。串的主人是这张工单现在在干活的帮工（`sessionOnIssue`），每次写消息时按工单现算，不存；没有帮工在干时串没有主人。从帮工找串只走一个函数（`threadOfSession`：先找它的工单，再找串），不拿帮工的 id 去找工单串。核心状态里 `message` 事实的 `thread` 是工单的 id。页面的串标题是工单标题，帮工走了也对（`apps/web/src/rules/chat.ts` 的 `threadTitle`、`threadOwnerOf`）。
@@ -123,6 +126,7 @@
 - **@ 和主人在工单串里的话才叫醒帮工，比 Raft 收得紧。** 放弃了「频道成员每条都收、都被叫醒」：Raft 的 agent 长驻，VibeValley 的帮工按工单开会话、按 token 花钱，田头一句闲聊叫醒六个帮工就是六份钱。成员照样被动知道（忙的收提示、歇着的醒来看摘要），所以主人说「main 刚合了大改动」帮工也知道。
 - **防 agent 来回靠结构上的闸，不靠礼节。** Raft 只靠提示词里的礼节，自己的手册承认关键时刻会失灵。来回上限、冷却和熔断不管模型守不守礼节都管用。`session_list` 的名单不带 @、规矩写明 @ 就是叫醒：真跑时帮工把带 @ 的名单原样抄进回答，一连叫醒了管家和别的帮工。
 - **管家的回答整条发，不逐字长出来。** 群聊里一条消息是说完的一句话。逐字长的时候，每 120 毫秒改一次正文就是一条事实、一帧整份的核心状态；消息还多了「没说完」这种状态：要标 `final`、开机时把说到一半的补成说完，按消息号补齐时还得带版本。模型调工具之前说的话本来就是单独的一条，主人照样先看到「我看一下」；中间只显示管家在哪个对话里想、在写。看字一个个长出来的地方留在过程面板（执行的日志）和电话的语音线路。放弃了只在长回答时逐字：多长算长说不清，页面还要两种画法。
+- **消息不跟着状态帧，按房间订阅。** 消息在核心状态里的时候，任何一条事实都把整份状态连同最近 300 条消息推一遍；一个热闹的串把别的对话的消息挤出状态，页面再拿 `channel.history` 补、两份合并；页面只拿得到「最近的」，断线回来只能重拿一整帧；页面对 SSE 的数据也不解码。#119 以后消息写下就不再改，每个对话的号码就是游标。用 Effect RPC：契约一份，两头照 Schema 解码；流式调用中断就是退订；socket 协议带心跳、按退避重连和流的回执，页面只管带着号码重新订阅。代价是页面多带 Effect（主包 gzip 后多约 53 KB），只在 `data/gateway.ts` 用。放弃了照 socket.io 自己写加入、离开、回执、重连；放弃了消息留在核心状态里、只是不进状态帧（帧和状态成了两种形状，服务端多存没人读的消息）；放弃了只把帧缩小、看到号码变大再用 HTTP 拉（多一个来回，设备多了还是要订阅）。
 - **用帮工的 id 来 @，不用名字。** 名字有空格、紧跟中文会被吞进去，都会 @ 错人；id 是稳定的，页面上显示名字。
 - **串跟着工单，不跟着帮工。** 原来工单串按派出去的 Session 开，重开、换帮工就另开一个串，同一张工单的话散在几个串里，新帮工和主人都要去翻旧串；叫「工单串」，`subject_id` 却是 Session，帮工走了界面上只剩 id。放弃了「重开时把旧串的 `subject_id` 改成新帮工」：串仍然是帮工的，取消后重开要挪串，挪的那一刻谁听得见说不清。也放弃了「串上存一列主人」：现在谁在干这张工单核心状态里已经有，存一份就要在换人时同步，违反核心状态只有一份。
 - **最后的汇报自动贴出，`channel_say` 只用于一轮中间。** 放弃了「只经工具说话」：帮工本来就用最后一段话汇报，每轮多调一次工具，模型容易忘。
@@ -146,7 +150,8 @@
 
 ## 怎么验证
 
-- `apps/server/src/channel/chat.test.ts`（假的帮工、真的库）：派活在派活消息下开串；没挂工单的帮工有一个说话的串；主人在工单串里的话叫醒它的帮工；田头叫到管家；频道；忙着的帮工一阵话只收一次提示；帮工之间互相叫停在来回上限；叫不醒的帮工在主人说话前不再叫；在频道里说话（重试、没看到的、确认频道、不在的名字和串）；管家的话整条写一次、写下就送；历史、翻页和已读；收件箱和管家的摘要；走了的帮工丢掉给它的；重启后交出去的再给一次；汇报的摘要是结论；消息带着产生它的那次干活；同一个 `sendKey` 只写一次；已读回执整份写或不写，写不成时记着的已读也照库重读；开不了串的派活不留派活消息、再试写一条。
+- `apps/server/src/channel/chat.test.ts`（假的帮工、真的库）：派活在派活消息下开串；没挂工单的帮工有一个说话的串；主人在工单串里的话叫醒它的帮工；田头叫到管家；频道；忙着的帮工一阵话只收一次提示；帮工之间互相叫停在来回上限；叫不醒的帮工在主人说话前不再叫；在频道里说话（重试、没看到的、确认频道、不在的名字和串）；管家的话整条写一次、写下就送；房间按号码补齐再推新的，主人的那条带 `sendKey`，落后太多回 `Reset`，不认识的对话拒绝；全农场的汇报先给最近的再推新的；历史、翻页和已读；收件箱和管家的摘要；走了的帮工丢掉给它的；重启后交出去的再给一次；汇报的摘要是结论；消息带着产生它的那次干活；同一个 `sendKey` 只写一次；已读回执整份写或不写，写不成时记着的已读也照库重读；开不了串的派活不留派活消息、再试写一条。
+- `apps/server/src/http/rooms.test.ts`（整座农场、真的 WebSocket）：订阅一个房间先补齐再推新的，不认识的对话拒绝；别的源和不是回环地址的 `Host` 回 403。页面的 `apps/web/test/rooms.spec.ts`：两个页面看同一个对话，各收到一次。
 - `src/flows/thread.test.ts`：一张工单一个串，派出去、取消、重开，前后两个帮工的派活、汇报、主人的话都在里面；主人的话叫醒现在的帮工，没人在干时只记下；串里的话等于评论（回答问题、作废验收），同一个键的评论只说一次。
 - `channel/rules.test.ts`：黄金数据（`testdata/rules.jsonl.gz`）。
 - `channel/mentions.test.ts`：未处理的 @主人 越过消息和对话保留窗口、重启后仍在 Frame 和巡查里；只有读过或在原对话回复后才消失。

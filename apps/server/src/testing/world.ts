@@ -15,6 +15,7 @@ import { layer as notice } from "../notice/notice.ts";
 import { layer as task } from "../task/task.ts";
 import { layer as tool } from "../tool/tool.ts";
 import { layer as mcp } from "../mcp/mcp.ts";
+import { said } from "./said.ts";
 import { testConfig } from "./layers.ts";
 import { clockLayer } from "./clock.ts";
 import { repo } from "./git.ts";
@@ -64,7 +65,7 @@ export function worldBelowTasks(options: WorldOptions = {}) {
     issue: { background: false },
   };
   const below = options.clock ? platform(config).pipe(Layer.provideMerge(clockLayer(options.clock))) : platform(config);
-  return below.pipe(agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
+  return said.pipe(Layer.provideMerge(below), agents(o), sourceControl(o), collaboration(o), agentSessions(o), issuesBelowTaskGraphs(o));
 }
 
 /** The farm up to its notifications, with the tools and /mcp: no orchestrator, gateway or game, and no startup (farm.ts adds

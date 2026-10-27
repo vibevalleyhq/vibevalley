@@ -81,8 +81,8 @@ const head = (text: string) => {
   return flat.length > 24 ? flat.slice(0, 24) : flat;
 };
 
-/** An issue's thread is named by the issue, so the name holds after its sessions leave. */
-export function threadTitle(chat: Chat | undefined, thread: Conversation, issues: Issue[] = [], sessions: Session[] = []) {
+/** An issue's thread is named by the issue, so the name holds after its sessions leave; the others by the server's title. */
+export function threadTitle(thread: Conversation, issues: Issue[] = [], sessions: Session[] = []) {
   switch (thread.subjectKind) {
     case "issue": {
       const issue = issues.find((i) => i.id === thread.subjectId);
@@ -94,59 +94,34 @@ export function threadTitle(chat: Chat | undefined, thread: Conversation, issues
     case undefined: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
-        const said = messagesIn(chat, thread.id).find((m) => m.from === thread.subjectId)?.name;
-        return rulesWording().chat.talkThread(session?.name ?? said ?? thread.subjectId ?? "");
+        return rulesWording().chat.talkThread(session?.name ?? thread.title ?? thread.subjectId);
       }
-      const parent = parentOf(chat, thread);
-      return parent ? head(parent.text) : rulesWording().chat.thread;
+      return thread.title || rulesWording().chat.thread;
     }
   }
 }
 
-export const messagesIn = (chat: Chat | undefined, conversation: string) => chat?.messages.filter((m) => m.conversation === conversation) ?? [];
+export const unreadIn = (c: Conversation) => c.unread ?? 0;
 
-export const unreadIn = (chat: Chat | undefined, c: Conversation) =>
-  messagesIn(chat, c.id).filter((m) => m.number > (c.read ?? 0) && m.fromKind !== "owner" && m.kind !== "notice").length;
-
-export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(chat, c), 0);
+export const unreadTotal = (chat: Chat | undefined) => (chat?.conversations ?? []).reduce((n, c) => n + unreadIn(c), 0);
 
 /** The number a receipt for this conversation carries, or undefined with nothing unread. */
-export function newestUnread(chat: Chat | undefined, c: Conversation) {
-  if (unreadIn(chat, c) === 0) return undefined;
-  return findLast(messagesIn(chat, c.id), (m) => m.number > (c.read ?? 0))?.number;
-}
+export const newestUnread = (c: Conversation) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
 
 /** A channel's own unread and its threads'; threads without a channel count under the general. */
 export const unreadUnder = (chat: Chat | undefined, channel: Conversation) =>
   (chat?.conversations ?? [])
     .filter((c) => c.id === channel.id || c.channel === channel.id || (channel.kind === "general" && c.kind === "thread" && !c.channel))
-    .reduce((n, c) => n + unreadIn(chat, c), 0);
+    .reduce((n, c) => n + unreadIn(c), 0);
 
-/** The pages of older messages read for a conversation; complete when the first message is among them. */
-export interface Loaded {
-  messages: ChatMessage[];
-  complete: boolean;
-}
-
+/** A page of a conversation read at a time (data/rooms.ts). */
 export const chatPage = 50;
 
-export function mergeLoaded(was: Loaded | undefined, more: ChatMessage[], complete: boolean): Loaded {
-  const all = new Map((was?.messages ?? []).map((m) => [m.id, m]));
-  for (const m of more) all.set(m.id, m);
-  return { messages: [...all.values()].sort((a, b) => a.number - b.number), complete: complete || (was?.complete ?? false) };
-}
-
-/** The state's messages over the loaded pages: the state's copy of a message is the newer. */
-export function messagesOf(chat: Chat | undefined, conversation: string, more?: Loaded) {
-  const all = new Map((more?.messages ?? []).map((m) => [m.id, m]));
-  for (const m of messagesIn(chat, conversation)) all.set(m.id, m);
-  return [...all.values()].sort((a, b) => a.number - b.number);
-}
-
-export function parentOf(chat: Chat | undefined, thread: Conversation, more?: Loaded) {
-  const p = thread.parent;
-  if (!p) return undefined;
-  return chat?.messages.find((m) => m.id === p) ?? more?.messages.find((m) => m.id === p);
+/** Where a thread's parent message is: its channel's, or the general's for a thread without one. */
+export function parentAt(chat: Chat | undefined, thread: Conversation) {
+  if (thread.kind !== "thread" || thread.parentNumber === undefined) return undefined;
+  const conversation = thread.channel ?? generalOf(chat)?.id;
+  return conversation ? { conversation, number: thread.parentNumber } : undefined;
 }
 
 export interface FeedItem {
@@ -164,12 +139,13 @@ const runMs = 5 * 60000;
 
 const senderOf = (m: ChatMessage) => (m.kind === "notice" ? "" : m.from);
 
-/** The rows of a conversation, with their day lines and grouping; filter keeps the messages containing it (any case). */
-export function feedOf(chat: Chat | undefined, conversation: string, more?: Loaded, filter = "", now = new Date()): FeedItem[] {
+/** The rows of a conversation's messages, with their day lines and grouping; filter keeps the messages containing it (any
+ * case). */
+export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], filter = "", now = new Date()): FeedItem[] {
   const threads = new Map<string, Conversation>();
   for (const c of chat?.conversations ?? []) if (c.kind === "thread" && c.parent) threads.set(c.parent, c);
   const q = filter.trim().toLowerCase();
-  const messages = messagesOf(chat, conversation, more).filter((m) => !q || m.text.toLowerCase().includes(q));
+  const messages = said.filter((m) => !q || m.text.toLowerCase().includes(q));
   let day = "";
   return messages.map((m, i) => {
     const label = dayLabel(m.at, now);

@@ -3,30 +3,23 @@
 import { type Chat, type ChatMessage, type Conversation, generalName, type OwnerMention } from "@vibevalley/protocol";
 import { compareText } from "../base/text.ts";
 
-/** The database keeps them all; the state these many. */
-export const keepMessages = 300;
+/** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepConversations = 100;
 
 export const isChannel = (c: Conversation) => c.kind !== "thread";
 
-const emptyChat = (): Chat => ({ conversations: [], messages: [] });
+const emptyChat = (): Chat => ({ conversations: [] });
 
 export const withOwnerMentions = (chat: Chat | undefined, ownerMentions: OwnerMention[]): Chat => ({ ...(chat ?? emptyChat()), ownerMentions });
 
-export const messagesIn = (chat: Chat | undefined, conversation: string) => (chat?.messages ?? []).filter((m) => m.conversation === conversation);
-
-const lastN = <T>(list: readonly T[], n: number) => list.slice(Math.max(0, list.length - n));
-
-export function withMessage(chat: Chat | undefined, m: ChatMessage): Chat {
-  const base = chat ?? emptyChat();
-  const messages = [...(base.messages ?? [])];
-  const i = messages.findIndex((x) => x.id === m.id);
-  if (i >= 0) messages[i] = m;
-  else {
-    messages.push(m);
-    messages.sort((a, b) => compareText(a.id, b.id));
-  }
-  return { ...base, messages: lastN(messages, keepMessages) };
+/** A message said: news when its number is past what the state knows of its conversation, or when the state does not
+ * keep that conversation (the game and the owner's other channels hear of it all the same); its conversation's
+ * lastNumber moves to it. A message said before, again (a restart's), is no news. */
+export function withMessage(chat: Chat | undefined, m: ChatMessage): [Chat | undefined, boolean] {
+  const c = chat?.conversations.find((x) => x.id === m.conversation);
+  if (!chat || !c) return [chat, true];
+  if (m.number <= (c.lastNumber ?? 0)) return [chat, false];
+  return [{ ...chat, conversations: chat.conversations.map((x) => (x === c ? { ...c, lastNumber: m.number } : x)) }, true];
 }
 
 /** Beyond keepConversations the quietest go, never a channel. */

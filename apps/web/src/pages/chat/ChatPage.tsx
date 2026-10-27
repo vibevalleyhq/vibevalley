@@ -24,7 +24,6 @@ import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots } from "./bits";
 import { Composer } from "./Composer";
-import { createHistory, HistoryContext } from "./data";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
 import { Jobs, Recurrences } from "./Tabs";
@@ -36,12 +35,7 @@ const iconButton =
 
 /** /chat is the general; /chat/<id> a channel, or a thread shown beside its channel. */
 export function ChatPage() {
-  const core = useCore();
-  return (
-    <HistoryContext value={createHistory(core)}>
-      <Chat />
-    </HistoryContext>
-  );
+  return <Chat />;
 }
 
 function Chat() {
@@ -289,7 +283,7 @@ function SessionRow(props: { h: Session; active: boolean; onShow: (c: Conversati
   const thread = () => jobThreadOf(core()?.chat, props.h);
   const unread = () => {
     const t = thread();
-    return t ? unreadIn(core()?.chat, t) : 0;
+    return t ? unreadIn(t) : 0;
   };
   const phase = () => phaseText(props.h, now());
   return (
@@ -360,7 +354,7 @@ function ThreadPane(props: { thread: Conversation; onClose: () => void }) {
           </Show>
         </span>
         <div class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate text-sm font-semibold">{threadTitle(core()?.chat, props.thread, core()?.issues ?? [], sessions())}</span>
+          <span class="truncate text-sm font-semibold">{threadTitle(props.thread, core()?.issues ?? [], sessions())}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
             <Show when={session()}>{(s) => <PhaseGlyph phase={s().phase} />}</Show>
             <span class="truncate">{status()}</span>

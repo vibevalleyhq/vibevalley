@@ -4,7 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { Message } from "../ai/messages.ts";
 import { type Answer, answer, toolCall } from "../ai/testing.ts";
 import { orchestratorAgent } from "@vibevalley/protocol";
-import { messagesIn } from "../channel/state.ts";
+import { Said } from "../testing/said.ts";
 import { seedAgents } from "../agent/seed.ts";
 import { Effect, Layer } from "effect";
 import { readFileSync } from "node:fs";
@@ -104,10 +104,10 @@ const enableLab = Effect.gen(function* () {
 });
 
 const said = Effect.gen(function* () {
-  const core = yield* Core;
+  const { in: saidIn } = yield* Said;
   const chat = yield* Channels;
   return () =>
-    messagesIn(core.state().chat, chat.general())
+    saidIn(chat.general())
       .filter((m) => m.from === orchestratorAgent && m.kind === "chat")
       .map((m) => m.text);
 });
@@ -125,7 +125,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
       const sessions = yield* Sessions;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       yield* enableLab;
       const words = yield* said;
@@ -155,7 +155,7 @@ describe("the orchestrator", () => {
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       const answered = f.requests.length;
       yield* marked(f);
-      expect(messagesIn(core.state().chat, chat.general()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
+      expect(saidIn(chat.general()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
       expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -182,7 +182,7 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const got = yield* Effect.promise(async () => {
         let out = "";
@@ -193,7 +193,7 @@ describe("the orchestrator", () => {
       expect(lastLine(f.requests.at(-1)!)).toMatch(/主人在电话里说的[\s\S]*主人说：现在地里怎么样/);
       expect(f.requests.length).toBe(1);
       const call = () =>
-        messagesIn(core.state().chat, chat.general())
+        saidIn(chat.general())
           .filter((m) => m.spoken || m.from === orchestratorAgent)
           .map((m) => m.from + "：" + m.text);
       expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
@@ -287,7 +287,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const agents = yield* Agents;
       const orchestrator = yield* Orchestrator;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const me = agents.agent(orchestratorAgent)!;
       yield* agents.saveAgent({ ...me, model: "openai/gpt" });
@@ -300,7 +300,7 @@ describe("the orchestrator", () => {
       const first = yield* pieces("在吗");
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
-      const refusal = () => messagesIn(core.state().chat, chat.general()).filter((m) => m.from === orchestratorAgent);
+      const refusal = () => saidIn(chat.general()).filter((m) => m.from === orchestratorAgent);
       expect((yield* until(() => refusal()[0], "the refusal on 田头")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
@@ -348,12 +348,12 @@ describe("the orchestrator", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = yield* Issues;
-      const core = yield* Core;
+      const { all: saidAll } = yield* Said;
       const chat = yield* Channels;
       const lab = yield* enableLab;
       const hired = yield* issues.hire({ ...lab, enabled: true, effort: "" }, "写一份长汇报", "notes");
       const id = hired.session!.id;
-      yield* until(() => core.state().chat?.messages.some((m) => m.from === id && m.kind === "report"), "its report");
+      yield* until(() => saidAll().some((m) => m.from === id && m.kind === "report"), "its report");
       const spoken = yield* chat.speak(id, "@管家 " + "长".repeat(5000), { anyway: true });
       expect(spoken.kind).toBe("sent");
       const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【田头】")), "the orchestrator asked");
@@ -377,7 +377,7 @@ describe("the orchestrator", () => {
     return Effect.gen(function* () {
       const issues = yield* Issues;
       const sessions = yield* Sessions;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const orchestrator = yield* Orchestrator;
       const lab = yield* enableLab;
@@ -387,10 +387,7 @@ describe("the orchestrator", () => {
       yield* until(() => sessions.roster().some((r) => r.session.id === helper && r.session.phase._tag === "done"), "the work handed back");
       yield* chat.speak(helper, "@管家 主人同意了，直接收", { anyway: true });
       const thread = (yield* chat.jobThread(helper))!;
-      const refused = yield* until(
-        () => messagesIn(core.state().chat, thread).find((m) => m.from === orchestratorAgent && m.text.startsWith("合并：")),
-        "the completion refused",
-      );
+      const refused = yield* until(() => saidIn(thread).find((m) => m.from === orchestratorAgent && m.text.startsWith("合并：")), "the completion refused");
       expect(refused.text).toBe("合并：没挪：改工单、挪状态要主人说一声。这一轮不是主人叫你的：在频道里问主人要不要这样做。");
       expect((yield* issues.get(hired.session!.issue!)).closedAt).toBeUndefined();
       yield* orchestrator.say("收下", {}, undefined, "");
@@ -402,7 +399,7 @@ describe("the orchestrator", () => {
       expect(merged.delivered).toBe("none");
       const general = (yield* Channels).general();
       yield* until(
-        () => messagesIn(core.state().chat, general).some((m) => m.from === orchestratorAgent && m.text === `合并：#${number} 已完成，没有改动要合`),
+        () => saidIn(general).some((m) => m.from === orchestratorAgent && m.text === `合并：#${number} 已完成，没有改动要合`),
         "what it delivered said",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));

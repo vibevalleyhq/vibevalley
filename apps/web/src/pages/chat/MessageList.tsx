@@ -1,14 +1,12 @@
 import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome } from "@vibevalley/protocol";
+import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
 import {
   chatPath,
   feedOf,
-  messagesIn,
-  messagesOf,
-  parentOf,
+  parentAt,
   phaseDot,
   phaseText,
   roleShort,
@@ -26,7 +24,8 @@ import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
-import { useMarkRead, useHistory } from "./data";
+import { useMarkRead } from "./data";
+import { rooms, useMessage, useRoom } from "../../data/rooms";
 import { TurnSteps } from "./WorkLog";
 import { useAgent } from "../../data/agents";
 
@@ -39,30 +38,16 @@ const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }>
 /** A conversation's messages, newest at the bottom; filter keeps those containing it. */
 export function MessageList(props: { conversation: Conversation | undefined; filter?: string; emptyText: string }) {
   const core = useCore();
-  const history = useHistory();
   const id = () => props.conversation?.id;
-  createEffect(id, (at) => {
-    if (at) history.ensure(at);
-  });
-  useMarkRead(core, () => props.conversation);
+  const room = useRoom(id);
+  useMarkRead(() => props.conversation);
   // Rows newer than this arrived while the list was shown: they rise in; the rest just appear.
   const shownAt = Date.now();
 
-  const more = () => {
-    const at = id();
-    return at ? history.loaded[at] : undefined;
-  };
-  const all = createMemo(() => {
-    const at = id();
-    return at ? messagesOf(core()?.chat, at, more()) : [];
-  });
-  const items = createMemo(() => {
-    const at = id();
-    return at ? feedOf(core()?.chat, at, more(), props.filter ?? "") : [];
-  });
-  const parent = () => (props.conversation?.kind === "thread" ? parentOf(core()?.chat, props.conversation, more()) : undefined);
+  const items = createMemo(() => feedOf(core()?.chat, room().messages, props.filter ?? ""));
+  const parent = useMessage(() => (props.conversation ? parentAt(core()?.chat, props.conversation) : undefined));
   const searching = () => (props.filter ?? "").trim() !== "";
-  const hasOlder = () => !!id() && all().length > 0 && !(more()?.complete ?? false);
+  const hasOlder = () => !!id() && room().messages.length > 0 && !room().complete;
   const typing = () => orchestratorTyping(core(), props.conversation);
 
   return (
@@ -78,7 +63,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
               </span>
             }
           >
-            <button type="button" onClick={() => void history.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
+            <button type="button" onClick={() => void rooms.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
               {chatWording().messages.older}
             </button>
           </Show>
@@ -241,8 +226,8 @@ function ThreadPreview(props: { thread: Conversation }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const unread = () => unreadIn(core()?.chat, props.thread);
-  const last = () => messagesIn(core()?.chat, props.thread.id).at(-1);
+  const unread = () => unreadIn(props.thread);
+  const last = () => props.thread.last;
   const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
   return (
     <button
@@ -271,8 +256,8 @@ function ThreadPreview(props: { thread: Conversation }) {
       <Show when={last()}>
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().fromKind === "owner" ? chatWording().messages.owner : m().name}</span>
-            <span class="min-w-0 flex-1 truncate text-muted">{m().text.replace(/\s+/g, " ")}</span>
+            <span class="shrink-0 font-medium">{m().from === ownerId ? chatWording().messages.owner : m().name}</span>
+            <span class="min-w-0 flex-1 truncate text-muted">{m().text}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>
         )}

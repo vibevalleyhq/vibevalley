@@ -21,7 +21,6 @@ it.live("an unresolved owner mention survives both history windows and restart u
   let number = 0;
   const standing = Effect.gen(function* () {
     const core = yield* Core;
-    expect(core.state().chat?.messages.some((m) => m.id === message)).toBe(false);
     expect(core.state().chat?.conversations.some((c) => c.id === thread)).toBe(false);
     expect(mentionIds(core)).toEqual([message]);
     expect(patrolStep(core.state(), at + 16 * 60_000, emptyPatrol())[0].map((item) => item.key)).toEqual([message]);
