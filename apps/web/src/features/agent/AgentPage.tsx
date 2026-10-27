@@ -42,7 +42,7 @@ import { Icon } from "../../ui/Icon";
 import { PoseSprite } from "../../ui/PoseSprite";
 import { Segmented } from "../../ui/Segmented";
 import { Toggle } from "../../ui/layout";
-import { MemoryPanel } from "../../pages/Memory";
+import { MemoryPanel } from "../memory/Memory";
 import { useSkills } from "../../pages/settings/SkillsPage";
 import { TrajectoryList } from "../session/Trajectory";
 

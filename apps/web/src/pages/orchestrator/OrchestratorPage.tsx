@@ -10,7 +10,7 @@ import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
-import { ArchivePanel, OrchestratorMemoryPanel } from "../Memory";
+import { ArchivePanel, OrchestratorMemoryPanel } from "../../features/memory/Memory";
 import { VoiceForm } from "../settings/VoiceForm";
 import { TrajectoryLog } from "../../features/session/Trajectory";
 import { usePrefs } from "../../base/prefs";
