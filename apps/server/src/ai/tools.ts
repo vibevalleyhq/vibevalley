@@ -139,3 +139,32 @@ function coerce(value: unknown, schema: JsonSchema): unknown {
   }
   return next;
 }
+
+/** A model's arguments for a tool as pi-ai's validateToolArguments takes them: coerced, or refused in its words, a line
+ * a problem and then the arguments as they came (the model reads it, and its next call goes by it). */
+export function toolArguments(name: string, args: unknown, schema: JsonSchema): { readonly ok: unknown } | { readonly refused: string } {
+  const coerced = coerceArguments(args, schema);
+  const problems = problemsOf(coerced, schema, "");
+  if (problems.length === 0) return { ok: coerced };
+  return {
+    refused: `Validation failed for tool "${name}":\n${problems.map((p) => `  - ${p}`).join("\n")}\n\nReceived arguments:\n${JSON.stringify(args, null, 2)}`,
+  };
+}
+
+const at = (path: string, key: string | number) => (path ? `${path}.${key}` : String(key));
+
+/** TypeBox's messages, for the JSON Schema parametersOf writes: types, required properties, enums, nested. */
+function problemsOf(value: unknown, schema: JsonSchema, path: string): string[] {
+  const types = typesOf(schema);
+  if (types.length > 0 && !types.some((t) => matches(value, t))) return [`${path || "root"}: must be ${types.join(",")}`];
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) return [`${path || "root"}: must be equal to one of the allowed values`];
+  if (matches(value, "object") && schema.properties) {
+    const object = value as Record<string, unknown>;
+    const missing = ((schema.required as string[] | undefined) ?? []).filter((k) => !(k in object));
+    if (missing.length > 0) return [`${at(path, missing[0]!)}: must have required properties ${missing.join(", ")}`];
+    return Object.entries(schema.properties as Record<string, JsonSchema>).flatMap(([k, p]) => (k in object ? problemsOf(object[k], p, at(path, k)) : []));
+  }
+  if (Array.isArray(value) && schema.items && !Array.isArray(schema.items))
+    return value.flatMap((v, i) => problemsOf(v, schema.items as JsonSchema, at(path, i)));
+  return [];
+}
