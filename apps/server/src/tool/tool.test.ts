@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Spent } from "@vibevalley/protocol";
+import { setLocale } from "@vibevalley/protocol/words";
 import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { schemas, sessionSchemas } from "./schemas.ts";
@@ -34,5 +35,14 @@ describe("the tools", () => {
     });
     expect(toolStart("graph_split", { goal: "长".repeat(50) }).text).toBe("拆计划：" + "长".repeat(40) + "…");
     expect(toolStart("unknown", undefined).text).toBe("unknown");
+  });
+
+  it("are named in the owner's language", () => {
+    setLocale("en");
+    try {
+      expect(toolStart("memory_search", { query: "the port" }).text).toBe("Search the memory: the port");
+    } finally {
+      setLocale("zh");
+    }
   });
 });

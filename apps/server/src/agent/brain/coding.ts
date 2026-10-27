@@ -8,6 +8,7 @@ import { dirname, isAbsolute, join, relative } from "node:path";
 import { schemaTool, stopped } from "./tool.ts";
 import { Schema } from "effect";
 import { afterRealTime } from "../../base/time.ts";
+import { coding as words } from "./prompts.ts";
 
 export interface CodingOptions {
   readonly cwd: string;
@@ -46,7 +47,7 @@ const outputCap = 200_000;
 /** Past timeout it gets SIGTERM, and SIGKILL 2 s later; when signal aborts it goes at once. The whole process group is
  * killed, so a child left behind does not hold the output open. */
 export function runCommand(argv: readonly string[], cwd: string, timeoutMs: number, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<Ran> {
-  if (argv.length === 0) return Promise.reject(new Error("跑不起来：没有命令"));
+  if (argv.length === 0) return Promise.reject(new Error(words.noCommand));
   if (signal?.aborted) return Promise.reject(new Error(stopped));
   return new Promise((resolve, reject) => {
     const child = spawn(argv[0]!, argv.slice(1), {
@@ -87,7 +88,7 @@ export function runCommand(argv: readonly string[], cwd: string, timeoutMs: numb
     child.on("error", (e) => {
       done();
       reject(
-        Object.assign(new Error("跑不起来：" + e.message), {
+        Object.assign(new Error(words.cannotRun(e.message)), {
           code: (e as NodeJS.ErrnoException).code,
         }),
       );
@@ -127,14 +128,14 @@ export function codingTools(o: CodingOptions): Tool[] {
 
   const read = schemaTool({
     name: "read_file",
-    description: "读一个文本文件，每行前面带行号。大文件用 offset（从第几行开始，1 起）和 limit（读几行）分段读。",
+    description: words.readDescription,
     parameters: Schema.Struct({ path: Schema.String, offset: Schema.optionalKey(Schema.Int), limit: Schema.optionalKey(Schema.Int) }),
     run: (p) => {
       let data: string;
       try {
         data = readFileSync(at(p.path), "utf8");
       } catch (e) {
-        throw new Error(`读不了 ${p.path}：${why(e)}`, { cause: e });
+        throw new Error(words.cannotRead(p.path, why(e)), { cause: e });
       }
       const lines = data.split("\n");
       const from = Math.max(1, p.offset ?? 1);
@@ -142,13 +143,13 @@ export function codingTools(o: CodingOptions): Tool[] {
       const body: string[] = [];
       for (let i = from - 1; i < to; i++) body.push(`${String(i + 1).padStart(6)}\t${lines[i]}`);
       const text = body.join("\n");
-      return to < lines.length ? `${text}\n（共 ${lines.length} 行，这里到第 ${to} 行；接着读用 offset=${to + 1}）` : text;
+      return to < lines.length ? text + words.moreLines(lines.length, to) : text;
     },
   });
 
   const write = schemaTool({
     name: "write_file",
-    description: "写一个文件（整个覆盖；没有的目录会建好）。改已有文件的一部分用 edit_file。",
+    description: words.writeDescription,
     parameters: Schema.Struct({ path: Schema.String, content: Schema.String }),
     run: (p) => {
       const file = at(p.path);
@@ -156,15 +157,15 @@ export function codingTools(o: CodingOptions): Tool[] {
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, p.content);
       } catch (e) {
-        throw new Error(`写不了 ${p.path}：${why(e)}`, { cause: e });
+        throw new Error(words.cannotWrite(p.path, why(e)), { cause: e });
       }
-      return `写好了 ${shown(file)}（${p.content.split("\n").length} 行）`;
+      return words.wrote(shown(file), p.content.split("\n").length);
     },
   });
 
   const edit = schemaTool({
     name: "edit_file",
-    description: "把文件里的一段原文换成新的。old_text 要和文件里一字不差、而且只出现一次（不唯一就多带几行上下文），要全换就把 replace_all 设成 true。",
+    description: words.editDescription,
     parameters: Schema.Struct({ path: Schema.String, old_text: Schema.String, new_text: Schema.String, replace_all: Schema.optionalKey(Schema.Boolean) }),
     run: (p) => {
       const file = at(p.path);
@@ -172,25 +173,25 @@ export function codingTools(o: CodingOptions): Tool[] {
       try {
         text = readFileSync(file, "utf8");
       } catch (e) {
-        throw new Error(`读不了 ${p.path}：${why(e)}`, { cause: e });
+        throw new Error(words.cannotRead(p.path, why(e)), { cause: e });
       }
-      if (p.old_text === "") throw new Error("old_text 是空的：要新建文件用 write_file。");
+      if (p.old_text === "") throw new Error(words.emptyOldText);
       const count = text.split(p.old_text).length - 1;
-      if (count === 0) throw new Error(`${p.path} 里找不到 old_text：先 read_file 看清原文（空格、缩进都要一样）。`);
-      if (count > 1 && !p.replace_all) throw new Error(`old_text 在 ${p.path} 里出现了 ${count} 次：多带几行上下文让它唯一，或者设 replace_all。`);
+      if (count === 0) throw new Error(words.oldTextNotFound(p.path));
+      if (count > 1 && !p.replace_all) throw new Error(words.oldTextNotUnique(p.path, count));
       const next = p.replace_all ? text.split(p.old_text).join(p.new_text) : text.replace(p.old_text, () => p.new_text);
       try {
         writeFileSync(file, next);
       } catch (e) {
-        throw new Error(`写不了 ${p.path}：${why(e)}`, { cause: e });
+        throw new Error(words.cannotWrite(p.path, why(e)), { cause: e });
       }
-      return `改好了 ${shown(file)}（换了 ${p.replace_all ? count : 1} 处）`;
+      return words.edited(shown(file), p.replace_all ? count : 1);
     },
   });
 
   const list = schemaTool({
     name: "list_dir",
-    description: "列一个目录里有什么（目录后面带 /）。depth 是往下看几层，默认 1。不进 .git、node_modules。",
+    description: words.listDirDescription,
     parameters: Schema.Struct({ path: Schema.optionalKey(Schema.String), depth: Schema.optionalKey(Schema.Int) }),
     run: (p) => {
       const path = p.path ?? ".";
@@ -209,16 +210,16 @@ export function codingTools(o: CodingOptions): Tool[] {
       try {
         walk(at(path), 0);
       } catch (e) {
-        throw new Error(`列不了 ${path}：${why(e)}`, { cause: e });
+        throw new Error(words.cannotList(path, why(e)), { cause: e });
       }
-      if (out.length === 0) return "（空的）";
-      return out.join("\n") + (out.length >= 500 ? "\n…（太多了，只列了 500 个）" : "");
+      if (out.length === 0) return words.empty;
+      return out.join("\n") + (out.length >= 500 ? words.tooManyNote : "");
     },
   });
 
   const grep = schemaTool({
     name: "grep",
-    description: "在文件里搜一个正则，返回「文件:行号:那一行」。path 默认工作目录；glob 只搜某些文件，比如 *.ts。",
+    description: words.grepDescription,
     parameters: Schema.Struct({
       pattern: Schema.String,
       path: Schema.optionalKey(Schema.String),
@@ -242,30 +243,30 @@ export function codingTools(o: CodingOptions): Tool[] {
       try {
         ran = await runCommand(argv, cwd, 30_000, runEnv, tc.signal);
       } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new Error("这台机器没有 ripgrep（rg）：用 bash 跑 grep -rn 代替。", { cause: e });
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new Error(words.noRipgrep, { cause: e });
         throw e;
       }
-      if (ran.code === 1 || ran.output.trim() === "") return "没搜到。";
+      if (ran.code === 1 || ran.output.trim() === "") return words.noMatches;
       return ran.output.trim();
     },
   });
 
   const bash = schemaTool({
     name: "bash",
-    description: `在工作目录里跑一条 shell 命令，返回它的输出和退出码。默认 ${formatSeconds(timeout)} 秒超时，可以用 timeout_seconds 改。不要用它读写文件（用 read_file、edit_file），不要起不会结束的进程。`,
+    description: words.bashDescription(formatSeconds(timeout)),
     parameters: Schema.Struct({ command: Schema.String, timeout_seconds: Schema.optionalKey(Schema.Number) }),
     run: async (p, tc) => {
       const limit = p.timeout_seconds ? p.timeout_seconds * 1000 : timeout;
       const ran = await runCommand(["/bin/bash", "-lc", p.command], cwd, limit, runEnv, tc.signal);
-      const output = ran.output.trim() || "（没有输出）";
-      if (ran.timedOut) return output + "\n（超时，停掉了）";
-      return `${output}\n（退出码 ${ran.code}）`;
+      const output = ran.output.trim() || words.noOutput;
+      if (ran.timedOut) return output + words.timedOutNote;
+      return words.exitCodeNote(output, ran.code);
     },
   });
 
   const fetchTool = schemaTool({
     name: "web_fetch",
-    description: "打开一个网页，返回它的正文（HTML 变成纯文本）。",
+    description: words.webFetchDescription,
     parameters: Schema.Struct({ url: Schema.String }),
     run: async (p, tc) => {
       const timeoutSignal = AbortSignal.timeout(30_000);
@@ -276,8 +277,8 @@ export function codingTools(o: CodingOptions): Tool[] {
           signal: AbortSignal.any([tc.signal, timeoutSignal]),
         });
       } catch (e) {
-        if (timeoutSignal.aborted) throw new Error(`打开 ${p.url} 超时了`, { cause: e });
-        throw new Error(`打不开 ${p.url}：${why(e)}`, { cause: e });
+        if (timeoutSignal.aborted) throw new Error(words.fetchTimedOut(p.url), { cause: e });
+        throw new Error(words.cannotFetch(p.url, why(e)), { cause: e });
       }
       let text = await res.text();
       if ((res.headers.get("content-type") ?? "").includes("html")) text = htmlText(text);

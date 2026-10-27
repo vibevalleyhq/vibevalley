@@ -4,6 +4,7 @@
 
 import { dagIDValid, dagProblems } from "../../base/dag.ts";
 import { head } from "../../base/text.ts";
+import { agentTask as words } from "./prompts.ts";
 
 export type By = "self" | "subagent";
 export type State = "waiting" | "working" | "done" | "failed" | "skipped";
@@ -49,13 +50,13 @@ function edgeProblems(g: readonly AgentTask[]): string[] {
   return dagProblems(g.map((t) => ({ id: t.id, after: [...t.after] }))).map((p) => {
     switch (p.kind) {
       case "duplicate":
-        return "id「" + p.id + "」重复了";
+        return words.duplicateId(p.id);
       case "self":
-        return "「" + p.id + "」不能等自己";
+        return words.selfWait(p.id);
       case "missing":
-        return "「" + p.id + "」要等的「" + p.other + "」不存在";
+        return words.missingAfter(p.id, p.other);
       case "circle":
-        return "这几件互相等，成了一个圈：" + p.circle.join("、");
+        return words.circle(p.circle);
     }
   });
 }
@@ -63,13 +64,13 @@ function edgeProblems(g: readonly AgentTask[]): string[] {
 /** Adds tasks to the graph, all or none: a batch with any problem changes nothing, and the problems say why. */
 export function add(g: readonly AgentTask[], more: readonly Partial<AgentTask>[]): [AgentTask[], string[]] {
   const problems: string[] = [];
-  if (more.length === 0) problems.push("一件任务都没有");
+  if (more.length === 0) problems.push(words.noTasks);
   const next: AgentTask[] = [...g];
   for (const t of more) {
     const id = (t.id ?? "").trim();
     const brief = (t.brief ?? "").trim();
-    if (!dagIDValid(id)) problems.push("「" + id + "」不能当 id：用简短的英文，比如 read、fix-auth");
-    if (!brief) problems.push("「" + id + "」没有写要做什么（brief）");
+    if (!dagIDValid(id)) problems.push(words.invalidId(id));
+    if (!brief) problems.push(words.noBrief(id));
     next.push({
       id,
       title: (t.title ?? "").trim() || head(brief, 20),
@@ -79,7 +80,7 @@ export function add(g: readonly AgentTask[], more: readonly Partial<AgentTask>[]
       state: "waiting",
     });
   }
-  if (next.length > maxTasks) problems.push(`最多 ${maxTasks} 件，这里有 ${next.length} 件：把小的合并，或者先做完一部分`);
+  if (next.length > maxTasks) problems.push(words.tooMany(maxTasks, next.length));
   const all = problems.length === 0 ? edgeProblems(next) : problems;
   return all.length > 0 ? [[...g], all] : [next, []];
 }
@@ -92,26 +93,19 @@ export interface Change {
   readonly after?: readonly string[];
 }
 
-const stateWords: Record<State, string> = {
-  waiting: "还没做",
-  working: "在做",
-  done: "做完了",
-  failed: "没做成",
-  skipped: "跳过了",
-};
+const stateWords: Record<State, string> = words.stateWords;
 
 export class AgentTaskError extends Error {}
 
 export function update(g: readonly AgentTask[], id: string, c: Change): AgentTask[] {
   const i = find(g, id);
-  if (i < 0) throw new AgentTaskError("没有「" + id + "」这件任务");
+  if (i < 0) throw new AgentTaskError(words.notFound(id));
   const was = g[i]!;
   const open = was.state === "waiting" || was.state === "failed";
-  if ((c.brief !== undefined || c.after !== undefined) && !open)
-    throw new AgentTaskError("「" + id + "」已经" + stateWords[was.state] + "，不能再改要做什么或等谁");
+  if ((c.brief !== undefined || c.after !== undefined) && !open) throw new AgentTaskError(words.cannotChangeBrief(id, stateWords[was.state]));
   let t: AgentTask = { ...was };
   if (c.brief !== undefined) {
-    if (!c.brief.trim()) throw new AgentTaskError("brief 是空的");
+    if (!c.brief.trim()) throw new AgentTaskError(words.emptyBrief);
     t = { ...t, brief: c.brief.trim() };
   }
   if (c.after !== undefined) t = { ...t, after: [...c.after] };
@@ -120,7 +114,7 @@ export function update(g: readonly AgentTask[], id: string, c: Change): AgentTas
     const to = c.state;
     if (to === "waiting" && (t.state === "failed" || t.state === "skipped")) t = { ...t, tries: (t.tries ?? 0) + 1, state: "waiting" };
     else if ((to === "done" || to === "failed" || to === "skipped") && (t.state === "waiting" || t.state === "working")) t = { ...t, state: to };
-    else throw new AgentTaskError("「" + id + "」" + stateWords[t.state] + "，不能改成" + stateWords[to]);
+    else throw new AgentTaskError("「" + id + "」" + stateWords[t.state] + words.cannotMoveTo(stateWords[to]));
   }
   const next = [...g];
   next[i] = t;
@@ -133,13 +127,13 @@ export function update(g: readonly AgentTask[], id: string, c: Change): AgentTas
 
 /** The whole graph as the model reads it: what each task is at, who does it, what it waits for, what it came to. */
 export function text(g: readonly AgentTask[]): string {
-  if (g.length === 0) return "现在没有任务。";
-  const lines = [`任务（${g.length} 件，${readyTasks(g).length} 件可以做）：`];
+  if (g.length === 0) return words.none;
+  const lines = [words.header(g.length, readyTasks(g).length)];
   for (const t of g) {
-    const mark = t.state === "waiting" ? (ready(g, t) ? "可以做" : "等着") : stateWords[t.state];
+    const mark = t.state === "waiting" ? (ready(g, t) ? words.canDo : words.waitingFor) : stateWords[t.state];
     let line = "- [" + mark + "] " + t.id + " " + t.title;
-    if (t.by === "subagent") line += "（帮手做）";
-    if (t.after.length > 0 && !settled(t)) line += "（等 " + t.after.join("、") + "）";
+    if (t.by === "subagent") line += words.bySubagent;
+    if (t.after.length > 0 && !settled(t)) line += words.waitingOn + t.after.join("、") + "）";
     if (t.result) line += " → " + head(t.result.split(/\s+/).filter(Boolean).join(" "), 80);
     lines.push(line);
   }

@@ -3,9 +3,10 @@
 import { Effect, Schema } from "effect";
 import { type JsonSchema, parametersOf } from "../../ai/tools.ts";
 import type { Tool } from "../loop/agent.ts";
+import { toolResult } from "./prompts.ts";
 
 /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */
-export const stopped = "已停下";
+export const stopped = toolResult.stopped;
 
 /** The model gets the head and the tail, and a note. */
 export const maxResultChars = 30_000;
@@ -15,7 +16,7 @@ export function clip(text: string, limit = maxResultChars): string {
   if (r.length <= limit) return text;
   const head = Math.trunc(limit * 0.7);
   const tail = Math.trunc(limit * 0.3);
-  return r.slice(0, head).join("") + `\n\n…（省略了 ${r.length - limit} 个字符）…\n\n` + r.slice(r.length - tail).join("");
+  return r.slice(0, head).join("") + toolResult.clippedNote(r.length - limit) + r.slice(r.length - tail).join("");
 }
 
 export interface ToolContext {

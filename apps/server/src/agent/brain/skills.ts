@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { skills as skillWords } from "./prompts.ts";
 
 export interface SkillInfo {
   readonly name: string;
@@ -94,12 +95,18 @@ export function skillIndex(skills: readonly SkillInfo[], max = 160): string {
 
 export function readSkill(skills: readonly SkillInfo[], name: string): string {
   const s = skills.find((x) => x.name === name);
-  if (!s) throw new Error(`没有叫 ${name} 的技能。有：${skills.map((x) => x.name).join("、") || "（没有）"}`);
+  if (!s)
+    throw new Error(
+      skillWords.noSuchSkill(
+        name,
+        skills.map((x) => x.name),
+      ),
+    );
   let data: string;
   try {
     data = readFileSync(s.path, "utf8");
   } catch {
-    throw new Error(`读不到 ${s.path}`);
+    throw new Error(skillWords.cannotRead(s.path));
   }
-  return "# " + s.name + "\n（来自 " + s.path + "）\n\n" + skillBody(data);
+  return skillWords.body(s.name, s.path, skillBody(data));
 }
