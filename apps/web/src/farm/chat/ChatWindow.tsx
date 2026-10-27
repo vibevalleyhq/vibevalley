@@ -11,7 +11,19 @@ import { arrived, pending, say } from "../../data/composer";
 import { liveCaptions, type SpokenLine } from "../../voice/captions";
 import { playSound } from "../sound";
 import { farm } from "../store";
-import { channelLabel, channelOf, conversationOf, feedOf, generalOf, parentOf, phaseText, threadOwnerOf, threadTitle, unreadIn } from "../../rules/chat";
+import {
+  channelLabel,
+  channelOf,
+  conversationOf,
+  feedOf,
+  generalOf,
+  orchestratorTyping,
+  parentOf,
+  phaseText,
+  threadOwnerOf,
+  threadTitle,
+  unreadIn,
+} from "../../rules/chat";
 import { voiceCall, type VoiceCall } from "../../voice/call";
 import { useRouter } from "../../app/router";
 import { useNow } from "../../app/util";
@@ -176,7 +188,8 @@ function Window() {
       .map((m) => ({ speaker: m.fromKind === "owner" ? "you" : "orchestrator", text: m.text }));
     return liveCaptions(c.captions.turns, c.answeredBy, spoken, tick()).map((t) => ({ ...t }));
   });
-  const thinking = () => phase() === "thinking" && !thread() && items().at(-1)?.message.from !== "orchestrator";
+  // On a call the captions show what is being said; the dots are for the chat.
+  const thinking = () => captions().length === 0 && orchestratorTyping(core(), shown()) !== undefined;
   const showSuggestions = () => !thread() && (core()?.call === "live" || (chat()?.messages ?? []).length === 0);
 
   return (

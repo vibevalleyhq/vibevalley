@@ -21,6 +21,7 @@ describe("core", () => {
       call: "live",
       callReason: "挂了",
       orchestrator: "speaking",
+      orchestratorConversation: "c1",
       sessions: [helper],
       progress: emptyProgress(),
       recurrences: [],
@@ -29,7 +30,7 @@ describe("core", () => {
     writeFileSync(join(config.home, "state.json"), JSON.stringify(was));
     return Effect.gen(function* () {
       const s = (yield* Core).state();
-      expect([s.call, s.callReason, s.orchestrator]).toEqual(["idle", undefined, "idle"]);
+      expect([s.call, s.callReason, s.orchestrator, s.orchestratorConversation]).toEqual(["idle", undefined, "idle", undefined]);
       expect([s.progress, s.recurrences, s.issues]).toEqual([undefined, undefined, undefined]);
       expect(s.sessions).toHaveLength(1);
       expect(s.sessions[0]!.play?.station).toBe(0);
@@ -150,6 +151,19 @@ describe("core", () => {
       expect(readFileSync(join(config.home, "state.json"), "utf8")).toContain("thinking");
     }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
   });
+
+  it.effect("the orchestrator's state says where it thinks and writes, and forgets it once it listens", () =>
+    Effect.gen(function* () {
+      const core = yield* Core;
+      yield* core.setOrchestrator("thinking", "c1");
+      expect([core.state().orchestrator, core.state().orchestratorConversation]).toEqual(["thinking", "c1"]);
+      yield* core.setOrchestrator("speaking", "c2");
+      expect([core.state().orchestrator, core.state().orchestratorConversation]).toEqual(["speaking", "c2"]);
+      yield* core.setOrchestrator("listening");
+      expect(core.state().orchestrator).toBe("listening");
+      expect("orchestratorConversation" in core.state()).toBe(false);
+    }).pipe(Effect.provide(layer.pipe(Layer.provide(projection), Layer.provide(Layer.succeed(Settings, testConfig()))))),
+  );
 
   it.effect("apply stays synchronous for oar callbacks", () =>
     Effect.gen(function* () {

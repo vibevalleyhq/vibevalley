@@ -16,7 +16,7 @@ import {
   spentText,
   threadOwnerOf,
   unreadIn,
-  waitingForOrchestrator,
+  orchestratorTyping,
   workbenchClock,
 } from "../../rules/chat";
 import { aria, useNow } from "../../app/util";
@@ -63,7 +63,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
   const parent = () => (props.conversation?.kind === "thread" ? parentOf(core()?.chat, props.conversation, more()) : undefined);
   const searching = () => (props.filter ?? "").trim() !== "";
   const hasOlder = () => !!id() && all().length > 0 && !(more()?.complete ?? false);
-  const waiting = () => waitingForOrchestrator(core()?.orchestrator, props.conversation, all());
+  const typing = () => orchestratorTyping(core(), props.conversation);
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
@@ -106,8 +106,12 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
             </div>
           )}
         </For>
-        <Show when={waiting()}>
-          <Frame face={<OrchestratorFace size={36} />} name={chatWording().orchestrator} meta={chatWording().messages.thinking}>
+        <Show when={typing()}>
+          <Frame
+            face={<OrchestratorFace size={36} />}
+            name={chatWording().orchestrator}
+            meta={typing() === "speaking" ? chatWording().messages.typing : chatWording().messages.thinking}
+          >
             <div class="flex h-5 items-center">
               <ThinkingDots />
             </div>

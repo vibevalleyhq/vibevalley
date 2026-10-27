@@ -171,7 +171,8 @@ export const make = (options: OrchestratorOptions = {}) =>
       first: { conversation: general, source: "owner" },
       quiet: (r) => r.quiet ?? false,
       say: (r, text, runId) => go(chat.orchestratorSays(r.conversation, text, runId)),
-      state: (s) => go(core.setOrchestrator(s)),
+      // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
+      state: (s, r) => go(core.setOrchestrator(s, r && (s === "thinking" || s === "speaking") && !r.quiet ? r.conversation : undefined)),
       fresh: () => {
         shown = "";
       },

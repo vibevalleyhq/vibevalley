@@ -658,6 +658,7 @@ export const WorkspaceState: Codec<T.WorkspaceState> = Schema.Struct({
   call: CallState,
   callReason: Schema.optionalKey(Schema.String),
   orchestrator: OrchestratorState,
+  orchestratorConversation: Schema.optionalKey(Schema.String),
   sessions: Schema.mutable(Schema.Array(Session)),
   chat: Schema.optionalKey(Chat),
   commits: Schema.optionalKey(CommitCount),
@@ -1589,6 +1590,7 @@ export const FactOrchestrator: Codec<T.FactOrchestrator> = Schema.Struct({
   type: Schema.Literal("orchestrator"),
   at: Schema.Number,
   state: OrchestratorState,
+  conversation: Schema.optionalKey(Schema.String),
 });
 
 export const FactMessage: Codec<T.FactMessage> = Schema.Struct({

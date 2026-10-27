@@ -14,6 +14,7 @@ import {
   type Phase,
   type Session,
   type Spent,
+  type WorkspaceState,
 } from "@vibevalley/protocol";
 
 export const isChannel = (c: Conversation) => c.kind !== "thread";
@@ -187,9 +188,11 @@ export function feedOf(chat: Chat | undefined, conversation: string, more?: Load
   });
 }
 
-/** The orchestrator's dots: it thinks, in a channel, and has not answered the last word yet. */
-export const waitingForOrchestrator = (orchestrator: string | undefined, conversation: Conversation | undefined, messages: ChatMessage[]) =>
-  orchestrator === "thinking" && conversation?.kind !== "thread" && messages.length > 0 && messages[messages.length - 1]!.from !== orchestratorAgent;
+/** The orchestrator's dots in a conversation: it is thinking or writing its answer there, as the server says. */
+export function orchestratorTyping(state: WorkspaceState | undefined, conversation: Conversation | undefined): "thinking" | "speaking" | undefined {
+  if (!state || !conversation || state.orchestratorConversation !== conversation.id) return undefined;
+  return state.orchestrator === "thinking" || state.orchestrator === "speaking" ? state.orchestrator : undefined;
+}
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 

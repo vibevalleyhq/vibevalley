@@ -7,7 +7,6 @@ import { scriptedLLM } from "../agent/brain/testing.ts";
 import { answer, text, toolCall } from "../ai/testing.ts";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";
-import type { OrchestratorState } from "@vibevalley/protocol";
 
 describe("Caller", () => {
   it("removes the abort listener after every kind of wake", async () => {
@@ -55,7 +54,7 @@ describe("AgentHost", () => {
       const sessions = yield* Sessions;
       const { llm } = scriptedLLM([answer([text("我看一下"), toolCall("missing", {})]), answer("看完了，一切正常")]);
       const said: string[] = [];
-      const states: OrchestratorState[] = [];
+      const states: string[] = [];
       const host = sessions.host({
         name: "orchestrator",
         label: "管家",
@@ -68,7 +67,7 @@ describe("AgentHost", () => {
         first: "first",
         quiet: () => false,
         say: async (_route, words) => void said.push(words),
-        state: async (s) => void states.push(s),
+        state: async (s, route) => void states.push(route ? `${s} ${route}` : s),
         fresh: () => {},
         restored: () => ({ by: { kind: "" } }),
         toolStart: (tool) => ({ text: tool, action: "other", tool }),
@@ -90,7 +89,16 @@ describe("AgentHost", () => {
       // A character at a time from the script: more pushes than answers.
       expect(heard.length).toBeGreaterThan(2);
       expect(heard.join("")).toBe("我看一下\n看完了，一切正常\n");
-      expect(states.filter((s, i) => s !== states[i - 1])).toEqual(["thinking", "speaking", "thinking", "speaking", "thinking", "listening"]);
+      // Where it works is said once it takes the input, and kept until it is done.
+      expect(states.filter((s, i) => s !== states[i - 1])).toEqual([
+        "thinking",
+        "thinking r",
+        "speaking r",
+        "thinking r",
+        "speaking r",
+        "thinking r",
+        "listening",
+      ]);
       yield* Effect.promise(() => host.close());
     }).pipe(Effect.scoped, Effect.provide(world({ config })));
   });

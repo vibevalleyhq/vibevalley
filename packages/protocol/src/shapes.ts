@@ -462,6 +462,8 @@ export interface WorkspaceState {
   call: CallState;
   callReason?: string;
   orchestrator: OrchestratorState;
+  /** Where the orchestrator is thinking or writing, as its last orchestrator fact says. */
+  orchestratorConversation?: string;
   sessions: Session[];
   chat?: Chat;
   commits?: CommitCount;
@@ -1901,6 +1903,8 @@ export interface FactOrchestrator {
   type: "orchestrator";
   at: number;
   state: OrchestratorState;
+  /** The conversation it is thinking or writing in; absent while it listens, or works for what is not said in the chat. */
+  conversation?: string;
 }
 
 export interface FactMessage {

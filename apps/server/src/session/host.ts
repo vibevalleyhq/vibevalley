@@ -111,7 +111,8 @@ export interface HostOptions<R> {
   readonly quiet: (route: R) => boolean;
   /** Where words go: each of the model's answers in full, as one message; the caller has them as they grow. */
   readonly say: (route: R, text: string, run: string) => Promise<void>;
-  readonly state: (state: OrchestratorState) => Promise<void>;
+  /** route: the input it works for, once it has taken one in this run; its words go there. */
+  readonly state: (state: OrchestratorState, route?: R) => Promise<void>;
   /** The agent started, or folded its conversation: what the model saw before is gone from it. */
   readonly fresh: () => void;
   /** The run an input found in the transcript after a restart goes on with: its issue and trigger, from its route. */
@@ -360,7 +361,7 @@ export class AgentHost<R> {
     }
     if (this.open) return;
     this.open = true;
-    await this.o.state("speaking");
+    await this.o.state("speaking", input.route);
   }
 
   private async done(text: string) {
@@ -372,7 +373,7 @@ export class AgentHost<R> {
     this.open = false;
     if (text && !this.o.quiet(input.route)) await this.o.say(input.route, text, this.execution.currentRun());
     // The run goes on (its tools, another answer) until it settles.
-    if (wrote) await this.o.state("thinking");
+    if (wrote) await this.o.state("thinking", input.route);
   }
 
   // Only stop aborts a run while the farm is up; the settle close publishes is the farm stopping.
@@ -416,9 +417,12 @@ export class AgentHost<R> {
           if (this.input.caller && this.input.caller !== next.caller) this.input.caller.end();
           this.input = next;
           this.toCaller = 0;
+          // It works for this input from here on, wherever the run began.
+          await this.o.state("thinking", next.route);
         }
         return;
       case "agent_start":
+        // The input it starts on is taken next (message_start), and says where.
         return this.o.state("thinking");
       case "message_update": {
         if (e.message.role !== "assistant") return;
