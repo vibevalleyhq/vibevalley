@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { Channel, WorkspaceState } from "@vibevalley/protocol";
-import { archivedOf, groupsOf, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
+import { archivedOf, groupsOf, linkedMessages, messagePath, orchestratorTyping, pointedAt, switchTargets, threadsIn, topsOf } from "./rules";
 
 const at = (id: string): Channel => ({ id, type: "channel", replies: 0, at: 0 });
 const state = (orchestrator: WorkspaceState["orchestrator"], where?: string): WorkspaceState => ({
@@ -68,4 +68,14 @@ test("Ctrl+K lists places by what is typed: a name starting with it first, then 
   expect(ids("#end")).toEqual(["b", "f"]);
   expect(ids("@")).toEqual(["d", "docs"]);
   expect(switchTargets(chat, "front", { profiles })[1]).toMatchObject({ kind: "thread", hint: "#frontend" });
+});
+
+test("a message's links to farm messages are read from any host for a known channel, the default's only from this one", () => {
+  const chat = { channels: [{ ...at("01a17e65-9647-7222-9a7d-06132e9d4dae") }, { ...at("g"), default: true }] };
+  const known = "01a17e65-9647-7222-9a7d-06132e9d4dae";
+  const text = `看这条 http://127.0.0.1:8787/chat/${known}?m=7 还有 http://192.168.1.5:8787/chat/${known}?m=7 和 http://127.0.0.1:8787/chat?m=3、http://other:1/chat?m=4 http://x/chat/01a17e65-0000-7222-9a7d-06132e9d4dae?m=1`;
+  expect(linkedMessages(text, chat, "127.0.0.1:8787")).toEqual([
+    { channel: known, number: 7 },
+    { channel: "g", number: 3 },
+  ]);
 });

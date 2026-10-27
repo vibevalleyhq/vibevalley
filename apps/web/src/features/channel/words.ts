@@ -90,6 +90,7 @@ const zh = {
     inThread: (address: string) => `在 ${address}`,
     file: (size: string) => `文件 · ${size}`,
     reactedBy: (emoji: string, names: string) => `${names} 回应了 ${emoji}`,
+    linked: (where: string, number: number) => `跳到 ${where} 的第 ${number} 条`,
   },
   tools: {
     label: "这条消息能做的",
@@ -298,6 +299,7 @@ const en: typeof zh = {
     searching: "Searching…",
     inThread: (address) => `in ${address}`,
     file: (size) => `File · ${size}`,
+    linked: (where, number) => `Go to message ${number} in ${where}`,
     reactedBy: (emoji, names) => `${names} reacted with ${emoji}`,
   },
   tools: {

@@ -15,7 +15,7 @@ import { quickReactions } from "./emoji";
 import { EmojiPicker } from "./EmojiPicker";
 import { useCore } from "../../base/frame";
 import { markUnread } from "./data";
-import { channelOf, messagePath } from "./rules";
+import { channelLabel, channelOf, type LinkedMessage, linkedMessages, messagePath, workbenchClock } from "./rules";
 
 const sizeText = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -435,5 +435,53 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
       </Show>
       <p class="mt-1 text-xs text-muted">{chatWording().tools.editHint}</p>
     </div>
+  );
+}
+
+/** The farm's messages a message links to, each as it is now; a press goes there. */
+export function LinkedMessages(props: { text: string }) {
+  const core = useCore();
+  const links = () => linkedMessages(props.text, core()?.chat, location.host);
+  return (
+    <Show when={links().length > 0}>
+      <div class="mt-1 flex flex-col gap-1.5">
+        <For each={links()} keyed={(l) => `${l.channel}:${l.number}`}>
+          {(l) => <LinkedCard at={l()} />}
+        </For>
+      </div>
+    </Show>
+  );
+}
+
+function LinkedCard(props: { at: LinkedMessage }) {
+  const core = useCore();
+  const router = useRouter();
+  const m = useMessage(() => props.at);
+  const where = () => channelOf(core()?.chat, props.at.channel);
+  return (
+    <button
+      type="button"
+      aria-label={chatWording().messages.linked(channelLabel(where()), props.at.number)}
+      onClick={() => router.navigate(messagePath(where(), props.at.number))}
+      class="flex max-w-lg cursor-pointer flex-col gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 text-left hover:bg-hover"
+    >
+      <span class="flex items-baseline gap-2 text-xs text-muted">
+        <span class="font-semibold text-ink">{m() ? nameOf(m()!) : `#${props.at.number}`}</span>
+        <span>{channelLabel(where())}</span>
+        <Show when={m()}>{(said) => <span>{workbenchClock(said().at)}</span>}</Show>
+      </span>
+      <Show when={m()}>
+        {(said) => (
+          <Show when={said().deleted === undefined} fallback={<span class="text-sm text-muted italic">{chatWording().messages.replyGone}</span>}>
+            <span class="line-clamp-3 text-sm">
+              {said().text ||
+                said()
+                  .attachments?.map((a) => a.name)
+                  .join("、")}
+            </span>
+          </Show>
+        )}
+      </Show>
+    </button>
   );
 }

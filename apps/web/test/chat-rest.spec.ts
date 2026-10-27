@@ -241,3 +241,20 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
   await box.press("Enter");
   await expect(page.getByRole("heading", { name: "小獾" })).toBeVisible();
 });
+
+test("a link to a farm message shows that message under it, and a press goes there", async ({ page, api, server }) => {
+  const from = await api.channel.create({ name: "原处" });
+  await api.channel.message.send({ id: from, text: "南坡的苹果熟了" });
+  const [said] = (await api.channel.message.list({ id: from })).filter((m) => m.text === "南坡的苹果熟了");
+  const to = await api.channel.create({ name: "转述" });
+  await api.channel.message.send({ id: to, text: `看这条 ${server.url}/chat/${from}?m=${said!.number}` });
+  await page.goto(`/chat/${to}`);
+  const card = page.getByRole("log", { name: "消息" }).getByRole("button", { name: `跳到 #原处 的第 ${said!.number} 条` });
+  await expect(card).toContainText("南坡的苹果熟了");
+  await expect(card).toContainText("主人");
+  await card.click();
+  await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
+  // The server reads no preview of the farm's own address.
+  const [linking] = (await api.channel.message.list({ id: to })).filter((m) => m.text.startsWith("看这条"));
+  expect(linking!.embeds ?? []).toEqual([]);
+});
