@@ -6,7 +6,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../ui/A";
 import { Keyed } from "../../base/util";
 import { Card, ListCard, ListRow } from "../../ui/layout";
-import { ConnectorsPage } from "./ConnectorsPage";
+import { ConnectorsPage } from "../../features/connector/ConnectorsPage";
 import { LanPage } from "../../features/lan/LanPage";
 import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
 import { SkillsPage } from "../../features/runtime/SkillsPage";
