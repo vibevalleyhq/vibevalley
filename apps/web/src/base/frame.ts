@@ -7,7 +7,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 export const FramesContext = createContext<Frames>();
 
-/** The state stream (data/frames.ts) as a store: each frame reconciles in by id, so only what changed updates. */
+/** The state stream (base/frames.ts) as a store: each frame reconciles in by id, so only what changed updates. */
 export function createFrames(): Frames {
   // Copies: reconciling changes the store's objects in place, and rawFrame() hands the frames as they came to the code
   // that compares one with the one before.

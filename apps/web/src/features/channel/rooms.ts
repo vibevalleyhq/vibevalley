@@ -1,5 +1,5 @@
 // What is said in each conversation the page shows, framework-free: its newest page read once (channel.history), then
-// its room followed from the last number (data/gateway.ts), older pages on asking. A room stays read after nobody
+// its room followed from the last number (base/gateway.ts), older pages on asking. A room stays read after nobody
 // shows it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
 
 import type { ChatMessage, RoomEvent } from "@vibevalley/protocol";

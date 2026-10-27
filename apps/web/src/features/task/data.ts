@@ -1,4 +1,4 @@
-// A task graph's calls, as both of its views carry them out: the workbench's (pages/issues/TaskDetail.tsx) and the farm's
+// A task graph's calls, as both of its views carry them out: the workbench's (features/issue/TaskDetail.tsx) and the farm's
 // (farm/panels/TaskBoard.tsx). Each answers in words, done or why not, and the issues are read again after either.
 
 import type { GraphAction, GraphSplitRequest, TaskAction, TaskEdit } from "@vibevalley/protocol";

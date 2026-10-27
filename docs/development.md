@@ -127,4 +127,4 @@ python3 design/pixel/process.py map plots  # 只切指定素材
 
 应用图标的原图用 `design/pixel/gen.sh app-icon` 生成。页面和官网用 `apps/web/public/icons/` 里的 `app-32.png`、`app-64.png`、`app-256.png`，桌面应用用 `apps/desktop/resources/icon.icns`。
 
-音效配方在 `apps/web/src/farm/sound.ts`，合成和响度见[农场的皮](docs/subsystems/farm.md#模型和不变量)。官网见 [site/README.md](site/README.md)；`vp run site:deploy` 构建并发到 Cloudflare。
+音效配方在 `apps/web/src/ui/pixel/sound.ts`，合成和响度见[农场的皮](docs/subsystems/farm.md#模型和不变量)。官网见 [site/README.md](site/README.md)；`vp run site:deploy` 构建并发到 Cloudflare。

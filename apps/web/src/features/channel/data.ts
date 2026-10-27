@@ -1,4 +1,4 @@
-// The chat page's reads beyond the rooms (data/rooms.ts).
+// The chat page's reads beyond the rooms (features/channel/rooms.ts).
 
 import { type Accessor, createEffect } from "solid-js";
 

@@ -1,5 +1,5 @@
 // The box for saying a sentence in a conversation, as both chat windows carry it out: the workbench's
-// (pages/chat/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a line, @ names
+// (features/channel/Composer.tsx) and the farm's (farm/chat/Composer.tsx). Enter sends, Shift+Enter starts a line, @ names
 // someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 

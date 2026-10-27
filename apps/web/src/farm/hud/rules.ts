@@ -1,5 +1,5 @@
 // Words the HUD shows, from the frame: the clock, the warehouse, what a helper is doing, a plot's title and what the
-// orchestrator last said. The runtimes' quotas are rules/quota.ts.
+// orchestrator last said. The runtimes' quotas are features/runtime/quota.ts.
 
 import { farmWording } from "../words";
 import type { ChatMessage, WorkspaceState, Crop, Doing, Issue, Session } from "@vibevalley/protocol";

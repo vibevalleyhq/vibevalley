@@ -21,7 +21,7 @@
 - 配置（`Config`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
 - 接口：`project.list`、`project.check`、`project.create`、`project.languages`、`project.activity`、`github.status`、`github.refresh`；工单的改动是 `issue.changes`（[capabilities.md](docs/reference/capabilities.md)）。
-- 页面：项目页 `apps/web/src/pages/projects/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/rules/projects.ts`。
+- 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/rules.ts`。
 
 ## 模型和不变量
 
@@ -118,4 +118,4 @@
 - `project/github.test.ts`：`gh` 在不在、登没登录（不记它打的字）；地址；权限在刷新时取、摘要不问 `gh`；登出或卸了丢掉权限；私有仓库用登录的 `gh` 克隆；PR 要项目打开、有权限；先检查再推送、已经开着的 PR 找回来；PR 的正文写检查跑没跑；新工单能快进时从 origin 的 main 开始；commit 每个仓库连同它的 worktree 只数一次。
 - `project/stack.test.ts`：每种标记文件、锁文件选包管理器。
 - `src/flows/pull_request.test.ts`：提 PR 的项目完成时推送、开 PR、主分支不动，第二轮只推送；重启以后 PR 合了或关了，工单关上，帮工、worktree 和分支清掉。
-- 页面：`apps/web/test/projects.spec.ts`（开一块新地、出现在地图上、打开地契；GitHub 地址先给名字）；`apps/web/src/rules/projects.test.ts`（空位、锁住的地、排队只算排上队的）。
+- 页面：`apps/web/test/projects.spec.ts`（开一块新地、出现在地图上、打开地契；GitHub 地址先给名字）；`apps/web/src/features/project/rules.test.ts`（空位、锁住的地、排队只算排上队的）。

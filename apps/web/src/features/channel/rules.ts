@@ -114,7 +114,7 @@ export const unreadUnder = (chat: Chat | undefined, channel: Conversation) =>
     .filter((c) => c.id === channel.id || c.channel === channel.id || (channel.kind === "general" && c.kind === "thread" && !c.channel))
     .reduce((n, c) => n + unreadIn(c), 0);
 
-/** A page of a conversation read at a time (data/rooms.ts). */
+/** A page of a conversation read at a time (features/channel/rooms.ts). */
 export const chatPage = 50;
 
 /** Where a thread's parent message is: its channel's, or the general's for a thread without one. */

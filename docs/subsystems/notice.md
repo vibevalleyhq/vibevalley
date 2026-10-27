@@ -15,7 +15,7 @@
 
 - 服务端 `apps/server/src/notice`（`Notices`，属于 Notifications 模块）：`notice.ts` 的 `news`（刚来的）、`overdue`（巡查的发现）、`patrol`（马上巡一次）、开机时的 `prime`；`rules.ts` 是巡查的纯规则（`patrolStep`、`patrolGrace`），黄金数据在 `testdata/rules.jsonl.gz`。
 - Inbox 在 `apps/server/src/notice/inbox.ts`（`inbox`、`inboxEntries`，每件的话）；拼帧（`projection/frame.ts`）把它放在 `StateFrame.inbox`，和 `state`、`view` 并排。哪些是刚来的（`freshOf`）页面也要算，留在 `packages/protocol`。
-- 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/app/Follow.tsx`、`apps/web/src/rules/notice.ts`。
+- 页面：手机 `apps/web/src/farm/phone/calls.ts`，系统通知和菜单栏 `apps/web/src/features/notice/Follow.tsx`、`apps/web/src/features/notice/tray.ts`。
 
 ## 模型和不变量
 
@@ -68,4 +68,4 @@
 - `apps/server/src/notice/rules.test.ts`：巡查照黄金数据。
 - `apps/server/src/orchestrator/orchestrator.test.ts`「hears the patrol once」：巡查经 `overdue` 叫醒管家一次。
 - `apps/server/src/voice/voice.test.ts`「tells what comes together once」：通话里两件刚来的合成一段说。
-- 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/rules/notice.test.ts`（菜单栏）。
+- 页面：`apps/web/test/farm-phone.spec.ts`（来电）、`src/farm/phone/calls.test.ts`、`src/features/notice/tray.test.ts`（菜单栏）。

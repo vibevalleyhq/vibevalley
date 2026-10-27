@@ -1,5 +1,5 @@
 // The page's one WebSocket to the farm (/api/v1/rooms): the Rooms RPCs (packages/protocol/src/rpc.ts), whose answers it
-// decodes by their Schema. Effect stays in this file; the rest of the page reads data/rooms.ts.
+// decodes by their Schema. Effect stays in this file; the rest of the page reads features/channel/rooms.ts.
 
 import type { RoomEvent } from "@vibevalley/protocol";
 import { Rooms, roomsPath } from "@vibevalley/protocol/rpc";

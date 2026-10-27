@@ -209,7 +209,7 @@ export default defineConfig({
                 {
                   name: "@tanstack/solid-query",
                   importNames: ["useQuery"],
-                  message: "Use data/query.ts's useQuery: it runs the fetch untracked.",
+                  message: "Use base/query.ts's useQuery: it runs the fetch untracked.",
                 },
                 { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
               ],

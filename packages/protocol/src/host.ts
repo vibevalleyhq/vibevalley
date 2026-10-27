@@ -1,6 +1,6 @@
 // What the page may ask of the program around it: the desktop's shell, the phone's, or none in a browser tab. Every host
 // gives the whole interface; a capability it lacks is null, and the page draws nothing for it. The page never asks which
-// host it is in (it finds its host in apps/web/src/host.ts). The phone's host is over its WebView's bridge: the page posts
+// host it is in (it finds its host in apps/web/src/base/host.ts). The phone's host is over its WebView's bridge: the page posts
 // a call as JSON and the shell answers it by id, the call's events come back the same way; mobileHost is the page's end of
 // it, and the shell (apps/mobile) the other.
 

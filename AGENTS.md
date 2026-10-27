@@ -16,7 +16,9 @@ apps/server/db/            库（PGlite）：migrations/0001_schema.up.sql 是�
                            generated/ 是 effect-sqlc 从它们写出的
 apps/server/src/*/testdata 规则的黄金数据（*.jsonl.gz）和样例
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 是像素农场
-                           （src/farm，PixiJS），其余是工作台（src/pages/<地方>）；public/ 是全部的图、像素字、指针和样音（apps/web/README.md）
+                           （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，名字和服务端的模块一样；分层
+                           base → ui → ui/pixel → features → 皮（farm、tree）→ app，lint 查；public/ 是全部的图、像素字、指针和样音
+                           （apps/web/README.md）
 apps/desktop/              Electron 壳：用自己的 Node 带着服务端起来，打开它提供的页面；宿主能力经 preload 给页面
 apps/island/               刘海上的灵动岛（Swift、AppKit、SwiftUI）：桌面壳带起来的原生小程序，显示在做和等你的工单，点一行打开它
 apps/mobile/               手机壳（Expo、React Native）：扫码配对，WebView 打开那台电脑「连接到本机」放出的页面；通知、锁屏不断的通话经桥给页面
@@ -94,7 +96,7 @@ guide doesn't cover, search through the source code in `node_modules/effect/src`
 - **生成的不手改**：`apps/server/db/generated` 由 effect-sqlc 写（`vp run db:generate`），`server:check` 查它是不是最新；`packages/protocol/src/client.ts` 由 `vp run api:client` 写，`docs:verify` 查它（[理由](docs/subsystems/foundation.md)）。
 - **表名是「模块_概念」**：单数，`<模块>` 或 `<模块>_<概念>`，模块是拥有它的 `apps/server/src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`）；索引以表名开头；SQL 只写在 `db/queries/<表>.sql`，一张表一个文件，代码里只调生成的；`src/base/schema.test.ts` 查这几条（[理由](docs/subsystems/foundation.md)）。
 - **内部不留兼容**：架构还在成形，不为兼容少走一步：改名、改形状、改存盘的格式（库里的表、家目录的文件、环境变量、存下的取值）都直接改，不写兼容层，不在读的地方兜底旧数据，也不写数据搬运；表结构直接改 `db/migrations/0001_schema.up.sql`，不另加迁移（`schema.test.ts` 查这条），本机的旧库和旧文件作废（库由服务端开机时挪到一边、新建一个），旧文件删掉重建；启动时只认今天的名字（[理由](docs/subsystems/foundation.md)）。对外 HTTP 的版本是唯一例外，v1 留到主人的设备都升上来（[接口版本](docs/subsystems/core.md#为什么这样)）。
-- **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（`apps/web/src/rules`）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
+- **页面不折事实**：它读 `GET /api/v1/state` 折好的 `StateFrame`（`useCore()`、`useFrames()`）；要新的数据就加进 protocol 的字段和 `reduce`，页面里只写跟着时钟走的画面和摆法（各 feature 里的纯函数）；服务端的规则（能不能派、下回想起什么、冲突怎么交代）不在页面里重写，加一个字段或接口问服务端（[理由](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支的地方，`switch` 覆盖每一种，或用 `default` 说明其余的有意不管（lint 的 `switch-exhaustiveness-check` 查）；成员表（`XValues`）要每种都处理时用 `Record<X, …>`，加新成员时编不过。
 - **服务端的服务**：每个模块导出一个服务（`class X extends Context.Service<X, XShape>()("vibevalley/X")`）、一个 `make`（`Effect.gen` 里 `yield*` 它用到的服务，不拿整个农场）和一个 `layer`；`services.ts` 按次序把 layer 叠起来，模块只用排在它前面的，往上走流（`Stream`，新闻、变化）；开机就要做的放 `start`、`ready` 这类 layer，叠在最后；服务之间传的形状放在定义它的模块里（[architecture.md](docs/architecture.md)）。
 - **处理函数要薄**：接口的处理（`handlers.ts`、`http/`）和页面只做转发和展示，规则在拥有它的服务或纯函数里。

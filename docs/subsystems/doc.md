@@ -16,7 +16,7 @@
 - 服务端 `apps/server/src/doc`（`Docs`）：`doc.ts` 存取和提交，`demo.ts` 是演示（脚本 `demoScript`），`ops.ts` 是 op 的规则（纯函数，在内存里的一篇文档上按顺序施加），`text.ts` 按码点切和接文字，`markdown.ts` 导入导出。顺序键在 `packages/protocol/src/rules/order.ts`（`keyBetween`），服务端和页面用同一份。
 - 形状在 `packages/protocol/src/shapes.ts`：`Document`、`BlockInput`（作者给的新块）、`Block`（服务端保存后的块）、`BlockAttrs`、`DocSpan`、`DocMarks`，op 是封闭的联合 `DocOp`（按 `op` 区分），`DocSubmit`、`DocAck`、`DocOpResult`；块的类型是普通字符串，取值是常量（`blockParagraph`……），页面 import 同名常量。
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
-- 页面：`apps/web/src/pages/docs/`：`DocsPage.tsx` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边）和块的画法、按键，`editor.ts` 的 `DocEditor` 管本地的块、待发的 op、防抖和问别人写的；不在 `apps/web/src/rules/docBlocks.ts` 以外重写规则：那里只有码点偏移、编辑时保留 marks、编号和行首的 Markdown。
+- 页面：`apps/web/src/features/doc/`：`DocsPage.tsx` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边）和块的画法、按键，`editor.ts` 的 `DocEditor` 管本地的块、待发的 op、防抖和问别人写的；不在 `apps/web/src/features/doc/blocks.ts` 以外重写规则：那里只有码点偏移、编辑时保留 marks、编号和行首的 Markdown。
 - 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`apps/server/src/tool/tool.ts`，经 `/mcp` 只给 Session）。
 - 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`docOwner`）；`doc.demo`（`POST /api/v1/docs/{id}/demo`）只有本机的主人能调。
 
@@ -104,5 +104,5 @@
 - `apps/server/src/doc/rules.test.ts`：拆分时留着 marks、接起来时合并一样的 marks；两键之间的键在两者之间；同键按 id 排；改过的块带着 rev 和写的人；协议里每种 op 都有分支；代码块没有 marks；Markdown → 块 → Markdown、块 → Markdown → 块不丢东西。
 - `doc/doc.test.ts`：一个人写的东西重启后还在；同一批发两次只收一次、回答一样；落后的改字盖住别人的改动是冲突、我写的存进修订；同一批勾选后改字不误判冲突；导入导出；演示写三节（跳过关着的档案、每节连续、写的人、正在跑时再开被拒绝）；主人接手正长着的一段，演示不再改它。
 - `mcp/mcp.test.ts`：帮工经 `/mcp` 写文档。
-- 页面：`apps/web/src/rules/docBlocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/docs.spec.ts`（建一篇、一块一块写、写的留着；演示让帮工写；段首退格并段；整页的样子）。
+- 页面：`apps/web/src/features/doc/blocks.test.ts`（键和服务端生成的一样、偏移是码点、编辑保留 marks、行首 Markdown 和编号）；`apps/web/test/docs.spec.ts`（建一篇、一块一块写、写的留着；演示让帮工写；段首退格并段；整页的样子）。
 - `apps/web/test/doc-commands.spec.ts`：真实 HTTP 接受没有存盘元数据的最小插入和拆分命令，回读的文档、修订、作者和时间由服务端填入。

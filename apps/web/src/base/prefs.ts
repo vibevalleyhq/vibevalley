@@ -7,7 +7,7 @@ import { createExternal } from "./external";
 export interface Prefs {
   /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose. */
   readonly pick: string;
-  /** The orchestrator's look (farm/kit/looks.ts ids; "farmer" is the plain one). */
+  /** The orchestrator's look (features/orchestrator/looks.ts ids; "farmer" is the plain one). */
   readonly orchestratorLook: string;
   readonly pet: string;
 }

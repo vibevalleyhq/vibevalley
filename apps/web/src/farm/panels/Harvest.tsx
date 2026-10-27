@@ -1,4 +1,4 @@
-// Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/rules/issueState.ts.
+// Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/features/issue/state.ts.
 
 import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";

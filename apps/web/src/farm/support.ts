@@ -96,7 +96,7 @@ export function feedPhoneCalls(raw: Accessor<StateFrame | undefined>) {
 /** Whether the sounds are off, kept on this machine and followed across tabs. */
 export const muted = (): [Accessor<boolean>, (on: boolean) => void] => [createExternal(subscribeMuted, isMuted), setMuted];
 
-/** Plays what changed between one input and the next (farm/sound.ts farmCues); the first input is the farm as it was. */
+/** Plays what changed between one input and the next (ui/pixel/sound.ts farmCues); the first input is the farm as it was. */
 export function farmSounds(input: Accessor<FarmSoundInput>) {
   createEffect(input, (next, before) => {
     if (before === undefined || before === next) return;

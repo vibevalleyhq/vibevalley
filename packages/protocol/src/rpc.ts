@@ -1,5 +1,5 @@
 // What a page subscribes to over one WebSocket (/api/v1/rooms): the server implements Rooms (apps/server/src/http/rooms.ts),
-// the page calls it (apps/web/src/data/gateway.ts). Writes stay on the HTTP endpoints (api.ts).
+// the page calls it (apps/web/src/base/gateway.ts). Writes stay on the HTTP endpoints (api.ts).
 
 import { Schema } from "effect";
 import { Rpc, RpcGroup } from "effect/rpc";

@@ -23,7 +23,7 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 - 表：计划和每一件存在 `issue`（`graph`、`task` 两列，`parent`、`blocked_by`）；经过存在 `task_event`。
 - 接口：`graph.*`（`split`、`updateTask`、`deleteTask`、`act`、`taskAct`、`changes`、`events`，[capabilities.md](docs/reference/capabilities.md)）；管家的工具 `graph_split`、`graphs`、`task_edit`、`graph_action`、`task_action`，帮工的工具 `issue_split`（都在 `tool/tool.ts`）。
 - 帧：`StateFrame.graphs` 是服务端拼好的计划，带分层（`layers`）、每件在等谁（`blockedBy`）、要不要主人看（`asksForYou`）、花了多少（`spent`）、做完几件（`settled`）和能做的动作。
-- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/rules/cards.ts`），子工单的标题前加计划名（`rules/issues.ts` 的 `issueTitle`）；工单详情里的一件是 `pages/issues/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/data/graphs.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
+- 页面：计划板 `apps/web/src/farm/panels/TaskBoard.tsx`；看板上计划是一张「计划：…」卡片（`apps/web/src/features/issue/cards.ts`），子工单的标题前加计划名（`features/issue/rules.ts` 的 `issueTitle`）；工单详情里的一件是 `features/issue/TaskDetail.tsx`。两边对计划的调用（拆、动作、改一件、删一件）和分支的改动都经 `apps/web/src/features/task/data.ts`：每个调用回一句话（成了，或为什么不行），之后重读工单。
 
 ## 模型和不变量
 

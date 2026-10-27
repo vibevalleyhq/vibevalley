@@ -31,7 +31,7 @@
 | 派活、排队、重开、取消 | 挑哪个档案（[管家](docs/subsystems/orchestrator.md)） |
 | 验收、验收意见、问题、帮工对每条标准的自评 | 汇报怎么读（`session/rules.ts` 读出「结论：」「要问主人：」和「标准 N：」交给它） |
 | 完成：查冲突、跑检查、本地合或提 PR | 项目和工作目录、worktree 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
-| 工单的状态、给主人看的状态和主人能做的事，和它们的词表；工单的时间线 | 怎么画（工单详情 `apps/web/src/rules/issueState.ts`；农场的地见[农场的皮](docs/subsystems/farm.md)） |
+| 工单的状态、给主人看的状态和主人能做的事，和它们的词表；工单的时间线 | 怎么画（工单详情 `apps/web/src/features/issue/state.ts`；农场的地见[农场的皮](docs/subsystems/farm.md)） |
 | | 计划里的工单（跟着计划走，[计划](docs/subsystems/task.md)） |
 
 ## 在哪
@@ -40,7 +40,7 @@
 - 只有服务端跑的规则在 `apps/server/src/issue`：`state.ts` 的 `issueStatusOf`（状态怎么算）、`issueRefiningOf`（谁在起草）、`withIssue`、`withIssueStatuses`、`issueOrder`、`keepClosedIssues`、`isForOrchestrator`、`openFindings`，`attention.ts` 的 `attentionOf`（给主人看的状态和能做的事）和 `attentionIn`，`moves.ts` 的 `statusMove`、`statusMoves`（能挪到哪、挪了做什么），`rules.ts` 的 `conflictBrief` 和只有工单用的规则（`cureWords`、`resumeWords` 动作带给帮工的话，`findingsOf` 打回的意见，`refinementBrief` 起草的规矩、`parseRefinement` 读草稿、`refinementDescription` 拼说明、`issueJob` 交给帮工的活（交付物是结论时带上只读的规矩和结论的格式，`answerOpening`）、`answerCureWords` 结论读不出来时「接着修」带的话、`splitJob` 一句话拆成标题和说明、`milestonesOf` 时间线）；地的样子（`plotOf`）在 `apps/server/src/game/view.ts`。服务端和页面都要的留在 `packages/protocol/src/rules`：`issues.ts` 的 `shortTitle`（一行的标题）和 `closedText`，`attention.ts` 的 `attentionWantsOwner`；状态和动作叫什么在 `packages/protocol/src/words`。
 - 表：`issue`（一张工单一行；验收标准在 `criteria`、帮工的问题在 `questions`、它对每条标准的自评在 `checks`，都是 JSON 数组）、`issue_session`（哪些 Session 干过它；只有工单写它，工单在内存里记着一份，`issue/sessions.ts`：开机读一遍，记下一个 Session 的事务提交后加一条，删了工单就重读，从帮工找工单、列一张工单的帮工都不再查库）、`issue_queue`（排队的上下文）。
 - 接口：`issue.*`（[capabilities.md](docs/reference/capabilities.md)），起草是 `issue.refine`（`POST /api/v1/issues/{id}/refine`），时间线是 `issue.timeline`；命令行 `vibevalley issue …`。
-- 页面：工作台的看板在 `apps/web/src/pages/issues`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/rules/issueState.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/data/issueActs.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和执行历史都经 `apps/web/src/data/issues.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/data/sessions.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
+- 页面：工作台的看板在 `apps/web/src/features/issue`，备选工单的草稿详情是 `TodoDetail.tsx`，派出去以后的详情是 `IssueDetail.tsx`，把服务端的状态说成话的规则在 `apps/web/src/features/issue/state.ts`；农场照同一份规则画 `farm/issue/IssueView.tsx`；两边的动作（哪些要话、要先打开框、要开对话框，重开以后说什么）都经 `apps/web/src/features/issue/acts.ts` 的 `createIssueActs`，农场只换掉自己有特效的几个（`commands`）；一张工单的改动、时间线和执行历史都经 `apps/web/src/features/issue/data.ts` 的 `useIssueChanges`、`useIssueTimeline`、`useIssueRuns` 读，键都在 `issues` 下，什么时候重读写在那里一处；工作台、农场、轨迹和工作记录里的帮工步骤都经 `apps/web/src/features/session/data.ts` 的 `createSessionEvents` 读（快照、直播和重连的约定见[客户端](docs/subsystems/app.md)）；农场的播种袋在 `farm/panels/SeedForms.tsx`。
 
 ## 模型和不变量
 

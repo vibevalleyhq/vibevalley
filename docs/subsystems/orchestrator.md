@@ -26,7 +26,7 @@
 - **`apps/server/src/agent`**：帮工档案、技能和农机设置，存在 `$VIBEVALLEY_HOME/config.json`；`orchestratorProfile` 是内置的管家档案。
 - **家目录 `$VIBEVALLEY_HOME/orchestrator/`**（`orchestratorHome`）：对话 `orchestrator.jsonl`、记性 `MEMORY.md`、压掉的原文 `archive/`、做错的一轮 `evals/<id>.json`。
 - **接口**：`orchestrator.stop`、`orchestrator.hear`、`orchestrator.markWrong`、`orchestrator.listArchive`、`orchestrator.getArchive`，记性走 `memory.*`（档案 `orchestrator`）；`POST /v1/chat/completions`（`http/mcp.ts` 挂 `agent/brain/openai.ts`）。清单在 [capabilities.md](docs/reference/capabilities.md)，命令行 `vibevalley orchestrator …`。
-- **页面**：管家页 `apps/web/src/pages/orchestrator/OrchestratorPage.tsx`（记性、轨迹、旧账、声音，[界面清单](docs/reference/farm-ui.md#界面清单)）；田头的输入框（农场的 `farm/chat/Composer.tsx`、聊天页的 `pages/chat/Composer.tsx`）在管家说话时有停止键（`orchestrator.stop`）。
+- **页面**：管家页 `apps/web/src/features/orchestrator/OrchestratorPage.tsx`（记性、轨迹、旧账、声音，[界面清单](docs/reference/farm-ui.md#界面清单)）；田头的输入框（农场的 `farm/chat/Composer.tsx`、聊天页的 `features/channel/Composer.tsx`）在管家说话时有停止键（`orchestrator.stop`）。
 
 ## 模型和不变量
 

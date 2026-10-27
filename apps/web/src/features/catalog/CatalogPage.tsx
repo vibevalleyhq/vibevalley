@@ -524,7 +524,7 @@ function Sounds(props: { tabs: JSX.Element }) {
       <Search query={query()} onChange={setQuery} placeholder={catalogWording().soundsFind} />
       <Card>
         <p class="text-sm text-muted">
-          {catalogWording().soundsRecipes} <code class="font-mono text-[12.5px]">apps/web/src/farm/sound.ts</code>
+          {catalogWording().soundsRecipes} <code class="font-mono text-[12.5px]">apps/web/src/ui/pixel/sound.ts</code>
           {catalogWording().soundsMusic} <code class="font-mono text-[12.5px]">design/music/suno-prompts.md</code>
           {catalogWording().period}
         </p>

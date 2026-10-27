@@ -1,4 +1,4 @@
-// The owner's acts on an issue, as both issue pages carry them out: the workbench's (pages/issues/IssueDetail.tsx) and
+// The owner's acts on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and
 // the farm's (farm/issue/IssueView.tsx). An act is the server's (issue.act); this says which take words from the box,
 // which open the box first, which open a dialog, what a reopen tells, and keeps the box, its words and the busy flag.
 // A page only says how it runs an act its own way (the farm's commands with their effects) and how it shows a failure.

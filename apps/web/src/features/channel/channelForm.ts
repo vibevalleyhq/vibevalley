@@ -1,4 +1,4 @@
-// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (pages/chat/Dialogs.tsx)
+// Making a channel or changing one, as both chat windows carry it out: the workbench's dialogs (features/channel/Dialogs.tsx)
 // and the farm's menu (farm/chat/ChannelMenu.tsx). This keeps the fields, the busy flag and the server's refusal; a
 // window only draws them and says what happens once it went through.
 

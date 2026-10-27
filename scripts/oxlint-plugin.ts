@@ -22,7 +22,7 @@
  *
  *   page-layers: the page (apps/web/src) is in layers, each importing only those before it: base, ui, ui/pixel, the
  *   features (features/<concept>), the skins (farm, tree), app. A feature uses another only through its index.ts, so
- *   what is inside it can change; the features' graph has no cycle (layers.test.ts). apps/web/README.md says why.
+ *   what is inside it can change; the features' graph has no cycle (layers.test.ts). docs/subsystems/app.md says why.
  */
 
 import { definePlugin, defineRule } from "vite-plus/lint/plugins";

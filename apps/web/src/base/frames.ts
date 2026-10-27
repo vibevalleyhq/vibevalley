@@ -1,4 +1,4 @@
-// The state stream as a store of its own, framework-free: the page reads it through data/frame.ts (a Solid store) and
+// The state stream as a store of its own, framework-free: the page reads it through base/frame.ts (a Solid store) and
 // rawFrame() (the frames as they came).
 
 import { readStream, statePath, type StateFrame } from "@vibevalley/protocol";

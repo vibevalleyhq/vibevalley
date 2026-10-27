@@ -12,7 +12,7 @@
 | 农场的规矩、汇报怎么读（结论、失败、问题）、没动静 | worktree、分支、合并、PR 的 git 操作（`project`，[项目](docs/subsystems/project.md)） |
 | 同时干活的上限；额度、花费和「派不出去」（`runtime`） | 汇报贴进工单串、@ 谁叫醒谁、投递和排队（田头，[田头](docs/subsystems/channel.md)） |
 | 进程内的 agent（管家）怎么跑：起大脑、排输入、边说边写、记 run 和日志、重启后接着做、做错的一轮存成评测（`session/host.ts`、`session/execution.ts`） | 管家想什么、说什么（[管家](docs/subsystems/orchestrator.md)）；记性想起和记下什么（[记性](docs/subsystems/memory.md)） |
-| | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/pages/chat/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/pages/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/rules/rounds.ts`） |
+| | 地上画成什么（`plotOf`、[farm-ui.md](docs/reference/farm-ui.md)）；干活过程的界面（`apps/web/src/features/session/WorkLog.tsx`，管家页和帮工档案的轨迹 `apps/web/src/features/session/Trajectory.tsx`，按 run 分段、瀑布图的规则在 `apps/web/src/features/session/rounds.ts`） |
 
 ## 在哪
 
@@ -21,7 +21,7 @@
 - 表：`session`（每个派出去的 Session 一行，走了也留着）、`session_run`（一次 run 一行）、`session_run_issue`（一次 run 实际消费了哪几张工单，管家用）。`issue_session` 归工单。
 - 库里的 `session` 表：每个 Session 一行，在地里的还存着接回它要的东西（`place` 干活的地方、`oar_session`、`last_text` 最后一轮原话、`recalled` 想起过的记性）。家目录：`events/<id>.json`（日志）、`spend.json`（今天每台农机花了多少）、`logs/`（oar 的原始记录）；核心状态里的 `WorkspaceState.sessions` 随 `state.json` 存。
 - 接口：`session.list`、`session.get`、`session.events`、`session.stop`、`issue.runs`、`issue.history`、`runtime.*`、`agent.check`（[capabilities.md](docs/reference/capabilities.md)）。
-- 页面：干活过程 `apps/web/src/pages/chat/WorkLog.tsx`，轨迹 `pages/Trajectory.tsx`（[轨迹](docs/reference/farm-ui.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `rules/rounds.ts`。
+- 页面：干活过程 `apps/web/src/features/session/WorkLog.tsx`，轨迹 `features/session/Trajectory.tsx`（[轨迹](docs/reference/farm-ui.md#轨迹)）；按 run 分段、瀑布的三道和合计的规则在 `features/session/rounds.ts`。
 
 ## 模型和不变量
 
@@ -173,4 +173,4 @@
 - `src/flows/work.test.ts`（照字眼干活的帮工、真的 git 仓库）：派出去、干活、汇报、回家；被拒的原因；合并后清掉 worktree、记进账本；重启后歇着回来、叫得醒；每一步都在轨迹里；失败说原因；没动静被标出来（开工就不出声也算）；合并前看改动；冲突的分支留到解决；项目和农机的上限；两个同时派到新项目；开口、结束、令牌随它走；每次 run 记着为什么开、重启打断的记成 `interrupted`；到场时工单已经在；走了的是一行。`flows/reach.test.ts`：帮工的 `/mcp` 跟着服务端实际的地址。
 - `session/execution.test.ts`：管家的一个 loop 是一次 run、关联它消费的全部工单，失败和叫停怎么说；终结没写成的 run 在下一次开始前先终结。
 - `runtime/runtime.test.ts`：接受的探测拥有它读用量的那个安装、慢的不覆盖新的；适配器的拒绝挡住档案；列表带每台农机的预设和事实；两份配置不经环境变量互相影响；昨天的花费不挡今天；存不上的设置被拒；`resolve` 管默认、覆盖和模型的退回；价目分开算缓存、按人民币；dsh 和 pi 的价格和余额。`runtime/rules.test.ts`：黄金数据和额度的说法。`runtime/dsh.test.ts`：DeepSeek Harness 的模型和思考强度。
-- 页面：`apps/web/src/rules/rounds.test.ts`（日志怎么按 run 分段、瀑布图）。
+- 页面：`apps/web/src/features/session/rounds.test.ts`（日志怎么按 run 分段、瀑布图）。
