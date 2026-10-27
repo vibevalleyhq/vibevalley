@@ -654,7 +654,10 @@ export const make = Effect.gen(function* () {
     Effect.fn("Tools.channel_settings")(function* (p: Orchestrator<"channel_settings">) {
       const c = yield* chat.channelByName(p.channel);
       if (!c) return yield* refuse(answers.channelSettings.noChannel(p.channel));
-      yield* chat.updateChannel(c.id, p.description, p.project);
+      yield* chat.updateChannel(c.id, {
+        ...(p.description !== undefined ? { description: p.description } : {}),
+        ...(p.project !== undefined ? { project: p.project } : {}),
+      });
       return answers.channelSettings.updated(c.name);
     }),
   );

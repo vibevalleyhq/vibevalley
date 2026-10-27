@@ -34,12 +34,20 @@ CREATE TABLE channel (
   peer_id       text unique references channel_participant (id),
   -- Moves on with every message written or changed here: what a follower catches up from (channel_message.revision).
   revision      integer not null default 0,
+  -- A channel's group in the sidebar; none is ungrouped.
+  category      text,
+  -- Its place in the sidebar, lowest first; none comes after the placed, oldest first.
+  position      integer,
+  archived_at   double precision,
+  -- What of it counts for the owner: everything, only what @s the owner, or nothing.
+  notify        text not null default 'all' check (notify in ('all', 'mentions', 'none')),
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
   check ((subject_kind is null) or type = 'thread'),
-  check (not is_default or type = 'channel')
+  check (not is_default or type = 'channel'),
+  check (not is_default or archived_at is null)
 );
 CREATE TABLE channel_message (
   id              text primary key,

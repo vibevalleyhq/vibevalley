@@ -70,3 +70,37 @@ export const readCursorsOf = Effect.fn("ReadCursorsOf")(function* (params: ReadC
     execute: (p) => sql.unsafe(ReadCursorsOfSql, [p["participant_id"]]),
   })(params)
 })
+
+export const DeleteCursorsInParams = Schema.Struct({
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type DeleteCursorsInParams = typeof DeleteCursorsInParams.Type
+
+
+export const DeleteCursorsInSql = "-- name: DeleteCursorsIn :exec\ndelete from channel_read_cursor where channel_id = $1 or channel_id in (select t.id from channel t where t.parent_id = $1);"
+
+export const deleteCursorsIn = Effect.fn("DeleteCursorsIn")(function* (params: DeleteCursorsInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteCursorsInParams,
+    execute: (p) => sql.unsafe(DeleteCursorsInSql, [p["id"]]),
+  })(params)
+})
+
+export const MarkUnreadParams = Schema.Struct({
+  ["channel_id"]: Schema.String,
+  ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["updated_at"]: Schema.Number,
+})
+export type MarkUnreadParams = typeof MarkUnreadParams.Type
+
+
+export const MarkUnreadSql = "-- name: MarkUnread :exec\n-- The owner's read moved back to just before a message, even past where it was.\ninsert into channel_read_cursor (participant_id, channel_id, read_number, updated_at)\nvalues ('owner', $1, $2, $3)\non conflict (participant_id, channel_id) do update set read_number = excluded.read_number, updated_at = excluded.updated_at;"
+
+export const markUnread = Effect.fn("MarkUnread")(function* (params: MarkUnreadParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: MarkUnreadParams,
+    execute: (p) => sql.unsafe(MarkUnreadSql, [p["channel_id"], p["read_number"], p["updated_at"]]),
+  })(params)
+})

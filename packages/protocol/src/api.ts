@@ -175,6 +175,15 @@ export interface Handlers<R = never> {
   /** The thread under a message, made if it has none: its id. */
   readonly "channel.thread.create": (a: { readonly id: string }) => Effect.Effect<string, ApiError, R>;
   readonly "channel.attachment.create": (a: T.AttachmentUpload) => Effect.Effect<T.Attachment, ApiError, R>;
+  /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
+  readonly "channel.archive.toggle": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** A channel nothing points at any more, with its threads and messages. */
+  readonly "channel.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
+  /** What channel.delete would do, refused as it would be; nothing changes. */
+  readonly "channel.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
+  readonly "channel.notify.set": (a: T.NotifyRequest) => Effect.Effect<void, ApiError, R>;
+  /** The owner's read moved back to just before this message. */
+  readonly "channel.markUnread": (a: { readonly id: string } & T.ChatReadRequest) => Effect.Effect<void, ApiError, R>;
   readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
   readonly "graph.event.list": (a: { readonly id: string }) => Effect.Effect<T.GraphEvent[], ApiError, R>;
   readonly "game.achievement.list": () => Effect.Effect<T.Achievement[], ApiError, R>;
@@ -659,6 +668,42 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: messageInput,
     result: Schema.String,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.archive.toggle",
+    about: ["id"],
+    input: messageInput,
+    result: undefined,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.delete",
+    about: ["id"],
+    input: messageInput,
+    result: undefined,
+    can: ["owner", "remote"],
+    dryRun: "channel.previewDelete",
+  },
+  {
+    op: "channel.previewDelete",
+    about: ["id"],
+    input: messageInput,
+    result: S.Preview,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.notify.set",
+    about: ["id"],
+    input: S.NotifyRequest,
+    result: undefined,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.markUnread",
+    about: ["id"],
+    input: input({ id: Schema.String }, S.ChatReadRequest),
+    result: undefined,
     can: ["owner", "remote"],
   },
   {

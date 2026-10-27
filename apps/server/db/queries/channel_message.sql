@@ -132,6 +132,20 @@ from channel_message m
 join channel_participant p on p.id = m.sender_id
 join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
-where m.deleted_at is null and m.kind <> 'notice' and strpos(lower(m.body), lower(sqlc.arg(text))) > 0
+where m.deleted_at is null and m.kind <> 'notice'
+  and (sqlc.arg(text)::text = '' or strpos(lower(m.body), lower(sqlc.arg(text))) > 0)
   and (sqlc.arg(channel)::text = '' or c.id = sqlc.arg(channel) or c.parent_id = sqlc.arg(channel))
+  and (sqlc.arg(sender)::text = '' or m.sender_id = sqlc.arg(sender) or lower(p.name) = lower(sqlc.arg(sender)))
+  and (not sqlc.arg(has_file)::boolean or strpos(coalesce(m.meta, ''), '"attachments"') > 0)
+  and (not sqlc.arg(has_image)::boolean or strpos(coalesce(m.meta, ''), '"type":"image/') > 0)
+  and (not sqlc.arg(has_link)::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)
+  and m.created_at >= sqlc.arg(after)::float8 and m.created_at < sqlc.arg(before)::float8
 order by m.id desc limit sqlc.arg(n)::int;
+
+-- name: DeleteMessagesIn :exec
+-- A channel deleted: what was said in it and its threads goes (their mentions, deliveries and seen marks with them).
+delete from channel_message where channel_id = sqlc.arg(id) or channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));
+
+-- name: SetEmbeds :exec
+-- The previews read for its links, once they are: a change like any other.
+update channel_message set meta = sqlc.narg(meta), revision = sqlc.arg(revision) where id = sqlc.arg(id);

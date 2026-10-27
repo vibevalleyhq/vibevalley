@@ -32,6 +32,9 @@ import {
   type AttachmentUpload,
   type MessageHit,
   type Preview,
+  type ChannelUpdate,
+  type Embed,
+  type Notify,
 } from "@vibevalley/protocol";
 import { sessionId, type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
@@ -50,6 +53,7 @@ import {
   mentionOf,
   mentionsIn,
   parseChatTarget,
+  parseSearch,
   retryWindowMs,
   summaryChannels,
   type UnreadRow,
@@ -65,6 +69,7 @@ import { jsonOrNone } from "../base/json.ts";
 import { bounded } from "../core/bounded.ts";
 import { Core } from "../core/core.ts";
 import { WakeBreaker } from "./breaker.ts";
+import { linksIn, readEmbed } from "./embeds.ts";
 import { Audience } from "./audience.ts";
 import { Deliveries, type DeliveryRow } from "./deliveries.ts";
 import { ChatModel, type ChannelRow } from "./model.ts";
@@ -162,6 +167,7 @@ interface Meta {
   /** Said on a call: the orchestrator heard it there, so it wakes no one here. */
   spoken?: boolean;
   attachments?: Attachment[];
+  embeds?: Embed[];
 }
 
 const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
@@ -174,6 +180,7 @@ const MetaSchema: Schema.Codec<Meta, Wire<Meta>> = Schema.Struct({
   code: Schema.optionalKey(Schema.String),
   spoken: Schema.optionalKey(Schema.Boolean),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(S.Attachment))),
+  embeds: Schema.optionalKey(Schema.mutable(Schema.Array(S.Embed))),
 });
 
 /** Anything unreadable is no meta. */
@@ -229,8 +236,11 @@ function toMessage(row: MsgRow): ChatMessage {
     ...(row.pinned_at !== null ? { pinned: row.pinned_at } : {}),
     ...(row.reactions !== null ? { reactions: Object.entries(reactionsOf(row.reactions)).map(([emoji, by]) => ({ emoji, by })) } : {}),
     ...(meta.attachments && meta.attachments.length > 0 ? { attachments: meta.attachments } : {}),
+    ...(meta.embeds && meta.embeds.length > 0 ? { embeds: meta.embeds } : {}),
   };
 }
+
+const notifyOf = (n: string): Notify => (n === "mentions" || n === "none" ? n : "all");
 
 const inboxMore = (row: Pick<MsgRow, "meta" | "reply_number"> & { edited_at?: number | null; deleted_at?: number | null }, filesAt: (id: string) => string) => {
   const files = metaOf(row.meta).attachments ?? [];
@@ -309,7 +319,7 @@ export interface ChannelShape {
     more?: SayMore,
   ) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;
   /** The owner's own chat words, changed. Changes tell and wake nobody. */
-  readonly edit: (id: string, text: string) => Effect.Effect<ChatMessage, ApiError>;
+  readonly edit: (id: string, text: string, keep?: readonly string[]) => Effect.Effect<ChatMessage, ApiError>;
   /** Any message: its words, files and reactions go, its number stays, and what it had still to hand is dropped. */
   readonly remove: (id: string) => Effect.Effect<void, ApiError>;
   readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
@@ -357,7 +367,15 @@ export interface ChannelShape {
   readonly channels: () => Effect.Effect<Info[]>;
   readonly openChannel: (name: string, description: string, project: string) => Effect.Effect<Info, ApiError>;
   /** description undefined or empty: as it was; project undefined: as it was, empty: none. */
-  readonly updateChannel: (id: string, description: string | undefined, project: string | undefined) => Effect.Effect<void, ApiError>;
+  /** Each field given changes: a channel's description, project, name, group and place; a thread's title. */
+  readonly updateChannel: (id: string, upd: ChannelUpdate) => Effect.Effect<void, ApiError>;
+  readonly archive: (id: string) => Effect.Effect<void, ApiError>;
+  readonly removeChannel: (id: string) => Effect.Effect<void, ApiError>;
+  readonly previewRemoveChannel: (id: string) => Effect.Effect<Preview, ApiError>;
+  readonly setNotify: (id: string, notify: Notify) => Effect.Effect<void, ApiError>;
+  /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
+  readonly notifyOf: (id: string) => Notify;
+  readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
   /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
   readonly topOf: (channel: string) => Effect.Effect<Info>;
   /** How the orchestrator writes the place it answers in: a direct channel's own address, else its channel's. */
@@ -544,6 +562,10 @@ export const make = Effect.gen(function* () {
       type: channelType(row.type),
       ...(row.is_default ? { default: true } : {}),
       ...(row.peer_id !== null ? { peer: row.peer_id } : {}),
+      ...(row.category !== null ? { category: row.category } : {}),
+      ...(row.position !== null ? { position: row.position } : {}),
+      ...(row.archived_at !== null ? { archived: row.archived_at } : {}),
+      ...(row.notify !== "all" ? { notify: notifyOf(row.notify) } : {}),
       ...(row.root_id !== null ? { root: row.root_id } : {}),
       ...(row.root_number !== null ? { rootNumber: row.root_number } : {}),
       ...(row.name !== null ? { name: row.name } : {}),
@@ -565,10 +587,17 @@ export const make = Effect.gen(function* () {
   /** What a page lists a channel with: the owner's unread there, and a thread's title when its subject does not
    * name it (a page keeps no messages to name it by). */
   const counted = Effect.fnUntraced(function* (row: ChannelRow) {
-    const { n } = yield* db(qm.ownerUnread({ channel_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }));
+    // Set to none it counts nothing; to mentions, only what names the owner and is not handled yet.
+    const n =
+      row.notify === "none"
+        ? 0
+        : row.notify === "mentions"
+          ? (yield* db(qm.ownerMentions())).filter((m) => m.channel_id === row.id).length
+          : (yield* db(qm.ownerUnread({ channel_id: row.id, read_number: model.ownerReadIn(row.id) ?? 0 }))).n;
     const sk = subjectKind(row.subject_kind);
     let title = "";
-    if (row.type === "direct" && row.peer_id) title = model.participant(row.peer_id)?.name ?? "";
+    if (row.type === "thread" && row.name) title = row.name;
+    else if (row.type === "direct" && row.peer_id) title = model.participant(row.peer_id)?.name ?? "";
     else if (row.type === "thread" && sk === "talk" && row.subject_id) title = model.participant(row.subject_id)?.name ?? "";
     else if (row.type === "thread" && sk === undefined && row.root_id)
       title = oneLine((yield* one(qm.messageByID({ id: row.root_id })))?.body ?? "", threadTitleMax);
@@ -582,7 +611,9 @@ export const make = Effect.gen(function* () {
   });
 
   const publishOwnerMentions = Effect.gen(function* () {
-    const rows = yield* db(qm.ownerMentions());
+    // A place set to none tells the owner of nothing, its mentions included.
+    const quiet = (id: string | null) => id !== null && model.channel(id)?.notify === "none";
+    const rows = (yield* db(qm.ownerMentions())).filter((r) => !quiet(r.channel_id) && !quiet(r.top_id));
     yield* core.apply({
       type: "ownerMentions",
       mentions: rows.map((r) => ({
@@ -644,6 +675,10 @@ export const make = Effect.gen(function* () {
       project: null,
       peer_id: null,
       revision: 0,
+      category: null,
+      position: null,
+      archived_at: null,
+      notify: "all",
     });
     if (subject.owner) yield* follow(id, subject.owner, "owner", root.number);
     return id;
@@ -846,9 +881,34 @@ export const make = Effect.gen(function* () {
     return written;
   });
 
+  /** The previews of a message's links, read after it is out (the server's own requests take seconds) and then put on
+   * it as a change. */
+  const embedLater = (row: MsgRow) => {
+    const links = row.kind === "chat" && row.deleted_at === null ? linksIn(row.body) : [];
+    if (links.length === 0) return;
+    void forkHere(
+      Effect.gen(function* () {
+        const found = (yield* Effect.promise(() => Promise.all(links.map((l) => readEmbed(l).catch(() => undefined))))).filter(
+          (e): e is Embed => e !== undefined,
+        );
+        yield* locked(
+          Effect.gen(function* () {
+            const now = yield* one(qm.messageByID({ id: row.id }));
+            // Changed meanwhile: its words are not the ones read.
+            if (!now || now.deleted_at !== null || now.body !== row.body) return;
+            const meta = metaOf(now.meta);
+            if (found.length === 0 && !meta.embeds) return;
+            yield* change(now, (revision) => db(qm.setEmbeds({ meta: metaText({ ...meta, embeds: found }), revision, id: now.id })));
+          }),
+        );
+      }).pipe(logged("link previews")),
+    );
+  };
+
   const after = Effect.fnUntraced(function* (channel: string, written: Written, answers: SessionId | undefined): Effect.fn.Return<void> {
     for (const r of written.resetWake) breaker.reset(r);
     yield* publishMessage(written.row, answers);
+    embedLater(written.row);
     yield* publishChannel(channel);
     if (written.ownerMentionsChanged) yield* publishOwnerMentions;
     if (written.thread) yield* publishChannel(written.thread);
@@ -1231,6 +1291,25 @@ export const make = Effect.gen(function* () {
   const received = (recipient: string, message: string) =>
     reacting(message, recipient, handedEmoji, true).pipe(Effect.catchCause((c) => Effect.logWarning(`chat: 👀 on ${message}: ${String(c)}`)));
 
+  /** A channel nothing points at any more; refused with what still does. */
+  const removable = Effect.fnUntraced(function* (id: string) {
+    const row = model.channel(id);
+    if (!row || row.type !== "channel") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+    if (row.is_default) return yield* Effect.fail(refused(channelWording().defaultStays));
+    if (presentSessions().some((h) => channelOfSession(h) === id)) return yield* Effect.fail(refused(channelWording().inUse(channelWording().helpersThere)));
+    const used = yield* db(qc.channelInUse({ id }));
+    const why = [
+      used.recurrences ? channelWording().recurrencesThere(used.recurrences) : "",
+      used.connectors ? channelWording().connectorsThere : "",
+      used.queued ? channelWording().queuedThere(used.queued) : "",
+      used.issue_threads ? channelWording().issuesThere(used.issue_threads) : "",
+    ].filter(Boolean);
+    if (why.length > 0) return yield* Effect.fail(refused(channelWording().inUse(why.join("、"))));
+    const threads = model.threadsOf(id);
+    const said = (row.last_number ?? 0) + threads.reduce((n, t) => n + t.reply_count, 0);
+    return { target: targetOfChannel(row), threads: threads.length, said };
+  });
+
   const shape: ChannelShape = {
     now: () => core.state().chat,
     follow: (channel, after) =>
@@ -1290,15 +1369,24 @@ export const make = Effect.gen(function* () {
           return { message: toMessage(written.row), again: false };
         }),
       ),
-    edit: (id, text) =>
+    edit: (id, text, keep) =>
       locked(
         Effect.gen(function* () {
           const row = yield* messageOf(id);
           if (row.sender_id !== ownerId || row.kind !== "chat" || row.deleted_at !== null) return yield* Effect.fail(refused(channelWording().notYours));
+          const meta = metaOf(row.meta);
+          const files = keep === undefined ? (meta.attachments ?? []) : (meta.attachments ?? []).filter((a) => keep.includes(a.id));
           const words = text.trim();
-          if (!words) return yield* Effect.fail(refused(channelWording().empty));
-          if (words === row.body) return toMessage(row);
-          return yield* change(row, (revision, now) => db(qm.editMessage({ body: words, at: now, revision, id })));
+          if (!words && files.length === 0) return yield* Effect.fail(refused(channelWording().empty));
+          if (words === row.body && files.length === (meta.attachments ?? []).length) return toMessage(row);
+          const changed = yield* change(row, (revision, now) =>
+            Effect.gen(function* () {
+              yield* db(qm.editMessage({ body: words, at: now, revision, id }));
+              if (files.length !== (meta.attachments ?? []).length) yield* db(qm.setEmbeds({ meta: metaText({ ...meta, attachments: files }), revision, id }));
+            }),
+          );
+          if (words !== row.body) embedLater({ ...row, body: words });
+          return changed;
         }),
       ),
     remove: (id) =>
@@ -1353,9 +1441,28 @@ export const make = Effect.gen(function* () {
       ),
     search: (text, channel) =>
       Effect.gen(function* () {
-        const words = text.trim();
-        if (!words) return yield* Effect.fail(refused(channelWording().empty));
-        const rows = yield* db(qm.searchMessages({ text: words, channel: channel ?? "", n: searchMax }));
+        const q = parseSearch(text);
+        if (!q.words && !q.from && !q.in && q.has.length === 0 && q.before === undefined && q.after === undefined)
+          return yield* Effect.fail(refused(channelWording().empty));
+        let scope = channel ?? "";
+        if (q.in) {
+          const named = model.channelByName(q.in);
+          if (!named) return yield* Effect.fail(missing(channelWording().noChannelNamed(q.in, channelTags()), [lookIn.channel]));
+          scope = named.id;
+        }
+        const rows = yield* db(
+          qm.searchMessages({
+            text: q.words,
+            channel: scope,
+            sender: q.from ?? "",
+            has_file: q.has.includes("file"),
+            has_image: q.has.includes("image"),
+            has_link: q.has.includes("link"),
+            after: q.after ?? 0,
+            before: q.before ?? Number.MAX_SAFE_INTEGER,
+            n: searchMax,
+          }),
+        );
         return rows.map((r) => ({
           message: toMessage(r),
           channel: r.top_id ?? r.channel_id,
@@ -1567,21 +1674,120 @@ export const make = Effect.gen(function* () {
             parent_id: null,
             peer_id: null,
             revision: 0,
+            category: null,
+            position: null,
+            archived_at: null,
+            notify: "all",
           });
           yield* publishChannel(id);
           return infoOf({ id, name: clean, description: desc, project: proj, is_default: false });
         }),
       ),
-    updateChannel: (id, description, project) =>
+    updateChannel: (id, upd) =>
       locked(
         Effect.gen(function* () {
           const row = model.channel(id);
-          if (!row || row.type === "thread") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
-          const desc = (description !== undefined ? optional(description) : null) ?? row.description;
-          const proj = project !== undefined ? optional(project) : row.project;
-          yield* db(qc.updateChannel({ description: desc, project: proj, id }));
-          model.channelUpdated(id, desc, proj);
+          if (!row || row.type === "direct") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          const onlyName = upd.description === undefined && upd.project === undefined && upd.category === undefined && upd.before === undefined;
+          if (row.type === "thread" && !onlyName) return yield* Effect.fail(refused(channelWording().threadOnlyTitle));
+          let name = row.name;
+          if (upd.name !== undefined) {
+            const clean = upd.name.trim().replace(/^#/, "");
+            if (row.type === "thread") name = clean ? head(clean, threadTitleMax * 2) : null;
+            else {
+              const problem = channelNameProblem(
+                clean,
+                model.channels().flatMap((c) => (c.name !== null && c.id !== id ? [c.name] : [])),
+              );
+              if (problem) return yield* Effect.fail(refused(problem));
+              name = clean;
+            }
+          }
+          const desc = (upd.description !== undefined ? optional(upd.description) : null) ?? row.description;
+          const proj = upd.project !== undefined ? optional(upd.project) : row.project;
+          const category = upd.category !== undefined ? optional(upd.category) : row.category;
+          // Placed before another channel: every channel but the default gets its place again, in order.
+          const order =
+            upd.before === undefined
+              ? undefined
+              : (() => {
+                  const rest = model
+                    .channels()
+                    .filter((c) => !c.is_default && c.id !== id)
+                    .map((c) => c.id);
+                  const at = rest.indexOf(upd.before);
+                  rest.splice(at < 0 ? rest.length : at, 0, id);
+                  return rest;
+                })();
+          yield* tx(
+            Effect.gen(function* () {
+              if (row.type === "channel") yield* db(qc.updateChannel({ description: desc, project: proj, id }));
+              if (name !== row.name) yield* db(qc.renameChannel({ name, id }));
+              if (category !== row.category) yield* db(qc.setCategory({ category, id }));
+              for (const [position, each] of (order ?? []).entries()) yield* db(qc.placeChannel({ position, id: each }));
+            }),
+          );
+          if (row.type === "channel") model.channelUpdated(id, desc, proj);
+          model.patched(id, { name, category });
+          for (const [position, each] of (order ?? []).entries()) model.patched(each, { position });
+          for (const each of order ?? [id]) yield* publishChannel(each);
+        }),
+      ),
+    archive: (id) =>
+      locked(
+        Effect.gen(function* () {
+          const row = model.channel(id);
+          if (!row || row.type === "direct") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (row.is_default) return yield* Effect.fail(refused(channelWording().defaultStays));
+          const archived_at = row.archived_at === null ? yield* Clock.currentTimeMillis : null;
+          yield* db(qc.setArchived({ archived_at, id }));
+          model.patched(id, { archived_at });
           yield* publishChannel(id);
+        }),
+      ),
+    previewRemoveChannel: (id) => Effect.map(removable(id), (r) => ({ does: [channelWording().deletesChannel(r.target, r.threads, r.said)] })),
+    removeChannel: (id) =>
+      locked(
+        Effect.gen(function* () {
+          yield* removable(id);
+          yield* tx(
+            Effect.gen(function* () {
+              yield* db(qm.deleteMessagesIn({ id }));
+              yield* db(qf.deleteFollowsIn({ id }));
+              yield* db(qr.deleteCursorsIn({ id }));
+              yield* db(qc.deleteThreadsOf({ id }));
+              yield* db(qc.deleteChannel({ id }));
+            }),
+          );
+          yield* reload;
+          yield* core.apply({ type: "channelGone", id });
+        }),
+      ),
+    setNotify: (id, notify) =>
+      locked(
+        Effect.gen(function* () {
+          if (!model.channel(id)) return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          yield* db(qc.setNotify({ notify, id }));
+          model.patched(id, { notify });
+          yield* publishChannel(id);
+          yield* publishOwnerMentions;
+        }),
+      ),
+    notifyOf: (id) => {
+      const c = model.channel(id);
+      const top = c?.parent_id ? model.channel(c.parent_id) : undefined;
+      if (c?.notify === "none" || top?.notify === "none") return "none";
+      return notifyOf(c?.notify !== "all" ? (c?.notify ?? "all") : (top?.notify ?? "all"));
+    },
+    markUnread: (channel, number) =>
+      locked(
+        Effect.gen(function* () {
+          if (!model.channel(channel)) return yield* Effect.fail(missing(channelWording().noChannel(channel), [lookIn.channel]));
+          const upto = Math.max(0, number - 1);
+          yield* db(qr.markUnread({ channel_id: channel, read_number: upto, updated_at: yield* Clock.currentTimeMillis }));
+          model.ownerReadBack(channel, upto);
+          yield* publishChannel(channel);
+          yield* publishOwnerMentions;
         }),
       ),
     makeDefault: (id) =>

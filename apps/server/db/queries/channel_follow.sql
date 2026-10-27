@@ -7,3 +7,6 @@ on conflict (channel_id, participant_id) do update set unfollowed_at = null;
 
 -- name: AllFollows :many
 select channel_id, participant_id from channel_follow where unfollowed_at is null;
+
+-- name: DeleteFollowsIn :exec
+delete from channel_follow where channel_id = sqlc.arg(id) or channel_id in (select t.id from channel t where t.parent_id = sqlc.arg(id));

@@ -247,7 +247,21 @@ export interface ChatMessage {
   /** In the order they first came. */
   reactions?: Reaction[];
   attachments?: Attachment[];
+  /** Previews of the links in its words, as the server read them. */
+  embeds?: Embed[];
 }
+
+export interface Embed {
+  url: string;
+  title?: string;
+  description?: string;
+  site?: string;
+  /** An image the page shows for it, at its own address on the web. */
+  image?: string;
+}
+
+export const NotifyValues = ["all", "mentions", "none"] as const;
+export type Notify = (typeof NotifyValues)[number];
 
 export interface Reaction {
   emoji: string;
@@ -278,10 +292,17 @@ export interface Channel {
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default?: boolean;
-  /** A direct channel's other participant: the owner talks with it there alone. */
+  /** A direct channel's other participant: the orchestrator, or a helper profile. The owner talks with it there alone. */
   peer?: string;
   /** A thread's channel. */
   parent?: string;
+  /** A channel's group in the sidebar. */
+  category?: string;
+  /** Its place in the sidebar, lowest first; none comes after the placed. */
+  position?: number;
+  archived?: number;
+  /** What of it counts for the owner; absent is all. */
+  notify?: Notify;
   /** The message a thread hangs under, and its number there. */
   root?: string;
   rootNumber?: number;
@@ -1392,6 +1413,12 @@ export interface SayRequest {
 export interface ChannelUpdate {
   description?: string;
   project?: string;
+  /** A channel's name (unique, written in its address), or a thread's title. */
+  name?: string;
+  /** A channel's group; empty takes it out of one. */
+  category?: string;
+  /** Placed before this channel in the sidebar; empty is last. */
+  before?: string;
 }
 
 export interface RecurrenceRequest {
@@ -1911,6 +1938,7 @@ export type Fact =
   | FactOrchestrator
   | FactMessage
   | FactChannel
+  | FactChannelGone
   | FactOwnerMentions
   | FactHired
   | FactStation
@@ -1957,6 +1985,13 @@ export interface FactChannel {
   type: "channel";
   at: number;
   channel: Channel;
+}
+
+/** A channel deleted, and its threads with it. */
+export interface FactChannelGone {
+  type: "channelGone";
+  at: number;
+  id: string;
 }
 
 export interface FactOwnerMentions {
@@ -2093,6 +2128,7 @@ export type SideEvent =
   | FactOrchestrator
   | FactMessage
   | FactChannel
+  | FactChannelGone
   | FactOwnerMentions
   | FactHired
   | FactStation
@@ -2413,6 +2449,13 @@ export interface DocAck {
 export interface MessageEdit {
   id: string;
   text: string;
+  /** The files it keeps: absent keeps them all, a shorter list takes the others off. */
+  attachments?: string[];
+}
+
+export interface NotifyRequest {
+  id: string;
+  notify: Notify;
 }
 
 export interface ReactionToggle {

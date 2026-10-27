@@ -54,6 +54,11 @@
 | `channel.pin.toggle` | `/api/v1/channel/pin/toggle` | ✓ | ✓ |   |
 | `channel.pin.list` | `/api/v1/channel/pin/list` | ✓ | ✓ | ✓ |
 | `channel.thread.create` | `/api/v1/channel/thread/create` | ✓ | ✓ |   |
+| `channel.archive.toggle` | `/api/v1/channel/archive/toggle` | ✓ | ✓ |   |
+| `channel.delete` | `/api/v1/channel/delete` | ✓ | ✓ |   |
+| `channel.previewDelete` | `/api/v1/channel/previewDelete` | ✓ | ✓ |   |
+| `channel.notify.set` | `/api/v1/channel/notify/set` | ✓ | ✓ |   |
+| `channel.markUnread` | `/api/v1/channel/markUnread` | ✓ | ✓ |   |
 | `channel.attachment.create` | `/api/v1/channel/attachment/create` | ✓ | ✓ |   |
 
 ## recurrence

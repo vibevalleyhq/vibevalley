@@ -301,6 +301,80 @@ describe("the chat", () => {
     });
   });
 
+  it.live("a channel is renamed, grouped, placed, archived, quieted, and deleted once nothing points at it", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const a = (yield* f.chat.openChannel("aa", "", "")).id;
+        const b = (yield* f.chat.openChannel("bb", "", "")).id;
+        yield* f.chat.updateChannel(a, { name: "前端", category: "项目" });
+        expect(f.channel(a)).toMatchObject({ name: "前端", category: "项目" });
+        expect(yield* Effect.flip(f.chat.updateChannel(b, { name: "前端" }))).toMatchObject({ _tag: "Refused" });
+        yield* f.chat.updateChannel(b, { before: a });
+        expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["general", "bb", "前端"]);
+
+        const said = (yield* f.chat.say("一句话", a, "")).message;
+        const thread = yield* f.chat.threadUnder(said.id);
+        yield* f.chat.updateChannel(thread, { name: "细说" });
+        expect(f.channel(thread)?.title).toBe("细说");
+        expect(yield* Effect.flip(f.chat.updateChannel(thread, { category: "x" }))).toMatchObject({ _tag: "Refused" });
+
+        yield* f.chat.archive(a);
+        expect(f.channel(a)?.archived).toBeDefined();
+        yield* f.chat.archive(a);
+        expect(f.channel(a)?.archived).toBeUndefined();
+        expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel()))).toMatchObject({ _tag: "Refused" });
+
+        // Quieted, it counts only what names the owner, then nothing.
+        yield* f.chat.speak(orchestratorAgent, "随便说说", { target: "#前端", anyway: true, confirm: true });
+        yield* f.chat.setNotify(a, "mentions");
+        expect(f.channel(a)?.unread).toBeUndefined();
+        yield* f.chat.speak(orchestratorAgent, "@主人 看一下", { target: "#前端", anyway: true, confirm: true });
+        expect(f.channel(a)?.unread).toBe(1);
+        expect(f.chat.notifyOf(thread)).toBe("mentions");
+        yield* f.chat.setNotify(a, "none");
+        expect([f.channel(a)?.unread, f.core.state().chat?.ownerMentions?.length ?? 0, f.chat.notifyOf(thread)]).toEqual([undefined, 0, "none"]);
+
+        yield* f.chat.setNotify(a, "all");
+        yield* f.chat.markRead(a, 99);
+        yield* f.chat.markUnread(a, said.number);
+        expect([f.channel(a)?.read, f.channel(a)?.unread]).toEqual([said.number - 1, 2]);
+
+        // A recurrence of the recurrence module's, as its table has it.
+        yield* f.sql`insert into recurrence (id, name, body, channel_id, spec, tz, created_at) values ('r1', '看看', '看一眼', ${a}, '{}', 'UTC', 0)`.pipe(
+          Effect.orDie,
+        );
+        expect(yield* Effect.flip(f.chat.removeChannel(a))).toMatchObject({ reason: expect.stringContaining("定时") });
+        expect(yield* Effect.flip(f.chat.removeChannel(f.chat.defaultChannel()))).toMatchObject({ _tag: "Refused" });
+        expect((yield* f.chat.previewRemoveChannel(b)).does[0]).toContain("#bb");
+        yield* f.chat.removeChannel(b);
+        expect([f.channel(b), (yield* f.chat.channels()).map((c) => c.name)]).toEqual([undefined, ["general", "前端"]]);
+      }),
+    ),
+  );
+
+  it.live("a search reads its filters, and an edit can take a message's files off", () =>
+    run((f) =>
+      Effect.gen(function* () {
+        const general = f.chat.defaultChannel();
+        const file = yield* f.chat.attach({ name: "图.png", type: "image/png", data: Buffer.from("x").toString("base64") });
+        const pictured = (yield* f.chat.say("看图", undefined, "", { attachments: [file.id] })).message;
+        yield* f.chat.say("一个链接 https://example.com/page", undefined, "");
+        yield* f.chat.speak(orchestratorAgent, "我看了图", { anyway: true, confirm: true });
+        const text = async (q: string) => (await Effect.runPromise(f.chat.search(q))).map((h) => h.message.text);
+        expect(yield* Effect.promise(() => text("has:image"))).toEqual(["看图"]);
+        expect(yield* Effect.promise(() => text("has:link"))).toEqual(["一个链接 https://example.com/page"]);
+        expect(yield* Effect.promise(() => text("图 from:管家"))).toEqual(["我看了图"]);
+        expect(yield* Effect.promise(() => text("from:主人 in:#general 图"))).toEqual(["看图"]);
+        expect(yield* Effect.promise(() => text("图 before:2000-01-01"))).toEqual([]);
+        expect(yield* Effect.flip(f.chat.search("in:#nowhere"))).toMatchObject({ _tag: "Missing" });
+
+        const bare = yield* f.chat.edit(pictured.id, "看图（图去掉了）", []);
+        expect([bare.attachments, bare.text]).toEqual([undefined, "看图（图去掉了）"]);
+        expect((yield* f.chat.history(general)).find((m) => m.id === pictured.id)?.attachments).toBeUndefined();
+      }),
+    ),
+  );
+
   it.live("channels", () =>
     run((f, x) =>
       Effect.gen(function* () {
@@ -326,7 +400,7 @@ describe("the chat", () => {
           what: expect.stringContaining("没有叫 #nowhere 的频道"),
         });
         expect((yield* f.chat.topOf(thread.id)).name).toBe("clock-in");
-        yield* f.chat.updateChannel(channel.id, undefined, "");
+        yield* f.chat.updateChannel(channel.id, { project: "" });
         expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
         expect(channelOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
         const general = f.chat.defaultChannel();

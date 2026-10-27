@@ -48,10 +48,16 @@ export class ChatModel {
     return undefined;
   }
 
-  /** The channels of a type, the default first, then as they were made. */
+  /** The channels of a type in the sidebar's order: the default first, then by place, then as they were made. */
   channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
     const all = [...this.byId.values()].filter((c) => c.type === type);
-    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const place = (c: ChannelRow) => c.position ?? Number.MAX_SAFE_INTEGER;
+    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : place(a) - place(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+  }
+
+  /** The threads under a channel's messages. */
+  threadsOf(channel: string): ChannelRow[] {
+    return [...this.byId.values()].filter((c) => c.parent_id === channel);
   }
 
   /** CreateChannel, CreateDirect, CreateThread. */
@@ -69,6 +75,29 @@ export class ChatModel {
   channelUpdated(id: string, description: string | null, project: string | null) {
     const c = this.byId.get(id);
     if (c && c.type !== "thread") this.byId.set(id, { ...c, description, project });
+  }
+
+  /** RenameChannel, SetCategory, PlaceChannel, SetArchived, SetNotify. */
+  patched(id: string, change: Partial<Pick<ChannelRow, "name" | "category" | "position" | "archived_at" | "notify">>) {
+    const c = this.byId.get(id);
+    if (c) this.byId.set(id, { ...c, ...change });
+  }
+
+  /** DeleteThreadsOf, DeleteChannel: the channel and its threads. */
+  removed(id: string) {
+    for (const c of [...this.byId.values()])
+      if (c.id === id || c.parent_id === id) {
+        this.byId.delete(c.id);
+        this.ownerRead.delete(c.id);
+        if (c.root_id !== null) this.threadByRoot.delete(c.root_id);
+        if (c.subject_kind !== null && c.subject_id !== null && this.threadBySubject.get(subjectKey(c.subject_kind, c.subject_id)) === c.id)
+          this.threadBySubject.delete(subjectKey(c.subject_kind, c.subject_id));
+      }
+  }
+
+  /** MarkUnread for the owner: it moves back too. */
+  ownerReadBack(channel: string, number: number) {
+    this.ownerRead.set(channel, number);
   }
 
   /** ClearDefault, MakeDefault. */
