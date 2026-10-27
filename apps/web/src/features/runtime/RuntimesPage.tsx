@@ -18,13 +18,13 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
-import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "../../rules/quota";
-import { yuan } from "../../features/channel/rules";
+import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
+import { yuan } from "../channel/rules";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { Keyed } from "../../base/util";
-import { useWorkAgents } from "../../features/agent/data";
+import { useWorkAgents } from "../agent/data";
 import { ready, useRuntimes } from "../../base/query";
 import { RuntimeIcon } from "../../ui/RuntimeIcon";
 import { Button } from "../../ui/Button";

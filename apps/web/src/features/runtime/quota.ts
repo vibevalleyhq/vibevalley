@@ -1,9 +1,9 @@
 // A runtime's account, as the runtimes page and the farm's bottle both say it: how much is left, its windows in
 // words, when it resets, and the machine each runtime is drawn as.
 
-import { rulesWording } from "../base/words/rules";
+import { rulesWording } from "../../base/words/rules";
 import type { RuntimeInfo } from "@vibevalley/protocol";
-import { numberText } from "../base/format";
+import { numberText } from "../../base/format";
 
 /** A switched-off runtime's account is not the farm's business. */
 export const usableRuntimes = (all: readonly RuntimeInfo[]) => all.filter((r) => r.installation.status === "available" && r.settings.enabled);

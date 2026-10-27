@@ -1,12 +1,12 @@
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
-import { settingsWording } from "./words";
+import { settingsWording } from "../../pages/settings/words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { type InstalledSkill, installedSkills, matches, runtimeName } from "../../rules/skills";
+import { type InstalledSkill, installedSkills, matches, runtimeName } from "./skills";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";

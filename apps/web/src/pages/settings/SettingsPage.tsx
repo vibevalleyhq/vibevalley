@@ -9,7 +9,7 @@ import { Card, ListCard, ListRow } from "../../ui/layout";
 import { ConnectorsPage } from "./ConnectorsPage";
 import { LanPage } from "./LanPage";
 import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
-import { SkillsPage } from "./SkillsPage";
+import { SkillsPage } from "../../features/runtime/SkillsPage";
 import { VoiceForm } from "./VoiceForm";
 
 export const sections = [

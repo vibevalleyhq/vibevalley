@@ -4,7 +4,7 @@
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
-import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../rules/quota";
+import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../features/runtime/quota";
 import { yuan } from "../../features/channel/rules";
 import { aria, useClickAway } from "../../base/util";
 import { ready, useRuntimes } from "../../base/query";

@@ -26,7 +26,7 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../ui/cast";
-import { runtimeName } from "../../rules/skills";
+import { runtimeName } from "../runtime/skills";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { useRouter, useSearch } from "../../base/router";
@@ -43,7 +43,7 @@ import { PoseSprite } from "../../ui/PoseSprite";
 import { Segmented } from "../../ui/Segmented";
 import { Toggle } from "../../ui/layout";
 import { MemoryPanel } from "../memory/Memory";
-import { useSkills } from "../../pages/settings/SkillsPage";
+import { useSkills } from "../runtime/SkillsPage";
 import { TrajectoryList } from "../session/Trajectory";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };

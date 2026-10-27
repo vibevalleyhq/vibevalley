@@ -13,7 +13,7 @@ import { IssuesPage } from "../features/issue/IssuesPage";
 import { OrchestratorPage } from "../features/orchestrator/OrchestratorPage";
 import { PairPage } from "../pages/pair/PairPage";
 import { ProjectsPage } from "../features/project/ProjectsPage";
-import { RuntimesPage } from "../pages/runtimes/RuntimesPage";
+import { RuntimesPage } from "../features/runtime/RuntimesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { ToastHost } from "../ui/ToastHost";
 import { Navigate } from "../ui/A";

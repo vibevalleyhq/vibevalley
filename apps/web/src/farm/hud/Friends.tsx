@@ -5,7 +5,7 @@
 import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
-import { bottleSprite, quotaOf } from "../../rules/quota";
+import { bottleSprite, quotaOf } from "../../features/runtime/quota";
 import { statusOf, type FriendStatus } from "./friendStatus";
 import { farm } from "../store";
 import { webRoutes } from "../world/places";
