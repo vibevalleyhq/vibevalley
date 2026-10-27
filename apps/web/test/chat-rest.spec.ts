@@ -238,6 +238,7 @@ test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with
     .click();
   await box.fill("@小獾");
   await expect(dialog.getByRole("option").first()).toContainText("开一个私聊");
+  await page.screenshot({ path: test.info().outputPath("switcher.png") });
   await box.press("Enter");
   await expect(page.getByRole("heading", { name: "小獾" })).toBeVisible();
 });
@@ -252,6 +253,7 @@ test("a link to a farm message shows that message under it, and a press goes the
   const card = page.getByRole("log", { name: "消息" }).getByRole("button", { name: `跳到 #原处 的第 ${said!.number} 条` });
   await expect(card).toContainText("南坡的苹果熟了");
   await expect(card).toContainText("主人");
+  await page.screenshot({ path: test.info().outputPath("linked.png") });
   await card.click();
   await expect(page).toHaveURL(new RegExp(`/chat/${from}\\?m=${said!.number}$`));
   // The server reads no preview of the farm's own address.
