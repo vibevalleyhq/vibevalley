@@ -1,4 +1,4 @@
-import { needsOwner } from "./prompts.ts";
+import { needsOwner, talkJob } from "./prompts.ts";
 import { commandOf } from "@vibevalley/protocol/api";
 import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
@@ -57,7 +57,9 @@ import {
   sentTitles,
   splitJob,
 } from "./rules.ts";
-import { Clock, Context, Effect, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { Clock, Context, Effect, FiberMap, Layer, Option, PubSub, Schedule, Schema, type Scope, Semaphore, Stream } from "effect";
+import { isBusy } from "@vibevalley/protocol/rules";
+import { inboxLines } from "../channel/prompts.ts";
 import { jsonOf, jsonOrNone } from "../base/json.ts";
 import * as S from "@vibevalley/protocol/schema";
 import { SqlClient, SqlError } from "effect/sql";
@@ -93,6 +95,7 @@ export interface OrchestratorWork {
 }
 
 export interface IssueShape {
+  /** The issues on the board: a talk with a profile is not one. */
   readonly list: () => Effect.Effect<Issue[]>;
   /** The issues the board holds now (open, and the latest closed). */
   readonly onBoard: () => readonly Issue[];
@@ -123,6 +126,8 @@ export interface IssueShape {
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
   readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
   readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
+  /** The owner's direct channel with a helper profile (or the orchestrator), opened with its talk issue the first time. */
+  readonly talkWith: (agent: string) => Effect.Effect<string, ApiError>;
   readonly history: () => Effect.Effect<IssueHistory[]>;
   readonly timeline: (id: string) => Effect.Effect<IssueTimeline, ApiError>;
   readonly templates: (project: string) => Effect.Effect<ProjectTemplates, ApiError>;
@@ -202,9 +207,16 @@ function failedText(findings: readonly Finding[], text: string): string {
   return out + w.failedEnd;
 }
 
+/** A talk's session stays this long with nothing said after its round. */
+const talkIdleMs = 10 * 60_000;
+/** How much of a talk a session sent for it is given: the newest messages. */
+const talkContext = 12;
+
 export interface IssueOptions {
   readonly tryEveryMs?: number;
   readonly background?: boolean;
+  /** How long a talk's session stays with nothing said after its round. */
+  readonly talkIdleMs?: number;
 }
 
 export const make = (options: IssueOptions = {}) =>
@@ -261,6 +273,7 @@ export const make = (options: IssueOptions = {}) =>
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
         deliver: row.deliver as Deliverable,
+        ...(row.talk !== null ? { talk: row.talk } : {}),
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: column.findings(row.findings) ?? [],
         questions: column.questions(row.questions) ?? [],
@@ -337,7 +350,7 @@ export const make = (options: IssueOptions = {}) =>
       return Effect.succeed([title, description] as const);
     };
 
-    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, recurrence?: string) {
+    const add = Effect.fn("Issues.add")(function* (req: IssueRequest, recurrence?: string, talk?: string) {
       const [title, description] = yield* issueWords(req);
       const id = newId();
       yield* db(
@@ -352,6 +365,7 @@ export const make = (options: IssueOptions = {}) =>
           recurrence: recurrence ?? null,
           // The orchestrator never changes code: what it is given is answered.
           deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
+          talk: talk ?? null,
         }),
       );
       yield* publish(id);
@@ -390,6 +404,8 @@ export const make = (options: IssueOptions = {}) =>
     const answered = Effect.fn("Issues.answered")(function* (id: string, session: string, outcome: Outcome, answer: IssueAnswer | undefined) {
       const t = yield* get(id);
       if (t.deliver !== "answer" || t.sessions.at(-1) !== session) return;
+      // A talk has no conclusion to read: its words are in its channel. What the round changed goes all the same.
+      if (t.talk) return yield* sessions.discardWork(session);
       if (outcome === "completed") yield* db(q.setIssueAnswer({ id, answer: jsonOrNull(answer, answer !== undefined) }));
       yield* sessions.discardWork(session);
       yield* publish(id);
@@ -829,6 +845,7 @@ export const make = (options: IssueOptions = {}) =>
           if (issue && checks.length > 0) yield* checked(issue, checks);
           if (issue) yield* asked(issue, e.questions);
           if (issue) yield* answered(issue, e.id, e.outcome, e.answer);
+          if (issue && (yield* get(issue)).talk) yield* idleLater(issue, e.id);
           yield* handedBack(e);
           return;
         }
@@ -837,11 +854,53 @@ export const make = (options: IssueOptions = {}) =>
       }
     });
 
+    /** Where a talk with a profile that has no folder of its own looks: the project worked in last, else the first one. */
+    const lastProject = Effect.gen(function* () {
+      const worked = (yield* list).filter((i) => i.project && !i.talk).sort((a, b) => b.createdAt - a.createdAt)[0]?.project;
+      return worked ?? (yield* projects.list())[0]?.name ?? "";
+    });
+
+    /** The owner said something to a profile no session talks for now: one is sent, with the talk so far. */
+    const talkOn = Effect.fn("Issues.talkOn")(function* (t: Issue) {
+      const agent = store.agent(t.assignee ?? "");
+      if (!agent || !t.talk) return;
+      const said = inboxLines(yield* chat.recent(t.talk, talkContext));
+      const hired = yield* hire(agent, talkJob(agent.name, said), t.project ?? (agent.workdir || (yield* lastProject)), {
+        channel: t.talk,
+        issue: t.id,
+        trigger: { kind: "comment" },
+      });
+      if (!hired.session) yield* chat.notice(t.talk, hired.refused ?? issueWording().sendFailed, "talk_refused");
+    });
+
     const onOwnerInThread = Effect.fn("Issues.onOwnerInThread")(function* (thread: string) {
       const issue = yield* Effect.option(get(thread));
-      if (Option.isNone(issue) || isClosed(issue.value.status)) return;
-      yield* ownerSaid(issue.value.id);
+      if (Option.isNone(issue)) return;
+      const t = issue.value;
+      if (t.talk) {
+        const last = t.sessions.at(-1);
+        if (last === undefined || !sessions.find(last)) yield* talkOn(t);
+        return;
+      }
+      if (isClosed(t.status)) return;
+      yield* ownerSaid(t.id);
     });
+
+    /** A talk's session goes home once nothing is said for talkIdleMs after its round; the next word sends another. */
+    const idleTalks = yield* FiberMap.make<string>();
+    const idleLater = (id: string, session: string) =>
+      FiberMap.run(
+        idleTalks,
+        id,
+        Effect.delay(
+          Effect.gen(function* () {
+            const s = sessions.sessionOf(session);
+            if (!s || isBusy(s)) return;
+            yield* sessions.dismiss(session, "discard", "completed");
+          }).pipe(Effect.catchCause((c) => Effect.logWarning(`vibevalley: a talk's session ${session} going home: ${String(c)}`))),
+          options.talkIdleMs ?? talkIdleMs,
+        ),
+      );
 
     const rows = yield* db(q.keptIssues({ closed: keepClosedIssues }));
     for (const row of rows) yield* core.apply({ type: "issue", issue: issueOf(row, worked.of(row.id)) });
@@ -911,7 +970,7 @@ export const make = (options: IssueOptions = {}) =>
 
     const shape: IssueShape = {
       onBoard: () => core.state().issues ?? [],
-      list: () => list,
+      list: () => Effect.map(list, (all) => all.filter((t) => !t.talk)),
       get,
       timeline,
       add: (req) => add(req),
@@ -1090,9 +1149,20 @@ export const make = (options: IssueOptions = {}) =>
         return yield* get(id);
       }),
       refine: draft,
+      talkWith: Effect.fn("Issues.talkWith")(function* (ref) {
+        const agent = store.named(ref.trim()) ?? store.agent(ref);
+        if (!agent) return yield* Effect.fail(missing(issueWording().noProfileNamed(ref), [lookIn.agent]));
+        if (agent.id === orchestratorAgent) return chat.orchestratorDirect();
+        const channel = yield* chat.openDirect({ id: agent.id, name: agent.name });
+        if (!(yield* one(q.talkOf({ talk: channel })))) {
+          const made = yield* add({ title: issueWording().talkTitle(agent.name), assignee: agent.id, deliver: "answer" }, undefined, channel);
+          yield* chat.linkTalk(channel, made.id);
+        }
+        return channel;
+      }),
       /** A session with no record is named as missing, not given a phase. */
       history: Effect.fn("Issues.history")(function* () {
-        const all = yield* list;
+        const all = (yield* list).filter((t) => !t.talk);
         const byId = new Map((yield* sessions.list("")).map((s) => [s.id, s]));
         return all.map((issue) => ({
           issue,

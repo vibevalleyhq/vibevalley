@@ -125,6 +125,10 @@ export class VibeValleyApi {
       /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
       toggle: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/archive/toggle", a) as Promise<void>,
     },
+    direct: {
+      /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
+      create: (a: { agent: string }): Promise<string> => this.call("/api/v1/channel/direct/create", a) as Promise<string>,
+    },
     notify: {
       set: (a: T.NotifyRequest): Promise<void> => this.call("/api/v1/channel/notify/set", a) as Promise<void>,
     },

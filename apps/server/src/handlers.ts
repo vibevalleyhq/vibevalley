@@ -149,6 +149,7 @@ export const handlers = Effect.gen(function* () {
     "channel.delete": ({ id }) => channels.removeChannel(id),
     "channel.previewDelete": ({ id }) => channels.previewRemoveChannel(id),
     "channel.notify.set": ({ id, notify }) => channels.setNotify(id, notify),
+    "channel.direct.create": ({ agent }) => issues.talkWith(agent),
     "channel.markUnread": ({ id, number }) => channels.markUnread(id, number),
     "channel.default.set": ({ id }) => channels.makeDefault(id),
     "channel.message.list": ({ id, before, limit }) => channels.history(id, before, limit),

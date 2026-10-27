@@ -87,6 +87,8 @@ import * as qs from "../../db/generated/channel_seen_mark.sql.ts";
 const reportMax = 1500;
 const searchMax = 50;
 const emojiPattern = /^\S{1,16}$/u;
+/** A helper profile as the chat knows it: apart from the orchestrator and its sessions. */
+const profileId = (agent: string) => `profile:${agent}`;
 /** What a participant says by reacting when a message that wakes it is handed to it. */
 const handedEmoji = "👀";
 const readLimit = 30;
@@ -375,6 +377,14 @@ export interface ChannelShape {
   readonly setNotify: (id: string, notify: Notify) => Effect.Effect<void, ApiError>;
   /** How much of a place counts for the owner: none when it or its channel is set to none, else its own level, else its channel's. */
   readonly notifyOf: (id: string) => Notify;
+  /** The owner's direct channel with a helper profile, made if there is none. */
+  readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
+  /** The direct channel with the orchestrator. */
+  readonly orchestratorDirect: () => string;
+  /** A profile's direct channel is its talk issue's thread from now on. */
+  readonly linkTalk: (channel: string, issue: string) => Effect.Effect<void>;
+  /** The newest messages of a channel, oldest first, as an agent reads them. */
+  readonly recent: (channel: string, n: number) => Effect.Effect<InboxMessage[]>;
   readonly markUnread: (channel: string, number: number) => Effect.Effect<void, ApiError>;
   /** The channel a place is in: a thread's, or the default one for a direct channel, which holds no work. */
   readonly topOf: (channel: string) => Effect.Effect<Info>;
@@ -626,7 +636,7 @@ export const make = Effect.gen(function* () {
 
   const publishMessage = Effect.fn("Channels.publishMessage")(function* (row: MsgRow, answers: SessionId | undefined) {
     const ch = model.channel(row.channel_id);
-    const thread = ch?.type === "thread" && ch.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
+    const thread = ch?.type !== "channel" && ch?.subject_kind === "issue" && ch.subject_id ? ch.subject_id : undefined;
     const message = toMessage(row);
     yield* core.apply({ type: "message", message, ...(thread ? { thread } : {}), ...(answers ? { answers } : {}) });
     yield* PubSub.publish(said, message);
@@ -642,7 +652,7 @@ export const make = Effect.gen(function* () {
 
   /** Who a thread's words are for, worked out now rather than kept: the session on the issue, or a talk thread's own session. */
   const ownerOf = (ch: ChannelRow): string => {
-    if (ch.type !== "thread" || !ch.subject_id) return "";
+    if (ch.type === "channel" || !ch.subject_id) return "";
     if (ch.subject_kind === "issue") return helpers?.onIssue(ch.subject_id) ?? "";
     if (ch.subject_kind === "talk") return sessionOf(ch.subject_id) ? ch.subject_id : "";
     return "";
@@ -1111,6 +1121,8 @@ export const make = Effect.gen(function* () {
   const handedOn = Effect.fn("Channels.handedOn")(function* (h: Session, thread: string) {
     const followers = reach.followers(thread);
     if (followers.includes(h.id)) return;
+    // A profile's talk: the session that answers there is not told of in it; it only follows.
+    if (model.channel(thread)?.type === "direct") return yield* follow(thread, h.id, "owner", model.channel(thread)?.last_number ?? 0);
     const channel = channelOfSession(h);
     const latest = (yield* db(qm.latestNumber({ channel_id: channel }))).n ?? 0;
     yield* setRead(h.id, channel, latest, yield* Clock.currentTimeMillis);
@@ -1773,6 +1785,38 @@ export const make = Effect.gen(function* () {
           yield* publishOwnerMentions;
         }),
       ),
+    openDirect: (agent) =>
+      locked(
+        Effect.gen(function* () {
+          const peer = profileId(agent.id);
+          const joined = { id: peer, kind: "profile", name: agent.name, agent_id: agent.id, runtime: null, joined_at: yield* Clock.currentTimeMillis };
+          yield* db(qp.upsertParticipant(joined));
+          model.joined(joined);
+          const had = model.channels("direct").find((c) => c.peer_id === peer);
+          if (had) return had.id;
+          const id = newId();
+          yield* db(qc.createDirect({ id, peer_id: peer, created_at: yield* Clock.currentTimeMillis }));
+          yield* reload;
+          yield* publishChannel(id);
+          return id;
+        }),
+      ),
+    orchestratorDirect: () => model.channels("direct").find((c) => c.peer_id === orchestratorAgent)?.id ?? "",
+    linkTalk: (channel, issue) =>
+      locked(
+        Effect.gen(function* () {
+          yield* db(qc.setSubject({ subject_id: issue, id: channel }));
+          yield* reload;
+          yield* publishChannel(channel);
+        }),
+      ),
+    recent: (channel, n) =>
+      Effect.gen(function* () {
+        const row = model.channel(channel);
+        if (!row) return [];
+        const target = targetOfChannel(row);
+        return [...(yield* db(qm.messagesBefore({ channel_id: channel, number: 2147483647, n })))].reverse().map((m) => inboxOf(m, target));
+      }),
     notifyOf: (id) => {
       const c = model.channel(id);
       const top = c?.parent_id ? model.channel(c.parent_id) : undefined;

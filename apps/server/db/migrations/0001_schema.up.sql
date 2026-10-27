@@ -5,7 +5,8 @@
 
 CREATE TABLE channel_participant (
   id         text primary key,
-  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'system')),
+  -- A profile is a helper profile the owner talks with alone (its id is profile:<agent>), not one of its sessions.
+  kind       text not null check (kind in ('owner', 'orchestrator', 'session', 'profile', 'system')),
   name       text not null,
   agent_id   text,
   runtime    text,
@@ -13,7 +14,7 @@ CREATE TABLE channel_participant (
   left_at    double precision,
   -- The order they joined in, for those who joined at the same millisecond.
   seq        integer generated always as identity,
-  check ((kind = 'session') = (agent_id is not null))
+  check ((kind in ('session', 'profile')) = (agent_id is not null))
 );
 CREATE TABLE channel (
   id            text primary key,
@@ -45,7 +46,8 @@ CREATE TABLE channel (
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
-  check ((subject_kind is null) or type = 'thread'),
+  -- A direct channel with a helper profile is its talk issue's thread too.
+  check ((subject_kind is null) or type in ('thread', 'direct')),
   check (not is_default or type = 'channel'),
   check (not is_default or archived_at is null)
 );
@@ -145,6 +147,8 @@ CREATE TABLE issue (
   canceled    text check (canceled in ('dismissed', 'lost')),
   pull_request text,
   deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer')),
+  -- A profile's talk with the owner: the direct channel it is said in. Off the board; read-only, its rounds' leftovers go.
+  talk    text unique,
   reviewed_at double precision,
   findings    text,
   questions        text,

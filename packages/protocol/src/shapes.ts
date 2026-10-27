@@ -1169,6 +1169,8 @@ export interface Issue {
   moves: IssueStatus[];
   pullRequest?: PullRequest;
   deliver: Deliverable;
+  /** A helper profile's talk with the owner: the direct channel it is said in. It is kept off the board. */
+  talk?: string;
   reviewedAt?: number;
   findings: Finding[];
   questions: Question[];

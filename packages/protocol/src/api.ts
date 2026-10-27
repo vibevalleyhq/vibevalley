@@ -182,6 +182,8 @@ export interface Handlers<R = never> {
   /** What channel.delete would do, refused as it would be; nothing changes. */
   readonly "channel.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "channel.notify.set": (a: T.NotifyRequest) => Effect.Effect<void, ApiError, R>;
+  /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
+  readonly "channel.direct.create": (a: { readonly agent: string }) => Effect.Effect<string, ApiError, R>;
   /** The owner's read moved back to just before this message. */
   readonly "channel.markUnread": (a: { readonly id: string } & T.ChatReadRequest) => Effect.Effect<void, ApiError, R>;
   readonly "graph.diff.get": (a: { readonly id: string }) => Effect.Effect<T.Changes, ApiError, R>;
@@ -690,6 +692,13 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: messageInput,
     result: S.Preview,
+    can: ["owner", "remote"],
+  },
+  {
+    op: "channel.direct.create",
+    about: ["agent"],
+    input: input({ agent: Schema.String }),
+    result: Schema.String,
     can: ["owner", "remote"],
   },
   {

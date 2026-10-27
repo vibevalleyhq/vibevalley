@@ -111,8 +111,11 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
 
+  // With the orchestrator, the owner's words go to it; with a helper profile, to the session talking for it now (none
+  // between its rounds: the talk's issue hears the words and sends one).
   if (i.channel.type === "direct") {
-    if (i.fromKind === "owner" && i.channel.peer) add(i.channel.peer, "direct", true);
+    const to = i.channel.peer === orchestratorAgent ? orchestratorAgent : (i.threadOwner ?? "");
+    if (i.fromKind === "owner" && to) add(to, "direct", true);
     return out;
   }
   if (i.kind === "report") {

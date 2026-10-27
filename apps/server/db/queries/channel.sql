@@ -89,3 +89,7 @@ delete from channel where parent_id = sqlc.arg(id);
 
 -- name: DeleteChannel :exec
 delete from channel where id = sqlc.arg(id) and not is_default;
+
+-- name: SetSubject :exec
+-- A direct channel with a helper profile takes its talk issue as its subject: the issue's thread is the channel.
+update channel set subject_kind = 'issue', subject_id = sqlc.arg(subject_id) where id = sqlc.arg(id) and type = 'direct';

@@ -666,6 +666,7 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
   deliver: Deliverable,
+  talk: Schema.optionalKey(Schema.String),
   reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),

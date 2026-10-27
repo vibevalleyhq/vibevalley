@@ -57,6 +57,7 @@
 | `channel.archive.toggle` | `/api/v1/channel/archive/toggle` | ✓ | ✓ |   |
 | `channel.delete` | `/api/v1/channel/delete` | ✓ | ✓ |   |
 | `channel.previewDelete` | `/api/v1/channel/previewDelete` | ✓ | ✓ |   |
+| `channel.direct.create` | `/api/v1/channel/direct/create` | ✓ | ✓ |   |
 | `channel.notify.set` | `/api/v1/channel/notify/set` | ✓ | ✓ |   |
 | `channel.markUnread` | `/api/v1/channel/markUnread` | ✓ | ✓ |   |
 | `channel.attachment.create` | `/api/v1/channel/attachment/create` | ✓ | ✓ |   |

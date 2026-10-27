@@ -437,3 +437,20 @@ export const deleteChannel = Effect.fn("DeleteChannel")(function* (params: Delet
     execute: (p) => sql.unsafe(DeleteChannelSql, [p["id"]]),
   })(params)
 })
+
+export const SetSubjectParams = Schema.Struct({
+  ["subject_id"]: Schema.NullOr(Schema.String),
+  ["id"]: Schema.String,
+})
+export type SetSubjectParams = typeof SetSubjectParams.Type
+
+
+export const SetSubjectSql = "-- name: SetSubject :exec\n-- A direct channel with a helper profile takes its talk issue as its subject: the issue's thread is the channel.\nupdate channel set subject_kind = 'issue', subject_id = $1 where id = $2 and type = 'direct';"
+
+export const setSubject = Effect.fn("SetSubject")(function* (params: SetSubjectParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetSubjectParams,
+    execute: (p) => sql.unsafe(SetSubjectSql, [p["subject_id"], p["id"]]),
+  })(params)
+})
