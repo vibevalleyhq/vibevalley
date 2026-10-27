@@ -14,7 +14,7 @@ import { OrchestratorPage } from "../features/orchestrator/OrchestratorPage";
 import { PairPage } from "../features/lan/PairPage";
 import { ProjectsPage } from "../features/project/ProjectsPage";
 import { RuntimesPage } from "../features/runtime/RuntimesPage";
-import { SettingsPage } from "../pages/settings/SettingsPage";
+import { SettingsPage } from "../features/setting/SettingsPage";
 import { ToastHost } from "../ui/ToastHost";
 import { Navigate } from "../ui/A";
 import { Follow } from "../features/notice/Follow";

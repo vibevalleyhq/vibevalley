@@ -1,7 +1,7 @@
 // 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
 // phone moves a login on without a reload.
 
-import { settingsWording } from "../../pages/settings/words";
+import { settingsWording } from "../setting/words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
