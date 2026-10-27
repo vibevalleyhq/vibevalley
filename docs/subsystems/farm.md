@@ -98,7 +98,7 @@
 | 收获 | 工单允许完成（`complete`）时打开收成清单（改动），确认后完成 |
 | 铲除 | 工单允许 `stop` 时叫停这一轮，否则允许 `close` 时请它收工 |
 
-农具、收成清单和工单详情只用最新帧里的 `Issue.attention.acts` 判断能做什么，统一发 `issue.act`。庄稼、帮工阶段和计划归属只用于画面，不再决定动作。收成清单开着时，工单不再允许收获就撤下确认键；冲突清单只展示改动，是否提供「让它解决冲突」也读工单动作。
+农具、收成清单和工单详情只用最新帧里的 `Issue.attention.acts` 判断能做什么，照它带着的请求发（`perform`：挪状态、说一句或叫停）。庄稼、帮工阶段和计划归属只用于画面，不再决定动作。收成清单开着时，工单不再允许收获就撤下确认键；冲突清单只展示改动，是否提供「让它解决冲突」也读工单动作。
 
 **播种袋**（`farm/panels/SeedForms.tsx`：农场点空地打开，地图点一座岛的空位也打开它）：
 
@@ -114,7 +114,7 @@
 ## 和谁打交道
 
 - **核心状态**：读 `StateFrame`（形状在 `packages/protocol`）的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`（`game/view.ts`），来电是 `inbox`（`notice/inbox.ts`），皮不重写这两条规则。
-- **工单、帮工**：农具按工单允许的动作调用 `issue.act`；播种是经田头发一条带档案和项目（农场的还带地号）的消息。
+- **工单、帮工**：农具按工单的按钮发它带着的请求；播种是经田头发一条带档案和项目（农场的还带地号）的消息。
 - **种子**：播种袋读 `project.template.list`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
 - **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
@@ -153,7 +153,7 @@
 - `packages/engine/test/*.test.ts`：寻路、光、钟、节奏。
 - `apps/web/src/farm/cues.test.ts`：每个音效都有名字和分组、合得出样本。
 - `apps/web/src/farm/commands.test.ts`：验收前后、失败、计划工单、等回答时的农具动作只跟 `attention.acts` 走；指向后动作被撤回就拒绝点击。
-- `apps/web/test/farm-actions.spec.ts`：真实帮工交活后先验收再用农具收获；收成清单和工作台关闭框开着时，重新开工会撤下收获键，下一次验收通过才恢复。
+- `apps/web/test/farm-actions.spec.ts`：真实帮工交活后用农具收获；收成清单和工作台关闭框开着时，又一轮开工会撤下收获键，交回来才恢复；收获和关单都是挪状态。
 - `apps/web/src/farm/phone/calls.test.ts`：打开时已有的来电不响、新来电响铃，挂断，20 秒没接算未接，别处处理掉自己停；`games/*.test.ts` 测小游戏的规则（种子重放、推箱子每关可解）。来电本身的规则在 `apps/server/src/core` 的黄金数据（`core/golden.test.ts`）。
 - `apps/web/src/features/notice/tray.test.ts`（来电变通知、只响一次、菜单栏摘要）、`projects.test.ts`（worktree 和空位、锁住的地，一座岛最多 6 块）、`catalog.test.ts`（书架、帧、重画的命令）。
 - Playwright：`farm.spec.ts`（画布没有错误、农场和工作台互相链）、`farm-canvas.spec.ts`（村子跑一阵不出错、指针跟着农具说能不能用、帮工走进来、干活、去书屋，夜里点灯）、`farm-hud.spec.ts`（等级和农具、数字键挑农具、每个面板打开和 Esc 关、点空地打开播种袋、「草稿」写进备选）、`farm-chat.spec.ts`（田头说话、管家回答、频道菜单、点帮工的地打开它的工单）、`farm-phone.spec.ts`（手机打开、小游戏接十字键、来电响铃、接听去那块地并记下）、`farm-title.spec.ts`（首页）、`projects.spec.ts`（地图和岛）、`catalog.spec.ts`。

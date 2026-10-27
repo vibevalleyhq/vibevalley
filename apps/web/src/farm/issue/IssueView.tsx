@@ -5,6 +5,7 @@
 
 import { appWording } from "../../base/words";
 import { farmWording } from "../words";
+import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -383,7 +384,7 @@ function IssueBody(props: {
                           disabled={busy() || props.issue.deliver === d || !s().open}
                           onClick={() => void setDeliver(d)}
                         >
-                          {farmWording().plot.delivers[d]}
+                          {wording().deliverable[d]}
                         </PxButton>
                       )}
                     </For>
