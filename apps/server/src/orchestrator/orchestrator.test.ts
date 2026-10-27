@@ -1,7 +1,8 @@
 import { scriptedRuntime } from "@botiverse/oar/testing";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
-import { type AssistantMessage, fauxAssistantMessage, type FauxResponseFactory, fauxToolCall, type Message } from "@earendil-works/pi-ai";
+import type { Message } from "../ai/messages.ts";
+import { type Answer, answer, toolCall } from "../ai/testing.ts";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { messagesIn } from "../channel/state.ts";
 import { seedAgents } from "../agent/seed.ts";
@@ -10,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Agents } from "../agent/agent.ts";
 import { messageText } from "../agent/brain/messages.ts";
-import { fauxLLM, type Request } from "../agent/brain/testing.ts";
+import { type Reply, type Request, scriptedLLM } from "../agent/brain/testing.ts";
 import type { Config } from "../base/config.ts";
 import { Channels } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
@@ -56,27 +57,26 @@ const sinceAnswer = (c: Request) => {
 
 const asked = /加个 (README|CHANGELOG)$/m;
 
-const respond = (c: Request): AssistantMessage => {
+const respond = (c: Request): Answer => {
   const result = answeredWith(c);
-  if (result !== undefined) return fauxAssistantMessage("好，" + [...result].slice(0, 2).join("") + "了");
+  if (result !== undefined) return answer("好，" + [...result].slice(0, 2).join("") + "了");
   const want = asked.exec(sinceAnswer(c))?.[0];
   if (want)
-    return fauxAssistantMessage(
-      fauxToolCall(
+    return answer([
+      toolCall(
         "issue_create",
         want.includes("CHANGELOG") ? { title: want, project: "notes", agent: "lab", start: true } : { title: want, project: "demo", start: true },
       ),
-    );
-  if (lastLine(c).includes("定时任务")) return fauxAssistantMessage("到点了，看了一眼");
-  return fauxAssistantMessage("收到");
+    ]);
+  if (lastLine(c).includes("定时任务")) return answer("到点了，看了一眼");
+  return answer("收到");
 };
 
 const pi = scriptedRuntime({ id: "pi", turn: async (turn) => turn.say("做完了") });
 
-/** The farm with a orchestrator on the faux model, answering with f; the patrol runs by hand. */
-const farm = (f: (c: Request) => AssistantMessage = respond, config: Config = testConfig(), clock?: () => number) => {
-  const { faux, llm, requests } = fauxLLM();
-  faux.appendResponses(Array.from({ length: 100 }, (): FauxResponseFactory => (context) => f({ messages: context.messages, options: undefined })));
+/** The patrol runs by hand: heartbeatMinutes 0 leaves nothing to the timer. */
+const farm = (f: Reply = respond, config: Config = testConfig(), clock?: () => number) => {
+  const { llm, requests } = scriptedLLM(Array.from({ length: 100 }, () => f));
   const below = world({
     config: { ...config, patrol: { heartbeatMinutes: 0 } },
     runtimes: [pi],
@@ -133,7 +133,7 @@ describe("the orchestrator", () => {
       expect(yield* until(() => words().length >= 1 && words(), "its words")).toEqual(["好，记下了"]);
       const first = f.requests[0]!;
       expect(lastInput(first)).toMatch(/^【现在】\d{4}\/\d+\/\d+ \d\d:\d\d\n\n【现状】[\s\S]*可以派的帮工：\n- /);
-      expect(first.messages[0]!.role === "system" && messageText(first.messages[0]!)).not.toContain("【现状】");
+      expect(first.system).not.toContain("【现状】");
       expect(lastLine(first)).toBe("[来源：主人]\n主人说：帮我在 demo 里加个 README");
       const trail = yield* until(() => {
         const events = (sessions.events(orchestratorAgent) ?? []).filter((e) => e.type !== "llm/usage");
@@ -203,12 +203,11 @@ describe("the orchestrator", () => {
   // A line joining the run ends the brief before it with the words it got: it does not wait for the run's end.
   it.live("ends a brief when another line joins its run", () => {
     // The brief's first answer waits until the call's line has come, so the line joins a run under way.
-    const answer = gate();
+    const release = gate();
     const f = farm((c) => {
       const line = lastLine(c);
-      if (answeredWith(c) !== undefined) return fauxAssistantMessage("看过了");
-      if (line.includes("要告诉主人"))
-        return answer.opened.then(() => fauxAssistantMessage([{ type: "text", text: "#41 交回来了" }, fauxToolCall("roster", {})])) as never;
+      if (answeredWith(c) !== undefined) return answer("看过了");
+      if (line.includes("要告诉主人")) return release.opened.then(() => answer([{ type: "text", text: "#41 交回来了" }, toolCall("roster", {})]));
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -221,7 +220,7 @@ describe("the orchestrator", () => {
         })();
         // The call's line is taken in the next turn of the event loop; then the brief's answer may come.
         await new Promise((r) => setImmediate(r));
-        answer.open();
+        release.open();
         const out = await within(brief, 4000, "the brief");
         await joined;
         return out;
@@ -259,8 +258,7 @@ describe("the orchestrator", () => {
   // The situation it is given is read from the farm; a read that fails ends the answer instead of leaving it open.
   it.live("ends an answer whose input could not be put together", () => {
     const f = (() => {
-      const { faux, llm, requests } = fauxLLM();
-      faux.appendResponses([() => fauxAssistantMessage("收到")]);
+      const { llm, requests } = scriptedLLM([answer("收到")]);
       const below = world({
         config: { ...testConfig(), patrol: { heartbeatMinutes: 0 } },
         runtimes: [pi],
@@ -369,11 +367,11 @@ describe("the orchestrator", () => {
     let number = 0;
     const f = farm((c) => {
       const result = answeredWith(c);
-      if (result !== undefined) return fauxAssistantMessage("合并：" + result);
+      if (result !== undefined) return answer("合并：" + result);
       const line = lastLine(c);
       // A helper's words name it by its name; the owner's, by the issue's number.
-      if (line.includes("直接收")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: helper, to: "已完成" }));
-      if (line.includes("收下")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: "#" + number, to: "已完成" }));
+      if (line.includes("直接收")) return answer([toolCall("issue_status", { issue: helper, to: "已完成" })]);
+      if (line.includes("收下")) return answer([toolCall("issue_status", { issue: "#" + number, to: "已完成" })]);
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -416,11 +414,11 @@ describe("the orchestrator", () => {
     let number = 0;
     const f = farm((c) => {
       const result = answeredWith(c);
-      if (result !== undefined) return fauxAssistantMessage("工单：" + result);
+      if (result !== undefined) return answer("工单：" + result);
       const line = lastLine(c);
-      if (line.includes("记一下")) return fauxAssistantMessage(fauxToolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" }));
-      if (line.includes("开工")) return fauxAssistantMessage(fauxToolCall("issue_status", { issue: "#" + number, to: "待办" }));
-      if (line.includes("在等我")) return fauxAssistantMessage(fauxToolCall("issues", { wants_owner: true }));
+      if (line.includes("记一下")) return answer([toolCall("issue_create", { title: "首页偶尔白屏", project: "demo", agent: "lab" })]);
+      if (line.includes("开工")) return answer([toolCall("issue_status", { issue: "#" + number, to: "待办" })]);
+      if (line.includes("在等我")) return answer([toolCall("issues", { wants_owner: true })]);
       return respond(c);
     });
     return Effect.gen(function* () {
@@ -449,9 +447,9 @@ describe("the orchestrator", () => {
     const f = farm(
       (c) => {
         const result = answeredWith(c);
-        if (result !== undefined) return fauxAssistantMessage("定时：" + result);
+        if (result !== undefined) return answer("定时：" + result);
         const line = lastLine(c);
-        if (line.includes("每天九点") || line.includes("定时任务")) return fauxAssistantMessage(fauxToolCall("recurrence", daily));
+        if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("recurrence", daily)]);
         return respond(c);
       },
       testConfig(),

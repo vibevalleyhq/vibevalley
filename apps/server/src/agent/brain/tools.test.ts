@@ -1,5 +1,3 @@
-import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { validateToolArguments } from "@earendil-works/pi-ai";
 import { existsSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Effect } from "effect";
@@ -14,9 +12,10 @@ import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Remi
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./agentTaskTools.ts";
-import { effectTool, stopped } from "./tool.ts";
-import { objectSchema } from "../../ai/tools.ts";
-import { fauxLLM, tempHome } from "./testing.ts";
+import { effectTool } from "./tool.ts";
+import { objectSchema, toolArguments } from "../../ai/tools.ts";
+import type { Tool } from "../loop/agent.ts";
+import { scriptedLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
 import { plainLog } from "../../base/log.ts";
 
@@ -31,16 +30,12 @@ afterEach(() => {
 });
 
 /** As the agent calls it: arguments checked first, a bad one said as an error. */
-async function call(tools: readonly AgentTool[], name: string, params: unknown): Promise<string> {
+async function call(tools: readonly Tool[], name: string, params: unknown): Promise<string> {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`no ${name}`);
-  const args = validateToolArguments(tool, {
-    type: "toolCall",
-    id: "t",
-    name,
-    arguments: params as never,
-  });
-  const result = await tool.execute("t", args);
+  const args = toolArguments(name, params, tool.parameters);
+  if ("refused" in args) throw new Error(args.refused);
+  const result = await Effect.runPromise(tool.execute(args.ok, { id: "t" }));
   return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 }
 const fails = async (p: Promise<string>) => {
@@ -74,35 +69,30 @@ describe("the task tools", () => {
 });
 
 describe("a tool whose work is an Effect", () => {
-  it("is interrupted when the run stops, and answers that it stopped", async () => {
+  it("is interrupted when the run stops", async () => {
     let interrupted = false;
-    const waits = effectTool(
-      {
-        name: "waits",
-        description: "",
-        parameters: objectSchema(),
-        run: () =>
-          Effect.never.pipe(
-            Effect.onInterrupt(() =>
-              Effect.sync(() => {
-                interrupted = true;
-              }),
-            ),
+    const waits = effectTool({
+      name: "waits",
+      description: "",
+      parameters: objectSchema(),
+      run: () =>
+        Effect.never.pipe(
+          Effect.onInterrupt(() =>
+            Effect.sync(() => {
+              interrupted = true;
+            }),
           ),
-      },
-      (effect, options) => Effect.runPromise(effect, options),
-    );
+        ),
+    });
     const stop = new AbortController();
-    const answer = waits.execute("t", {}, stop.signal);
+    const answer = Effect.runPromise(waits.execute({}, { id: "t" }), { signal: stop.signal });
     stop.abort();
-    expect(await fails(answer.then((r) => JSON.stringify(r)))).toBe(stopped);
+    await expect(answer).rejects.toThrow();
     expect(interrupted).toBe(true);
   });
 
   it("says a failure's message as its failed result", async () => {
-    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new Error("不行")) }, (effect, options) =>
-      Effect.runPromise(effect, options),
-    );
+    const refuses = effectTool({ name: "refuses", description: "", parameters: objectSchema(), run: () => Effect.fail(new Error("不行")) });
     expect(await fails(call([refuses], "refuses", {}))).toBe("不行");
   });
 });
@@ -361,7 +351,7 @@ describe("MCP", () => {
       log: plainLog,
       name: "test",
       instructions: "",
-      llm: fauxLLM().llm,
+      llm: scriptedLLM().llm,
       home: dir,
       cwd: dir,
       noSession: true,
@@ -375,7 +365,7 @@ describe("MCP", () => {
     const status = agent.mcpStatus();
     expect(status.toolCount).toBe(2);
     expect(status.failed.length).toBe(1);
-    const tools = agent.core.state.tools;
+    const tools = agent.tools();
     expect(await call(tools, "calc__add", { a: 2, b: 3 })).toBe("5");
     await agent.close();
     await fails(call(tools, "calc__add", { a: 2, b: 3 }));

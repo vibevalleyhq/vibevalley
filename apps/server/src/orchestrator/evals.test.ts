@@ -1,20 +1,20 @@
-import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { assistantMessage, toolCall } from "../ai/testing.ts";
+import type { BrainMessage } from "../agent/brain/messages.ts";
 import { describe, expect, it } from "vite-plus/test";
 import { check, committed, type Expect, casesIn, isInput, kinds, orchestratorToolNames, problemOf } from "./evals.ts";
 
-const call = fauxAssistantMessage(fauxToolCall("issue_create", { title: "加个 README", project: "demo", start: true }, { id: "c1" }));
-const turn: AgentMessage[] = [
+const call = assistantMessage([toolCall("issue_create", { title: "加个 README", project: "demo", start: true }, "c1")]);
+const turn: BrainMessage[] = [
   call,
   { role: "toolResult", toolCallId: "c1", toolName: "issue_create", content: [{ type: "text", text: "派了" }], isError: false, timestamp: 0 },
-  fauxAssistantMessage("派给了 Kimi"),
+  assistantMessage("派给了 Kimi"),
 ];
 const quiet = turn.slice(0, 2);
 
 describe("the orchestrator's evals", () => {
   it("judge every kind", () => {
     const passed = new Set<string>();
-    const cases: [Expect, AgentMessage[], boolean][] = [
+    const cases: [Expect, BrainMessage[], boolean][] = [
       [{ kind: "called", tool: "issue_create" }, turn, true],
       [{ kind: "called", tool: "issue_create", argContains: `"project":"demo"` }, turn, true],
       [{ kind: "called", tool: "issue_create", argContains: `"project":"notes"` }, turn, false],

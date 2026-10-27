@@ -5,10 +5,9 @@ import { ownersLanguage } from "../../prompts.ts";
 import { agentWording } from "../words.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
-import type { AgentToolResult, ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { models } from "../../ai/models.ts";
+import { models, type ThinkingLevel } from "../../ai/models.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { Brain, type BrainEvent } from "./agent.ts";
 import { codingTools } from "./coding.ts";
@@ -138,14 +137,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
           break;
         }
         case "tool_execution_end": {
-          const text = messageText({
-            role: "toolResult",
-            toolCallId: "",
-            toolName: "",
-            content: (e.result as AgentToolResult | undefined)?.content ?? [],
-            isError: false,
-            timestamp: 0,
-          });
+          const text = messageText({ role: "toolResult", toolCallId: "", toolName: "", content: e.result.content, isError: false, timestamp: 0 });
           const result = e.isError ? "failed" : "ok";
           frame("vibevalley/tool_end", { callId: e.toolCallId, output: text, result }, [
             {

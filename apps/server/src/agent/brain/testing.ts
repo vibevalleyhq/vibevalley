@@ -1,17 +1,9 @@
-// A brain on pi-ai's faux provider, for tests: no model is reached. Every request's transcript is kept, as the model saw it.
-
-import type { StreamFn } from "@earendil-works/pi-agent-core";
-import {
-  type FauxResponseStep,
-  fauxProvider,
-  type Message,
-  type SimpleStreamOptions,
-  type Tool,
-  type RegisterFauxProviderOptions,
-} from "@earendil-works/pi-ai";
+import { Effect } from "effect";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Message } from "../../ai/messages.ts";
+import { type Reply, type Request, scriptedLlm, type Step, testModel } from "../../ai/testing.ts";
 import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import type { LLM } from "./config.ts";
@@ -19,19 +11,10 @@ import { messageText, userMessage } from "./messages.ts";
 import { wallTime } from "../../base/time.ts";
 import { plainLog } from "../../base/log.ts";
 
-export interface Request {
-  readonly messages: Message[];
-  readonly options: SimpleStreamOptions | undefined;
-}
+export type { Reply, Request, Step };
 
-export const systemPrompt = (r: { messages: readonly Message[] }) => {
-  const head = r.messages[0];
-  return head?.role === "system" ? (typeof head.content === "string" ? head.content : head.content.map((c) => (c.type === "text" ? c.text : "")).join("")) : "";
-};
-export const toolsOf = (r: { messages: readonly Message[] }): Tool[] => {
-  const head = r.messages[0];
-  return head?.role === "system" ? (head.toolsAdded ?? []) : [];
-};
+export const systemPrompt = (r: Request) => r.system;
+export const toolsOf = (r: Request) => r.tools;
 export const lastUser = (r: { messages: readonly Message[] }) => {
   const m = r.messages.findLast((x) => x.role === "user");
   return m ? messageText(m) : "";
@@ -40,20 +23,15 @@ export const results = (r: { messages: readonly Message[] }) =>
   r.messages.flatMap((m) => (m.role === "toolResult" ? [{ failed: m.isError, text: messageText(m) }] : []));
 export const answered = (r: { messages: readonly Message[] }) => r.messages.at(-1)?.role === "toolResult";
 
-export function fauxLLM(options: RegisterFauxProviderOptions = {}) {
-  const faux = fauxProvider(options);
-  const requests: Request[] = [];
-  const stream: StreamFn = (model, context, o) => {
-    requests.push({ messages: structuredClone(context.messages), options: o });
-    return faux.provider.streamSimple(model, context, o);
-  };
-  // pi-ai's faux model in the farm's Model type, the same fields, until the tests' model is the farm's own.
-  const llm: LLM = { model: faux.getModel() as unknown as LLM["model"], stream };
+/** The brain's model on a script; its runs are on fibers of their own. */
+export function scriptedLLM(steps: readonly Step[] = []) {
+  const script = Effect.runSync(scriptedLlm(steps));
+  const llm: LLM = { model: testModel, service: script.llm, run: (effect, options) => Effect.runPromise(effect, options), apiKey: () => "k" };
   return {
-    faux,
     llm,
-    requests,
-    append: (steps: FauxResponseStep[]) => faux.appendResponses(steps),
+    requests: script.requests,
+    append: script.append,
+    pending: () => Effect.runSync(script.pending),
   };
 }
 
@@ -74,20 +52,13 @@ export interface Rig {
   readonly agent: Brain;
   readonly events: BrainEvent[];
   readonly requests: Request[];
-  readonly faux: ReturnType<typeof fauxLLM>["faux"];
+  readonly script: Pick<ReturnType<typeof scriptedLLM>, "append" | "pending">;
   readonly has: (type: BrainEvent["type"]) => boolean;
   readonly ask: (text: string) => Promise<string>;
 }
 
-export async function withAgent(
-  dir: string,
-  steps: FauxResponseStep[],
-  body: (r: Rig) => Promise<void>,
-  extra: Partial<BrainOptions> = {},
-  fauxOptions: RegisterFauxProviderOptions = {},
-) {
-  const { faux, llm, requests } = fauxLLM(fauxOptions);
-  faux.appendResponses(steps);
+export async function withAgent(dir: string, steps: readonly Step[], body: (r: Rig) => Promise<void>, extra: Partial<BrainOptions> = {}) {
+  const { llm, requests, append, pending } = scriptedLLM(steps);
   const agent = await Brain.start({
     time: wallTime,
     log: plainLog,
@@ -107,7 +78,7 @@ export async function withAgent(
       agent,
       events,
       requests,
-      faux,
+      script: { append, pending },
       has: (type) => events.some((e) => e.type === type),
       ask: (text) => agent.ask(userMessage(text, wallTime.now())),
     });

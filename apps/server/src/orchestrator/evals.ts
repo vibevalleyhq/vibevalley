@@ -2,11 +2,10 @@
 // the checks that catch the error, written by whoever fixes it. evals.test.ts holds the committed cases (testdata/evals) to
 // their checks; evals.live.test.ts replays them on the real model.
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage, ToolCall } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ToolCall } from "../ai/messages.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { messageText } from "../agent/brain/messages.ts";
+import { type BrainMessage, messageText } from "../agent/brain/messages.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { schemas } from "../tool/schemas.ts";
 
@@ -31,9 +30,9 @@ export interface EvalCase {
   /** The whole MEMORY.md when the turn was marked, not necessarily as it was in the turn. */
   readonly memory: string;
   readonly tools: readonly string[];
-  readonly before: readonly AgentMessage[];
-  readonly input: AgentMessage;
-  readonly did: readonly AgentMessage[];
+  readonly before: readonly BrainMessage[];
+  readonly input: BrainMessage;
+  readonly did: readonly BrainMessage[];
   /** Empty when saved. */
   readonly expect: readonly Expect[];
 }
@@ -62,17 +61,17 @@ export function problemOf(e: Expect): string {
   }
 }
 
-const assistants = (turn: readonly AgentMessage[]) => turn.filter((m): m is AssistantMessage => m.role === "assistant");
-const callsOf = (turn: readonly AgentMessage[]) => assistants(turn).flatMap((a) => a.content.filter((c): c is ToolCall => c.type === "toolCall"));
+const assistants = (turn: readonly BrainMessage[]) => turn.filter((m): m is AssistantMessage => m.role === "assistant");
+const callsOf = (turn: readonly BrainMessage[]) => assistants(turn).flatMap((a) => a.content.filter((c): c is ToolCall => c.type === "toolCall"));
 /** What it said in the turn, each message's words on a line. */
-const wordsOf = (turn: readonly AgentMessage[]) =>
+const wordsOf = (turn: readonly BrainMessage[]) =>
   assistants(turn)
     .map((a) => messageText(a).trim())
     .filter(Boolean)
     .join("\n");
 
 /** The expectations the turn does not meet, each as it is written; none when it passes. */
-export function check(expect: readonly Expect[], turn: readonly AgentMessage[]): string[] {
+export function check(expect: readonly Expect[], turn: readonly BrainMessage[]): string[] {
   const calls = callsOf(turn);
   const words = wordsOf(turn);
   const called = (tool: string, args = "", lacks?: string) =>
@@ -113,6 +112,6 @@ export function casesIn(dir: string): { file: string; case: EvalCase }[] {
   return names.sort().map((n) => ({ file: join(dir, n), case: JSON.parse(readFileSync(join(dir, n), "utf8")) as EvalCase }));
 }
 
-export const isInput = (m: AgentMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
+export const isInput = (m: BrainMessage) => m.role === "custom" && (m as { customType?: string }).customType === "orchestratorInput";
 
 export const committed = join(import.meta.dirname, "testdata", "evals");

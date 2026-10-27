@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Ref } from "effect";
 import type { Context, Message, ToolResultMessage, UserMessage } from "../../ai/messages.ts";
-import { answer, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "../../ai/testing.ts";
+import { make as llmOver } from "../../ai/llm.ts";
+import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "../../ai/testing.ts";
 import { objectSchema } from "../../ai/tools.ts";
 import { type AgentEvent, type AgentOptions, AgentBusy, make, type Tool } from "./agent.ts";
 
@@ -27,21 +28,20 @@ const words = (m: Message | { role: string }) => {
   return m.role + ":" + (typeof c === "string" ? c : c.map((b) => ("text" in b ? b.text : "")).join(""));
 };
 const results = (r: Request) =>
-  r.context.messages
-    .filter((m): m is ToolResultMessage => m.role === "toolResult")
-    .map((m) => ({ failed: m.isError, text: words(m).slice("toolResult:".length) }));
-const lastUser = (r: Request) => words(r.context.messages.findLast((m) => m.role === "user")!);
+  r.messages.filter((m): m is ToolResultMessage => m.role === "toolResult").map((m) => ({ failed: m.isError, text: words(m).slice("toolResult:".length) }));
+const lastUser = (r: Request) => words(r.messages.findLast((m) => m.role === "user")!);
 const shape = (events: readonly AgentEvent<never>[]) =>
   events
     .map((e) => ("message" in e && e.type.startsWith("message_") ? `${e.type}:${e.message.role}` : "toolName" in e ? `${e.type}:${e.toolName}` : e.type))
     .filter((e, i, all) => !(e.startsWith("message_update") && all[i - 1]?.startsWith("message_update")));
 
-/** An agent on a scripted model; it runs from a user's line, and the test waits for it to be idle. */
+/** streaming is done once the answer's text is said. */
 const rig = (
   steps: readonly Step[],
   tools: readonly Tool[],
   more: Partial<AgentOptions<never>> = {},
   hook: (e: AgentEvent<never>) => Effect.Effect<void> = () => Effect.void,
+  said = "",
 ) =>
   Effect.gen(function* () {
     const { llm, requests } = yield* scriptedLlm(steps);
@@ -58,7 +58,7 @@ const rig = (
         Effect.andThen(
           Effect.sync(() => events.push(e)),
           Effect.andThen(
-            e.type === "message_update" && e.assistantMessageEvent.type === "text_delta" ? Deferred.succeed(streaming, undefined) : Effect.void,
+            e.type === "message_update" && words(e.message) === "assistant:" + said ? Deferred.succeed(streaming, undefined) : Effect.void,
             hook(e),
           ),
         ),
@@ -177,7 +177,7 @@ describe("an agent's loop", () => {
 
   it.effect("stopped while the model answers, keeps what had come, aborted", () =>
     Effect.gen(function* () {
-      const r = yield* rig([answer("说到一半就停", { hangAfter: 3 })], []);
+      const r = yield* rig([answer("说到一半就停", { hangAfter: 3 })], [], {}, undefined, "说到一");
       yield* r.agent.prompt([user("说")]);
       yield* Deferred.await(r.streaming);
       yield* r.agent.abort;
@@ -185,6 +185,56 @@ describe("an agent's loop", () => {
       const last = (yield* Ref.get(r.agent.messages)).at(-1)!;
       expect(last.role === "assistant" && [last.stopReason, last.errorMessage, words(last)]).toEqual(["aborted", "Request was aborted", "assistant:说到一"]);
       expect(r.events.slice(-2).map((e) => e.type)).toEqual(["turn_end", "agent_end"]);
+    }),
+  );
+
+  it.effect("stopped while the answer comes over the wire, the request is cut off and what had come is kept", () =>
+    Effect.gen(function* () {
+      let wrote = false;
+      const hanging = new ReadableStream<Uint8Array>({
+        pull: (controller) => {
+          if (wrote) return new Promise(() => {});
+          wrote = true;
+          controller.enqueue(new TextEncoder().encode(chunk({ content: "说到" })));
+          return undefined;
+        },
+      });
+      const r = yield* rig([], [], { llm: yield* llmOver.pipe(Effect.provide(http([], hanging))) }, undefined, "说到");
+      yield* r.agent.prompt([user("说")]);
+      yield* Deferred.await(r.streaming);
+      yield* r.agent.abort;
+      yield* r.agent.idle;
+      const last = (yield* Ref.get(r.agent.messages)).at(-1)!;
+      expect(last.role === "assistant" && [last.stopReason, last.errorMessage, words(last)]).toEqual(["aborted", "Request was aborted", "assistant:说到"]);
+    }),
+  );
+
+  it.effect("ends a request the model refused with its status as the error", () =>
+    Effect.gen(function* () {
+      const r = yield* rig([], [], { llm: yield* llmOver.pipe(Effect.provide(http([], "nope", 500))) });
+      yield* r.agent.prompt([user("问")]);
+      yield* r.agent.idle;
+      const last = (yield* Ref.get(r.agent.messages)).at(-1)!;
+      expect(last.role === "assistant" && [last.stopReason, last.errorMessage]).toEqual(["error", "500 nope"]);
+    }),
+  );
+
+  it.effect("does not start a call once the run is stopped", () =>
+    Effect.gen(function* () {
+      let ran = 0;
+      const counted: Tool = { ...done("counted"), execute: () => Effect.sync(() => ({ content: [text(String(++ran))] })) };
+      let stop: Effect.Effect<void> = Effect.void;
+      const r = yield* rig(
+        [answer([toolCall("counted", {}, "c1"), toolCall("counted", {}, "c2")])],
+        [counted],
+        { finishTurn: (turn) => Effect.succeed(turn.stopped ? "end" : undefined) },
+        (e) => (e.type === "tool_execution_start" && e.toolCallId === "c1" ? Effect.suspend(() => stop) : Effect.void),
+      );
+      stop = r.agent.abort;
+      yield* r.agent.prompt([user("数")]);
+      yield* r.agent.idle;
+      expect(ran).toBe(0);
+      expect(yield* r.said).toEqual(["user:数", "assistant:", "toolResult:Operation aborted"]);
     }),
   );
 
@@ -221,7 +271,27 @@ describe("an agent's loop", () => {
       });
       yield* r.agent.prompt([user("原话")]);
       yield* r.agent.idle;
-      expect(r.requests.map((q) => q.context.messages.map(words))).toEqual([["user:摘要"], ["user:摘要", "assistant:", "toolResult:list_dir"]]);
+      expect(r.requests.map((q) => q.messages.map(words))).toEqual([["user:摘要"], ["user:摘要", "assistant:", "toolResult:list_dir"]]);
+    }),
+  );
+
+  it.effect("stopped while preparing a request, stops preparing it, and the request ends aborted", () =>
+    Effect.gen(function* () {
+      const [preparing, interrupted] = [yield* Deferred.make<void>(), yield* Deferred.make<void>()];
+      const r = yield* rig([answer("不该有")], [], {
+        prepareRequest: () =>
+          Effect.andThen(
+            Deferred.succeed(preparing, undefined),
+            Effect.onInterrupt(Effect.never, () => Deferred.succeed(interrupted, undefined)),
+          ),
+      });
+      yield* r.agent.prompt([user("说")]);
+      yield* Deferred.await(preparing);
+      yield* r.agent.abort;
+      yield* r.agent.idle;
+      expect(yield* Deferred.isDone(interrupted)).toBe(true);
+      const last = (yield* Ref.get(r.agent.messages)).at(-1)!;
+      expect(last.role === "assistant" && [last.stopReason, words(last)]).toEqual(["aborted", "assistant:"]);
     }),
   );
 

@@ -2,9 +2,10 @@
 
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
-import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { llmStreamFn } from "../agent/brain/config.ts";
+import type { LlmOn } from "../agent/brain/config.ts";
 import { make } from "../ai/llm.ts";
 
-export const standaloneStream = (): StreamFn =>
-  llmStreamFn(Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer))), (effect, options) => Effect.runPromise(effect, options));
+export const standaloneLlm = (): LlmOn => ({
+  service: Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer))),
+  run: (effect, options) => Effect.runPromise(effect, options),
+});

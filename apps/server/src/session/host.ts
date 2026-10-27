@@ -10,14 +10,14 @@ import { sessionWording } from "./words.ts";
 import { agentWording } from "../agent/words.ts";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { Usage } from "../ai/messages.ts";
+import type { Tool } from "../agent/loop/agent.ts";
 import type { OrchestratorState } from "@vibevalley/protocol";
 import { Effect } from "effect";
 import { Brain, type BrainEvent, sessionUnfinished } from "../agent/brain/agent.ts";
 import type { LLM } from "../agent/brain/config.ts";
 import { memoryFile } from "../agent/brain/memory.ts";
-import { type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
+import { type BrainMessage, type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
 import { readLines, replay } from "../agent/brain/session.ts";
 import { newId } from "../base/ids.ts";
 import { type ApiError, missing, refused } from "../errors.ts";
@@ -106,7 +106,7 @@ export interface HostOptions<R> {
   /** Asked when the agent starts: a model missing a key throws, and the input that started it says why. */
   readonly llm: () => LLM;
   /** The tools; each reads the route of the input taken last. */
-  readonly tools: (current: () => R) => AgentTool[];
+  readonly tools: (current: () => R) => Tool[];
   readonly wakeSoon?: (withinMs: number) => boolean;
   /** The route before any input is taken. */
   readonly first: R;
@@ -133,7 +133,7 @@ export type Build = (busy: boolean, memoryNews: string) => Promise<{ readonly te
 
 export class AgentHost<R> {
   private readonly execution: AgentExecution;
-  private readonly local = new WeakMap<AgentMessage, Hosted<R>>();
+  private readonly local = new WeakMap<BrainMessage, Hosted<R>>();
   private readonly transcript: string;
   private input: Hosted<R>;
   private toCaller = 0;
@@ -169,7 +169,7 @@ export class AgentHost<R> {
 
   /** The input taken last: its route is where words go now. */
   current(): Hosted<R> {
-    const messages = this.brain?.core.state.messages ?? [];
+    const messages = this.brain?.history() ?? [];
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i]!;
       if (isHosted(m, this.o.inputType)) return this.local.get(m) ?? { route: m.details as R, run: { by: { kind: "" } } };
@@ -213,7 +213,7 @@ export class AgentHost<R> {
         return { ok: false, why, run: id };
       }
       if (this.closing) return this.closeInput(input);
-      const { text, heard } = await build(b.busy() || b.core.hasQueuedMessages(), b.memoryNews());
+      const { text, heard } = await build(b.busy() || b.queued(), b.memoryNews());
       if (this.closing) return this.closeInput(input);
       const message = customMessage(this.o.inputType, text, this.time.now(), { details: input.route });
       this.local.set(message, { ...input, run: { ...run, ...(heard ? { heard } : {}) } });
@@ -466,12 +466,12 @@ export class AgentHost<R> {
   }
 }
 
-const isHosted = (m: AgentMessage, inputType: string): m is CustomMessage => m.role === "custom" && (m as CustomMessage).customType === inputType;
+const isHosted = (m: BrainMessage, inputType: string): m is CustomMessage => m.role === "custom" && m.customType === inputType;
 
 /** The input that began the turn asked: logged when the input is taken, after it was made, so the message is no newer
  * than the step, and it holds the step's words (trimmed and maybe cut; the message puts what the owner adds before them).
  * Of those, the newest: an older one with the same words was taken before. -1 when none is. */
-export function turnAt(lines: readonly AgentMessage[], text: string, time: number, inputType: string): number {
+export function turnAt(lines: readonly BrainMessage[], text: string, time: number, inputType: string): number {
   const head = text.endsWith("…") ? text.slice(0, -1) : text;
   let at = -1;
   lines.forEach((m, i) => {
@@ -481,8 +481,8 @@ export function turnAt(lines: readonly AgentMessage[], text: string, time: numbe
 }
 
 /** What followed an input until the next one, without the compactions written after a run. */
-export function turnOf(rest: readonly AgentMessage[], inputType: string): AgentMessage[] {
-  const out: AgentMessage[] = [];
+export function turnOf(rest: readonly BrainMessage[], inputType: string): BrainMessage[] {
+  const out: BrainMessage[] = [];
   for (const m of rest) {
     if (isHosted(m, inputType)) break;
     if (m.role !== "compactionSummary") out.push(m);

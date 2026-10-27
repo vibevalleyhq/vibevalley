@@ -1,7 +1,7 @@
 // What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { Tool } from "../loop/agent.ts";
 import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -78,7 +78,7 @@ export function describeReminder(j: Reminder): string {
 export const dueMessage = (j: Reminder) => "【提醒「" + j.name + "」到点了（" + j.id + "）】\n" + j.message;
 
 export class Reminders {
-  readonly tools: AgentTool[];
+  readonly tools: Tool[];
   private readonly file: string;
 
   constructor(
@@ -118,7 +118,7 @@ export class Reminders {
     for (const j of due) this.wake(dueMessage(j));
   }
 
-  private makeTools(): AgentTool[] {
+  private makeTools(): Tool[] {
     const add = schemaTool({
       name: "reminder",
       description:

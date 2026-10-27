@@ -64,7 +64,8 @@ export interface AgentOptions<A> {
   /** Asked before each request, so a key changed meanwhile is used at once. */
   readonly apiKey: () => string;
   readonly toLlm: (messages: readonly AgentMessage<A>[]) => Context;
-  /** Before each request: what it is asked with instead (a fold, say), for the rest of the run. */
+  /** Before each request: what it is asked with instead (a fold, say), for the rest of the run. Stopping the run
+   * interrupts it; the request then ends at once, aborted. */
   readonly prepareRequest?: (messages: readonly AgentMessage<A>[], stopped: boolean) => Effect.Effect<readonly AgentMessage<A>[] | undefined>;
   /** After each turn's tools: end ends the run, continue asks once more when nothing else would. */
   readonly finishTurn?: (turn: Turn<A>) => Effect.Effect<"end" | "continue" | undefined>;
@@ -310,7 +311,9 @@ export const make = <A>(options: AgentOptions<A>): Effect.Effect<Agent<A>, never
               fresh.push(m);
             }
             pending = [];
-            const prepared = options.prepareRequest ? yield* options.prepareRequest(asked, yield* Deferred.isDone(stop)) : undefined;
+            const prepared = options.prepareRequest
+              ? yield* Effect.raceFirst(options.prepareRequest(asked, yield* Deferred.isDone(stop)), Effect.as(Deferred.await(stop), undefined))
+              : undefined;
             if (prepared) asked = prepared;
             const message = yield* answer(asked, stop);
             asked = [...asked, message];

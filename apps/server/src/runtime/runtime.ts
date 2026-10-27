@@ -11,7 +11,7 @@ import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, Ru
 import { factsOf, presetOf, runtimeIds, runtimeLabel } from "../agent/seed.ts";
 import { Clock, Context, Effect, FiberMap, FiberSet, FileSystem, Layer, Option, Schedule, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
-import { deepseek, llmStreamFn } from "../agent/brain/config.ts";
+import { deepseek, type LlmOn } from "../agent/brain/config.ts";
 import { Llm } from "../ai/llm.ts";
 import { vibevalleyRuntimeOf } from "../agent/brain/runtime.ts";
 import { dshRuntime } from "./dsh.ts";
@@ -545,11 +545,12 @@ export const layer = (options: RuntimeOptions = {}) =>
       const config = yield* Settings;
       const keys = yield* Setting;
       const time = yield* timeHere;
-      const stream = llmStreamFn(yield* Llm, yield* FiberSet.makeRuntimePromise<never>());
+      // The sessions' runs and requests are on this service's fibers.
+      const on: LlmOn = { service: yield* Llm, run: yield* FiberSet.makeRuntimePromise<never>() };
       // It reads the DeepSeek key each session, so one saved meanwhile is used.
       const own = vibevalleyRuntimeOf({
         home: () => config.home,
-        llm: (model) => deepseek(model, keys.deepseekApiKey, stream),
+        llm: (model) => deepseek(model, keys.deepseekApiKey, on),
         time,
         log: yield* callbackLog,
         tasks: yield* dbStores,

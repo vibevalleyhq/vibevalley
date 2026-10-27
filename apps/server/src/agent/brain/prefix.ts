@@ -2,7 +2,7 @@
 // prompt's start (tools, then the system prompt) is hashed part by part on every request, so a change between two
 // compactions, which costs the whole conversation at full price, is told and can be traced to its part.
 
-import type { Tool } from "@earendil-works/pi-ai";
+import type { ToolDeclaration } from "../../ai/messages.ts";
 import { createHash } from "node:crypto";
 
 export interface PromptPart {
@@ -17,7 +17,7 @@ const digest = (text: string) => createHash("sha256").update(text).digest("hex")
 /** In the order told. Tools last: they are sent before the system prompt, but are told after its own parts. */
 export const prefixParts = ["instructions", "env", "skills", "memory", "tools"] as const;
 
-export function prefixHashes(parts: readonly PromptPart[], tools: readonly Tool[]): Record<string, string> {
+export function prefixHashes(parts: readonly PromptPart[], tools: readonly ToolDeclaration[]): Record<string, string> {
   const hashes: Record<string, string> = {};
   for (const p of parts) hashes[p.name] = digest(p.text);
   hashes.tools = digest(tools.map((t) => t.name + "\0" + t.description + "\0" + JSON.stringify(t.parameters) + "\0").join(""));

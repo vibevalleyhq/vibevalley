@@ -1,30 +1,28 @@
-import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
+import type { CoreEvent } from "../agent/brain/agent.ts";
+import type { StopReason } from "../ai/messages.ts";
+import { assistantMessage, text, thinking } from "../ai/testing.ts";
 import { until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
 import { AgentExecution } from "./execution.ts";
 import { type RunFinished, type RunStore, runOf, Sessions, type SessionsInside } from "./session.ts";
 
-const user = (text: string) => ({ type: "message_start", message: { role: "user", content: [{ type: "text", text }], timestamp: 0 } }) as AgentEvent;
-const said = (text: string, stopReason = "stop", errorMessage?: string) =>
-  ({
-    type: "message_end",
-    message: {
-      role: "assistant",
-      content: [
-        { type: "thinking", thinking: "想" },
-        { type: "text", text },
-      ],
-      stopReason,
-      ...(errorMessage ? { errorMessage } : {}),
-    },
-  }) as unknown as AgentEvent;
-const end = (stopReason = "stop") => ({ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason }] }) as unknown as AgentEvent;
-const tool = (id: string) => ({ type: "tool_execution_start", toolCallId: id, toolName: "issue_list", args: {} }) as AgentEvent;
-const toolEnd = (id: string) =>
-  ({ type: "tool_execution_end", toolCallId: id, toolName: "issue_list", result: { content: [{ type: "text", text: "两张" }] }, isError: false }) as AgentEvent;
+const user = (words: string): CoreEvent => ({ type: "message_start", message: { role: "user", content: [text(words)], timestamp: 0 } });
+const said = (words: string, stopReason: StopReason = "stop", errorMessage?: string): CoreEvent => ({
+  type: "message_end",
+  message: assistantMessage([thinking("想"), text(words)], { stopReason, ...(errorMessage ? { errorMessage } : {}) }),
+});
+const end = (stopReason: StopReason = "stop"): CoreEvent => ({ type: "agent_end", messages: [assistantMessage([], { stopReason })] });
+const tool = (id: string): CoreEvent => ({ type: "tool_execution_start", toolCallId: id, toolName: "issue_list", args: {} });
+const toolEnd = (id: string): CoreEvent => ({
+  type: "tool_execution_end",
+  toolCallId: id,
+  toolName: "issue_list",
+  result: { content: [text("两张")] },
+  isError: false,
+});
 
 const issue = (id: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) =>
