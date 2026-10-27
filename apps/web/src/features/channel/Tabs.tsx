@@ -18,7 +18,7 @@ export function Jobs(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.type === "general"));
+  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : !!props.channel.default));
   return (
     <Show when={sessions().length > 0} fallback={<Empty icon="icon-tasks">{chatWording().jobs.empty}</Empty>}>
       <div class="flex flex-col gap-3 overflow-y-auto p-4">
@@ -73,7 +73,7 @@ export function Recurrences(props: { channel: Channel }) {
 function RecurrenceCard(props: { s: Recurrence }) {
   const [deleting, setDeleting] = createSignal(false);
   const act = (p: Promise<void>) => p.catch((e) => toast(reasonOf(e), "bad"));
-  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, body: { enabled } }));
+  const setEnabled = (enabled: boolean) => act(api.recurrence.update({ id: props.s.id, enabled }));
   const remove = () => act(api.recurrence.delete({ id: props.s.id }));
   // The second press deletes; a press anywhere else takes the first back.
   createEffect(deleting, (on) => {

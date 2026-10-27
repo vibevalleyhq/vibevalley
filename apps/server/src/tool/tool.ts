@@ -6,7 +6,6 @@ import {
   type Agent,
   type BlockAttrs,
   DeliverableValues,
-  generalName,
   type Issue,
   IssueStatusValues,
   orchestratorAgent,
@@ -299,7 +298,7 @@ export const make = Effect.gen(function* () {
   const channelSay = (who: Who) =>
     sessionSchemaTool(
       "channel_say",
-      descriptions.channelSay(generalName),
+      descriptions.channelSay,
       Effect.fn("Tools.channel_say")(function* (p: Session<"channel_say">) {
         const c = yield* callerOf(who);
         return spokenText(
@@ -320,7 +319,7 @@ export const make = Effect.gen(function* () {
         const c = yield* callerOf(who);
         let where = p.target ?? "";
         // A session's default is its own thread, which the channel service fills in.
-        if (where === "" && c.session === "") where = "#" + (yield* chat.topOf(c.here)).name;
+        if (where === "" && c.session === "") where = (yield* chat.addressOf(c.here)).target;
         const read = yield* Effect.result(
           chat.read(participant(c), {
             target: where,

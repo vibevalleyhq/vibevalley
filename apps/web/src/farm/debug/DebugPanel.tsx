@@ -94,7 +94,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const core = useCore();
   const frames = useFrames();
   const day = createExternal(clock.subscribe, clock.day, { always: true });
-  const achievementsQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievements() }));
+  const achievementsQuery = useQuery(() => ({ queryKey: ["achievements"], queryFn: () => api.game.achievement.list() }));
   const achievements = () => ready(achievementsQuery, []);
   const [next, setNext] = createSignal(0);
   const run = async (f: () => Promise<unknown>) => {
@@ -108,8 +108,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const issueOf = (h: Session) => h.issue ?? h.id;
   const everyone = (action: "stop" | "dismiss") =>
     run(async () => {
-      for (const h of sessions())
-        await (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status({ id: issueOf(h), body: { status: "canceled" } }));
+      for (const h of sessions()) await (action === "stop" ? api.session.stop({ id: h.id }) : api.issue.status.update({ id: issueOf(h), status: "canceled" }));
     });
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
@@ -217,14 +216,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                   {h.id} {h.name} · {h.phase._tag}
                 </button>
                 <Show when={h.phase._tag === "done"}>
-                  <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status({ id: issueOf(h), body: { status: "done" } }))}>
+                  <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "done" }))}>
                     {farmWording().tool.harvest.label}
                   </button>
                 </Show>
                 <button type="button" class={btn()} onClick={() => void run(() => api.session.stop({ id: h.id }))}>
                   {farmWording().debug.halt}
                 </button>
-                <button type="button" class={btn("bad")} onClick={() => void run(() => api.issue.status({ id: issueOf(h), body: { status: "canceled" } }))}>
+                <button type="button" class={btn("bad")} onClick={() => void run(() => api.issue.status.update({ id: issueOf(h), status: "canceled" }))}>
                   {farmWording().debug.dismiss}
                 </button>
               </div>

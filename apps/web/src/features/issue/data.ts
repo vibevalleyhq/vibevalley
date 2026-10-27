@@ -17,7 +17,7 @@ export function useIssueHistory(older: () => boolean) {
     () => void queries.invalidateQueries({ queryKey: ["issues"] }),
     { defer: true },
   );
-  const history = useQuery(() => ({ queryKey: ["issues", "history"], queryFn: () => api.issue.history() }));
+  const history = useQuery(() => ({ queryKey: ["issues", "history"], queryFn: () => api.issue.history.list() }));
   // Without 更早的, only the issues the frame still keeps.
   const rows = createMemo<IssueHistory[] | undefined>(() => {
     const all = ready(history, undefined);
@@ -32,13 +32,13 @@ export function useIssueHistory(older: () => boolean) {
 
 /** What completing the issue would merge; read only while it is shown. */
 export const useIssueChanges = (id: () => string, shown: () => boolean = () => true) =>
-  useQuery(() => ({ queryKey: ["issues", "changes", id()], queryFn: () => api.issue.changes({ id: id() }), enabled: shown() }));
+  useQuery(() => ({ queryKey: ["issues", "changes", id()], queryFn: () => api.issue.diff.get({ id: id() }), enabled: shown() }));
 
 /** The issue's timeline, read again as it moves on: where it stands, its helper's rounds, the findings it was sent back with. */
 export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>
   useQuery(() => ({
     queryKey: ["issues", "timeline", issue().id, issue().attention.state, rounds(), issue().findings.length],
-    queryFn: () => api.issue.timeline({ id: issue().id }),
+    queryFn: () => api.issue.timeline.get({ id: issue().id }),
     placeholderData: <T>(prev: T) => prev,
   }));
 
@@ -46,6 +46,6 @@ export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>
 export const useIssueRuns = (id: () => string, version: () => string) =>
   useQuery(() => ({
     queryKey: ["issues", "runs", id(), version()],
-    queryFn: () => api.issue.runs({ id: id() }),
+    queryFn: () => api.issue.run.list({ id: id() }),
     placeholderData: <T>(prev: T) => prev,
   }));

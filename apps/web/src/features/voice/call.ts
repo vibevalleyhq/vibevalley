@@ -86,8 +86,8 @@ export class VoiceCall {
 
   private send(agentId: string, c: { text: string; owner: boolean; picked?: string; key?: string }) {
     const sent = c.owner
-      ? api.voice.heard({ body: { agentId, text: c.text, agent: c.picked ?? null, ...(c.key ? { sendKey: c.key } : {}) } })
-      : api.voice.said({ body: { agentId, text: c.text } });
+      ? api.voice.agent.hear({ agentId, text: c.text, agent: c.picked ?? null, ...(c.key ? { sendKey: c.key } : {}) })
+      : api.voice.agent.say({ agentId, text: c.text });
     sent.catch(() => undefined);
   }
 
@@ -105,7 +105,7 @@ export class VoiceCall {
     const until = <T>(p: Promise<T>) => Promise.race([p, stop]);
     this.set("connecting", null);
     try {
-      const session = await until(api.voice.session());
+      const session = await until(api.voice.session.create());
       let line: RtcLine | undefined;
       const mine = () => !cancelled && this.line === line;
       line = await until(
@@ -125,7 +125,7 @@ export class VoiceCall {
             void (async () => {
               if (!mine()) return;
               try {
-                const fresh = await api.voice.renew({ body: { channel: session.channel, uid: session.uid } });
+                const fresh = await api.voice.session.renew({ channel: session.channel, uid: session.uid });
                 if (mine()) await line!.renew(fresh.token);
               } catch (e) {
                 if (!mine()) return;
@@ -143,7 +143,7 @@ export class VoiceCall {
       );
       this.line = line;
       const agent = await until(
-        api.voice.start({ body: { channel: session.channel, uid: session.uid, ...(about ? { about } : {}) } }).then(async (a) => {
+        api.voice.agent.start({ channel: session.channel, uid: session.uid, ...(about ? { about } : {}) }).then(async (a) => {
           if (cancelled) {
             await this.stopAgent(a.agentId);
             throw new Cancelled();
@@ -191,7 +191,7 @@ export class VoiceCall {
   }
 
   private async stopAgent(agentId: string) {
-    await Promise.race([api.voice.stop({ body: { agentId } }), new Promise((r) => setTimeout(r, 3000))]).catch(() => undefined);
+    await Promise.race([api.voice.agent.stop({ agentId }), new Promise((r) => setTimeout(r, 3000))]).catch(() => undefined);
   }
 
   private async teardown() {

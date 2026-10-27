@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { Agent, VibeValleyApi } from "@vibevalley/protocol";
+import { type Agent, pathOf, type VibeValleyApi } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test.use({ farm: "farm-actions" });
@@ -28,11 +28,11 @@ const scripted: Agent = {
 };
 
 async function handBack(api: VibeValleyApi, project: string) {
-  const fox = await api.agent.create({ body: scripted });
-  await api.project.create({ body: { name: project } });
-  const issue = await api.issue.create({ body: { title: "提交打卡页", assignee: fox.id, project } });
-  await api.issue.update({ id: issue.id, body: { review: "required" } });
-  await api.issue.act({ id: issue.id, body: { act: "start" } });
+  const fox = await api.agent.create(scripted);
+  await api.project.create({ name: project });
+  const issue = await api.issue.create({ title: "提交打卡页", assignee: fox.id, project });
+  await api.issue.update({ id: issue.id, review: "required" });
+  await api.issue.act({ id: issue.id, act: "start" });
   await expect.poll(async () => (await api.issue.get({ id: issue.id })).attention.acts, { timeout: 20_000 }).toContain("accept");
   return issue.id;
 }
@@ -68,15 +68,15 @@ test("the harvest tool waits for acceptance and its open confirmation follows th
   const review = page.getByRole("dialog", { name: "收获阿狐的地" });
   const take = review.getByRole("button", { name: /确认收获/ });
   await expect(take).toBeVisible();
-  await api.issue.act({ id, body: { act: "tell", text: "发呆后检查一下" } });
+  await api.issue.act({ id, act: "tell", text: "发呆后检查一下" });
   await expect.poll(async () => (await api.issue.get({ id })).attention.acts).toContain("accept");
   await expect(take).toHaveCount(0);
   await expect(review).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("farm-awaiting-acceptance.png") });
-  await api.issue.act({ id, body: { act: "accept" } });
+  await api.issue.act({ id, act: "accept" });
   await expect(take).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("farm-harvest.png") });
-  const harvest = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "complete");
+  const harvest = page.waitForRequest((r) => r.url().endsWith(pathOf("issue.act")) && r.postDataJSON()?.id === id && r.postDataJSON()?.act === "complete");
   await take.click();
   await harvest;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");
@@ -92,14 +92,14 @@ test("the workbench close dialog only offers the issue's current acts and closes
   const complete = closing.getByRole("button", { name: "看改动，完成" });
   await expect(complete).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath("close-awaiting-acceptance.png") });
-  await api.issue.act({ id, body: { act: "accept" } });
+  await api.issue.act({ id, act: "accept" });
   await expect(complete).toBeVisible();
-  await api.issue.act({ id, body: { act: "tell", text: "发呆后再看看" } });
+  await api.issue.act({ id, act: "tell", text: "发呆后再看看" });
   await expect(complete).toHaveCount(0);
   await expect.poll(async () => (await api.issue.get({ id })).attention.acts).toContain("accept");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: test.info().outputPath("close-awaiting-acceptance-narrow.png") });
-  const close = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "close");
+  const close = page.waitForRequest((r) => r.url().endsWith(pathOf("issue.act")) && r.postDataJSON()?.id === id && r.postDataJSON()?.act === "close");
   await closing.getByRole("button", { name: "取消工单" }).click();
   await close;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("canceled");
@@ -107,21 +107,21 @@ test("the workbench close dialog only offers the issue's current acts and closes
 
 test("the workbench completion withdraws completing while a new round requires acceptance", async ({ page, api }) => {
   const id = await handBack(api, "review-accept");
-  await api.issue.act({ id, body: { act: "accept" } });
+  await api.issue.act({ id, act: "accept" });
   await page.goto(`/issues/${id}`);
   const detail = page.getByRole("dialog", { name: "工单", exact: true });
   await detail.getByRole("button", { name: "完成", exact: true }).click();
   const review = page.getByRole("dialog", { name: /^关上「/ });
   const take = review.getByRole("button", { name: /^完成，合进/ });
   await expect(take).toBeVisible();
-  await api.issue.act({ id, body: { act: "tell", text: "发呆后再检查" } });
+  await api.issue.act({ id, act: "tell", text: "发呆后再检查" });
   await expect.poll(async () => (await api.issue.get({ id })).attention.acts).toContain("accept");
   await expect(take).toHaveCount(0);
   await expect(review).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("workbench-awaiting-acceptance.png") });
-  await api.issue.act({ id, body: { act: "accept" } });
+  await api.issue.act({ id, act: "accept" });
   await expect(take).toBeVisible();
-  const completed = page.waitForRequest((r) => r.url().endsWith(`/issues/${id}/act`) && r.postDataJSON()?.act === "complete");
+  const completed = page.waitForRequest((r) => r.url().endsWith(pathOf("issue.act")) && r.postDataJSON()?.id === id && r.postDataJSON()?.act === "complete");
   await take.click();
   await completed;
   await expect.poll(async () => (await api.issue.get({ id })).status).toBe("done");

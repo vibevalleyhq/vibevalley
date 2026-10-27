@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 async function openBag(page: Page, project: string) {
@@ -12,19 +13,19 @@ async function openBag(page: Page, project: string) {
 }
 
 test("one lost seed request retries through the query observer and loads the real project templates", async ({ page, api }) => {
-  const project = await api.project.create({ body: { name: "seed-retry-once" } });
+  const project = await api.project.create({ name: "seed-retry-once" });
   let attempts = 0;
-  await page.route(`**/api/v1/projects/${project.name}/templates`, (route) => (++attempts === 1 ? route.abort("connectionrefused") : route.continue()));
+  await page.route(`**${pathOf("project.template.list")}`, (route) => (++attempts === 1 ? route.abort("connectionrefused") : route.continue()));
   const bag = await openBag(page, project.name);
   await expect(bag.getByRole("tablist", { name: "常见的活" })).toBeVisible();
   expect(attempts).toBe(2);
 });
 
 test("the seed bag can retry after the server is reachable again without losing the owner's draft", async ({ page, api }) => {
-  const project = await api.project.create({ body: { name: "seed-recover" } });
+  const project = await api.project.create({ name: "seed-recover" });
   let unavailable = true;
   let attempts = 0;
-  await page.route(`**/api/v1/projects/${project.name}/templates`, (route) => {
+  await page.route(`**${pathOf("project.template.list")}`, (route) => {
     attempts++;
     return unavailable ? route.abort("connectionrefused") : route.continue();
   });

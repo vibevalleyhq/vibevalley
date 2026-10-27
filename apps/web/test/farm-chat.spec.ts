@@ -4,7 +4,7 @@
 
 import type { Page } from "@playwright/test";
 import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
-import { readStream, statePath } from "@vibevalley/protocol";
+import { readStream, statePath, pathOf } from "@vibevalley/protocol";
 import { expect, gate, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
 
@@ -67,7 +67,7 @@ test("a sentence shows at once while the server takes its time, and only once af
   const chat = await openChat(page);
   // The server takes its time: until the test has seen the sentence shown before it.
   const server = gate();
-  await page.route("**/api/v1/say", async (route) => {
+  await page.route(`**${pathOf("channel.message.send")}`, async (route) => {
     await server.opened;
     await route.continue();
   });
@@ -79,6 +79,20 @@ test("a sentence shows at once while the server takes its time, and only once af
   server.open();
   await expect(chat.getByLabel("发送中")).toHaveCount(0, { timeout: 10_000 });
   await expect(chat.getByText("先别动数据库", { exact: true })).toHaveCount(1);
+});
+
+test("the channel menu lists the direct channel with the orchestrator, and a sentence said there stays there", async ({ page }) => {
+  await openFarm(page);
+  const chat = await openChat(page);
+  await chat.getByRole("button", { name: /^频道：田头/ }).click();
+  const menu = page.getByRole("dialog", { name: "频道" });
+  await expect(menu.getByText("私聊", { exact: true })).toBeVisible();
+  await menu.getByRole("button", { name: "管家" }).click();
+  await expect(chat.getByRole("button", { name: /^频道：管家/ })).toBeVisible();
+  const box = chat.getByRole("textbox");
+  await box.fill("只跟你说");
+  await box.press("Enter");
+  await expect(chat.getByRole("log", { name: "管家" }).getByText("只跟你说")).toBeVisible();
 });
 
 test("the channel menu makes a channel and shows it; folding keeps it, Esc folds and then puts the phone away", async ({ page }) => {
@@ -109,10 +123,10 @@ test("the channel menu makes a channel and shows it; folding keeps it, Esc folds
 
 // A dispatch note is one line until opened, truncated inside its column: a long one once ran past the window's edge.
 test("a dispatch note stays inside its column", async ({ page, api }) => {
-  const fox = await api.agent.create({ body: scripted });
-  const project = await api.project.create({ body: { name: "clock" } });
-  const made = await api.issue.create({ body: { title: "给打卡页加一个补卡按钮，补卡要写原因，还要发通知给组长", project: project.name, assignee: fox.id } });
-  await api.issue.status({ id: made.id, body: { status: "todo" } });
+  const fox = await api.agent.create(scripted);
+  const project = await api.project.create({ name: "clock" });
+  const made = await api.issue.create({ title: "给打卡页加一个补卡按钮，补卡要写原因，还要发通知给组长", project: project.name, assignee: fox.id });
+  await api.issue.status.update({ id: made.id, status: "todo" });
   await openFarm(page);
   const chat = await openChat(page);
   const note = chat.getByRole("button", { name: "展开派活" }).first();
@@ -133,7 +147,7 @@ async function firstFrame(url: string): Promise<StateFrame> {
 }
 
 test("a click on a helper's plot opens its issue: its state, the box and the offers", async ({ page, server, api }) => {
-  const made = await api.issue.create({ body: { title: "把登录页的记住我做完" } });
+  const made = await api.issue.create({ title: "把登录页的记住我做完" });
   const frame = await firstFrame(server.url);
   const session: Session = {
     id: sessionId("w1"),

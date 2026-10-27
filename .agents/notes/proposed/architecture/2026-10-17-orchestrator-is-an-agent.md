@@ -40,7 +40,7 @@ Status: proposed
 | `hire` | 建档案、改别的档案的人设、模型、技能（新） | ✓ | |
 
 - 管家的 `Can` 是全部，内置档案开机时补齐；普通档案新建时是 `talk`、`memory`、`look`。默认值是 `agent` 包的规则。
-- 只有主人能改 `Can`（`agent.save` 从 `owner` 入口来，`agent.Service` 查）；工具不能改任何档案的 `Can`，也不能改管家这份档案。所以没有哪个 agent 能给自己或别人加权。
+- 只有主人能改 `Can`（`agent.update` 从 `owner` 入口来，`agent.Service` 查）；工具不能改任何档案的 `Can`，也不能改管家这份档案。所以没有哪个 agent 能给自己或别人加权。
 - 给一份 Claude Code 档案加上 `dispatch`，它就是能拆子工单的领班；不用新概念。
 
 ### 2. 一张工具表，两种接法
@@ -77,7 +77,7 @@ type Caller struct {
 下面这些不是「工具多少」，并进档案以后照样不同，代码里保留，但都按「这份档案是不是常驻的」判断一次，不再散着写 `== OrchestratorAgent`：
 
 - **在哪跑**：管家跑在服务端进程里的 `apps/server/src/agent/brain`，常驻、不绑工单、不进 worktree；电话、听写、`/v1/chat/completions` 要它低延迟地插话，也要它的提示开头不变（[提示开头不变](docs/subsystems/orchestrator.md)）。普通档案每次为一张工单开一个 Session，经 oar 驱动外部农机。所以管家的农机仍然只能是 `vibevalley`。
-- **在频道里是谁**：`channel_participant.kind` 留着 `orchestrator`：不在地里、不离开、田头的话都给它（见 Alternatives）。
+- **在频道里是谁**：`channel_participant.kind` 留着 `orchestrator`：不在地里、不离开、频道的话都给它（见 Alternatives）。
 - **不能派给它**：工单派给管家走管家的输入，不开 Session（`Issue.Hire` 拒绝派给管家）。
 
 代码里给这件事一个名字：`agent.Service` 回答「这份档案是不是常驻的」（目前只有管家是），上面三处都问它。它是档案的规则，不挂在 `protocol.Agent` 上。

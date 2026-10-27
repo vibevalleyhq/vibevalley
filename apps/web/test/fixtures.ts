@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { VibeValleyApi } from "@vibevalley/protocol";
+import { readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 
 interface Server {
   url: string;
@@ -115,4 +115,13 @@ export function gate() {
   let open = () => {};
   const opened = new Promise<void>((resolve) => (open = resolve));
   return { opened, open: () => open() };
+}
+
+/** The farm's default channel's id: "" when the frame names none. */
+export async function defaultChannel(api: VibeValleyApi): Promise<string> {
+  const abort = new AbortController();
+  const frame = await new Promise<StateFrame>((resolve, reject) => {
+    readStream<StateFrame>(api.base + statePath, (f) => (resolve(f), abort.abort()), abort.signal).catch((e: unknown) => abort.signal.aborted || reject(e));
+  });
+  return frame.state.chat?.channels.find((c) => c.default)?.id ?? "";
 }

@@ -131,7 +131,7 @@ function Creator(props: { saved?: Agent; start: Agent; all: readonly Agent[] }) 
     const d = draft();
     const body = { ...d, name: d.name.trim() || agentsWording().unnamedAgent };
     try {
-      const got = isNew ? await api.agent.create({ body }) : await api.agent.save({ id: d.id, body });
+      const got = isNew ? await api.agent.create(body) : await api.agent.update(body);
       client.setQueryData<Agent[]>(["agents"], (list) => (list ? [...list.filter((a) => a.id !== got.id), got] : list));
       await client.invalidateQueries({ queryKey: ["agents"] });
       setDraft(got);

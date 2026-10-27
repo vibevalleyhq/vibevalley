@@ -27,7 +27,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 | 事件 | `SessionEvent`（原来的 `Activity`） | `events/<id>.json` | 日志里的一条；带 `run` |
 
 - 删掉 `Trajectory`、`TrajectoryHead` 和 `*.head.json`。已有的头文件搬进 `session` 表一次；旧的事件没有 Run，按时间落进对应的 Run，落不进的留空。走了的 Session 也是 `Session`：`Phase` 加一个 `closed`（结束的时间和怎么关的）。
-- 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.events <id> [--run]` 返回事件。
+- 接口：`session.list` 返回 `[]Session`（活的和走了的）；`session.get <id>` 返回它和它的 Run；新的 `session.event.list <id> [--run]` 返回事件。
 - 管家也是一个 agent loop，按 [管家是一份档案，只是能力多](.agents/notes/proposed/architecture/2026-10-17-orchestrator-is-an-agent.md) 它是档案 `orchestrator`，它的会话是一个 Session，进同一张表；它的事件现在只留最近 1000 条，照旧。
 
 ### 和消息之间只有两个口子，都在服务端
@@ -46,7 +46,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 ### 顺序
 
 1. 管家成为内置档案（它的会话才能进 `session` 表）。
-2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、`session.list`/`get` 给 `Session`、`session.events`、搬头文件、删 `Trajectory`、`TrajectoryHead`（已做：`session/session.ts`，迁移 `0005_session_table.sql`）；日志只追加（已做）。页面的干活记录和工单详情改读 `Session` 和 `Run`。
+2. `SessionEvent` 和 Run 的边界（已做）；`session` 表、`Phase` 的 `closed`、`session.list`/`get` 给 `Session`、`session.event.list`、搬头文件、删 `Trajectory`、`TrajectoryHead`（已做：`session/session.ts`，迁移 `0005_session_table.sql`）；日志只追加（已做）。页面的干活记录和工单详情改读 `Session` 和 `Run`。
 3. 两个口子：投递带上文，交代里的 @ 投递出去；删 `farm_*` 和令牌，改 `session/rules.ts` 给帮工的说明。
 
 ## Alternatives considered
@@ -60,7 +60,7 @@ Session 是一个 agent loop（harness）的会话：agent 在这里想、动手
 ## Acceptance criteria
 
 - 协议里没有 `Trajectory`、`TrajectoryHead`；家目录里没有 `*.head.json`；`session` 表有活的和走了的 Session。
-- 每个 `SessionEvent` 落在一个 Run 里（搬来的旧事件可以没有）；`session.events <id> --run <n>` 只返回那一轮的。
+- 每个 `SessionEvent` 落在一个 Run 里（搬来的旧事件可以没有）；`session.event.list <id> --run <n>` 只返回那一轮的。
 - `mcp/mcp.ts` 里没有 `farm_*`；帮工被 @ 时，投递的 prompt 里有那几条上文；一轮的交代里 @ 到的人收到投递。
 - `bun run server:check`、`bun run capabilities`、`bun run web:check`、`bun run docs:verify` 通过；旧家目录打开后头文件搬进了表。
 

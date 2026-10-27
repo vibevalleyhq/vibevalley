@@ -22,7 +22,7 @@ type Act = (call: () => Promise<LanStatus>) => Promise<void>;
 export function LanPage() {
   const client = useQueryClient();
   // Polled: a device asking to pair shows up without a reload.
-  const status = useQuery(() => ({ queryKey: ["lan"], queryFn: () => api.lan.status(), refetchInterval: 1500 }));
+  const status = useQuery(() => ({ queryKey: ["lan"], queryFn: () => api.lan.get(), refetchInterval: 1500 }));
   const act: Act = async (call) => {
     try {
       client.setQueryData(["lan"], await call());
@@ -46,7 +46,7 @@ export function LanPage() {
                   <>
                     <p class="text-sm">{lanWording().lan.intro}</p>
                     <div>
-                      <Button tone="primary" onClick={() => void act(() => api.lan.update({ body: { open: true } }))}>
+                      <Button tone="primary" onClick={() => void act(() => api.lan.update({ open: true }))}>
                         {lanWording().lan.allow}
                       </Button>
                     </div>
@@ -61,10 +61,10 @@ export function LanPage() {
                   when={s().pairing}
                   fallback={
                     <div class="flex flex-wrap gap-2">
-                      <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.startPairing())}>
+                      <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.pairing.start())}>
                         {lanWording().lan.add}
                       </Button>
-                      <Button onClick={() => void act(() => api.lan.update({ body: { open: false } }))}>{lanWording().lan.close}</Button>
+                      <Button onClick={() => void act(() => api.lan.update({ open: false }))}>{lanWording().lan.close}</Button>
                     </div>
                   }
                 >
@@ -100,7 +100,7 @@ export function LanPage() {
                       {lanWording().lan.paired(momentText(d.pairedAt), d.lastSeen ? momentText(d.lastSeen) : undefined)}
                     </span>
                   </span>
-                  <Button tone="danger" aria-label={lanWording().lan.removeWhich(d.name)} onClick={() => void act(() => api.lan.deleteDevice({ id: d.id }))}>
+                  <Button tone="danger" aria-label={lanWording().lan.removeWhich(d.name)} onClick={() => void act(() => api.lan.device.delete({ id: d.id }))}>
                     {lanWording().lan.remove}
                   </Button>
                 </div>
@@ -141,8 +141,8 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
               <Button icon="button-copy" onClick={() => void copy(props.pairing.link)}>
                 {lanWording().lan.copy}
               </Button>
-              <Button onClick={() => void props.act(() => api.lan.startPairing())}>{lanWording().lan.newCode}</Button>
-              <Button onClick={() => void props.act(() => api.lan.stopPairing())}>{lanWording().lan.stop}</Button>
+              <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{lanWording().lan.newCode}</Button>
+              <Button onClick={() => void props.act(() => api.lan.pairing.stop())}>{lanWording().lan.stop}</Button>
             </div>
           </div>
         </div>
@@ -152,10 +152,10 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
         <div class="flex flex-col gap-3">
           <p class="text-sm">{lanWording().lan.asking(asking())}</p>
           <div class="flex gap-2">
-            <Button tone="primary" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: true } }))}>
+            <Button tone="primary" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: true }))}>
               {lanWording().lan.letIn}
             </Button>
-            <Button tone="danger" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: false } }))}>
+            <Button tone="danger" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: false }))}>
               {lanWording().lan.refuse}
             </Button>
           </div>

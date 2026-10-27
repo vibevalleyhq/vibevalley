@@ -1,8 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { endpoints } from "@vibevalley/protocol/api";
+import { endpoints, kebab, pathOf } from "@vibevalley/protocol/api";
 import { Preview } from "@vibevalley/protocol/schema";
-import { kebab } from "./cli/api.ts";
 import { lookIn, memoriesOf } from "./errors.ts";
 import { cli, farm } from "./testing/cli.ts";
 
@@ -10,10 +9,9 @@ describe("the command line", () => {
   it.effect("has a command, with its help, for every endpoint", () =>
     Effect.gen(function* () {
       for (const e of endpoints) {
-        const [group, op] = e.op.split(".") as [string, string];
-        const help = yield* cli([group, kebab(op), "--help"]);
+        const help = yield* cli([...e.op.split(".").map(kebab), "--help"]);
         expect({ op: e.op, code: help.code }).toEqual({ op: e.op, code: 0 });
-        expect(help.out).toContain(`${e.method} ${e.path}`);
+        expect(help.out).toContain(`POST ${pathOf(e.op)}`);
       }
     }),
   );
@@ -56,7 +54,7 @@ describe("the command line", () => {
       const missing = yield* cli(["issue", "get", "nope", "--server", server]);
       expect([missing.code, missing.out, missing.failure?.tag]).toEqual([4, "", "Missing"]);
       const made = JSON.parse((yield* cli(["issue", "create", "--server", server, "--json", JSON.stringify({ title: "派不出去" })])).out) as { id: string };
-      const refused = yield* cli(["issue", "status", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
+      const refused = yield* cli(["issue", "status", "update", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
       expect([refused.code, refused.out, refused.failure?.tag]).toEqual([3, "", "Refused"]);
       // The refusal says what can be done instead, as commands that run as they are.
       const cancel = refused.failure?.next?.find((n) => n.run?.includes('{"status":"canceled"}'));
@@ -75,16 +73,10 @@ describe("the command line", () => {
     for (const e of endpoints.filter((x) => x.dryRun)) {
       const preview = endpoints.find((x) => x.op === e.dryRun);
       expect({ op: e.op, preview: preview?.op }).toEqual({ op: e.op, preview: e.dryRun });
-      expect([preview!.pathParams, preview!.query, preview!.body === e.body, preview!.result === Preview, preview!.can]).toEqual([
-        e.pathParams,
-        e.query,
-        true,
-        true,
-        e.can,
-      ]);
+      expect([preview!.about, preview!.input === e.input, preview!.result === Preview, preview!.can]).toEqual([e.about, true, true, e.can]);
     }
     // Every delete has one.
-    expect(endpoints.filter((e) => e.method === "DELETE" && !e.dryRun).map((e) => e.op)).toEqual([]);
+    expect(endpoints.filter((e) => e.op.endsWith(".delete") && !e.dryRun).map((e) => e.op)).toEqual([]);
   });
 
   it.live("--dry-run says what a command would do and changes nothing; one with no dry run is refused, a read runs", () =>
@@ -97,12 +89,12 @@ describe("the command line", () => {
       const preview = yield* cli(["issue", "delete", made.id, "--server", server, "--dry-run"]);
       expect([preview.code, (JSON.parse(preview.out) as { does: string[] }).does[0]]).toEqual([0, `删掉工单 #${made.number}「先试跑」`]);
       expect((yield* cli(["issue", "get", made.id, "--server", server])).code).toBe(0);
-      const cancel = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "canceled" })]);
+      const cancel = yield* cli(["issue", "status", "update", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "canceled" })]);
       expect((JSON.parse(cancel.out) as { does: string[] }).does).toEqual([`#${made.number} 关成已取消：还没派过`]);
       expect((JSON.parse((yield* cli(["issue", "get", made.id, "--server", server])).out) as { status: string }).status).toBe("backlog");
       // Refused as the real move would be, with the same words.
-      const real = yield* cli(["issue", "status", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
-      const dry = yield* cli(["issue", "status", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "done" })]);
+      const real = yield* cli(["issue", "status", "update", made.id, "--server", server, "--json", JSON.stringify({ status: "done" })]);
+      const dry = yield* cli(["issue", "status", "update", made.id, "--server", server, "--dry-run", "--json", JSON.stringify({ status: "done" })]);
       expect([dry.code, dry.failure?.message]).toEqual([3, real.failure?.message]);
       const create = yield* cli(["issue", "create", "--server", server, "--dry-run", "--json", JSON.stringify({ title: "不该建" })]);
       expect([create.code, create.failure?.tag]).toEqual([2, "NoDryRun"]);
@@ -126,7 +118,7 @@ describe("the command line", () => {
       const skill = doc(yield* run(["skill", "create"], { id: "", name: "写测试", description: "先写测试", body: "先写测试再改" }));
       const agents = (yield* list(["agent", "list"])) as { id: string; name: string }[];
       const docs = agents.find((a) => a.id === "docs")!;
-      yield* run(["agent", "save", "docs"], { ...docs, skills: [skill.id] });
+      yield* run(["agent", "update", "docs"], { ...docs, skills: [skill.id] });
       expect(doc(yield* run(["skill", "delete", skill.id, "--dry-run"])).does).toEqual(["删掉技能「写测试」", `从 「${docs.name}」 的档案里摘掉它`]);
       expect(JSON.stringify(yield* list(["skill", "list"]))).toContain(skill.id);
 
@@ -139,7 +131,7 @@ describe("the command line", () => {
       expect(doc(yield* run(["memory", "delete", "docs", memory.id, "--dry-run"])).does).toEqual([`从 docs 的记性里忘掉：「主人喜欢短的提交说明」`]);
       expect(JSON.stringify(yield* list(["memory", "list", "docs"]))).toContain(memory.id);
 
-      expect(doc(yield* run(["lan", "stop-pairing", "--dry-run"])).does).toEqual(["没有在配对的码：什么都不会动"]);
+      expect(doc(yield* run(["lan", "pairing", "stop", "--dry-run"])).does).toEqual(["没有在配对的码：什么都不会动"]);
 
       // Not there: the delete and its dry run are both missing, and say where to look.
       for (const args of [
@@ -147,7 +139,7 @@ describe("the command line", () => {
         ["skill", "delete", "nothing"],
         ["recurrence", "delete", "never"],
         ["memory", "delete", "docs", "nothing"],
-        ["lan", "delete-device", "nowhere"],
+        ["lan", "device", "delete", "nowhere"],
       ]) {
         const dry = yield* run([...args, "--dry-run"]);
         const real = yield* run(args);

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, defaultChannel } from "./fixtures";
 
 test("the orchestrator's memory takes a note and forgets it", async ({ page }) => {
   await page.goto("/orchestrator");
@@ -16,7 +16,7 @@ test("the orchestrator's memory takes a note and forgets it", async ({ page }) =
 
 test("the orchestrator's trajectory shows what it was told, and a round it never heard cannot be marked wrong", async ({ page, api }) => {
   // Without the model's key the orchestrator cannot start: the line is in its log, not in its channel.
-  await api.channel.say({ body: { text: "帮我看看打卡页" } });
+  await api.channel.message.send({ id: await defaultChannel(api), text: "帮我看看打卡页" });
   await page.goto("/orchestrator/trajectory");
   const row = page.getByRole("button", { name: /^收到 .*帮我看看打卡页/ });
   await expect(row).toBeVisible({ timeout: 15_000 });
@@ -49,7 +49,7 @@ test("the archive and the orchestrator's voice", async ({ page }) => {
 
 test("the orchestrator's page as it looks", async ({ page, api }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await api.channel.say({ body: { text: "看看今天地里怎么样" } });
+  await api.channel.message.send({ id: await defaultChannel(api), text: "看看今天地里怎么样" });
   await page.goto("/orchestrator/trajectory");
   await expect(page.getByRole("button", { name: /^收到 .*看看今天地里怎么样/ })).toBeVisible({ timeout: 15_000 });
   await page.screenshot({ path: test.info().outputPath("orchestrator-trajectory.png") });

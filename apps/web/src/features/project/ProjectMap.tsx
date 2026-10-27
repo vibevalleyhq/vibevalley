@@ -33,6 +33,7 @@ import { writeIssue } from "../issue";
 import { useRouter } from "../../base/router";
 import { autofocus } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
+import { defaultOf } from "../channel";
 import { ready, useAgents, useProjects } from "../../base/query";
 import { PixelCard } from "../../ui/pixel";
 import { Button } from "../../ui/Button";
@@ -441,11 +442,14 @@ function SowHere(props: { project: string; onDone: () => void }) {
   const [text, setText] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const router = useRouter();
+  const core = useCore();
   const send = async () => {
     const project = props.project;
+    const id = defaultOf(core()?.chat)?.id;
+    if (!id) return;
     setBusy(true);
     try {
-      await api.channel.say({ body: { text: text().trim(), project, sendKey: newSendKey() } });
+      await api.channel.message.send({ id, text: text().trim(), project, sendKey: newSendKey() });
       props.onDone();
     } catch (e) {
       toast(reasonOf(e));

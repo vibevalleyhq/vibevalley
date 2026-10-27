@@ -10,7 +10,7 @@ import { SessionLogs } from "./logs";
 // SessionLogs deduplicates active readers. A later observation must not borrow a request started before it subscribed.
 let readNumber = 0;
 const logs = new SessionLogs(
-  (id) => queries.fetchQuery({ queryKey: ["session-events", id, ++readNumber], queryFn: () => api.session.events({ id }), gcTime: 0 }),
+  (id) => queries.fetchQuery({ queryKey: ["session-events", id, ++readNumber], queryFn: () => api.session.event.list({ id }), gcTime: 0 }),
   subscribeLive,
 );
 

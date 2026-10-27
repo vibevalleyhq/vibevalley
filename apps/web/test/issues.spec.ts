@@ -27,7 +27,7 @@ const issue = (
   api: VibeValleyApi,
   title: string,
   more: { description?: string; priority?: "urgent" | "high" | "medium" | "low"; project?: string; assignee?: string } = {},
-) => api.issue.create({ body: { title, ...more } });
+) => api.issue.create({ title, ...more });
 
 const lane = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
 
@@ -93,7 +93,7 @@ test("starting an issue with no helper asks for one", async ({ page, api }) => {
 
 test("an act carries the fields not saved yet, saved before it is tried", async ({ api }) => {
   const made = await issue(api, "带着改动开工之前");
-  await expect(api.issue.status({ id: made.id, body: { status: "todo", edit: { title: "带着改动开工", priority: "high" } } })).rejects.toThrow();
+  await expect(api.issue.status.update({ id: made.id, status: "todo", edit: { title: "带着改动开工", priority: "high" } })).rejects.toThrow();
   const got = await api.issue.get({ id: made.id });
   expect([got.title, got.priority, got.status]).toEqual(["带着改动开工", "high", "backlog"]);
 });
@@ -106,7 +106,7 @@ test("a todo dragged onto another goes before it", async ({ page, api }) => {
   await todo.getByRole("button", { name: "排先后乙" }).dragTo(todo.getByRole("button", { name: "排先后甲" }));
   await expect
     .poll(async () => {
-      const ids = (await api.issue.history()).map((r) => r.issue.id);
+      const ids = (await api.issue.history.list()).map((r) => r.issue.id);
       return ids.indexOf(second.id) < ids.indexOf(first.id);
     })
     .toBe(true);
@@ -126,9 +126,9 @@ test("the search keeps only the cards it matches", async ({ page, api }) => {
 });
 
 test("screenshots of the board and of an issue", async ({ page, api }) => {
-  const fox = await api.agent.create({ body: helper("阿狐", "fox") });
-  const rabbit = await api.agent.create({ body: helper("小兔", "rabbit") });
-  const project = await api.project.create({ body: { name: "farm-site" } });
+  const fox = await api.agent.create(helper("阿狐", "fox"));
+  const rabbit = await api.agent.create(helper("小兔", "rabbit"));
+  const project = await api.project.create({ name: "farm-site" });
   await issue(api, "首页的农场地图在窄屏上会挤成一团", { priority: "urgent", project: project.name, assignee: fox.id });
   await issue(api, "给工单加上验收标准的模板", { priority: "high", project: project.name, assignee: rabbit.id });
   await issue(api, "设置页的语音开关不生效", { priority: "low", project: project.name });
@@ -138,7 +138,7 @@ test("screenshots of the board and of an issue", async ({ page, api }) => {
     assignee: fox.id,
     description: "登录页已经有「记住我」的勾选框，但没有接上：\n\n- 勾上时把会话存 30 天\n- 不勾时关掉浏览器就登出",
   });
-  await api.issue.update({ id: shown.id, body: { criteria: ["勾上后重开浏览器还登着", "不勾时关掉浏览器就登出"] } });
+  await api.issue.update({ id: shown.id, criteria: ["勾上后重开浏览器还登着", "不勾时关掉浏览器就登出"] });
 
   await page.goto("/issues");
   await expect(lane(page, "待办").getByRole("button", { name: "首页的农场地图在窄屏上会挤成一团" })).toBeVisible();

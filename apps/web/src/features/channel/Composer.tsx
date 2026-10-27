@@ -19,7 +19,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   let input: HTMLTextAreaElement | undefined;
   const [problem, setProblem] = createSignal<string>();
   const box = createComposer(core, () => input, {
-    target: () => ({ channel: props.channel?.id }),
+    target: () => ({ id: props.channel?.id ?? "" }),
     failed: (reason) => {
       setProblem(reason);
       toast(chatWording().composer.notSent(reason), "bad");
@@ -75,7 +75,9 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           class="block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none [field-sizing:content] placeholder:text-faint"
         />
         <div class="flex items-center gap-1 px-2 pb-2">
-          <span class="text-xs text-faint">{chatWording().composer.mention}</span>
+          <Show when={props.channel?.type !== "direct"}>
+            <span class="text-xs text-faint">{chatWording().composer.mention}</span>
+          </Show>
           <span class="flex-1" />
           <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="rounded-md hover:bg-hover" />
           <Show when={box.stoppable()}>

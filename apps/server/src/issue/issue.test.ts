@@ -513,7 +513,7 @@ describe("issues", () => {
       const repo = join(f.config.workRoot, "projects", "demo");
       renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
       expect((yield* Effect.flip(issues.previewStatus(hired.session!.issue!, "done", "")))._tag).toBe("Refused");
-      expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.general(), owner)))._tag).toBe("Refused");
+      expect((yield* Effect.flip(issues.setStatus(hired.session!.issue!, "done", "", chat.defaultChannel(), owner)))._tag).toBe("Refused");
       const after = yield* issues.get(hired.session!.issue!);
       expect([after.status, after.delivered]).toEqual(["in_review", undefined]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -603,7 +603,7 @@ describe("issues", () => {
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", assignee: "lab", project: "demo" });
       expect((yield* Effect.flip(issues.dispatchQueued(issue.id)))._tag).toBe("Refused");
-      expect((yield* issues.start(issue.id, chat.general())).queued).toBeDefined();
+      expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
       const queued = yield* issues.get(issue.id);
       const still = yield* issues.dispatchQueued(issue.id);
       expect([still.queued !== undefined, still.session]).toEqual([true, undefined]);
@@ -625,15 +625,15 @@ describe("issues", () => {
       const issue = yield* issues.add({ title: "write hello", assignee: "lab", project: "demo" });
       const inReview = (n: number) =>
         until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_review" && t.sessions.length === n), "round " + n);
-      yield* issues.setStatus(issue.id, "todo", "", chat.general(), owner);
+      yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
       yield* inReview(1);
       const [first] = (yield* issues.get(issue.id)).sessions;
       const refused = (to: "done" | "todo", agent: string) =>
-        Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.general(), owner, { agent })), reasonOf);
+        Effect.map(Effect.flip(issues.setStatus(issue.id, to, "", chat.defaultChannel(), owner, { agent })), reasonOf);
       expect(yield* refused("done", "lab2")).toContain("换人是挪到待办时的事");
       expect(yield* refused("todo", "nobody")).toContain("没有叫 nobody 的帮工档案");
 
-      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.general(), owner, { agent: "Lab Two" });
+      const handed = yield* issues.setStatus(issue.id, "todo", "接着写", chat.defaultChannel(), owner, { agent: "Lab Two" });
       expect([handed.assignee, handed.sessions.length, handed.closedAt]).toEqual(["lab2", 2, undefined]);
       expect(sessions.find(first!)).toBeUndefined();
       const second = (yield* sessions.get(handed.sessions[1]!))!;
@@ -652,9 +652,9 @@ describe("issues", () => {
       yield* agents.saveAgent(lab());
       yield* agents.saveAgent({ ...lab(), id: "lab2", name: "Lab Two" });
       const issue = yield* issues.add({ title: "work on", assignee: "lab", project: "demo" });
-      yield* issues.setStatus(issue.id, "todo", "", chat.general(), owner);
+      yield* issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner);
       yield* until(() => Effect.runPromise(issues.get(issue.id)).then((t) => t.status === "in_progress"), "working");
-      expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.general(), owner, { agent: "lab2" })))).toContain(
+      expect(reasonOf(yield* Effect.flip(issues.setStatus(issue.id, "todo", "", chat.defaultChannel(), owner, { agent: "lab2" })))).toContain(
         "先叫停，等它停下再换人",
       );
       expect((yield* issues.get(issue.id)).sessions).toHaveLength(1);

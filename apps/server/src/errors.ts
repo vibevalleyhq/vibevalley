@@ -1,7 +1,7 @@
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
 import { gatewayWording } from "./words.ts";
-import type { ApiError, Next } from "@vibevalley/protocol/api";
+import { type ApiError, commandOf, type Next } from "@vibevalley/protocol/api";
 
 export type { ApiError, Next };
 
@@ -21,23 +21,23 @@ const listed = (key: keyof ReturnType<typeof gatewayWording>["lookIn"], run: rea
 });
 
 export const lookIn = {
-  issue: listed("issue", ["issue", "list"]),
-  session: listed("session", ["session", "list"]),
-  project: listed("project", ["project", "list"]),
-  runtime: listed("runtime", ["runtime", "list"]),
-  doc: listed("doc", ["doc", "list"]),
-  agent: listed("agent", ["agent", "list"]),
-  skill: listed("skill", ["skill", "list"]),
-  recurrence: listed("recurrence", ["recurrence", "list"]),
-  device: listed("device", ["lan", "status"]),
-  archive: listed("archive", ["orchestrator", "list-archive"]),
+  issue: listed("issue", commandOf("issue.list")),
+  session: listed("session", commandOf("session.list")),
+  project: listed("project", commandOf("project.list")),
+  runtime: listed("runtime", commandOf("runtime.list")),
+  doc: listed("doc", commandOf("doc.list")),
+  agent: listed("agent", commandOf("agent.list")),
+  skill: listed("skill", commandOf("skill.list")),
+  recurrence: listed("recurrence", commandOf("recurrence.list")),
+  device: listed("device", commandOf("lan.get")),
+  archive: listed("archive", commandOf("orchestrator.archive.list")),
   // Channels and task graphs have no list of their own: they are in the core state.
   channel: listed("channel", ["state"]),
   graph: listed("graph", ["state"]),
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */
-export const memoriesOf = (agent: string): Next => ({ say: gatewayWording().lookIn.memories, run: ["memory", "list", agent] });
+export const memoriesOf = (agent: string): Next => ({ say: gatewayWording().lookIn.memories, run: commandOf("memory.list", [agent]) });
 
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>

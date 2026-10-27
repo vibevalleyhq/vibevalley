@@ -13,7 +13,7 @@ function setup() {
   const failed = vi.fn();
   const box = createRoot((stop) => {
     dispose = stop;
-    const [to, setTo] = createSignal<ReturnType<ComposerWays["target"]>>({ channel: "channel" });
+    const [to, setTo] = createSignal<ReturnType<ComposerWays["target"]>>({ id: "channel" });
     target = setTo;
     return createComposer(
       () => undefined,
@@ -39,28 +39,28 @@ function setup() {
 }
 
 test("every routing field participates in a send identity, while unchanged retries keep it", async () => {
-  const send = vi.spyOn(api.channel, "say").mockRejectedValue(new Error("response lost"));
+  const send = vi.spyOn(api.channel.message, "send").mockRejectedValue(new Error("response lost"));
   const s = setup();
   try {
     s.edit("同一句");
     for (const target of [
-      { channel: "channel" },
-      { channel: "thread" },
-      { channel: "thread", agent: "a" },
-      { channel: "thread", agent: "a", project: "p" },
-      { channel: "thread", agent: "a", project: "p", station: 1 },
+      { id: "channel" },
+      { id: "thread" },
+      { id: "thread", agent: "a" },
+      { id: "thread", agent: "a", project: "p" },
+      { id: "thread", agent: "a", project: "p", station: 1 },
     ]) {
       s.target(target);
       await s.box.send();
-      const first = send.mock.calls.at(-1)![0].body;
+      const first = send.mock.calls.at(-1)![0];
       await s.box.send();
-      expect(send.mock.calls.at(-1)![0].body).toEqual(first);
+      expect(send.mock.calls.at(-1)![0]).toEqual(first);
     }
-    const keys = send.mock.calls.filter((_, i) => i % 2 === 0).map(([request]) => request.body.sendKey);
+    const keys = send.mock.calls.filter((_, i) => i % 2 === 0).map(([request]) => request.sendKey);
     expect(new Set(keys).size).toBe(5);
     s.edit("改了文字");
     await s.box.send();
-    expect(keys).not.toContain(send.mock.calls.at(-1)![0].body.sendKey);
+    expect(keys).not.toContain(send.mock.calls.at(-1)![0].sendKey);
   } finally {
     s.dispose();
   }
@@ -68,7 +68,7 @@ test("every routing field participates in a send identity, while unchanged retri
 
 test("editing back to the original words while sending still keeps the later draft", async () => {
   let complete!: () => void;
-  const send = vi.spyOn(api.channel, "say").mockImplementation(
+  const send = vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;
@@ -94,7 +94,7 @@ test("editing back to the original words while sending still keeps the later dra
 
 test("a response for the previous destination cannot clear the current destination's draft", async () => {
   let complete!: () => void;
-  vi.spyOn(api.channel, "say").mockImplementation(
+  vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;
@@ -104,7 +104,7 @@ test("a response for the previous destination cannot clear the current destinati
   try {
     s.edit("给这里的一句话");
     const pending = s.box.send();
-    s.target({ channel: "somewhere-else" });
+    s.target({ id: "somewhere-else" });
     complete();
     await pending;
     flush();
@@ -116,7 +116,7 @@ test("a response for the previous destination cannot clear the current destinati
 
 test("closing a composer releases its target before a pending response arrives", async () => {
   let complete!: () => void;
-  vi.spyOn(api.channel, "say").mockImplementation(
+  vi.spyOn(api.channel.message, "send").mockImplementation(
     () =>
       new Promise((resolve) => {
         complete = resolve;
@@ -132,7 +132,7 @@ test("closing a composer releases its target before a pending response arrives",
       {
         target: () => {
           if (closed) throw new Error("disposed target was read");
-          return { channel: "a" };
+          return { id: "a" };
         },
         failed: () => {
           throw new Error("disposed failure callback was called");

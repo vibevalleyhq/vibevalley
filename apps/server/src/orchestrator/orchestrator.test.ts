@@ -34,7 +34,7 @@ const lastInput = (c: Request) =>
     .map(userText)
     .filter((t): t is string => t !== undefined)
     .at(-1) ?? "";
-const heads = ["【现在】", "【现状】", "【现状变了】", "【记性有更新】", "这期间田头上的汇报"];
+const heads = ["【现在】", "【现状】", "【现状变了】", "【记性有更新】", "这期间群聊里的汇报"];
 /** An input without what the orchestrator puts before the words. */
 const words = (input: string) => {
   const blocks = input.split("\n\n");
@@ -107,7 +107,7 @@ const said = Effect.gen(function* () {
   const { in: saidIn } = yield* Said;
   const chat = yield* Channels;
   return () =>
-    saidIn(chat.general())
+    saidIn(chat.defaultChannel())
       .filter((m) => m.from === orchestratorAgent && m.kind === "chat")
       .map((m) => m.text);
 });
@@ -120,7 +120,7 @@ describe("the orchestrator", () => {
     expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/);
   });
 
-  it.live("writes an issue down and starts it, and hears the owner's voice in 田头", () => {
+  it.live("writes an issue down and starts it, and hears the owner's voice in the default channel", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
@@ -155,9 +155,26 @@ describe("the orchestrator", () => {
       expect((yield* until(() => words().length >= 2 && words(), "its words")).at(-1)).toBe("收到");
       const answered = f.requests.length;
       yield* marked(f);
-      expect(saidIn(chat.general()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
+      expect(saidIn(chat.defaultChannel()).some((m) => m.from === "owner" && m.text === "随便说一句" && m.spoken)).toBe(true);
       expect(f.requests.slice(before).filter((c) => lastLine(c).includes("随便说一句")).length).toBe(1);
       expect(lastLine(f.requests[answered - 1]!)).toContain("语音那边已经回答了");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
+  it.live("answers the owner in their direct channel", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator;
+      const { in: saidIn } = yield* Said;
+      const chat = yield* Channels;
+      const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === orchestratorAgent)!;
+      yield* orchestrator.say("单独问你一句：地里怎么样", {}, direct.id, "");
+      const answered = () => saidIn(direct.id).filter((m) => m.from === orchestratorAgent);
+      expect((yield* until(() => answered().length >= 1 && answered(), "its answer there")).map((m) => m.text)).toEqual(["收到"]);
+      expect(saidIn(chat.defaultChannel()).some((m) => m.from === orchestratorAgent)).toBe(false);
+      const asked = f.requests.at(-1)!;
+      expect(lastLine(asked)).toBe("[来源：主人]\n主人说：单独问你一句：地里怎么样");
+      expect(lastInput(asked)).toContain("你正在回话的地方：和主人的私聊 @owner");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -193,10 +210,10 @@ describe("the orchestrator", () => {
       expect(lastLine(f.requests.at(-1)!)).toMatch(/主人在电话里说的[\s\S]*主人说：现在地里怎么样/);
       expect(f.requests.length).toBe(1);
       const call = () =>
-        saidIn(chat.general())
+        saidIn(chat.defaultChannel())
           .filter((m) => m.spoken || m.from === orchestratorAgent)
           .map((m) => m.from + "：" + m.text);
-      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
+      expect(yield* until(() => call().length === 2 && call(), "the call in the default channel")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -300,8 +317,8 @@ describe("the orchestrator", () => {
       const first = yield* pieces("在吗");
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
-      const refusal = () => saidIn(chat.general()).filter((m) => m.from === orchestratorAgent);
-      expect((yield* until(() => refusal()[0], "the refusal on 田头")).text).toMatch(/^我这边起不来：/);
+      const refusal = () => saidIn(chat.defaultChannel()).filter((m) => m.from === orchestratorAgent);
+      expect((yield* until(() => refusal()[0], "the refusal in the default channel")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
       yield* pieces("（标记）");
@@ -356,7 +373,7 @@ describe("the orchestrator", () => {
       yield* until(() => saidAll().some((m) => m.from === id && m.kind === "report"), "its report");
       const spoken = yield* chat.speak(id, "@管家 " + "长".repeat(5000), { anyway: true });
       expect(spoken.kind).toBe("sent");
-      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【田头】")), "the orchestrator asked");
+      const line = yield* until(() => f.requests.map(lastLine).find((l) => l.startsWith(intake.chat.head + "【群聊】")), "the orchestrator asked");
       expect(line).not.toContain("长".repeat(797));
       expect(line).toContain("@管家 " + "长".repeat(796) + "…（这条有 5004 字，全文用 read_chat 读 " + spoken.target + "）");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -397,7 +414,7 @@ describe("the orchestrator", () => {
       }, "merged");
       // The helper said its words and committed nothing: done, with nothing to merge, and said so.
       expect(merged.delivered).toBe("none");
-      const general = (yield* Channels).general();
+      const general = (yield* Channels).defaultChannel();
       yield* until(
         () => saidIn(general).some((m) => m.from === orchestratorAgent && m.text === `合并：#${number} 已完成，没有改动要合`),
         "what it delivered said",
@@ -512,7 +529,7 @@ describe("the orchestrator", () => {
       offset = 3 * 3_600_000;
       yield* notices.patrol;
       const line = yield* until(() => f.requests.map(lastLine).find((l) => patrolLine.test(l)), "the patrol's news");
-      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#田头 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/);
+      expect(line).toMatch(/^\[来源：巡查\]\n【巡查】#general 里有几件事放着没人管：\n(- .+\n)*- .+（w\d+）的活做完 3 小时了还没人看：「加个 CHANGELOG」/);
       offset = 3.5 * 3_600_000;
       yield* notices.patrol;
       yield* marked(f);

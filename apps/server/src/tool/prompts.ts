@@ -100,9 +100,8 @@ export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) =>
   "没有「" + word + "」这个状态：" + allowed.map((s) => wording().status[s]).join("、");
 export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => wording().priority[p]).join("、");
 
-/** A channel in one line: its name, what it is for, its default project. */
-export const channelLine = (c: { readonly name: string; readonly description?: string; readonly project?: string }) =>
-  "#" + c.name + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
+export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly project?: string }) =>
+  "#" + c.name + (c.default ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
 
 /** How long, in round words. */
 export function spanWords(ms: number): string {
@@ -231,7 +230,7 @@ export const params = {
     text: "要它记住的一句话",
   },
   readChat: {
-    target: "#田头、#clock-in，或 #田头:<消息号>",
+    target: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
   },
   recurrence: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
@@ -267,7 +266,7 @@ export const params = {
   },
   channelSay: {
     anyway: "看过新消息、仍要原样发",
-    confirm: "确实要发到田头顶层，而不是刚读的那个串",
+    confirm: "确实要发到频道的顶层，而不是刚读的那个串",
   },
   docAppend: {
     level: "标题的级别 1–3，只给 heading 用；默认 2",
@@ -306,13 +305,13 @@ export const memoryWhere = (m: Memory) => (m.project ? "项目 " + m.project : "
 /** A tool's description, shown to the model alongside its name and parameters (tool.ts). */
 export const descriptions = {
   projects: "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
-  channels: "列出频道：名字、是做什么的、默认项目。频道是安排活的地方，田头是默认的那个。",
+  channels: "列出频道：名字、哪个是默认的、是做什么的、默认项目。频道是安排活的地方。",
   roster: "列出在场的所有帮工：在做什么、上一轮的结果。",
   check: "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
   changes: "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
   sessionList: "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
   readChat:
-    "读一个频道或一个串里说的话。target 写 #<频道>（比如 #田头），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+    "读一个频道或一个串里说的话。target 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   channelInbox: "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   accept:
     "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能完成；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
@@ -347,10 +346,8 @@ export const descriptions = {
   docUpdate: "把一块的字整段换成新的。base_rev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
   issueSplit: (maxTasks: number) =>
     `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
-  channelSay: (defaultChannel: string) =>
-    "在群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（#" +
-    defaultChannel +
-    " 是默认的频道田头）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+  channelSay:
+    "在群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（channels 列出有哪些、哪个是默认的）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   memorySearchOrchestrator:
     "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
   memorySearchSession:
@@ -402,7 +399,7 @@ export const answers = {
         "看过了：要改就改了再发；原样发就加 anyway: true；不用发了就不发。",
       ].join("\n"),
     confirm: (target: string, lastRead: string | undefined) =>
-      `先没发：你刚读的是 ${lastRead}，这条却要发到 ${target} 顶层。要回在那个串里，就把 target 写成 ${lastRead}；确实要发到田头，就加 confirm: true。`,
+      `先没发：你刚读的是 ${lastRead}，这条却要发到 ${target} 顶层。要回在那个串里，就把 target 写成 ${lastRead}；确实要发到顶层，就加 confirm: true。`,
     sent: (target: string, msgNumber: number, absent: string) => `发出去了：${target} msg=${msgNumber}${absent}`,
     absentNote: (names: string) => "。" + names + " 不在场，没送到",
   },

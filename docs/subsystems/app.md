@@ -30,7 +30,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 ## 模型和不变量
 
 - **服务端是核心状态唯一的持有者。** 页面经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。页面不读事实，`/api/v1/events` 留给命令行和调试。
-- **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突是工单的动作 `resolve`（`POST /api/v1/issues/{id}/act`）、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
+- **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agent/check`、新项目会被拒的第一处 `POST /api/v1/project/check`、设置会被拒的第一处 `POST /api/v1/setting/check`、记性的预览 `POST /api/v1/memory/recall`、交代冲突是工单的动作 `resolve`（`POST /api/v1/issue/act`）、播种袋的工单模板 `POST /api/v1/project/template/list`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievement.list`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
 - **页面的规则只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、看板怎么分栏，只给页面用；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在页面。
 - **页面的话在词表里，语言读一次**：每个目录一份 `words.ts`（中英各一份），语言是服务端发的 `index.html` 上的 `data-locale`，开页时读定；设置里换了语言就整页重开，帧里服务端写的话也一起换。页面开起来以后经 `host.locale` 告诉宿主，桌面壳的菜单栏和灵动岛跟着说（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。开机的进度条（`public/opening.html`，也写进 `index.html`）按同一个 `data-locale` 或桌面壳给的 `?locale=` 选字。
 - **一条状态流**：`base/frames.ts` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
@@ -106,7 +106,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **子进程自己发布就绪地址。** 宿主先绑端口 0、读出端口、关掉再交给服务端，关掉到重绑之间端口可能被抢；从人读的日志里找地址，日志措辞就成了协议。绑定结果只有子进程知道，所以由它写一行 JSON 说出来。
 - **宿主接口封闭、缺的是 null。** 页面问「我在哪个壳里」再分支，每加一个宿主就要改每一处；按能力有没有来画，加宿主只是实现一遍接口。
 - **连进来的浏览器用 cookie 带钥匙。** 页面的状态流和 REST 都走 `fetch`，同源的 cookie 自动带上，页面不用改；监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。
-- **首页只给第一次来的人。** 天天用的人每次都要先点「继续游戏」，点开一条通知也被首页挡住要多点一次。不做「新游戏」清档：农场里是主人的田头、账本和帮工的分支，一个按钮清掉代价太大。
+- **首页只给第一次来的人。** 天天用的人每次都要先点「继续游戏」，点开一条通知也被首页挡住要多点一次。不做「新游戏」清档：农场里是主人的频道、账本和帮工的分支，一个按钮清掉代价太大。
 - **设置是工作台的一页。** 首页、扳手和缺钥匙的开始游戏都进 `/settings`，不另开一处设置窗口。
 
 ## 还没做的

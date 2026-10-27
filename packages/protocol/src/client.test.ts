@@ -4,7 +4,7 @@ import { VibeValleyApi, VibeValleyApiError } from "./client";
 const client = (status: number, text: string) => new VibeValleyApi("http://farm", async () => new Response(text, { status }));
 const failure = async (status: number, text: string) => {
   const error = await client(status, text)
-    .server.health()
+    .server.health.get()
     .catch((e: unknown) => e);
   expect(error).toBeInstanceOf(VibeValleyApiError);
   return error as VibeValleyApiError;
@@ -38,10 +38,10 @@ describe("the API client error boundary", () => {
   });
 
   it("keeps success JSON parsing separate from HTTP failure handling", async () => {
-    expect(await client(200, `{"ok":true,"version":"test"}`).server.health()).toEqual({
+    expect(await client(200, `{"ok":true,"version":"test"}`).server.health.get()).toEqual({
       ok: true,
       version: "test",
     });
-    await expect(client(200, "not json").server.health()).rejects.toThrow(SyntaxError);
+    await expect(client(200, "not json").server.health.get()).rejects.toThrow(SyntaxError);
   });
 });

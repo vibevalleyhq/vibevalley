@@ -61,7 +61,7 @@ export function DocsPage(props: { rest: string }) {
   const open = () => (id() && decodeURIComponent(id()!)) || list()[0]?.id;
   const create = async () => {
     try {
-      const made = await api.doc.create({ body: { title: title() } });
+      const made = await api.doc.create({ title: title() });
       setTitle("");
       setProblem(undefined);
       await client.invalidateQueries({ queryKey: ["docs"] });

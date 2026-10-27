@@ -86,15 +86,15 @@ VibeValley 自己的 agent 在一个会话里给自己记的任务（`AgentTask`
 
 **重启**：开机时停在 `splitting` 的计划放弃（「规划停在了半路：再说一遍要做什么」），请规划的帮工收工；有件在做的 `running` 计划暂停（「点继续接着做」）；其余 `running` 的照常调度。
 
-**告诉管家**：计划里帮工的汇报不转给管家（`forTask` 的汇报不投给它）；只有拆好、没拆成、某件没做成、全部做完时，计划经 `News()` 在田头告诉管家一句「【计划】…」。
+**告诉管家**：计划里帮工的汇报不转给管家（`forTask` 的汇报不投给它）；只有拆好、没拆成、某件没做成、全部做完时，计划经 `News()` 在频道告诉管家一句「【计划】…」。
 
 ## 和谁打交道
 
 - **工单（`issue`）**：`putTask` 写整家工单，`nextTaskId` 给下一个计划号，`hire` 派帮工（查档案、地满没满）；工单服务的转换表不管计划里的工单（[工单](docs/subsystems/issue.md)）。
 - **帮工（`session`）**：派规划的、做件的帮工，`tell` 带话（触发是 `task`），`dismiss` 请走，`mergeInto` 在合并动作里停住写入、合并、离场；正在干或有待开始的一轮时不能合。计划听核心状态的事实：`report`（一轮结束）和 `left`（帮工离开）。
-- **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.changes` 的改动）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
+- **项目（`project`）**：`openBranch`、`mergeBranch`、`branchChanges`（`graph.diff.get` 的改动）、`changedFiles`（冻结文件的判断）、`Run`（检查命令）。
 - **管家（`orchestrator`、`tool`）**：五个工具起头、看、改、动作；计划的新闻进管家的输入（来源 `graph`）；管家的现状写着开着的计划。
-- **田头（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。
+- **频道（`channel`）**：计划里帮工的汇报标 `forTask`，不投给管家。
 - **Inbox（`apps/server/src/notice/inbox.ts`）**：没做成的件是一条 `task-failed`，巡查过了宽限期叫醒管家（[管家](docs/subsystems/orchestrator.md)）。
 - **游戏（`game`）**：一个计划合进主分支记一条账，金币 `30 + 10 × 合进去的件数`，件数到档位给成就（[farm-ui.md](docs/reference/farm-ui.md)「金币」）。
 

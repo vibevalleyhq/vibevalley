@@ -43,7 +43,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
   const send = async (s: Session, body: IssueActRequest) => {
     if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(farmWording().command.cannot(wording().act[body.act]));
-    await api.issue.act({ id: issueOf(s), body });
+    await api.issue.act({ id: issueOf(s), ...body });
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {
     const f = frame();
@@ -80,7 +80,9 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;
-      await api.channel.say({ body: { text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() } });
+      const id = frame()?.state.chat?.channels.find((c) => c.default)?.id;
+      if (!id) return;
+      await api.channel.message.send({ id, text: said, station: o.station, agent: o.agent, project: o.project, sendKey: o.sendKey ?? newSendKey() });
     },
     aim: (bed) => aimAt(bed, farmState().tool),
     async act({ bed, tool, session: pointed }) {
@@ -108,7 +110,7 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
           return { kind: "done" };
       }
     },
-    chooseTitle: (achievement, tier) => api.game.chooseTitle({ body: { achievement, tier } }),
+    chooseTitle: (achievement, tier) => api.game.title.set({ achievement, tier }),
     refreshRuntime: async (id) => void (await api.runtime.refresh({ id })),
   };
   return commands;

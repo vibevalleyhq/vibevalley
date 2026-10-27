@@ -1,4 +1,4 @@
-import { generalName, type StateFrame, type VibeValleyApi } from "@vibevalley/protocol";
+import { firstChannelName, type StateFrame, type VibeValleyApi } from "@vibevalley/protocol";
 import { expect, settled, test } from "./fixtures";
 
 // The state as the stream sends it: its first frame.
@@ -12,14 +12,14 @@ async function stateOf(baseURL: string) {
 }
 
 async function newChannel(api: VibeValleyApi, name: string, description?: string) {
-  return api.channel.create({ body: { name, description } });
+  return api.channel.create({ name, description });
 }
 
 test("the general shows with its empty words, the orchestrator resting", async ({ page }) => {
   await page.goto("/chat");
-  await expect(page.getByRole("heading", { name: generalName })).toBeVisible();
+  await expect(page.getByRole("heading", { name: firstChannelName })).toBeVisible();
   const side = page.getByRole("complementary", { name: "频道和帮工" });
-  await expect(side.getByRole("button", { name: generalName })).toHaveAttribute("aria-current", "page");
+  await expect(side.getByRole("button", { name: firstChannelName })).toHaveAttribute("aria-current", "page");
   await expect(side.getByText("还没有在场的帮工")).toBeVisible();
   await expect(side.getByText("在歇着")).toBeVisible();
   await expect(page.getByRole("tab", { name: "聊天" })).toHaveAttribute("aria-selected", "true");
@@ -40,6 +40,29 @@ test("a sentence said shows in the list through the state stream", async ({ page
   // Without a model key the orchestrator answers that it has none; the page takes that as any answer.
   await expect(log.getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "说话" })).toBeVisible();
+});
+
+test("the direct channel with the orchestrator: listed apart, talked in alone, with no one to @", async ({ page }) => {
+  await page.goto("/chat");
+  const side = page.getByRole("complementary", { name: "频道和帮工" });
+  await side.getByRole("region", { name: "私聊" }).getByRole("button", { name: "管家" }).click();
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page.getByRole("heading", { name: "管家" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "聊天" })).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(1);
+  const box = page.getByRole("textbox", { name: "发送消息至 管家" });
+  await box.click();
+  await box.pressSequentially("单独问一句 @");
+  await expect(page.getByRole("listbox", { name: "叫谁" })).toBeHidden();
+  await expect(page.getByText("@ 叫人")).toHaveCount(0);
+  await box.fill("单独问一句：地里怎么样");
+  await box.press("Enter");
+  const log = page.getByRole("log", { name: "消息" });
+  await expect(log.getByText("单独问一句：地里怎么样")).toBeVisible();
+  // Without a model key the orchestrator answers that it has none, here and not in the default channel.
+  await expect(log.getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await side.getByRole("button", { name: firstChannelName }).click();
+  await expect(page.getByRole("log", { name: "消息" }).getByText("单独问一句：地里怎么样")).toHaveCount(0);
 });
 
 test("Shift+Enter starts a line and @ offers the orchestrator", async ({ page, api }) => {
@@ -99,8 +122,8 @@ test("the channel's settings save its description", async ({ page, api }) => {
 
 test("search keeps the messages that contain it", async ({ page, api }) => {
   const id = await newChannel(api, "找");
-  await api.channel.say({ body: { text: "苹果要浇水", channel: id } });
-  await api.channel.say({ body: { text: "香蕉该收了", channel: id } });
+  await api.channel.message.send({ id, text: "苹果要浇水" });
+  await api.channel.message.send({ id, text: "香蕉该收了" });
   await page.goto(`/chat/${id}`);
   const log = page.getByRole("log", { name: "消息" });
   await expect(log.getByText("香蕉该收了")).toBeVisible();
@@ -117,7 +140,7 @@ test("search keeps the messages that contain it", async ({ page, api }) => {
 
 test("the recurrences tab turns a recurrence off and deletes it on the second press", async ({ page, api }) => {
   const id = await newChannel(api, "定时");
-  await api.recurrence.create({ body: { name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } } });
+  await api.recurrence.create({ name: "跑测试", text: "跑一遍测试", channel: id, when: { kind: "once", at: Date.now() + 30 * 86400000 } });
   await page.goto(`/chat/${id}`);
   await page.getByRole("tab", { name: "任务" }).click();
   await expect(page.getByText("这个频道里还没有活")).toBeVisible();
@@ -133,8 +156,8 @@ test("the recurrences tab turns a recurrence off and deletes it on the second pr
 
 test("the chat page as it looks", async ({ page, api }) => {
   const id = await newChannel(api, "clock", "打卡小程序的活");
-  await api.channel.update({ id, body: { description: "打卡小程序的活", project: "clock-in" } });
-  await api.channel.say({ body: { text: "帮我看看 @管家 打卡页为什么**白屏**", channel: id } });
+  await api.channel.update({ id, description: "打卡小程序的活", project: "clock-in" });
+  await api.channel.message.send({ id, text: "帮我看看 @管家 打卡页为什么**白屏**" });
   await page.goto(`/chat/${id}`);
   await expect(page.getByRole("log", { name: "消息" }).getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
   // Shown, the orchestrator's answer is read: no count on the channel.

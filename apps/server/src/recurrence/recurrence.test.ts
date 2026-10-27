@@ -87,7 +87,7 @@ describe("recurrences", () => {
         const core = yield* Core;
         const chat = yield* Channels;
         const due = yield* collect;
-        const general = chat.general();
+        const general = chat.defaultChannel();
         const made = yield* s.add(req(" 看进度 ", "看看帮工们的进度", { kind: "once", at: clock.now + 150 }), owner);
         expect([made.channel, made.name, made.enabled, made.tz !== ""]).toEqual([general, "看进度", true, true]);
         expect(core.state().recurrences?.map((x) => x.id)).toEqual([made.id]);
@@ -197,7 +197,7 @@ describe("recurrences", () => {
     const clock = { now: Date.now() };
     return Effect.gen(function* () {
       yield* Effect.gen(function* () {
-        const channel = (yield* Channels).general();
+        const channel = (yield* Channels).defaultChannel();
         for (const [id, spec] of [
           ["bad-spec", `{"kind":"weekly","days":[1.5],"time":"09:00"}`],
           ["good", `{"kind":"daily","time":"09:00"}`],

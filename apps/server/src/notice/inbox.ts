@@ -4,7 +4,7 @@
 // questions in their place; a quiet one still questions.
 
 import type { Question, WorkspaceState, InboxFrom, InboxItem, Session } from "@vibevalley/protocol";
-import { generalOf } from "../channel/state.ts";
+import { defaultOf } from "../channel/state.ts";
 import { needOf } from "@vibevalley/protocol/rules";
 import { graphsOf } from "../task/issues.ts";
 import { cut, oneLine, slice } from "../base/text.ts";
@@ -33,7 +33,7 @@ export function inboxEntries(state: WorkspaceState): InboxEntry[] {
 
 function gathered(state: WorkspaceState): Unworded[] {
   const chat = state.chat;
-  const general = generalOf(chat)?.id;
+  const general = defaultOf(chat)?.id;
   const out: Unworded[] = [];
   for (const h of state.sessions) {
     const want = wantOf(h, state);

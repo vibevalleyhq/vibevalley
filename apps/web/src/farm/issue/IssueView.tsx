@@ -88,7 +88,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
             farm.review(s.id);
             props.onDone();
           }}
-          onClose={(s) => api.issue.act({ id: issueOf(s), body: { act: "close" } }).then(() => props.onDone())}
+          onClose={(s) => api.issue.act({ id: issueOf(s), act: "close" }).then(() => props.onDone())}
           onThread={
             hasThread()
               ? () => {
@@ -169,7 +169,7 @@ function IssueBody(props: {
 
   const setReview = (a: Review) => {
     const id = props.issue.id;
-    return acts.act(() => api.issue.update({ id, body: { review: a } }));
+    return acts.act(() => api.issue.update({ id, review: a }));
   }; /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
     <PxButton tone={lead() ? "primary" : a === "close" || acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>

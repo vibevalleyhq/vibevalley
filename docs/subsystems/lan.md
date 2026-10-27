@@ -10,13 +10,13 @@
 | 配对：配对码、设备等主人点头、发钥匙 | 哪些接口给「连接到本机」：`api.ts` 里每个接口的 `can` 含不含 `remote`，「连接到本机」只照它放（[能力表](docs/reference/capabilities.md)） |
 | 设备：存钥匙的 SHA-256、认钥匙（`Bearer` 头或 cookie）、移除时断开它的连接 | 接口本身怎么答：「连接到本机」把放行的请求转给本机的主监听 |
 | 页面经它到别的设备上 | 页面里配对和带钥匙的那一半（[客户端](docs/subsystems/app.md)「连进来的浏览器先配对」） |
-| | 语音线路，另一个对外的监听（[语音](docs/subsystems/voice.md)「语音线路」）；帮工的 `/mcp`（[田头](docs/subsystems/channel.md)），「连接到本机」不放 |
+| | 语音线路，另一个对外的监听（[语音](docs/subsystems/voice.md)「语音线路」）；帮工的 `/mcp`（[频道](docs/subsystems/channel.md)），「连接到本机」不放 |
 
 ## 在哪
 
 - 服务端 `apps/server/src/lan/lan.ts`：监听、配对、设备、`guard`（每个请求先过它）、放行表 `remoteMay`、`pairLink`；`http/app.ts` 开始答 HTTP 后把主监听的地址交给它（`setUpstream`）。
 - 表：`lan`（一行，`open`）、`lan_device`（一台设备一行：名字、`key_hash`、`paired_at`、`last_seen`）；查询在 `db/queries/lan.sql`、`lan_device.sql`。
-- 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.status`、`lan.update`、`lan.startPairing`、`lan.stopPairing`、`lan.answerPairing`、`lan.deleteDevice` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me`（`GET /api/v1/lan/me`）也给 `remote`。形状是 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。钥匙的 cookie 名是 `packages/protocol` 的 `lanKeyCookie`。
+- 接口：`lan.*`（[capabilities.md](docs/reference/capabilities.md)）。`lan.get`、`lan.update`、`lan.pairing.start`、`lan.pairing.stop`、`lan.pairing.answer`、`lan.device.delete` 只有 `owner`；`lan.pair`（`POST /api/v1/lan/pair`）和 `lan.me.get`（`POST /api/v1/lan/me/get`）也给 `remote`。形状是 `LanStatus`、`LanPairing`、`LanDevice`、`LanPaired`，拒绝是 `LanRefused`（403）。钥匙的 cookie 名是 `packages/protocol` 的 `lanKeyCookie`。
 - 配置：`lan.port`（默认 8790；0 是随便一个）。
 - 页面：`apps/web/src/features/lan/LanPage.tsx`（开关、二维码、点头、设备列表），`features/lan/PairPage.tsx`（设备上的配对），`features/lan/rules.ts`（是不是远端、配没配对、cookie 怎么写、猜设备名），`main.tsx` 把没配对的远端浏览器送去 `/pair`。
 
@@ -31,24 +31,24 @@
 - **配对链接**：`http://<地址>:<端口>/pair?c=<码>`。地址是这台电脑首选网卡（`en*`、`eth*`、`wlan*`、`wl*` 在前）的私有 IPv4，端口是「连接到本机」实际听的；找不到这样的地址时不发码，状态里说「连上 Wi-Fi 或网线再试」。手机的相机扫开就是浏览器里的配对页。
 - **设备名**：配对页按浏览器猜一个（iPhone、iPad、安卓手机、Mac、Windows 电脑），设备上能改；空白合成一个空格，最长 40 个字，空的叫「一台设备」。电脑名（`LanStatus.hostName`、`LanPaired.hostName`）是这台电脑的主机名，去掉 `.local`。
 - **移除当场生效**：移除删库里的行、取消这台设备正连着的每个请求，状态流随之断开；关「连接到本机」等整个监听完成关闭，再允许重开同一端口。转发响应体经 `pipeline` 跟随下游背压，设备断开同时取消上游读取。认设备和登记它的连接在同一步里，移除和进门不会错开。
-- **能干活，不能改配置**：配对过的设备能派活、带话、在田头说话、验收、完成、定时、看全部状态，也能看设置（钥匙只看到最后四个字）；改配置的只在本机：设置的保存、农机设置、帮工档案和技能书的增删改、连接器的账号，这些没有 `remote`，设备调了答 403。
+- **能干活，不能改配置**：配对过的设备能派活、带话、在频道说话、验收、完成、定时、看全部状态，也能看设置（钥匙只看到最后四个字）；改配置的只在本机：设置的保存、农机设置、帮工档案和技能书的增删改、连接器的账号，这些没有 `remote`，设备调了答 403。
 - **明文**：「连接到本机」走 HTTP，同一个网络里的人能看到内容、抓到钥匙冒充那台设备，直到主人移除它。页面上提示只在信得过的网络里开。
 
 ## 怎么走
 
 **配对**：
 
-1. 主人打开「连接到本机」（`lan.update`），点「添加设备」（`lan.startPairing`）：「连接到本机」没开或找不到地址就拒绝；否则作废旧码、发新码，页面把 `LanPairing.link` 画成二维码，旁边是链接本身。
+1. 主人打开「连接到本机」（`lan.update`），点「添加设备」（`lan.pairing.start`）：「连接到本机」没开或找不到地址就拒绝；否则作废旧码、发新码，页面把 `LanPairing.link` 画成二维码，旁边是链接本身。
 2. 设备扫码或打开链接，浏览器进 `/pair?c=<码>`；没带码时页面让它填。不带 cookie 打开那台电脑上别的地址，页面先送它去 `/pair`。
 3. 设备带码和名字发 `lan.pair`，请求一直挂着，页面说「等那台电脑上的主人点头」。「连接到本机」关着、码过期、码不对、已有设备在等都当场拒绝，页面照原话说。
-4. 主人在本机看到「谁在等」（`LanPairing.asking`），点「让它进来」或「不让」（`lan.answerPairing`）。让进：新建设备行、发钥匙，回 `LanPaired`（设备 id、钥匙、电脑名）；不让、2 分钟没答：拒绝，码作废。
+4. 主人在本机看到「谁在等」（`LanPairing.asking`），点「让它进来」或「不让」（`lan.pairing.answer`）。让进：新建设备行、发钥匙，回 `LanPaired`（设备 id、钥匙、电脑名）；不让、2 分钟没答：拒绝，码作废。
 5. 页面把钥匙写进 cookie（`SameSite=Strict`，十年），回到 `/`；之后的状态流和接口都带着它。手机的壳走同一个 `lan.pair`，钥匙存在系统钥匙串，打开 WebView 时写成同一个 cookie（[客户端](docs/subsystems/app.md)「手机壳」）。
 
 电脑换了地址，设备就连不上：主人在「连接到本机」里再添加一次设备，设备扫新码重新配对。服务端停了，用这个农场的设备也连不上。
 
 ## 和谁打交道
 
-- **主监听（`http/app.ts`）**：「连接到本机」放行的请求原样转给它，带上设备头；`lan.me` 从这个头读出是哪台设备。
+- **主监听（`http/app.ts`）**：「连接到本机」放行的请求原样转给它，带上设备头；`lan.me.get` 从这个头读出是哪台设备。
 - **`packages/protocol`**：`endpoints` 的 `can` 是放行表的唯一来源，同时写出能力表的「连接到本机」一列；`lanKeyCookie` 是页面和监听共用的 cookie 名。
 - **`base`**：`lan.port` 从配置来；配对码用 `code`，设备 id 用 `newId`。
 - **页面**：没配对的远端浏览器去 `/pair`；同源的 `fetch` 自动带上 cookie，页面别处不用知道自己是不是连进来的（[客户端](docs/subsystems/app.md)）。

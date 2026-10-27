@@ -327,7 +327,7 @@ export function IssueDetail(props: {
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, body: { deliver: v as Deliverable } }));
+              void act(() => api.issue.update({ id, deliver: v as Deliverable }));
             }}
             options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
           />
@@ -339,7 +339,7 @@ export function IssueDetail(props: {
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
-              void act(() => api.issue.update({ id, body: { review: v as Review } }));
+              void act(() => api.issue.update({ id, review: v as Review }));
             }}
             options={[
               { value: "glance", label: issuesWording().detail.glance },
@@ -553,7 +553,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const go = async (a: IssueAct) => {
     const id = props.issue.id;
     setBusy(true);
-    await run(() => api.issue.act({ id, body: { act: a } }));
+    await run(() => api.issue.act({ id, act: a }));
     setBusy(false);
   };
   return (

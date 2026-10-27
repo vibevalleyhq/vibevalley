@@ -5,7 +5,7 @@
 import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
-import type { Next } from "@vibevalley/protocol/api";
+import { commandOf, type Next } from "@vibevalley/protocol/api";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -75,14 +75,14 @@ export function nextSteps(t: Issue): Next[] {
   const acts = t.attention.acts.map((act): Next => {
     const label = wording().act[act];
     return wordy.has(act)
-      ? { say: issueWording().move.actWithText(label, n, act) }
-      : { say: label, run: ["issue", "act", n, "--json", JSON.stringify({ act })] };
+      ? { say: issueWording().move.actWithText(label, commandOf("issue.act", [n]).join(" "), act) }
+      : { say: label, run: commandOf("issue.act", [n], { act }) };
   });
   const moves = statusMoves(t).map((to): Next => {
     const say = issueWording().move.moveTo(wording().status[to]);
     return statusMove(t, to)[0] === "round"
-      ? { say: issueWording().move.roundWithText(say, n, to) }
-      : { say, run: ["issue", "status", n, "--json", JSON.stringify({ status: to })] };
+      ? { say: issueWording().move.roundWithText(say, commandOf("issue.status.update", [n]).join(" "), to) }
+      : { say, run: commandOf("issue.status.update", [n], { status: to }) };
   });
   return [...acts, ...moves];
 }

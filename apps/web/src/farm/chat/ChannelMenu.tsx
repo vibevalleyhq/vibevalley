@@ -1,10 +1,11 @@
-// The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, a
-// new channel, the current one's settings, and the way to its full page (its recurrences are there).
+// The channel switcher in the farm chat window's head: the channels with what they are for and their unread lines, the
+// owner's direct channels, a new channel, the current one's settings, and the way to its full page (its recurrences are there).
 
+import { farmChannelLabel } from "./text";
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { Channel } from "@vibevalley/protocol";
-import { createChannelForm, channelLabel, topsOf, chatPath, unreadUnder } from "../../features/channel";
+import { createChannelForm, directsOf, topsOf, chatPath, unreadUnder } from "../../features/channel";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import { aria, useClickAway } from "../../base/util";
@@ -23,16 +24,14 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
   const [mode, setMode] = createSignal<Mode>("list");
   const box = useClickAway(open, () => setOpen(false));
   const channels = () => topsOf(chat());
-  const elsewhere = () =>
-    channels()
-      .filter((c) => c.id !== props.current?.id)
-      .reduce((n, c) => n + unreadUnder(chat(), c), 0);
+  const directs = () => directsOf(chat());
+  const elsewhere = () => [...channels(), ...directs()].filter((c) => c.id !== props.current?.id).reduce((n, c) => n + unreadUnder(chat(), c), 0);
   const close = () => setOpen(false);
   return (
     <div ref={box} class="relative min-w-0">
       <button
         type="button"
-        aria-label={farmWording().chat.channel(channelLabel(props.current))}
+        aria-label={farmWording().chat.channel(farmChannelLabel(props.current))}
         aria-expanded={aria(open())}
         onClick={() => {
           if (!open()) playSound("open");
@@ -41,7 +40,7 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         }}
         class="flex max-w-full cursor-pointer items-center gap-1.5 px-1 hover:bg-cream-200"
       >
-        <span class="truncate text-[13px]">{channelLabel(props.current)}</span>
+        <span class="truncate text-[13px]">{farmChannelLabel(props.current)}</span>
         <Show when={elsewhere() > 0}>
           <span class="text-[12px] text-berry">{elsewhere()}</span>
         </Show>
@@ -52,36 +51,11 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
           <Switch>
             <Match when={mode() === "list"}>
               <div class="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
-                <For each={channels()}>
-                  {(c) => {
-                    const unread = () => unreadUnder(chat(), c);
-                    const line = () => [c.description, c.project ? farmWording().chat.projectTag(c.project) : undefined].filter(Boolean).join(" · ");
-                    return (
-                      <button
-                        type="button"
-                        aria-current={c.id === props.current?.id ? "true" : undefined}
-                        onClick={() => {
-                          close();
-                          farm.showChat(c.type === "general" ? null : c.id);
-                        }}
-                        class={[
-                          "flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left",
-                          c.id === props.current?.id ? "bg-leaf-300/50" : "hover:bg-cream-200",
-                        ]}
-                      >
-                        <span class="min-w-0 flex-1">
-                          <span class="block truncate text-[13px]">{channelLabel(c)}</span>
-                          <Show when={line()}>
-                            <span class="block truncate text-[12px] text-bark-500">{line()}</span>
-                          </Show>
-                        </span>
-                        <Show when={unread() > 0}>
-                          <span class="bg-berry px-1.5 text-[12px] text-cream-50">{unread()}</span>
-                        </Show>
-                      </button>
-                    );
-                  }}
-                </For>
+                <For each={channels()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
+                <Show when={directs().length > 0}>
+                  <p class="px-2 pt-1.5 text-[12px] text-bark-500">{farmWording().chat.directs}</p>
+                  <For each={directs()}>{(c) => <ChannelItem channel={c} current={props.current} onPick={close} />}</For>
+                </Show>
               </div>
               <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-cream-200 pt-1.5 text-[12px] text-leaf-700">
                 <button type="button" onClick={() => setMode("create")} class="flex cursor-pointer items-center gap-1 hover:underline">
@@ -110,6 +84,35 @@ export function ChannelMenu(props: { current: Channel | undefined }) {
         </div>
       </Show>
     </div>
+  );
+}
+
+function ChannelItem(props: { channel: Channel; current: Channel | undefined; onPick: () => void }) {
+  const core = useCore();
+  const c = () => props.channel;
+  const unread = () => unreadUnder(core()?.chat, c());
+  const line = () => [c().description, c().project ? farmWording().chat.projectTag(c().project!) : undefined].filter(Boolean).join(" · ");
+  const here = () => c().id === props.current?.id;
+  return (
+    <button
+      type="button"
+      aria-current={here() ? "true" : undefined}
+      onClick={() => {
+        props.onPick();
+        farm.showChat(c().default ? null : c().id);
+      }}
+      class={["flex cursor-pointer items-start gap-2 px-2 py-1.5 text-left", here() ? "bg-leaf-300/50" : "hover:bg-cream-200"]}
+    >
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-[13px]">{farmChannelLabel(c())}</span>
+        <Show when={line()}>
+          <span class="block truncate text-[12px] text-bark-500">{line()}</span>
+        </Show>
+      </span>
+      <Show when={unread() > 0}>
+        <span class="bg-berry px-1.5 text-[12px] text-cream-50">{unread()}</span>
+      </Show>
+    </button>
   );
 }
 
@@ -173,7 +176,7 @@ function ChannelSettings(props: { channel: Channel; onDone: () => void; onBack: 
   };
   return (
     <div class="flex flex-col gap-1.5">
-      <p class="text-[13px]">{farmWording().chat.settingsOf(channelLabel(props.channel))}</p>
+      <p class="text-[13px]">{farmWording().chat.settingsOf(farmChannelLabel(props.channel))}</p>
       <PxTextInput value={form.description()} onChange={form.setDescription} placeholder={farmWording().chat.what} label={farmWording().chat.description} />
       <PxTextInput
         value={form.project()}

@@ -25,7 +25,7 @@ const zh = {
     redraft: (id: string, name: string) => `这张工单交给 @${id}（${name}）再起草一版`,
     handedOn: (id: string, name: string, nth: number) => `这张工单交给 @${id}（${name}）接着做，第 ${nth} 次派活`,
   },
-  badTarget: (target: string) => `不认识这个地方：${target}（写 #<频道>，比如 #田头；或 #<频道>:<消息号>）`,
+  badTarget: (target: string) => `不认识这个地方：${target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）`,
   noChannelNamed: (name: string, tags: readonly string[]) => `没有叫 #${name} 的频道。有：${tags.join("、")}`,
   noMessage: (n: number) => `频道里没有 ${n} 这条消息`,
   empty: "没说什么",
@@ -34,6 +34,8 @@ const zh = {
   absent: (who: readonly string[]) => who.join("、") + " 不在场，没送到",
   noHelper: (id: string) => `没有 ${id} 这个帮工`,
   noChannel: (id: string) => `没有 ${id} 这个频道`,
+  defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
+  noDirect: (target: string) => `${target}：你和对方之间没有私聊`,
 };
 
 const en: typeof zh = {
@@ -55,7 +57,7 @@ const en: typeof zh = {
     redraft: (id, name) => `This ticket goes to @${id} (${name}) for another draft`,
     handedOn: (id, name, nth) => `This ticket goes to @${id} (${name}) to carry on, sent for the ${ordinal(nth)} time`,
   },
-  badTarget: (target) => `Unknown place: ${target} (write #<channel>, such as #田头, or #<channel>:<message number>)`,
+  badTarget: (target) => `Unknown place: ${target} (write #<channel>, such as #general, or #<channel>:<message number>)`,
   noChannelNamed: (name, tags) => `There is no channel #${name}. There are: ${tags.join(", ")}`,
   noMessage: (n) => `The channel has no message ${n}`,
   empty: "Nothing was said",
@@ -64,6 +66,8 @@ const en: typeof zh = {
   absent: (who) => who.join(", ") + (who.length === 1 ? " is" : " are") + " not here; not delivered",
   noHelper: (id) => `There is no helper ${id}`,
   noChannel: (id) => `There is no channel ${id}`,
+  defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
+  noDirect: (target) => `${target}: there is no direct channel between you`,
 };
 
 function ordinal(n: number): string {

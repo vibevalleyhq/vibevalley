@@ -41,7 +41,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   const send = (a: IssueAct, words = "") => {
     const own = ways.own?.[a];
     const id = issue().id;
-    return act(() => (own ? own(words) : api.issue.act({ id, body: { act: a, ...(words ? { text: words, sendKey: newSendKey() } : {}) } })));
+    return act(() => (own ? own(words) : api.issue.act({ id, act: a, ...(words ? { text: words, sendKey: newSendKey() } : {}) })));
   };
 
   /** The box's words as the act's; nothing said, nothing sent. The box empties and closes once it went through. */
@@ -59,7 +59,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     const id = issue().id;
     const words = text().trim();
     void act(async () => {
-      const got = await api.issue.act({ id, body: { act: "reopen", ...(words ? { text: words } : {}) } });
+      const got = await api.issue.act({ id, act: "reopen", ...(words ? { text: words } : {}) });
       const helper = got.sessions.at(-1);
       if (helper) {
         setText("");

@@ -249,9 +249,9 @@ interface Call {
   readonly client: AgoraClient;
   readonly session: CallSession;
   readonly release: () => void;
-  /** Agora's model answers, so its words reach 田头 only through said; the orchestrator's own reach it as it says them. */
+  /** Agora's model answers, so its words reach the default channel only through said; the orchestrator's own reach it as it says them. */
   readonly quick: boolean;
-  /** Said at every pickup; not worth keeping in 田头. */
+  /** Said at every pickup; not worth keeping in the chat. */
   readonly greeting: string;
   readonly life: AbortController;
   ending: boolean;

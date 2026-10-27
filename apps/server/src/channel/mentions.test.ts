@@ -30,12 +30,12 @@ it.live("an unresolved owner mention survives both history windows and restart u
       const chat = yield* Channels;
       const core = yield* Core;
       const parent = (yield* chat.say("需要确认的话题", undefined, "")).message;
-      const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", { target: `#田头:${parent.number}`, anyway: true })).message!;
+      const written = (yield* chat.speak("orchestrator", "@主人 请确认这份变更", { target: `#general:${parent.number}`, anyway: true })).message!;
       ({ channel: thread, id: message, at, number } = written);
       expect(mentionIds(core)).toEqual([message]);
       for (let i = 0; i < 101; i++) {
         const other = (yield* chat.say(`其他话题 ${i}`, undefined, "")).message;
-        const fresh = (yield* chat.speak("orchestrator", "其他答复", { target: `#田头:${other.number}`, anyway: true })).message!.channel;
+        const fresh = (yield* chat.speak("orchestrator", "其他答复", { target: `#general:${other.number}`, anyway: true })).message!.channel;
         yield* chat.notice(fresh, "动静一", "history");
         yield* chat.notice(fresh, "动静二", "history");
       }
@@ -59,7 +59,7 @@ it.live("only reading or replying in the mentioned channel completes an owner me
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
     const first = (yield* chat.speak("orchestrator", "@主人 第一份变更", { target: "#review", anyway: true })).message!;
-    yield* chat.say("田头的另一件事", undefined, "");
+    yield* chat.say("默认频道的另一件事", undefined, "");
     expect(mentionIds(core)).toEqual([first.id]);
     yield* chat.say("确认了", channel.id, "");
     expect(mentionIds(core)).toEqual([]);

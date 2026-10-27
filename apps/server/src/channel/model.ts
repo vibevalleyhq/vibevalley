@@ -43,19 +43,18 @@ export class ChatModel {
     return this.threadBySubject.get(subjectKey(kind, id));
   }
 
-  /** A channel, 田头 among them, by its name. */
   channelByName(name: string): ChannelRow | undefined {
-    for (const c of this.byId.values()) if (c.name === name && c.type !== "thread") return c;
+    for (const c of this.byId.values()) if (c.name === name && c.type === "channel") return c;
     return undefined;
   }
 
-  /** 田头 first, then the channels as they were made. */
-  channels(): ChannelRow[] {
-    const all = [...this.byId.values()].filter((c) => c.type !== "thread");
-    return all.sort((a, b) => (a.type === "general" ? -1 : b.type === "general" ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  /** The channels of a type, the default first, then as they were made. */
+  channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
+    const all = [...this.byId.values()].filter((c) => c.type === type);
+    return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
-  /** CreateGeneral, CreateChannel, CreateThread. */
+  /** CreateChannel, CreateDirect, CreateThread. */
   created(row: ChannelRow) {
     this.byId.set(row.id, { ...row });
     if (row.root_id !== null) this.threadByRoot.set(row.root_id, row.id);
@@ -70,6 +69,14 @@ export class ChatModel {
   channelUpdated(id: string, description: string | null, project: string | null) {
     const c = this.byId.get(id);
     if (c && c.type !== "thread") this.byId.set(id, { ...c, description, project });
+  }
+
+  /** ClearDefault, MakeDefault. */
+  defaultMoved(from: string, to: string) {
+    const a = this.byId.get(from);
+    const b = this.byId.get(to);
+    if (a) this.byId.set(from, { ...a, is_default: false });
+    if (b) this.byId.set(to, { ...b, is_default: true });
   }
 
   /** TouchChannel. */

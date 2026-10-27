@@ -19,8 +19,8 @@
 - 规则在 `apps/server/src/game`：`view.ts` 等级（`xpToNext`、`levelForCommits`、`farmLevelOf`、`levelUps`）、地块（`plotOfSession`、`plotOf`、`viewOf`）、特效（`effectsOf`）、`viewOf` 里每个成就到了第几档、计数、下一档要多少；`play.ts` 帮工的 `SessionPlay`（地块号、最近 30 步动作、工具次数、最近的文件和命令）、空地（`freeStation`、`withStations`）、`station` 事实的折法（`stationed`）；`progress.ts` 成就的说法（`achievementsInWords`：每档叫什么、到了叫什么、给多少金币、能不能当称号）。成就单在 `apps/server/src/agent/seeds.json` 的 `achievements`（`seed.ts` 的 `achievements`），页面不另拿一份。
 - 核心状态里的游戏字段：`WorkspaceState.progress`、`commits`、`Session.play`；帧里的 `view`（地块、等级、每个成就的进度 `achievements`）和 `effects`。`progress` 只在账本里有，`state.json` 不存它。
 - 表：`game_ledger`（`id` 是 UUIDv7，`kind`、`at`、其余字段放进 `payload` 的 JSON），查询在 `db/queries/game_ledger.sql`。
-- 接口：`game.achievements`（成就的说法，页面的顺序）、`game.chooseTitle`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.say` 带的 `station`。
-- 页面：`apps/web/src/farm/panels/Achievements.tsx`（任务与成就页、奖章，读一次 `game.achievements` 的说法和帧里的进度）、`farm/panels/Panels.tsx`（仓库）、`farm/hud/FxLayer.tsx`（把特效画成飘字、横幅、提示上的奖章）、`farm/effects.ts`（页面自己放的特效）。
+- 接口：`game.achievement.list`（成就的说法，页面的顺序）、`game.title.set`（[capabilities.md](docs/reference/capabilities.md)）；点空地是 `channel.message.send` 带的 `station`。
+- 页面：`apps/web/src/farm/panels/Achievements.tsx`（任务与成就页、奖章，读一次 `game.achievement.list` 的说法和帧里的进度）、`farm/panels/Panels.tsx`（仓库）、`farm/hud/FxLayer.tsx`（把特效画成飘字、横幅、提示上的奖章）、`farm/effects.ts`（页面自己放的特效）。
 
 ## 模型和不变量
 
@@ -37,7 +37,7 @@
 
 | 类 | 成就（计数） | 怎么涨 | 档位 |
 |---|---|---|---|
-| 新手任务 | 开门、派活、带话、验收、说话、规划、点名（`s_open`、`s_hire`、`s_tell`、`s_review`、`s_voice`、`s_split`、`s_call`） | 开工（`call` 变成 `live`）、派出帮工、给帮工带话、看过收成清单再收获、语音接通、拆好一张计划、在田头 @ 一个帮工 | 一次 |
+| 新手任务 | 开门、派活、带话、验收、说话、规划、点名（`s_open`、`s_hire`、`s_tell`、`s_review`、`s_voice`、`s_split`、`s_call`） | 开工（`call` 变成 `live`）、派出帮工、给帮工带话、看过收成清单再收获、语音接通、拆好一张计划、在频道 @ 一个帮工 | 一次 |
 | 收成 | 开张大吉 → 小有收成 → 粮仓满了（`harvests`） | 每收进一件 | 1 / 20 / 100 |
 | | 一气呵成（`first_try`） | 收进的这件只跑了一轮（`Runs ≤ 1`），没被带过话、没失败过 | 1 / 10 / 50 |
 | | 五谷丰登（`big_graph`） | 收获的计划里合进去的件数最多的一张 | 3 / 5 / 10 |
@@ -59,41 +59,41 @@
 - **仓库是交付 `merged` 或 `pull_request` 的工单**，一张一格（整个计划也是一格），最近收的在前；不另存，页面从 `WorkspaceState.issues` 读。
 - **地块号**：`SessionPlay.station` 是 0–5（`maxRunning` 6），`-1` 是不在地里。新雇的帮工站第一块空着的地；已经有 `play` 的帮工再雇不换地；读回的 `state.json` 里没有地块的帮工由 `withStations` 补上。`station` 事实只挪到空着的地：帮工不在、已经在那块地、那块地有人、超出范围都不改状态。
 - **特效是纯函数** `EffectsOf(折之前的状态, 事实)`：`commits` 给 `levelUp`；`progress` 的 `news` 给 `reward`（金币、帮工、连胜）和每档一个 `achievement`（带着这一档的说法：叫什么、到了叫什么、成就的介绍、金币、是不是一次性的）；一个已知帮工的 `report` 是 `failed` 给 `penalty`。
-- **成就的说法**（`achievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，页面读一次 `game.achievements`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。
+- **成就的说法**（`achievementsInWords`）：每档的称号是 `tierTitles` 里的，没有就是成就名，第二、三档前面加「银牌」「金牌」；到了一档叫「新手任务做完了」（新手任务）、「发现一个彩蛋」（彩蛋）、「升到金牌」「升到银牌」「解锁成就」；新手任务以外的都能当称号（`wearable`）。说法不进帧，页面读一次 `game.achievement.list`；每帧的 `view.achievements` 只有进度（成就、档、计数、下一档要多少，全到了就没有下一档），和说法一样按页面的顺序。
 
 ## 怎么走
 
 **记账**（`ledger.OnStart`）：
 
 1. 订阅 `core.Transitions()`，先对当时的状态跑 `catchUp`。
-2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；田头的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
+2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；频道的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
 3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.owner`（返回前就订上：开机后主人马上做的也不漏）记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
 4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `progress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
 
 **数 commit**（`commits`）：开机就绪后数一次，之后每 2 分钟一次；每个 `report` 事实（一轮结束）后 15 秒再数一次，几轮共用一次。数和写回由 `counting` 锁成一次一个，旧的数不会盖掉新的；停机以后数完的不写。结果经 `Core.setCommits` 施加 `commits` 事实。
 
-**点空地**（`game.ts`）：主人点一块空地再说话，`channel.say` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `hired` 站到第一块空地，`game` 听到 `hired` 再施加 `station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
+**点空地**（`game.ts`）：主人点一块空地再说话，`channel.message.send` 带上这块地的 `station`，`Game.want` 记下这块地 10 秒。这期间雇的第一个帮工先由 `hired` 站到第一块空地，`game` 听到 `hired` 再施加 `station` 把它挪过去；地已有人就不挪。记下的地用一次就清掉，不管挪没挪成。两个事实相隔不到 200 毫秒，通常在同一帧里。
 
 ## 和谁打交道
 
 - **核心状态（`core`）**：游戏只经 `core.Facts()`、`core.Transitions()`、`core.owner` 听，经 `Core.apply` 施加 `progress`、`station`、`commits`。
 - **项目（`project`）**：`commits` 调 `project.Contributions`，带上配置的 `git_emails`。
 - **工单（`issue`）、语音（`voice`）**：只经 `core.Did` 说主人做了什么，不 import `game`。
-- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievements`、`game.chooseTitle`、`channel.say` 的 `station`。
-- **页面**：读 `game.achievements`、`progress`、`view`、`effects`，不折、不另存，也不照成就单算档和进度；调试台只能放一遍横幅和提示（说法取自 `game.achievements`），改不了金币、等级和成就。
+- **HTTP（`handler`）**：只为游戏自己的事调 `Game`：`game.achievement.list`、`game.title.set`、`channel.message.send` 的 `station`。
+- **页面**：读 `game.achievement.list`、`progress`、`view`、`effects`，不折、不另存，也不照成就单算档和进度；调试台只能放一遍横幅和提示（说法取自 `game.achievement.list`），改不了金币、等级和成就。
 
 ## 为什么这样
 
 - **奖结果，不奖消耗。** 按命令数、读写次数、token 给奖等于奖励多花钱，和「管住花费」相反；按「一轮做完」给，活最后有没有收进主分支都一样。经验同理：按完成的工单算奖的是忙，失败重试也能刷。
 - **一本账本，在服务端，折出结果。** 在页面里算，页面关着时的事漏掉，几个客户端各算一份互相覆盖。直接存计数最简单，但规则一改旧数就对不上，也说不清某一档是哪天、因为哪件活拿到的；账本按顺序折，结果总能重算，还带着每档的日期。
-- **哪些事实记账是一个纯函数 `entriesFor`，游戏只听事实。** 写在各个业务里记，业务就认识了游戏；收获、带话、点名、交接都从帮工离开和田头消息的事实里读出来。只有主人做的、不改状态的事从 `core.Did` 来，经手的服务说一声，不管从哪个入口进来都记得到。
+- **哪些事实记账是一个纯函数 `entriesFor`，游戏只听事实。** 写在各个业务里记，业务就认识了游戏；收获、带话、点名、交接都从帮工离开和频道消息的事实里读出来。只有主人做的、不改状态的事从 `core.Did` 来，经手的服务说一声，不管从哪个入口进来都记得到。
 - **服务收在 `game` 一个包。** 名字只叫 `ledger` 时，它装的其实是全部游戏；`game` 也是主人和概念里的词。地块、特效这类拼帧要用的规则放在 `game` 自己的文件里，折法和拼帧那层（`projection`）import 它们；账本的折法只有 `game` 读，所以在 `game/progress.ts`。
 - **核心状态不替游戏做决定。** 主人点的地要经过管家（模型）才雇到帮工，中间隔着一句话和 10 秒；把地块一路带过管家和派活（`hired` 带地块），业务就认识了游戏。所以 `game` 听到 `hired` 再施加 `station`，代价是分在两帧时页面上帮工挪一下。
 - **特效在 `Core.apply` 里算，不搬进 `game`。** `effectsOf` 要折之前的状态：`game` 要么自己存一份，违反核心状态只有一份；要么等事件发出再算，特效晚一帧。`Core` 只跑一个纯函数，不做游戏的决定。
 - **经验只算工作目录里你名下的 commit。** 算这台机器上所有仓库会把和 VibeValley 无关的工作算进来，算所有作者会把别人的提交算成你的；代价是要定期扫目录、跑 git。
 - **仓库装收获了的工单，不装每一轮的汇报。** 汇报在看板、干活过程、工单串里都有；收获需要一个看得见的去处，看板的「已关」里还有没收就收工的。读工单，不另存。
 - **称号不挂新手任务**：「开门」「派活」挂在农场卡上没有意思。奖章是框加图案叠起来，不为每档画一张（21 个成就 × 3 档）。
-- **成就的说法和进度由服务端给，页面不照成就单算。** 说法（约 5KB）每帧都带太浪费，帧每个事实都出，所以拆成两半：说法是一次性的接口 `game.achievements`，进度（约 1KB）跟着 `view` 每帧走，特效自己带着说法，通知和提示不用等接口。页面不照成就单算档和进度：「连接到本机」的设备和那台电脑的服务端版本不一样时，门槛会和服务端的账本对不上。
+- **成就的说法和进度由服务端给，页面不照成就单算。** 说法（约 5KB）每帧都带太浪费，帧每个事实都出，所以拆成两半：说法是一次性的接口 `game.achievement.list`，进度（约 1KB）跟着 `view` 每帧走，特效自己带着说法，通知和提示不用等接口。页面不照成就单算档和进度：「连接到本机」的设备和那台电脑的服务端版本不一样时，门槛会和服务端的账本对不上。
 
 ## 还没做的
 

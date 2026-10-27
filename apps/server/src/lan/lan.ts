@@ -16,7 +16,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { eventsPath, type LanDevice, lanKeyCookie, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
-import { type ApiError, endpoints } from "@vibevalley/protocol/api";
+import { type ApiError, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Clock, Context, Effect, FiberSet, Layer, Option, Semaphore } from "effect";
 import { Settings } from "../base/config.ts";
@@ -110,13 +110,13 @@ const keyOf = (req: IncomingMessage) => {
 /** Never handed on: the device's key stays at the listener, and only the listener says which device asks. */
 const dropped = new Set(["host", "connection", "cookie", "authorization", deviceHeader]);
 
-/** The endpoints a device may call, and the three streams; a request no pattern matches is refused. */
-const remote = [
-  ...endpoints.filter((e) => e.can.includes("remote")).map((e) => ({ method: e.method, path: e.path })),
-  ...[statePath, eventsPath, livePath].map((path) => ({ method: "GET", path })),
-].map((r) => ({ method: r.method, pattern: new RegExp("^" + r.path.replace(/\{\w+\}/g, "[^/]+") + "$") }));
+/** The endpoints a device may call, and the three streams; any other request is refused. */
+const remote = new Set([
+  ...endpoints.filter((e) => e.can.includes("remote")).map((e) => "POST " + pathOf(e.op)),
+  ...[statePath, eventsPath, livePath].map((path) => "GET " + path),
+]);
 
-export const remoteMay = (method: string, path: string) => remote.some((r) => r.method === method && r.pattern.test(path));
+export const remoteMay = (method: string, path: string) => remote.has(method + " " + path);
 
 export interface LanOptions {
   readonly address?: () => string;
@@ -225,7 +225,7 @@ export const make = (options: LanOptions = {}) =>
       res.on("close", () => done.abort());
       const go = async () => {
         if (!upstream) return refuseHttp(res, 503, lanWording().notUp);
-        if (req.method === "POST" && path === "/api/v1/lan/pair") return forward(req, res, "", done.signal);
+        if (req.method === "POST" && path === pathOf("lan.pair")) return forward(req, res, "", done.signal);
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return forward(req, res, "", done.signal);
           res.writeHead(404, { "content-type": "text/plain" });

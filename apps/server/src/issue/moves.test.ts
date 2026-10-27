@@ -138,12 +138,12 @@ describe("next steps after a refusal", () => {
     expect(next.filter((n) => n.run).map((n) => n.run)).toEqual([
       ["issue", "act", "41", "--json", '{"act":"complete"}'],
       ["issue", "act", "41", "--json", '{"act":"close"}'],
-      ["issue", "status", "41", "--json", '{"status":"done"}'],
-      ["issue", "status", "41", "--json", '{"status":"canceled"}'],
+      ["issue", "status", "update", "41", "--json", '{"status":"done"}'],
+      ["issue", "status", "update", "41", "--json", '{"status":"canceled"}'],
     ]);
     expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
       "带话：issue act 41，--json 带 act「tell」和要说的 text",
-      "挪到待办：issue status 41，--json 带 status「todo」和这一轮要它做什么的 text",
+      "挪到待办：issue status update 41，--json 带 status「todo」和这一轮要它做什么的 text",
     ]);
   });
 });

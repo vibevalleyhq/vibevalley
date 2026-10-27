@@ -1,11 +1,13 @@
+import { pathOf } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
 
 test("insert accepts only the new block's content and position", async ({ api, request }) => {
-  const doc = await api.doc.create({ body: { title: "最小插入命令" } });
+  const doc = await api.doc.create({ title: "最小插入命令" });
   const id = crypto.randomUUID();
   const before = Date.now();
-  const response = await request.post(`/api/v1/docs/${doc.doc.id}/submit`, {
+  const response = await request.post(pathOf("doc.submit"), {
     data: {
+      id: doc.doc.id,
       batchId: crypto.randomUUID(),
       lastSeq: 0,
       ops: [{ op: "insert_block", block: { id, orderKey: "V", type: "paragraph", attrs: {}, text: [{ t: "你好世界", marks: {} }] } }],
@@ -20,12 +22,13 @@ test("insert accepts only the new block's content and position", async ({ api, r
 });
 
 test("split accepts a new block without fabricated server metadata", async ({ api, request }) => {
-  const doc = await api.doc.import({ body: { title: "最小拆分命令", markdown: "你好世界" } });
+  const doc = await api.doc.import({ title: "最小拆分命令", markdown: "你好世界" });
   const source = doc.blocks[0]!;
   const id = crypto.randomUUID();
   const before = Date.now();
-  const response = await request.post(`/api/v1/docs/${doc.doc.id}/submit`, {
+  const response = await request.post(pathOf("doc.submit"), {
     data: {
+      id: doc.doc.id,
       batchId: crypto.randomUUID(),
       lastSeq: doc.doc.seq,
       ops: [{ op: "split_block", blockId: source.id, baseRev: source.rev, offset: 2, newBlock: { id, orderKey: "W", type: "paragraph", attrs: {}, text: [] } }],

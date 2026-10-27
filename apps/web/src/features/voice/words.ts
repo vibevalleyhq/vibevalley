@@ -12,7 +12,7 @@ const zh = {
     saving: "在存…",
     answer: {
       orchestrator:
-        "田头上那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
+        "群聊里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
       agora: "声网托管的模型，不用别的 key。",
       deepseek: (from: string) => `用设置里的 DeepSeek key（${from}）。`,
       noDeepseek: "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
@@ -56,7 +56,7 @@ const zh = {
     dictation: "听写",
     speechServer: "本机的 speech-server →",
     dictationIntro:
-      "田头输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；填本机的 speech-server，声音就不出这台电脑。",
+      "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；填本机的 speech-server，声音就不出这台电脑。",
     dictationAddress: "到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。",
     dictationAddressLabel: "听写的地址",
     dictationModel: "本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。",
@@ -68,7 +68,7 @@ const zh = {
       page: "页。",
       open: "开口",
       openParts: "人设 · 开场白",
-      ownCall: "电话由管家自己接：它就是田头里那个管家，用它自己的提示词，不另设人设。",
+      ownCall: "电话由管家自己接：它就是群聊里那个管家，用它自己的提示词，不另设人设。",
       persona: "人设",
       personaHint: "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。",
       greeting: "开场白",

@@ -6,7 +6,7 @@ Status: proposed
 
 主人想把 VibeValley 自己的活派给 VibeValley：工单派给帮工，帮工在 worktree 里改 heybro，验收过了合进 main。开始时这样做有几处会出事：
 
-- 拿来干活的农场和正在改的代码是同一份：源码里跑的服务端一重启、表结构一改，派出去的工单和田头就没了。
+- 拿来干活的农场和正在改的代码是同一份：源码里跑的服务端一重启、表结构一改，派出去的工单和频道就没了。
 - 表结构只有一个基线，直接改（[不留兼容](docs/subsystems/foundation.md)）。`user_version` 数的是文件，基线改了它还是 1：新版本的服务端打开旧库不报错，跑到某条查询才炸。
 - 合并在项目的检出里做，把检出当前的 HEAD 当主分支，不看工作区干不干净；合并前也不跑检查。
 - 三个渠道共用一个工作目录 `~/vibevalley-work`，两个农场的帮工会在同一份项目里干活。
@@ -23,10 +23,10 @@ Status: proposed
 ```bash
 vv project create --json '{"name":"vibevalley","github":"https://github.com/vibevalleyhq/vibevalley"}'
 vv issue create --json '{"title":"…","description":"要做什么、怎么算做完、跑哪些检查","project":"vibevalley","assignee":"codex"}'
-vv issue run <issue>                                            # 挪到待办，等它交回来，打出改动
-vv issue status <issue> --json '{"status":"todo","text":"…"}'   # 不满意：再干一轮
-vv issue accept <issue> --json '{"pass":true}'                  # 验收
-vv issue status <issue> --json '{"status":"done"}'              # 收获
+vv issue work <issue>                                            # 挪到待办，等它交回来，打出改动
+vv issue status update <issue> --json '{"status":"todo","text":"…"}'   # 不满意：再干一轮
+vv issue act <issue> --json '{"act":"accept"}'                  # 验收
+vv issue status update <issue> --json '{"status":"done"}'              # 收获
 ```
 
 等一轮交回来不用新命令：轮询 `issue get`，先等 `in_progress` 再等 `in_review`（刚带话完会先读到上一轮的 `in_review`）。
@@ -53,14 +53,14 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 跑的时候学到的：
 
-- 农场的规矩写死「提交信息用一句中文」，压过了项目的约定，codex 把它当系统指令，主人在田头说也不改。规矩改成照项目的约定写，项目没说才用中文，主人另有说法的照主人。
+- 农场的规矩写死「提交信息用一句中文」，压过了项目的约定，codex 把它当系统指令，主人在频道说也不改。规矩改成照项目的约定写，项目没说才用中文，主人另有说法的照主人。
 - 规矩在帮工开工时进它的系统提示；接着干的帮工（包括农场重启以后）拿的还是开工时那一份，新规矩只对新开的帮工有用。
 - 并行的两个帮工各自过了检查，合在一起的 main 没人查：本地收获的检查要包含主分支的合并结果，走 PR 的靠 CI。
 - 新克隆的仓库要先 `flutter pub get` 才查得准格式（`app/tool/format-check.sh` 先装依赖）。
 
 ### 还没做的
 
-1. **库认得出自己的表结构**：服务端把 `0001_schema.sql` 的指纹记在库里（比如一张只有一行的 `core_schema` 表）。开机时指纹对不上，就把旧库挪成 `vibevalley.db.<旧指纹>`，按今天的表结构建一个新的，并在日志和田头说一声。现在每次改基线都要手动把开发农场的库挪开。
+1. **库认得出自己的表结构**：服务端把 `0001_schema.sql` 的指纹记在库里（比如一张只有一行的 `core_schema` 表）。开机时指纹对不上，就把旧库挪成 `vibevalley.db.<旧指纹>`，按今天的表结构建一个新的，并在日志和默认频道说一声。现在每次改基线都要手动把开发农场的库挪开。
 2. **打第一个 Beta 天天用**：Beta 的家目录要填一次帮工档案和语音凭据，`~/vibevalley-beta/projects/vibevalley` 要先克隆好；vibevalley 本身加进 `github.pr_projects` 以后，收获就是开 PR。
 3. **验证 skill**：把命令行这条路写成 `verify-feature-loop`，照 [create-verification-skill](.agents/skills/create-verification-skill/SKILL.md) 写成能反复跑的样子。
 
@@ -84,6 +84,6 @@ vv issue status <issue> --json '{"status":"done"}'              # 收获
 
 ## Risks
 
-- 换 Beta 会清空工单板和田头。要是嫌这一步太疼，再考虑给工单开一条导出的路，不在读库的地方兜底。
+- 换 Beta 会清空工单板和频道。要是嫌这一步太疼，再考虑给工单开一条导出的路，不在读库的地方兜底。
 - 主人自己在检出里直接提交到 main，会和 PR 合进来的冲突，要先推。
 - 真跑要花 codex 的钱，验证挑小活。

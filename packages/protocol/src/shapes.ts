@@ -17,10 +17,8 @@ export const ownerId = "owner";
 /** Who @所有人 is. */
 export const everyone = "everyone";
 
-/** The channel everyone is in. */
-// The general channel's stored name, which models and chat grammar also use; the owner reads wording().general.
-// oxlint-disable-next-line vibevalley/no-cjk-literal
-export const generalName = "田头";
+/** The first channel, made default when the farm has none; then a name like any other, stored and in its address. */
+export const firstChannelName = "general";
 
 /** Sessions working at once; also the beds on the farm. */
 export const maxRunning = 6;
@@ -32,6 +30,9 @@ export const dayMs = 86400000;
 
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;
+
+/** Every endpoint is a POST at its op, named as in api.ts. */
+export const pathOf = (op: string) => "/api/v1/" + op.replaceAll(".", "/");
 
 /** The three long-lived streams; the client asks for them by path. */
 export const statePath = "/api/v1/state";
@@ -236,17 +237,20 @@ export interface ChatMessage {
   at: number;
 }
 
-export const ChannelTypeValues = ["general", "channel", "thread"] as const;
+export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
 
 export const SubjectKindValues = ["issue", "graph", "talk"] as const;
 export type SubjectKind = (typeof SubjectKindValues)[number];
 
-/** Anywhere something is said: 田头 (general), a channel, or a thread under a message of one (as Discord's). */
 export interface Channel {
   id: string;
   type: ChannelType;
-  /** A thread's channel; absent for a thread in 田头. */
+  /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
+  default?: boolean;
+  /** A direct channel's other participant: the owner talks with it there alone. */
+  peer?: string;
+  /** A thread's channel. */
   parent?: string;
   /** The message a thread hangs under, and its number there. */
   root?: string;
@@ -1371,9 +1375,10 @@ export interface CommentRequest {
 }
 
 export interface SayRequest {
+  /** The channel it is said in. */
+  id: string;
   text: string;
   station?: number;
-  channel?: string;
   agent?: string;
   project?: string;
   sendKey?: string;

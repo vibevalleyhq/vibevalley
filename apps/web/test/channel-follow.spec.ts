@@ -6,7 +6,7 @@ import { expect, test } from "./fixtures";
 test.use({ farm: "channel-follow" });
 
 test("two pages on one channel each get a line said in it, once", async ({ page, context, api }) => {
-  const id = await api.channel.create({ body: { name: "两边" } });
+  const id = await api.channel.create({ name: "两边" });
   const other = await context.newPage();
   await Promise.all([page.goto(`/chat/${id}`), other.goto(`/chat/${id}`)]);
   for (const p of [page, other]) await expect(p.getByText("#两边 里还没人说话")).toBeVisible();
@@ -22,6 +22,6 @@ test("two pages on one channel each get a line said in it, once", async ({ page,
   }
 
   // Said from elsewhere (the command line, a chat app), it reaches both too.
-  await api.channel.say({ body: { text: "从别处说一句", channel: id } });
+  await api.channel.message.send({ id, text: "从别处说一句" });
   for (const p of [page, other]) await expect(p.getByRole("log", { name: "消息" }).getByText("从别处说一句")).toHaveCount(1);
 });

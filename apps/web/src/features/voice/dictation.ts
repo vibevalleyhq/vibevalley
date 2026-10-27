@@ -149,7 +149,7 @@ export class Dictation {
         at += c.length;
       }
       if (all.length === 0) throw new Error(voiceWording().dictation.nothing);
-      const said = await api.voice.dictate({ body: { audio: base64Of(wavOf(all)), format: "wav" } });
+      const said = await api.voice.dictate({ audio: base64Of(wavOf(all)), format: "wav" });
       if (this.owner === owner && said.text) r.onWords(said.text);
       this.set("idle", null);
     } catch (e) {

@@ -22,10 +22,10 @@ const profile: Agent = {
 };
 
 async function finishedIssue(api: VibeValleyApi) {
-  const agent = await api.agent.create({ body: profile });
-  const project = await api.project.create({ body: { name: `log-${Date.now()}` } });
-  const issue = await api.issue.create({ body: { title: "先记下第一轮", project: project.name, assignee: agent.id } });
-  await api.issue.status({ id: issue.id, body: { status: "todo" } });
+  const agent = await api.agent.create(profile);
+  const project = await api.project.create({ name: `log-${Date.now()}` });
+  const issue = await api.issue.create({ title: "先记下第一轮", project: project.name, assignee: agent.id });
+  await api.issue.status.update({ id: issue.id, status: "todo" });
   await expect.poll(async () => (await api.issue.get({ id: issue.id })).attention.state).toBe("reviewing");
   const session = (await api.issue.get({ id: issue.id })).sessions.at(-1)!;
   return { agent, issue, session };
@@ -47,9 +47,9 @@ test("a reconnected trajectory catches the steps completed while its live stream
   await expect(page.getByRole("button", { name: "工单 先记下第一轮", exact: true })).toBeVisible();
   await expect.poll(() => connections).toBeGreaterThan(1);
 
-  await api.issue.comment({ id: issue.id, body: { text: "断线时写下第二轮" } });
+  await api.issue.comment.create({ id: issue.id, text: "断线时写下第二轮" });
   await expect
-    .poll(async () => (await api.session.events({ id: session })).some((e) => e.type === "assistant/message" && e.text.includes("断线时写下第二轮")))
+    .poll(async () => (await api.session.event.list({ id: session })).some((e) => e.type === "assistant/message" && e.text.includes("断线时写下第二轮")))
     .toBe(true);
   reconnect!();
   await expect(page.getByRole("button", { name: /带话 .*断线时写下第二轮/ })).toBeVisible({ timeout: 10_000 });

@@ -1,6 +1,6 @@
 // The chat in the core state.
 
-import { type Chat, type ChatMessage, type Channel, generalName, type OwnerMention } from "@vibevalley/protocol";
+import { type Chat, type ChatMessage, type Channel, type OwnerMention, ownerId } from "@vibevalley/protocol";
 import { compareText } from "../base/text.ts";
 
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
@@ -22,7 +22,7 @@ export function withMessage(chat: Chat | undefined, m: ChatMessage): [Chat | und
   return [{ ...chat, channels: chat.channels.map((x) => (x === c ? { ...c, lastNumber: m.number } : x)) }, true];
 }
 
-/** Beyond keepChannels the quietest threads go; 田头 and the channels always stay. */
+/** Beyond keepChannels the quietest threads go; the channels always stay. */
 export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   const base = chat ?? emptyChat();
   let all = (base.channels ?? []).filter((x) => x.id !== c.id);
@@ -36,23 +36,24 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   return { ...base, channels: all };
 }
 
-/** A channel is #<name> (#田头), a thread #<its channel>:<the number of the message it hangs under>. channelName undefined: the general channel. */
-export function targetOf(c: Channel, channelName: string | undefined): string {
-  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + (channelName ?? generalName) + ":" + c.rootNumber;
-  if (c.name !== undefined) return "#" + c.name;
-  return "#" + generalName;
+/** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>, and a
+ * direct channel @owner: only its peer reads an address, and the one there with it is the owner. */
+export function targetOf(c: Channel, channelName: string): string {
+  if (c.type === "direct") return "@" + ownerId;
+  if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
+  return "#" + (c.name ?? channelName);
 }
 
-export const generalOf = (chat: Chat | undefined) => chat?.channels?.find((c) => c.type === "general");
+export const defaultOf = (chat: Chat | undefined) => chat?.channels?.find((c) => c.default);
 
 export const channelOf = (chat: Chat | undefined, id: string) => chat?.channels?.find((c) => c.id === id);
 
 export function topOf(chat: Chat | undefined, c: Channel | undefined): Channel | undefined {
-  if (!c) return generalOf(chat);
+  if (!c) return defaultOf(chat);
   if (isTop(c)) return c;
-  return channelOf(chat, c.parent ?? "") ?? generalOf(chat);
+  return channelOf(chat, c.parent ?? "") ?? defaultOf(chat);
 }
 
-export const addressOf = (chat: Chat | undefined, c: Channel) => targetOf(c, topOf(chat, c)?.name);
+export const addressOf = (chat: Chat | undefined, c: Channel) => targetOf(c, topOf(chat, c)?.name ?? "");
 
 export const noticeBatchMs = 3_000;

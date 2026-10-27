@@ -84,11 +84,11 @@ export interface OrchestratorShape {
   readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
-  /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in 田头
+  /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
    * as always; the whole answer comes back to be read out. Aborting ends only this wait, not the shared run. */
   readonly brief: (line: string, signal?: AbortSignal) => Promise<string>;
-  /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in 田头.
-   * On the phone (the voice line) the words are said in 田头 too, and the answer is one to be read out. */
+  /** The orchestrator as orchestratorModel on a chat/completions endpoint: what is asked there is the owner's, as in the chat.
+   * On the phone (the voice line) the words are said in the default channel too, and the answer is one to be read out. */
   readonly answerer: (on: "phone" | "api") => (model: string) => Answer | undefined;
   /** The lines waiting for the orchestrator are dropped with the run; the sessions it sent keep working. */
   readonly stop: () => Effect.Effect<void>;
@@ -127,7 +127,6 @@ export const make = (options: OrchestratorOptions = {}) =>
     const service = yield* Llm;
     const forkHere = yield* FiberSet.makeRuntime<never>();
     const notice = (level: "info" | "warn" | "error", text: string) => void forkHere(core.notice(level, text));
-    const general = chat.general();
     const home = orchestratorHome(config.home);
 
     const selected = new Map<string, Pick>();
@@ -168,7 +167,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       llm: llmOf,
       tools: toolsFor,
       wakeSoon,
-      first: { channel: general, source: "owner" },
+      first: { channel: chat.defaultChannel(), source: "owner" },
       quiet: (r) => r.quiet ?? false,
       say: (r, text, runId) => go(chat.orchestratorSays(r.channel, text, runId)),
       // The chat shows where it thinks or writes; what it answers off the chat (the local chat/completions) shows nowhere.
@@ -204,9 +203,9 @@ export const make = (options: OrchestratorOptions = {}) =>
     const situation = async (channel: string) => {
       const sessions = await agentLines();
       const roster = run.roster();
-      const here = await go(chat.topOf(channel));
+      const here = await go(chat.addressOf(channel));
       const byChannel = (await go(chat.channels())).map((c) => {
-        const theirs = roster.filter((w) => (w.session.channel ?? general) === c.id).map((w) => tool.sessionLine(w));
+        const theirs = roster.filter((w) => (w.session.channel ?? chat.defaultChannel()) === c.id).map((w) => tool.sessionLine(w));
         const head = channelLine(c);
         return head + "\n" + (theirs.length > 0 ? theirs.join("\n") : situationWords.noHelpers);
       });
@@ -214,7 +213,15 @@ export const make = (options: OrchestratorOptions = {}) =>
       const folders = all.length > 0 ? situationWords.projects(all.map((p) => p.name)) : situationWords.noProjects;
       const open = tasks.graphs().filter(isOpen).map(graphText);
       const graphs = open.length > 0 ? situationWords.graphs(open) : "";
-      return situationWords.whole(projects.root, folders, sessions.join("\n"), byChannel.join("\n"), graphs, here.name, ownersLanguage());
+      return situationWords.whole(
+        projects.root,
+        folders,
+        sessions.join("\n"),
+        byChannel.join("\n"),
+        graphs,
+        here.direct ? situationWords.direct(here.target) : here.target,
+        ownersLanguage(),
+      );
     };
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while
@@ -300,7 +307,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         }
       }
       const line =
-        fromPerson && n.channel === general
+        fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
           ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
           : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
       await take({ source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
@@ -337,7 +344,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         },
         { once: true },
       );
-      void take({ source: "owner", line, channel: general, owner: true, caller: me });
+      void take({ source: "owner", line, channel: chat.defaultChannel(), owner: true, caller: me });
       return me.words(signal);
     };
 
@@ -360,7 +367,7 @@ export const make = (options: OrchestratorOptions = {}) =>
       yield* Effect.forkScoped(
         Stream.runForEach(
           yield* tasks.news,
-          handled("a task graph's line", (line: string) => take({ source: "graph", line, channel: general })),
+          handled("a task graph's line", (line: string) => take({ source: "graph", line, channel: chat.defaultChannel() })),
         ),
       );
       if (host.unfinished() && (options.llm || settings.deepseekApiKey())) void host.resume(resumeWithinMs);
@@ -391,7 +398,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         void take({
           source: "owner",
           line: pickedNote(picked ? { agent: picked } : {}) + lineWords.dictated + lineWords.owner(text),
-          channel: general,
+          channel: chat.defaultChannel(),
           ...(picked ? { agent: picked } : {}),
           owner: true,
         });
@@ -402,7 +409,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         const stop = () => me.end();
         signal?.addEventListener("abort", stop, { once: true });
         try {
-          if (!signal?.aborted) void take({ source: "issue", line, channel: general, caller: me });
+          if (!signal?.aborted) void take({ source: "issue", line, channel: chat.defaultChannel(), caller: me });
           let said = "";
           for await (const w of me.words(signal)) said += w;
           return said.trim();

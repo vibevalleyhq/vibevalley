@@ -20,7 +20,7 @@
 - 服务端 `apps/server/src/project`：`project.ts` 工作目录、新建和克隆、`Workplace`、改动（`Changes`）、冲突预检和 `.vibevalley/check`、合并和清理、`houseRules`、推送和 PR、快进主分支、GitHub 检测、地契、数 commit，对外的形状（`Workplace`、`Merged`、`MergeFailure`）；`repository.ts` 是一个仓库能回答的和能做的（主分支、分支在不在和指向哪、谁包含谁、领先几个提交、远端地址；提交剩下的改动、不检出就合并、试合并看冲突、描述一个分支、清掉 worktree 和分支），git 的拼法都在这里，拿这些答案做什么（合并的规矩、PR、项目检查、释放时留什么）在 `project.ts`；`git.ts` 跑 git 和别的命令；`stack.ts` 认项目的栈。
 - 配置（`Config`，[设置和配置](docs/subsystems/setting.md#模型和不变量)）：`work_root`、`project.max_sessions`、`project.check_timeout_seconds`、`github.pr_projects`、`tokei`、`git_emails`。
 - 没有表：项目就是磁盘上的文件夹，PR 的回执记在工单上（`Issue.pullRequest`）。
-- 接口：`project.list`、`project.check`、`project.create`、`project.languages`、`project.activity`、`github.status`、`github.refresh`；工单的改动是 `issue.changes`（[capabilities.md](docs/reference/capabilities.md)）。
+- 接口：`project.list`、`project.check`、`project.create`、`project.language.list`、`project.activity.get`、`github.get`、`github.refresh`；工单的改动是 `issue.diff.get`（[capabilities.md](docs/reference/capabilities.md)）。
 - 页面：项目页 `apps/web/src/features/project/ProjectsPage.tsx`（新建、地契、语言、开垦日历），地图 `ProjectMap.tsx`；规则在 `apps/web/src/features/project/rules.ts`。
 
 ## 模型和不变量
@@ -73,20 +73,20 @@
 3. 登录了就对每个项目读 `origin`（GitHub 的 HTTPS、`ssh://`、`git@github.com:` 地址），不是 GitHub 仓库就说不是；是就 `gh repo view <owner/repo> --json viewerPermission`，`ADMIN`、`MAINTAIN`、`WRITE` 算能提 PR，别的是「没有写权限」。
 4. 结果整份替换缓存；几次刷新排队，不让旧结果盖掉新的。
 
-`github.status` 读这份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
+`github.get` 读这份缓存：安装、版本、登录、账号、检测时间和中文原因，不含命令原文和 token；还没测过时是「尚未检测 GitHub」。`project.list` 不调 `gh`，每个项目的 `pullRequest` 读缓存，新建项目或改了远端以后要 `github refresh`（没测过这个项目时是「尚未检测项目，请刷新 GitHub 状态」）。
 
 **地契**（每次打开现算，不缓存）：
 
 - `project.list`（`summaries`）：每个项目的名字、路径、是不是 git 仓库、`maxSessions`、`pullRequest` 和最近一次提交（`git log --all -1`）；地图半分钟问一次。
-- `project.languages`：`tokei --output json`，排除锁文件、压缩文件、source map、依赖和构建目录（`leftOut`），限时 1 分钟；只有空行的语言和 `total` 不算，按代码加注释的行数排。`tokei` 配置能指定路径；没装就拒绝，说用 `brew install tokei` 或 `cargo install tokei`。
-- `project.activity`：最近 53 周、所有分支、不算合并的提交，按服务端那台机器的本地日期和作者名数；还有总提交数、第一个提交（所有根提交里最早的）和最近一个。
+- `project.language.list`：`tokei --output json`，排除锁文件、压缩文件、source map、依赖和构建目录（`leftOut`），限时 1 分钟；只有空行的语言和 `total` 不算，按代码加注释的行数排。`tokei` 配置能指定路径；没装就拒绝，说用 `brew install tokei` 或 `cargo install tokei`。
+- `project.activity.get`：最近 53 周、所有分支、不算合并的提交，按服务端那台机器的本地日期和作者名数；还有总提交数、第一个提交（所有根提交里最早的）和最近一个。
 
 **数 commit**（`contributions`）：在 `projects/` 下往下找最多 3 层的 git 仓库（跳过依赖和构建目录），同一个 `--git-common-dir` 只数一次，数所有分支上作者邮箱是你的提交：git 全局和这个仓库的 `user.email`，加上 `git_emails`，不分大小写。
 
 ## 和谁打交道
 
 - **帮工（`session`）**：开工取 worktree、离开调 `release`，规矩里附 `houseRules`；`noRoom` 用 `limit` 判一个项目还能不能再开工；合并经 `session` 的 `handOver`（先让帮工歇下，再由工单、计划给的合并方式调 `merge`、`mergeInto`、`submitPullRequest`、`finishPullRequest`），`conflict` 的失败由它施加 `conflict` 事实。
-- **工单（`issue`）**：决定什么时候合、走本地合还是 PR（`usesPullRequests`）；`issue.changes` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
+- **工单（`issue`）**：决定什么时候合、走本地合还是 PR（`usesPullRequests`）；`issue.diff.get` 调 `Changes`，用它刷新帮工的冲突；冲突预检 `Conflict`；重开时用 `branchChanges` 看分支上有没有上次的提交；PR 的轮询调 `PullRequestState`（[工单](docs/subsystems/issue.md)）。
 - **计划（`task`）**：`openBranch` 开计划分支、`changedFiles` 看一件改了哪些文件、`Run` 跑一件的检查、`mergeBranch` 把计划合进主分支、`branchChanges` 给计划的改动。
 - **游戏（`game`）**：`game/game.ts` 开机、每 2 分钟、帮工干完一轮 15 秒后各调一次 `contributions`，变了施加 `commits` 事实，经验由它折。
 - **管家（`orchestrator`、`tool`）**：现状和 `look` 工具列出 `list` 和 `root`。

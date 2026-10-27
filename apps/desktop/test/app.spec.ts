@@ -6,7 +6,7 @@ import { _electron as electron, expect, test } from "@playwright/test";
 import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { VibeValleyApi } from "@vibevalley/protocol";
+import { VibeValleyApi, pathOf } from "@vibevalley/protocol";
 import type { Notice } from "@vibevalley/protocol/host";
 
 // The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
@@ -34,7 +34,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await expect(page.getByRole("status")).toHaveText("已连上");
 
     const api = new VibeValleyApi(server);
-    await api.issue.create({ body: { title: "桌面版看到我了" } });
+    await api.issue.create({ title: "桌面版看到我了" });
     await expect(page.getByText("桌面版看到我了")).toBeVisible();
 
     const host = await page.evaluate(async () => {
@@ -58,7 +58,7 @@ test("the desktop app shows the live board and sends a notice", async () => {
     await app.close();
   }
   // Quitting stopped the server it started.
-  await expect(fetch(server + "/api/v1/health")).rejects.toThrow();
+  await expect(fetch(server + pathOf("server.health.get"), { method: "POST" })).rejects.toThrow();
 });
 
 test("the window opens on the bar at once, and says there why the server could not start", async () => {
@@ -109,11 +109,11 @@ test("the island follows the issues in flight and opens one", async () => {
     // Built on macOS by scripts/build.ts; elsewhere there is no helper.
     expect((await probe())?.helper).toBe(process.platform === "darwin");
 
-    const fox = await api.agent.create({ body: scripted });
-    const project = await api.project.create({ body: { name: "clock" } });
+    const fox = await api.agent.create(scripted);
+    const project = await api.project.create({ name: "clock" });
     // The scripted helper asks with options when its job says 先问清楚: the issue waits on the owner.
-    const made = await api.issue.create({ body: { title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id } });
-    await api.issue.status({ id: made.id, body: { status: "todo" } });
+    const made = await api.issue.create({ title: "打卡页先问清楚，给选项", project: project.name, assignee: fox.id });
+    await api.issue.status.update({ id: made.id, status: "todo" });
     await expect
       .poll(async () => (await probe())?.glance?.rows.map((r) => [r.issue, r.tone, r.doing]), { timeout: 20_000 })
       .toEqual([[made.id, "waiting", "等你回答"]]);

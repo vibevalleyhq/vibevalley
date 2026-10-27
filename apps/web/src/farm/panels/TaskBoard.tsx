@@ -572,7 +572,7 @@ function TaskLog(props: { graph: TaskGraph; only?: string; onAll: () => void }) 
   // Read when shown, and again whenever the graph changes: something happened.
   const events = useQuery(() => ({
     queryKey: ["graph-events", props.graph.id, JSON.stringify(props.graph)],
-    queryFn: () => api.graph.events({ id: props.graph.id }),
+    queryFn: () => api.graph.event.list({ id: props.graph.id }),
   }));
   const titleOf = (id: string) => taskOf(props.graph, id)?.title ?? id;
   const shown = () =>

@@ -59,7 +59,7 @@ Status: proposed
 |---|---|---|
 | `owner` | `steer` | `steer` |
 | `chat`（@ 它、它的工单串） | `queue` | `steer`（农机不能插话时 `queue`） |
-| `chat`（跟着的串、田头里没 @ 的） | `digest` | `digest` |
+| `chat`（跟着的串、频道里没 @ 的） | `digest` | `digest` |
 | `issue` | `queue` | `queue` |
 | `report` 没做成 | `queue` | — |
 | `report` 做完 | `digest` | — |
@@ -87,7 +87,7 @@ Status: proposed
 
 不搬的：
 
-- 「谁该听到」（`chatAudience`：@、工单串、跟着的串、田头）留在 `channel`：这是频道的规则。
+- 「谁该听到」（`chatAudience`：@、工单串、跟着的串、频道）留在 `channel`：这是频道的规则。
 - 同时干活的上限（工作区、农机、项目三层）留在 `session`：这是开工的规则。
 - 排队的工单找空地（`issue` 每 5 秒）留在 `issue`：那是派活，不是交话。
 - agent 自己的 Task 里帮手做完了交回结果，是 `apps/server/src/agent/brain` 自己一个进程里的事（[Task：一张按 DAG 推进的活](.agents/notes/proposed/architecture/2026-10-18-tasks-are-dags.md)），不经信箱；它和信箱共用一条规则：有帮手在跑时，新来的话不打断这一轮。
@@ -108,7 +108,7 @@ Status: proposed
 
 ## Alternatives considered
 
-**什么都改成频道消息，`channel_delivery` 就是信箱。** 巡查、计划、工单交给管家都发成田头里的系统消息，投递表天然就是信箱，概念最少。不选：主人的田头会被这些刷屏，而且「交给管家的一条输入」和「大家看得见的一句话」不是一回事：管家自己的输入不该出现在群聊里。
+**什么都改成频道消息，`channel_delivery` 就是信箱。** 巡查、计划、工单交给管家都发成默认频道里的系统消息，投递表天然就是信箱，概念最少。不选：主人的默认频道会被这些刷屏，而且「交给管家的一条输入」和「大家看得见的一句话」不是一回事：管家自己的输入不该出现在群聊里。
 
 **每个包保留自己的节奏，只抽一个公共的节流器。** 改动最小，四份「攒一批」能合成一份；但「插话还是排队」的三套判断和七条入口还在，加入口时照样要选一套抄。
 

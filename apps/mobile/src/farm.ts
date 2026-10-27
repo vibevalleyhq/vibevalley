@@ -1,6 +1,7 @@
 // The phone's current farm: one choice owns its pending pairing, durable key and published page. Native keychain writes
 // cannot be aborted, so they are serialized and a superseded write restores the last committed choice before the next one.
 
+import { pathOf } from "@vibevalley/protocol";
 import { mobileWording } from "./words";
 import * as SecureStore from "expo-secure-store";
 import type { LanPaired } from "@vibevalley/protocol";
@@ -133,7 +134,7 @@ export class FarmConnection {
     try {
       let response: Response;
       try {
-        response = await fetch(choice.link.url + "/api/v1/lan/pair", {
+        response = await fetch(choice.link.url + pathOf("lan.pair"), {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code: choice.link.code, name: choice.name.trim() }),

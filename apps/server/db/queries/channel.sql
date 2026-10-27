@@ -1,17 +1,26 @@
--- The general channel, the channels and the threads under their messages (channel/store.ts).
+-- The channels, the default one among them, and the threads under their messages (channel/chat.ts).
 
--- name: GeneralID :one
-select id from channel where type = 'general';
-
--- name: CreateGeneral :exec
-insert into channel (id, type, name, created_at) values (sqlc.arg(id), 'general', sqlc.arg(name), sqlc.arg(created_at));
+-- name: DefaultID :one
+select id from channel where is_default;
 
 -- name: CreateChannel :exec
-insert into channel (id, type, name, description, project, created_at)
-values (sqlc.arg(id), 'channel', sqlc.arg(name), sqlc.narg(description), sqlc.narg(project), sqlc.arg(created_at));
+insert into channel (id, type, is_default, name, description, project, created_at)
+values (sqlc.arg(id), 'channel', sqlc.arg(is_default), sqlc.arg(name), sqlc.narg(description), sqlc.narg(project), sqlc.arg(created_at));
+
+-- name: CreateDirect :exec
+-- At most one with each peer (peer_id is unique): a second for the same peer is not made.
+insert into channel (id, type, peer_id, created_at) values (sqlc.arg(id), 'direct', sqlc.arg(peer_id), sqlc.arg(created_at))
+on conflict (peer_id) do nothing;
+
+-- name: ClearDefault :exec
+-- Before MakeDefault, in its transaction: one default at a time (channel_one_default).
+update channel set is_default = false where is_default;
+
+-- name: MakeDefault :exec
+update channel set is_default = true where id = sqlc.arg(id) and type = 'channel';
 
 -- name: UpdateChannel :exec
-update channel set description = sqlc.narg(description), project = sqlc.narg(project) where id = sqlc.arg(id) and type in ('general', 'channel');
+update channel set description = sqlc.narg(description), project = sqlc.narg(project) where id = sqlc.arg(id) and type = 'channel';
 
 -- name: CreateThread :exec
 insert into channel (id, type, root_id, root_number, subject_kind, subject_id, parent_id, created_at)

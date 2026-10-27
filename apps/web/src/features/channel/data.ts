@@ -18,7 +18,7 @@ export function useMarkRead(channel: Accessor<Channel | undefined>) {
     (read) => {
       if (!read) return;
       const [id, number] = JSON.parse(read) as [string, number];
-      api.channel.markRead({ id, body: { number } }).catch(() => {});
+      api.channel.markRead({ id, number }).catch(() => {});
     },
   );
 }

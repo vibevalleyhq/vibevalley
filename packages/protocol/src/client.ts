@@ -47,7 +47,7 @@ function apiErrorOf(value: unknown): ApiError | undefined {
   }
 }
 
-/** The server's HTTP API, one object per group: `api.issue.create({ body })`. */
+/** The server's HTTP API, one object per module and noun, a method per op: `api.issue.status.update({ id, status })`. */
 export class VibeValleyApi {
   /** base: the server's address; empty is the page's own origin, which serves it. */
   constructor(
@@ -56,317 +56,276 @@ export class VibeValleyApi {
   ) {}
 
   readonly server = {
-    health: (): Promise<T.Health> => this.call("GET", "/api/v1/health", undefined, undefined) as Promise<T.Health>,
+    health: {
+      get: (): Promise<T.Health> => this.call("/api/v1/server/health/get", undefined) as Promise<T.Health>,
+    },
   };
 
   readonly orchestrator = {
-    open: (): Promise<void> => this.call("POST", "/api/v1/orchestrator/open", undefined, undefined) as Promise<void>,
+    open: (): Promise<void> => this.call("/api/v1/orchestrator/open", undefined) as Promise<void>,
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (): Promise<void> => this.call("POST", "/api/v1/orchestrator/stop", undefined, undefined) as Promise<void>,
-    /** The v1 caption relay without a call id is accepted only with one active call. */
-    hear: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/orchestrator/hear", undefined, a.body) as Promise<void>,
-    listArchive: (a: { q?: string }): Promise<T.ArchiveListing> =>
-      this.call("GET", "/api/v1/orchestrator/archive", { q: a.q }, undefined) as Promise<T.ArchiveListing>,
-    getArchive: (a: { name: string }): Promise<string> =>
-      this.call("GET", "/api/v1/orchestrator/archive/" + encodeURIComponent(String(a.name)), undefined, undefined) as Promise<string>,
-    /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
-    markWrong: (a: { body: T.OrchestratorEvalRequest }): Promise<T.OrchestratorEval> =>
-      this.call("POST", "/api/v1/orchestrator/evals", undefined, a.body) as Promise<T.OrchestratorEval>,
+    stop: (): Promise<void> => this.call("/api/v1/orchestrator/stop", undefined) as Promise<void>,
+    archive: {
+      list: (a: { q?: string }): Promise<T.ArchiveListing> => this.call("/api/v1/orchestrator/archive/list", a) as Promise<T.ArchiveListing>,
+      get: (a: { name: string }): Promise<string> => this.call("/api/v1/orchestrator/archive/get", a) as Promise<string>,
+    },
+    eval: {
+      /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
+      create: (a: T.OrchestratorEvalRequest): Promise<T.OrchestratorEval> => this.call("/api/v1/orchestrator/eval/create", a) as Promise<T.OrchestratorEval>,
+    },
   };
 
   readonly setting = {
-    load: (): Promise<T.SettingsStatus> => this.call("GET", "/api/v1/settings", undefined, undefined) as Promise<T.SettingsStatus>,
+    get: (): Promise<T.SettingsStatus> => this.call("/api/v1/setting/get", undefined) as Promise<T.SettingsStatus>,
     /** The first thing Save would refuse in these settings, without saving them. */
-    check: (a: { body: T.SettingsUpdate }): Promise<T.Check> => this.call("POST", "/api/v1/settings/check", undefined, a.body) as Promise<T.Check>,
-    save: (a: { body: T.SettingsUpdate }): Promise<T.SettingsStatus> => this.call("PUT", "/api/v1/settings", undefined, a.body) as Promise<T.SettingsStatus>,
+    check: (a: T.SettingsUpdate): Promise<T.Check> => this.call("/api/v1/setting/check", a) as Promise<T.Check>,
+    update: (a: T.SettingsUpdate): Promise<T.SettingsStatus> => this.call("/api/v1/setting/update", a) as Promise<T.SettingsStatus>,
   };
 
   readonly channel = {
-    say: (a: { body: T.SayRequest }): Promise<void> => this.call("POST", "/api/v1/say", undefined, a.body) as Promise<void>,
-    create: (a: { body: T.ChannelRequest }): Promise<string> => this.call("POST", "/api/v1/channels", undefined, a.body) as Promise<string>,
-    update: (a: { id: string; body: T.ChannelUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/channels/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
-    history: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
-      this.call("GET", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/messages", { before: a.before, limit: a.limit }, undefined) as Promise<
-        T.ChatMessage[]
-      >,
-    markRead: (a: { id: string; body: T.ChatReadRequest }): Promise<void> =>
-      this.call("POST", "/api/v1/channels/" + encodeURIComponent(String(a.id)) + "/read", undefined, a.body) as Promise<void>,
+    create: (a: T.ChannelRequest): Promise<string> => this.call("/api/v1/channel/create", a) as Promise<string>,
+    update: (a: { id: string } & T.ChannelUpdate): Promise<void> => this.call("/api/v1/channel/update", a) as Promise<void>,
+    markRead: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call("/api/v1/channel/markRead", a) as Promise<void>,
+    message: {
+      send: (a: T.SayRequest): Promise<void> => this.call("/api/v1/channel/message/send", a) as Promise<void>,
+      list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
+        this.call("/api/v1/channel/message/list", a) as Promise<T.ChatMessage[]>,
+    },
+    default: {
+      /** The channel what names none goes to from now on: a connector's, a call's. */
+      set: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/default/set", a) as Promise<void>,
+    },
   };
 
   readonly recurrence = {
-    create: (a: { body: T.RecurrenceRequest }): Promise<T.Recurrence> => this.call("POST", "/api/v1/recurrences", undefined, a.body) as Promise<T.Recurrence>,
-    list: (): Promise<T.Recurrence[]> => this.call("GET", "/api/v1/recurrences", undefined, undefined) as Promise<T.Recurrence[]>,
+    create: (a: T.RecurrenceRequest): Promise<T.Recurrence> => this.call("/api/v1/recurrence/create", a) as Promise<T.Recurrence>,
+    list: (): Promise<T.Recurrence[]> => this.call("/api/v1/recurrence/list", undefined) as Promise<T.Recurrence[]>,
     /** Only what the body gives changes. */
-    update: (a: { id: string; body: T.RecurrenceUpdate }): Promise<void> =>
-      this.call("PUT", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<void>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    update: (a: { id: string } & T.RecurrenceUpdate): Promise<void> => this.call("/api/v1/recurrence/update", a) as Promise<void>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/recurrence/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/recurrences/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/recurrence/previewDelete", a) as Promise<T.Preview>,
+  };
+
+  readonly voice = {
+    /** A line heard on the call that is on, without its id: refused unless one call is. */
+    hear: (a: { text: string; agent?: string; sendKey?: string }): Promise<void> => this.call("/api/v1/voice/hear", a) as Promise<void>,
+    dictate: (a: T.DictateRequest): Promise<T.Dictated> => this.call("/api/v1/voice/dictate", a) as Promise<T.Dictated>,
+    session: {
+      create: (): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/create", undefined) as Promise<T.AgoraGrant>,
+      renew: (a: T.RenewRequest): Promise<T.AgoraGrant> => this.call("/api/v1/voice/session/renew", a) as Promise<T.AgoraGrant>,
+    },
+    agent: {
+      start: (a: T.StartRequest): Promise<T.VoiceAgent> => this.call("/api/v1/voice/agent/start", a) as Promise<T.VoiceAgent>,
+      stop: (a: T.VoiceAgent): Promise<void> => this.call("/api/v1/voice/agent/stop", a) as Promise<void>,
+      hear: (a: T.VoiceHeard): Promise<void> => this.call("/api/v1/voice/agent/hear", a) as Promise<void>,
+      say: (a: T.VoiceSaid): Promise<void> => this.call("/api/v1/voice/agent/say", a) as Promise<void>,
+    },
   };
 
   readonly issue = {
-    /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
-    comment: (a: { id: string; body: T.CommentRequest }): Promise<void> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/comment", undefined, a.body) as Promise<void>,
-    changes: (a: { id: string }): Promise<T.Changes> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<T.Changes>,
-    /** One joined read of issues and their real sessions, including explicit missing records. */
-    history: (): Promise<T.IssueHistory[]> => this.call("GET", "/api/v1/issues/history", undefined, undefined) as Promise<T.IssueHistory[]>,
-    list: (): Promise<T.Issue[]> => this.call("GET", "/api/v1/issues", undefined, undefined) as Promise<T.Issue[]>,
-    get: (a: { id: string }): Promise<T.Issue> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.Issue>,
-    runs: (a: { id: string }): Promise<T.Run[]> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/runs", undefined, undefined) as Promise<T.Run[]>,
-    /** The issue's milestones, newest first, and what all its runs cost. */
-    timeline: (a: { id: string }): Promise<T.IssueTimeline> =>
-      this.call("GET", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/timeline", undefined, undefined) as Promise<T.IssueTimeline>,
-    create: (a: { body: T.IssueRequest }): Promise<T.Issue> => this.call("POST", "/api/v1/issues", undefined, a.body) as Promise<T.Issue>,
-    update: (a: { id: string; body: T.IssueUpdate }): Promise<T.Issue> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Issue>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/issues/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    list: (): Promise<T.Issue[]> => this.call("/api/v1/issue/list", undefined) as Promise<T.Issue[]>,
+    get: (a: { id: string }): Promise<T.Issue> => this.call("/api/v1/issue/get", a) as Promise<T.Issue>,
+    create: (a: T.IssueRequest): Promise<T.Issue> => this.call("/api/v1/issue/create", a) as Promise<T.Issue>,
+    update: (a: { id: string } & T.IssueUpdate): Promise<T.Issue> => this.call("/api/v1/issue/update", a) as Promise<T.Issue>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/issue/delete", a) as Promise<void>,
     /** What issue.delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
-    move: (a: { id: string; body: T.MoveIssueRequest }): Promise<T.Issue[]> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/move", undefined, a.body) as Promise<T.Issue[]>,
-    /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
-     * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
-    status: (a: { id: string; body: T.IssueStatusRequest }): Promise<T.Issue> =>
-      this.call("PUT", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status", undefined, a.body) as Promise<T.Issue>,
-    /** What issue.status would do with the same body, refused as it would be; nothing changes. */
-    previewStatus: (a: { id: string; body: T.IssueStatusRequest }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/status/preview", undefined, a.body) as Promise<T.Preview>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/issue/previewDelete", a) as Promise<T.Preview>,
+    move: (a: { id: string } & T.MoveIssueRequest): Promise<T.Issue[]> => this.call("/api/v1/issue/move", a) as Promise<T.Issue[]>,
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
      * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
-    refine: (a: { id: string; body: T.IssueRefineRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/refine", undefined, a.body) as Promise<T.Issue>,
+    refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call("/api/v1/issue/refine", a) as Promise<T.Issue>,
     /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
-    dispatch: (a: { id: string; body: T.IssueDispatchRequest }): Promise<T.Dispatched> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/dispatch", undefined, a.body) as Promise<T.Dispatched>,
+    dispatch: (a: { id: string } & T.IssueDispatchRequest): Promise<T.Dispatched> => this.call("/api/v1/issue/dispatch", a) as Promise<T.Dispatched>,
     /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
-    act: (a: { id: string; body: T.IssueActRequest }): Promise<T.Issue> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<T.Issue>,
+    act: (a: { id: string } & T.IssueActRequest): Promise<T.Issue> => this.call("/api/v1/issue/act", a) as Promise<T.Issue>,
     /** What issue.act would do with the same body, refused as it would be; nothing changes. */
-    previewAct: (a: { id: string; body: T.IssueActRequest }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/issues/" + encodeURIComponent(String(a.id)) + "/act/preview", undefined, a.body) as Promise<T.Preview>,
+    previewAct: (a: { id: string } & T.IssueActRequest): Promise<T.Preview> => this.call("/api/v1/issue/previewAct", a) as Promise<T.Preview>,
+    comment: {
+      /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
+      create: (a: { id: string } & T.CommentRequest): Promise<void> => this.call("/api/v1/issue/comment/create", a) as Promise<void>,
+    },
+    diff: {
+      get: (a: { id: string }): Promise<T.Changes> => this.call("/api/v1/issue/diff/get", a) as Promise<T.Changes>,
+    },
+    history: {
+      /** One joined read of issues and their real sessions, including explicit missing records. */
+      list: (): Promise<T.IssueHistory[]> => this.call("/api/v1/issue/history/list", undefined) as Promise<T.IssueHistory[]>,
+    },
+    run: {
+      list: (a: { id: string }): Promise<T.Run[]> => this.call("/api/v1/issue/run/list", a) as Promise<T.Run[]>,
+    },
+    timeline: {
+      /** The issue's milestones, newest first, and what all its runs cost. */
+      get: (a: { id: string }): Promise<T.IssueTimeline> => this.call("/api/v1/issue/timeline/get", a) as Promise<T.IssueTimeline>,
+    },
+    status: {
+      /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
+       * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
+      update: (a: { id: string } & T.IssueStatusRequest): Promise<T.Issue> => this.call("/api/v1/issue/status/update", a) as Promise<T.Issue>,
+      /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
+      previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call("/api/v1/issue/status/previewUpdate", a) as Promise<T.Preview>,
+    },
   };
 
   readonly session = {
     /** Stops a session's turn; it stays, and a comment starts the next. */
-    stop: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/stop", undefined, undefined) as Promise<void>,
-    list: (a: { agent?: string }): Promise<T.Session[]> => this.call("GET", "/api/v1/sessions", { agent: a.agent }, undefined) as Promise<T.Session[]>,
-    get: (a: { id: string }): Promise<T.Session> =>
-      this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.Session>,
-    /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
-    events: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> =>
-      this.call("GET", "/api/v1/sessions/" + encodeURIComponent(String(a.id)) + "/events", { run: a.run }, undefined) as Promise<T.SessionEvent[]>,
+    stop: (a: { id: string }): Promise<void> => this.call("/api/v1/session/stop", a) as Promise<void>,
+    list: (a: { agent?: string }): Promise<T.Session[]> => this.call("/api/v1/session/list", a) as Promise<T.Session[]>,
+    get: (a: { id: string }): Promise<T.Session> => this.call("/api/v1/session/get", a) as Promise<T.Session>,
+    event: {
+      /** Its log, oldest first; run gives one run's only. The orchestrator's log is session orchestrator's. */
+      list: (a: { id: string; run?: string }): Promise<T.SessionEvent[]> => this.call("/api/v1/session/event/list", a) as Promise<T.SessionEvent[]>,
+    },
   };
 
   readonly graph = {
-    split: (a: { body: T.GraphSplitRequest }): Promise<string> => this.call("POST", "/api/v1/graphs", undefined, a.body) as Promise<string>,
-    updateTask: (a: { id: string; task: string; body: T.TaskEdit }): Promise<string> =>
-      this.call(
-        "PUT",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)),
-        undefined,
-        a.body,
-      ) as Promise<string>,
-    deleteTask: (a: { id: string; task: string }): Promise<string> =>
-      this.call(
-        "DELETE",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)),
-        undefined,
-        undefined,
-      ) as Promise<string>,
-    /** What deleteTask would do, refused as it would be; nothing changes. */
-    previewDeleteTask: (a: { id: string; task: string }): Promise<T.Preview> =>
-      this.call(
-        "POST",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)) + "/delete/preview",
-        undefined,
-        undefined,
-      ) as Promise<T.Preview>,
-    act: (a: { id: string; body: T.GraphActRequest }): Promise<string> =>
-      this.call("POST", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/act", undefined, a.body) as Promise<string>,
-    taskAct: (a: { id: string; task: string; body: T.TaskActRequest }): Promise<string> =>
-      this.call(
-        "POST",
-        "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/tasks/" + encodeURIComponent(String(a.task)) + "/act",
-        undefined,
-        a.body,
-      ) as Promise<string>,
-    changes: (a: { id: string }): Promise<T.Changes> =>
-      this.call("GET", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/changes", undefined, undefined) as Promise<T.Changes>,
-    events: (a: { id: string }): Promise<T.GraphEvent[]> =>
-      this.call("GET", "/api/v1/graphs/" + encodeURIComponent(String(a.id)) + "/events", undefined, undefined) as Promise<T.GraphEvent[]>,
+    split: (a: T.GraphSplitRequest): Promise<string> => this.call("/api/v1/graph/split", a) as Promise<string>,
+    act: (a: { id: string } & T.GraphActRequest): Promise<string> => this.call("/api/v1/graph/act", a) as Promise<string>,
+    task: {
+      update: (a: { id: string; task: string } & T.TaskEdit): Promise<string> => this.call("/api/v1/graph/task/update", a) as Promise<string>,
+      delete: (a: { id: string; task: string }): Promise<string> => this.call("/api/v1/graph/task/delete", a) as Promise<string>,
+      /** What deleteTask would do, refused as it would be; nothing changes. */
+      previewDelete: (a: { id: string; task: string }): Promise<T.Preview> => this.call("/api/v1/graph/task/previewDelete", a) as Promise<T.Preview>,
+      act: (a: { id: string; task: string } & T.TaskActRequest): Promise<string> => this.call("/api/v1/graph/task/act", a) as Promise<string>,
+    },
+    diff: {
+      get: (a: { id: string }): Promise<T.Changes> => this.call("/api/v1/graph/diff/get", a) as Promise<T.Changes>,
+    },
+    event: {
+      list: (a: { id: string }): Promise<T.GraphEvent[]> => this.call("/api/v1/graph/event/list", a) as Promise<T.GraphEvent[]>,
+    },
   };
 
   readonly game = {
-    achievements: (): Promise<T.Achievement[]> => this.call("GET", "/api/v1/game/achievements", undefined, undefined) as Promise<T.Achievement[]>,
-    chooseTitle: (a: { body: T.ChooseTitleRequest }): Promise<void> => this.call("POST", "/api/v1/game/title", undefined, a.body) as Promise<void>,
+    achievement: {
+      list: (): Promise<T.Achievement[]> => this.call("/api/v1/game/achievement/list", undefined) as Promise<T.Achievement[]>,
+    },
+    title: {
+      set: (a: T.ChooseTitleRequest): Promise<void> => this.call("/api/v1/game/title/set", a) as Promise<void>,
+    },
   };
 
   readonly runtime = {
-    list: (): Promise<T.RuntimeInfo[]> => this.call("GET", "/api/v1/runtimes", undefined, undefined) as Promise<T.RuntimeInfo[]>,
-    refresh: (a: { id: string }): Promise<T.RuntimeInfo> =>
-      this.call("POST", "/api/v1/runtimes/" + encodeURIComponent(String(a.id)) + "/refresh", undefined, undefined) as Promise<T.RuntimeInfo>,
-    update: (a: { id: string; body: T.RuntimeSettings }): Promise<T.RuntimeInfo> =>
-      this.call("PUT", "/api/v1/runtimes/" + encodeURIComponent(String(a.id)) + "/settings", undefined, a.body) as Promise<T.RuntimeInfo>,
+    list: (): Promise<T.RuntimeInfo[]> => this.call("/api/v1/runtime/list", undefined) as Promise<T.RuntimeInfo[]>,
+    refresh: (a: { id: string }): Promise<T.RuntimeInfo> => this.call("/api/v1/runtime/refresh", a) as Promise<T.RuntimeInfo>,
+    setting: {
+      update: (a: { id: string } & T.RuntimeSettings): Promise<T.RuntimeInfo> => this.call("/api/v1/runtime/setting/update", a) as Promise<T.RuntimeInfo>,
+    },
   };
 
   readonly github = {
-    status: (): Promise<T.GitHubStatus> => this.call("GET", "/api/v1/github", undefined, undefined) as Promise<T.GitHubStatus>,
-    refresh: (): Promise<T.GitHubStatus> => this.call("POST", "/api/v1/github/refresh", undefined, undefined) as Promise<T.GitHubStatus>,
+    get: (): Promise<T.GitHubStatus> => this.call("/api/v1/github/get", undefined) as Promise<T.GitHubStatus>,
+    refresh: (): Promise<T.GitHubStatus> => this.call("/api/v1/github/refresh", undefined) as Promise<T.GitHubStatus>,
   };
 
   readonly agent = {
-    list: (): Promise<T.Agent[]> => this.call("GET", "/api/v1/agents", undefined, undefined) as Promise<T.Agent[]>,
+    list: (): Promise<T.Agent[]> => this.call("/api/v1/agent/list", undefined) as Promise<T.Agent[]>,
     /** The issues of each profile as it would be dispatched now; a draft not saved yet too. */
-    check: (a: { body: T.AgentCheckRequest }): Promise<T.AgentCheck[]> =>
-      this.call("POST", "/api/v1/agents/check", undefined, a.body) as Promise<T.AgentCheck[]>,
+    check: (a: T.AgentCheckRequest): Promise<T.AgentCheck[]> => this.call("/api/v1/agent/check", a) as Promise<T.AgentCheck[]>,
     /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: { body: T.Agent }): Promise<T.Agent> => this.call("POST", "/api/v1/agents", undefined, a.body) as Promise<T.Agent>,
-    save: (a: { id: string; body: T.Agent }): Promise<T.Agent> =>
-      this.call("PUT", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Agent>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/agents/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    create: (a: T.Agent): Promise<T.Agent> => this.call("/api/v1/agent/create", a) as Promise<T.Agent>,
+    update: (a: T.Agent): Promise<T.Agent> => this.call("/api/v1/agent/update", a) as Promise<T.Agent>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/agent/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/agents/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/agent/previewDelete", a) as Promise<T.Preview>,
   };
 
   readonly memory = {
     /** An agent's memories: the orchestrator's (agent orchestrator) are the lines of its MEMORY.md, with the file and how many of the newest
      * its prompt carries; every other agent's are rows. */
-    list: (a: { agent: string }): Promise<T.MemoryList> =>
-      this.call("GET", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, undefined) as Promise<T.MemoryList>,
+    list: (a: { agent: string }): Promise<T.MemoryList> => this.call("/api/v1/memory/list", a) as Promise<T.MemoryList>,
     /** What the agent would be reminded of on its next start; the orchestrator is not reminded, it carries its whole file. */
     recall: (a: { agent: string; project?: string; text?: string }): Promise<T.RecallPreview> =>
-      this.call(
-        "GET",
-        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/recall",
-        { project: a.project, text: a.text },
-        undefined,
-      ) as Promise<T.RecallPreview>,
-    create: (a: { agent: string; body: T.MemoryRequest }): Promise<T.Memory> =>
-      this.call("POST", "/api/v1/memories/" + encodeURIComponent(String(a.agent)), undefined, a.body) as Promise<T.Memory>,
-    delete: (a: { agent: string; memory: string }): Promise<void> =>
-      this.call(
-        "DELETE",
-        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/" + encodeURIComponent(String(a.memory)),
-        undefined,
-        undefined,
-      ) as Promise<void>,
+      this.call("/api/v1/memory/recall", a) as Promise<T.RecallPreview>,
+    create: (a: { agent: string } & T.MemoryRequest): Promise<T.Memory> => this.call("/api/v1/memory/create", a) as Promise<T.Memory>,
+    delete: (a: { agent: string; memory: string }): Promise<void> => this.call("/api/v1/memory/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> =>
-      this.call(
-        "POST",
-        "/api/v1/memories/" + encodeURIComponent(String(a.agent)) + "/" + encodeURIComponent(String(a.memory)) + "/delete/preview",
-        undefined,
-        undefined,
-      ) as Promise<T.Preview>,
+    previewDelete: (a: { agent: string; memory: string }): Promise<T.Preview> => this.call("/api/v1/memory/previewDelete", a) as Promise<T.Preview>,
   };
 
   readonly skill = {
-    list: (): Promise<T.Skill[]> => this.call("GET", "/api/v1/skills", undefined, undefined) as Promise<T.Skill[]>,
+    list: (): Promise<T.Skill[]> => this.call("/api/v1/skill/list", undefined) as Promise<T.Skill[]>,
     /** Create allocates an identity; callers with an existing identity use save. */
-    create: (a: { body: T.Skill }): Promise<T.Skill> => this.call("POST", "/api/v1/skills", undefined, a.body) as Promise<T.Skill>,
-    save: (a: { id: string; body: T.Skill }): Promise<T.Skill> =>
-      this.call("PUT", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, a.body) as Promise<T.Skill>,
-    delete: (a: { id: string }): Promise<void> =>
-      this.call("DELETE", "/api/v1/skills/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<void>,
+    create: (a: T.Skill): Promise<T.Skill> => this.call("/api/v1/skill/create", a) as Promise<T.Skill>,
+    update: (a: T.Skill): Promise<T.Skill> => this.call("/api/v1/skill/update", a) as Promise<T.Skill>,
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/skill/delete", a) as Promise<void>,
     /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/skills/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/skill/previewDelete", a) as Promise<T.Preview>,
   };
 
   readonly project = {
-    list: (): Promise<T.ProjectSummary[]> => this.call("GET", "/api/v1/projects", undefined, undefined) as Promise<T.ProjectSummary[]>,
+    list: (): Promise<T.ProjectSummary[]> => this.call("/api/v1/project/list", undefined) as Promise<T.ProjectSummary[]>,
     /** The first thing Create would refuse in this project, without making it. */
-    check: (a: { body: T.NewProject }): Promise<T.Check> => this.call("POST", "/api/v1/projects/check", undefined, a.body) as Promise<T.Check>,
-    create: (a: { body: T.NewProject }): Promise<T.ProjectSummary> => this.call("POST", "/api/v1/projects", undefined, a.body) as Promise<T.ProjectSummary>,
-    languages: (a: { id: string }): Promise<T.ProjectLanguages> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/languages", undefined, undefined) as Promise<T.ProjectLanguages>,
-    /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
-    templates: (a: { id: string }): Promise<T.ProjectTemplates> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/templates", undefined, undefined) as Promise<T.ProjectTemplates>,
-    activity: (a: { id: string }): Promise<T.ProjectActivity> =>
-      this.call("GET", "/api/v1/projects/" + encodeURIComponent(String(a.id)) + "/activity", undefined, undefined) as Promise<T.ProjectActivity>,
-  };
-
-  readonly voice = {
-    session: (): Promise<T.AgoraGrant> => this.call("POST", "/api/v1/voice/session", undefined, undefined) as Promise<T.AgoraGrant>,
-    renew: (a: { body: T.RenewRequest }): Promise<T.AgoraGrant> => this.call("POST", "/api/v1/voice/renew", undefined, a.body) as Promise<T.AgoraGrant>,
-    start: (a: { body: T.StartRequest }): Promise<T.VoiceAgent> => this.call("POST", "/api/v1/voice/agent", undefined, a.body) as Promise<T.VoiceAgent>,
-    stop: (a: { body: T.VoiceAgent }): Promise<void> => this.call("POST", "/api/v1/voice/agent/stop", undefined, a.body) as Promise<void>,
-    heard: (a: { body: T.VoiceHeard }): Promise<void> => this.call("POST", "/api/v1/voice/agent/heard", undefined, a.body) as Promise<void>,
-    said: (a: { body: T.VoiceSaid }): Promise<void> => this.call("POST", "/api/v1/voice/agent/said", undefined, a.body) as Promise<void>,
-    dictate: (a: { body: T.DictateRequest }): Promise<T.Dictated> => this.call("POST", "/api/v1/voice/dictate", undefined, a.body) as Promise<T.Dictated>,
+    check: (a: T.NewProject): Promise<T.Check> => this.call("/api/v1/project/check", a) as Promise<T.Check>,
+    create: (a: T.NewProject): Promise<T.ProjectSummary> => this.call("/api/v1/project/create", a) as Promise<T.ProjectSummary>,
+    language: {
+      list: (a: { id: string }): Promise<T.ProjectLanguages> => this.call("/api/v1/project/language/list", a) as Promise<T.ProjectLanguages>,
+    },
+    template: {
+      /** The issue templates for the project: its stack, the titles sent out there before, and the template catalog filled in for it. */
+      list: (a: { id: string }): Promise<T.ProjectTemplates> => this.call("/api/v1/project/template/list", a) as Promise<T.ProjectTemplates>,
+    },
+    activity: {
+      get: (a: { id: string }): Promise<T.ProjectActivity> => this.call("/api/v1/project/activity/get", a) as Promise<T.ProjectActivity>,
+    },
   };
 
   readonly connector = {
-    list: (): Promise<T.ConnectorStatus[]> => this.call("GET", "/api/v1/connectors", undefined, undefined) as Promise<T.ConnectorStatus[]>,
-    login: (a: { id: T.ConnectorID; body: T.ConnectorLogin }): Promise<T.ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/login", undefined, a.body) as Promise<T.ConnectorStatus>,
-    verify: (a: { id: T.ConnectorID; body: T.VerifyRequest }): Promise<T.ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/verify", undefined, a.body) as Promise<T.ConnectorStatus>,
-    logout: (a: { id: T.ConnectorID }): Promise<T.ConnectorStatus> =>
-      this.call("POST", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/logout", undefined, undefined) as Promise<T.ConnectorStatus>,
-    channel: (a: { id: T.ConnectorID; body: T.ConnectorsChannelRequest }): Promise<T.ConnectorStatus> =>
-      this.call("PUT", "/api/v1/connectors/" + encodeURIComponent(String(a.id)) + "/channel", undefined, a.body) as Promise<T.ConnectorStatus>,
+    list: (): Promise<T.ConnectorStatus[]> => this.call("/api/v1/connector/list", undefined) as Promise<T.ConnectorStatus[]>,
+    login: (a: { id: T.ConnectorID } & T.ConnectorLogin): Promise<T.ConnectorStatus> => this.call("/api/v1/connector/login", a) as Promise<T.ConnectorStatus>,
+    verify: (a: { id: T.ConnectorID } & T.VerifyRequest): Promise<T.ConnectorStatus> => this.call("/api/v1/connector/verify", a) as Promise<T.ConnectorStatus>,
+    logout: (a: { id: T.ConnectorID }): Promise<T.ConnectorStatus> => this.call("/api/v1/connector/logout", a) as Promise<T.ConnectorStatus>,
+    channel: {
+      set: (a: { id: T.ConnectorID } & T.ConnectorsChannelRequest): Promise<T.ConnectorStatus> =>
+        this.call("/api/v1/connector/channel/set", a) as Promise<T.ConnectorStatus>,
+    },
   };
 
   readonly lan = {
-    status: (): Promise<T.LanStatus> => this.call("GET", "/api/v1/lan", undefined, undefined) as Promise<T.LanStatus>,
-    update: (a: { body: T.SetOpenRequest }): Promise<T.LanStatus> => this.call("PUT", "/api/v1/lan", undefined, a.body) as Promise<T.LanStatus>,
-    startPairing: (): Promise<T.LanStatus> => this.call("POST", "/api/v1/lan/pairing", undefined, undefined) as Promise<T.LanStatus>,
-    stopPairing: (): Promise<T.LanStatus> => this.call("DELETE", "/api/v1/lan/pairing", undefined, undefined) as Promise<T.LanStatus>,
-    /** What stopPairing would do, refused as it would be; nothing changes. */
-    previewStopPairing: (): Promise<T.Preview> => this.call("POST", "/api/v1/lan/pairing/stop/preview", undefined, undefined) as Promise<T.Preview>,
-    answerPairing: (a: { body: T.AnswerPairingRequest }): Promise<T.LanStatus> =>
-      this.call("POST", "/api/v1/lan/pairing/answer", undefined, a.body) as Promise<T.LanStatus>,
-    deleteDevice: (a: { id: string }): Promise<T.LanStatus> =>
-      this.call("DELETE", "/api/v1/lan/devices/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.LanStatus>,
-    /** What deleteDevice would do, refused as it would be; nothing changes. */
-    previewDeleteDevice: (a: { id: string }): Promise<T.Preview> =>
-      this.call("POST", "/api/v1/lan/devices/" + encodeURIComponent(String(a.id)) + "/delete/preview", undefined, undefined) as Promise<T.Preview>,
-    pair: (a: { body: T.LanPairRequest }): Promise<T.LanPaired> => this.call("POST", "/api/v1/lan/pair", undefined, a.body) as Promise<T.LanPaired>,
-    me: (): Promise<T.LanDevice> => this.call("GET", "/api/v1/lan/me", undefined, undefined) as Promise<T.LanDevice>,
+    get: (): Promise<T.LanStatus> => this.call("/api/v1/lan/get", undefined) as Promise<T.LanStatus>,
+    update: (a: T.SetOpenRequest): Promise<T.LanStatus> => this.call("/api/v1/lan/update", a) as Promise<T.LanStatus>,
+    pair: (a: T.LanPairRequest): Promise<T.LanPaired> => this.call("/api/v1/lan/pair", a) as Promise<T.LanPaired>,
+    pairing: {
+      start: (): Promise<T.LanStatus> => this.call("/api/v1/lan/pairing/start", undefined) as Promise<T.LanStatus>,
+      stop: (): Promise<T.LanStatus> => this.call("/api/v1/lan/pairing/stop", undefined) as Promise<T.LanStatus>,
+      /** What stopPairing would do, refused as it would be; nothing changes. */
+      previewStop: (): Promise<T.Preview> => this.call("/api/v1/lan/pairing/previewStop", undefined) as Promise<T.Preview>,
+      answer: (a: T.AnswerPairingRequest): Promise<T.LanStatus> => this.call("/api/v1/lan/pairing/answer", a) as Promise<T.LanStatus>,
+    },
+    device: {
+      delete: (a: { id: string }): Promise<T.LanStatus> => this.call("/api/v1/lan/device/delete", a) as Promise<T.LanStatus>,
+      /** What deleteDevice would do, refused as it would be; nothing changes. */
+      previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/lan/device/previewDelete", a) as Promise<T.Preview>,
+    },
+    me: {
+      get: (): Promise<T.LanDevice> => this.call("/api/v1/lan/me/get", undefined) as Promise<T.LanDevice>,
+    },
   };
 
   readonly doc = {
     /** The documents, the newest change first; their blocks are in doc.get. */
-    list: (): Promise<T.Document[]> => this.call("GET", "/api/v1/docs", undefined, undefined) as Promise<T.Document[]>,
-    create: (a: { body: T.DocRequest }): Promise<T.DocSnapshot> => this.call("POST", "/api/v1/docs", undefined, a.body) as Promise<T.DocSnapshot>,
+    list: (): Promise<T.Document[]> => this.call("/api/v1/doc/list", undefined) as Promise<T.Document[]>,
+    create: (a: T.DocRequest): Promise<T.DocSnapshot> => this.call("/api/v1/doc/create", a) as Promise<T.DocSnapshot>,
     /** A new document from Markdown: the format documents trade with agents and MEMORY.md in, not how they are stored. */
-    import: (a: { body: T.DocImport }): Promise<T.DocSnapshot> => this.call("POST", "/api/v1/docs/import", undefined, a.body) as Promise<T.DocSnapshot>,
+    import: (a: T.DocImport): Promise<T.DocSnapshot> => this.call("/api/v1/doc/import", a) as Promise<T.DocSnapshot>,
     /** The document and every live block (no tombstones), in order. */
-    get: (a: { id: string }): Promise<T.DocSnapshot> =>
-      this.call("GET", "/api/v1/docs/" + encodeURIComponent(String(a.id)), undefined, undefined) as Promise<T.DocSnapshot>,
+    get: (a: { id: string }): Promise<T.DocSnapshot> => this.call("/api/v1/doc/get", a) as Promise<T.DocSnapshot>,
     /** A batch of ops, as the owner: taken in order, in one transaction, one batch of a document at a time. */
-    submit: (a: { id: string; body: T.DocSubmit }): Promise<T.DocAck> =>
-      this.call("POST", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/submit", undefined, a.body) as Promise<T.DocAck>,
-    markdown: (a: { id: string }): Promise<T.DocMarkdown> =>
-      this.call("GET", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/markdown", undefined, undefined) as Promise<T.DocMarkdown>,
+    submit: (a: { id: string } & T.DocSubmit): Promise<T.DocAck> => this.call("/api/v1/doc/submit", a) as Promise<T.DocAck>,
     /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
      * one already running is refused. */
-    demo: (a: { id: string }): Promise<void> =>
-      this.call("POST", "/api/v1/docs/" + encodeURIComponent(String(a.id)) + "/demo", undefined, undefined) as Promise<void>,
+    demo: (a: { id: string }): Promise<void> => this.call("/api/v1/doc/demo", a) as Promise<void>,
+    markdown: {
+      get: (a: { id: string }): Promise<T.DocMarkdown> => this.call("/api/v1/doc/markdown/get", a) as Promise<T.DocMarkdown>,
+    },
   };
 
-  private async call(method: string, path: string, query: Record<string, string | number | boolean | undefined> | undefined, body: unknown): Promise<unknown> {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined) params.set(k, String(v));
-    const url = this.base + path + (params.size > 0 ? "?" + params.toString() : "");
-    const res = await this.fetcher(url, {
-      method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+  private async call(path: string, input: unknown): Promise<unknown> {
+    const res = await this.fetcher(this.base + path, {
+      method: "POST",
+      headers: input === undefined ? undefined : { "content-type": "application/json" },
+      body: input === undefined ? undefined : JSON.stringify(input),
     });
     const text = await res.text();
     if (!res.ok) {

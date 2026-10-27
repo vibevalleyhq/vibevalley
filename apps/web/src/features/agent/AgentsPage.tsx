@@ -125,7 +125,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
   const toggle = async () => {
     const a = props.agent;
     try {
-      await api.agent.save({ id: a.id, body: { ...a, enabled: !a.enabled } });
+      await api.agent.update({ ...a, enabled: !a.enabled });
       await client.invalidateQueries({ queryKey: ["agents"] });
     } catch (e) {
       toast(reasonOf(e));

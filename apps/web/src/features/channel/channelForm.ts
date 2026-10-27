@@ -20,12 +20,10 @@ export function createChannelForm(channel?: Channel) {
     setError(undefined);
     try {
       if (channel) {
-        await api.channel.update({ id: channel.id, body: { description: description(), project: project() } });
+        await api.channel.update({ id: channel.id, description: description(), project: project() });
         return channel.id;
       }
-      return await api.channel.create({
-        body: { name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined },
-      });
+      return await api.channel.create({ name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined });
     } catch (e) {
       setError(reasonOf(e));
       return undefined;

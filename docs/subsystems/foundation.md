@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 仓库和目录：`apps/`、`packages/`、`apps/server/db`、`scripts/` | 每个包对外的约定（各包的 README） |
-| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[田头](docs/subsystems/channel.md)、[管家](docs/subsystems/orchestrator.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
+| 模块怎么分、怎么起名、谁能用谁；服务、`make`、`layer`、开机的 `start`/`ready` | 每块业务里面的行为（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[项目](docs/subsystems/project.md)、[频道](docs/subsystems/channel.md)、[管家](docs/subsystems/orchestrator.md)、[定时](docs/subsystems/recurrence.md)、[种植计划](docs/subsystems/task.md)、[记性](docs/subsystems/memory.md)） |
 | 形状、Schema 和接口表放在哪 | 核心状态折什么、帧里有什么（[architecture.md](docs/architecture.md)「核心状态」） |
 | 规则放在哪、黄金数据跟着谁 | 某条规则本身（它的主人的子系统） |
 | 存盘的地基：一个 PGlite 库、一份表结构、effect-sqlc、表名、uuidv7 主键、不认旧数据 | 每张表存什么（拥有它的子系统）；家目录里的文件（[architecture.md](docs/architecture.md#存了什么)）和配置键（[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
@@ -40,7 +40,7 @@
 - **一个模块导出一个服务**：`class Issues extends Context.Service<Issues, IssuesShape>()("vibevalley/Issues")`，加上建它的 `make`（`Effect.gen` 里 `yield*` 它用到的服务和 `Settings`）和 `layer`。没有服务拿整个农场。一块业务里分开写的几部分是模块里不导出的函数，`make` 把它们拼成一个服务。
 - **`base` 只放地基**：配置、数据库、id、租约、存文件、日志脱敏、谁在做（`Actor`）。不放业务，不放服务之间传的形状；那些形状放在定义它的模块里，上下两层都用的放在下层。
 - **谁在做是一个 `Actor`**（`base/actor.ts`）：主人、管家（带 `forOwner`：这一轮有没有主人的话）、某个帮工（Session）、农场自己。只有入口造它：HTTP 接口是主人（服务端只听本机，手机是主人放进来的设备）；管家的工具是管家；帮工经 `/mcp` 的工具是那个帮工；定时和巡查是农场。改东西的服务操作带着它，自己按 `actsForOwner` 判断要不要主人的话（工单的改和挪、计划的开工和合并、定时要不要等主人同意），规矩不写在工具层或入口。记下来的只有它的种类（`ActorKind`：计划的修改记录、定时是谁定的、记性是谁记的），表里的取值约束跟着它。
-- **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Notifications、Orchestrator、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Sessions.sessionOf`、`Issues.onBoard`、`Tasks.graphs`、`Channels.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Sessions.news`、`Channels.ownerInThread`、`Notices.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（田头的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
+- **十个模块，有先后**：文件夹归进十个模块（`src/modules.ts`），从下往上 Platform、Agents、Source Control、Collaboration、Agent Sessions、Issues、Notifications、Orchestrator、Gamification、Gateway。一个模块只 import 排在它前面的，也不读核心状态里别的模块那一块，经那个模块的查询（`Sessions.sessionOf`、`Issues.onBoard`、`Tasks.graphs`、`Channels.now`）；`src/modules.test.ts` 扫 import 和 `core.state()` 查这两条。反方向的消息走带类型的流（`Sessions.news`、`Channels.ownerInThread`、`Notices.news`），订阅的人自己读，发布的人不等；下面的模块要上面的东西时，由上面的在建的时候登记给它（频道的 `Helpers`）。`game` 只听别的服务的事实，业务的服务不调它。
 - **组装分两段**：`services.ts` 每个模块一个组装函数（`platform`、`agents`……`gateway`，`on(layer)` 是 `Layer.provideMerge`），先把十个模块都建好（建的时候订阅自己要跟的），再按模块顺序跑各自的开机（`sourceControlStart` 第一次看 GitHub，`agentSessionsStart` 把帮工请回来，`issuesStart` 整理被打断的计划、定时开始走，`notificationsStart` 记下 Inbox 里已有的、开始巡查，`gamificationStart` 数 commit）。测试的 `testing/world.ts` 用同一套组装函数。`http/app.ts` 先开始答 HTTP，再把地址告诉 `Sessions`（`/mcp`）和 `Lan`（转发），所以开机就开的执行连得上 `/mcp`。
 - **折法和拼帧在组装那一层**：`projection/` 的 `reduce`、`frameOf` 读每个模块的规则，组装时以 `Projection` 交给 Platform 里的 `core`，`core` 不 import 上面的模块。
 - **一个家目录一个服务端**：`base/lease.ts` 在家目录写 `.vibevalley.lock`（里面是进程号）；第二个服务端开不起来，锁着它的进程已经不在了就接过来（Node 没有 `flock`）。
@@ -61,7 +61,7 @@
 **形状和规则**
 
 - **形状写一次，Schema 由它定类型**：`shapes.ts` 是类型，`schema.ts` 里每个 Schema 写成 `Codec<T.X>`（`Schema.Codec<T.X, Wire<T.X>>`：线上的一侧是去掉 id 品牌的同一个形状），两边对不上就编不过，`schema.test.ts` 再逐个查 Schema 和 interface 的键；`endpoints` 里的每一行带方法、路径、参数、请求和回答的 Schema、`can`（谁能调），`Handlers` 由它推出，`handlers.ts` 漏了或多了一个接口就编不过。服务端按这张表路由（`http/api.ts`：请求解不开是 400，拒绝按 `errorStatus` 给状态码），页面和命令行用同一张表调（`VibeValleyApi`、`cli.ts`）。
-- **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`vp run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，HTTP 的调用不用带上每个接口的 Schema；页面里的 Effect 只在房间的连接上（`apps/web/src/base/gateway.ts`，[田头](docs/subsystems/channel.md)）；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
+- **生成的不手改**：`db/generated/`、[capabilities.md](docs/reference/capabilities.md) 和 `packages/protocol/src/client.ts`（`vp run api:client`：每个方法的参数、回答和注释照 `Handlers`，方法、路径、查询和请求体照 `endpoints`；生成而不在运行时读 `endpoints`，HTTP 的调用不用带上每个接口的 Schema；页面里的 Effect 只在房间的连接上（`apps/web/src/base/gateway.ts`，[频道](docs/subsystems/channel.md)）；`docs:verify` 查它是不是最新）。生成的 client 对非 2xx 先做不依赖 Schema 的结构校验，真正的 `ApiError` 保留标签和 `next`，纯文本或畸形响应也保留状态和原始 `body`；成功仍走普通 JSON 解析。`seeds.json`、`template_catalog.json`（`packages/protocol/src/rules`）是直接改的数据文件。
 - **要每种都处理的地方穷尽**：按 `_tag`、`type` 分支的 `switch` 覆盖每一种，返回值或 `never` 让 `tsc` 查出漏掉的；成员表要每种都处理时写成 `Record<X, …>`。
 - **规则在它的主人那里，protocol 只放契约**：只有服务端跑的规则在拥有它的模块里（`session/state.ts`、`issue/state.ts`、`task/graph.ts`、`game/view.ts`、`notice/inbox.ts`、`setting/rules.ts`、`runtime/rules.ts`……），上面的模块可以 import 下面的；核心状态的折法和拼帧读每个模块的规则，放在组装那一层（`projection/`），交给 `core`。`packages/protocol/src/rules` 只放页面和服务端都跑的（`rules/contract.test.ts` 查）。页面要的结论由服务端算好写进帧或另开接口问；只有跟着页面的时钟走、两边都得算的（帮工在干什么的话）才挪进 protocol，不在页面里重写。
 - **黄金数据跟着规则**：每处有规则的地方有 `testdata/*.jsonl.gz`（成千上万条带种子的随机输入和结果），测试逐条比。`VIBEVALLEY_GOLDEN=update`（`vp run golden:update`，后面加 `<模块>` 或 `protocol` 只重写那一处，`scripts/golden-update.ts`）用现在的结果重写，看 diff 再留。
@@ -98,10 +98,10 @@
 
 ### 话放在哪
 
-- **对主人的话进词表，对模型的话进 `prompts.ts`。** 主人看得到的（界面上的字、写进帧的说法、通知、拒绝的理由、田头里的系统消息、以主人的名义写进串里的话、命令行和连接器的输出）写在词表里，中英各一份；模型读的（系统提示、工具说明、交给帮工的活、巡查和管家的输入）写在模块的 `prompts.ts`，只有中文，另加一句用主人的语言说话。两边都读的照谁先读归：拒绝的理由主人和管家都读，进词表。日志是英文，不进词表。
+- **对主人的话进词表，对模型的话进 `prompts.ts`。** 主人看得到的（界面上的字、写进帧的说法、通知、拒绝的理由、频道里的系统消息、以主人的名义写进串里的话、命令行和连接器的输出）写在词表里，中英各一份；模型读的（系统提示、工具说明、交给帮工的活、巡查和管家的输入）写在模块的 `prompts.ts`，只有中文，另加一句用主人的语言说话。两边都读的照谁先读归：拒绝的理由主人和管家都读，进词表。日志是英文，不进词表。
 - **一张表的样子**：`const zh = {…}`，`const en: typeof zh = {…}`，`export const xWording = localized({ zh, en })`；键是概念（`attention.reviewing`），要填值的写成函数，参数由类型查；英文少一条或参数对不上就编不过。用的时候每次取（`xWording().…`），不在模块顶上存一份句子。
-- **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（田头的消息、时间线）是写下那时的语言，换了不回头翻。
-- **田头的名字不翻**：`generalName`（「田头」）是存盘的名字，模型和对话里的 @ 也用它；主人看到的是词表里的 `general`。
+- **语言是农场的，一个进程一个**：存在设置里（`settings.json` 的 `locale`，默认 `zh`），服务端读出和保存时 `setLocale`；页面从服务端发的 `index.html` 上的 `data-locale` 读，换了语言重新打开；命令行和桌面壳开机读同一个 `settings.json`，桌面壳再听页面经宿主接口说的（`host.locale`），菜单栏和灵动岛跟着变；手机壳说手机自己的语言。存进库的话（频道里的消息、时间线）是写下那时的语言，换了不回头翻。
+- **频道的名字不翻**：开机建的默认频道叫 `general`（`firstChannelName`），名字存下来，地址和给模型的话都写它；农场把默认频道画成词表里的「田头」，工作台写它的名字。
 - **模型写的记号不翻**：提示要帮工照原样写「结论：」「要问主人：」「标准 N：」「记住：」；读的时候英文的写法（Conclusion、Ask the owner、Criterion N、Remember）也认。
 - **lint 卡住**：`vibevalley/no-cjk-literal`（`scripts/oxlint-plugin.ts`）拒绝 `apps/*/src`、`packages/*/src` 里字符串、模板和 JSX 文字中的汉字；词表、`prompts.ts`、测试和测试数据、记忆树的假数据不查；正则不查。对模型说的话也只在 `prompts.ts`：VibeValley 自己的 agent 在 `agent/brain/prompts.ts`，管家和帮工用的工具（说明、参数、回给模型的话）在 `tool/prompts.ts`，模块里的代码只引用它们。
 
@@ -141,8 +141,8 @@
 
 ## 为什么这样
 
-- **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调执行、合并写在执行里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（执行同时被工单、田头、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
-- **端口只在有两个适配器、或方向必须倒过来时才立。** 田头的 `Helpers` 是因为田头在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和合并）；执行和田头的几块共用同一份状态，拆开只是把状态传来传去。
+- **按领域切成十个模块，不平铺。** 原来十九个服务一层层叠，只有顺序没有边界：开机的规矩靠层的先后撑着（帮工挂着不存在的工单就是这一类），频道调执行、合并写在执行里、什么要找主人散在四处，管家的工具和接口是两套动作。按限界上下文切（同一个原因改的放一起），依赖只朝下，用一个测试守住。放弃了：维持平铺只加 lint（挡得住新的越界，挡不住放错的）；并成五个大模块（执行同时被工单、频道、管家用，是真 seam，并掉以后使用方又伸进内部）；把核心状态单独当模块（它是投影，单独成模块会继续被当成模块之间互相读数据的通道）。
+- **端口只在有两个适配器、或方向必须倒过来时才立。** 频道的 `Helpers` 是因为频道在执行下面；送达的路（通话、手机、系统通知）不立端口，各自订阅。大服务只拆有真 seam 的（工单的起草和合并）；执行和频道的几块共用同一份状态，拆开只是把状态传来传去。
 - **代码用行业的词，只在旧词有歧义时才改。** 改过的：Recurrence（`Schedule` 和 Effect 的撞名）、Refinement（`draft` 同时指表单、计划、消息的草稿）、Review、Question、Attention、WorkspaceState、Orchestrator（管家：收活、派给帮工、盯进度、转告，行业里编排者的位置）；`scripts/stale-names.ts` 拦旧名字。没改的：task graph、project、fact、`SessionEvent`：改名只换说法，牵涉接口路径、表、存盘的值和皮的素材，有的还会和现有的名字撞上。管家的美术素材和地图实体来自美术仓库，名字不跟着改。文件夹也不按模块挪：归属写在 `modules.ts`，挪了只换路径。
 - **一门语言到底。** 服务端是 Go、客户端是 Flutter 时，规则写两遍、形状靠生成器在两门语言间搬，驱动编码 agent 的 oar 还得维护一份 Go 的移植。换成 TypeScript 以后，oar 和各家编码 agent 的 SDK 直接用 npm 的，规则在服务端和页面之间共用，agent 只要写好一门。放弃了「服务端留在 Go，只换客户端」：跨语言的成本还在，smith 还要追 oar。
 - **Effect v4。** 服务之间的依赖、资源的生命周期、错误类型由它管：`Context.Service` 和 layer 让依赖写在 `make` 上、开停的顺序从叠法里来，Schema 让形状和解码是一份，`effect/http`、`effect/sql` 不用另找。能用 Effect 自己的模块就用（`Cron`、`DateTime`、`Schema`、`HttpRouter`、`PubSub`、`Stream`），不再写一份。
@@ -167,7 +167,7 @@
 - **测试的层按依赖算，边界写成检查。** 层由一个文件经 import 一路碰得到什么算出来，加一个 import 就换了层，金字塔小结里看得见；放弃了按文件名声明层（`*.rules.test.ts`：要改二三十个名字，名字和内容还会对不上）、按层裁剪 `world`（农场搭起来中位数 10 毫秒，越层由依赖和预算挡住就够）、覆盖率门槛（说不出测在哪层、花多少）、超预算就失败（机器快慢不同，CI 会时好时坏）。按依赖算的第一回就找出一处越层：`session/rules.test.ts` 要用 `MergeFailure`，而它定义在会跑 git 的 `project.ts` 里，形状挪到了 `project/shapes.ts`。不靠时间等的 lint 改掉了 72 处写死的等待，顺带找出 `Core.owner` 是开机后才订上的流（开机后主人马上做的会漏），改成返回前就订上；只剩 8 处没有可等事件的否定断言，每处一行理由。
 - **测试快一个台阶，靠模块的接口便宜，不靠并行。** 顺序跑服务端的测试原来要 210 s：worker 的 CPU 里 PGlite 占 36%，加载模块、起子进程、读写文件占 30%，空闲 19%，Effect 和业务代码只有 6%；把写死的几个延时调小几乎不省时间，测试主要在干活，不在等。所以先让每个测试本身便宜：库清空复用（新建一个约 110 ms，清空约 13 ms）、模块只加载一次、测试仓库从模板复制、产品代码少起 git（一个 git 命令就是一个进程，约 20 ms；管家每次开口都要列项目，列一次原来每个项目起一个 git）、规则在自己的接口上测；做完是 108 s。没做：前后端共用一个时钟（页面和服务端是两个进程，页面的测试基本不依赖时间，投入换不来收益）；把延时常量在测试里调小（几乎不省时间，测的也不再是上线的数值）；每个测试一个 Postgres schema（每个 schema 要重跑建表，还要改所有查询的 `search_path`）；测试里把 git 换成假的（合并、冲突、工作区正是最容易错的地方）；加并行（不在这一轮：每个测试先便宜，并行的收益跟着放大）。
 - **时间只从 Clock 来，靠 lint，不靠记得。** 虚拟时钟只跳过「等」、跳不过「干活」，它的价值是确定性和测得到长的窗口（一小时后到点的定时、10 分钟后关的线路）。可一处绕开 Clock 的 `setTimeout` 就让 `TestClock` 卡住，而这些地方集中在 Promise 一侧，所以写成规则，并让那一侧的类在构造时接 `Time`：时间从哪来写在构造参数上，测试换一个 `Time` 就拨得动。外部协议和真实进程的节奏留在真时间，名字上说明（`afterRealTime`、`wallTime`）；外面的库自己在真时间上重试的（声网的 SDK），把重试收回来、关掉它的（`maxRetries: 0`）。
-- **贵的东西归拥有它的模块管，测试分层、有预算。** 时间归 `Clock`；库归拥有那几张表的模块，它在内存里记着自己写过的（田头的对话、参与者、主人的已读，[田头](docs/subsystems/channel.md)），不把刚写下的再读回来，一条消息的几次写在一个事务里；外面的世界（git、进程、网络）照旧真的，只让调用少；等后台的事按条件问，挂住的帮工由测试放行，有窗口的拨 `TestClock`。测试按层算预算（流程 2 秒，其余 300 毫秒），`testing/budgets.ts` 每次列出超两倍的。这一轮顺序跑从 107 s 到 77 s：盘上的库从一份建好的拷贝开始，`until` 每毫秒问一次、挂住的轮次由测试放行，服务端停下前关掉所有连接（离开的事件流不再把关停拖住 3 秒），田头一句话的查询从 22 条到 10 条，描述分支的三次 diff 合成一次。放弃了：整座农场在虚拟时间上闲下来就自动拨钟（git、库、子进程还没回来就可能拨过超时和停滞的窗口，测试里显式拨更清楚）；`world` 只搭到某一层（170 个农场搭起来一共 20 s，中位数 10 ms，贵的是 19 个盘上的库，已经用拷贝解决）；git 的仓库端口和常驻的 git 进程（git 一共约 20 s，一半是 `worktree add`、`commit` 这类写，读散在各个操作里，一个操作多是一两次，合起来省 3 秒上下，却要动合并和派活的主路）；把检查超时的测试缩到半秒（macOS 第一次执行新写的脚本要先扫一遍，半秒来不及输出）。
+- **贵的东西归拥有它的模块管，测试分层、有预算。** 时间归 `Clock`；库归拥有那几张表的模块，它在内存里记着自己写过的（频道的对话、参与者、主人的已读，[频道](docs/subsystems/channel.md)），不把刚写下的再读回来，一条消息的几次写在一个事务里；外面的世界（git、进程、网络）照旧真的，只让调用少；等后台的事按条件问，挂住的帮工由测试放行，有窗口的拨 `TestClock`。测试按层算预算（流程 2 秒，其余 300 毫秒），`testing/budgets.ts` 每次列出超两倍的。这一轮顺序跑从 107 s 到 77 s：盘上的库从一份建好的拷贝开始，`until` 每毫秒问一次、挂住的轮次由测试放行，服务端停下前关掉所有连接（离开的事件流不再把关停拖住 3 秒），频道一句话的查询从 22 条到 10 条，描述分支的三次 diff 合成一次。放弃了：整座农场在虚拟时间上闲下来就自动拨钟（git、库、子进程还没回来就可能拨过超时和停滞的窗口，测试里显式拨更清楚）；`world` 只搭到某一层（170 个农场搭起来一共 20 s，中位数 10 ms，贵的是 19 个盘上的库，已经用拷贝解决）；git 的仓库端口和常驻的 git 进程（git 一共约 20 s，一半是 `worktree add`、`commit` 这类写，读散在各个操作里，一个操作多是一两次，合起来省 3 秒上下，却要动合并和派活的主路）；把检查超时的测试缩到半秒（macOS 第一次执行新写的脚本要先扫一遍，半秒来不及输出）。
 
 ## 还没做的
 

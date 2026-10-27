@@ -76,7 +76,7 @@ export function OrchestratorPage(props: { rest: string }) {
               empty={orchestratorWording().orchestrator.quiet}
               title={orchestratorWording().orchestrator.trajectory}
               about={orchestratorWording().orchestrator.about}
-              onMarkWrong={(on, want) => api.orchestrator.markWrong({ body: { on, want } })}
+              onMarkWrong={(on, want) => api.orchestrator.eval.create({ on, want })}
             />
           </div>
         </div>

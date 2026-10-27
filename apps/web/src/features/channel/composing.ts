@@ -9,9 +9,8 @@ import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
 
-/** Says a line in a channel (the general one when it is undefined), with the picked helper. */
-export async function say(text: string, channel: Channel | undefined, sendKey: string, agent: string | undefined) {
-  await api.channel.say({ body: { text, channel: channel?.type === "general" ? undefined : channel?.id, agent, sendKey } });
+export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
+  await api.channel.message.send({ id: channel.id, text, agent, sendKey });
 }
 
 /** A line sent and not yet in its channel: a window shows it at once, until the server's copy comes (the
@@ -51,13 +50,13 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     disposed = true;
   });
   const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
-  /** The channel a line goes to, as the core state has it: none named is the general one. */
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = core()?.chat?.channels ?? [];
-    return id ? all.find((c) => c.id === id) : all.find((c) => c.type === "general");
+    return id ? all.find((c) => c.id === id) : all.find((c) => c.default);
   };
 
-  const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
+  // No one else is in a direct channel to be named.
+  const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];
@@ -89,7 +88,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     if (!body.text) return;
     if (!attempt || !same(attempt.body, body)) attempt = { body, key: newSendKey() };
     const sent = attempt;
-    const shown = ways.echo ? channelOf(body.channel) : undefined;
+    const shown = ways.echo ? channelOf(body.id) : undefined;
     if (shown) {
       setPendingLines((all) => [...all.filter((p) => p.key !== sent.key), { key: sent.key, channel: shown.id, text: body.text }]);
       // The box empties at once; a failure puts the line back, with its key, unless something was typed meanwhile.
@@ -99,7 +98,7 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     sending = true;
     setBusy(true);
     try {
-      await api.channel.say({ body: { ...sent.body, sendKey: sent.key } });
+      await api.channel.message.send({ ...sent.body, sendKey: sent.key });
       attempt = undefined;
       // The window hides it once its copy is in the channel; the list lets it go a while after.
       if (shown) setTimeout(() => setPendingLines((all) => all.filter((p) => p.key !== sent.key)), 15_000);

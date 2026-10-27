@@ -57,7 +57,7 @@ export const useAgents = () => useQuery(() => ({ queryKey: ["agents"], queryFn: 
 
 export const useProjects = () => useQuery(() => ({ queryKey: ["projects"], queryFn: () => api.project.list(), refetchInterval: 30_000 }));
 
-export const useSettings = () => useQuery(() => ({ queryKey: ["settings"], queryFn: () => api.setting.load() }));
+export const useSettings = () => useQuery(() => ({ queryKey: ["settings"], queryFn: () => api.setting.get() }));
 
 /** The runtimes on this machine; probed again every few minutes on the server. */
 export const useRuntimes = () => useQuery(() => ({ queryKey: ["runtimes"], queryFn: () => api.runtime.list(), refetchInterval: 60_000 }));

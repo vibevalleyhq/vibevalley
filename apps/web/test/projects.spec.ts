@@ -46,7 +46,7 @@ test("the GitHub address names the project until the name is typed", async ({ pa
 
 test("项目 as it looks", async ({ page, api }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await api.project.create({ body: { name: `look-${Date.now() % 100000}` } }).catch(() => undefined);
+  await api.project.create({ name: `look-${Date.now() % 100000}` }).catch(() => undefined);
   await page.goto("/projects");
   await expect(page.getByText(/\d+ 座岛 · /)).toBeVisible();
   await settled(page);

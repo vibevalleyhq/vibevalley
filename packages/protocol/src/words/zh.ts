@@ -86,8 +86,6 @@ export const zh = {
   /** A short span: seconds under a minute, else minutes. */
   span: (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} 秒` : `${Math.round(ms / 60_000)} 分钟`),
   order: { invalid: "不是有效的顺序键", unordered: (a: string, b: string) => `顺序键 ${a} 不在 ${b} 前面` },
-  /** The general channel as the owner reads it; its name stays shapes.generalName. */
-  general: "田头",
   /** What the voice line says first, unless the owner set their own (the voice samples say it too). */
   greeting: "来啦！今天想种点什么？",
   /** The API client, when the server's answer says nothing more. */
