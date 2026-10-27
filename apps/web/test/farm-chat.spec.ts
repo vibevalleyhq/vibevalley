@@ -81,6 +81,20 @@ test("a sentence shows at once while the server takes its time, and only once af
   await expect(chat.getByText("先别动数据库", { exact: true })).toHaveCount(1);
 });
 
+test("the channel menu lists the direct channel with the orchestrator, and a sentence said there stays there", async ({ page }) => {
+  await openFarm(page);
+  const chat = await openChat(page);
+  await chat.getByRole("button", { name: /^频道：田头/ }).click();
+  const menu = page.getByRole("dialog", { name: "频道" });
+  await expect(menu.getByText("私聊", { exact: true })).toBeVisible();
+  await menu.getByRole("button", { name: "管家" }).click();
+  await expect(chat.getByRole("button", { name: /^频道：管家/ })).toBeVisible();
+  const box = chat.getByRole("textbox");
+  await box.fill("只跟你说");
+  await box.press("Enter");
+  await expect(chat.getByRole("log", { name: "管家" }).getByText("只跟你说")).toBeVisible();
+});
+
 test("the channel menu makes a channel and shows it; folding keeps it, Esc folds and then puts the phone away", async ({ page }) => {
   await openFarm(page);
   const chat = await openChat(page);

@@ -21,7 +21,7 @@ const row = (message: string, number: number, channel = "c"): DeliveryRow => ({
   root_number: null,
   subject_kind: null,
   subject_id: null,
-  channel_name: "田头",
+  channel_name: "general",
 });
 
 const states = (d: Deliveries, who: string) => d.of(who).map((r) => [r.message_id, r.state, r.launch]);

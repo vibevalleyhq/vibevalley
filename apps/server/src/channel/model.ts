@@ -45,17 +45,17 @@ export class ChatModel {
 
   /** A channel by its name. */
   channelByName(name: string): ChannelRow | undefined {
-    for (const c of this.byId.values()) if (c.name === name && c.type !== "thread") return c;
+    for (const c of this.byId.values()) if (c.name === name && c.type === "channel") return c;
     return undefined;
   }
 
-  /** The default first, then the channels as they were made. */
-  channels(): ChannelRow[] {
-    const all = [...this.byId.values()].filter((c) => c.type !== "thread");
+  /** The channels of a type, the default first, then as they were made. */
+  channels(type: "channel" | "direct" = "channel"): ChannelRow[] {
+    const all = [...this.byId.values()].filter((c) => c.type === type);
     return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
-  /** CreateGeneral, CreateChannel, CreateThread. */
+  /** CreateChannel, CreateDirect, CreateThread. */
   created(row: ChannelRow) {
     this.byId.set(row.id, { ...row });
     if (row.root_id !== null) this.threadByRoot.set(row.root_id, row.id);

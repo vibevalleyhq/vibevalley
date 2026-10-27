@@ -120,7 +120,7 @@ describe("the orchestrator", () => {
     expect(() => deepseekModel("anthropic/claude", "x")).toThrow(/只接 DeepSeek/);
   });
 
-  it.live("writes an issue down and starts it, and hears the owner's voice in 田头", () => {
+  it.live("writes an issue down and starts it, and hears the owner's voice in the default channel", () => {
     const f = farm();
     return Effect.gen(function* () {
       const orchestrator = yield* Orchestrator;
@@ -161,6 +161,23 @@ describe("the orchestrator", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
+  it.live("answers the owner in their direct channel", () => {
+    const f = farm();
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator;
+      const { in: saidIn } = yield* Said;
+      const chat = yield* Channels;
+      const direct = (yield* Core).state().chat!.channels.find((c) => c.type === "direct" && c.peer === orchestratorAgent)!;
+      yield* orchestrator.say("单独问你一句：地里怎么样", {}, direct.id, "");
+      const answered = () => saidIn(direct.id).filter((m) => m.from === orchestratorAgent);
+      expect((yield* until(() => answered().length >= 1 && answered(), "its answer there")).map((m) => m.text)).toEqual(["收到"]);
+      expect(saidIn(chat.defaultChannel()).some((m) => m.from === orchestratorAgent)).toBe(false);
+      const asked = f.requests.at(-1)!;
+      expect(lastLine(asked)).toBe("[来源：主人]\n主人说：单独问你一句：地里怎么样");
+      expect(lastInput(asked)).toContain("你正在回话的地方：和主人的私聊 @owner");
+    }).pipe(Effect.scoped, Effect.provide(f.layer));
+  });
+
   it.live("keeps its inputs with where they came from", () => {
     const config = testConfig();
     const f = farm(respond, config);
@@ -196,7 +213,7 @@ describe("the orchestrator", () => {
         saidIn(chat.defaultChannel())
           .filter((m) => m.spoken || m.from === orchestratorAgent)
           .map((m) => m.from + "：" + m.text);
-      expect(yield* until(() => call().length === 2 && call(), "the call in 田头")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
+      expect(yield* until(() => call().length === 2 && call(), "the call in the default channel")).toEqual(["owner：现在地里怎么样", "orchestrator：收到"]);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -301,7 +318,7 @@ describe("the orchestrator", () => {
       expect(first.length).toBe(1);
       expect(first[0]).toContain("只接 DeepSeek");
       const refusal = () => saidIn(chat.defaultChannel()).filter((m) => m.from === orchestratorAgent);
-      expect((yield* until(() => refusal()[0], "the refusal on 田头")).text).toMatch(/^我这边起不来：/);
+      expect((yield* until(() => refusal()[0], "the refusal in the default channel")).text).toMatch(/^我这边起不来：/);
       expect((yield* pieces("还在吗")).length).toBe(1);
       // Taken one at a time: once a third is answered, the second's refusal was said or not.
       yield* pieces("（标记）");

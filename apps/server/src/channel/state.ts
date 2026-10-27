@@ -1,11 +1,12 @@
 // The chat in the core state.
 
-import { type Chat, type ChatMessage, type Channel, type OwnerMention } from "@vibevalley/protocol";
+import { type Chat, type ChatMessage, type Channel, type OwnerMention, ownerId } from "@vibevalley/protocol";
 import { compareText } from "../base/text.ts";
 
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepChannels = 100;
 
+/** A channel or a direct channel: not under another. */
 export const isTop = (c: Channel) => c.type !== "thread";
 
 const emptyChat = (): Chat => ({ channels: [] });
@@ -36,8 +37,10 @@ export function withChannel(chat: Chat | undefined, c: Channel): Chat {
   return { ...base, channels: all };
 }
 
-/** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>. */
+/** A channel is #<name> (#general), a thread #<its channel's name>:<the number of the message it hangs under>, and a
+ * direct channel @owner: only its peer reads an address, and the one there with it is the owner. */
 export function targetOf(c: Channel, channelName: string): string {
+  if (c.type === "direct") return "@" + ownerId;
   if (c.type === "thread" && c.rootNumber !== undefined) return "#" + channelName + ":" + c.rootNumber;
   return "#" + (c.name ?? channelName);
 }

@@ -57,7 +57,8 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     return id ? all.find((c) => c.id === id) : all.find((c) => c.default);
   };
 
-  const typing = createMemo(() => (closed() ? undefined : typedName(text(), caret())));
+  // No one else is in a direct channel to be named.
+  const typing = createMemo(() => (closed() || channelOf(ways.target().id)?.type === "direct" ? undefined : typedName(text(), caret())));
   const offered = createMemo(() => {
     const t = typing();
     return t ? offeredFor(nameables(core()?.sessions ?? [], Date.now()), t.query) : [];

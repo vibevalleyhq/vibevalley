@@ -12,7 +12,7 @@ const zh = {
     title: "连接到本机",
     open: "开着",
     closed: "关着",
-    intro: "打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在田头说话。",
+    intro: "打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在群聊里说话。",
     allow: "允许连接",
     address: "地址",
     add: "添加设备",
@@ -37,7 +37,7 @@ const zh = {
   devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
   pair: {
     title: "连进那台电脑",
-    intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在田头说话。配对要那台电脑上的主人点头。",
+    intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在群聊里说话。配对要那台电脑上的主人点头。",
     code: "配对码",
     codeHint: "在那台电脑的「连接到本机」里点「添加设备」",
     name: "这台设备叫",

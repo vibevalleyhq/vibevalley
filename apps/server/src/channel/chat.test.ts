@@ -266,6 +266,42 @@ describe("the chat", () => {
     ),
   );
 
+  it.live("the owner talks with the orchestrator alone in their direct channel", () => {
+    const config = { ...testConfig(), db: "" };
+    const directs = (f: Farm) => (f.core.state().chat?.channels ?? []).filter((c) => c.type === "direct");
+    return Effect.gen(function* () {
+      yield* run(
+        (f, x) =>
+          Effect.gen(function* () {
+            yield* hireAndRun(f, x, "w3", "写 hello", "chat-d");
+            const [direct, ...more] = directs(f);
+            expect([direct?.peer, direct?.title, more.length]).toEqual([orchestratorAgent, "管家", 0]);
+            const heard = yield* news(f);
+            const before = x.runsOf("w3").length;
+            const { message: said } = yield* f.chat.say("@w3 你先别动，我们单独说", direct!.id, "");
+            const n = yield* heard.of(said.id);
+            expect([n.channel, n.type, n.target]).toEqual([direct!.id, "direct", "@owner"]);
+            expect(yield* Effect.promise(() => f.deliveryOf(orchestratorAgent, said.id))).toMatchObject({ reason: "direct", wakes: true });
+            // No one else is there: the helper named is neither woken nor handed it, and the message names no one.
+            expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toBeUndefined();
+            expect(x.runsOf("w3")).toHaveLength(before);
+            expect(f.messagesOf(direct!.id).at(-1)?.mentions).toBeUndefined();
+            // It answers there, the owner has it unread, and it finds the place by its address.
+            yield* f.chat.orchestratorSays(direct!.id, "好，说吧", "");
+            yield* until(() => (f.channel(direct!.id)?.unread ?? 0) === 1, "the answer unread");
+            expect((yield* f.chat.read(orchestratorAgent, { target: "@主人" })).messages.map((m) => m.text)).toEqual(["@w3 你先别动，我们单独说", "好，说吧"]);
+            expect(yield* f.chat.addressOf(direct!.id)).toEqual({ direct: true, target: "@owner" });
+            expect((yield* f.chat.topOf(direct!.id)).id).toBe(f.chat.defaultChannel());
+            expect(yield* Effect.flip(f.chat.read("w3", { target: "@owner" }))).toMatchObject({ reason: expect.stringContaining("没有私聊") });
+            expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["general"]);
+          }),
+        config,
+      );
+      // Made once: a restart finds it.
+      yield* run((g) => Effect.sync(() => expect(directs(g)).toHaveLength(1)), config);
+    });
+  });
+
   it.live("channels", () =>
     run((f, x) =>
       Effect.gen(function* () {

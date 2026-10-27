@@ -96,8 +96,9 @@ export const situationWords = {
     "\n各频道里在场的帮工：\n" +
     channels +
     graphs +
-    "\n你正在回话的频道：#" +
+    "\n你正在回话的地方：" +
     here,
+  direct: (target: string) => "和主人的私聊 " + target + "（只有你们两个；派的活和定时照旧落在默认频道）",
   changed: "【现状变了】",
   now: (time: string) => "【现在】" + time,
   news: (lines: string) => "这期间群聊里的汇报（不用逐条转述，主人问到再说）：\n" + lines,

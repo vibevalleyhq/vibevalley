@@ -2,7 +2,22 @@ import { chatWording } from "./words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Channel, type OrchestratorState, type Session } from "@vibevalley/protocol";
-import { channelName, topOf, topsOf, chatPath, channelOf, jobThreadOf, phaseDot, phaseText, threadOwnerOf, threadTitle, unreadIn, unreadUnder } from "./rules";
+import {
+  channelLabel,
+  channelName,
+  directsOf,
+  topOf,
+  topsOf,
+  chatPath,
+  channelOf,
+  jobThreadOf,
+  phaseDot,
+  phaseText,
+  threadOwnerOf,
+  threadTitle,
+  unreadIn,
+  unreadUnder,
+} from "./rules";
 import { aria, autofocus, Keyed, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
@@ -84,12 +99,12 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
   const about = () =>
     [props.channel?.description, props.channel?.project ? chatWording().defaultProject(props.channel.project) : ""].filter(Boolean).join(" · ");
   return (
-    <section class="flex min-w-0 flex-1 flex-col" aria-label={`#${name()}`}>
+    <section class="flex min-w-0 flex-1 flex-col" aria-label={channelLabel(props.channel)}>
       <header class={[head, "gap-3 px-4"]}>
         <button type="button" class={[iconButton, "md:hidden"]} aria-label={chatWording().channels} onClick={() => props.onDrawer()}>
           <Icon name="icon-board" size={18} />
         </button>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">#</span>
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-wheat text-lg font-semibold">{markOf(props.channel)}</span>
         <div class="flex min-w-0 flex-1 flex-col">
           <h1 class="truncate text-lg font-semibold" title={props.channel?.default ? chatWording().defaultHint : undefined}>
             {name()}
@@ -130,14 +145,14 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
           class={iconButton}
           aria-label={chatWording().settings}
           title={chatWording().settings}
-          disabled={!props.channel}
+          disabled={props.channel?.type !== "channel"}
           onClick={() => setSettings(true)}
         >
           <Icon name="icon-wrench" size={18} />
         </button>
       </header>
       <div role="tablist" aria-label={chatWording().inChannel} class="flex shrink-0 gap-1 border-b border-line px-3">
-        <For each={tabs}>
+        <For each={props.channel?.type === "direct" ? tabs.filter((t) => t.tab === "chat") : tabs}>
           {(t) => (
             <button
               type="button"
@@ -156,8 +171,8 @@ function ChannelMain(props: { channel: Channel | undefined; onDrawer: () => void
         </For>
       </div>
       <Show when={tab() === "chat"}>
-        <MessageList channel={props.channel} filter={search()} emptyText={chatWording().empty(name())} />
-        <Composer channel={props.channel} placeholder={chatWording().sendTo(name())} />
+        <MessageList channel={props.channel} filter={search()} emptyText={chatWording().empty(channelLabel(props.channel))} />
+        <Composer channel={props.channel} placeholder={chatWording().sendTo(channelLabel(props.channel))} />
       </Show>
       <Show when={props.channel}>
         {(c) => (
@@ -206,9 +221,16 @@ function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefi
           }
         >
           <For each={channels()}>
-            {(c) => <ChannelRow label={channelName(c)} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
+            {(c) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
           </For>
         </Section>
+        <Show when={directsOf(chat()).length > 0}>
+          <Section title={chatWording().directsTitle} count={directsOf(chat()).length}>
+            <For each={directsOf(chat())}>
+              {(c) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} />}
+            </For>
+          </Section>
+        </Show>
         <Section title={chatWording().helpers} count={sessions().length}>
           <Show when={sessions().length === 0}>
             <p class="px-3 text-xs text-muted">{chatWording().noHelpers}</p>
@@ -240,7 +262,10 @@ function Section(props: { title: string; count: number; action?: JSX.Element; ch
   );
 }
 
-function ChannelRow(props: { label: string; here: boolean; unread: number; onClick?: () => void }) {
+/** What stands before a channel's name: # for a channel, @ for a direct one. */
+const markOf = (c: Channel | undefined) => (c?.type === "direct" ? "@" : "#");
+
+function ChannelRow(props: { channel: Channel; here: boolean; unread: number; onClick?: () => void }) {
   return (
     <button
       type="button"
@@ -249,9 +274,9 @@ function ChannelRow(props: { label: string; here: boolean; unread: number; onCli
       class={["flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm", props.here ? "bg-selected" : "hover:bg-hover"]}
     >
       <span class="text-faint" aria-hidden="true">
-        #
+        {markOf(props.channel)}
       </span>
-      <span class={["min-w-0 flex-1 truncate", { "font-semibold": props.here || props.unread > 0 }]}>{props.label}</span>
+      <span class={["min-w-0 flex-1 truncate", { "font-semibold": props.here || props.unread > 0 }]}>{channelName(props.channel)}</span>
       <Show when={props.unread > 0}>
         <Count n={props.unread} />
       </Show>

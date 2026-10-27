@@ -59,7 +59,7 @@ it.live("only reading or replying in the mentioned channel completes an owner me
     const core = yield* Core;
     const channel = yield* chat.openChannel("review", "", "");
     const first = (yield* chat.speak("orchestrator", "@主人 第一份变更", { target: "#review", anyway: true })).message!;
-    yield* chat.say("田头的另一件事", undefined, "");
+    yield* chat.say("默认频道的另一件事", undefined, "");
     expect(mentionIds(core)).toEqual([first.id]);
     yield* chat.say("确认了", channel.id, "");
     expect(mentionIds(core)).toEqual([]);

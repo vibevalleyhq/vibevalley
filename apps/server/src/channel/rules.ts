@@ -42,19 +42,26 @@ export function channelNameProblem(name: string, taken: readonly string[]): stri
   return "";
 }
 
-export type ChatTarget = { readonly kind: "channel"; readonly name: string } | { readonly kind: "thread"; readonly root: number };
+export type ChatTarget =
+  | { readonly kind: "channel"; readonly name: string }
+  | { readonly kind: "thread"; readonly root: number }
+  | { readonly kind: "direct"; readonly peer: string };
+
+const chatDirectTarget = /^@(\S+)$/u;
 
 const int64Max = 9223372036854775807n;
 
-/** A channel's name, or a thread's parent number; a number past int64 is not one. */
+/** A channel's name, a thread's parent number, or @ the one a direct channel is with; a number past int64 is not one. */
 export function parseChatTarget(target: string): ChatTarget | undefined {
+  const direct = chatDirectTarget.exec(target.trim());
+  if (direct) return { kind: "direct", peer: chatNamed[direct[1]!] ?? direct[1]! };
   const t = target.trim().replace(/^#/, "");
   const m = chatThreadTarget.exec(t);
   if (m) return BigInt(m[1]!) > int64Max ? undefined : { kind: "thread", root: Number(m[1]) };
   return channelNamePattern.test(t) ? { kind: "channel", name: t } : undefined;
 }
 
-export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "dispatch" | "addressed" | "graph";
+export type DeliveryReason = "mention" | "everyone" | "own_thread" | "follower" | "channel" | "direct" | "dispatch" | "addressed" | "graph";
 export type HeldBy = "hop_limit" | "cooldown" | "wake_breaker";
 
 export interface Delivery {
@@ -69,8 +76,8 @@ export interface AudienceInput {
   readonly fromKind: ActorKind;
   readonly kind: MessageKind;
   readonly mentions: readonly string[];
-  /** Only its type is read. */
-  readonly channel: Pick<Channel, "type">;
+  /** Only its type and a direct channel's peer are read. */
+  readonly channel: Pick<Channel, "type" | "peer">;
   /** In a thread, the session its words are for: the one working the thread's issue now, "" when none is. */
   readonly threadOwner?: string;
   readonly sessions: readonly string[];
@@ -85,7 +92,8 @@ export interface AudienceInput {
   readonly spoken?: boolean;
 }
 
-/** Who hears a message: named first (the strongest reason wins), then the thread's owner and followers, or the channel's. */
+/** Who hears a message: in a direct channel the owner's words wake the peer and no one else hears anything; elsewhere
+ * who is named first (the strongest reason wins), then the thread's owner and followers, or the channel's. */
 export function chatAudience(i: AudienceInput): Delivery[] {
   const out: Delivery[] = [];
   if (i.kind === "notice" || i.kind === "dispatch" || i.fromKind === "system" || i.spoken) return out;
@@ -103,6 +111,10 @@ export function chatAudience(i: AudienceInput): Delivery[] {
     out.push({ recipient, reason, wakes, ...(heldBy ? { heldBy } : {}) });
   };
 
+  if (i.channel.type === "direct") {
+    if (i.fromKind === "owner" && i.channel.peer) add(i.channel.peer, "direct", true);
+    return out;
+  }
   if (i.kind === "report") {
     if (!i.forTask) add(orchestratorAgent, "addressed", i.outcome === "failed");
     return out;

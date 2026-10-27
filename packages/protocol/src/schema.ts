@@ -214,6 +214,7 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   id: Schema.String,
   type: ChannelType,
   default: Schema.optionalKey(Schema.Boolean),
+  peer: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
   root: Schema.optionalKey(Schema.String),
   rootNumber: Schema.optionalKey(Schema.Number),

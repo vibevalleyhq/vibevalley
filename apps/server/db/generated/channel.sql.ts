@@ -48,6 +48,24 @@ export const createChannel = Effect.fn("CreateChannel")(function* (params: Creat
   })(params)
 })
 
+export const CreateDirectParams = Schema.Struct({
+  ["id"]: Schema.String,
+  ["peer_id"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+})
+export type CreateDirectParams = typeof CreateDirectParams.Type
+
+
+export const CreateDirectSql = "-- name: CreateDirect :exec\n-- At most one with each peer (peer_id is unique): a second for the same peer is not made.\ninsert into channel (id, type, peer_id, created_at) values ($1, 'direct', $2, $3)\non conflict (peer_id) do nothing;"
+
+export const createDirect = Effect.fn("CreateDirect")(function* (params: CreateDirectParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: CreateDirectParams,
+    execute: (p) => sql.unsafe(CreateDirectSql, [p["id"], p["peer_id"], p["created_at"]]),
+  })(params)
+})
+
 export const ClearDefaultParams = Schema.Struct({
 
 })
@@ -141,11 +159,12 @@ export const AllChannelsResult = Schema.Struct({
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
+  ["peer_id"]: Schema.NullOr(Schema.String),
 })
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -177,11 +196,12 @@ export const RecentChannelsResult = Schema.Struct({
   ["description"]: Schema.NullOr(Schema.String),
   ["project"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
+  ["peer_id"]: Schema.NullOr(Schema.String),
 })
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
 
 
-export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
+export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
 
 export const recentChannels = Effect.fn("RecentChannels")(function* (params: RecentChannelsParams) {
   const sql = yield* SqlClient.SqlClient

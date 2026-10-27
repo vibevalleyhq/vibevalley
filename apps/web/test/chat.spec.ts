@@ -42,6 +42,28 @@ test("a sentence said shows in the list through the state stream", async ({ page
   await expect(page.getByRole("heading", { name: "说话" })).toBeVisible();
 });
 
+test("the direct channel with the orchestrator: listed apart, talked in alone, with no one to @", async ({ page }) => {
+  await page.goto("/chat");
+  const side = page.getByRole("complementary", { name: "频道和帮工" });
+  await side.getByRole("region", { name: "私聊" }).getByRole("button", { name: "管家" }).click();
+  await expect(page).toHaveURL(/\/chat\/[^/]+$/);
+  await expect(page.getByRole("heading", { name: "管家" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "聊天" })).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(1);
+  const box = page.getByRole("textbox", { name: "发送消息至 管家" });
+  await box.click();
+  await box.pressSequentially("单独问一句 @");
+  await expect(page.getByRole("listbox", { name: "叫谁" })).toBeHidden();
+  await box.fill("单独问一句：地里怎么样");
+  await box.press("Enter");
+  const log = page.getByRole("log", { name: "消息" });
+  await expect(log.getByText("单独问一句：地里怎么样")).toBeVisible();
+  // Without a model key the orchestrator answers that it has none, here and not in the default channel.
+  await expect(log.getByText("管家", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await side.getByRole("button", { name: firstChannelName }).click();
+  await expect(page.getByRole("log", { name: "消息" }).getByText("单独问一句：地里怎么样")).toHaveCount(0);
+});
+
 test("Shift+Enter starts a line and @ offers the orchestrator", async ({ page, api }) => {
   const id = await newChannel(api, "叫人");
   await page.goto(`/chat/${id}`);

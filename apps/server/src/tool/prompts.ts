@@ -231,7 +231,7 @@ export const params = {
     text: "要它记住的一句话",
   },
   readChat: {
-    target: "#general、#clock-in，或 #general:<消息号>",
+    target: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
   },
   recurrence: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
@@ -312,7 +312,7 @@ export const descriptions = {
   changes: "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
   sessionList: "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
   readChat:
-    "读一个频道或一个串里说的话。target 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+    "读一个频道或一个串里说的话。target 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   channelInbox: "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
   accept:
     "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就能完成；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",

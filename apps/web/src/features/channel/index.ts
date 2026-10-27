@@ -7,6 +7,7 @@ export {
   channelLabel,
   topOf,
   topsOf,
+  directsOf,
   chatPath,
   channelOf,
   feedOf,

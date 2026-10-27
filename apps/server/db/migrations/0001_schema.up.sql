@@ -17,7 +17,7 @@ CREATE TABLE channel_participant (
 );
 CREATE TABLE channel (
   id            text primary key,
-  type          text not null check (type in ('channel', 'thread')),
+  type          text not null check (type in ('channel', 'direct', 'thread')),
   is_default    boolean not null default false,
   root_id       text unique,
   root_number   integer,
@@ -30,7 +30,11 @@ CREATE TABLE channel (
   description   text,
   project       text,
   parent_id     text references channel (id),
+  -- A direct channel is the owner's and one other participant's: the peer.
+  peer_id       text unique references channel_participant (id),
   check ((type = 'thread') = (root_id is not null)),
+  check ((type = 'direct') = (peer_id is not null)),
+  check (type <> 'direct' or name is null),
   check ((type = 'thread') = (parent_id is not null)),
   check ((subject_kind is null) or type = 'thread'),
   check (not is_default or type = 'channel')
@@ -76,7 +80,7 @@ CREATE TABLE channel_seen_mark (
 CREATE TABLE channel_delivery (
   recipient_id   text not null references channel_participant (id),
   message_id     text not null references channel_message (id) on delete cascade,
-  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'dispatch', 'addressed', 'graph')),
+  reason         text not null check (reason in ('mention', 'everyone', 'own_thread', 'follower', 'channel', 'direct', 'dispatch', 'addressed', 'graph')),
   wakes          boolean not null,
   held_by        text check (held_by in ('hop_limit', 'cooldown', 'wake_breaker')),
   state          text not null default 'pending' check (state in ('pending', 'announced', 'handed', 'seen', 'dropped')),

@@ -238,19 +238,22 @@ export interface ChatMessage {
   at: number;
 }
 
-export const ChannelTypeValues = ["channel", "thread"] as const;
+export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
 
 export const SubjectKindValues = ["issue", "graph", "talk"] as const;
 export type SubjectKind = (typeof SubjectKindValues)[number];
 
-/** Anywhere something is said: a channel, or a thread under a message of one (as Discord's). */
+/** Anywhere something is said, as Discord's: a channel, a direct channel between the owner and one other, or a thread
+ * under a message of a channel. */
 export interface Channel {
   id: string;
   type: ChannelType;
   /** The farm's default channel: what names no channel goes there (a connector's, a call's). One channel is. */
   default?: boolean;
-  /** A thread's channel; absent for a thread in 田头. */
+  /** A direct channel's other participant: the owner talks with it there alone. */
+  peer?: string;
+  /** A thread's channel. */
   parent?: string;
   /** The message a thread hangs under, and its number there. */
   root?: string;

@@ -212,7 +212,7 @@ const qqPaired = (script: Script) =>
   });
 
 describe("the chat apps", () => {
-  it.live("take the owner's WeChat words to 田头 and answer there", () => {
+  it.live("take the owner's WeChat words to the default channel and answer there", () => {
     const script = new Script();
     return Effect.gen(function* () {
       const chat = yield* Channels;
@@ -289,7 +289,7 @@ describe("the chat apps", () => {
       expect(yield* Effect.flip(c.setChannel("weixin", "#nowhere"))).toMatchObject({
         reason: expect.stringContaining("没有叫"),
       });
-      yield* chat.orchestratorSays(chat.defaultChannel(), "田头上的话", "");
+      yield* chat.orchestratorSays(chat.defaultChannel(), "默认频道里的话", "");
       script.weixinIn.push(wx(owner, "打卡页怎么样了", "ctx-c"));
       expect(yield* nth(script, "weixin", 0, "the answer in WeChat")).toEqual({
         app: "weixin",
@@ -299,7 +299,7 @@ describe("the chat apps", () => {
       });
       expect(yield* saidIn(channel.id)).toEqual(["打卡页怎么样了"]);
       expect(yield* saidIn(chat.defaultChannel())).toEqual([]);
-      // What goes out is offered in the order it was said: the answer is out, so 田头's earlier words were weighed and
+      // What goes out is offered in the order it was said: the answer is out, so the default channel's earlier words were weighed and
       // kept from WeChat.
       expect(script.by("weixin").length).toBe(1);
     }).pipe(Effect.scoped, Effect.provide(farm(script)));

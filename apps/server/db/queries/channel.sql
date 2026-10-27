@@ -7,6 +7,11 @@ select id from channel where is_default;
 insert into channel (id, type, is_default, name, description, project, created_at)
 values (sqlc.arg(id), 'channel', sqlc.arg(is_default), sqlc.arg(name), sqlc.narg(description), sqlc.narg(project), sqlc.arg(created_at));
 
+-- name: CreateDirect :exec
+-- At most one with each peer (peer_id is unique): a second for the same peer is not made.
+insert into channel (id, type, peer_id, created_at) values (sqlc.arg(id), 'direct', sqlc.arg(peer_id), sqlc.arg(created_at))
+on conflict (peer_id) do nothing;
+
 -- name: ClearDefault :exec
 -- Before MakeDefault, in its transaction: one default at a time (channel_one_default).
 update channel set is_default = false where is_default;

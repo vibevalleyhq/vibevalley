@@ -198,7 +198,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/,
-    says: "Channel (channel_id, Channels): 田头, a channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    says: "Channel (channel_id, Channels): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
   },
   {
     name: "a business name in farm words",

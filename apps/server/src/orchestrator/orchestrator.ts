@@ -203,7 +203,7 @@ export const make = (options: OrchestratorOptions = {}) =>
     const situation = async (channel: string) => {
       const sessions = await agentLines();
       const roster = run.roster();
-      const here = await go(chat.topOf(channel));
+      const here = await go(chat.addressOf(channel));
       const byChannel = (await go(chat.channels())).map((c) => {
         const theirs = roster.filter((w) => (w.session.channel ?? chat.defaultChannel()) === c.id).map((w) => tool.sessionLine(w));
         const head = channelLine(c);
@@ -213,7 +213,15 @@ export const make = (options: OrchestratorOptions = {}) =>
       const folders = all.length > 0 ? situationWords.projects(all.map((p) => p.name)) : situationWords.noProjects;
       const open = tasks.graphs().filter(isOpen).map(graphText);
       const graphs = open.length > 0 ? situationWords.graphs(open) : "";
-      return situationWords.whole(projects.root, folders, sessions.join("\n"), byChannel.join("\n"), graphs, here.name, ownersLanguage());
+      return situationWords.whole(
+        projects.root,
+        folders,
+        sessions.join("\n"),
+        byChannel.join("\n"),
+        graphs,
+        here.direct ? situationWords.direct(here.target) : here.target,
+        ownersLanguage(),
+      );
     };
 
     // The situation for the next input: the whole of it, or what changed since the input before. An input given while
@@ -299,7 +307,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         }
       }
       const line =
-        fromPerson && n.channel === chat.defaultChannel()
+        fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
           ? pickedNote(picked) + lineWords.owner(n.messages.map((m) => m.text).join("\n"))
           : pickedNote(picked) + lineWords.chat(n.target, orchestratorInboxLines(n.messages));
       await take({ source: fromPerson ? "owner" : "chat", line, channel: n.channel, ...(picked.agent ? { agent: picked.agent } : {}), owner });
