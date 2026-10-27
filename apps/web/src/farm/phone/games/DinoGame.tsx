@@ -5,7 +5,7 @@ import { phoneWording } from "../words";
 import { createEffect, createSignal, Show } from "solid-js";
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 import { drawPattern, lcd } from "../lcd";
-import { playSound } from "../../sound";
+import { playSound } from "../../../ui/pixel/sound";
 import { kept, usePad, useTicks } from "../../support";
 
 const best = kept(0);

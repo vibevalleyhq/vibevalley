@@ -14,7 +14,7 @@ import { useCore } from "../base/frame";
 import { queries, ready, useProjects, useQuery } from "../base/query";
 import { Button } from "../ui/Button";
 import { Select, TextArea, TextInput } from "../ui/Field";
-import { Quiet } from "./kit";
+import { Quiet } from "../ui/layout";
 
 /** Notes not tied to a project. */
 const everywhere = "*";

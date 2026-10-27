@@ -8,15 +8,15 @@ import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { type InstalledSkill, installedSkills, matches, runtimeName } from "../../rules/skills";
 import { toast } from "../../ui/toasts";
-import { A } from "../../app/A";
+import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { Keyed } from "../../base/util";
 import { ready, useAgents, useQuery, useRuntimes } from "../../base/query";
-import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
+import { RuntimeIcon } from "../../ui/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { AgentFace } from "../../ui/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
-import { Card, Quiet } from "../kit";
+import { Card, Quiet } from "../../ui/layout";
 
 const installedPrefix = "installed:";
 export const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);

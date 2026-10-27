@@ -23,7 +23,7 @@ import {
 } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { DocEditor, type EditBlock } from "./editor";
-import { hexColor, swatches } from "../../rules/cast";
+import { hexColor, swatches } from "../../ui/cast";
 import { knownTypes } from "../../rules/docBlocks";
 import { useRouter } from "../../base/router";
 import { aria, Keyed } from "../../base/util";

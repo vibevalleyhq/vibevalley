@@ -8,9 +8,9 @@ import type { JSX } from "@solidjs/web";
 import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
-import { badgeColors, CardColors } from "../../farm/kit/card";
-import type { SpriteAtlas, SpriteInfo } from "../../farm/world/sprites";
-import { castOf, castSprite, cropSprite } from "../../rules/cast";
+import { badgeColors, CardColors } from "../../ui/pixel/card";
+import type { SpriteAtlas, SpriteInfo } from "../../ui/pixel/atlas";
+import { castOf, castSprite, cropSprite } from "../../ui/cast";
 import {
   growthOf,
   homeless,
@@ -34,7 +34,7 @@ import { useRouter } from "../../base/router";
 import { autofocus } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useAgents, useProjects } from "../../base/query";
-import { PixelCard } from "../../farm/kit";
+import { PixelCard } from "../../ui/pixel";
 import { useVillage } from "../../farm/support";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
@@ -42,7 +42,7 @@ import { AgentFace } from "../../ui/Face";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { PoseSprite } from "../../ui/PoseSprite";
-import { Card, Quiet } from "../kit";
+import { Card, Quiet } from "../../ui/layout";
 
 const gap = 24;
 const parchment = "#ebd9ae";

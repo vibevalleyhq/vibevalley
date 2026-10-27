@@ -5,7 +5,7 @@
 
 import { treeWording } from "./words";
 import { onSettled } from "solid-js";
-import { reducedMotion } from "../farm/kit";
+import { reducedMotion } from "../ui/pixel";
 import { growthOf, growTree, type GrownTree, type Placed } from "./grow";
 import type { MemoryItem, MemoryKind, MemoryTree } from "./mock";
 import { constellation, flashFor, hash01, kept, type Star, starsOf, tiesOf, type TreeFilter } from "./rules";

@@ -1,4 +1,4 @@
-import type { SpriteAtlas } from "../world/sprites";
+import type { SpriteAtlas } from "./atlas";
 
 // Where the ribbon frames' empty disc is, as a share of the square.
 const disc = { size: 0.44, centerY: 0.409 };

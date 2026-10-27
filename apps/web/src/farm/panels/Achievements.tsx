@@ -13,7 +13,7 @@ import { beds } from "../world/plots";
 import { aria, useClickAway } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useQuery } from "../../base/query";
-import { numberText, SpriteIcon } from "../kit";
+import { numberText, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { tint, Tinted } from "./bits";
 

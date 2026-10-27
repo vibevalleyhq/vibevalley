@@ -1,4 +1,4 @@
-import { farmWording } from "../words";
+import { farmWording } from "../../farm/words";
 import type { IssueAct } from "@vibevalley/protocol";
 
 export { ago, numberText } from "../../base/format";

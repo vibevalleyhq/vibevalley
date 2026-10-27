@@ -22,8 +22,8 @@ import {
 } from "@vibevalley/engine/pixi";
 import type { Agent, Crop, Session, StateFrame, SessionId } from "@vibevalley/protocol";
 import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js";
-import { castPrefix } from "../../rules/cast";
-import { playSound } from "../sound";
+import { castPrefix } from "../../ui/cast";
+import { playSound } from "../../ui/pixel/sound";
 import { clock, farmState } from "../store";
 import { orchestratorLooks, orchestratorSprite } from "../kit/looks";
 import { frameVillage } from "../world/framing";

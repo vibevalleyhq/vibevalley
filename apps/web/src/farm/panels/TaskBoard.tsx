@@ -17,7 +17,7 @@ import { aria, Keyed } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useProjects, useQuery } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
-import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../kit";
+import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
 import { type Answer, graphs, useGraphChanges } from "../../data/graphs";

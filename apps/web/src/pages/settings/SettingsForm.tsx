@@ -23,7 +23,7 @@ import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Segmented } from "../../ui/Segmented";
 import { currentLocale } from "@vibevalley/protocol/words";
-import { Quiet, SecretInput, TextLink, Toggle } from "../kit";
+import { Quiet, SecretInput, TextLink, Toggle } from "../../ui/layout";
 
 const from: Record<KeySource, string> = { settings: settingsWording().from.settings, config: settingsWording().from.config };
 const keyLine = (k: KeyStatus) => (k.source ? settingsWording().inUse(k.hint ?? "", from[k.source]) : settingsWording().none);

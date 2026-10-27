@@ -11,14 +11,14 @@ import { clockText } from "@vibevalley/engine/clock";
 import { api, reasonOf } from "../../base/api";
 import { subscribeLive } from "../../base/live";
 import { localEffects } from "../effects";
-import { playSound, SOUND_GROUPS, SOUND_LABEL } from "../sound";
+import { playSound, SOUND_GROUPS, SOUND_LABEL } from "../../ui/pixel/sound";
 import { clock, farm } from "../store";
 import { typing } from "../tools";
 import { aria } from "../../base/util";
 import { createExternal } from "../../base/external";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useQuery } from "../../base/query";
-import { toasts, ToastType } from "../kit";
+import { toasts, ToastType } from "../../ui/pixel";
 import { rawFrame } from "../../base/frame";
 
 const keep = 2000;

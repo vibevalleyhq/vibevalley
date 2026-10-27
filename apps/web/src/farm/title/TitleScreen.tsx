@@ -6,7 +6,7 @@
 import { farmWording } from "../words";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { api } from "../../base/api";
-import { playSound } from "../sound";
+import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import { hasFarm, orchestratorReady } from "./rules";
 import { startScene } from "./scene";

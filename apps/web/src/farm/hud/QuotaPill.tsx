@@ -8,10 +8,10 @@ import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLab
 import { yuan } from "../../rules/chat";
 import { aria, useClickAway } from "../../base/util";
 import { ready, useRuntimes } from "../../base/query";
-import { CardColors, PxButton, SpriteIcon } from "../kit";
+import { CardColors, PxButton, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { HudCard } from "./HudCard";
-import { RuntimeIcon } from "../kit/RuntimeIcon";
+import { RuntimeIcon } from "../../ui/RuntimeIcon";
 
 const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#c84a3a", unknown: "#7f5b3b" } as const;
 

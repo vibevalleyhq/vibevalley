@@ -3,7 +3,7 @@
 
 import { rulesWording } from "../base/words/rules";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
-import { outfitLabel, speciesLabel } from "./cast";
+import { outfitLabel, speciesLabel } from "../ui/cast";
 
 export interface Picture {
   readonly name: string;

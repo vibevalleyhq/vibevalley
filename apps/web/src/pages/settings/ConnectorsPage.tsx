@@ -15,7 +15,7 @@ import { Button } from "../../ui/Button";
 import { Field, Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Qr } from "../../ui/Qr";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../kit";
+import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../../ui/layout";
 
 export const connectorLabel: Record<ConnectorID, string> = {
   weixin: settingsWording().connectors.label.weixin,

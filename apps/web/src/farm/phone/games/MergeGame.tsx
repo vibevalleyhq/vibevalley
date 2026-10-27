@@ -6,7 +6,7 @@ import { phoneWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 import { lcd } from "../lcd";
-import { playSound } from "../../sound";
+import { playSound } from "../../../ui/pixel/sound";
 import { kept, usePad } from "../../support";
 
 const game = kept<Merge | null>(null);

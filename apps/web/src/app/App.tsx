@@ -16,7 +16,7 @@ import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { RuntimesPage } from "../pages/runtimes/RuntimesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { ToastHost } from "../ui/ToastHost";
-import { Navigate } from "./A";
+import { Navigate } from "../ui/A";
 import { Follow } from "./Follow";
 import { Root } from "./Root";
 import { Keyed } from "../base/util";
@@ -25,7 +25,7 @@ import { sortProjects } from "../rules/projects";
 import { farmState } from "../farm/store";
 import { useRouter } from "../base/router";
 import { Shell } from "./Shell";
-import { WindowStrip } from "./TitleBar";
+import { WindowStrip } from "../ui/TitleBar";
 
 type Rest = () => string;
 

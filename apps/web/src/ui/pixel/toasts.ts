@@ -1,4 +1,4 @@
-import { farmWording } from "../words";
+import { farmWording } from "../../farm/words";
 // Each closes after its timeout (5 s by default), held while the pointer is over the stack; past `limit` they hide.
 
 export const ToastType = { info: "info", warn: "warn", error: "error", achievement: "achievement" } as const;

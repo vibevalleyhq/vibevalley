@@ -10,7 +10,7 @@ import { useCore } from "../../base/frame";
 import { useReports, useRoom } from "../../data/rooms";
 import { useAgent } from "../../data/agents";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
-import { DashedLine, PxMarkdown } from "../kit";
+import { DashedLine, PxMarkdown } from "../../ui/pixel";
 
 import { clockOf, FarmEmpty, FarmTag } from "./bits";
 import { usePrefs } from "../../base/prefs";

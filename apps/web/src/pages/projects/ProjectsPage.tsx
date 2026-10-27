@@ -33,7 +33,7 @@ import { AgentFace } from "../../ui/Face";
 import { Field, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
-import { Card, ListCard, ListRow, Quiet } from "../kit";
+import { Card, ListCard, ListRow, Quiet } from "../../ui/layout";
 import { IslandDetail, ProjectMap, useIslands } from "./ProjectMap";
 
 type Asked<A> = QueryObserverResult<A>;

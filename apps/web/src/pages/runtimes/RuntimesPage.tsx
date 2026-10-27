@@ -22,18 +22,18 @@ import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "../.
 import { yuan } from "../../rules/chat";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
-import { A } from "../../app/A";
+import { A } from "../../ui/A";
 import { Keyed } from "../../base/util";
 import { useWorkAgents } from "../../data/agents";
 import { ready, useRuntimes } from "../../base/query";
-import { RuntimeIcon } from "../../farm/kit/RuntimeIcon";
+import { RuntimeIcon } from "../../ui/RuntimeIcon";
 import { Button } from "../../ui/Button";
 import { KeyValueEditor } from "../../ui/Chips";
 import { AgentFace } from "../../ui/Face";
 import { Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
-import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../kit";
+import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../../ui/layout";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: runtimesWording().capability.listModels,

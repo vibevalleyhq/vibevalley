@@ -3,7 +3,7 @@
 import { appWording } from "../base/words";
 import { Show } from "solid-js";
 import type { Look } from "@vibevalley/protocol";
-import { castPrefix } from "../rules/cast";
+import { castPrefix } from "./cast";
 import { ready, useSprites } from "../base/query";
 import { RuntimeBadge } from "./RuntimeBadge";
 

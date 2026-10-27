@@ -15,7 +15,7 @@ import { useFarm } from "../state";
 import { voiceCall } from "../../voice/call";
 import { lcd } from "./lcd";
 import type { PadButton } from "./pad";
-import { playSound } from "../sound";
+import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import { useRouter } from "../../base/router";
 import { padListening, phoneState, pressPad } from "../support";

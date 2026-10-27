@@ -16,7 +16,7 @@ import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
-import { FarmSection, PxButton, SpriteIcon } from "../kit";
+import { FarmSection, PxButton, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
 import { useIssueChanges } from "../../data/issues";

@@ -7,7 +7,7 @@ import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
 import { changeKind, patchLines, patchMarkOf } from "../../rules/issueState";
 import { aria } from "../../base/util";
-import { SpriteIcon } from "../kit";
+import { SpriteIcon } from "../../ui/pixel";
 
 /** A colour at `alpha` of its strength over cream. */
 export const tint = (hex: string, alpha: number) => `color-mix(in srgb, ${hex} ${Math.round(alpha * 100)}%, #f7e8c4)`;

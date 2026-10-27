@@ -9,9 +9,9 @@ import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../base/frame";
 import { AgentFace, OrchestratorFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
-import { A } from "./A";
+import { A } from "../ui/A";
 import { useRouter } from "../base/router";
-import { titleBar } from "./TitleBar";
+import { titleBar } from "../ui/TitleBar";
 import { usePrefs } from "../base/prefs";
 
 /** The head's height, the rail's top slot's too. */

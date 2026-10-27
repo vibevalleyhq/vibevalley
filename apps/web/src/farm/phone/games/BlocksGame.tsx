@@ -5,7 +5,7 @@ import { phoneWording } from "../words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 import { lcd } from "../lcd";
-import { playSound } from "../../sound";
+import { playSound } from "../../../ui/pixel/sound";
 import { kept, usePad, useTicks } from "../../support";
 
 const game = kept<Blocks | null>(null);

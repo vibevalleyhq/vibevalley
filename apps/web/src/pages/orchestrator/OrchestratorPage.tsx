@@ -6,7 +6,7 @@ import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { orchestratorLooks } from "../../farm/kit/looks";
-import { A } from "../../app/A";
+import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";

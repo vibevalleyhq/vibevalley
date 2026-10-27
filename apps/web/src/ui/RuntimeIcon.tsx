@@ -1,9 +1,9 @@
 // A runtime drawn as its farm machine, with its maker's badge: the farm's quota bottle and the workbench's runtime lists.
 
 import { Show } from "solid-js";
-import { machineOf } from "../../rules/quota";
-import { RuntimeBadge } from "../../ui/RuntimeBadge";
-import { SpriteIcon } from "./icons";
+import { machineOf } from "../rules/quota";
+import { RuntimeBadge } from "./RuntimeBadge";
+import { SpriteIcon } from "./pixel/icons";
 
 export function RuntimeIcon(props: { runtime: string; size: number }) {
   return (

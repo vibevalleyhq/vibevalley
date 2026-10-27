@@ -7,8 +7,8 @@
 import { treeWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../farm/kit";
-import { playSound } from "../farm/sound";
+import { PxButton, PxPick, PxWindow, pxText, SpriteIcon } from "../ui/pixel";
+import { playSound } from "../ui/pixel/sound";
 import { useRouter, useSearch } from "../base/router";
 import { useNow, useViewport } from "../base/util";
 import { ago } from "../base/format";

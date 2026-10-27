@@ -41,14 +41,14 @@ import {
   voiceSample,
   withPart,
 } from "../../rules/voice";
-import { A } from "../../app/A";
+import { A } from "../../ui/A";
 import { aria, createSettled, Keyed } from "../../base/util";
 import { ready, useQuery, useSettings } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
-import { Card, Quiet, SecretInput, TextLink } from "../kit";
+import { Card, Quiet, SecretInput, TextLink } from "../../ui/layout";
 import { saveSettings } from "./SettingsForm";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";

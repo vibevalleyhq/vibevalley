@@ -1,6 +1,6 @@
 import { For, Match, Switch } from "solid-js";
 import { CardColors, type Piece } from "./card";
-import type { SpriteAtlas } from "../world/sprites";
+import type { SpriteAtlas } from "./atlas";
 
 /** A helper's head, cut from its attention drawing (`<look>-down`, else the bear farmer's), on a leaf green ground. */
 export function AnimalFace(props: { atlas: SpriteAtlas; look: string; size: number }) {

@@ -5,7 +5,7 @@ import { type Accessor, createEffect, createSignal, onSettled } from "solid-js";
 import type { StateFrame } from "@vibevalley/protocol";
 import { phoneCalls } from "./phone/calls";
 import { type PadButton, type PadHandler, padKeys, typingIn } from "./phone/pad";
-import { type FarmSoundInput, farmCues, inTurn, isMuted, playSound, setMuted, subscribeMuted, unlockSound } from "./sound";
+import { type FarmSoundInput, farmCues, inTurn, isMuted, playSound, setMuted, subscribeMuted, unlockSound } from "../ui/pixel/sound";
 import { farm, farmState, subscribeFarm } from "./store";
 import { farmKey, typing } from "./tools";
 import { loadVillage, type Village } from "./world/load";

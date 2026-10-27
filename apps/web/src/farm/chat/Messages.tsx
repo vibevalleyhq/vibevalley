@@ -10,7 +10,7 @@ import { farmClock, readsLong } from "./text";
 import { spentText } from "../../rules/chat";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
-import { PxMarkdown, SpriteIcon } from "../kit";
+import { PxMarkdown, SpriteIcon } from "../../ui/pixel";
 
 import { usePrefs } from "../../base/prefs";
 

@@ -1,4 +1,4 @@
-import { farmWording } from "../words";
+import { farmWording } from "../../farm/words";
 import { createEffect, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { pxText, pxWindow } from "./style";

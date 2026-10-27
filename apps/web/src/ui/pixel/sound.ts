@@ -2,10 +2,10 @@
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
-import { farmWording } from "./words";
+import { farmWording } from "../../farm/words";
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
-import type { BedFxKind } from "./tools";
+import type { BedFxKind } from "../../farm/tools";
 
 function grains(
   pen: Pen,

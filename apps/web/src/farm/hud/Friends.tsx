@@ -14,7 +14,7 @@ import { useRouter } from "../../base/router";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useAgents, useRuntimes } from "../../base/query";
 import { AgentFace } from "../../ui/Face";
-import { PxButton, SpriteIcon } from "../kit";
+import { PxButton, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { HudCard } from "./HudCard";
 import { setPick, usePrefs } from "../../base/prefs";

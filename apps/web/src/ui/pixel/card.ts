@@ -1,5 +1,5 @@
 import type { BadgeTone } from "@vibevalley/protocol";
-import type { SpriteAtlas, SpriteInfo } from "../world/sprites";
+import type { SpriteAtlas, SpriteInfo } from "./atlas";
 
 // At screen pixels, so the words stay sharp at any scale.
 

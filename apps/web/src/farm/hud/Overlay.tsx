@@ -15,7 +15,7 @@ import { plotH } from "../world/world";
 import { useFrames } from "../../base/frame";
 import { useRoom } from "../../data/rooms";
 import { generalOf } from "../../rules/chat";
-import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../kit";
+import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { useVillage } from "../support";
 

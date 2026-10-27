@@ -9,7 +9,7 @@ import { farm, type FarmOverlay, type FarmPanel } from "../store";
 import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../kit/looks";
 import { aria, Keyed } from "../../base/util";
 import { useCore } from "../../base/frame";
-import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../kit";
+import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { useVillage } from "../support";
 import { Achievements } from "./Achievements";

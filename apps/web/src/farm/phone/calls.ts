@@ -5,7 +5,7 @@
 import type { InboxItem } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { voiceCall } from "../../voice/call";
-import { playSound } from "../sound";
+import { playSound } from "../../ui/pixel/sound";
 import { farm, farmState } from "../store";
 
 export interface PhoneLogEntry {

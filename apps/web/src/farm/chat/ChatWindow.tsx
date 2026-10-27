@@ -9,7 +9,7 @@ import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } 
 import { newSendKey } from "../../base/api";
 import { arrived, pending, say } from "../../data/composer";
 import { liveCaptions, type SpokenLine } from "../../voice/captions";
-import { playSound } from "../sound";
+import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import {
   channelLabel,
@@ -34,7 +34,7 @@ import { useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
 import { createCall } from "../../voice/createCall";
-import { PxButton, SpriteIcon } from "../kit";
+import { PxButton, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";
 import { type ChatPhase, FarmComposer } from "./Composer";

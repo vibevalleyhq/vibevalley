@@ -2,7 +2,7 @@
 // as large as it can be while its edges cut off at most 5% of its width on each side and 8% of its height above and
 // below. A window it cannot fill that way keeps bars.
 
-import type { Size } from "./sprites";
+import type { Size } from "../../ui/pixel/atlas";
 
 export const villageCutAcross = 0.05;
 export const villageCutDown = 0.08;

@@ -4,9 +4,9 @@
 import { pagesWording } from "../base/words/pages";
 import { createSignal, omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { A } from "../app/A";
+import { A } from "./A";
 import { aria } from "../base/util";
-import { TextInput } from "../ui/Field";
+import { TextInput } from "./Field";
 
 /** A list beside its detail; under md the list stacks over it. */
 export function Split(props: { list: JSX.Element; children: JSX.Element }) {

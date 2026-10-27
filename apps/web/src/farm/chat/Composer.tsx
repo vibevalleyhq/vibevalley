@@ -14,7 +14,7 @@ import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { AgentFace } from "../../ui/Face";
 import { DictationButton } from "../../voice/DictationButton";
-import { SpriteIcon } from "../kit";
+import { SpriteIcon } from "../../ui/pixel";
 
 import { useAgent } from "../../data/agents";
 import { setPick, usePrefs } from "../../base/prefs";

@@ -1,4 +1,4 @@
-import { farmWording } from "../words";
+import { farmWording } from "../../farm/words";
 import { createSignal, For } from "solid-js";
 import { splitChips } from "./chips";
 import { pxRing, pxText } from "./style";

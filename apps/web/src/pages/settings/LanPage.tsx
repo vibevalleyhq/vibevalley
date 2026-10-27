@@ -12,7 +12,7 @@ import { useNow } from "../../base/util";
 import { ready, useQuery } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { Qr } from "../../ui/Qr";
-import { Card, Quiet } from "../kit";
+import { Card, Quiet } from "../../ui/layout";
 
 const notes = settingsWording().lan.notes;
 

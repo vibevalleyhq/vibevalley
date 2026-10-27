@@ -1,7 +1,7 @@
 // The level and the atlas, fetched once per page (public/village.ldtk, public/pixel).
 
 import { Level } from "./level";
-import { SpriteAtlas } from "./sprites";
+import { SpriteAtlas } from "../../ui/pixel/atlas";
 import { VillageWorld } from "./world";
 
 export interface Village {

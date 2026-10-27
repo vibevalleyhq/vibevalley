@@ -33,7 +33,7 @@ import { ready, useQuery } from "../base/query";
 import { TextInput } from "../ui/Field";
 import { Icon } from "../ui/Icon";
 import { Markdown } from "../ui/Markdown";
-import { Quiet } from "./kit";
+import { Quiet } from "../ui/layout";
 
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
