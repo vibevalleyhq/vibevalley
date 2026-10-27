@@ -1,7 +1,8 @@
 // 技能: the skills the runtimes on this machine carry, read-only, and VibeValley's own, which
 // a profile picks; /settings/skills/<id>, installed:<name> for an installed one, new for a new one.
 
-import { settingsWording } from "../setting/words";
+import { runtimesWording } from "./words";
+import { appWording } from "../../base/words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { RuntimeInfo, Skill } from "@vibevalley/protocol";
@@ -46,26 +47,29 @@ export function SkillsPage(props: { id?: string }) {
 
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <nav aria-label={settingsWording().skills.book} class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto">
-        <h2 class="px-2 pt-1.5 text-base font-semibold">{settingsWording().skills.book}</h2>
+      <nav
+        aria-label={runtimesWording().library.book}
+        class="flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-72 lg:overflow-y-auto"
+      >
+        <h2 class="px-2 pt-1.5 text-base font-semibold">{runtimesWording().library.book}</h2>
         <TextInput
-          aria-label={settingsWording().skills.search}
-          placeholder={settingsWording().skills.searchHint}
+          aria-label={runtimesWording().library.search}
+          placeholder={runtimesWording().library.searchHint}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
         <Show when={runtimes.error}>
           <p class="px-2 text-xs text-berry">
-            {settingsWording().skills.noRuntimes}
+            {runtimesWording().library.noRuntimes}
             {reasonOf(runtimes.error)}
           </p>
         </Show>
-        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">{settingsWording().skills.installed(count(list().length, installed().length))}</h3>
+        <h3 class="px-2 pt-2 text-xs font-semibold text-muted">{runtimesWording().library.installed(count(list().length, installed().length))}</h3>
         <Show when={installed().length === 0}>
-          <p class="px-2 text-xs text-muted">{settingsWording().skills.noneReported}</p>
+          <p class="px-2 text-xs text-muted">{runtimesWording().library.noneReported}</p>
         </Show>
         <Show when={installed().length > 0 && list().length === 0}>
-          <p class="px-2 text-xs text-muted">{settingsWording().skills.noMatch}</p>
+          <p class="px-2 text-xs text-muted">{runtimesWording().library.noMatch}</p>
         </Show>
         <ul class="flex flex-col gap-0.5">
           <For each={list()}>
@@ -80,9 +84,9 @@ export function SkillsPage(props: { id?: string }) {
           </For>
         </ul>
         <div class="flex items-center gap-2 px-2 pt-3">
-          <h3 class="flex-1 text-xs font-semibold text-muted">{settingsWording().skills.own(count(ownShown().length, own().length))}</h3>
+          <h3 class="flex-1 text-xs font-semibold text-muted">{runtimesWording().library.own(count(ownShown().length, own().length))}</h3>
           <A href={skillPath("new")} class="inline-flex h-6 items-center rounded-md bg-accent px-2 text-xs text-page hover:bg-leaf">
-            {settingsWording().skills.newSkill}
+            {runtimesWording().library.newSkill}
           </A>
         </div>
         <ul class="flex flex-col gap-0.5">
@@ -90,7 +94,7 @@ export function SkillsPage(props: { id?: string }) {
         </ul>
       </nav>
       <div class="min-w-0 flex-1 lg:overflow-y-auto">
-        <Switch fallback={<Quiet>{settingsWording().skills.noSkills}</Quiet>}>
+        <Switch fallback={<Quiet>{runtimesWording().library.noSkills}</Quiet>}>
           <Match when={creating()}>
             <Keyed key="new">{() => <SkillEditor />}</Keyed>
           </Match>
@@ -123,12 +127,12 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
 function InstalledCard(props: { skill: InstalledSkill; catalog: readonly RuntimeInfo[] }) {
   return (
     <Card title={props.skill.name} class="max-w-3xl">
-      <p class="text-xs text-muted">{settingsWording().skills.installedNote}</p>
+      <p class="text-xs text-muted">{runtimesWording().library.installedNote}</p>
       <Show when={props.skill.description}>
         <p class="text-sm whitespace-pre-wrap">{props.skill.description}</p>
       </Show>
       <div class="flex flex-col gap-1.5">
-        <h3 class="text-xs font-semibold text-muted">{settingsWording().skills.where}</h3>
+        <h3 class="text-xs font-semibold text-muted">{runtimesWording().library.where}</h3>
         <For each={props.skill.runtimes}>
           {(x) => (
             <div class="flex items-center gap-2.5 rounded-md bg-hover px-3 py-2">
@@ -189,57 +193,57 @@ function SkillEditor(props: { skill?: Skill }) {
 
   return (
     <Card
-      title={draft().name || settingsWording().skills.newSkill}
+      title={draft().name || runtimesWording().library.newSkill}
       class="max-w-3xl"
       action={
         <div class="flex flex-wrap items-center gap-2">
           <Show when={skill}>
             {(s) => (
-              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{settingsWording().remove}</Button>}>
+              <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{appWording().form.remove}</Button>}>
                 <span class="text-xs text-muted">
-                  {agents().length > 0 ? settingsWording().skills.inUse(agents().length) : settingsWording().skills.removeIt}
+                  {agents().length > 0 ? runtimesWording().library.inUse(agents().length) : runtimesWording().library.removeIt}
                 </span>
                 <Button tone="danger" disabled={busy()} onClick={() => void remove(s())}>
-                  {settingsWording().remove}
+                  {appWording().form.remove}
                 </Button>
-                <Button onClick={() => setSure(false)}>{settingsWording().never}</Button>
+                <Button onClick={() => setSure(false)}>{appWording().form.never}</Button>
               </Show>
             )}
           </Show>
           <Button tone="primary" disabled={busy() || !dirty() || !draft().name.trim() || !draft().body.trim()} onClick={() => void save()}>
-            {settingsWording().save}
+            {appWording().form.save}
           </Button>
         </div>
       }
     >
-      <Field label={settingsWording().skills.name}>
+      <Field label={runtimesWording().library.name}>
         <TextInput
-          aria-label={settingsWording().skills.nameLabel}
-          placeholder={settingsWording().skills.nameHint}
+          aria-label={runtimesWording().library.nameLabel}
+          placeholder={runtimesWording().library.nameHint}
           value={draft().name}
           onInput={(e) => setDraft({ ...draft(), name: e.currentTarget.value })}
         />
       </Field>
-      <Field label={settingsWording().skills.when} hint={settingsWording().skills.whenHint}>
+      <Field label={runtimesWording().library.when} hint={runtimesWording().library.whenHint}>
         <TextInput
-          aria-label={settingsWording().skills.description}
-          placeholder={settingsWording().skills.descriptionHint}
+          aria-label={runtimesWording().library.description}
+          placeholder={runtimesWording().library.descriptionHint}
           value={draft().description}
           onInput={(e) => setDraft({ ...draft(), description: e.currentTarget.value })}
         />
       </Field>
-      <Field label={settingsWording().skills.body} hint={settingsWording().skills.bodyHint}>
+      <Field label={runtimesWording().library.body} hint={runtimesWording().library.bodyHint}>
         <TextArea
-          aria-label={settingsWording().skills.body}
+          aria-label={runtimesWording().library.body}
           rows={14}
-          placeholder={settingsWording().skills.bodyExample}
+          placeholder={runtimesWording().library.bodyExample}
           value={draft().body}
           onInput={(e) => setDraft({ ...draft(), body: e.currentTarget.value })}
         />
       </Field>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-muted">{settingsWording().skills.who}</span>
-        <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{settingsWording().skills.nobody}</p>}>
+        <span class="text-xs font-medium text-muted">{runtimesWording().library.who}</span>
+        <Show when={agents().length > 0} fallback={<p class="text-xs text-muted">{runtimesWording().library.nobody}</p>}>
           <div class="flex flex-wrap gap-2">
             <For each={agents()}>
               {(a) => (

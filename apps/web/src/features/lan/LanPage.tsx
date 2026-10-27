@@ -1,7 +1,8 @@
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
-import { settingsWording } from "../setting/words";
+import { lanWording } from "./words";
+import { appWording } from "../../base/words";
 import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
@@ -14,7 +15,7 @@ import { Button } from "../../ui/Button";
 import { Qr } from "../../ui/Qr";
 import { Card, Quiet } from "../../ui/layout";
 
-const notes = settingsWording().lan.notes;
+const notes = lanWording().lan.notes;
 
 type Act = (call: () => Promise<LanStatus>) => Promise<void>;
 
@@ -33,27 +34,27 @@ export function LanPage() {
   return (
     <div class="flex max-w-3xl flex-col gap-3">
       <Card
-        title={settingsWording().sections.lan.label}
-        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? settingsWording().lan.open : settingsWording().lan.closed}</span>}</Show>}
+        title={lanWording().lan.section.label}
+        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? lanWording().lan.open : lanWording().lan.closed}</span>}</Show>}
       >
-        <Show when={s()} fallback={<Quiet>{status.error ? reasonOf(status.error) : settingsWording().asking}</Quiet>}>
+        <Show when={s()} fallback={<Quiet>{status.error ? reasonOf(status.error) : appWording().form.asking}</Quiet>}>
           {(s) => (
             <>
               <Show
                 when={s().open}
                 fallback={
                   <>
-                    <p class="text-sm">{settingsWording().lan.intro}</p>
+                    <p class="text-sm">{lanWording().lan.intro}</p>
                     <div>
                       <Button tone="primary" onClick={() => void act(() => api.lan.update({ body: { open: true } }))}>
-                        {settingsWording().lan.allow}
+                        {lanWording().lan.allow}
                       </Button>
                     </div>
                   </>
                 }
               >
                 <div class="flex gap-3">
-                  <span class="w-18 shrink-0 text-sm text-muted">{settingsWording().lan.address}</span>
+                  <span class="w-18 shrink-0 text-sm text-muted">{lanWording().lan.address}</span>
                   <span class="font-mono text-sm select-all">{s().url ?? "—"}</span>
                 </div>
                 <Show
@@ -61,9 +62,9 @@ export function LanPage() {
                   fallback={
                     <div class="flex flex-wrap gap-2">
                       <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.startPairing())}>
-                        {settingsWording().lan.add}
+                        {lanWording().lan.add}
                       </Button>
-                      <Button onClick={() => void act(() => api.lan.update({ body: { open: false } }))}>{settingsWording().lan.close}</Button>
+                      <Button onClick={() => void act(() => api.lan.update({ body: { open: false } }))}>{lanWording().lan.close}</Button>
                     </div>
                   }
                 >
@@ -89,22 +90,18 @@ export function LanPage() {
       </Card>
       <Show when={s() && s()!.devices.length > 0 ? s() : undefined}>
         {(s) => (
-          <Card title={settingsWording().lan.devices} action={<span class="text-sm text-muted">{settingsWording().lan.deviceCount(s().devices.length)}</span>}>
+          <Card title={lanWording().lan.devices} action={<span class="text-sm text-muted">{lanWording().lan.deviceCount(s().devices.length)}</span>}>
             <For each={s().devices}>
               {(d) => (
                 <div class="flex items-center gap-2">
                   <span class="flex min-w-0 flex-1 flex-col">
                     <span class="truncate text-sm font-medium">{d.name}</span>
                     <span class="truncate text-xs text-muted">
-                      {settingsWording().lan.paired(momentText(d.pairedAt), d.lastSeen ? momentText(d.lastSeen) : undefined)}
+                      {lanWording().lan.paired(momentText(d.pairedAt), d.lastSeen ? momentText(d.lastSeen) : undefined)}
                     </span>
                   </span>
-                  <Button
-                    tone="danger"
-                    aria-label={settingsWording().lan.removeWhich(d.name)}
-                    onClick={() => void act(() => api.lan.deleteDevice({ id: d.id }))}
-                  >
-                    {settingsWording().lan.remove}
+                  <Button tone="danger" aria-label={lanWording().lan.removeWhich(d.name)} onClick={() => void act(() => api.lan.deleteDevice({ id: d.id }))}>
+                    {lanWording().lan.remove}
                   </Button>
                 </div>
               )}
@@ -119,9 +116,9 @@ export function LanPage() {
 async function copy(link: string) {
   try {
     await navigator.clipboard.writeText(link);
-    toast(settingsWording().lan.copied);
+    toast(lanWording().lan.copied);
   } catch {
-    toast(settingsWording().lan.notCopied);
+    toast(lanWording().lan.notCopied);
   }
 }
 
@@ -134,18 +131,18 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
       fallback={
         <div class="flex flex-wrap gap-5">
           <div class="rounded-md border border-line bg-white p-2">
-            <Qr text={props.pairing.link} label={settingsWording().lan.qr} />
+            <Qr text={props.pairing.link} label={lanWording().lan.qr} />
           </div>
           <div class="flex max-w-md min-w-50 flex-col gap-2">
-            <p class="text-sm">{settingsWording().lan.scan}</p>
+            <p class="text-sm">{lanWording().lan.scan}</p>
             <p class="font-mono text-[11.5px] break-all select-all">{props.pairing.link}</p>
-            <p class="text-xs text-muted">{settingsWording().lan.left(left())}</p>
+            <p class="text-xs text-muted">{lanWording().lan.left(left())}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <Button icon="button-copy" onClick={() => void copy(props.pairing.link)}>
-                {settingsWording().lan.copy}
+                {lanWording().lan.copy}
               </Button>
-              <Button onClick={() => void props.act(() => api.lan.startPairing())}>{settingsWording().connectors.newCode}</Button>
-              <Button onClick={() => void props.act(() => api.lan.stopPairing())}>{settingsWording().lan.stop}</Button>
+              <Button onClick={() => void props.act(() => api.lan.startPairing())}>{lanWording().lan.newCode}</Button>
+              <Button onClick={() => void props.act(() => api.lan.stopPairing())}>{lanWording().lan.stop}</Button>
             </div>
           </div>
         </div>
@@ -153,13 +150,13 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
     >
       {(asking) => (
         <div class="flex flex-col gap-3">
-          <p class="text-sm">{settingsWording().lan.asking(asking())}</p>
+          <p class="text-sm">{lanWording().lan.asking(asking())}</p>
           <div class="flex gap-2">
             <Button tone="primary" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: true } }))}>
-              {settingsWording().lan.letIn}
+              {lanWording().lan.letIn}
             </Button>
             <Button tone="danger" onClick={() => void props.act(() => api.lan.answerPairing({ body: { allow: false } }))}>
-              {settingsWording().lan.refuse}
+              {lanWording().lan.refuse}
             </Button>
           </div>
         </div>

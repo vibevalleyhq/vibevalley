@@ -1,7 +1,8 @@
 // 连接器: the chat apps the owner talks to the farm from. Polled while open: a scan on the
 // phone moves a login on without a reload.
 
-import { settingsWording } from "../setting/words";
+import { connectorWording } from "./words";
+import { appWording } from "../../base/words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
@@ -18,33 +19,33 @@ import { Qr } from "../../ui/Qr";
 import { Card, ListCard, ListRow, Quiet, SecretInput, Split, TextLink } from "../../ui/layout";
 
 export const connectorLabel: Record<ConnectorID, string> = {
-  weixin: settingsWording().connectors.label.weixin,
-  feishu: settingsWording().connectors.label.feishu,
+  weixin: connectorWording().connectors.label.weixin,
+  feishu: connectorWording().connectors.label.feishu,
   qq: "QQ",
 };
 
 const connectorHow: Record<ConnectorID, string> = {
-  weixin: settingsWording().connectors.how.weixin,
-  feishu: settingsWording().connectors.how.feishu,
-  qq: settingsWording().connectors.how.qq,
+  weixin: connectorWording().connectors.how.weixin,
+  feishu: connectorWording().connectors.how.feishu,
+  qq: connectorWording().connectors.how.qq,
 };
 
 const connectorNotes: Record<ConnectorID, string[]> = {
-  weixin: settingsWording().connectors.notes.weixin,
-  feishu: settingsWording().connectors.notes.feishu,
-  qq: settingsWording().connectors.notes.qq,
+  weixin: connectorWording().connectors.notes.weixin,
+  feishu: connectorWording().connectors.notes.feishu,
+  qq: connectorWording().connectors.notes.qq,
 };
 
-const connectorsAlways = settingsWording().connectors.always;
+const connectorsAlways = connectorWording().connectors.always;
 
 export const stateLabel: Record<ConnectorState, string> = {
-  off: settingsWording().connectors.state.off,
-  waiting: settingsWording().connectors.state.waiting,
-  scanned: settingsWording().connectors.state.scanned,
-  verify: settingsWording().connectors.state.verify,
-  pairing: settingsWording().connectors.state.pairing,
-  connected: settingsWording().connectors.state.connected,
-  paused: settingsWording().connectors.state.paused,
+  off: connectorWording().connectors.state.off,
+  waiting: connectorWording().connectors.state.waiting,
+  scanned: connectorWording().connectors.state.scanned,
+  verify: connectorWording().connectors.state.verify,
+  pairing: connectorWording().connectors.state.pairing,
+  connected: connectorWording().connectors.state.connected,
+  paused: connectorWording().connectors.state.paused,
 };
 
 const dot = (s: ConnectorState | undefined) => (s === "connected" ? "bg-leaf" : s === "pairing" || s === "paused" ? "bg-wheat" : "bg-cream-300");
@@ -67,8 +68,8 @@ export function ConnectorsPage(props: { id?: string }) {
   return (
     <Split
       list={
-        <ListCard title={settingsWording().sections.connectors.label} label={settingsWording().connectors.list}>
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{settingsWording().connectors.intro}</li>
+        <ListCard title={connectorWording().connectors.section.label} label={connectorWording().connectors.list}>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{connectorWording().connectors.intro}</li>
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
@@ -89,13 +90,13 @@ export function ConnectorsPage(props: { id?: string }) {
           when={list()}
           fallback={
             <Card title={connectorLabel[selected()]}>
-              <Quiet>{settingsWording().asking}</Quiet>
+              <Quiet>{appWording().form.asking}</Quiet>
             </Card>
           }
         >
           <Keyed key={selected()}>{() => <ConnectorCard id={selected()} status={of(selected()) ?? { id: selected(), state: "off", pending: 0 }} />}</Keyed>
         </Show>
-        <Card title={settingsWording().connectors.know}>
+        <Card title={connectorWording().connectors.know}>
           <ul class="flex flex-col gap-1.5">
             <For each={[...connectorNotes[selected()], connectorsAlways]}>
               {(n) => (
@@ -147,7 +148,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
   const disconnect = () => (
     <div>
       <Button tone="danger" disabled={busy()} onClick={() => void logout()}>
-        {settingsWording().connectors.disconnect}
+        {connectorWording().connectors.disconnect}
       </Button>
     </div>
   );
@@ -157,10 +158,10 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
       <Switch>
         <Match when={state() === "off"}>
           <Show when={props.id !== "qq"} fallback={<QqLogin busy={busy()} onLogin={(appId, secret) => void login({ appId, secret })} />}>
-            <p class="text-sm">{props.id === "weixin" ? settingsWording().connectors.weixinIntro : settingsWording().connectors.feishuIntro}</p>
+            <p class="text-sm">{props.id === "weixin" ? connectorWording().connectors.weixinIntro : connectorWording().connectors.feishuIntro}</p>
             <div>
               <Button tone="primary" disabled={busy()} onClick={() => void login()}>
-                {settingsWording().connectors.scan(label())}
+                {connectorWording().connectors.scan(label())}
               </Button>
             </div>
           </Show>
@@ -169,29 +170,29 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
           <LoginCode status={props.status} busy={busy()} app={label()} onRefresh={() => void login({ force: true })} onVerify={(code) => void verify(code)} />
         </Match>
         <Match when={state() === "pairing"}>
-          <p class="text-sm">{settingsWording().connectors.pairing(label())}</p>
+          <p class="text-sm">{connectorWording().connectors.pairing(label())}</p>
           <div>
             <span class="inline-block rounded-lg bg-hover px-4 py-2 font-mono text-3xl font-semibold tracking-[4px] select-all">
               {props.status.pairCode ?? ""}
             </span>
           </div>
-          <p class="text-xs text-muted">{settingsWording().connectors.pairingNote}</p>
+          <p class="text-xs text-muted">{connectorWording().connectors.pairingNote}</p>
           {disconnect()}
         </Match>
         <Match when={state() === "connected" || state() === "paused"}>
-          <Row label={settingsWording().connectors.owner}>{props.status.owner ?? ""}</Row>
-          <Row label={settingsWording().connectors.channel}>
+          <Row label={connectorWording().connectors.owner}>{props.status.owner ?? ""}</Row>
+          <Row label={connectorWording().connectors.channel}>
             <ChannelPick id={props.id} current={props.status.channel ?? generalName} />
           </Row>
-          <Show when={props.status.since}>{(since) => <Row label={settingsWording().connectors.since}>{momentText(since())}</Row>}</Show>
-          <Row label={settingsWording().connectors.lastInbound}>
-            {props.status.lastInbound !== undefined ? momentText(props.status.lastInbound) : settingsWording().none}
+          <Show when={props.status.since}>{(since) => <Row label={connectorWording().connectors.since}>{momentText(since())}</Row>}</Show>
+          <Row label={connectorWording().connectors.lastInbound}>
+            {props.status.lastInbound !== undefined ? momentText(props.status.lastInbound) : appWording().form.none}
           </Row>
-          <Row label={settingsWording().connectors.pending}>
-            {props.status.pending > 0 ? settingsWording().connectors.pendingCount(Math.round(props.status.pending)) : settingsWording().connectors.noPending}
+          <Row label={connectorWording().connectors.pending}>
+            {props.status.pending > 0 ? connectorWording().connectors.pendingCount(Math.round(props.status.pending)) : connectorWording().connectors.noPending}
           </Row>
           <Show when={state() === "paused" ? props.status.pausedUntil : undefined}>
-            {(until) => <p class="text-sm text-berry">{settingsWording().connectors.paused(wallClockText(until()))}</p>}
+            {(until) => <p class="text-sm text-berry">{connectorWording().connectors.paused(wallClockText(until()))}</p>}
           </Show>
           {disconnect()}
         </Match>
@@ -224,7 +225,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   };
   return (
     <span class="flex flex-wrap items-center gap-2">
-      <Select class="w-50" label={settingsWording().connectors.whichChannel} value={props.current} options={options()} onChange={(v) => void move(v)} />
+      <Select class="w-50" label={connectorWording().connectors.whichChannel} value={props.current} options={options()} onChange={(v) => void move(v)} />
       <Show when={error()}>
         <span class="text-xs text-berry">{error()}</span>
       </Show>
@@ -245,26 +246,26 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
       }}
     >
       <p class="text-sm">
-        {settingsWording().connectors.qqBefore}{" "}
+        {connectorWording().connectors.qqBefore}{" "}
         <a class="underline" href="https://q.qq.com/" target="_blank" rel="noreferrer">
-          {settingsWording().connectors.qqPlatform}
+          {connectorWording().connectors.qqPlatform}
         </a>{" "}
-        {settingsWording().connectors.qqAfter}
+        {connectorWording().connectors.qqAfter}
       </p>
       <Field label="AppID">
         <TextInput aria-label="AppID" class="font-mono" placeholder="102xxxxxx" value={appId()} onInput={(e) => setAppId(e.currentTarget.value)} />
       </Field>
-      <Field label="AppSecret" hint={settingsWording().connectors.secretHint}>
+      <Field label="AppSecret" hint={connectorWording().connectors.secretHint}>
         <SecretInput
           aria-label="AppSecret"
-          placeholder={settingsWording().connectors.secret}
+          placeholder={connectorWording().connectors.secret}
           value={secret()}
           onInput={(e) => setSecret(e.currentTarget.value)}
         />
       </Field>
       <div>
         <Button type="submit" tone="primary" disabled={!canLogin()}>
-          {settingsWording().connectors.connectQq}
+          {connectorWording().connectors.connectQq}
         </Button>
       </div>
     </form>
@@ -275,17 +276,17 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
   const [code, setCode] = createSignal("");
   const say = () =>
     props.status.state === "waiting"
-      ? settingsWording().connectors.scanWith(props.app)
+      ? connectorWording().connectors.scanWith(props.app)
       : props.status.state === "scanned"
-        ? settingsWording().connectors.scanned
+        ? connectorWording().connectors.scanned
         : props.status.state === "verify"
-          ? settingsWording().connectors.digits
+          ? connectorWording().connectors.digits
           : "";
   return (
     <div class="flex flex-wrap gap-5">
       <div class="flex size-56 items-center justify-center rounded-md border border-line bg-white p-2">
-        <Show when={props.status.qr} fallback={<span class="text-xs text-muted">{settingsWording().connectors.gettingQr}</span>}>
-          {(qr) => <Qr text={qr()} label={settingsWording().connectors.qr(props.app)} />}
+        <Show when={props.status.qr} fallback={<span class="text-xs text-muted">{connectorWording().connectors.gettingQr}</span>}>
+          {(qr) => <Qr text={qr()} label={connectorWording().connectors.qr(props.app)} />}
         </Show>
       </div>
       <div class="flex max-w-md min-w-50 flex-col gap-3">
@@ -299,27 +300,27 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
             }}
           >
             <TextInput
-              aria-label={settingsWording().connectors.phoneDigits}
-              placeholder={settingsWording().connectors.phoneDigits}
+              aria-label={connectorWording().connectors.phoneDigits}
+              placeholder={connectorWording().connectors.phoneDigits}
               value={code()}
               onInput={(e) => setCode(e.currentTarget.value)}
             />
             <Button type="submit" tone="primary" disabled={props.busy || !code().trim()}>
-              {settingsWording().connectors.ok}
+              {connectorWording().connectors.ok}
             </Button>
           </form>
         </Show>
         <Show when={props.status.qr}>
           {(qr) => (
             <p class="text-xs text-muted">
-              {settingsWording().connectors.cannotScan}
+              {connectorWording().connectors.cannotScan}
               <TextLink href={qr()}>{qr()}</TextLink>
             </p>
           )}
         </Show>
         <div>
           <Button disabled={props.busy} onClick={() => props.onRefresh()}>
-            {settingsWording().connectors.newCode}
+            {connectorWording().connectors.newCode}
           </Button>
         </div>
       </div>

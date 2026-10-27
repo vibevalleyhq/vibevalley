@@ -1,6 +1,7 @@
 // The keys, the language and the memory sources (setting.load, setting.save), a part at a time; and what the server
 // found of gh.
 
+import { appWording } from "../../base/words";
 import { settingsWording } from "./words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -26,8 +27,8 @@ import { Segmented } from "../../ui/Segmented";
 import { currentLocale } from "@vibevalley/protocol/words";
 import { Quiet, SecretInput, TextLink, Toggle } from "../../ui/layout";
 
-const from: Record<KeySource, string> = { settings: settingsWording().from.settings, config: settingsWording().from.config };
-const keyLine = (k: KeyStatus) => (k.source ? settingsWording().inUse(k.hint ?? "", from[k.source]) : settingsWording().none);
+const from: Record<KeySource, string> = { settings: appWording().form.from.settings, config: appWording().form.from.config };
+const keyLine = (k: KeyStatus) => (k.source ? appWording().form.inUse(k.hint ?? "", from[k.source]) : appWording().form.none);
 
 export type SettingsPart = "deepseek" | "agora" | "memory";
 
@@ -72,8 +73,8 @@ const draftOf = (kind: MemorySourceKind, saved: MemorySource | undefined): Sourc
 export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();
   return (
-    <Pick fallback={<Quiet>{settingsWording().asking}</Quiet>}>
-      <Match when={settings.error}>{(e) => <Quiet>{settingsWording().unreachable(reasonOf(e()))}</Quiet>}</Match>
+    <Pick fallback={<Quiet>{appWording().form.asking}</Quiet>}>
+      <Match when={settings.error}>{(e) => <Quiet>{appWording().form.unreachable(reasonOf(e()))}</Quiet>}</Match>
       <Match when={ready(settings, undefined)}>{(status) => <Form part={props.part} status={untrack(status)} />}</Match>
     </Pick>
   );
@@ -171,7 +172,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <KeyField
           label="DeepSeek API Key"
           help={<TextLink href="https://platform.deepseek.com/api_keys">platform.deepseek.com</TextLink>}
-          line={cleared().has("deepseekApiKey") ? settingsWording().clearOnSave : keyLine(status().deepseekApiKey)}
+          line={cleared().has("deepseekApiKey") ? appWording().form.clearOnSave : keyLine(status().deepseekApiKey)}
           onClear={status().deepseekApiKey.source === "settings" && !cleared().has("deepseekApiKey") ? () => clear("deepseekApiKey") : undefined}
         >
           <SecretInput
@@ -188,10 +189,10 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
           help={<TextLink href="https://console.agora.io/">console.agora.io</TextLink>}
           line={
             cleared().has("agoraAppId")
-              ? settingsWording().clearOnSave
+              ? appWording().form.clearOnSave
               : status().agoraAppId.source
                 ? `（${from[status().agoraAppId.source!]}）`
-                : settingsWording().none
+                : appWording().form.none
           }
           onClear={status().agoraAppId.source === "settings" && !cleared().has("agoraAppId") ? () => clear("agoraAppId") : undefined}
         >
@@ -206,12 +207,12 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
         <KeyField
           label="Agora App Certificate"
           help={<span class="text-xs text-muted">{settingsWording().keys.certificateHelp}</span>}
-          line={cleared().has("agoraAppCertificate") ? settingsWording().clearOnSave : keyLine(status().agoraAppCertificate)}
+          line={cleared().has("agoraAppCertificate") ? appWording().form.clearOnSave : keyLine(status().agoraAppCertificate)}
           onClear={status().agoraAppCertificate.source === "settings" && !cleared().has("agoraAppCertificate") ? () => clear("agoraAppCertificate") : undefined}
         >
           <SecretInput
             aria-label="Agora App Certificate"
-            placeholder={settingsWording().keepEmpty}
+            placeholder={appWording().form.keepEmpty}
             value={certificate()}
             onInput={(e) => typed(setCertificate)(e.currentTarget.value)}
           />
@@ -233,7 +234,7 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
           {status().file}
         </span>
         <Button type="submit" tone="primary" disabled={busy()}>
-          {settingsWording().save}
+          {appWording().form.save}
         </Button>
       </div>
     </form>
@@ -332,7 +333,7 @@ function KeyField(props: { label: string; help: JSX.Element; line: string; onCle
         <span class="flex-1 text-xs text-muted">{props.line}</span>
         <Show when={props.onClear}>
           <TextLink danger onClick={() => props.onClear?.()}>
-            {settingsWording().clear}
+            {appWording().form.clear}
           </TextLink>
         </Show>
       </div>
@@ -349,7 +350,7 @@ export function GitHub() {
   const lines = () => {
     const s = refreshed() ?? ready(status, undefined);
     return !s
-      ? [status.error ? settingsWording().unreachable(reasonOf(status.error)) : settingsWording().asking]
+      ? [status.error ? appWording().form.unreachable(reasonOf(status.error)) : appWording().form.asking]
       : [
           s.installed ? `gh ${s.version}` : settingsWording().github.noGh,
           ...(s.loggedIn ? [settingsWording().github.signedIn(s.account ?? "")] : []),

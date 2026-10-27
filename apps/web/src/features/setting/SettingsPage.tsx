@@ -1,6 +1,10 @@
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
 // first five are the server's settings in a card, the rest whole pages of their own.
 
+import { voiceWording } from "../voice/words";
+import { runtimesWording } from "../runtime/words";
+import { lanWording } from "../lan/words";
+import { connectorWording } from "../connector/words";
 import { settingsWording } from "./words";
 import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../ui/A";
@@ -18,10 +22,10 @@ export const sections = [
   { id: "agora", label: settingsWording().sections.agora.label, line: settingsWording().sections.agora.line },
   { id: "memory", label: settingsWording().sections.memory.label, line: "Nowledge Mem、EverOS" },
   { id: "github", label: "GitHub", line: settingsWording().sections.github.line },
-  { id: "connectors", label: settingsWording().sections.connectors.label, line: settingsWording().sections.connectors.line },
-  { id: "skills", label: settingsWording().sections.skills.label, line: settingsWording().sections.skills.line },
-  { id: "voice", label: settingsWording().sections.voice.label, line: settingsWording().sections.voice.line },
-  { id: "lan", label: settingsWording().sections.lan.label, line: settingsWording().sections.lan.line },
+  { id: "connectors", label: connectorWording().connectors.section.label, line: connectorWording().connectors.section.line },
+  { id: "skills", label: runtimesWording().library.section.label, line: runtimesWording().library.section.line },
+  { id: "voice", label: voiceWording().voice.section.label, line: voiceWording().voice.section.line },
+  { id: "lan", label: lanWording().lan.section.label, line: lanWording().lan.section.line },
 ] as const;
 
 /** `rest` is the path after /settings/. */

@@ -1,5 +1,5 @@
 // What the page's frame says: the places on the rail, the connection to the server, the shared controls (chips,
-// key-value rows, toasts, faces), and the voice: calls and dictation.
+// key-value rows, toasts, faces), the settings forms' shared words, and the voice: calls and dictation.
 
 import { localized } from "@vibevalley/protocol/words";
 
@@ -52,6 +52,21 @@ const zh = {
     cannotHear: (why: string) => `声网：听不到对面：${why}`,
     agora: (code: number, msg: string) => `声网：${code} ${msg}`,
   },
+  form: {
+    asking: "在问服务端……",
+    unreachable: (why: string) => `问不到服务端：${why}`,
+    clear: "清掉",
+    clearOnSave: "存的时候清掉",
+    none: "还没有",
+    keepEmpty: "不改就空着",
+    save: "保存",
+    reset: "恢复默认",
+    never: "算了",
+    remove: "删除",
+    from: { settings: "存在设置里", config: "来自配置（vibevalley.yaml 或环境变量）" },
+    inUse: (hint: string, from: string) => `在用 ${hint}（${from}）`,
+    fromOnly: (from: string) => `（${from}）`,
+  },
 };
 
 const en: typeof zh = {
@@ -101,6 +116,21 @@ const en: typeof zh = {
     noMic: "No microphone permission",
     cannotHear: (why) => `Agora: cannot hear the other side: ${why}`,
     agora: (code, msg) => `Agora: ${code} ${msg}`,
+  },
+  form: {
+    asking: "Asking the server…",
+    unreachable: (why) => `The server cannot be asked: ${why}`,
+    clear: "Clear",
+    clearOnSave: "Cleared on save",
+    none: "None yet",
+    keepEmpty: "Leave empty to keep",
+    save: "Save",
+    reset: "Reset",
+    never: "Never mind",
+    remove: "Delete",
+    from: { settings: "saved in the settings", config: "from the configuration (vibevalley.yaml or the environment)" },
+    inUse: (hint, from) => `Using ${hint} (${from})`,
+    fromOnly: (from) => `(${from})`,
   },
 };
 
