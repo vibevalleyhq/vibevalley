@@ -3,7 +3,7 @@
 // head with the place's name and whether the farm is open.
 
 import { appWording } from "../base/words";
-import { For, Show } from "solid-js";
+import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../base/frame";
@@ -13,6 +13,7 @@ import { A } from "../ui/A";
 import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
 import { usePrefs } from "../base/prefs";
+import { QuickSwitcher, switcher } from "../features/channel";
 
 /** The head's height, the rail's top slot's too. */
 const head = 66;
@@ -114,8 +115,19 @@ function Desk(props: { place?: Place }) {
 export function Shell(props: { children: JSX.Element }) {
   const router = useRouter();
   const here = () => placeOf(router.path().split("?")[0]!);
+  // Ctrl+K (⌘K on a Mac) anywhere in the workbench.
+  onSettled(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
+      e.preventDefault();
+      switcher.toggle();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
   return (
     <div class="flex h-full">
+      <QuickSwitcher />
       <Rail here={here()} />
       <main class="flex min-w-0 flex-1 flex-col">
         <Show when={here()?.id !== "chat"}>

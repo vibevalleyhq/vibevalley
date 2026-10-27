@@ -219,3 +219,25 @@ test("a reaction can be any emoji, picked from the toolbar or beside the reactio
   await page.getByRole("dialog", { name: "表情" }).getByRole("button", { name: "🍀" }).click();
   await expect(log.getByRole("button", { name: /🍀\s*1/ })).toBeVisible();
 });
+
+test("Ctrl+K jumps to a channel by its name from anywhere, and opens a talk with a profile", async ({ page, api }) => {
+  const id = await api.channel.create({ name: "前台" });
+  await api.agent.create({ ...helper, name: "小獾" });
+  await page.goto("/issues");
+  await page.keyboard.press("Control+k");
+  const dialog = page.getByRole("dialog", { name: "跳到频道、串或私聊" });
+  const box = dialog.getByRole("combobox", { name: "跳到频道、串或私聊" });
+  await box.fill("#前");
+  await expect(dialog.getByRole("option").first()).toContainText("#前台");
+  await box.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/chat/${id}$`));
+  await expect(dialog).toHaveCount(0);
+
+  await side(page)
+    .getByRole("button", { name: /跳到…/ })
+    .click();
+  await box.fill("@小獾");
+  await expect(dialog.getByRole("option").first()).toContainText("开一个私聊");
+  await box.press("Enter");
+  await expect(page.getByRole("heading", { name: "小獾" })).toBeVisible();
+});

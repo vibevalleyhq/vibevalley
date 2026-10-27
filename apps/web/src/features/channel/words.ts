@@ -162,6 +162,15 @@ const zh = {
     markUnread: "从这里标成未读",
     jump: "跳到这条",
   },
+  switcher: {
+    open: "跳到…",
+    title: "跳到频道、串或私聊",
+    hint: "输入名字；# 只找频道和串，@ 只找私聊",
+    none: "没有找到",
+    direct: "私聊",
+    newDirect: "开一个私聊",
+    keys: (mac: boolean) => (mac ? "⌘K" : "Ctrl K"),
+  },
   farmSearch: {
     open: "搜全农场",
     title: "搜全农场",
@@ -361,6 +370,15 @@ const en: typeof zh = {
     copied: "Link copied",
     markUnread: "Mark unread from here",
     jump: "Jump to it",
+  },
+  switcher: {
+    open: "Jump to…",
+    title: "Jump to a channel, thread or direct message",
+    hint: "Type a name; # finds channels and threads, @ direct messages",
+    none: "Nothing found",
+    direct: "Direct message",
+    newDirect: "New direct message",
+    keys: (mac) => (mac ? "⌘K" : "Ctrl K"),
   },
   farmSearch: {
     open: "Search the farm",
