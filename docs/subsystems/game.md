@@ -66,7 +66,7 @@
 **记账**（`ledger.OnStart`）：
 
 1. 订阅 `core.Transitions()`，先对当时的状态跑 `catchUp`。
-2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；田头的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`（流式更新的同一条消息只算一次）；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
+2. 每个事实连同折之前、折之后的状态交给 `entriesFor`，读出要记的条目：`report` 失败 → `failed`；`conflict` 有冲突 → `conflicted`；`call` 变成 `live` → `opened`；`hired` → `hired`；`issue` 的计划从 `splitting` 到 `draft` → `split`，到 `done` → `graph`；`left` 关成 `merged` 且有提交 → `harvested`；田头的新消息：主人在工单串里说的 → `told`，主人 @ 的帮工 → `called`，帮工回别人的 → `handoff`；`commits` 跨了级 → `level`；6 块地填满 → `busy6`。
 3. 主人在应用里做的、不改状态的事由经手的服务说给 `core.Did`，账本订阅 `core.owner`（返回前就订上：开机后主人马上做的也不漏）记：主人看收成清单（`issue` 的 `changesFor`，管家看的不算）→ `reviewed`；语音接通（`voice.Start`）→ `voice`。挑称号由 HTTP 调 `Game.chooseTitle` 记 `titled`。
 4. 每条写进 `game_ledger`，`progressStep` 折一步，施加 `progress` 事实；`Core.apply` 同时用 `effectsOf` 算出特效，和帧一起发。
 
