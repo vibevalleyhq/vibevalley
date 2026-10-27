@@ -2,7 +2,6 @@
 // 旧账 (the conversation it folded away) and 声音 (what it says on a call); /orchestrator/<tab>.
 
 import { orchestratorWording } from "./words";
-import { sessionWording } from "../session/words";
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -73,7 +72,7 @@ export function OrchestratorPage(props: { rest: string }) {
           <div class="min-h-0 flex-1">
             <TrajectoryLog
               id={orchestratorAgent}
-              asked={sessionWording().trajectory.lane.asked}
+              asked={orchestratorWording().orchestrator.heard}
               empty={orchestratorWording().orchestrator.quiet}
               title={orchestratorWording().orchestrator.trajectory}
               about={orchestratorWording().orchestrator.about}
