@@ -101,7 +101,7 @@ jobs:
       - if: matrix.shard == 1
         run: vp run --filter @vibevalley/protocol test
       # The test task with the shard as its argument: cached per shard.
-      - run: vp run --filter vibevalley-server test --shard=${{ matrix.shard }}/3
+      - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
 
       # The one check main requires for the server: it passes only when every part did.
       - name: Save Vite Task cache
@@ -143,9 +143,9 @@ jobs:
           restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
       - run: git config --global user.name ci && git config --global user.email ci@example.com
       # web:check without its vp check, which the check job runs. The page's Playwright suite (e2e) runs on the owner's
-      # machine: vp run --filter vibevalley-web e2e.
-      - run: vp run --filter @vibevalley/engine --filter vibevalley-mobile --filter vibevalley-web test
-      - run: vp run --filter vibevalley-web build
+      # machine: vp run --filter @vibevalley/web e2e.
+      - run: vp run --filter @vibevalley/engine --filter @vibevalley/mobile --filter @vibevalley/web test
+      - run: vp run --filter @vibevalley/web build
       - name: Save Vite Task cache
         if: success()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

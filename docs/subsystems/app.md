@@ -25,7 +25,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **灵动岛** `apps/island`：Swift 的原生小程序（AppKit 的 `NSPanel` 里放 SwiftUI），`IslandCore` 是能离开屏幕测的消息（`Messages.swift`）和位置（`Geometry.swift`），`VibeValleyIsland` 画它；桌面壳那一半在 `apps/desktop/src/island.ts`（`glanceOf`、`startIsland`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
-- **检查**：`vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run desktop:test`；手机壳是 `vp run --filter vibevalley-mobile test` 和 `scripts/e2e.ts`。
+- **检查**：`vp run web:check`、`vp run --filter @vibevalley/web e2e`、`vp run desktop:test`；手机壳是 `vp run --filter @vibevalley/mobile test` 和 `scripts/e2e.ts`。
 
 ## 模型和不变量
 

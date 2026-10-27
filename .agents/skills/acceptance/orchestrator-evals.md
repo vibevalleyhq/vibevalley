@@ -8,7 +8,7 @@
 - 改了 `apps/server/src/agent/brain` 里系统提示怎么拼、对话怎么压缩（`agent.ts`、`prefix.ts`、`compaction.ts`）。
 - 往 `apps/server/src/orchestrator/testdata/evals/` 加了样例。
 
-不用它：只改了管家的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter vibevalley-server test src/orchestrator` 就够。
+不用它：只改了管家的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/orchestrator` 就够。
 
 重放连网、花钱（一个样例约等于管家一轮的 token 乘 5），**跑之前先问主人**。没有钥匙或主人没同意时，只做「准备」的第 1 步，并在汇报里写明在线的那半没跑。
 
@@ -17,7 +17,7 @@
 1. 先过离线的检查：每个样例能解开、`expect` 不空、每条 `expect` 写全了它那一种要的字段、录下的那一轮过不了它的 `expect`。
 
    ```bash
-   vp check && vp run --filter vibevalley-server test src/orchestrator/evals.test.ts
+   vp check && vp run --filter @vibevalley/server test src/orchestrator/evals.test.ts
    ```
 
 2. 要加新样例时，从家目录拿主人标出的那一轮：
@@ -35,7 +35,7 @@
 1. 在**改之前**的代码上跑一遍，记下表：
 
    ```bash
-   vp run --filter vibevalley-server evals
+   vp run --filter @vibevalley/server evals
    ```
 
    最后打出一张表：`| case | model | passed | tokens |`，每个样例一行，`passed` 是 `过了几次/5`。没过的每一次都打出 `missed` 和那一轮的对话。新样例在改之前应当不过。
@@ -45,7 +45,7 @@
 4. 只想少采几次省钱、换模型、或把家目录里的样例也跑上：
 
    ```bash
-   VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/orchestrator/evals vp run --filter vibevalley-server evals
+   VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/orchestrator/evals vp run --filter @vibevalley/server evals
    ```
 
    还没写 `expect` 的样例会跳过（`no expect yet, skipped`）。
@@ -60,7 +60,7 @@
 
 ## 出错时
 
-- **测试被跳过**：环境里没有 `DEEPSEEK_API_KEY`，或没经 `vp run --filter vibevalley-server evals`（它设 `VIBEVALLEY_EVALS_LIVE=1`）。钥匙问主人要，不要自己去找主人的配置文件。
+- **测试被跳过**：环境里没有 `DEEPSEEK_API_KEY`，或没经 `vp run --filter @vibevalley/server evals`（它设 `VIBEVALLEY_EVALS_LIVE=1`）。钥匙问主人要，不要自己去找主人的配置文件。
 - **模型报错**：DeepSeek 返回了错（钥匙不对、余额不够、限流）。照原话告诉主人。
 - **`the turn took too long`**：一轮超过 5 分钟，多半是网络。再跑一次；还这样就告诉主人。
 - **一个样例时过时不过（比如 3/5）**：模型在两种做法之间摇摆。看没过的几次的对话，改提示让规矩更明确；不要为了过而放宽 `expect`。

@@ -1,5 +1,5 @@
 // Builds what `electron .` runs from apps/desktop/build: the main process and the preload (CommonJS, as Electron's sandboxed
-// preload needs). The page is apps/web/dist (vp run --filter vibevalley-web build); the server runs from apps/server
+// preload needs). The page is apps/web/dist (vp run --filter @vibevalley/web build); the server runs from apps/server
 // (src/server.ts). On macOS it builds the island too (apps/island, release), where src/main.ts looks for it.
 
 import { build } from "esbuild";

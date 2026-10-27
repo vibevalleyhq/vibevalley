@@ -1,5 +1,5 @@
 {
-  "name": "vibevalley-desktop",
+  "name": "@vibevalley/desktop",
   "private": true,
   "type": "module",
   "main": "build/main.cjs",

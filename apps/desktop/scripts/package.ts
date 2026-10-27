@@ -14,7 +14,7 @@ const stage = join(desktop, "dist/stage");
 const server = join(stage, "server");
 
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
-sh(repo, "vp", "run", "--filter", "vibevalley-web", "build");
+sh(repo, "vp", "run", "--filter", "@vibevalley/web", "build");
 sh(desktop, "pnpm", "exec", "vpx", "scripts/build.ts");
 // The island, for this Mac's architecture as the rest of the package is; where SwiftPM puts it differs between its
 // versions, so it is asked.

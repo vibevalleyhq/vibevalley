@@ -7,7 +7,7 @@ export default defineConfig({
   run: {
     tasks: {
       test: "vp test run",
-      e2e: { command: ["vpx scripts/build.ts", "playwright test"], dependsOn: ["vibevalley-web#build"], cache: false },
+      e2e: { command: ["vpx scripts/build.ts", "playwright test"], dependsOn: ["@vibevalley/web#build"], cache: false },
     },
   },
 });

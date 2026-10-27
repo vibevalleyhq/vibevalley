@@ -1,5 +1,5 @@
 {
-  "name": "vibevalley-web",
+  "name": "@vibevalley/web",
   "private": true,
   "type": "module",
   "scripts": {
