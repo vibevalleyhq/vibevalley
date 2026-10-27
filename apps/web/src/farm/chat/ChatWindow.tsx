@@ -29,7 +29,7 @@ import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
 import { useMarkRead } from "../../features/channel/data";
 import { rooms, useMessage, useRoom } from "../../features/channel/rooms";
-import { TurnSteps } from "../../pages/chat/WorkLog";
+import { TurnSteps } from "../../features/session/WorkLog";
 import { useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";

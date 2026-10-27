@@ -1,9 +1,9 @@
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
-import { rulesWording } from "../base/words/rules";
+import { rulesWording } from "../../base/words/rules";
 import type { SessionEvent } from "@vibevalley/protocol";
-import { tookText } from "../base/format";
+import { tookText } from "../../base/format";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;

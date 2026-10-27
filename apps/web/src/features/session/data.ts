@@ -2,10 +2,10 @@
 
 import { type Accessor, createEffect, createSignal } from "solid-js";
 import type { SessionEvent } from "@vibevalley/protocol";
-import { api } from "../base/api";
-import { subscribeLive } from "../base/live";
-import { queries } from "../base/query";
-import { SessionLogs } from "./sessionLogs";
+import { api } from "../../base/api";
+import { subscribeLive } from "../../base/live";
+import { queries } from "../../base/query";
+import { SessionLogs } from "./logs";
 
 // SessionLogs deduplicates active readers. A later observation must not borrow a request started before it subscribed.
 let readNumber = 0;

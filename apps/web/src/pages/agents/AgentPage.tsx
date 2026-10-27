@@ -44,7 +44,7 @@ import { Segmented } from "../../ui/Segmented";
 import { Toggle } from "../../ui/layout";
 import { MemoryPanel } from "../Memory";
 import { useSkills } from "../settings/SkillsPage";
-import { TrajectoryList } from "../Trajectory";
+import { TrajectoryList } from "../../features/session/Trajectory";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;

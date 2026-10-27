@@ -33,7 +33,7 @@ import { run, useGraphs } from "./hooks";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 import { useIssueChanges, useIssueRuns, useIssueTimeline } from "./data";
 import { useAgent } from "../../data/agents";
-import { createSessionEvents } from "../../data/sessions";
+import { createSessionEvents } from "../session/data";
 
 function Dot(props: { tone: Tone }) {
   return <span class="size-2 shrink-0 rounded-full" style={{ background: `var(--color-${props.tone})` }} />;
