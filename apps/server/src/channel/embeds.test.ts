@@ -19,7 +19,6 @@ describe("a link's preview", () => {
       async () =>
         ips;
     expect(await reachable(new URL("https://example.com"), at("93.184.216.34"))).toBe(true);
-    // One private address among a name's is enough to refuse it.
     expect(await reachable(new URL("https://example.com"), at("93.184.216.34", "10.0.0.1"))).toBe(false);
     expect(await reachable(new URL("http://localhost:8787"), at("127.0.0.1"))).toBe(false);
     expect(await reachable(new URL("file:///etc/passwd"), at("93.184.216.34"))).toBe(false);

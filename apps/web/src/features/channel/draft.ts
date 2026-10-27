@@ -110,7 +110,6 @@ export interface Upload {
 const [uploads, setUploads] = createSignal<readonly Upload[]>([]);
 let lastUpload = 0;
 
-/** The files going up for a channel's draft now. */
 export const uploadsIn = (channel: string | undefined) => uploads().filter((u) => u.channel === channel);
 
 /** Files picked, pasted or dropped: each goes up in turn and joins the channel's draft. */

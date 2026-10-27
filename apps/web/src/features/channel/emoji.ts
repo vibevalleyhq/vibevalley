@@ -1,5 +1,4 @@
-// The emoji the picker offers, by group; the words name the groups (words.ts emoji.groups). Any other is still said by
-// typing it.
+// The words name the groups (words.ts emoji.groups); any other emoji is still said by typing it.
 
 export const emojiGroups: readonly { readonly id: string; readonly emoji: readonly string[] }[] = [
   {

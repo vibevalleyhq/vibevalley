@@ -199,7 +199,8 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         </div>
         <button
           type="button"
-          class={[iconButton, "w-auto px-2 text-sm", { "bg-selected": membersOpen() }]}
+          // The members panel is beside the list, which a phone has no room for.
+          class={[iconButton, "w-auto px-2 text-sm max-md:hidden", { "bg-selected": membersOpen() }]}
           aria-pressed={aria(membersOpen())}
           disabled={!props.channel}
           onClick={() => setMembersOpen(!membersOpen())}

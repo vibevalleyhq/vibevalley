@@ -325,7 +325,6 @@ describe("the chat", () => {
         expect(f.channel(a)?.archived).toBeUndefined();
         expect(yield* Effect.flip(f.chat.archive(f.chat.defaultChannel()))).toMatchObject({ _tag: "Refused" });
 
-        // Quieted, it counts only what names the owner, then nothing.
         yield* f.chat.speak(orchestratorAgent, "随便说说", { target: "#前端", anyway: true, confirm: true });
         yield* f.chat.setNotify(a, "mentions");
         expect(f.channel(a)?.unread).toBeUndefined();

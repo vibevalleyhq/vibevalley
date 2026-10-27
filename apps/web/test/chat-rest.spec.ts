@@ -1,7 +1,3 @@
-// What the chat does past saying and changing messages: channels managed from their settings and the sidebar, threads
-// listed, a message's address, the box's drafts, emoji, keys and drops, files that play, the farm-wide search, and talking
-// with a helper profile alone.
-
 import type { Page } from "@playwright/test";
 import type { Agent } from "@vibevalley/protocol";
 import { expect, test } from "./fixtures";
@@ -45,7 +41,6 @@ test("a channel dropped on another is placed before it", async ({ page, api }) =
   await page.goto(`/chat/${first}`);
   const rows = side(page).getByRole("region", { name: "频道" });
   await rows.getByRole("button", { name: "丙", exact: true }).dragTo(rows.getByRole("button", { name: "甲", exact: true }));
-  // The default channel stays first; the dropped one is next.
   const order = () => side(page).getByRole("region", { name: "频道" }).locator("button[draggable]");
   await expect(order().nth(1)).toHaveText("#丙");
   await page.reload();

@@ -379,7 +379,6 @@ export interface ChannelShape {
   readonly notifyOf: (id: string) => Notify;
   /** The owner's direct channel with a helper profile, made if there is none. */
   readonly openDirect: (agent: { readonly id: string; readonly name: string }) => Effect.Effect<string>;
-  /** The direct channel with the orchestrator. */
   readonly orchestratorDirect: () => string;
   /** A profile's direct channel is its talk issue's thread from now on. */
   readonly linkTalk: (channel: string, issue: string) => Effect.Effect<void>;

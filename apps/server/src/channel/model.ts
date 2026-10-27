@@ -55,7 +55,6 @@ export class ChatModel {
     return all.sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : place(a) - place(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
   }
 
-  /** The threads under a channel's messages. */
   threadsOf(channel: string): ChannelRow[] {
     return [...this.byId.values()].filter((c) => c.parent_id === channel);
   }
