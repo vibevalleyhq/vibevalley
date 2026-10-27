@@ -164,6 +164,11 @@ export default defineConfig({
         rules: { "no-console": "off" },
       },
       {
+        // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).
+        files: ["apps/web/src/**"],
+        rules: { "vibevalley/page-layers": "error" },
+      },
+      {
         // eslint-plugin-solid's v2 config, for the page: the 1.x APIs, one-argument effects, destructured props, accessors
         // passed as props, writes inside computations. Its server-function rules are left out: there are none here.
         files: ["apps/web/src/**"],

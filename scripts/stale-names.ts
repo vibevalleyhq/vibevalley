@@ -164,8 +164,8 @@ const RULES: readonly Rule[] = [
     name: "an issue's state in farm words",
     pattern: /收获|收成|缺肥|种植计划|活熟了|\bPhaseRipe\b|_tag (?:===|!==|:) "ripe"|"graph-ripe"|act: "harvest"|\bHarvest(?:Deps|Review)\b|\bharvesting\(/,
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
-    // The farm's skin and the game say it their way.
-    except: /^apps\/(web\/src\/farm\/|web\/test\/farm-|server\/src\/game\/)/,
+    // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
+    except: /^apps\/(web\/src\/(farm|ui\/pixel)\/|web\/test\/farm-|server\/src\/game\/)/,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
@@ -174,14 +174,7 @@ const RULES: readonly Rule[] = [
     says: "the protocol's word tables (packages/protocol/src/words: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/(rules|words)\//,
   },
-  {
-    name: "the workbench leaning on the farm's state or rules",
-    pattern: /from "(\.\.?\/)+farm\/(state|store|commands|tools|scope|hud\/rules|world\/plots)"/,
-    says: "the rules and state both read live outside farm/: data/frame (rawFrame), data/prefs (the pick, the looks), rules/quota, data/issueActs; only the farm's pictures (farm/kit, farm/world/sprites, farm/sound) are for other pages to draw with",
-    dirs: ["apps/web/src"],
-    // The farm itself, and where the app mounts it.
-    except: /^apps\/web\/src\/(farm\/|app\/(App|Root)\.tsx$)/,
-  },
+
   {
     name: "presence or the system in farm words, where agents and the workbench read them",
     pattern: /地里|【农场|农场现状|not_on_farm/,
@@ -195,19 +188,19 @@ const RULES: readonly Rule[] = [
       "apps/server/src/channel",
       "apps/server/src/mcp",
       "apps/server/src/notice",
-      "apps/web/src/pages",
-      "apps/web/src/rules",
-      "apps/web/src/data",
+      "apps/web/src/features",
+      "apps/web/src/base",
+      "apps/web/src/ui",
     ],
-    // What the owner types in a test is the owner's words.
-    except: /\.test\.ts$/,
+    // What the owner types in a test is the owner's words; the pixel pieces are the skins' own.
+    except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//,
   },
   {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/,
     says: "presentSessions, Present, Absent, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
     // The client's onFarm is the skin it is on.
-    dirs: ["apps/server/src", "apps/web/src/pages"],
+    dirs: ["apps/server/src", "apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
   },
 ];
 
