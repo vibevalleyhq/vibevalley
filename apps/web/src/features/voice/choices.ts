@@ -1,7 +1,7 @@
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.check).
 
-import { rulesWording } from "../base/words/rules";
+import { rulesWording } from "../../base/words/rules";
 import {
   type Area,
   type Language,

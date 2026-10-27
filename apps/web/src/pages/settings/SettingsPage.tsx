@@ -10,7 +10,7 @@ import { ConnectorsPage } from "./ConnectorsPage";
 import { LanPage } from "./LanPage";
 import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
 import { SkillsPage } from "../../features/runtime/SkillsPage";
-import { VoiceForm } from "./VoiceForm";
+import { VoiceForm } from "../../features/voice/VoiceForm";
 
 export const sections = [
   { id: "deepseek", label: "DeepSeek", line: settingsWording().sections.deepseek.line },

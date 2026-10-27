@@ -13,7 +13,7 @@ import { threadOwnerOf } from "../../features/channel/rules";
 import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { AgentFace } from "../../ui/Face";
-import { DictationButton } from "../../voice/DictationButton";
+import { DictationButton } from "../../features/voice/DictationButton";
 import { SpriteIcon } from "../../ui/pixel";
 
 import { useAgent } from "../../features/agent/data";

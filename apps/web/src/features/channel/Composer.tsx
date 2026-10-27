@@ -10,7 +10,7 @@ import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
-import { DictationButton } from "../../voice/DictationButton";
+import { DictationButton } from "../voice/DictationButton";
 import { HelperFace } from "./bits";
 
 /** The box for saying a sentence in a conversation: Enter sends, Shift+Enter starts a line, @ names someone. */

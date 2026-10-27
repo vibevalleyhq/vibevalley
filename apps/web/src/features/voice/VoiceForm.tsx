@@ -2,7 +2,7 @@
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
-import { settingsWording } from "./words";
+import { settingsWording } from "../../pages/settings/words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal, For, Match, onSettled, Show, snapshot, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -40,7 +40,7 @@ import {
   voiceLimits,
   voiceSample,
   withPart,
-} from "../../rules/voice";
+} from "./choices";
 import { A } from "../../ui/A";
 import { aria, createSettled, Keyed } from "../../base/util";
 import { ready, useQuery, useSettings } from "../../base/query";
@@ -49,7 +49,7 @@ import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { Card, Quiet, SecretInput, TextLink } from "../../ui/layout";
-import { saveSettings } from "./SettingsForm";
+import { saveSettings } from "../../pages/settings/SettingsForm";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey";
 

@@ -1,11 +1,11 @@
 // The dictation button every input row has.
 
-import { appWording } from "../base/words";
+import { appWording } from "../../base/words";
 import { onSettled } from "solid-js";
 import { dictation, insertDictated } from "./dictation";
-import { createExternal } from "../base/external";
-import { ready, useSettings } from "../base/query";
-import { Icon } from "../ui/Icon";
+import { createExternal } from "../../base/external";
+import { ready, useSettings } from "../../base/query";
+import { Icon } from "../../ui/Icon";
 
 /** Tap to start talking, tap again to stop: the words go into the field at its caret, for the owner to read before sending. */
 export function DictationButton(props: {

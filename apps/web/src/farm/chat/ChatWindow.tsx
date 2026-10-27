@@ -8,7 +8,7 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../base/api";
 import { arrived, pending, say } from "../../features/channel/composing";
-import { liveCaptions, type SpokenLine } from "../../voice/captions";
+import { liveCaptions, type SpokenLine } from "../../features/voice/captions";
 import { playSound } from "../../ui/pixel/sound";
 import { farm } from "../store";
 import {
@@ -24,7 +24,7 @@ import {
   threadTitle,
   unreadIn,
 } from "../../features/channel/rules";
-import { voiceCall, type VoiceCall } from "../../voice/call";
+import { voiceCall, type VoiceCall } from "../../features/voice/call";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
 import { useMarkRead } from "../../features/channel/data";
@@ -33,7 +33,7 @@ import { TurnSteps } from "../../features/session/WorkLog";
 import { useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
-import { createCall } from "../../voice/createCall";
+import { createCall } from "../../features/voice/createCall";
 import { PxButton, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";

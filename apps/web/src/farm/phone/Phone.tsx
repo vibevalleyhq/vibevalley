@@ -12,7 +12,7 @@ import { ChatWindow } from "../chat/ChatWindow";
 import { useCore } from "../../base/frame";
 import { unreadTotal } from "../../features/channel/rules";
 import { useFarm } from "../state";
-import { voiceCall } from "../../voice/call";
+import { voiceCall } from "../../features/voice/call";
 import { lcd } from "./lcd";
 import type { PadButton } from "./pad";
 import { playSound } from "../../ui/pixel/sound";

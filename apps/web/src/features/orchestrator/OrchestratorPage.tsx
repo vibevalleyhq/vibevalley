@@ -11,7 +11,7 @@ import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
 import { ArchivePanel, OrchestratorMemoryPanel } from "../memory/Memory";
-import { VoiceForm } from "../../pages/settings/VoiceForm";
+import { VoiceForm } from "../voice/VoiceForm";
 import { TrajectoryLog } from "../session/Trajectory";
 import { usePrefs } from "../../base/prefs";
 
