@@ -64,7 +64,6 @@ describe("an issue", () => {
       const kept = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const keptIssue = yield* issues.get(kept.issue!);
-      // Kept on its branch is what the issue delivers, chosen before it is completed.
       yield* issues.edit(kept.issue!, { deliver: "branch" }, owner);
       yield* issues.setStatus(kept.issue!, "done", "", "", owner);
       expect((yield* closed(kept.issue!)).delivered).toBe("kept");
@@ -414,7 +413,6 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // A button is a move the server names: a stuck issue moved back with no words goes on with the server's words, by number too.
   it.live("moves as the issue's buttons say", () => {
     const f = farm();
     return Effect.gen(function* () {
@@ -575,7 +573,6 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Completing is the acceptance; sent back with findings it grows weeds and goes another round, and completing settles them.
   // A question in a report leaves the plot short of fertilizer until the owner answers.
   it.live("grows through its acceptance", () => {
     const f = farm();
@@ -617,7 +614,6 @@ describe("an issue", () => {
       );
       yield* until(() => crop() === "flowering", "抽穗：等验收");
 
-      // Moved back while it waits for acceptance, the words are the findings.
       yield* issues.setStatus(issue.id, "todo", "再写版本B", "", owner);
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
       yield* w.nextReport;

@@ -36,7 +36,6 @@ async function handBack(api: VibeValleyApi, project: string) {
   return issue.id;
 }
 
-/** Back from its round, completing is offered again. */
 const handedBack = (api: VibeValleyApi, id: string, timeout?: number) =>
   expect.poll(async () => (await api.issue.get({ id })).attention.acts.map((a) => a.act), timeout ? { timeout } : {}).toContain("complete");
 
@@ -60,7 +59,6 @@ test("the harvest tool and its open confirmation follow the latest issue", async
   const review = page.getByRole("dialog", { name: "收获阿狐的地" });
   const take = review.getByRole("button", { name: /确认收获/ });
   await expect(take).toBeVisible();
-  // Another round: while it is worked there is nothing to harvest, and back from it there is again.
   await api.issue.comment.create({ id, text: "发呆后检查一下" });
   await expect(take).toHaveCount(0);
   await expect(review).toBeVisible();

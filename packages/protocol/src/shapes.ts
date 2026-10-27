@@ -1117,7 +1117,6 @@ export interface Issue {
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
-  /** What it delivers: a change that goes into the project, a change left on its branch, or an answer that stays on the issue. */
   deliver: Deliverable;
   reviewedAt?: number;
   findings: Finding[];
@@ -1193,8 +1192,7 @@ export interface IssueAttention {
   acts: IssueAction[];
 }
 
-/** What pressing an issue's button sends, as the server says it: a move (issue.status.update) with the owner's words
- * required, allowed or not taken; words to its helper (issue.comment.create); or stopping its turn (session.stop). */
+/** What pressing an issue's button sends: move is issue.status.update, say issue.comment.create, stop session.stop. */
 export type IssueAction =
   | { readonly act: IssueAct; readonly does: "move"; readonly status: IssueStatus; readonly words: ActWords }
   | { readonly act: IssueAct; readonly does: "say" }

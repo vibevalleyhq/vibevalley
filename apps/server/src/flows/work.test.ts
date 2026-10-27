@@ -233,7 +233,6 @@ describe("a session's work", () => {
       expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
       const stayed = sessions.find(b.id)!;
       expect(stayed.session.conflict).toEqual({ base: "main", files: ["same.ts"] });
-      // The owner's 让它解决冲突 moves it back with no words: the server says which conflicts, in the owner's words.
       yield* issues.setStatus(b.issue!, "todo", "", "", owner);
       yield* w.nextReport;
       // The round settled it: the sessions look at the mark again by themselves.

@@ -64,8 +64,7 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
 
-/** Next steps after a refusal: each of the issue's buttons and moves as its command; one that needs the owner's words has
- * no command and says which field takes them. */
+/** One that needs the owner's words runs nothing and says which field takes them. */
 export function nextSteps(t: Issue): Next[] {
   const n = String(t.number);
   const session = t.sessions.at(-1);

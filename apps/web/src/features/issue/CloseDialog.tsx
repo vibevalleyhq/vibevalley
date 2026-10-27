@@ -57,7 +57,7 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   );
 }
 
-/** Presses the issue's button by this name, as the server says; false when it is not offered or did not go through. */
+/** False when the issue does not offer it or the press did not go through. */
 async function pressed(issue: Issue | undefined, act: IssueAct) {
   const a = issue && actionOf(issue, act);
   return a !== undefined && (await run(() => perform(issue!, a).then(() => true))) === true;

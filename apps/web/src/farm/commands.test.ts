@@ -8,7 +8,6 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 afterEach(resetFarm);
 
-/** The issue's buttons by name, as the server sends them. */
 const buttons = (...names: IssueAct[]): IssueAction[] =>
   names.map((act): IssueAction => {
     switch (act) {

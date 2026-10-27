@@ -708,8 +708,6 @@ export const make = (options: IssueOptions = {}) =>
       return (last !== undefined ? sessions.sessionOf(last)?.name : undefined) ?? issueWording().helper;
     };
 
-    /** What a stuck issue goes back with when the owner says nothing: the conflicts the farm marked on its session, the job
-     * again for a failed round (or what was wrong with an answer it could not read), or to go on after it was stopped. */
     const stuckWords = Effect.fn("Issues.stuckWords")(function* (t: Issue) {
       const last = t.sessions.at(-1);
       switch (t.attention.stuck) {

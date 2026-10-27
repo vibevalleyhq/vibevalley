@@ -42,7 +42,6 @@ export interface FarmCommands {
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
-  /** Presses the issue's button as the server says it; one it does not offer is refused here, by its name. */
   const send = async (s: Session, act: IssueAct, words = "", sendKey?: string) => {
     const t = issue(s);
     const action = t && actionOf(t, act);

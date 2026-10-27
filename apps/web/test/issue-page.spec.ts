@@ -103,7 +103,6 @@ test("a real round: the helper asks with options, one click answers, and it hand
   // Exact: the folded steps hold the helper's whole last message, which says it too.
   await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
   await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成", exact: true })).toBeVisible();
-  // Done need not be a merge: what it delivers can be its branch, kept.
   const deliver = view.getByRole("combobox", { name: "交付" });
   await expect(deliver).toHaveValue("change");
   await expect(deliver.locator("option", { hasText: "分支留着不合" })).toHaveCount(1);
@@ -155,7 +154,6 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   await page.setViewportSize({ width: 1280, height: 800 });
 
   let said: unknown;
-  // An option is the answer, said to the helper (issue.comment.create).
   await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     said = route.request().postDataJSON();
     await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
@@ -196,7 +194,6 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
   await expect(ask).toContainText("阿狐交回来了，等你验收");
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 2 条做到了");
   await expect(view.getByText("bun test auth 通过")).toBeVisible();
-  // Completing is the acceptance: it leads.
   await expect(ask.getByRole("button", { name: "完成", exact: true })).toBeVisible();
   await view.getByRole("checkbox", { name: "看过了：勾上后重开浏览器还登着" }).check();
   const findings = ask.getByRole("textbox", { name: "哪里没过" });

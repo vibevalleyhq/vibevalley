@@ -10,8 +10,7 @@ import { createSignal } from "solid-js";
 import type { Issue, IssueAct, IssueAction } from "@vibevalley/protocol";
 import { api, newSendKey } from "../../base/api";
 
-/** Presses a button as the server says it: a move with the words (if any), words to the helper (said again with the same
- * sendKey, said once), or stopping its turn. */
+/** Words said again with the same sendKey are said once. */
 export function perform(issue: Issue, a: IssueAction, words = "", sendKey = newSendKey()): Promise<unknown> {
   switch (a.does) {
     case "move":
@@ -25,7 +24,6 @@ export function perform(issue: Issue, a: IssueAction, words = "", sendKey = newS
   }
 }
 
-/** The button the issue offers by this name, if it does. */
 export const actionOf = (issue: Issue, act: IssueAct) => issue.attention.acts.find((a) => a.act === act);
 
 /** The box under an issue's ask: the findings of 打回, or a word to the helper. */
@@ -56,7 +54,6 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     return ok;
   };
 
-  /** One button with words (or none): the page's own way, else as the server says. One the issue no longer offers sends nothing. */
   const send = (a: IssueAct, words = "") => {
     const own = ways.own?.[a];
     const action = actionOf(issue(), a);
