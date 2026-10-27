@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { WorkspaceState, InboxItem, Session } from "@vibevalley/protocol";
-import { traySummary } from "./notice";
+import { traySummary } from "./tray";
 
 const call = (id: string, kind: InboxItem["kind"], tray?: string): InboxItem => ({
   id,

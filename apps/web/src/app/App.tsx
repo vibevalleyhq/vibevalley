@@ -17,7 +17,7 @@ import { RuntimesPage } from "../features/runtime/RuntimesPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { ToastHost } from "../ui/ToastHost";
 import { Navigate } from "../ui/A";
-import { Follow } from "./Follow";
+import { Follow } from "../features/notice/Follow";
 import { Root } from "./Root";
 import { Keyed } from "../base/util";
 import { ready, useProjects } from "../base/query";

@@ -3,12 +3,12 @@
 // page speaks. Mounted once, over every page, the farm's too.
 
 import { createEffect, onSettled } from "solid-js";
-import { currentHost } from "../host";
+import { currentHost } from "../../host";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { currentLocale } from "@vibevalley/protocol/words";
-import { traySummary } from "../rules/notice";
-import { voiceCall } from "../features/voice/call";
-import { rawFrame } from "../base/frame";
+import { traySummary } from "./tray";
+import { voiceCall } from "../voice/call";
+import { rawFrame } from "../../base/frame";
 
 export function Follow() {
   // The frame as it came: what is news compares one inbox with the one before.
