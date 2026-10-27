@@ -78,7 +78,8 @@ test("the window opens on the bar at once, and says there why the server could n
     await expect(page).toHaveURL(/\/opening\.html\?.*\bproblem=/);
     await expect(page.getByText(/^农场起不来：/)).toBeVisible();
     await expect(page.getByRole("progressbar")).toHaveCount(0);
-    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
+    // The window shows on its first ready-to-show, which may come after the page is drawn hidden: wait for it.
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([true]);
     await page.screenshot({ path: test.info().outputPath("problem.png") });
   } finally {
     writeFileSync(test.info().outputPath("electron.log"), said.join(""));
