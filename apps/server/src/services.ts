@@ -23,6 +23,7 @@ import { layer as runtime, type RuntimeOptions } from "./runtime/runtime.ts";
 import { layer as session, ready as sessionReady, type SessionOptionsIn } from "./session/session.ts";
 import { layer as recurrence, start as recurrenceStart } from "./recurrence/recurrence.ts";
 import { layer as setting } from "./setting/setting.ts";
+import { layer as llm } from "./ai/llm.ts";
 import { start as taskGraphStart, layer as task, type TaskOptions } from "./task/task.ts";
 import { layer as tool } from "./tool/tool.ts";
 import { layer as mcp, type McpOptions } from "./mcp/mcp.ts";
@@ -64,6 +65,7 @@ export const platform = (config: Config) =>
     on(projection),
     on(core),
     on(setting),
+    on(llm),
   );
 
 /** Agents: the profiles, their memory, the runtimes they run on. */

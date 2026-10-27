@@ -36,9 +36,9 @@ Status: proposed
 
 ### 次序：一步一个 PR，每步服务端和页面的测试都过
 
-1. **模型**：先把 pi-ai 现在的行为录成黄金数据：一组对话经 pi-ai 发出去的请求体、一组 SSE 喂给它得到的 `AssistantMessage`（`ai/testdata`，照「规则的黄金数据」的做法）；新的 `Llm` 照着逐字段一样。然后换掉 `complete()`（压缩、摘要）和测试的假模型。
+1. **模型**（做了）：pi-ai 的行为录成了黄金数据（`ai/testdata/deepseek.jsonl.gz`：9 个请求体、8 段流读出的消息），新的 `Llm` 逐字段一样。服务端经它发请求：pi-agent-core 的 `streamFn` 换成 `config.ts` 的 `llmStreamFn`（`Llm` 跑在拥有大脑的服务的纤程上，请求的 signal 打断它），`complete()` 跟着换了；命令行和真模型的评测用 `cli/llm.ts`。测试的假模型留到第 3 步：大脑的测试那时要连着循环一起改。
 2. **工具**：大脑自己的工具换成 Schema 加 Effect，和农场的工具一个形状；`mcp/mcp.ts` 用 Schema 解参数，MCP 的 SDK 仍是一次库调用。
-3. **循环**：`Brain` 换到 `agent/loop` 上；`agent.test.ts`、`run.test.ts`、`runtime.test.ts`、`tools.test.ts`、`orchestrator.test.ts`、`host.test.ts` 换到 `Llm` 的测试 layer，断言的行为不改。
+3. **循环**：`Brain` 换到 `agent/loop` 上，`llmStreamFn` 去掉；`agent.test.ts`、`run.test.ts`、`runtime.test.ts`、`tools.test.ts`、`orchestrator.test.ts`、`host.test.ts` 从 pi-ai 的 faux 换到 `Llm` 的测试 layer，断言的行为不改。
 4. **收尾**：`apps/server` 不再依赖 pi-agent-core；pi-ai 只剩 `runtime/price.ts` 给 pi 的农机算钱用它自带的价目。改 [地基](docs/subsystems/foundation.md)、[管家](docs/subsystems/orchestrator.md)、AGENTS.md 和 `apps/server/README.md` 里「模型用 pi-ai 的 faux」的说法；本 Note 沉淀以后删掉。
 
 ## Alternatives considered

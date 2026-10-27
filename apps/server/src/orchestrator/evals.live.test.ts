@@ -2,6 +2,7 @@
 // (vp run evals in apps/server), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
 // do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
 
+import { standaloneStream } from "../cli/llm.ts";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { orchestrator } from "../base/actor.ts";
 import { orchestratorAgent } from "@vibevalley/protocol";
@@ -63,7 +64,7 @@ async function replay(c: EvalCase, model: string, tools: readonly AgentTool[]): 
     log: plainLog,
     name: orchestratorAgent,
     instructions: systemPrompt + agentPrompt,
-    llm: deepseek(model, key),
+    llm: deepseek(model, key, standaloneStream()),
     home,
     cwd: home,
     tools: stubbed(tools, c.did),

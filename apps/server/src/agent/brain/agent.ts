@@ -5,6 +5,7 @@
 // memory) goes in the newest input, so the start of every request stays the cached one.
 
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { Api, Model as AgentModel } from "@earendil-works/pi-ai";
 import { type Tool, toToolDeclaration, type ToolCall, type Usage } from "@earendil-works/pi-ai";
 import { join } from "node:path";
 import { finished, type AgentTask } from "./agentTask.ts";
@@ -293,7 +294,8 @@ export class Brain {
     }
     this.core = new Agent({
       initialState: {
-        model: options.llm.model,
+        // pi-agent-core's Model type, the same fields, until the loop is the farm's own.
+        model: options.llm.model as unknown as AgentModel<Api>,
         thinkingLevel: options.thinkingLevel ?? "off",
         tools,
         messages: this.session?.load() ?? [],

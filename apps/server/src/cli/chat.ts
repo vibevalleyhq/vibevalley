@@ -2,6 +2,7 @@
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
+import { standaloneStream } from "./llm.ts";
 import { cliWording } from "./words.ts";
 import { instructions } from "./prompts.ts";
 import { currentLocale } from "@vibevalley/protocol/words";
@@ -97,7 +98,7 @@ export interface OwnChat {
 /** The conversation with VibeValley's own agent. */
 export async function ownChat(values: OwnChat) {
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
-  const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey);
+  const llm = deepseek(values.model || config.agent.model, config.deepseek.apiKey, standaloneStream());
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const home = join(homedir(), ".vibevalley", "agent", values.name);
   const servers = readMcpConfig(values.mcp || join(home, "mcp.json"));
@@ -189,8 +190,9 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
   if (id === "vibevalley")
     return ownChat({ cwd: values.cwd ?? "", name: "vibevalley", model: values.model ?? "", mcp: "", ...(values.p !== undefined ? { p: values.p } : {}) });
   const config = await Effect.runPromise(loadConfig().pipe(Effect.provide(NodeServices.layer)));
+  const stream = standaloneStream();
   const registry = registryOf([
-    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey), time: wallTime, log: plainLog }),
+    vibevalleyRuntimeOf({ home: () => config.home, llm: (model) => deepseek(model, config.deepseek.apiKey, stream), time: wallTime, log: plainLog }),
     dshRuntime,
   ]);
   const runtime = registry.get(id);
