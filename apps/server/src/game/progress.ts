@@ -187,9 +187,6 @@ function graphEntry(graph: TaskGraph): Entry {
   return { kind: "graph", graph: graph.id, merged: merged.size, parallel };
 }
 
-/** Whether a message is new to the state: the orchestrator's words change as they stream in, and count once. */
-const isNew = (state: WorkspaceState, id: string) => !state.chat || !state.chat.messages.some((m) => m.id === id);
-
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
 export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceState): Entry[] {
@@ -237,7 +234,6 @@ export function entriesFor(before: WorkspaceState, fact: Fact, after: WorkspaceS
       break;
     }
     case "message": {
-      if (!isNew(before, fact.message.id)) break;
       if (fact.message.fromKind === "owner") {
         if (fact.thread) {
           const h = sessionOnIssue(before, fact.thread);

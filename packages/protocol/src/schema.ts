@@ -202,6 +202,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   outcome: Schema.optionalKey(Outcome),
   spent: Schema.optionalKey(Spent),
   spoken: Schema.optionalKey(Schema.Boolean),
+  sendKey: Schema.optionalKey(Schema.String),
   at: Schema.Number,
 });
 
@@ -223,6 +224,7 @@ export const Conversation: Codec<T.Conversation> = Schema.Struct({
   lastNumber: Schema.optionalKey(Schema.Number),
   replies: Schema.Number,
   read: Schema.optionalKey(Schema.Number),
+  unread: Schema.optionalKey(Schema.Number),
   at: Schema.Number,
 });
 
@@ -497,9 +499,13 @@ export const OwnerMention: Codec<T.OwnerMention> = Schema.Struct({
 
 export const Chat: Codec<T.Chat> = Schema.Struct({
   conversations: Schema.mutable(Schema.Array(Conversation)),
-  messages: Schema.mutable(Schema.Array(ChatMessage)),
   ownerMentions: Schema.optionalKey(Schema.mutable(Schema.Array(OwnerMention))),
 });
+
+export const RoomEvent: Codec<T.RoomEvent> = Schema.Union([
+  Schema.Struct({ _tag: Schema.Literal("Message"), message: ChatMessage }),
+  Schema.Struct({ _tag: Schema.Literal("Reset") }),
+]);
 
 export const Priority: Codec<T.Priority> = Schema.Literals(T.PriorityValues);
 

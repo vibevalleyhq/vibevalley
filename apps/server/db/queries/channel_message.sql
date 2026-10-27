@@ -10,14 +10,14 @@ returning number;
 update channel_message set meta = sqlc.narg(meta) where id = sqlc.arg(id);
 
 -- name: MessageByID :one
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = sqlc.arg(id);
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = sqlc.arg(id);
 
 -- name: MessageBySendKey :one
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = sqlc.arg(sender_id) and m.send_key = sqlc.arg(send_key);
 
 -- name: OwnerMentions :many
 -- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at,
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at,
        p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,
        c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,
        coalesce(ch.name, c.name, '')::text as channel_name
@@ -32,16 +32,13 @@ where n.target_id = 'owner' and m.sender_id <> 'owner'
   and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)
 order by m.id;
 
--- name: RecentMessages :many
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit sqlc.arg(n)::int;
-
 -- name: MessagesBefore :many
 -- Newest first.
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.conversation_id = sqlc.arg(conversation_id) and m.number < sqlc.arg(number) order by m.number desc limit sqlc.arg(n)::int;
 
 -- name: MessagesAfter :many
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.conversation_id = sqlc.arg(conversation_id) and m.number > sqlc.arg(number) order by m.number limit sqlc.arg(n)::int;
 
 -- name: RecentDuplicate :one
@@ -51,6 +48,11 @@ order by id desc limit 1;
 
 -- name: DispatchesIn :one
 select count(*)::int as n from channel_message where conversation_id = sqlc.arg(conversation_id) and kind = 'dispatch';
+
+-- name: OwnerUnread :one
+-- What the owner has not read in a conversation: others' words past its read number, the farm's notices left out.
+select count(*)::int as n from channel_message
+where conversation_id = sqlc.arg(conversation_id) and number > sqlc.arg(read_number) and sender_id <> 'owner' and kind <> 'notice';
 
 -- name: LatestNumber :one
 select coalesce(max(number), 0)::int as n from channel_message where conversation_id = sqlc.arg(conversation_id);
@@ -80,7 +82,7 @@ where m.conversation_id = sqlc.arg(conversation) and m.sender_id = 'system' and 
   and m.id > coalesce((select max(u.id) from channel_message u where u.conversation_id = sqlc.arg(conversation) and u.sender_id = 'owner'), '');
 
 -- name: MessageByNumber :one
-select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
+select m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id
 where m.conversation_id = sqlc.arg(conversation_id) and m.number = sqlc.arg(number);
 
 -- name: OwnerLastMessages :many

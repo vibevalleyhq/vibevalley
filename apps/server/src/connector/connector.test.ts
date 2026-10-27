@@ -515,11 +515,9 @@ describe("the chat apps", () => {
   it.live("route quoted replies to an old thread before and after a restart", () => {
     const config = { ...testConfig(), db: "" };
     let thread = "";
-    let message = "";
     const reply = (script: Script, text: string, sent: number) =>
       Effect.gen(function* () {
         const chat = yield* Channels;
-        expect(chat.now()?.messages.some((m) => m.id === message)).toBe(false);
         const inbound = wx(owner, text);
         script.weixinIn.push({
           ...inbound,
@@ -542,7 +540,6 @@ describe("the chat apps", () => {
           anyway: true,
         });
         thread = written.message!.conversation;
-        message = written.message!.id;
         yield* nth(first, "weixin", 0, "the original answer sent");
         const status = (ok: (s: ConnectorStatus) => boolean, what: string) => statusIs("weixin", ok, what);
         yield* status((s) => s.pending === 0, "the external identity saved");

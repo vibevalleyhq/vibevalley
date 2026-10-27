@@ -65,6 +65,7 @@ export const MessageByIDResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -73,7 +74,7 @@ export const MessageByIDResult = Schema.Struct({
 export type MessageByIDResult = typeof MessageByIDResult.Type
 
 
-export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
+export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
 
 export const messageByID = Effect.fn("MessageByID")(function* (params: MessageByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -99,6 +100,7 @@ export const MessageBySendKeyResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -107,7 +109,7 @@ export const MessageBySendKeyResult = Schema.Struct({
 export type MessageBySendKeyResult = typeof MessageBySendKeyResult.Type
 
 
-export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
+export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
 
 export const messageBySendKey = Effect.fn("MessageBySendKey")(function* (params: MessageBySendKeyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -132,6 +134,7 @@ export const OwnerMentionsResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -144,7 +147,7 @@ export const OwnerMentionsResult = Schema.Struct({
 export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
 
 
-export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.conversation_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
+export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that conversation completes them.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.kind as conversation_kind, c.parent_number, coalesce(c.channel_id, c.id)::text as channel_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel_conversation c on c.id = m.conversation_id\nleft join channel_conversation ch on ch.id = c.channel_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.conversation_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.conversation_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
 
 export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -153,39 +156,6 @@ export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
     Result: OwnerMentionsResult,
     execute: () => sql.unsafe(OwnerMentionsSql, []),
   })({})
-})
-
-export const RecentMessagesParams = Schema.Struct({
-  ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-})
-export type RecentMessagesParams = typeof RecentMessagesParams.Type
-
-
-export const RecentMessagesResult = Schema.Struct({
-  ["id"]: Schema.String,
-  ["conversation_id"]: Schema.String,
-  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
-  ["sender_id"]: Schema.String,
-  ["kind"]: Schema.String,
-  ["body"]: Schema.String,
-  ["meta"]: Schema.NullOr(Schema.String),
-  ["created_at"]: Schema.Number,
-  ["sender_name"]: Schema.String,
-  ["sender_kind"]: Schema.String,
-  ["sender_agent"]: Schema.NullOr(Schema.String),
-})
-export type RecentMessagesResult = typeof RecentMessagesResult.Type
-
-
-export const RecentMessagesSql = "-- name: RecentMessages :many\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id order by m.id desc limit $1::int;"
-
-export const recentMessages = Effect.fn("RecentMessages")(function* (params: RecentMessagesParams) {
-  const sql = yield* SqlClient.SqlClient
-  return yield* SqlSchema.findAll({
-    Request: RecentMessagesParams,
-    Result: RecentMessagesResult,
-    execute: (p) => sql.unsafe(RecentMessagesSql, [p["n"]]),
-  })(params)
 })
 
 export const MessagesBeforeParams = Schema.Struct({
@@ -204,6 +174,7 @@ export const MessagesBeforeResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -212,7 +183,7 @@ export const MessagesBeforeResult = Schema.Struct({
 export type MessagesBeforeResult = typeof MessagesBeforeResult.Type
 
 
-export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
+export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
 
 export const messagesBefore = Effect.fn("MessagesBefore")(function* (params: MessagesBeforeParams) {
   const sql = yield* SqlClient.SqlClient
@@ -239,6 +210,7 @@ export const MessagesAfterResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -247,7 +219,7 @@ export const MessagesAfterResult = Schema.Struct({
 export type MessagesAfterResult = typeof MessagesAfterResult.Type
 
 
-export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number > $2 order by m.number limit $3::int;"
+export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number > $2 order by m.number limit $3::int;"
 
 export const messagesAfter = Effect.fn("MessagesAfter")(function* (params: MessagesAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -304,6 +276,30 @@ export const dispatchesIn = Effect.fn("DispatchesIn")(function* (params: Dispatc
     Request: DispatchesInParams,
     Result: DispatchesInResult,
     execute: (p) => sql.unsafe(DispatchesInSql, [p["conversation_id"]]),
+  })(params)
+})
+
+export const OwnerUnreadParams = Schema.Struct({
+  ["conversation_id"]: Schema.String,
+  ["read_number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type OwnerUnreadParams = typeof OwnerUnreadParams.Type
+
+
+export const OwnerUnreadResult = Schema.Struct({
+  ["n"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+})
+export type OwnerUnreadResult = typeof OwnerUnreadResult.Type
+
+
+export const OwnerUnreadSql = "-- name: OwnerUnread :one\n-- What the owner has not read in a conversation: others' words past its read number, the farm's notices left out.\nselect count(*)::int as n from channel_message\nwhere conversation_id = $1 and number > $2 and sender_id <> 'owner' and kind <> 'notice';"
+
+export const ownerUnread = Effect.fn("OwnerUnread")(function* (params: OwnerUnreadParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: OwnerUnreadParams,
+    Result: OwnerUnreadResult,
+    execute: (p) => sql.unsafe(OwnerUnreadSql, [p["conversation_id"], p["read_number"]]),
   })(params)
 })
 
@@ -417,6 +413,7 @@ export const MessageByNumberResult = Schema.Struct({
   ["kind"]: Schema.String,
   ["body"]: Schema.String,
   ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
@@ -425,7 +422,7 @@ export const MessageByNumberResult = Schema.Struct({
 export type MessageByNumberResult = typeof MessageByNumberResult.Type
 
 
-export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number = $2;"
+export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.conversation_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.conversation_id = $1 and m.number = $2;"
 
 export const messageByNumber = Effect.fn("MessageByNumber")(function* (params: MessageByNumberParams) {
   const sql = yield* SqlClient.SqlClient

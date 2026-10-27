@@ -1,9 +1,11 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
+import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
+import { roomsPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer } from "effect";
 import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
@@ -52,6 +54,26 @@ const pair = (lan: Lan["Service"], addr: string, name: string) =>
     const paired = JSON.parse(yield* Effect.promise(() => got)) as LanPaired;
     expect(paired.key).not.toBe("");
     return paired;
+  });
+
+/** An upgrade to the rooms through the listener: its status, and the socket when it was upgraded. */
+const upgradeAt = (addr: string, headers: Record<string, string>) =>
+  new Promise<{ status: number; socket?: Socket }>((resolve, reject) => {
+    const u = new URL(addr);
+    const req = httpRequest({
+      host: u.hostname,
+      port: Number(u.port),
+      path: roomsPath,
+      agent: false,
+      headers: { connection: "Upgrade", upgrade: "websocket", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==", ...headers },
+    });
+    req.on("upgrade", (res, socket) => resolve({ status: res.statusCode ?? 0, socket }));
+    req.on("response", (res) => {
+      res.resume();
+      resolve({ status: res.statusCode ?? 0 });
+    });
+    req.on("error", reject);
+    req.end();
   });
 
 describe("lan access", () => {
@@ -182,6 +204,21 @@ describe("lan access", () => {
       yield* lan.forget(paired.device);
       expect(yield* Effect.promise(() => ended)).toBe("ended");
       expect((yield* Effect.promise(() => request("GET", addr + "/api/v1/health", paired.key))).status).toBe(401);
+    }).pipe(Effect.scoped),
+  );
+  it.live("hands a paired device's rooms WebSocket to the farm, and forgetting the device ends it", () =>
+    Effect.gen(function* () {
+      const lan = yield* farm();
+      const addr = yield* open(lan);
+      const paired = yield* pair(lan, addr, "手机");
+      expect((yield* Effect.promise(() => upgradeAt(addr, {}))).status).toBe(401);
+      const key = { authorization: "Bearer " + paired.key };
+      expect((yield* Effect.promise(() => upgradeAt(addr, { ...key, origin: "https://evil.example" }))).status).toBe(403);
+      const { status, socket } = yield* Effect.promise(() => upgradeAt(addr, { ...key, origin: addr }));
+      expect(status).toBe(101);
+      const ended = new Promise<string>((resolve) => socket!.once("close", () => resolve("ended")));
+      yield* lan.forget(paired.device);
+      expect(yield* Effect.promise(() => ended)).toBe("ended");
     }).pipe(Effect.scoped),
   );
 });

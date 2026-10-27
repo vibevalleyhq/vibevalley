@@ -5,7 +5,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { AccountUsage, Issue, Session } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
-import { messagesIn } from "../channel/state.ts";
+import { Said } from "../testing/said.ts";
 import { viewOf } from "../game/view.ts";
 import { Effect } from "effect";
 import { SqlClient } from "effect/sql";
@@ -416,7 +416,7 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       yield* (yield* Agents).saveAgent(lab());
       const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
@@ -439,7 +439,7 @@ describe("an issue", () => {
       yield* issues.act("#" + issue.number, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
-        () => messagesIn(core.state().chat, thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
+        () => saidIn(thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
         "the cure said once, by the server",
       );
     }).pipe(Effect.scoped, Effect.provide(f.layer));
@@ -486,7 +486,7 @@ describe("an issue", () => {
     return Effect.gen(function* () {
       const w = yield* watch;
       const issues = yield* Issues;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       yield* (yield* Agents).saveAgent(lab());
       const project = join(f.config.workRoot, "projects", "clock");
@@ -539,7 +539,7 @@ describe("an issue", () => {
       yield* issues.act(garbled.id, { act: "cure" }, "", owner);
       const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
       yield* until(
-        () => messagesIn(core.state().chat, thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
+        () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
         "what was wrong with it, said",
       );
       yield* w.nextReport;

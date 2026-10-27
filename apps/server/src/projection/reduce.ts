@@ -28,9 +28,10 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
       const { orchestratorConversation: _was, ...rest } = state;
       return [{ ...rest, orchestrator: f.state, ...(f.conversation ? { orchestratorConversation: f.conversation } : {}) }, true];
     }
-    case "message":
-      if (state.chat?.messages?.some((m) => m.id === f.message.id && same(m, f.message))) return [state, false];
-      return [{ ...state, chat: withMessage(state.chat, f.message) }, true];
+    case "message": {
+      const [chat, news] = withMessage(state.chat, f.message);
+      return [chat === state.chat ? state : { ...state, ...(chat ? { chat } : {}) }, news];
+    }
     case "conversation":
       if (state.chat?.conversations?.some((c) => c.id === f.conversation.id && same(c, f.conversation))) return [state, false];
       return [{ ...state, chat: withConversation(state.chat, f.conversation) }, true];

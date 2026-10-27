@@ -2,7 +2,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { owner } from "../base/actor.ts";
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent, Session } from "@vibevalley/protocol";
-import { messagesIn } from "../channel/state.ts";
+import { Said } from "../testing/said.ts";
 import { seedAgents } from "../agent/seed.ts";
 import { Effect } from "effect";
 import { Channels } from "../channel/chat.ts";
@@ -73,7 +73,7 @@ describe("mcp", () => {
     });
     return Effect.gen(function* () {
       const issues = yield* Issues;
-      const core = yield* Core;
+      const { in: saidIn } = yield* Said;
       const chat = yield* Channels;
       const mcp = yield* Mcp;
       const got = yield* issues.hire(lab(), "写 hello", "chat-j");
@@ -99,7 +99,7 @@ describe("mcp", () => {
       // Names are listed without an @: models copy a wake.
       expect(who.split("\n").slice(0, -1).join("\n")).not.toContain("@");
       expect(yield* Effect.promise(() => c.tool("channel_say", { text: "从 MCP 说一句", anyway: true }))).toContain("发出去了");
-      const m = messagesIn(core.state().chat, thread!).find((x) => x.text === "从 MCP 说一句");
+      const m = saidIn(thread!).find((x) => x.text === "从 MCP 说一句");
       expect(m).toMatchObject({ from: id, fromKind: "session" });
       expect(yield* Effect.promise(() => c.tool("channel_inbox"))).not.toBe("");
       expect(yield* Effect.promise(() => c.tool("read_chat"))).toContain("从 MCP 说一句");
