@@ -5,17 +5,17 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import {
   type Deliverable,
   DeliverableValues,
-  type Review,
   type Question,
   type Issue,
   type IssueAct,
+  type IssueAction,
   type IssueAnswer,
   type Milestone,
   type Session,
   type SessionEvent,
 } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { createIssueActs } from "./acts";
+import { createIssueActs, perform } from "./acts";
 import type { Tone } from "./cards";
 import { issueTag, runText, tagOpen, tagText } from "./rules";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "./state";
@@ -292,7 +292,10 @@ export function IssueDetail(props: {
   );
 
   // The acts the block above does not offer: a word, a stop, a close.
-  const sideActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
+  const sideActs = () => {
+    const all = s().attention.acts.map((a) => a.act);
+    return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
+  };
   const side = (
     <>
       <Show when={sideActs().length > 0}>
@@ -330,21 +333,6 @@ export function IssueDetail(props: {
               void act(() => api.issue.update({ id, deliver: v as Deliverable }));
             }}
             options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
-          />
-        </Property>
-        <Property label={issuesWording().detail.review}>
-          <Pick
-            label={issuesWording().detail.review}
-            value={props.issue.review}
-            disabled={busy() || !s().open}
-            onChange={(v) => {
-              const id = props.issue.id;
-              void act(() => api.issue.update({ id, review: v as Review }));
-            }}
-            options={[
-              { value: "glance", label: issuesWording().detail.glance },
-              { value: "required", label: issuesWording().detail.required },
-            ]}
           />
         </Property>
       </Show>
@@ -550,10 +538,10 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const tag = () => issueTag(props.issue);
   const [busy, setBusy] = createSignal(false);
   // The orchestrator's answer is the owner's to take as done or put away; one that did not end well can only be put away.
-  const go = async (a: IssueAct) => {
-    const id = props.issue.id;
+  const go = async (a: IssueAction) => {
+    const issue = props.issue;
     setBusy(true);
-    await run(() => api.issue.act({ id, act: a }));
+    await run(() => perform(issue, a));
     setBusy(false);
   };
   return (
@@ -569,8 +557,8 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           </Show>
           <For each={props.issue.attention.acts}>
             {(a) => (
-              <Button tone={a === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
-                {wording().act[a]}
+              <Button tone={a.act === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
+                {wording().act[a.act]}
               </Button>
             )}
           </For>

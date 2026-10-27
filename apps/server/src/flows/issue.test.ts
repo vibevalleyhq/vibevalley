@@ -64,7 +64,9 @@ describe("an issue", () => {
       const kept = mustHire(yield* issues.hire(lab(), "写打卡并提交", "clock"));
       yield* w.nextReport;
       const keptIssue = yield* issues.get(kept.issue!);
-      yield* issues.act(kept.issue!, { act: "keep" }, "", owner);
+      // Kept on its branch is what the issue delivers, chosen before it is completed.
+      yield* issues.edit(kept.issue!, { deliver: "branch" }, owner);
+      yield* issues.setStatus(kept.issue!, "done", "", "", owner);
       expect((yield* closed(kept.issue!)).delivered).toBe("kept");
       yield* left(kept.id);
       expect(mainLog()).toBe(before);
@@ -178,8 +180,10 @@ describe("an issue", () => {
       const b = yield* issues.add({ title: "二", priority: "urgent" });
       const c = yield* issues.add({ title: "三" });
       expect([a.priority, b.priority]).toEqual(["medium", "urgent"]);
-      expect(unsent(yield* issues.move(c.id, a.id))).toEqual(["三", "一", "二"]);
-      expect(unsent(yield* issues.move(c.id, ""))).toEqual(["一", "二", "三"]);
+      yield* issues.edit(c.id, { before: a.id }, owner);
+      expect(unsent(yield* issues.list())).toEqual(["三", "一", "二"]);
+      yield* issues.edit(c.id, { before: "" }, owner);
+      expect(unsent(yield* issues.list())).toEqual(["一", "二", "三"]);
       const d = yield* issues.add({ title: "四" });
       const all = yield* issues.list();
       expect(unsent(all)[3]).toBe(d.title);
@@ -410,8 +414,8 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // An act is the server's: only what the attention offers, with the words the server puts to the helper, by number too.
-  it.live("does an act as the issue's page does it", () => {
+  // A button is a move the server names: a stuck issue moved back with no words goes on with the server's words, by number too.
+  it.live("moves as the issue's buttons say", () => {
     const f = farm();
     return Effect.gen(function* () {
       const w = yield* watch;
@@ -420,23 +424,22 @@ describe("an issue", () => {
       const chat = yield* Channels;
       yield* (yield* Agents).saveAgent(lab());
       const drop = yield* issues.add({ title: "先放着", project: "acts", assignee: "lab" });
-      refusedWith(yield* Effect.flip(issues.act(drop.id, { act: "cure" }, "", owner)), "现在不能「接着修」");
-      const dropped = yield* issues.act(drop.id, { act: "close" }, "", owner);
-      expect(dropped.status).toBe("canceled");
+      const dropped = yield* issues.setStatus(drop.id, "canceled", "", "", owner);
+      expect([dropped.status, dropped.attention.acts]).toEqual(["canceled", [{ act: "reopen", does: "move", status: "backlog", words: "none" }]]);
       // Never sent: a reopen is back to the backlog, with nothing to tell.
-      expect((yield* issues.act("#" + drop.number, { act: "reopen" }, "", owner)).status).toBe("backlog");
+      expect((yield* issues.setStatus("#" + drop.number, "backlog", "", "", owner)).status).toBe("backlog");
 
       const issue = yield* issues.add({ title: "这一单必败", project: "acts", assignee: "lab" });
-      yield* issues.act(String(issue.number), { act: "start" }, "", owner);
+      yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       yield* await_(
         () => issues.get(issue.id),
         (i) => i.attention.stuck === "failed",
         "stuck: failed",
       );
-      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "complete" }, "", owner)), "现在不能「完成」");
-      refusedWith(yield* Effect.flip(issues.act(issue.id, { act: "tell" }, "", owner)), "「带话」要说一句");
-      yield* issues.act("#" + issue.number, { act: "cure" }, "", owner);
+      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)), "这一轮没做成");
+      expect((yield* issues.get(issue.id)).attention.acts[0]).toEqual({ act: "cure", does: "move", status: "todo", words: "none" });
+      yield* issues.setStatus(issue.id, "todo", "", "", owner);
       const thread = (yield* chat.jobThread((yield* issues.get(issue.id)).sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text === "接着修：这一单必败。看一下报错，修好再跑一遍测试"),
@@ -458,9 +461,7 @@ describe("an issue", () => {
       const before = git(project, "log", "--format=%s", "main");
       const merging = yield* issues.previewStatus(committed.issue!, "done", "");
       expect(merging.does.at(-1)).toMatch(/^合进 main（1 个提交），关成已完成，/);
-      const keeping = yield* issues.previewStatus(committed.issue!, "done", "", {
-        keepBranch: true,
-      });
+      const keeping = yield* issues.previewStatus(committed.issue!, "done", "", {}, { deliver: "branch" });
       expect(keeping.does[0]).toMatch(/关成已完成：分支留着没合（1 个提交）$/);
       expect([git(project, "log", "--format=%s", "main"), (yield* issues.get(committed.issue!)).status]).toEqual([before, "in_review"]);
       yield* issues.setStatus(committed.issue!, "done", "", "", owner);
@@ -474,8 +475,8 @@ describe("an issue", () => {
       const looked = mustHire(yield* issues.hire(lab(), "看看打卡页", "clock"));
       yield* w.nextReport;
       expect((yield* issues.previewStatus(looked.issue!, "done", "")).does[0]).toMatch(/关成已完成：没有改动要合$/);
-      expect((yield* issues.previewAct(looked.issue!, { act: "close" })).does[0]).toMatch(/关成已取消$/);
-      refusedWith(yield* Effect.flip(issues.previewAct(looked.issue!, { act: "tell" })), "要说一句");
+      expect((yield* issues.previewStatus(looked.issue!, "canceled", "")).does[0]).toMatch(/关成已取消$/);
+      refusedWith(yield* Effect.flip(issues.previewStatus(looked.issue!, "todo", "")), "要说一句");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -510,10 +511,10 @@ describe("an issue", () => {
         unsure: [],
         next: ["把配置读一次缓存起来"],
       });
-      expect(answered.attention.acts).toEqual(["acknowledge", "reject", "tell", "close"]);
+      expect(answered.attention.acts.map((a) => a.act)).toEqual(["acknowledge", "reject", "tell", "close"]);
       const branch = `vibevalley/issue-${answered.number}`;
       yield* until(() => git(project, "rev-parse", branch) === git(project, "rev-parse", "main"), "what it committed gone");
-      yield* issues.act(asked.id, { act: "acknowledge" }, "", owner);
+      yield* issues.setStatus(asked.id, "done", "", "", owner);
       const done = yield* await_(
         () => issues.get(asked.id),
         (i) => i.closedAt !== undefined,
@@ -536,7 +537,7 @@ describe("an issue", () => {
       );
       expect([stuck.answer, stuck.moves]).toEqual([undefined, ["todo", "canceled"]]);
       refusedWith(yield* Effect.flip(issues.setStatus(garbled.id, "done", "", "", owner)), "这一轮没做成");
-      yield* issues.act(garbled.id, { act: "cure" }, "", owner);
+      yield* issues.setStatus(garbled.id, "todo", "", "", owner);
       const thread = (yield* chat.jobThread(stuck.sessions.at(-1)!))!;
       yield* until(
         () => saidIn(thread).some((m) => m.from === "owner" && m.text.startsWith("接着修：上一轮交回的结论读不出来（没找到结论")),
@@ -574,7 +575,7 @@ describe("an issue", () => {
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
-  // Every issue has an acceptance: one that must pass waits for it; a fail grows weeds and another round; a pass is ready to complete.
+  // Completing is the acceptance; sent back with findings it grows weeds and goes another round, and completing settles them.
   // A question in a report leaves the plot short of fertilizer until the owner answers.
   it.live("grows through its acceptance", () => {
     const f = farm();
@@ -587,9 +588,7 @@ describe("an issue", () => {
         title: "先问清楚，再写打卡并提交",
         project: "clock",
         assignee: "lab",
-        review: "required",
       });
-      expect(issue.review).toBe("required");
       yield* issues.setStatus(issue.id, "todo", "", "", owner);
       yield* w.nextReport;
       issue = yield* await_(
@@ -617,9 +616,9 @@ describe("an issue", () => {
         "handed back",
       );
       yield* until(() => crop() === "flowering", "抽穗：等验收");
-      refusedWith(yield* Effect.flip(issues.setStatus(issue.id, "done", "", "", owner)));
 
-      yield* issues.review(issue.id, { pass: false, findings: ["再写版本B"] });
+      // Moved back while it waits for acceptance, the words are the findings.
+      yield* issues.setStatus(issue.id, "todo", "再写版本B", "", owner);
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
       yield* w.nextReport;
       yield* await_(
@@ -631,10 +630,8 @@ describe("an issue", () => {
       yield* until(() => crop() === "flowering", "waiting on the acceptance again");
       expect(openFindings(yield* issues.get(issue.id))).toBe(1);
 
-      issue = yield* issues.review(issue.id, { pass: true });
-      expect([issue.reviewedAt !== undefined, openFindings(issue), (issue.moves ?? []).includes("done")]).toEqual([true, 0, true]);
       issue = yield* issues.setStatus(issue.id, "done", "", "", owner);
-      expect(issue.status).toBe("done");
+      expect([issue.status, openFindings(issue)]).toEqual(["done", 0]);
       expect(git(join(f.config.workRoot, "projects", "clock"), "log", "--format=%s", "main")).toMatch(/版本 B/);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });

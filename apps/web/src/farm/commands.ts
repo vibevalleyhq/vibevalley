@@ -3,8 +3,9 @@
 
 import { farmWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
-import type { IssueActRequest, Session, StateFrame } from "@vibevalley/protocol";
+import type { IssueAct, Session, StateFrame } from "@vibevalley/protocol";
 import { api, newSendKey } from "../base/api";
+import { actionOf, perform } from "../features/issue";
 import { farm, farmState } from "./store";
 import { actForTool, aimTool, type BedFxKind, type PlotAim, type Tool, type ToolResult } from "./tools";
 import { type Bed, bedOfStation, issueOf, plotOf, sessionAtStation, stationOfSession } from "./world/plots";
@@ -41,9 +42,12 @@ export interface FarmCommands {
 /** The commands over the latest frame `frame()` gives. */
 export function farmCommands(frame: () => StateFrame | undefined): FarmCommands {
   const issue = (s: Session) => frame()?.state.issues?.find((i) => i.id === issueOf(s));
-  const send = async (s: Session, body: IssueActRequest) => {
-    if (!issue(s)?.attention.acts.includes(body.act)) throw new Error(farmWording().command.cannot(wording().act[body.act]));
-    await api.issue.act({ id: issueOf(s), ...body });
+  /** Presses the issue's button as the server says it; one it does not offer is refused here, by its name. */
+  const send = async (s: Session, act: IssueAct, words = "", sendKey?: string) => {
+    const t = issue(s);
+    const action = t && actionOf(t, act);
+    if (!t || !action) throw new Error(farmWording().command.cannot(wording().act[act]));
+    await perform(t, action, words, sendKey);
   };
   const aimAt = (bed: Bed, tool: Tool): PlotAim => {
     const f = frame();
@@ -55,28 +59,31 @@ export function farmCommands(frame: () => StateFrame | undefined): FarmCommands 
   };
   const commands: FarmCommands = {
     async water(s, text, sendKey) {
-      await send(s, { act: "tell", text, sendKey });
+      await send(s, "tell", text, sendKey);
       fx(s, "water");
     },
     async resolve(s) {
-      await send(s, { act: "resolve" });
+      await send(s, "resolve");
       fx(s, "water");
     },
     async cure(s) {
-      await send(s, { act: "cure" });
+      await send(s, "cure");
       fx(s, "spray");
     },
     async harvest(s) {
-      await send(s, { act: "complete" });
+      await send(s, "complete");
       fx(s, "harvest", farmWording().command.stored);
     },
     async shovel(s) {
-      const act = actForTool("shovel", issue(s)?.attention.acts ?? []);
+      const act = actForTool(
+        "shovel",
+        (issue(s)?.attention.acts ?? []).map((a) => a.act),
+      );
       if (!act) throw new Error(farmWording().command.noShovel);
-      await send(s, { act });
+      await send(s, act);
       fx(s, "shovel");
     },
-    stop: (s) => send(s, { act: "stop" }),
+    stop: (s) => send(s, "stop"),
     async plant(text, o = {}) {
       const said = text.trim();
       if (!said) return;

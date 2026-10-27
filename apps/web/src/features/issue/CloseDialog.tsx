@@ -1,8 +1,9 @@
 import { issuesWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
-import type { ChangedFile, Changes, Issue, Session } from "@vibevalley/protocol";
+import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
+import { actionOf, perform } from "./acts";
 import { issueTitle } from "./rules";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "./state";
 import { ago } from "../../base/format";
@@ -20,13 +21,11 @@ import { useCore } from "../../base/frame";
 export function CloseIssueDialog(props: { issue: Issue; session: Session; review?: boolean; onClose: () => void }) {
   const [reviewing, setReviewing] = createSignal(untrack(() => props.review ?? false));
   const core = useCore();
-  const acts = () => core()?.issues?.find((i) => i.id === props.issue.id)?.attention.acts ?? [];
+  const live = () => core()?.issues?.find((i) => i.id === props.issue.id);
+  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const cancel = async () => {
-    if (!acts().includes("close")) return;
-    const id = props.issue.id;
-    const closed = await run(() => api.issue.act({ id, act: "close" }));
-    if (closed) props.onClose();
+    if (await pressed(live(), "close")) props.onClose();
   };
   return (
     <Dialog open onClose={props.onClose} title={issuesWording().close.title(issueTitle(props.issue))} wide={reviewing()}>
@@ -58,22 +57,23 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
   );
 }
 
+/** Presses the issue's button by this name, as the server says; false when it is not offered or did not go through. */
+async function pressed(issue: Issue | undefined, act: IssueAct) {
+  const a = issue && actionOf(issue, act);
+  return a !== undefined && (await run(() => perform(issue!, a).then(() => true))) === true;
+}
+
 /** What the branch brings before it is merged. */
 export function ChangesReview(props: { issue: string; onDone: () => void }) {
   const changes = useIssueChanges(() => props.issue);
   const core = useCore();
-  const acts = () => core()?.issues?.find((i) => i.id === props.issue)?.attention.acts ?? [];
+  const live = () => core()?.issues?.find((i) => i.id === props.issue);
+  const acts = () => (live()?.attention.acts ?? []).map((a) => a.act);
   const take = async () => {
-    if (!acts().includes("complete")) return;
-    const id = props.issue;
-    const completed = await run(() => api.issue.act({ id, act: "complete" }));
-    if (completed) props.onDone();
+    if (await pressed(live(), "complete")) props.onDone();
   };
   const resolve = async () => {
-    if (!acts().includes("resolve")) return;
-    const id = props.issue;
-    const resolving = await run(() => api.issue.act({ id, act: "resolve" }));
-    if (resolving) props.onDone();
+    if (await pressed(live(), "resolve")) props.onDone();
   };
   return (
     <Switch>

@@ -131,16 +131,9 @@ export class VibeValleyApi {
     delete: (a: { id: string }): Promise<void> => this.call("/api/v1/issue/delete", a) as Promise<void>,
     /** What issue.delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/issue/previewDelete", a) as Promise<T.Preview>,
-    move: (a: { id: string } & T.MoveIssueRequest): Promise<T.Issue[]> => this.call("/api/v1/issue/move", a) as Promise<T.Issue[]>,
     /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
      * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
     refine: (a: { id: string } & T.IssueRefineRequest): Promise<T.Issue> => this.call("/api/v1/issue/refine", a) as Promise<T.Issue>,
-    /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
-    dispatch: (a: { id: string } & T.IssueDispatchRequest): Promise<T.Dispatched> => this.call("/api/v1/issue/dispatch", a) as Promise<T.Dispatched>,
-    /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
-    act: (a: { id: string } & T.IssueActRequest): Promise<T.Issue> => this.call("/api/v1/issue/act", a) as Promise<T.Issue>,
-    /** What issue.act would do with the same body, refused as it would be; nothing changes. */
-    previewAct: (a: { id: string } & T.IssueActRequest): Promise<T.Preview> => this.call("/api/v1/issue/previewAct", a) as Promise<T.Preview>,
     comment: {
       /** To the issue's newest session, as the owner: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
       create: (a: { id: string } & T.CommentRequest): Promise<void> => this.call("/api/v1/issue/comment/create", a) as Promise<void>,
@@ -160,8 +153,9 @@ export class VibeValleyApi {
       get: (a: { id: string }): Promise<T.IssueTimeline> => this.call("/api/v1/issue/timeline/get", a) as Promise<T.IssueTimeline>,
     },
     status: {
-      /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
-       * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
+      /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
+       * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
+       * issue says; canceled sends its session home. Issue.moves lists where it may go. */
       update: (a: { id: string } & T.IssueStatusRequest): Promise<T.Issue> => this.call("/api/v1/issue/status/update", a) as Promise<T.Issue>,
       /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
       previewUpdate: (a: { id: string } & T.IssueStatusRequest): Promise<T.Preview> => this.call("/api/v1/issue/status/previewUpdate", a) as Promise<T.Preview>,

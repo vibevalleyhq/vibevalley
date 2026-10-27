@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { orchestrator } from "../base/actor.ts";
+import { orchestrator, owner } from "../base/actor.ts";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import type { Fact, Session } from "@vibevalley/protocol";
@@ -233,9 +233,8 @@ describe("a session's work", () => {
       expect(JSON.stringify(failed)).toMatch(/会冲突（same\.ts）/);
       const stayed = sessions.find(b.id)!;
       expect(stayed.session.conflict).toEqual({ base: "main", files: ["same.ts"] });
-      yield* Effect.flip(issues.resolve(a.issue!));
-      // The owner's 让它解决冲突: the server says which conflicts, in the owner's words.
-      yield* issues.resolve(b.issue!);
+      // The owner's 让它解决冲突 moves it back with no words: the server says which conflicts, in the owner's words.
+      yield* issues.setStatus(b.issue!, "todo", "", "", owner);
       yield* w.nextReport;
       // The round settled it: the sessions look at the mark again by themselves.
       yield* until(() => sessions.find(b.id)?.session.conflict === undefined, "the conflict mark cleared");

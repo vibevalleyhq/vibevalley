@@ -4,7 +4,7 @@
 
 import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
-import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
+import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import { commandOf, type Next } from "@vibevalley/protocol/api";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
@@ -14,13 +14,14 @@ export type Move =
   | "start"
   /** todo → backlog */
   | "unqueue"
-  /** in_review → todo: another round, with the owner's words */
+  /** in_review → todo: another round, with the owner's words (the findings, while it waits for acceptance), or with the
+   * server's own for why it is stuck */
   | "round"
   /** done, canceled → todo: its doer takes it up again (a new session, or the orchestrator), with the owner's words */
   | "reopen"
   /** canceled before it was ever sent → backlog */
   | "revive"
-  /** in_review → done: what it delivers follows the issue (its branch's commits, the owner's choice to keep it) */
+  /** in_review → done: accepted, and delivered as the issue says (merged or by a pull request, kept on its branch, an answer) */
   | "complete"
   /** in_progress, in_review → canceled: its session, if any, goes home */
   | "cancel"
@@ -48,11 +49,8 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       return to === "canceled" ? ["cancel", ""] : ["none", issueWording().move.working];
     case "in_review":
       if (to === "todo") return ["round", ""];
-      // A round that failed is never done, even with a glance acceptance: done is what was asked for, not how the round ended.
-      if (to === "done") {
-        if (t.attention.stuck === "failed") return ["none", issueWording().move.failed];
-        return t.review === "required" && t.reviewedAt === undefined ? ["none", issueWording().move.needsAcceptance] : ["complete", ""];
-      }
+      // A round that failed is never done: done is what was asked for, not how the round ended.
+      if (to === "done") return t.attention.stuck === "failed" ? ["none", issueWording().move.failed] : ["complete", ""];
       if (to === "canceled") return ["cancel", ""];
       break;
     case "done":
@@ -66,23 +64,32 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
 
-/** The acts that need the owner's words. */
-const wordy: ReadonlySet<IssueAct> = new Set(["answer", "tell", "reject", "reopen"]);
-
-/** Next steps after a refusal: each act and move as its command; one that needs the owner's words has no command and says which field takes them. */
+/** Next steps after a refusal: each of the issue's buttons and moves as its command; one that needs the owner's words has
+ * no command and says which field takes them. */
 export function nextSteps(t: Issue): Next[] {
   const n = String(t.number);
-  const acts = t.attention.acts.map((act): Next => {
-    const label = wording().act[act];
-    return wordy.has(act)
-      ? { say: issueWording().move.actWithText(label, commandOf("issue.act", [n]).join(" "), act) }
-      : { say: label, run: commandOf("issue.act", [n], { act }) };
+  const session = t.sessions.at(-1);
+  const acts = t.attention.acts.flatMap((a): Next[] => {
+    const label = wording().act[a.act];
+    switch (a.does) {
+      case "move":
+        return a.words === "required"
+          ? [{ say: issueWording().move.roundWithText(label, commandOf("issue.status.update", [n]).join(" "), a.status) }]
+          : [{ say: label, run: commandOf("issue.status.update", [n], { status: a.status }) }];
+      case "say":
+        return [{ say: issueWording().move.sayWithText(label, commandOf("issue.comment.create", [n]).join(" ")) }];
+      case "stop":
+        return session === undefined ? [] : [{ say: label, run: commandOf("session.stop", [session]) }];
+    }
   });
-  const moves = statusMoves(t).map((to): Next => {
-    const say = issueWording().move.moveTo(wording().status[to]);
-    return statusMove(t, to)[0] === "round"
-      ? { say: issueWording().move.roundWithText(say, commandOf("issue.status.update", [n]).join(" "), to) }
-      : { say, run: commandOf("issue.status.update", [n], { status: to }) };
-  });
+  const pressed = new Set(t.attention.acts.flatMap((a) => (a.does === "move" ? [a.status] : [])));
+  const moves = statusMoves(t)
+    .filter((to) => !pressed.has(to))
+    .map((to): Next => {
+      const say = issueWording().move.moveTo(wording().status[to]);
+      return statusMove(t, to)[0] === "round"
+        ? { say: issueWording().move.roundWithText(say, commandOf("issue.status.update", [n]).join(" "), to) }
+        : { say, run: commandOf("issue.status.update", [n], { status: to }) };
+    });
   return [...acts, ...moves];
 }

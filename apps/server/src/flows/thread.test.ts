@@ -84,7 +84,6 @@ describe("an issue's thread", () => {
         title: "先问清楚，再写打卡",
         project: "clock",
         assignee: "lab",
-        review: "required",
       });
       const sent = yield* issues.start(issue.id, "");
       const thread = (yield* await_(

@@ -3,6 +3,7 @@
 // labels, hints and lines on screen.
 
 import { localized } from "@vibevalley/protocol/words";
+import type { Deliverable } from "@vibevalley/protocol";
 
 const zh = {
   reading: "在读……",
@@ -48,8 +49,8 @@ const zh = {
     who: "谁在做",
     crew: "地上的人",
     review: "验收",
-    glance: "看一眼就收",
-    required: "必须过验收",
+    deliver: "交付",
+    delivers: { change: "合进去", branch: "留分支", answer: "只要结论" } satisfies Record<Deliverable, string>,
     reviewed: (clock: string) => `已验收 ${clock}`,
     weeded: "拔了的草",
     weed: (text: string) => `已拔 · ${text}`,
@@ -538,8 +539,8 @@ const en: typeof zh = {
     who: "Who",
     crew: "On the plot",
     review: "Acceptance",
-    glance: "A glance will do",
-    required: "Must be accepted",
+    deliver: "Delivers",
+    delivers: { change: "Merge it", branch: "Keep the branch", answer: "An answer only" },
     reviewed: (clock) => `Accepted ${clock}`,
     weeded: "Weeds pulled",
     weed: (text) => `Pulled · ${text}`,

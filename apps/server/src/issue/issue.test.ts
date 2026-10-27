@@ -460,7 +460,7 @@ describe("issues", () => {
       const ranks = () => sql<{ id: string; rank: number }>`select id, rank from issue where id = 'p1' or parent = 'p1' order by id`.pipe(Effect.orDie);
       const before = yield* ranks();
       expect(before.length).toBeGreaterThan(0);
-      yield* issues.move(one.id, "");
+      yield* issues.edit(one.id, { before: "" }, owner);
       expect(yield* ranks()).toEqual(before);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
@@ -476,19 +476,6 @@ describe("issues", () => {
       const out = yield* Effect.exit(issues.get(issue.id));
       expect(out._tag).toBe("Failure");
       if (out._tag === "Failure") expect(Cause.hasDies(out.cause)).toBe(true);
-    }).pipe(Effect.scoped, Effect.provide(f.layer));
-  });
-
-  it.live("resolving says what git said when git fails", () => {
-    const f = farm();
-    return Effect.gen(function* () {
-      const issues = yield* Issues;
-      const got = yield* issues.hire(lab(), "test", "demo");
-      expect(got.session).toBeDefined();
-      const repo = join(f.config.workRoot, "projects", "demo");
-      renameSync(join(repo, ".git"), join(repo, ".git-hidden"));
-      const err = yield* Effect.flip(issues.resolve(got.session!.issue!));
-      expect(JSON.stringify(err)).not.toContain("没有冲突");
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 
@@ -593,7 +580,7 @@ describe("issues", () => {
     }).pipe(Effect.scoped, Effect.provide(world({ config: c, runtimes: [busy], repos: ["demo"], clock: () => clock.now })));
   });
 
-  it.live("a queued todo starts from the sowing form when there is room", () => {
+  it.live("a queued todo starts once there is room, and keeps its place until then", () => {
     const f = farm();
     return Effect.gen(function* () {
       const issues = yield* Issues;
@@ -602,14 +589,13 @@ describe("issues", () => {
       yield* (yield* Agents).saveAgent(lab());
       yield* occupied(core, "pi");
       const issue = yield* issues.add({ title: "queued", assignee: "lab", project: "demo" });
-      expect((yield* Effect.flip(issues.dispatchQueued(issue.id)))._tag).toBe("Refused");
       expect((yield* issues.start(issue.id, chat.defaultChannel())).queued).toBeDefined();
       const queued = yield* issues.get(issue.id);
-      const still = yield* issues.dispatchQueued(issue.id);
-      expect([still.queued !== undefined, still.session]).toEqual([true, undefined]);
-      expect((yield* issues.get(issue.id)).queuedAt).toBe(queued.queuedAt);
+      yield* issues.tryQueued;
+      expect([(yield* issues.get(issue.id)).queuedAt, (yield* issues.get(issue.id)).sessions]).toEqual([queued.queuedAt, []]);
       yield* core.apply({ type: "left", id: sessionId("occupied") });
-      expect((yield* issues.dispatchQueued(issue.id)).session).toBeDefined();
+      yield* issues.tryQueued;
+      expect((yield* issues.get(issue.id)).sessions).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(f.layer));
   });
 

@@ -29,7 +29,7 @@ export const zh = {
   } satisfies Record<IssueStatus, string>,
   priority: { urgent: "紧急", high: "高", medium: "普通", low: "低" } satisfies Record<Priority, string>,
   /** What an issue is to deliver, as the owner picks it. */
-  deliverable: { change: "改动，合进项目", answer: "结论，只查不改代码" } satisfies Record<Deliverable, string>,
+  deliverable: { change: "改动，合进项目", branch: "改动，分支留着不合", answer: "结论，只查不改代码" } satisfies Record<Deliverable, string>,
   /** What a done issue delivered. */
   delivered: {
     merged: "合进了主分支",
@@ -58,10 +58,8 @@ export const zh = {
   act: {
     start: "开工",
     answer: "回答",
-    accept: "验收通过",
     reject: "打回",
     complete: "完成",
-    keep: "完成，分支留着",
     acknowledge: "知道了",
     resolve: "让它解决冲突",
     resume: "接着做",

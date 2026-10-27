@@ -24,18 +24,23 @@ const done = session({ _tag: "done" });
 describe("a plot", () => {
   it("pictures its issue's attention, not its session's phase", () => {
     const cases: [IssueAttention, Partial<Issue>, string, string | undefined][] = [
-      [{ state: "asking", acts: ["answer"] }, {}, "dry", "等你回答"],
-      [{ state: "reviewing", lead: "complete", acts: ["complete"] }, {}, "flowering", "等你验收"],
-      [{ state: "reviewing", lead: "complete", acts: ["complete"] }, { reviewedAt: 5 }, "carrot", "可收获"],
+      [{ state: "asking", acts: [{ act: "answer", does: "say" }] }, {}, "dry", "等你回答"],
+      [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, {}, "flowering", "等你验收"],
+      [{ state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] }, { reviewedAt: 5 }, "carrot", "可收获"],
       // Reworked after a failed acceptance and handed back: it waits on the owner again, its findings are not weeds yet.
-      [{ state: "reviewing", lead: "accept", acts: ["accept"] }, { findings: [{ id: "f", text: "再改", at: 1 }] }, "flowering", "等你验收"],
+      [
+        { state: "reviewing", lead: "complete", acts: [{ act: "complete", does: "say" }] },
+        { findings: [{ id: "f", text: "再改", at: 1 }] },
+        "flowering",
+        "等你验收",
+      ],
       // A task graph's step: it stands, but its graph is where the owner acts.
       [{ state: "reviewing", acts: [] }, {}, "flowering", undefined],
       // A conflict is not ripe, whatever the round came to.
-      [{ state: "stuck", stuck: "conflict", lead: "resolve", acts: ["resolve"] }, {}, "withered", "有冲突"],
+      [{ state: "stuck", stuck: "conflict", lead: "resolve", acts: [{ act: "resolve", does: "say" }] }, {}, "withered", "有冲突"],
       // An answer it could not read: the round completed, the issue did not.
-      [{ state: "stuck", stuck: "failed", lead: "cure", acts: ["cure"] }, { deliver: "answer" }, "withered", "有虫"],
-      [{ state: "stuck", stuck: "quiet", lead: "stop", acts: ["stop"] }, {}, "dry", "没动静"],
+      [{ state: "stuck", stuck: "failed", lead: "cure", acts: [{ act: "cure", does: "say" }] }, { deliver: "answer" }, "withered", "有虫"],
+      [{ state: "stuck", stuck: "quiet", lead: "stop", acts: [{ act: "stop", does: "say" }] }, {}, "dry", "没动静"],
     ];
     for (const [attention, more, crop, badge] of cases) {
       const plot = plotOf(done, issue(attention, more));
@@ -44,13 +49,13 @@ describe("a plot", () => {
   });
 
   it("stopped halfway grows where it got to, and says so", () => {
-    const plot = plotOf(session({ _tag: "resting" }), issue({ state: "stuck", stuck: "interrupted", lead: "resume", acts: ["resume"] }));
+    const plot = plotOf(session({ _tag: "resting" }), issue({ state: "stuck", stuck: "interrupted", lead: "resume", acts: [{ act: "resume", does: "say" }] }));
     expect([plot.crop, plot.badge?.text]).toEqual(["sprout", "停在半路"]);
   });
 
   it("at work, fixes what a failed acceptance said", () => {
     const working = session({ _tag: "working", since: 1, doing: { action: "none", label: "" } });
-    const t = issue({ state: "working", acts: ["tell"] }, { status: "in_progress", findings: [{ id: "f", text: "再改", at: 1 }] });
+    const t = issue({ state: "working", acts: [{ act: "tell", does: "say" }] }, { status: "in_progress", findings: [{ id: "f", text: "再改", at: 1 }] });
     expect(plotOf(working, t)).toEqual({ crop: "weeds", badge: { text: "除草中 1", tone: "bug" } });
     expect(plotOf(working, { ...t, findings: [{ id: "f", text: "再改", at: 1, resolved: true }] }).crop).toBe("sprout");
   });
