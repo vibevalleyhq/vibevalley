@@ -1,5 +1,3 @@
-// What the connectors pane says: the chat apps (WeChat, Feishu, QQ) the farm answers in, each account and its channel.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

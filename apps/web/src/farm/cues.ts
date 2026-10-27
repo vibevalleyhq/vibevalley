@@ -1,6 +1,3 @@
-// When the farm plays its sounds: what changed between two moments of the farm (a tool picked, a bed's effect, a panel,
-// the frame's effects, helpers arriving, plots ripening, the call), and good news taking turns.
-
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 import { playSound, type SoundName } from "../ui/pixel/sound";
 import type { BedFxKind } from "./tools";

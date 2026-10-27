@@ -1,6 +1,3 @@
-// What the pixel pieces say themselves: a dialog's close, an optional field, a chip's remove, the toasts' titles, and
-// each sound's name.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

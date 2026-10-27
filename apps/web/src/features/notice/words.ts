@@ -1,5 +1,3 @@
-// What the tray says of the farm at a glance: who is working, and the unread in 田头.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

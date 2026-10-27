@@ -1,7 +1,3 @@
-// The features' graph has no cycle; their order among the page's other layers, and that a feature is used through its
-// index.ts, are the lint's (scripts/oxlint-plugin.ts, page-layers). A feature that needs one needing it back has a piece
-// in the wrong place, most often words or a helper the two share (apps/web/README.md).
-
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { expect, test } from "vite-plus/test";
@@ -51,7 +47,10 @@ function cycleIn(edges: Map<string, Set<string>>): string[] {
 }
 
 test("the features' imports have no cycle", () => {
-  expect(cycleIn(graph())).toEqual([]);
+  expect(
+    cycleIn(graph()),
+    "a feature needing one that needs it back has a piece in the wrong place, most often words or a helper the two share: move it below both (apps/web/README.md)",
+  ).toEqual([]);
 });
 
 test("a cycle is found and named", () => {

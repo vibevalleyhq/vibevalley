@@ -1,5 +1,3 @@
-// What the voice says: the call to the manager and dictation, and the voice pane's choices.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

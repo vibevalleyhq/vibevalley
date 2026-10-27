@@ -1,5 +1,3 @@
-// What the orchestrator's page says: its tabs, the looks it can wear and the pets by its door.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

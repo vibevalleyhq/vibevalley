@@ -1,5 +1,3 @@
-// What a helper's session says: its work log under a message, its rounds and its trajectory.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

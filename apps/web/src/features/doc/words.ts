@@ -1,10 +1,7 @@
-// What the documents page says: the list, a document's blocks and the editor's state.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {
   docs: {
-    /** A memory item block's mark. */
     memoryItem: "记性",
     list: "文档列表",
     title: "文档",
@@ -38,7 +35,6 @@ const zh = {
 
 const en: typeof zh = {
   docs: {
-    /** A memory item block's mark. */
     memoryItem: "Memory",
     list: "Documents",
     title: "Documents",

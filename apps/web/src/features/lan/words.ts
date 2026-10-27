@@ -1,6 +1,3 @@
-// What connecting to this machine says: the pane that lets a phone or another computer in, the devices by kind, and
-// the page it pairs on.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

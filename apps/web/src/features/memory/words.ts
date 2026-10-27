@@ -1,5 +1,3 @@
-// What an agent's memory says: a profile's shared memory, the manager's, and the manager's archive of folded conversations.
-
 import { localized } from "@vibevalley/protocol/words";
 
 const zh = {

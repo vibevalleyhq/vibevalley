@@ -1,7 +1,7 @@
 import { orchestratorWording } from "./words";
 // The orchestrator's looks and the pets the owner can pick (base/prefs.ts keeps the choice), and their sprites.
 
-/** The orchestrator's looks: sprite orchestrator-<id>, the plain one is farmer. */
+/** The orchestrator's looks: sprite manager-<id>, the plain one is farmer. */
 export const orchestratorLooks: readonly { readonly id: string; readonly name: string; readonly blurb: string }[] = [
   { id: "farmer", name: orchestratorWording().looks.farmer.name, blurb: orchestratorWording().looks.farmer.blurb },
   { id: "foreman", name: orchestratorWording().looks.foreman.name, blurb: orchestratorWording().looks.foreman.blurb },

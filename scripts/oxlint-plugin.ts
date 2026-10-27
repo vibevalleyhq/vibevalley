@@ -123,7 +123,7 @@ function pageUnit(path: string): { layer: (typeof pageLayers)[number]; unit: str
   return { layer: layer ?? "root", unit: parts[0]! };
 }
 
-/** The normalized path of `spec` from the file at `from`, both relative to the page's src. */
+/** Both paths are relative to the page's src. */
 function joinPath(from: string, spec: string) {
   const out = from.split("/").slice(0, -1);
   for (const part of spec.split("/")) {
