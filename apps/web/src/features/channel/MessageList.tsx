@@ -5,8 +5,22 @@ import { createEffect, createMemo, createSignal, For, Show, untrack } from "soli
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Channel, type MessageHit, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { Attachments, EditBox, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
-import { chatPath, feedOf, parentAt, phaseDot, phaseText, roleShort, runtimeLabel, threadOwnerOf, unreadIn, orchestratorTyping, workbenchClock } from "./rules";
+import { Attachments, EditBox, Embeds, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
+import {
+  channelOf,
+  messagePath,
+  chatPath,
+  feedOf,
+  parentAt,
+  phaseDot,
+  phaseText,
+  roleShort,
+  runtimeLabel,
+  threadOwnerOf,
+  unreadIn,
+  orchestratorTyping,
+  workbenchClock,
+} from "./rules";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";
@@ -15,6 +29,7 @@ import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
+import { editingId, setEditingId } from "./draft";
 import { followed, useFollowed, useMessage } from "./follow";
 import { TurnSteps } from "../session";
 import { useAgent } from "../../base/agents";
@@ -26,11 +41,36 @@ const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }>
 };
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
-export function MessageList(props: { channel: Channel | undefined; filter?: string; emptyText: string }) {
+export function MessageList(props: { channel: Channel | undefined; filter?: string; point?: number | undefined; emptyText: string }) {
   const core = useCore();
+  const router = useRouter();
   const id = () => props.channel?.id;
   const said = useFollowed(id);
   useMarkRead(() => props.channel);
+  let log: HTMLDivElement | undefined;
+  // The message an address points at: older pages are read until it is among them, then it is scrolled to and lit up a
+  // while. A string, so a change elsewhere in the list does not scroll again.
+  const [lit, setLit] = createSignal<number>();
+  createEffect(
+    () => {
+      const at = id();
+      const n = props.point;
+      const f = said();
+      if (!at || n === undefined || !f.ready) return undefined;
+      if (f.messages.some((m) => m.number === n)) return `here:${at}:${n}`;
+      const first = f.messages[0]?.number;
+      return !f.complete && first !== undefined && first > n ? `older:${at}:${first}` : undefined;
+    },
+    (step) => {
+      if (!step) return;
+      const [what, at, n] = step.split(":") as [string, string, string];
+      if (what === "older") return void followed.loadOlder(at);
+      requestAnimationFrame(() => log?.querySelector(`[data-number="${n}"]`)?.scrollIntoView({ block: "center" }));
+      setLit(Number(n));
+      const off = setTimeout(() => setLit(undefined), litMs);
+      return () => clearTimeout(off);
+    },
+  );
   // Rows newer than this arrived while the list was shown: they rise in; the rest just appear.
   const shownAt = Date.now();
 
@@ -64,7 +104,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={chatWording().messages.label}>
+    <div ref={(el) => (log = el)} class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={chatWording().messages.label}>
       <div class="flex flex-col px-4 pt-3 pb-4">
         <div class="flex justify-center pb-2">
           <Show
@@ -96,7 +136,16 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         </Show>
         <For each={items()} keyed={(item) => item.message.id}>
           {(item) => (
-            <div class={item().message.at > shownAt ? "transition-[opacity,translate] duration-200 ease-out starting:translate-y-2 starting:opacity-0" : ""}>
+            <div
+              data-number={item().message.channel === id() ? item().message.number : undefined}
+              class={[
+                "rounded-md transition-[opacity,translate,background-color] duration-200 ease-out",
+                {
+                  "starting:translate-y-2 starting:opacity-0": item().message.at > shownAt,
+                  "bg-wheat/25": lit() === item().message.number && item().message.channel === id(),
+                },
+              ]}
+            >
               <Show when={item().day}>{(day) => <DayLine label={day()} />}</Show>
               <Show when={item().message.id === firstNew()}>
                 <DayLine label={chatWording().messages.newMessages} tone="new" />
@@ -110,6 +159,9 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
                     thread={item().thread}
                     inChannel={props.channel?.type === "channel"}
                     where={addressOf(item().message)}
+                    {...(searching()
+                      ? { onJump: () => router.navigate(messagePath(channelOf(core()?.chat, item().message.channel), item().message.number)) }
+                      : {})}
                   />
                 }
               >
@@ -135,6 +187,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 }
 
 const searchWaitMs = 200;
+const litMs = 2500;
 
 function DayLine(props: { label: string; tone?: "new" }) {
   return (
@@ -152,15 +205,20 @@ function Frame(props: {
   name: string;
   meta: string;
   continues?: boolean;
-  above?: JSX.Element;
+  /** The message it answers, quoted above it. */
+  quote?: { channel: string; number: number } | undefined;
   tools?: JSX.Element;
   children: JSX.Element;
 }) {
   return (
     <div class={["group/m relative rounded-md px-1 hover:bg-hover", props.continues ? "pt-0.5" : "mt-3 pt-1"]}>
       {props.tools}
-      <Show when={props.above}>
-        <div class="pl-[52px]">{props.above}</div>
+      <Show when={props.quote}>
+        {(q) => (
+          <div class="pl-[52px]">
+            <ReplyQuote channel={q().channel} number={q().number} />
+          </div>
+        )}
       </Show>
       <div class="flex gap-3">
         <div class="relative w-10 shrink-0">
@@ -215,9 +273,10 @@ function Dispatch(props: { text: string }) {
   );
 }
 
-function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel; inChannel?: boolean; where?: string | undefined }) {
+function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channel; inChannel?: boolean; where?: string | undefined; onJump?: () => void }) {
   const core = useCore();
-  const [editing, setEditing] = createSignal(false);
+  const editing = () => editingId() === props.m.id;
+  const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const nameOf = (who: string) =>
     who === ownerId
       ? chatWording().messages.owner
@@ -244,9 +303,19 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
       name={props.m.fromKind === "owner" ? chatWording().messages.owner : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
-      above={props.m.replyTo !== undefined ? <ReplyQuote channel={props.m.channel} number={props.m.replyTo} /> : undefined}
+      quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
       tools={
-        props.m.deleted === undefined && !props.where ? <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} /> : undefined
+        props.onJump ? (
+          <button
+            type="button"
+            onClick={() => props.onJump?.()}
+            class="absolute -top-3 right-2 z-10 hidden cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs shadow-float group-focus-within/m:block group-hover/m:block"
+          >
+            {chatWording().more.jump}
+          </button>
+        ) : props.m.deleted === undefined && !props.where ? (
+          <MessageTools m={props.m} inChannel={!!props.inChannel} onEdit={() => setEditing(true)} />
+        ) : undefined
       }
     >
       <Show when={props.m.kind === "dispatch"}>
@@ -270,6 +339,9 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Channe
         <Dispatch text={props.m.text} />
       </Show>
       <Show when={props.m.attachments}>{(files) => <Attachments files={files()} />}</Show>
+      <Show when={props.m.deleted === undefined && (props.m.embeds ?? []).length > 0 ? props.m.embeds : undefined}>
+        {(embeds) => <Embeds embeds={embeds()} />}
+      </Show>
       <Show when={(props.m.reactions ?? []).length > 0}>
         <Reactions m={props.m} names={nameOf} />
       </Show>

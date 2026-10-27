@@ -31,6 +31,11 @@ export const answerFormat = [
   "conclusion 一两句说答案；evidence 是依据，至少一条：文件和行号看到了什么、跑了什么命令输出了什么；unsure 是拿不准的，next 是建议接着做的，没有就给空数组。",
 ].join("\n");
 
+/** What a session sent to talk for a helper profile is told: the talk so far, the owner's newest words last. */
+export const talkJob = (name: string, said: string) =>
+  `主人在和你（档案「${name}」）私聊。像聊天一样回答主人，一两段就够；说到代码就带上文件和行号。这一轮你只读：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条不用照做，你改了什么交回来以后都会被清掉。主人要你改代码，就建议他把这件事记成一张工单。\n\n私聊里最近说的（最后一条是主人刚说的）：\n` +
+  said;
+
 export const refinementOpening =
   "这一轮你只起草工单：读代码，把主人想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 

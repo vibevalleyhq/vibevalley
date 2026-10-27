@@ -186,6 +186,16 @@ export const Spent: Codec<T.Spent> = Schema.Struct({
   cny: Schema.optionalKey(Schema.Finite),
 });
 
+export const Notify: Codec<T.Notify> = Schema.Literals(T.NotifyValues);
+
+export const Embed: Codec<T.Embed> = Schema.Struct({
+  url: Schema.String,
+  title: Schema.optionalKey(Schema.String),
+  description: Schema.optionalKey(Schema.String),
+  site: Schema.optionalKey(Schema.String),
+  image: Schema.optionalKey(Schema.String),
+});
+
 export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
 
 export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Number });
@@ -215,6 +225,7 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   pinned: Schema.optionalKey(Schema.Number),
   reactions: Schema.optionalKey(Schema.mutable(Schema.Array(Reaction))),
   attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Attachment))),
+  embeds: Schema.optionalKey(Schema.mutable(Schema.Array(Embed))),
 });
 
 export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);
@@ -227,6 +238,10 @@ export const Channel: Codec<T.Channel> = Schema.Struct({
   default: Schema.optionalKey(Schema.Boolean),
   peer: Schema.optionalKey(Schema.String),
   parent: Schema.optionalKey(Schema.String),
+  category: Schema.optionalKey(Schema.String),
+  position: Schema.optionalKey(Schema.Number),
+  archived: Schema.optionalKey(Schema.Number),
+  notify: Schema.optionalKey(Notify),
   root: Schema.optionalKey(Schema.String),
   rootNumber: Schema.optionalKey(Schema.Number),
   name: Schema.optionalKey(Schema.String),
@@ -651,6 +666,7 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
   deliver: Deliverable,
+  talk: Schema.optionalKey(Schema.String),
   reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
   questions: Schema.mutable(Schema.Array(Question)),
@@ -1395,6 +1411,9 @@ export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
 export const ChannelUpdate: Codec<T.ChannelUpdate> = Schema.Struct({
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  category: Schema.optionalKey(Schema.String),
+  before: Schema.optionalKey(Schema.String),
 });
 
 export const RecurrenceRequest: Codec<T.RecurrenceRequest> = Schema.Struct({
@@ -1713,6 +1732,12 @@ export const FactIssue: Codec<T.FactIssue> = Schema.Struct({
   issue: Issue,
 });
 
+export const FactChannelGone: Codec<T.FactChannelGone> = Schema.Struct({
+  type: Schema.Literal("channelGone"),
+  at: Schema.Number,
+  id: Schema.String,
+});
+
 export const FactIssueGone: Codec<T.FactIssueGone> = Schema.Struct({
   type: Schema.Literal("issueGone"),
   at: Schema.Number,
@@ -1763,6 +1788,7 @@ export const Fact: Codec<T.Fact> = Schema.Union([
   FactCommits,
   FactIssue,
   FactIssueGone,
+  FactChannelGone,
   FactProgress,
   FactRecurrence,
   FactRecurrenceGone,
@@ -1814,6 +1840,7 @@ export const SideEvent: Codec<T.SideEvent> = Schema.Union([
   FactCommits,
   FactIssue,
   FactIssueGone,
+  FactChannelGone,
   FactProgress,
   FactRecurrence,
   FactRecurrenceGone,
@@ -2094,7 +2121,13 @@ export const DocAck: Codec<T.DocAck> = Schema.Struct({
   blocks: Schema.mutable(Schema.Array(Block)),
 });
 
-export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({ id: Schema.String, text: Schema.String });
+export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+});
+
+export const NotifyRequest: Codec<T.NotifyRequest> = Schema.Struct({ id: Schema.String, notify: Notify });
 
 export const ReactionToggle: Codec<T.ReactionToggle> = Schema.Struct({ id: Schema.String, emoji: Schema.String });
 

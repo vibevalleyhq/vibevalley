@@ -11,6 +11,8 @@ export function attentionOf(t: Issue, session: Session | undefined): IssueAttent
   const followed = t.graph !== undefined || t.task !== undefined || t.parent !== undefined || session?.graph !== undefined;
   const own = (s: IssueAttention): IssueAttention => (followed ? { state: s.state, ...at(s.since), ...(s.stuck ? { stuck: s.stuck } : {}), acts: [] } : s);
   const last = session?.lastRun;
+  // A profile's talk asks nothing of the owner: its words are in its channel, and it has no buttons.
+  if (t.talk) return { state: session?.phase._tag === "working" ? "working" : "done", acts: [] };
   // Completing follows what the issue delivers, not who did the work: an answer is taken (知道了), a change completed
   // (merged, or kept on its branch).
   const finish = move(t.deliver === "answer" ? "acknowledge" : "complete", "done");

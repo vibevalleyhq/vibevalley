@@ -70,7 +70,7 @@ export const make = Effect.gen(function* () {
     overdue: Effect.map(PubSub.subscribe(overdueHub), Stream.fromSubscription),
     toOwner: Effect.map(
       core.subscribe,
-      Stream.flatMap((e) => (e.type === "message" && forOwner(e.message) ? Stream.make(e.message) : Stream.empty)),
+      Stream.flatMap((e) => (e.type === "message" && forOwner(e.message, chat.notifyOf(e.message.channel)) ? Stream.make(e.message) : Stream.empty)),
     ),
     patrol,
     prime: Effect.sync(() => {

@@ -86,6 +86,12 @@ export class VibeValleyApi {
     create: (a: T.ChannelRequest): Promise<string> => this.call("/api/v1/channel/create", a) as Promise<string>,
     update: (a: { id: string } & T.ChannelUpdate): Promise<void> => this.call("/api/v1/channel/update", a) as Promise<void>,
     markRead: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call("/api/v1/channel/markRead", a) as Promise<void>,
+    /** A channel nothing points at any more, with its threads and messages. */
+    delete: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/delete", a) as Promise<void>,
+    /** What channel.delete would do, refused as it would be; nothing changes. */
+    previewDelete: (a: { id: string }): Promise<T.Preview> => this.call("/api/v1/channel/previewDelete", a) as Promise<T.Preview>,
+    /** The owner's read moved back to just before this message. */
+    markUnread: (a: { id: string } & T.ChatReadRequest): Promise<void> => this.call("/api/v1/channel/markUnread", a) as Promise<void>,
     message: {
       send: (a: T.SayRequest): Promise<void> => this.call("/api/v1/channel/message/send", a) as Promise<void>,
       list: (a: { id: string; before?: number; limit?: number }): Promise<T.ChatMessage[]> =>
@@ -114,6 +120,17 @@ export class VibeValleyApi {
     thread: {
       /** The thread under a message, made if it has none: its id. */
       create: (a: { id: string }): Promise<string> => this.call("/api/v1/channel/thread/create", a) as Promise<string>,
+    },
+    archive: {
+      /** Out of the sidebar and the thread lists, or back; its messages and address stay. The default channel stays. */
+      toggle: (a: { id: string }): Promise<void> => this.call("/api/v1/channel/archive/toggle", a) as Promise<void>,
+    },
+    direct: {
+      /** The owner's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
+      create: (a: { agent: string }): Promise<string> => this.call("/api/v1/channel/direct/create", a) as Promise<string>,
+    },
+    notify: {
+      set: (a: T.NotifyRequest): Promise<void> => this.call("/api/v1/channel/notify/set", a) as Promise<void>,
     },
     attachment: {
       create: (a: T.AttachmentUpload): Promise<T.Attachment> => this.call("/api/v1/channel/attachment/create", a) as Promise<T.Attachment>,

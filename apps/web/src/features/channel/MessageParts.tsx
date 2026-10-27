@@ -2,7 +2,7 @@
 
 import { chatWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
-import { type Attachment, attachmentPath, type ChatMessage, ownerId } from "@vibevalley/protocol";
+import { type Attachment, attachmentPath, type ChatMessage, type Embed, ownerId } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import { useRouter } from "../../base/router";
 import { Icon } from "../../ui/Icon";
@@ -11,6 +11,9 @@ import { toast } from "../../ui/toasts";
 import { aria, autofocus } from "../../base/util";
 import { drafts } from "./draft";
 import { useMessage } from "./follow";
+import { useCore } from "../../base/frame";
+import { markUnread } from "./data";
+import { channelOf, messagePath } from "./rules";
 
 // What a press offers; an agent can still react with any other.
 export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];
@@ -24,27 +27,29 @@ const run = (call: () => Promise<unknown>) => void call().catch((e) => toast(rea
 
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
+  const core = useCore();
+  const router = useRouter();
   return (
-    <div class="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+    <button
+      type="button"
+      onClick={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
+      class="mb-0.5 flex w-full min-w-0 cursor-pointer items-center gap-1.5 text-left text-xs text-muted hover:text-ink"
+    >
       <Icon name="button-back" size={10} class="opacity-60" />
       <Show when={answered()} fallback={<span>#{props.number}</span>}>
-        {(m) =>
-          m().deleted !== undefined ? (
-            <span class="italic">{chatWording().messages.replyGone}</span>
-          ) : (
-            <>
-              <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
-              <span class="min-w-0 truncate">
-                {m().text ||
-                  m()
-                    .attachments?.map((a) => a.name)
-                    .join("、")}
-              </span>
-            </>
-          )
-        }
+        {(m) => (
+          <Show when={m().deleted === undefined} fallback={<span class="italic">{chatWording().messages.replyGone}</span>}>
+            <span class="shrink-0 font-medium text-ink">{nameOf(m())}</span>
+            <span class="min-w-0 truncate">
+              {m().text ||
+                m()
+                  .attachments?.map((a) => a.name)
+                  .join("、")}
+            </span>
+          </Show>
+        )}
       </Show>
-    </div>
+    </button>
   );
 }
 
@@ -61,32 +66,81 @@ export function MessageBody(props: { m: ChatMessage }) {
   );
 }
 
+/** How a file shows in a message: a picture, a player, a PDF to open in a tab, or a file to save. */
+const shownAs = (type: string) =>
+  type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : type === "application/pdf" ? "pdf" : "file";
+
 export function Attachments(props: { files: readonly Attachment[] }) {
   return (
     <div class="mt-1 flex flex-wrap gap-2">
       <For each={props.files} keyed={(f) => f.id}>
-        {(f) => (
-          <Show
-            when={f().type.startsWith("image/")}
-            fallback={
-              <a
-                href={attachmentPath(f().id)}
-                target="_blank"
-                rel="noreferrer"
-                class="flex items-center gap-2 rounded-md border border-line bg-page px-3 py-2 text-sm hover:bg-hover"
-              >
-                <Icon name="button-folder" size={16} />
-                <span class="flex min-w-0 flex-col">
-                  <span class="max-w-64 truncate">{f().name}</span>
-                  <span class="text-xs text-muted">{chatWording().messages.file(sizeText(f().size))}</span>
-                </span>
-              </a>
-            }
+        {(f) => {
+          // Keyed by its id, which names its bytes: a file never changes.
+          const file = untrack(f);
+          const at = () => attachmentPath(file.id);
+          switch (shownAs(file.type)) {
+            case "image":
+              return (
+                <a href={at()} target="_blank" rel="noreferrer" class="block">
+                  <img src={at()} alt={file.name} class="max-h-64 max-w-80 rounded-md border border-line object-contain" loading="lazy" />
+                </a>
+              );
+            case "video":
+              return <video src={at()} controls preload="metadata" aria-label={file.name} class="max-h-72 max-w-96 rounded-md border border-line bg-ink" />;
+            case "audio":
+              return <audio src={at()} controls preload="metadata" aria-label={file.name} class="max-w-96" />;
+            case "pdf":
+            case "file":
+              return (
+                <a
+                  href={at()}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="flex items-center gap-2 rounded-md border border-line bg-page px-3 py-2 text-sm hover:bg-hover"
+                >
+                  <Icon name={shownAs(file.type) === "pdf" ? "icon-log" : "button-folder"} size={16} />
+                  <span class="flex min-w-0 flex-col">
+                    <span class="max-w-64 truncate">{file.name}</span>
+                    <span class="text-xs text-muted">
+                      {shownAs(file.type) === "pdf" ? chatWording().media.pdf : chatWording().messages.file(sizeText(file.size))}
+                    </span>
+                  </span>
+                </a>
+              );
+          }
+        }}
+      </For>
+    </div>
+  );
+}
+
+/** The links' previews the server read: what the page says of itself, and its picture from its own site. */
+export function Embeds(props: { embeds: readonly Embed[] }) {
+  return (
+    <div class="mt-1 flex flex-col gap-1.5" aria-label={chatWording().media.preview}>
+      <For each={props.embeds} keyed={(e) => e.url}>
+        {(e) => (
+          <a
+            href={e().url}
+            target="_blank"
+            rel="noreferrer noopener"
+            class="flex max-w-lg gap-3 rounded-md border-l-4 border-accent bg-side px-3 py-2 hover:bg-hover"
           >
-            <a href={attachmentPath(f().id)} target="_blank" rel="noreferrer" class="block">
-              <img src={attachmentPath(f().id)} alt={f().name} class="max-h-64 max-w-80 rounded-md border border-line object-contain" loading="lazy" />
-            </a>
-          </Show>
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <Show when={e().site}>
+                <span class="truncate text-xs text-muted">{e().site}</span>
+              </Show>
+              <Show when={e().title}>
+                <span class="line-clamp-2 text-sm font-semibold text-accent">{e().title}</span>
+              </Show>
+              <Show when={e().description}>
+                <span class="line-clamp-3 text-xs">{e().description}</span>
+              </Show>
+            </span>
+            <Show when={e().image}>
+              {(src) => <img src={src()} alt="" referrerpolicy="no-referrer" loading="lazy" class="size-16 shrink-0 rounded object-cover" />}
+            </Show>
+          </a>
         )}
       </For>
     </div>
@@ -124,8 +178,18 @@ const tool = "inline-flex size-7 cursor-pointer items-center justify-center roun
 
 export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit: () => void }) {
   const router = useRouter();
+  const core = useCore();
   const [picking, setPicking] = createSignal(false);
   const [sure, setSure] = createSignal(false);
+  const [more, setMore] = createSignal(false);
+  const copyLink = () => {
+    setMore(false);
+    const link = location.origin + messagePath(channelOf(core()?.chat, props.m.channel), props.m.number);
+    run(async () => {
+      await navigator.clipboard.writeText(link);
+      toast(chatWording().more.copied);
+    });
+  };
   const editable = () => props.m.from === ownerId && props.m.kind === "chat";
   return (
     <div
@@ -195,6 +259,40 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           <Icon name="button-edit" size={14} />
         </button>
       </Show>
+      <div class="relative">
+        <button
+          type="button"
+          class={tool}
+          aria-label={chatWording().more.label}
+          title={chatWording().more.label}
+          aria-expanded={aria(more())}
+          onClick={() => setMore(!more())}
+        >
+          <Icon name="button-more" size={14} />
+        </button>
+        <Show when={more()}>
+          <div
+            role="menu"
+            aria-label={chatWording().more.label}
+            class="absolute right-0 bottom-full z-20 mb-1 flex w-44 flex-col rounded-md border border-line bg-page p-1 shadow-float"
+          >
+            <button type="button" role="menuitem" class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover" onClick={copyLink}>
+              {chatWording().more.copyLink}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class="cursor-pointer rounded px-2 py-1 text-left text-sm hover:bg-hover"
+              onClick={() => {
+                setMore(false);
+                run(() => markUnread(props.m.channel, props.m.number));
+              }}
+            >
+              {chatWording().more.markUnread}
+            </button>
+          </div>
+        </Show>
+      </div>
       <button
         type="button"
         class={[tool, { "bg-berry/15": sure() }]}
@@ -215,14 +313,17 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
 
 export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
   // The words as they were when editing began: a change heard meanwhile does not move the box under the owner's hands.
-  const { id, text: was } = untrack(() => props.m);
+  const { id, text: was, attachments: files = [] } = untrack(() => props.m);
   const done = () => untrack(() => props.onDone)();
   const [text, setText] = createSignal(was);
+  const [kept, setKept] = createSignal<readonly string[]>(files.map((f) => f.id));
   const save = () => {
     const words = text().trim();
-    if (!words || words === was) return done();
+    const fewer = kept().length < files.length;
+    if ((!words && kept().length === 0) || (words === was && !fewer)) return done();
+    const keep = [...kept()];
     run(async () => {
-      await api.channel.message.update({ id, text: words });
+      await api.channel.message.update({ id, text: words, ...(fewer ? { attachments: keep } : {}) });
       done();
     });
   };
@@ -246,6 +347,31 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
         }}
         class="block w-full resize-none rounded-md border border-focus bg-page px-2 py-1.5 text-base outline-none [field-sizing:content]"
       />
+      <Show when={files.length > 0}>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <For each={files}>
+            {(f) => {
+              const keeps = () => kept().includes(f.id);
+              return (
+                <button
+                  type="button"
+                  aria-pressed={aria(keeps())}
+                  aria-label={keeps() ? chatWording().media.takeOff(f.name) : chatWording().media.keep(f.name)}
+                  onClick={() => setKept((k) => (keeps() ? k.filter((x) => x !== f.id) : [...k, f.id]))}
+                  class={[
+                    "flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
+                    keeps() ? "border-line bg-page" : "border-dashed border-line text-faint line-through",
+                  ]}
+                >
+                  <Icon name="button-folder" size={12} />
+                  <span class="max-w-48 truncate">{f.name}</span>
+                  <Icon name={keeps() ? "button-close" : "button-add"} size={10} />
+                </button>
+              );
+            }}
+          </For>
+        </div>
+      </Show>
       <p class="mt-1 text-xs text-muted">{chatWording().tools.editHint}</p>
     </div>
   );

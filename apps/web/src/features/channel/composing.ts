@@ -29,6 +29,8 @@ export const arrived = (p: PendingLine, messages: readonly ChatMessage[]) => mes
 export interface ComposerWays {
   /** Every routing field of the next message; its text and retry identity belong to the composer. */
   readonly target: () => Omit<SayRequest, "text" | "sendKey">;
+  /** The words the box starts with: a draft kept from before. */
+  readonly initial?: string;
   /** The window draws pending lines (`pending`): a line shows at once and the box empties as it is sent. */
   readonly echo?: boolean;
   readonly failed: (reason: string) => void;
@@ -39,7 +41,7 @@ export interface ComposerWays {
 }
 
 export function createComposer(core: () => WorkspaceState | undefined, input: () => HTMLTextAreaElement | undefined, ways: ComposerWays) {
-  const [text, setText] = createSignal("");
+  const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
   const [closed, setClosed] = createSignal(false);

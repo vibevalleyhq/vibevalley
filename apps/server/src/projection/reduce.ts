@@ -35,6 +35,11 @@ function fold(state: WorkspaceState, f: Fact): [WorkspaceState, boolean] {
     case "channel":
       if (state.chat?.channels?.some((c) => c.id === f.channel.id && same(c, f.channel))) return [state, false];
       return [{ ...state, chat: withChannel(state.chat, f.channel) }, true];
+    case "channelGone": {
+      const all = state.chat?.channels ?? [];
+      const kept = all.filter((c) => c.id !== f.id && c.parent !== f.id);
+      return kept.length === all.length || !state.chat ? [state, false] : [{ ...state, chat: { ...state.chat, channels: kept } }, true];
+    }
     case "ownerMentions":
       return same(state.chat?.ownerMentions ?? [], f.mentions) ? [state, false] : [{ ...state, chat: withOwnerMentions(state.chat, f.mentions) }, true];
     case "hired": {

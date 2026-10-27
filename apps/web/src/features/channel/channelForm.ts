@@ -3,14 +3,23 @@
 // window only draws them and says what happens once it went through.
 
 import { createSignal, untrack } from "solid-js";
-import type { Channel } from "@vibevalley/protocol";
+import type { Channel, Notify } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 
 /** The form for a new channel, or for the one given as it is when opened (the form edits its own copy). */
 export function createChannelForm(channel?: Channel) {
-  const [name, setName] = createSignal("");
-  const [description, setDescription] = createSignal(untrack(() => channel?.description ?? ""));
-  const [project, setProject] = createSignal(untrack(() => channel?.project ?? ""));
+  const was = untrack(() => ({
+    name: channel?.name ?? "",
+    description: channel?.description ?? "",
+    project: channel?.project ?? "",
+    category: channel?.category ?? "",
+    notify: channel?.notify ?? "all",
+  }));
+  const [name, setName] = createSignal(was.name);
+  const [description, setDescription] = createSignal(was.description);
+  const [project, setProject] = createSignal(was.project);
+  const [category, setCategory] = createSignal(was.category);
+  const [notify, setNotify] = createSignal<Notify>(was.notify);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
 
@@ -20,7 +29,16 @@ export function createChannelForm(channel?: Channel) {
     setError(undefined);
     try {
       if (channel) {
-        await api.channel.update({ id: channel.id, description: description(), project: project() });
+        // A direct channel has only its notifications to change.
+        if (channel.type === "channel")
+          await api.channel.update({
+            id: channel.id,
+            description: description(),
+            project: project(),
+            category: category().trim(),
+            ...(name().trim() !== was.name ? { name: name().trim() } : {}),
+          });
+        if (notify() !== was.notify) await api.channel.notify.set({ id: channel.id, notify: notify() });
         return channel.id;
       }
       return await api.channel.create({ name: name().trim(), description: description().trim() || undefined, project: project().trim() || undefined });
@@ -42,6 +60,10 @@ export function createChannelForm(channel?: Channel) {
     setDescription,
     project,
     setProject,
+    category,
+    setCategory,
+    notify,
+    setNotify,
     busy,
     error,
     /** Pressing save now would be sent: not busy, and a new channel has a name. */

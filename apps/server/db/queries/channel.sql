@@ -61,3 +61,35 @@ limit 20;
 -- name: BumpRevision :one
 -- In the transaction that writes or changes a message there: the revision it is written with.
 update channel set revision = revision + 1 where id = sqlc.arg(id) returning revision;
+
+-- name: RenameChannel :exec
+update channel set name = sqlc.narg(name) where id = sqlc.arg(id) and type <> 'direct';
+
+-- name: SetCategory :exec
+update channel set category = sqlc.narg(category) where id = sqlc.arg(id) and type = 'channel';
+
+-- name: PlaceChannel :exec
+update channel set position = sqlc.arg(position) where id = sqlc.arg(id);
+
+-- name: SetArchived :exec
+update channel set archived_at = sqlc.narg(archived_at) where id = sqlc.arg(id) and not is_default;
+
+-- name: SetNotify :exec
+update channel set notify = sqlc.arg(notify) where id = sqlc.arg(id);
+
+-- name: ChannelInUse :one
+-- What still points at a channel, so deleting it would take it from under them.
+select (select count(*) from recurrence r where r.channel_id = sqlc.arg(id))::int as recurrences,
+       (select count(*) from connector_account a where a.channel_id = sqlc.arg(id))::int as connectors,
+       (select count(*) from issue_queue q where q.channel = sqlc.arg(id))::int as queued,
+       (select count(*) from channel t where t.parent_id = sqlc.arg(id) and t.subject_kind = 'issue')::int as issue_threads;
+
+-- name: DeleteThreadsOf :exec
+delete from channel where parent_id = sqlc.arg(id);
+
+-- name: DeleteChannel :exec
+delete from channel where id = sqlc.arg(id) and not is_default;
+
+-- name: SetSubject :exec
+-- A direct channel with a helper profile takes its talk issue as its subject: the issue's thread is the channel.
+update channel set subject_kind = 'issue', subject_id = sqlc.arg(subject_id) where id = sqlc.arg(id) and type = 'direct';

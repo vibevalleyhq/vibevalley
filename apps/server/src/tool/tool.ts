@@ -423,6 +423,7 @@ export const make = Effect.gen(function* () {
       const now = clock.currentTimeMillisUnsafe();
       let found = (yield* issue.list()).filter(
         (t) =>
+          t.talk === undefined &&
           (status ? t.status === status : p.closed || (t.status !== "done" && t.status !== "canceled")) &&
           (!p.wants_owner || attentionWantsOwner(t.attention.state)) &&
           (!p.project || t.project === p.project.trim()) &&
@@ -654,7 +655,10 @@ export const make = Effect.gen(function* () {
     Effect.fn("Tools.channel_settings")(function* (p: Orchestrator<"channel_settings">) {
       const c = yield* chat.channelByName(p.channel);
       if (!c) return yield* refuse(answers.channelSettings.noChannel(p.channel));
-      yield* chat.updateChannel(c.id, p.description, p.project);
+      yield* chat.updateChannel(c.id, {
+        ...(p.description !== undefined ? { description: p.description } : {}),
+        ...(p.project !== undefined ? { project: p.project } : {}),
+      });
       return answers.channelSettings.updated(c.name);
     }),
   );

@@ -1,8 +1,8 @@
-import type { WorkspaceState } from "@vibevalley/protocol";
+import { type ChatMessage, ownerId, type WorkspaceState } from "@vibevalley/protocol";
 import { describe, expect, it } from "vite-plus/test";
 import { emptyWorkspaceState } from "../core/core.ts";
 import { checkCases, goldenCases } from "../testing/golden.ts";
-import { emptyPatrol, type PatrolNote, patrolStep } from "./rules.ts";
+import { emptyPatrol, forOwner, type PatrolNote, patrolStep } from "./rules.ts";
 
 describe("the patrol", () => {
   // Every fifth round the farm is empty: what was hanging is forgotten.
@@ -23,5 +23,25 @@ describe("the patrol", () => {
       });
     });
     expect(failed).toEqual([]);
+  });
+});
+
+describe("what reaches the owner off the farm", () => {
+  const said = (more: Partial<ChatMessage>): ChatMessage => ({
+    id: "m",
+    number: 1,
+    channel: "c",
+    from: "orchestrator",
+    fromKind: "orchestrator",
+    name: "管家",
+    kind: "chat",
+    text: "好",
+    at: 0,
+    revision: 1,
+    ...more,
+  });
+  it("follows how much the place it is said in counts", () => {
+    const named = said({ mentions: [ownerId] });
+    expect([forOwner(said({})), forOwner(said({}), "mentions"), forOwner(named, "mentions"), forOwner(named, "none")]).toEqual([true, false, true, false]);
   });
 });

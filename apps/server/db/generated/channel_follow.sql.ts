@@ -46,3 +46,19 @@ export const allFollows = Effect.fn("AllFollows")(function* () {
     execute: () => sql.unsafe(AllFollowsSql, []),
   })({})
 })
+
+export const DeleteFollowsInParams = Schema.Struct({
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type DeleteFollowsInParams = typeof DeleteFollowsInParams.Type
+
+
+export const DeleteFollowsInSql = "-- name: DeleteFollowsIn :exec\ndelete from channel_follow where channel_id = $1 or channel_id in (select t.id from channel t where t.parent_id = $1);"
+
+export const deleteFollowsIn = Effect.fn("DeleteFollowsIn")(function* (params: DeleteFollowsInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteFollowsInParams,
+    execute: (p) => sql.unsafe(DeleteFollowsInSql, [p["id"]]),
+  })(params)
+})

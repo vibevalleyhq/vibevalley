@@ -734,6 +734,12 @@ export const pinnedIn = Effect.fn("PinnedIn")(function* (params: PinnedInParams)
 export const SearchMessagesParams = Schema.Struct({
   ["text"]: Schema.String,
   ["channel"]: Schema.String,
+  ["sender"]: Schema.String,
+  ["has_file"]: Schema.Boolean,
+  ["has_image"]: Schema.Boolean,
+  ["has_link"]: Schema.Boolean,
+  ["after"]: Schema.Number,
+  ["before"]: Schema.Number,
   ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type SearchMessagesParams = typeof SearchMessagesParams.Type
@@ -766,13 +772,47 @@ export const SearchMessagesResult = Schema.Struct({
 export type SearchMessagesResult = typeof SearchMessagesResult.Type
 
 
-export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice' and strpos(lower(m.body), lower($1)) > 0\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\norder by m.id desc limit $3::int;"
+export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice'\n  and ($1::text = '' or strpos(lower(m.body), lower($1)) > 0)\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\n  and ($3::text = '' or m.sender_id = $3 or lower(p.name) = lower($3))\n  and (not $4::boolean or strpos(coalesce(m.meta, ''), '\"attachments\"') > 0)\n  and (not $5::boolean or strpos(coalesce(m.meta, ''), '\"type\":\"image/') > 0)\n  and (not $6::boolean or strpos(m.body, 'http://') > 0 or strpos(m.body, 'https://') > 0)\n  and m.created_at >= $7::float8 and m.created_at < $8::float8\norder by m.id desc limit $9::int;"
 
 export const searchMessages = Effect.fn("SearchMessages")(function* (params: SearchMessagesParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findAll({
     Request: SearchMessagesParams,
     Result: SearchMessagesResult,
-    execute: (p) => sql.unsafe(SearchMessagesSql, [p["text"], p["channel"], p["n"]]),
+    execute: (p) => sql.unsafe(SearchMessagesSql, [p["text"], p["channel"], p["sender"], p["has_file"], p["has_image"], p["has_link"], p["after"], p["before"], p["n"]]),
+  })(params)
+})
+
+export const DeleteMessagesInParams = Schema.Struct({
+  ["id"]: Schema.NullOr(Schema.String),
+})
+export type DeleteMessagesInParams = typeof DeleteMessagesInParams.Type
+
+
+export const DeleteMessagesInSql = "-- name: DeleteMessagesIn :exec\n-- A channel deleted: what was said in it and its threads goes (their mentions, deliveries and seen marks with them).\ndelete from channel_message where channel_id = $1 or channel_id in (select t.id from channel t where t.parent_id = $1);"
+
+export const deleteMessagesIn = Effect.fn("DeleteMessagesIn")(function* (params: DeleteMessagesInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteMessagesInParams,
+    execute: (p) => sql.unsafe(DeleteMessagesInSql, [p["id"]]),
+  })(params)
+})
+
+export const SetEmbedsParams = Schema.Struct({
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["id"]: Schema.String,
+})
+export type SetEmbedsParams = typeof SetEmbedsParams.Type
+
+
+export const SetEmbedsSql = "-- name: SetEmbeds :exec\n-- The previews read for its links, once they are: a change like any other.\nupdate channel_message set meta = $1, revision = $2 where id = $3;"
+
+export const setEmbeds = Effect.fn("SetEmbeds")(function* (params: SetEmbedsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetEmbedsParams,
+    execute: (p) => sql.unsafe(SetEmbedsSql, [p["meta"], p["revision"], p["id"]]),
   })(params)
 })

@@ -10,9 +10,9 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, deliver)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, deliver, talk)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(deliver));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(deliver), sqlc.narg(talk));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
@@ -105,3 +105,7 @@ update issue set last_run = sqlc.narg(last_run) where id = sqlc.arg(id);
 
 -- name: SetIssuePullRequest :exec
 update issue set pull_request = sqlc.narg(pull_request) where id = sqlc.arg(id);
+
+-- name: TalkOf :one
+-- A profile's talk with the owner, by its direct channel.
+select id from issue where talk = sqlc.arg(talk);
