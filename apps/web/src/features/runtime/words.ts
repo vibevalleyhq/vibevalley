@@ -114,6 +114,19 @@ const zh = {
     who: "谁在用",
     nobody: "还没有 agent 带这个技能。到 agent 的「技能」页签里勾上。",
   },
+  quota: {
+    session: "当前会话",
+    weekly: "本周额度",
+    week: (models: string) => `本周（${models === "all models" ? "全部模型" : models}）`,
+    oneWeek: "· 一周",
+    weekdays: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
+    now: "马上重置",
+    minutes: (m: number) => `${m} 分钟后重置`,
+    hours: (h: number) => `${h} 小时后重置`,
+    on: (weekday: string) => `${weekday}重置`,
+    unreported: "不报额度",
+    signedOut: "没登录",
+  },
 };
 
 const en: typeof zh = {
@@ -229,6 +242,19 @@ const en: typeof zh = {
     bodyExample: "Before changing any behavior, write a test that reproduces the problem…",
     who: "Used by",
     nobody: "No agent carries this skill yet. Tick it on an agent's Skills tab.",
+  },
+  quota: {
+    session: "This session",
+    weekly: "This week's allowance",
+    week: (models) => `This week (${models})`,
+    oneWeek: "· a week",
+    weekdays: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    now: "resets now",
+    minutes: (m) => `resets in ${m} min`,
+    hours: (h) => (h === 1 ? "resets in an hour" : `resets in ${h} hours`),
+    on: (weekday) => `resets ${weekday}`,
+    unreported: "reports no allowance",
+    signedOut: "Not signed in",
   },
 };
 

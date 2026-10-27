@@ -1,7 +1,8 @@
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.check).
 
-import { rulesWording } from "../../base/words/rules";
+import { voiceWording } from "./words";
+import { appWording } from "../../base/words";
 import {
   type Area,
   type Language,
@@ -19,32 +20,32 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 
 export const areaLabel: Record<Area, string> = {
-  US: rulesWording().voice.area.US,
-  EU: rulesWording().voice.area.EU,
-  AP: rulesWording().voice.area.AP,
-  CN: rulesWording().voice.area.CN,
+  US: voiceWording().choices.area.US,
+  EU: voiceWording().choices.area.EU,
+  AP: voiceWording().choices.area.AP,
+  CN: voiceWording().choices.area.CN,
 };
 export const languageLabel: Record<Language, string> = {
-  "zh-CN": rulesWording().voice.language["zh-CN"],
-  "zh-HK": rulesWording().voice.language["zh-HK"],
-  "zh-TW": rulesWording().voice.language["zh-TW"],
-  "en-US": rulesWording().voice.language["en-US"],
-  "ja-JP": rulesWording().voice.language["ja-JP"],
-  "ko-KR": rulesWording().voice.language["ko-KR"],
+  "zh-CN": voiceWording().choices.language["zh-CN"],
+  "zh-HK": voiceWording().choices.language["zh-HK"],
+  "zh-TW": voiceWording().choices.language["zh-TW"],
+  "en-US": voiceWording().choices.language["en-US"],
+  "ja-JP": voiceWording().choices.language["ja-JP"],
+  "ko-KR": voiceWording().choices.language["ko-KR"],
 };
 
 export const asrLabel: Record<VoiceASR["vendor"], string> = {
-  ares: rulesWording().voice.asr.ares,
+  ares: voiceWording().choices.asr.ares,
   deepgram: "Deepgram",
-  microsoft: rulesWording().voice.asr.microsoft,
+  microsoft: voiceWording().choices.asr.microsoft,
 };
 export const answerLabel: Record<VoiceAnswer["vendor"], string> = {
-  orchestrator: rulesWording().card.orchestrator,
-  agora: rulesWording().voice.answer.agora,
+  orchestrator: appWording().orchestrator,
+  agora: voiceWording().choices.answer.agora,
   deepseek: "DeepSeek",
-  openai: rulesWording().voice.answer.openai,
+  openai: voiceWording().choices.answer.openai,
 };
-export const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: rulesWording().voice.asr.microsoft };
+export const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: voiceWording().choices.asr.microsoft };
 
 /** What each starts with when picked: the one in use if it is the same vendor, else these. */
 export const asrStart: Record<VoiceASR["vendor"], VoiceASR> = {
@@ -66,19 +67,19 @@ export const ttsStart: Record<VoiceTTS["vendor"], VoiceTTS> = {
 
 /** Any other id can be typed. */
 export const minimaxVoices = [
-  { id: "Chinese (Mandarin)_Gentle_Youth", label: rulesWording().voice.minimax.gentle },
-  { id: "male-qn-qingse", label: rulesWording().voice.minimax.qingse },
-  { id: "male-qn-jingying", label: rulesWording().voice.minimax.jingying },
-  { id: "male-qn-badao", label: rulesWording().voice.minimax.badao },
-  { id: "male-qn-daxuesheng", label: rulesWording().voice.minimax.student },
-  { id: "female-shaonv", label: rulesWording().voice.minimax.girl },
-  { id: "female-yujie", label: rulesWording().voice.minimax.yujie },
-  { id: "female-chengshu", label: rulesWording().voice.minimax.mature },
-  { id: "female-tianmei", label: rulesWording().voice.minimax.sweet },
-  { id: "presenter_male", label: rulesWording().voice.minimax.presenterMale },
-  { id: "presenter_female", label: rulesWording().voice.minimax.presenterFemale },
-  { id: "audiobook_male_1", label: rulesWording().voice.minimax.audiobookMale },
-  { id: "audiobook_female_1", label: rulesWording().voice.minimax.audiobookFemale },
+  { id: "Chinese (Mandarin)_Gentle_Youth", label: voiceWording().choices.minimax.gentle },
+  { id: "male-qn-qingse", label: voiceWording().choices.minimax.qingse },
+  { id: "male-qn-jingying", label: voiceWording().choices.minimax.jingying },
+  { id: "male-qn-badao", label: voiceWording().choices.minimax.badao },
+  { id: "male-qn-daxuesheng", label: voiceWording().choices.minimax.student },
+  { id: "female-shaonv", label: voiceWording().choices.minimax.girl },
+  { id: "female-yujie", label: voiceWording().choices.minimax.yujie },
+  { id: "female-chengshu", label: voiceWording().choices.minimax.mature },
+  { id: "female-tianmei", label: voiceWording().choices.minimax.sweet },
+  { id: "presenter_male", label: voiceWording().choices.minimax.presenterMale },
+  { id: "presenter_female", label: voiceWording().choices.minimax.presenterFemale },
+  { id: "audiobook_male_1", label: voiceWording().choices.minimax.audiobookMale },
+  { id: "audiobook_female_1", label: voiceWording().choices.minimax.audiobookFemale },
 ] as const;
 
 /** Any other name can be typed. */
@@ -103,9 +104,9 @@ export const voiceLimits: Record<VoiceNumber, { min: number; max: number }> = {
 };
 
 export const numberLabel: Record<VoiceNumber, string> = {
-  silenceMs: rulesWording().voice.number.silenceMs,
-  interruptMs: rulesWording().voice.number.interruptMs,
-  idleSeconds: rulesWording().voice.number.idleSeconds,
+  silenceMs: voiceWording().choices.number.silenceMs,
+  interruptMs: voiceWording().choices.number.interruptMs,
+  idleSeconds: voiceWording().choices.number.idleSeconds,
 };
 
 /** The line: credentials' area, how it listens and who answers. The agent: what it says and in what voice. */

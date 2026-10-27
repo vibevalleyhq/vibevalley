@@ -1,6 +1,6 @@
 // An issue's lane, title and status and priority words.
 
-import { rulesWording } from "../../base/words/rules";
+import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
 import {
@@ -52,19 +52,19 @@ export const issueIs = (issue: Issue, id: string) => issue.id === id || issue.se
 export function taskLine(g: TaskGraph) {
   switch (g.state) {
     case "splitting":
-      return rulesWording().graph.splitting;
+      return issuesWording().graph.splitting;
     case "draft":
-      return rulesWording().graph.draft;
+      return issuesWording().graph.draft;
     case "running":
-      return rulesWording().graph.running(Math.round(g.settled ?? 0), g.tasks.length);
+      return issuesWording().graph.running(Math.round(g.settled ?? 0), g.tasks.length);
     case "paused":
-      return rulesWording().graph.paused;
+      return issuesWording().graph.paused;
     case "ready":
-      return rulesWording().graph.ready;
+      return issuesWording().graph.ready;
     case "done":
-      return rulesWording().graph.done;
+      return issuesWording().graph.done;
     case "abandoned":
-      return rulesWording().graph.abandoned;
+      return issuesWording().graph.abandoned;
   }
 }
 
@@ -81,10 +81,10 @@ export function issueSession(core: WorkspaceState | undefined, issue: Issue): Se
 export type Lane = "todo" | "working" | "waiting" | "closed";
 export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
 export const laneLabel: Record<Lane, string> = {
-  todo: rulesWording().board.lane.todo,
-  working: rulesWording().board.lane.working,
-  waiting: rulesWording().board.lane.waiting,
-  closed: rulesWording().board.lane.closed,
+  todo: issuesWording().boardLabels.lane.todo,
+  working: issuesWording().boardLabels.lane.working,
+  waiting: issuesWording().boardLabels.lane.waiting,
+  closed: issuesWording().boardLabels.lane.closed,
 };
 
 /** The status a lane's header is drawn with: the one its cards mostly have. */
@@ -94,9 +94,9 @@ export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "i
 export type Stage = "talk" | "work" | "finish";
 export const stages: Stage[] = ["talk", "work", "finish"];
 export const stageLabel: Record<Stage, string> = {
-  talk: rulesWording().board.stage.talk,
-  work: rulesWording().board.stage.work,
-  finish: rulesWording().board.stage.finish,
+  talk: issuesWording().boardLabels.stage.talk,
+  work: issuesWording().boardLabels.stage.work,
+  finish: issuesWording().boardLabels.stage.finish,
 };
 
 export function stageOf(s: IssueStatus): Stage {
@@ -106,7 +106,7 @@ export function stageOf(s: IssueStatus): Stage {
 }
 
 /** The title an issue made by the plus has until the owner says what it is for. */
-export const newIssueTitle = rulesWording().board.newIssue;
+export const newIssueTitle = issuesWording().boardLabels.newIssue;
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
 export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
@@ -147,17 +147,17 @@ export const closedShown = 15;
 function runTriggerText(t: RunTrigger) {
   switch (t.kind) {
     case "issue":
-      return rulesWording().trigger.issue;
+      return issuesWording().trigger.issue;
     case "comment":
-      return t.message ? rulesWording().trigger.commentNumbered(t.message.slice(0, 8)) : rulesWording().trigger.comment;
+      return t.message ? issuesWording().trigger.commentNumbered(t.message.slice(0, 8)) : issuesWording().trigger.comment;
     case "task":
-      return rulesWording().trigger.task;
+      return issuesWording().trigger.task;
     case "recurrence":
-      return t.missed ? rulesWording().trigger.missed : rulesWording().trigger.recurrence;
+      return t.missed ? issuesWording().trigger.missed : issuesWording().trigger.recurrence;
     case "refine":
-      return rulesWording().trigger.refine;
+      return issuesWording().trigger.refine;
     case "runtime":
-      return rulesWording().trigger.runtime;
+      return issuesWording().trigger.runtime;
   }
 }
 
@@ -165,8 +165,8 @@ function runTriggerText(t: RunTrigger) {
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),
-    r.outcome ? wording().outcome[r.outcome] : rulesWording().run.working,
+    r.outcome ? wording().outcome[r.outcome] : issuesWording().run.working,
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
-    ...(r.heard.length ? [rulesWording().run.heard(r.heard.length)] : []),
+    ...(r.heard.length ? [issuesWording().run.heard(r.heard.length)] : []),
   ].join(" · ");

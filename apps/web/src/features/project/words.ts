@@ -109,6 +109,16 @@ const zh = {
     queue: (n: number) => `排队 · ${n} 件`,
     see: "看这张工单",
   },
+  project: {
+    otherLang: "其他",
+    growth: { empty: "还没动过土", flowering: "正旺", leafy: "在长", sprout: "冒着芽", dry: "有点干了", withered: "荒了" },
+    branch: (branch: string) => `\n分支 ${branch}`,
+    open: "空位：派一件活来，马上开工",
+    shut: (n: number) => `已经有 ${n} 张工单在做，等有工单做完`,
+    gone: "不在工作目录里了",
+    working: (n: number, of: number, full: boolean) => `在干 ${n}/${of}${full ? "（满了）" : ""}`,
+    queued: (n: number) => `排队 ${n}`,
+  },
 };
 
 const en: typeof zh = {
@@ -216,6 +226,16 @@ const en: typeof zh = {
     full: (n) => `Full: all ${n} helpers are working, so new work queues.`,
     queue: (n) => `Queued · ${n}`,
     see: "See this ticket",
+  },
+  project: {
+    otherLang: "Other",
+    growth: { empty: "never dug", flowering: "thriving", leafy: "growing", sprout: "sprouting", dry: "drying out", withered: "gone wild" },
+    branch: (branch) => `\nbranch ${branch}`,
+    open: "Free spot: send a job here and it starts at once",
+    shut: (n) => `${n} tickets are already being worked on: wait for one to finish`,
+    gone: "no longer in the work folder",
+    working: (n, of, full) => `working ${n}/${of}${full ? " (full)" : ""}`,
+    queued: (n) => `${n} queued`,
   },
 };
 

@@ -33,6 +33,7 @@ const zh = {
   runtime: (name: string) => `运行工具：${name}`,
   /** The owner's face, one character. */
   owner: "主",
+  orchestrator: "管家",
   unreachable: "暂时连不上服务端，请等它恢复后重试。",
   dictation: {
     unset: "听写还没配：在「声音」页的「听写」里填地址和模型",
@@ -67,7 +68,46 @@ const zh = {
     inUse: (hint: string, from: string) => `在用 ${hint}（${from}）`,
     fromOnly: (from: string) => `（${from}）`,
   },
+  time: {
+    justNow: "刚刚",
+    secondsAgo: (s: number) => `${s} 秒前`,
+    minutesAgo: (m: number) => `${m} 分钟前`,
+    hoursAgo: (h: number) => `${h} 小时前`,
+    daysAgo: (d: number) => `${d} 天前`,
+    monthsAgo: (m: number) => `${m} 个月前`,
+    yearsAgo: (y: string) => `${y} 年前`,
+    seconds: (s: number) => `${s} 秒`,
+    minutes: (m: number, s: number) => (s === 0 ? `${m} 分` : `${m} 分 ${s} 秒`),
+    hours: (h: number, m: number) => (m === 0 ? `${h} 小时` : `${h} 小时 ${m} 分`),
+    /** Round words: 不到 1 分钟, 3 分钟, 2 小时, 4 天. */
+    round: { underMinute: "不到 1 分钟", minutes: (m: number) => `${m} 分钟`, hours: (h: number) => `${h} 小时`, days: (d: number) => `${d} 天` },
+    tenths: (s: string) => `${s} 秒`,
+    today: "今天",
+    yesterday: "昨天",
+    monthDay: (month: number, day: number) => `${month}月${day}日`,
+    month: (month: number) => `${month}月`,
+    /** 12-hour, two digits: 下午03:07. */
+    clock: (am: boolean, hh: string, mm: string) => `${am ? "上午" : "下午"}${hh}:${mm}`,
+    date: (y: number, m: number, d: number) => `${y} 年 ${m} 月 ${d} 日`,
+    /** Sunday first, as Date.getDay has them. */
+    weekdays: ["日", "一", "二", "三", "四", "五", "六"],
+    day: (m: number, d: number, weekday: string) => `${m} 月 ${d} 日 星期${weekday}`,
+  },
+  money: {
+    underCent: "不到 ¥0.01",
+    about: (yuan: string) => `约 ${yuan}`,
+    spent: (yuan: string) => `花了 ${yuan}`,
+  },
+  /** A count of ten thousand or more: 1.2 万, to `digits` places. */
+  big: (n: number, digits: number) => `${(n / 10000).toFixed(digits)} 万`,
+  cast: {
+    species: { bear: "熊", rabbit: "兔子", fox: "小狐狸", cat: "猫", owl: "猫头鹰", hedgehog: "刺猬", raccoon: "浣熊" },
+    outfit: { farmer: "农夫", gardener: "园丁", rain: "雨衣", winter: "冬装" },
+    pose: { idle: "待命", walk: "走过来", think: "琢磨", work: "干活", cheer: "做完", worry: "长虫了" },
+  },
 };
+
+const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const en: typeof zh = {
   place: {
@@ -98,6 +138,7 @@ const en: typeof zh = {
   toasts: "Notices",
   runtime: (name) => `Runs on: ${name}`,
   owner: "Me",
+  orchestrator: "Manager",
   unreachable: "The server cannot be reached for now: try again when it is back.",
   dictation: {
     unset: "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
@@ -131,6 +172,44 @@ const en: typeof zh = {
     from: { settings: "saved in the settings", config: "from the configuration (vibevalley.yaml or the environment)" },
     inUse: (hint, from) => `Using ${hint} (${from})`,
     fromOnly: (from) => `(${from})`,
+  },
+  time: {
+    justNow: "just now",
+    secondsAgo: (s) => `${s}s ago`,
+    minutesAgo: (m) => `${m} min ago`,
+    hoursAgo: (h) => (h === 1 ? "an hour ago" : `${h} hours ago`),
+    daysAgo: (d) => (d === 1 ? "a day ago" : `${d} days ago`),
+    monthsAgo: (m) => (m === 1 ? "a month ago" : `${m} months ago`),
+    yearsAgo: (y) => `${y} years ago`,
+    seconds: (s) => `${s}s`,
+    minutes: (m, s) => (s === 0 ? `${m} min` : `${m} min ${s}s`),
+    hours: (h, m) => (m === 0 ? `${h} h` : `${h} h ${m} min`),
+    round: {
+      underMinute: "under a minute",
+      minutes: (m) => `${m} min`,
+      hours: (h) => (h === 1 ? "an hour" : `${h} hours`),
+      days: (d) => (d === 1 ? "a day" : `${d} days`),
+    },
+    tenths: (s) => `${s}s`,
+    today: "Today",
+    yesterday: "Yesterday",
+    monthDay: (month, day) => `${monthsShort[month - 1]} ${day}`,
+    month: (month) => monthsShort[month - 1]!,
+    clock: (am, hh, mm) => `${hh}:${mm} ${am ? "AM" : "PM"}`,
+    date: (y, m, d) => `${monthsShort[m - 1]} ${d}, ${y}`,
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    day: (m, d, weekday) => `${weekday}, ${monthsShort[m - 1]} ${d}`,
+  },
+  money: {
+    underCent: "under ¥0.01",
+    about: (yuan) => `about ${yuan}`,
+    spent: (yuan) => `spent ${yuan}`,
+  },
+  big: (n) => `${Math.round(n / 1000)}k`,
+  cast: {
+    species: { bear: "Bear", rabbit: "Rabbit", fox: "Fox", cat: "Cat", owl: "Owl", hedgehog: "Hedgehog", raccoon: "Raccoon" },
+    outfit: { farmer: "Farmer", gardener: "Gardener", rain: "Raincoat", winter: "Winter coat" },
+    pose: { idle: "Standing by", walk: "Walking over", think: "Pondering", work: "Working", cheer: "Done", worry: "Bugs!" },
   },
 };
 

@@ -3,7 +3,7 @@
 // how far it is against its criteria, and folded under it what it made, how it got here, each step and the details.
 // Where it stands and what may be done is the server's Issue.attention, worded by src/rules/issueState.ts.
 
-import { rulesWording } from "../../base/words/rules";
+import { appWording } from "../../base/words";
 import { farmWording } from "../words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -36,8 +36,8 @@ const tones: Record<string, string> = { berry: "#c84a3a", wheat: "#e5a93c", wate
 const body = "text-[13px] leading-[1.5] text-bark-800";
 const xs = "text-[12px] text-bark-600";
 
-const speciesLabel: Record<string, string> = rulesWording().cast.species;
-const outfitLabel: Record<string, string> = rulesWording().cast.outfit;
+const speciesLabel: Record<string, string> = appWording().cast.species;
+const outfitLabel: Record<string, string> = appWording().cast.outfit;
 
 /** The plot's issue while the store says so (the inspect layer). */
 export function IssueView() {

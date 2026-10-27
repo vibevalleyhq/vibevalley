@@ -1,31 +1,31 @@
 // The issue board's look: how its list is grouped and ordered.
 
-import { rulesWording } from "../../base/words/rules";
+import { issuesWording } from "./words";
 import type { Priority } from "@vibevalley/protocol";
 import { type Lane, lanes } from "./rules";
 
 export type BoardView = "board" | "list";
 export const boardViews: BoardView[] = ["board", "list"];
-export const viewLabel: Record<BoardView, string> = { board: rulesWording().board.view.board, list: rulesWording().board.view.list };
+export const viewLabel: Record<BoardView, string> = { board: issuesWording().boardLabels.view.board, list: issuesWording().boardLabels.view.list };
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "project" | "agent" | "none";
 export const groupings: Grouping[] = ["status", "project", "agent", "none"];
 export const groupingLabel: Record<Grouping, string> = {
-  status: rulesWording().board.grouping.status,
-  project: rulesWording().board.grouping.project,
-  agent: rulesWording().board.grouping.agent,
-  none: rulesWording().board.grouping.none,
+  status: issuesWording().boardLabels.grouping.status,
+  project: issuesWording().boardLabels.grouping.project,
+  agent: issuesWording().boardLabels.grouping.agent,
+  none: issuesWording().boardLabels.grouping.none,
 };
 
 /** `manual` keeps the order the rows came in: the history's, which for 待办 is the owner's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings: Ordering[] = ["manual", "priority", "updated", "created"];
 export const orderingLabel: Record<Ordering, string> = {
-  manual: rulesWording().board.ordering.manual,
-  priority: rulesWording().board.ordering.priority,
-  updated: rulesWording().board.ordering.updated,
-  created: rulesWording().board.ordering.created,
+  manual: issuesWording().boardLabels.ordering.manual,
+  priority: issuesWording().boardLabels.ordering.priority,
+  updated: issuesWording().boardLabels.ordering.updated,
+  created: issuesWording().boardLabels.ordering.created,
 };
 
 export interface BoardLook {

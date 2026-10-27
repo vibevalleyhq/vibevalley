@@ -36,6 +36,7 @@ const zh = {
     letIn: "让它进来",
     refuse: "不让",
   },
+  devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
 };
 
 const en: typeof zh = {
@@ -73,6 +74,7 @@ const en: typeof zh = {
     letIn: "Let it in",
     refuse: "Refuse",
   },
+  devices: { android: "Android phone", windows: "Windows PC", device: "A device" },
 };
 
 export const lanWording = localized({ zh, en });

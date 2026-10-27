@@ -1,8 +1,9 @@
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
 // phase. Nothing here folds facts: it only reads the chat the server sent.
 
+import { chatWording } from "./words";
+import { appWording } from "../../base/words";
 import { wording } from "@vibevalley/protocol/words";
-import { rulesWording } from "../../base/words/rules";
 import {
   type Chat,
   type ChatMessage,
@@ -85,17 +86,17 @@ export function threadTitle(thread: Conversation, issues: Issue[] = [], sessions
   switch (thread.subjectKind) {
     case "issue": {
       const issue = issues.find((i) => i.id === thread.subjectId);
-      return issue ? head(issue.title) : rulesWording().chat.issueThread;
+      return issue ? head(issue.title) : chatWording().names.issueThread;
     }
     case "graph":
-      return rulesWording().chat.planThread(thread.subjectId ?? "");
+      return chatWording().names.planThread(thread.subjectId ?? "");
     case "talk":
     case undefined: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
-        return rulesWording().chat.talkThread(session?.name ?? thread.title ?? thread.subjectId);
+        return chatWording().names.talkThread(session?.name ?? thread.title ?? thread.subjectId);
       }
-      return thread.title || rulesWording().chat.thread;
+      return thread.title || chatWording().names.thread;
     }
   }
 }
@@ -173,18 +174,18 @@ const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.g
 
 function dayLabel(at: number, now = new Date()) {
   const d = new Date(Math.round(at));
-  if (sameDay(d, now)) return rulesWording().time.today;
+  if (sameDay(d, now)) return appWording().time.today;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (sameDay(d, yesterday)) return rulesWording().time.yesterday;
-  return rulesWording().time.monthDay(d.getMonth() + 1, d.getDate());
+  if (sameDay(d, yesterday)) return appWording().time.yesterday;
+  return appWording().time.monthDay(d.getMonth() + 1, d.getDate());
 }
 
 /** 12-hour, two digits: 下午03:07, 03:07 PM. */
 export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
-  return rulesWording().time.clock(d.getHours() < 12, String(h12).padStart(2, "0"), String(d.getMinutes()).padStart(2, "0"));
+  return appWording().time.clock(d.getHours() < 12, String(h12).padStart(2, "0"), String(d.getMinutes()).padStart(2, "0"));
 }
 
 const span = (ms: number) => wording().span(ms);
@@ -238,9 +239,9 @@ export function roleShort(role: string) {
 }
 
 export const mentionOf: Record<string, string> = {
-  [orchestratorAgent]: rulesWording().chat.mention.orchestrator,
-  [ownerId]: rulesWording().chat.mention.owner,
-  [everyone]: rulesWording().chat.mention.everyone,
+  [orchestratorAgent]: chatWording().names.mention.orchestrator,
+  [ownerId]: chatWording().names.mention.owner,
+  [everyone]: chatWording().names.mention.everyone,
 };
 
 export interface Nameable {
@@ -255,8 +256,8 @@ export const menuMax = 6;
 /** Everyone only when there is more than one helper. */
 export const nameables = (sessions: Session[], now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[orchestratorAgent]!, name: rulesWording().card.orchestrator, note: rulesWording().chat.orchestratorNote },
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: rulesWording().chat.everyone, note: rulesWording().chat.everyoneNote }] : []),
+  { token: mentionOf[orchestratorAgent]!, name: appWording().orchestrator, note: chatWording().names.orchestratorNote },
+  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: chatWording().names.everyone, note: chatWording().names.everyoneNote }] : []),
 ];
 
 const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;

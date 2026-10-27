@@ -1,7 +1,8 @@
 // 图鉴's shelves: every drawing in sprites.json on a shelf by its name, a
 // helper's by animal and outfit; which ones are a walk's frames; how one is drawn again.
 
-import { rulesWording } from "../../base/words/rules";
+import { catalogWording } from "./words";
+import { appWording } from "../../base/words";
 import { OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 import { outfitLabel, speciesLabel } from "../../ui/cast";
 
@@ -44,30 +45,30 @@ export interface Shelf {
 }
 
 export const shelves: readonly Shelf[] = [
-  { id: "helpers", label: rulesWording().shelf.helpers.label, hint: rulesWording().shelf.helpers.hint, match: isHelper },
-  { id: "orchestrator", label: rulesWording().card.orchestrator, hint: rulesWording().shelf.orchestrator.hint, match: (n) => n.startsWith("manager-") },
-  { id: "dog", label: rulesWording().shelf.dog.label, hint: rulesWording().shelf.dog.hint, match: (n) => n.startsWith("dog-") },
-  { id: "plots", label: rulesWording().shelf.plots.label, hint: rulesWording().shelf.plots.hint, match: (n) => n.startsWith("plot-") },
+  { id: "helpers", label: catalogWording().shelf.helpers.label, hint: catalogWording().shelf.helpers.hint, match: isHelper },
+  { id: "orchestrator", label: appWording().orchestrator, hint: catalogWording().shelf.orchestrator.hint, match: (n) => n.startsWith("manager-") },
+  { id: "dog", label: catalogWording().shelf.dog.label, hint: catalogWording().shelf.dog.hint, match: (n) => n.startsWith("dog-") },
+  { id: "plots", label: catalogWording().shelf.plots.label, hint: catalogWording().shelf.plots.hint, match: (n) => n.startsWith("plot-") },
   {
     id: "yard",
-    label: rulesWording().shelf.yard.label,
-    hint: rulesWording().shelf.yard.hint,
+    label: catalogWording().shelf.yard.label,
+    hint: catalogWording().shelf.yard.hint,
     match: (n) => n === "map" || n === "mailbox" || /^(prop-|fg-|critter-)/.test(n),
   },
-  { id: "map", label: rulesWording().shelf.map.label, hint: rulesWording().shelf.map.hint, match: (n) => /^(island|map)-/.test(n) },
-  { id: "machines", label: rulesWording().shelf.machines.label, hint: rulesWording().shelf.machines.hint, match: (n) => n.startsWith("machine-") },
-  { id: "icons", label: rulesWording().shelf.icons.label, hint: rulesWording().shelf.icons.hint, match: (n) => n.startsWith("icon-") },
-  { id: "acts", label: rulesWording().shelf.acts.label, hint: rulesWording().shelf.acts.hint, match: (n) => n.startsWith("act-") },
+  { id: "map", label: catalogWording().shelf.map.label, hint: catalogWording().shelf.map.hint, match: (n) => /^(island|map)-/.test(n) },
+  { id: "machines", label: catalogWording().shelf.machines.label, hint: catalogWording().shelf.machines.hint, match: (n) => n.startsWith("machine-") },
+  { id: "icons", label: catalogWording().shelf.icons.label, hint: catalogWording().shelf.icons.hint, match: (n) => n.startsWith("icon-") },
+  { id: "acts", label: catalogWording().shelf.acts.label, hint: catalogWording().shelf.acts.hint, match: (n) => n.startsWith("act-") },
   {
     id: "medals",
-    label: rulesWording().shelf.medals.label,
-    hint: rulesWording().shelf.medals.hint,
+    label: catalogWording().shelf.medals.label,
+    hint: catalogWording().shelf.medals.hint,
     match: (n) => /^(medal|emblem|stamp|coins|banner)-/.test(n),
   },
-  { id: "logos", label: "Logo", hint: rulesWording().shelf.logos.hint, match: (n) => /^(logo|connector|app)-/.test(n) },
-  { id: "langs", label: rulesWording().shelf.langs.label, hint: rulesWording().shelf.langs.hint, match: (n) => n.startsWith("lang-") },
-  { id: "ui", label: rulesWording().shelf.ui.label, hint: rulesWording().shelf.ui.hint, match: (n) => /^(button|energy|day)-/.test(n) },
-  { id: "other", label: rulesWording().shelf.other.label, hint: rulesWording().shelf.other.hint, match: () => true },
+  { id: "logos", label: "Logo", hint: catalogWording().shelf.logos.hint, match: (n) => /^(logo|connector|app)-/.test(n) },
+  { id: "langs", label: catalogWording().shelf.langs.label, hint: catalogWording().shelf.langs.hint, match: (n) => n.startsWith("lang-") },
+  { id: "ui", label: catalogWording().shelf.ui.label, hint: catalogWording().shelf.ui.hint, match: (n) => /^(button|energy|day)-/.test(n) },
+  { id: "other", label: catalogWording().shelf.other.label, hint: catalogWording().shelf.other.hint, match: () => true },
 ];
 
 export const shelfOf = (name: string) => shelves.find((s) => s.match(name))!.id;

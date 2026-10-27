@@ -44,6 +44,22 @@ const zh = {
   soundsMusic: "。关了音效就听不到。背景音乐还没有，给 Suno 的提示词在",
   period: "。",
   playSound: (name: string) => `播放 ${name}`,
+  shelf: {
+    helpers: { label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修" },
+    orchestrator: { label: "管家", hint: "六种样子，各有说话、听和头像" },
+    dog: { label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……" },
+    plots: { label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着" },
+    yard: { label: "院子", hint: "地图、道具、镜头前的草木、小动物" },
+    map: { label: "地图", hint: "每个项目一座岛，罗盘、云、排队的种子袋、空位的木桩" },
+    machines: { label: "农机", hint: "每台是一种 runtime" },
+    icons: { label: "图标", hint: "面板、入口和提示用的" },
+    acts: { label: "在做什么", hint: "帮工头上的小图标：读、改、跑命令、搜……" },
+    medals: { label: "奖章与成就", hint: "奖章、成就图案、印章、金币" },
+    logos: { label: "Logo", hint: "农机上的 agent、聊天软件、网页和桌面的图标" },
+    langs: { label: "语言", hint: "项目页上种了什么" },
+    ui: { label: "界面", hint: "精力瓶、田头的按钮、日历的格子" },
+    other: { label: "其他", hint: "没归上类的" },
+  },
 };
 
 const en: typeof zh = {
@@ -88,6 +104,22 @@ const en: typeof zh = {
   soundsMusic: ". With sound off they are silent. There is no background music yet; the prompts for Suno are in",
   period: ".",
   playSound: (name) => `Play ${name}`,
+  shelf: {
+    helpers: { label: "Helpers", hint: "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings" },
+    orchestrator: { label: "Manager", hint: "Six looks, each with talking, listening and a portrait" },
+    dog: { label: "Dog", hint: "Sleep, wake, stretch, wag, bark, jump, roll over…" },
+    plots: { label: "Plots", hint: "From bare soil to ripe, weedy, dry, withered and locked" },
+    yard: { label: "Yard", hint: "The map, props, plants in front of the camera, little animals" },
+    map: { label: "Map", hint: "An island for each project, the compass, clouds, queued seed bags, stumps for free spots" },
+    machines: { label: "Machines", hint: "Each is a runtime" },
+    icons: { label: "Icons", hint: "For panels, entries and hints" },
+    acts: { label: "Doing", hint: "The little icons over a helper's head: read, edit, run a command, search…" },
+    medals: { label: "Medals and badges", hint: "Medals, badge emblems, stamps, coins" },
+    logos: { label: "Logos", hint: "The agents on the machines, the chat apps, the web and desktop icons" },
+    langs: { label: "Languages", hint: "What a project page has planted" },
+    ui: { label: "Interface", hint: "The energy bottle, the farm chat's buttons, the calendar's cells" },
+    other: { label: "Other", hint: "What fits no shelf" },
+  },
 };
 
 export const catalogWording = localized({ zh, en });
