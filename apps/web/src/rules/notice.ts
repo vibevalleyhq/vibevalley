@@ -1,5 +1,6 @@
 // The farm at a glance in the tray (traySummary); each inbox item comes worded for it (InboxItem.words).
 
+import { rulesWording } from "./words";
 import type { WorkspaceState, InboxItem } from "@vibevalley/protocol";
 import type { TraySummary } from "@vibevalley/host";
 import { unreadTotal } from "./chat";
@@ -10,9 +11,9 @@ export function traySummary(state: WorkspaceState, inbox: readonly InboxItem[]):
   const waiting = inbox.flatMap((c) => c.words.tray ?? []);
   const unread = unreadTotal(state.chat);
   const lines = [
-    state.call === "live" ? (working > 0 ? `${working} 个帮工在干活` : "开工了，没有在干的活") : "还没开工",
+    state.call === "live" ? (working > 0 ? rulesWording().tray.working(working) : rulesWording().tray.idle) : rulesWording().tray.off,
     ...waiting,
-    ...(unread > 0 ? [`田头 ${unread} 条没读`] : []),
+    ...(unread > 0 ? [rulesWording().tray.unread(unread)] : []),
   ];
   const title = [...(working > 0 ? [`${working}`] : []), ...(waiting.length > 0 ? [`${waiting.length}!`] : [])].join(" · ");
   return { title, lines };

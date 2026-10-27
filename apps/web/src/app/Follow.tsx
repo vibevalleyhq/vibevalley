@@ -1,10 +1,11 @@
 // The page following the farm for the host around it: each new call in the inbox as a system notice while the window is
-// not in front, the farm at a glance in the tray, and the key that calls the orchestrator from anywhere. Mounted once, over
-// every page, the farm's too.
+// not in front, the farm at a glance in the tray, the key that calls the orchestrator from anywhere, and the language the
+// page speaks. Mounted once, over every page, the farm's too.
 
 import { createEffect, onSettled } from "solid-js";
 import { currentHost } from "@vibevalley/host";
 import { freshOf } from "@vibevalley/protocol/rules";
+import { currentLocale } from "@vibevalley/protocol/words";
 import { traySummary } from "../rules/notice";
 import { voiceCall } from "../voice/call";
 import { rawFrame } from "../data/frame";
@@ -28,6 +29,7 @@ export function Follow() {
     tray = said;
     void host.tray(summary).catch(() => {});
   });
+  onSettled(() => currentHost().locale?.(currentLocale()));
   onSettled(() => currentHost().voiceShortcut?.on(() => void voiceCall.toggle()));
   return null;
 }

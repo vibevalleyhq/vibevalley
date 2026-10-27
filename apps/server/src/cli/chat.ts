@@ -3,6 +3,9 @@
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
 import { standaloneStream } from "./llm.ts";
+import { cliWording } from "./words.ts";
+import { instructions } from "./prompts.ts";
+import { currentLocale } from "@vibevalley/protocol/words";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -23,13 +26,6 @@ import { memoryStore } from "../agent/brain/agentTaskStore.ts";
 import { wallTime } from "../base/time.ts";
 import { plainLog } from "../base/log.ts";
 
-const instructions = `你是 VibeValley，一个在用户电脑上干活的助手：读写代码、跑命令、查资料、记住用户交代的事、按时做定好的事。
-- 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
-- 能自己查到的不问；真正要用户拿主意的才问，一次问清。
-- 几件互不相干、各自要花工夫的事，用 spawn_agent 派帮手同时做。
-- 用户说「记住」「以后都」时用 remember；说「每天」「到点」「过一会儿」时用 reminder。
-- 回答用中文，简短，先说结论。`;
-
 const dim = (s: string) => "\x1b[2m" + s + "\x1b[0m";
 const short = (s: string) => {
   const r = [...s];
@@ -48,7 +44,7 @@ function show(e: BrainEvent, prompt: () => void) {
     }
     case "message_end":
       if (e.message.role !== "assistant") return;
-      if (e.message.stopReason === "error") write("\n出错了：" + (e.message.errorMessage ?? ""));
+      if (e.message.stopReason === "error") write(cliWording().chat.error(e.message.errorMessage ?? ""));
       write("\n");
       return;
     case "tool_execution_start":
@@ -62,10 +58,10 @@ function show(e: BrainEvent, prompt: () => void) {
       );
       return;
     case "compaction_end":
-      if (e.compaction) console.log(dim("（前面的对话压成了摘要，原文在 " + (e.compaction.archive ?? "") + "）"));
+      if (e.compaction) console.log(dim(cliWording().chat.compacted(e.compaction.archive ?? "")));
       return;
     case "agent_settled":
-      write(dim(`（${e.run.aborted ? "停下了，" : ""}输入 ${e.run.usage.input}，缓存 ${e.run.usage.cacheRead}，输出 ${e.run.usage.output}）\n`));
+      write(dim(cliWording().chat.usage(e.run.aborted, e.run.usage.input, e.run.usage.cacheRead, e.run.usage.output) + "\n"));
       prompt();
       return;
     default:
@@ -112,7 +108,7 @@ export async function ownChat(values: OwnChat) {
     time: wallTime,
     log: plainLog,
     name: values.name,
-    instructions,
+    instructions: instructions(currentLocale()),
     llm,
     home,
     cwd,
@@ -129,11 +125,7 @@ export async function ownChat(values: OwnChat) {
       await agent.ask(userMessage(values.p, wallTime.now()));
       return;
     }
-    console.log(
-      dim(
-        `vibevalley agent · ${cwd} · ${home}\n${agent.skills().length} 个技能，${agent.mcpStatus().toolCount} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。`,
-      ),
-    );
+    console.log(dim(`vibevalley agent · ${cwd} · ${home}\n` + cliWording().chat.hello(agent.skills().length, agent.mcpStatus().toolCount)));
     prompt = () => write("› ");
     prompt();
     let quit = () => {};
@@ -143,7 +135,7 @@ export async function ownChat(values: OwnChat) {
         if (text === "/exit") return quit();
         if (text === "/reset") {
           agent.reset();
-          console.log(dim("忘掉了。"));
+          console.log(dim(cliWording().chat.forgot));
           return prompt();
         }
         if (text) agent.send(userMessage(text, wallTime.now()));
@@ -204,10 +196,10 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
     dshRuntime,
   ]);
   const runtime = registry.get(id);
-  if (!runtime) throw new Error(`没有 ${id} 这个农机`);
-  if (!runtime.installation) throw new Error(`${id} 看不出装没装`);
+  if (!runtime) throw new Error(cliWording().chat.noRuntime(id));
+  if (!runtime.installation) throw new Error(cliWording().chat.unknownInstall(id));
   const found = await runtime.installation();
-  if (found.kind !== "available") throw new Error(`${id} 用不了：${found.kind}`);
+  if (found.kind !== "available") throw new Error(cliWording().chat.unusable(id, found.kind));
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const session: Session = await runtime.session(found, {
     cwd,
@@ -216,7 +208,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
     ...(values.resume ? { resume: values.resume } : {}),
   });
   try {
-    console.log(dim(`${id} · ${session.id}${values.resume ? "（接着）" : ""}\n直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。`));
+    console.log(dim(`${id} · ${session.id}${values.resume ? cliWording().chat.resumed : ""}\n` + cliWording().chat.direct));
     session.events(
       (e) => {
         const line = render(e);
@@ -231,7 +223,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
       const cancelled = new Promise<void>((r) => (cancel = r));
       const done = promptAndWait(session, text, { cancel: cancelled } as never)
         .then((run) => {
-          if ((run as { kind?: string }).kind === "rejected") console.log(dim("没接住：" + String((run as { reason?: string }).reason ?? "")));
+          if ((run as { kind?: string }).kind === "rejected") console.log(dim(cliWording().chat.rejected(String((run as { reason?: string }).reason ?? ""))));
         })
         .finally(() => {
           turn = undefined;
@@ -253,7 +245,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
         if (!text) return turn ? undefined : write("› ");
         if (!turn) return start(text);
         void (session.steer ? session.steer(text) : session.queue(text)).then((r) => {
-          if ((r as { kind?: string }).kind === "rejected") console.log(dim("没送进去：" + String((r as { reason?: string }).reason ?? "")));
+          if ((r as { kind?: string }).kind === "rejected") console.log(dim(cliWording().chat.notSent(String((r as { reason?: string }).reason ?? ""))));
         });
       },
       () => {

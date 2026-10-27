@@ -1,6 +1,7 @@
 // 农具: the coding agents on this machine as oar probed them; one's account, what it takes,
 // its settings, models and inventories, and the profiles that use it. /runtimes/<id>.
 
+import { runtimesWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -35,27 +36,27 @@ import { Segmented } from "../../ui/Segmented";
 import { Card, ListCard, ListRow, Quiet, Split, Toggle } from "../kit";
 
 const capabilityLabel: Record<RuntimeCapability, string> = {
-  listModels: "模型列表",
-  accountUsage: "账户用量",
-  checkUpdate: "检查更新",
-  upgrade: "升级",
-  skills: "技能清单",
-  mcpServers: "MCP 清单",
-  tools: "工具清单",
+  listModels: runtimesWording().capability.listModels,
+  accountUsage: runtimesWording().capability.accountUsage,
+  checkUpdate: runtimesWording().capability.checkUpdate,
+  upgrade: runtimesWording().capability.upgrade,
+  skills: runtimesWording().capability.skills,
+  mcpServers: runtimesWording().capability.mcpServers,
+  tools: runtimesWording().capability.tools,
 };
 
 const statusOf = (r: RuntimeInfo) => {
   const i = r.installation;
   switch (i.status) {
     case "available":
-      return r.settings.enabled ? (i.version ?? "可用") : "已停用";
+      return r.settings.enabled ? (i.version ?? runtimesWording().available) : runtimesWording().disabled;
     // The reason, not just 不支持: for vibevalley it is a missing DeepSeek key, which is the owner's to fix.
     case "unsupported":
-      return i.reason || "不支持";
+      return i.reason || runtimesWording().unsupported;
     case "not_found":
-      return "没找到";
+      return runtimesWording().notFound;
     case "checking":
-      return "检测中…";
+      return runtimesWording().checking;
   }
 };
 
@@ -87,12 +88,20 @@ export function RuntimesPage(props: { rest: string }) {
   const list = () => ready(runtimes, []);
   const selected = () => list().find((r) => r.id === props.rest) ?? list()[0];
   return (
-    <Show when={!runtimes.error} fallback={<p class="p-8 text-sm text-berry">读不到农机：{reasonOf(runtimes.error)}</p>}>
+    <Show
+      when={!runtimes.error}
+      fallback={
+        <p class="p-8 text-sm text-berry">
+          {runtimesWording().noRuntimes}
+          {reasonOf(runtimes.error)}
+        </p>
+      }
+    >
       <div class="h-full p-3">
         <Split
           list={
-            <ListCard title="农具" label="农具列表">
-              <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">机器上的编码 agent</li>
+            <ListCard title={runtimesWording().title} label={runtimesWording().list}>
+              <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{runtimesWording().intro}</li>
               <For each={list()}>
                 {(r) => {
                   const ok = () => r.installation.status === "available";
@@ -103,7 +112,7 @@ export function RuntimesPage(props: { rest: string }) {
                       to={`/runtimes/${r.id}`}
                       active={selected()?.id === r.id}
                       title={r.preset.label}
-                      line={`${statusOf(r)}${using() > 0 ? ` · ${using()} 个 agent` : ""}`}
+                      line={`${statusOf(r)}${using() > 0 ? runtimesWording().usedBy(using()) : ""}`}
                       leading={
                         <span class={{ "opacity-50 grayscale": !ok() }}>
                           <RuntimeIcon runtime={r.id} size={36} />
@@ -124,7 +133,7 @@ export function RuntimesPage(props: { rest: string }) {
             </ListCard>
           }
         >
-          <Show when={selected()} fallback={<Quiet>读取中…</Quiet>}>
+          <Show when={selected()} fallback={<Quiet>{runtimesWording().reading}</Quiet>}>
             {(s) => <Keyed key={s().id}>{() => <Detail info={s()} agents={agents().filter((a) => a.runtime === s().id)} />}</Keyed>}
           </Show>
         </Split>
@@ -168,30 +177,32 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
               <Match when={inst().status === "available" ? (inst() as Extract<RuntimeInfo["installation"], { status: "available" }>) : undefined}>
                 {(i) => (
                   <>
-                    <span class="rounded bg-[#e3efd2] px-1.5 text-[#3f6427]">可用 {i().version ?? ""}</span>
+                    <span class="rounded bg-[#e3efd2] px-1.5 text-[#3f6427]">
+                      {runtimesWording().available} {i().version ?? ""}
+                    </span>
                     <span class="font-mono">{i().command}</span>
-                    <span>{i().via === "bundled" ? "随 oar 一起装" : "命令行"}</span>
+                    <span>{i().via === "bundled" ? runtimesWording().bundled : runtimesWording().commandLine}</span>
                   </>
                 )}
               </Match>
               <Match when={inst().status === "unsupported" ? (inst() as Extract<RuntimeInfo["installation"], { status: "unsupported" }>) : undefined}>
-                {(i) => <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">不支持：{i().reason}</span>}
+                {(i) => <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{runtimesWording().unsupportedWhy(i().reason)}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
-                <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">这台机器上没找到</span>
+                <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{runtimesWording().notHere}</span>
               </Match>
             </Switch>
-            <Show when={inst().status !== "checking"} fallback={<span>检测中…</span>}>
-              <span>检测于 {wallClockText(props.info.checkedAt)}</span>
+            <Show when={inst().status !== "checking"} fallback={<span>{runtimesWording().checking}</span>}>
+              <span>{runtimesWording().checkedAt(wallClockText(props.info.checkedAt))}</span>
             </Show>
           </div>
         </div>
         <Button disabled={refreshing()} onClick={() => void refresh()}>
-          {refreshing() ? "检测中…" : "重新检测"}
+          {refreshing() ? runtimesWording().checking : runtimesWording().recheck}
         </Button>
       </div>
       <div class="grid gap-3 md:grid-cols-2">
-        <Card title="账户">
+        <Card title={runtimesWording().account}>
           <Usage info={props.info} />
         </Card>
         <FactsCard info={props.info} />
@@ -199,19 +210,19 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <SettingsCard info={props.info} onSaved={keep} />
       <ModelsCard info={props.info} />
       <div class="grid gap-3 md:grid-cols-3">
-        <InventoryCard title="技能" entries={props.info.skills} />
-        <InventoryCard title="MCP 服务器" entries={props.info.mcpServers} />
-        <InventoryCard title="工具" entries={props.info.tools} />
+        <InventoryCard title={runtimesWording().skills} entries={props.info.skills} />
+        <InventoryCard title={runtimesWording().mcp} entries={props.info.mcpServers} />
+        <InventoryCard title={runtimesWording().tools} entries={props.info.tools} />
       </div>
       <Card
-        title="用到它的 agent"
+        title={runtimesWording().agents}
         action={
           <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} class="text-xs text-muted underline hover:text-ink">
-            用它捏一个新 agent →
+            {runtimesWording().makeAgent}
           </A>
         }
       >
-        <Show when={props.agents.length > 0} fallback={<Quiet>还没有。</Quiet>}>
+        <Show when={props.agents.length > 0} fallback={<Quiet>{runtimesWording().noneYet}</Quiet>}>
           <div class="flex flex-wrap gap-2">
             <For each={props.agents}>
               {(a) => (
@@ -238,15 +249,15 @@ function Usage(props: { info: RuntimeInfo }) {
   return (
     <Show
       when={props.info.usage}
-      fallback={<Quiet>{props.info.facts.capabilities.includes("accountUsage") ? "装好以后才能读到。" : "这个 runtime 不报告账户用量。"}</Quiet>}
+      fallback={<Quiet>{props.info.facts.capabilities.includes("accountUsage") ? runtimesWording().afterInstall : runtimesWording().noUsage}</Quiet>}
     >
       {(usage) => (
         <Switch>
           <Match when={usage().status === "login_required"}>
-            <p class="text-xs text-[#b8682a]">没登录。在这台机器上运行 {props.info.preset.label} 登录一次。</p>
+            <p class="text-xs text-[#b8682a]">{runtimesWording().signedOut(props.info.preset.label)}</p>
           </Match>
           <Match when={usage().status === "unavailable" ? (usage() as Extract<Usage, { status: "unavailable" }>) : undefined}>
-            {(u) => <Quiet>读不到：{u().reason}</Quiet>}
+            {(u) => <Quiet>{runtimesWording().unreadable(u().reason)}</Quiet>}
           </Match>
           <Match when={usage()}>
             <div class="flex items-start gap-3">
@@ -259,12 +270,12 @@ function Usage(props: { info: RuntimeInfo }) {
                   <Match when={usage().status === "balance" ? (usage() as Extract<Usage, { status: "balance" }>) : undefined}>
                     {(u) => (
                       <>
-                        <p class={["text-sm", { "text-berry": !u().available }]}>
-                          按量计费，这里是 {u().provider} 账户余额{u().available ? "。" : "，不够用了。"}
-                        </p>
+                        <p class={["text-sm", { "text-berry": !u().available }]}>{runtimesWording().balance(u().provider, u().available)}</p>
                         <p class="text-sm text-muted">
-                          今天帮工花了约 {yuan(props.info.spentToday ?? 0)}
-                          {(props.info.settings.dailyBudget ?? 0) > 0 ? `，每日预算 ${yuan(props.info.settings.dailyBudget!)}` : "，没设每日预算"}。
+                          {runtimesWording().spentToday(
+                            yuan(props.info.spentToday ?? 0),
+                            (props.info.settings.dailyBudget ?? 0) > 0 ? yuan(props.info.settings.dailyBudget!) : undefined,
+                          )}
                         </p>
                       </>
                     )}
@@ -273,7 +284,7 @@ function Usage(props: { info: RuntimeInfo }) {
                     {(u) => (
                       <>
                         <Show when={u().subscription}>
-                          <p class="text-sm text-muted">套餐：{u().subscription}</p>
+                          <p class="text-sm text-muted">{runtimesWording().subscription(u().subscription ?? "")}</p>
                         </Show>
                         <For each={u().windows}>{(w) => <Window window={w} />}</For>
                       </>
@@ -297,14 +308,15 @@ function Window(props: { window: UsageWindow }) {
   return (
     <div class="flex flex-col gap-1">
       <span class="flex text-xs">
-        <span class="flex-1 text-muted">{label()}</span>剩 {pct(left())}%
+        <span class="flex-1 text-muted">{label()}</span>
+        {runtimesWording().left(pct(left()))}
       </span>
       <Stamina
-        quota={{ level: quotaLevel(left()), fill: left() / 100, short: `${pct(left())}%`, text: `${label()} 剩 ${pct(left())}%` }}
+        quota={{ level: quotaLevel(left()), fill: left() / 100, short: `${pct(left())}%`, text: runtimesWording().windowLeft(label(), pct(left())) }}
         width={220}
         height={10}
       />
-      <Show when={props.window.resetsAt}>{(at) => <span class="text-xs text-muted">{momentText(at())} 重置</span>}</Show>
+      <Show when={props.window.resetsAt}>{(at) => <span class="text-xs text-muted">{runtimesWording().resets(momentText(at()))}</span>}</Show>
     </div>
   );
 }
@@ -313,15 +325,15 @@ function FactsCard(props: { info: RuntimeInfo }) {
   const facts = () => props.info.facts;
   const refused = () => Object.entries(facts().refused);
   return (
-    <Card title="能做什么">
+    <Card title={runtimesWording().can}>
       <div class="flex flex-col gap-1.5">
         <span class="flex items-start gap-1.5 text-sm">
           <Icon name={facts().steer ? "mark-check" : "mark-cross"} size={12} class="mt-1" />
-          {facts().steer ? "干活时能接话（steer）" : "干活时不能插话，话会排到这一轮之后"}
+          {facts().steer ? runtimesWording().steer : runtimesWording().noSteer}
         </span>
-        <span class="text-sm">{facts().inProcess ? "· 跑在 server 进程里（Node SDK）" : "· 作为单独的命令行进程运行"}</span>
-        <span class="pt-2 text-xs font-medium text-muted">不接受的开 session 参数</span>
-        <Show when={refused().length > 0} fallback={<span class="text-sm">都接受。</span>}>
+        <span class="text-sm">{facts().inProcess ? runtimesWording().inProcess : runtimesWording().ownProcess}</span>
+        <span class="pt-2 text-xs font-medium text-muted">{runtimesWording().refused}</span>
+        <Show when={refused().length > 0} fallback={<span class="text-sm">{runtimesWording().acceptsAll}</span>}>
           <For each={refused()}>
             {([k, v]) => (
               <span class="text-sm">
@@ -330,7 +342,7 @@ function FactsCard(props: { info: RuntimeInfo }) {
             )}
           </For>
         </Show>
-        <span class="pt-2 text-xs font-medium text-muted">oar 提供的查询</span>
+        <span class="pt-2 text-xs font-medium text-muted">{runtimesWording().queries}</span>
         <div class="flex flex-wrap gap-1">
           <For each={RuntimeCapabilityValues}>
             {(c) => (
@@ -389,7 +401,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
   };
   const refusedEffort = () => props.info.facts.refused[sessionEffort];
   const refusedEnv = () => props.info.facts.refused[sessionEnv];
-  const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : "这个模型没有推理强度可选。");
+  const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : runtimesWording().noEffort);
   const save = async () => {
     const id = props.info.id;
     const body = draft();
@@ -402,13 +414,13 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
   const budgeted = () => props.info.id === "pi" || props.info.id === "vibevalley";
   return (
     <Card
-      title="设置"
+      title={runtimesWording().settings}
       action={
         <Show when={dirty()}>
           <span class="flex gap-2">
-            <Button onClick={() => setDraft(props.info.settings)}>放弃</Button>
+            <Button onClick={() => setDraft(props.info.settings)}>{runtimesWording().discard}</Button>
             <Button tone="primary" onClick={() => void save()}>
-              保存
+              {runtimesWording().save}
             </Button>
           </span>
         </Show>
@@ -416,46 +428,46 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
     >
       <div class="grid gap-4 md:grid-cols-2">
         <Toggle
-          label="让 agent 用它"
-          hint="停用后，用它的 agent 都派不出去。"
+          label={runtimesWording().enabled}
+          hint={runtimesWording().enabledHint}
           checked={draft().enabled}
           onChange={(enabled) => setDraft({ ...draft(), enabled })}
         />
-        <Field label="命令路径" hint={`对应 oar 的 OAR_${props.info.id.toUpperCase()}_BIN。留空就在 PATH 里找。`}>
+        <Field label={runtimesWording().binPath} hint={runtimesWording().binPathHint(props.info.id.toUpperCase())}>
           <TextInput
-            aria-label="命令路径"
+            aria-label={runtimesWording().binPath}
             class="font-mono"
-            placeholder="自动查找"
+            placeholder={runtimesWording().auto}
             value={draft().binPath}
             onInput={(e) => setDraft({ ...draft(), binPath: e.currentTarget.value })}
           />
         </Field>
-        <Field label="默认模型" hint="agent 没指定模型时用它。">
+        <Field label={runtimesWording().defaultModel} hint={runtimesWording().defaultModelHint}>
           <Select
-            label="默认模型"
-            placeholder="runtime 自己的默认"
+            label={runtimesWording().defaultModel}
+            placeholder={runtimesWording().ownDefault}
             value={draft().defaultModel}
             options={models().map((m) => ({ value: m.id, label: m.name }))}
             onChange={(defaultModel) => setDraft({ ...draft(), defaultModel, defaultEffort: "" })}
           />
         </Field>
-        <Field label="默认推理强度" hint={effortHint()}>
+        <Field label={runtimesWording().defaultEffort} hint={effortHint()}>
           <div>
             <Segmented
-              label="默认推理强度"
+              label={runtimesWording().defaultEffort}
               value={draft().defaultEffort}
-              options={[{ value: "", label: "默认" }, ...(model()?.effortLevels ?? []).map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
+              options={[
+                { value: "", label: runtimesWording().default },
+                ...(model()?.effortLevels ?? []).map((l) => ({ value: l, label: l, disabled: !!refusedEffort() })),
+              ]}
               onChange={(defaultEffort) => setDraft({ ...draft(), defaultEffort })}
             />
           </div>
         </Field>
-        <Field
-          label="最多同时干活"
-          hint="用它的帮工同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受整个工作区的上限（同时 6 张工单）。"
-        >
+        <Field label={runtimesWording().maxWorking} hint={runtimesWording().maxWorkingHint}>
           <NumberInput
-            label="最多同时干活"
-            placeholder="不另设"
+            label={runtimesWording().maxWorking}
+            placeholder={runtimesWording().noLimit}
             value={draft().maxWorking}
             onChange={(n) => {
               const { maxWorking: _, ...rest } = draft();
@@ -464,13 +476,10 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
           />
         </Field>
         <Show when={budgeted()}>
-          <Field
-            label="每日预算（元）"
-            hint={`今天已经花了 ${yuan(props.info.spentToday ?? 0)}（按${props.info.id === "pi" ? " pi 的" : "模型的"}价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。`}
-          >
+          <Field label={runtimesWording().budget} hint={runtimesWording().budgetHint(yuan(props.info.spentToday ?? 0), props.info.id === "pi")}>
             <NumberInput
-              label="每日预算"
-              placeholder="不设上限"
+              label={runtimesWording().budgetLabel}
+              placeholder={runtimesWording().unlimited}
               value={draft().dailyBudget}
               onChange={(n) => {
                 const { dailyBudget: _, ...rest } = draft();
@@ -480,7 +489,7 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
           </Field>
         </Show>
       </div>
-      <Field label="环境变量" hint={refusedEnv() ?? "叠加到这个 runtime 的每个 session 上；agent 自己的环境变量优先。"}>
+      <Field label={runtimesWording().env} hint={refusedEnv() ?? runtimesWording().envHint}>
         <KeyValueEditor value={draft().env} disabled={!!refusedEnv()} onChange={(env) => setDraft({ ...draft(), env })} />
       </Field>
     </Card>
@@ -489,17 +498,20 @@ function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) =>
 
 function ModelsCard(props: { info: RuntimeInfo }) {
   return (
-    <Card title="模型" action={<Show when={props.info.models}>{(m) => <span class="text-sm text-muted">{m().length} 个</span>}</Show>}>
+    <Card
+      title={runtimesWording().models}
+      action={<Show when={props.info.models}>{(m) => <span class="text-sm text-muted">{runtimesWording().modelCount(m().length)}</span>}</Show>}
+    >
       <Show
         when={props.info.models}
-        fallback={<Quiet>{props.info.installation.status === "available" ? "这个 runtime 不报告模型列表。" : "装好以后才能读到。"}</Quiet>}
+        fallback={<Quiet>{props.info.installation.status === "available" ? runtimesWording().noModels : runtimesWording().afterInstall}</Quiet>}
       >
         {(models) => (
           <table class="w-full text-left">
             <thead>
               <tr class="text-xs font-medium text-muted">
-                <th class="pb-2 font-medium">模型</th>
-                <th class="pb-2 font-medium">推理强度</th>
+                <th class="pb-2 font-medium">{runtimesWording().models}</th>
+                <th class="pb-2 font-medium">{runtimesWording().effort}</th>
               </tr>
             </thead>
             <tbody>
@@ -509,7 +521,7 @@ function ModelsCard(props: { info: RuntimeInfo }) {
                     <td class="py-1.5">
                       <span class="font-mono text-sm">{m.id}</span>
                       <Show when={m.isDefault}>
-                        <span class="ml-2 rounded bg-[#e3efd2] px-1.5 text-xs text-[#3f6427]">默认</span>
+                        <span class="ml-2 rounded bg-[#e3efd2] px-1.5 text-xs text-[#3f6427]">{runtimesWording().default}</span>
                       </Show>
                     </td>
                     <td class="py-1.5 text-sm text-muted">{m.effortLevels.length === 0 ? "—" : m.effortLevels.join(" · ")}</td>
@@ -544,10 +556,10 @@ function InventoryCard(props: { title: string; entries: InventoryEntry[] | null 
         }
       >
         <Match when={!props.entries}>
-          <Quiet>不报告。</Quiet>
+          <Quiet>{runtimesWording().unreported}</Quiet>
         </Match>
         <Match when={props.entries!.length === 0}>
-          <Quiet>没有。</Quiet>
+          <Quiet>{runtimesWording().none}</Quiet>
         </Match>
       </Switch>
     </Card>

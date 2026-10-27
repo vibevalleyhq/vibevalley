@@ -1,3 +1,5 @@
+import { issuesWording } from "./words";
+import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import {
@@ -17,7 +19,7 @@ import { createIssueActs } from "../../data/issueActs";
 import type { Tone } from "../../rules/cards";
 import { issueTag, runText, tagOpen, tagText } from "../../rules/issues";
 import { changesLine, type CriterionRow, issueState, noStepsText, attentionTone } from "../../rules/issueState";
-import { actLabel, closedText, deliverableLabel, priorityLabel } from "@vibevalley/protocol/rules";
+import { closedText } from "@vibevalley/protocol/rules";
 import { tookText, wallClockText } from "../../rules/time";
 import { toast } from "../../ui/toasts";
 import { ready } from "../../data/query";
@@ -91,7 +93,7 @@ export function IssueDetail(props: {
       <Show when={s().inTask ? props.onTask : undefined}>
         {(onTask) => (
           <button type="button" onClick={() => onTask()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
-            ‹ {parent()?.title ? `计划「${parent()!.title}」的一步` : "回到计划"}
+            ‹ {parent()?.title ? issuesWording().detail.planStep(parent()!.title) : issuesWording().detail.backToPlan}
           </button>
         )}
       </Show>
@@ -101,10 +103,10 @@ export function IssueDetail(props: {
           {s().title}
         </h1>
         <span class="shrink-0 text-xs text-muted @max-[560px]:basis-full">
-          {[s().project, priorityLabel[props.issue.priority]].filter(Boolean).join(" · ")}
+          {[s().project, wording().priority[props.issue.priority]].filter(Boolean).join(" · ")}
         </span>
       </div>
-      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label="现在怎样">
+      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={issuesWording().detail.now}>
         <Dot tone={tone()} />
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
@@ -115,8 +117,8 @@ export function IssueDetail(props: {
     <>
       <Show when={s().ask}>
         {(ask) => (
-          <section aria-label="要你做的" class="mb-5">
-            <SheetLabel>要你做的</SheetLabel>
+          <section aria-label={issuesWording().detail.yours} class="mb-5">
+            <SheetLabel>{issuesWording().detail.yours}</SheetLabel>
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
               <Show when={ask().line}>
@@ -143,21 +145,21 @@ export function IssueDetail(props: {
                 }}
                 placeholder={
                   box() === "reject"
-                    ? "哪里没过，一行一条"
+                    ? issuesWording().detail.rejectWhere
                     : s().attention.state === "asking"
-                      ? "自己说……"
+                      ? issuesWording().detail.sayIt
                       : s().attention.state === "canceled"
-                        ? "这次要它做什么（不填就是接着做完）"
-                        : `给${head().name}带句话`
+                        ? issuesWording().reopen.what
+                        : issuesWording().detail.tell(head().name)
                 }
                 aria-label={
                   box() === "reject"
-                    ? "哪里没过"
+                    ? issuesWording().detail.rejectLabel
                     : s().attention.state === "asking"
-                      ? "回答"
+                      ? issuesWording().detail.answer
                       : s().attention.state === "canceled"
-                        ? "重开这张工单"
-                        : `给${head().name}带句话`
+                        ? issuesWording().reopen.title
+                        : issuesWording().detail.tell(head().name)
                 }
               />
             </Show>
@@ -171,7 +173,7 @@ export function IssueDetail(props: {
         )}
       </Show>
       <Show when={!s().ask && box() === "tell"}>
-        <section aria-label="带话" class="mb-5">
+        <section aria-label={issuesWording().detail.tellSection} class="mb-5">
           <TextArea
             rows={2}
             value={text()}
@@ -183,26 +185,24 @@ export function IssueDetail(props: {
                 sayAct("tell");
               }
             }}
-            placeholder={head().phase._tag === "working" ? "干着活也能收到这句话" : "说一句，它接着做一轮"}
-            aria-label={`给${head().name}带句话`}
+            placeholder={head().phase._tag === "working" ? issuesWording().detail.tellWorking : issuesWording().detail.tellIdle}
+            aria-label={issuesWording().detail.tell(head().name)}
             autofocus
           />
           <div class="mt-2 flex gap-2">
             {button("tell", () => true)}
             <Button disabled={busy()} onClick={() => setBox(undefined)}>
-              算了
+              {issuesWording().never}
             </Button>
           </div>
         </section>
       </Show>
 
-      <section aria-label="做到哪了">
+      <section aria-label={issuesWording().detail.progress}>
         <SheetLabel>
-          做到哪了
+          {issuesWording().detail.progress}
           <Show when={s().criteria.length > 0}>
-            <span class="ml-2 font-normal">
-              {s().met} / {s().criteria.length} 条做到了
-            </span>
+            <span class="ml-2 font-normal">{issuesWording().detail.met(s().met, s().criteria.length)}</span>
           </Show>
         </SheetLabel>
         <Show when={s().doing}>
@@ -211,25 +211,24 @@ export function IssueDetail(props: {
         <Show when={s().inTask}>
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
-        <Show
-          when={s().criteria.length > 0}
-          fallback={<p class="text-sm text-muted">这张工单没写做完的标准：交回来时看{props.issue.deliver === "answer" ? "结论" : "改动"}判断。</p>}
-        >
+        <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">{issuesWording().detail.noCriteria(props.issue.deliver === "answer")}</p>}>
           <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().openFindings.length > 0}>
           <div class="mt-2">
-            <div class="text-xs text-muted">上次打回的</div>
+            <div class="text-xs text-muted">{issuesWording().detail.rejected}</div>
             <For each={s().openFindings}>{(f) => <div class="text-sm text-berry">· {f.text}</div>}</For>
           </div>
         </Show>
       </section>
 
-      <section aria-label="做出了什么">
-        <SheetLabel>做出了什么</SheetLabel>
-        <Switch fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : "没有可看的改动。"}</p>}>
+      <section aria-label={issuesWording().detail.made}>
+        <SheetLabel>{issuesWording().detail.made}</SheetLabel>
+        <Switch
+          fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : issuesWording().detail.nothingToSee}</p>}
+        >
           <Match when={props.issue.deliver === "answer"}>
-            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">还没有结论。</p>}>
+            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">{issuesWording().detail.noAnswer}</p>}>
               {(a) => <AnswerView answer={a()} />}
             </Show>
           </Match>
@@ -237,16 +236,14 @@ export function IssueDetail(props: {
             {(c) => (
               <Show
                 when={c().commits.length > 0 || c().uncommitted.length > 0 || c().files.length > 0}
-                fallback={<p class="text-sm text-muted">还没有改动。</p>}
+                fallback={<p class="text-sm text-muted">{issuesWording().detail.noChanges}</p>}
               >
                 <div class="flex flex-col gap-2">
                   <div class="text-sm">{changesLine(c())}</div>
                   <Show when={c().conflicts.length > 0}>
-                    <div class="text-sm text-berry">
-                      合进 {c().base} 会冲突：{c().conflicts.join("、")}
-                    </div>
+                    <div class="text-sm text-berry">{issuesWording().detail.conflict(c().base, c().conflicts)}</div>
                   </Show>
-                  <Fold label="改了哪些文件" summary={`${c().files.length} 个`}>
+                  <Fold label={issuesWording().detail.changedFiles} summary={issuesWording().detail.fileCount(c().files.length)}>
                     <ChangesHead changes={c()} />
                     <ChangesBody changes={c()} />
                   </Fold>
@@ -255,7 +252,7 @@ export function IssueDetail(props: {
             )}
           </Match>
           <Match when={s().showsChanges}>
-            <p class="text-sm text-muted">{changesQuery.isPending ? "在读……" : "读不到改动。"}</p>
+            <p class="text-sm text-muted">{changesQuery.isPending ? issuesWording().reading : issuesWording().detail.changesUnread}</p>
           </Match>
         </Switch>
         <Show when={props.issue.pullRequest}>
@@ -267,23 +264,26 @@ export function IssueDetail(props: {
         </Show>
       </section>
 
-      <section aria-label="怎么走到这一步">
-        <SheetLabel>怎么走到这一步</SheetLabel>
-        <Show when={timeline()} fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? "在读……" : "读不到。"}</p>}>
+      <section aria-label={issuesWording().detail.story}>
+        <SheetLabel>{issuesWording().detail.story}</SheetLabel>
+        <Show
+          when={timeline()}
+          fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? issuesWording().reading : issuesWording().detail.unread}</p>}
+        >
           {(t) => <Story milestones={t().milestones} />}
         </Show>
         <div class="mt-3 border-t border-line">
           <Show when={s().description}>
-            <Fold label="要做的（完整说明）">
+            <Fold label={issuesWording().detail.full}>
               <Markdown class="text-sm text-ink/90" text={s().description} />
             </Fold>
           </Show>
-          <Fold label="帮工的每一步" summary={steps().length ? stepsLine(steps()) : undefined}>
+          <Fold label={issuesWording().detail.steps} summary={steps().length ? stepsLine(steps()) : undefined}>
             <Show when={steps().length ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
               {(st) => <WorkLog steps={st()} />}
             </Show>
           </Fold>
-          <Fold label="每次干活" summary={s().historyLine}>
+          <Fold label={issuesWording().detail.runs} summary={s().historyLine}>
             <Runs issue={props.issue.id} version={`${props.issue.attention.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>
         </div>
@@ -300,39 +300,41 @@ export function IssueDetail(props: {
           <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
         </div>
       </Show>
-      <SheetLabel>时间</SheetLabel>
-      <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>
-      <Property label="开工">{wallClockText(props.sessions[0]!.hiredAt)}</Property>
-      <Show when={s().ask && s().attention.since}>{(at) => <Property label="在等你">{wallClockText(at())} 起</Property>}</Show>
+      <SheetLabel>{issuesWording().detail.time}</SheetLabel>
+      <Property label={issuesWording().detail.opened}>{wallClockText(props.issue.createdAt)}</Property>
+      <Property label={issuesWording().detail.started}>{wallClockText(props.sessions[0]!.hiredAt)}</Property>
+      <Show when={s().ask && s().attention.since}>
+        {(at) => <Property label={issuesWording().detail.waiting}>{issuesWording().detail.since(wallClockText(at()))}</Property>}
+      </Show>
       <Show when={props.issue.reviewedAt}>
         {(at) => (
-          <Property label="验收过">
+          <Property label={issuesWording().detail.reviewed}>
             <span class="text-accent">{wallClockText(at())}</span>
           </Property>
         )}
       </Show>
-      <Show when={props.issue.closedAt}>{(at) => <Property label="关单">{wallClockText(at())}</Property>}</Show>
-      <SheetLabel>谁在做</SheetLabel>
-      <Property label="帮工">{s().whoLine}</Property>
+      <Show when={props.issue.closedAt}>{(at) => <Property label={issuesWording().detail.closedAt}>{wallClockText(at())}</Property>}</Show>
+      <SheetLabel>{issuesWording().detail.who}</SheetLabel>
+      <Property label={issuesWording().detail.helper}>{s().whoLine}</Property>
       <Show when={agent()?.model}>
-        <Property label="模型">{agent()!.model}</Property>
+        <Property label={issuesWording().detail.model}>{agent()!.model}</Property>
       </Show>
       <Show when={!s().inTask}>
-        <Property label="交付">
+        <Property label={issuesWording().detail.deliver}>
           <Pick
-            label="交付"
+            label={issuesWording().detail.deliver}
             value={props.issue.deliver}
             disabled={busy() || !s().open}
             onChange={(v) => {
               const id = props.issue.id;
               void act(() => api.issue.update({ id, body: { deliver: v as Deliverable } }));
             }}
-            options={DeliverableValues.map((v) => ({ value: v, label: deliverableLabel[v] }))}
+            options={DeliverableValues.map((v) => ({ value: v, label: wording().deliverable[v] }))}
           />
         </Property>
-        <Property label="验收">
+        <Property label={issuesWording().detail.review}>
           <Pick
-            label="验收"
+            label={issuesWording().detail.review}
             value={props.issue.review}
             disabled={busy() || !s().open}
             onChange={(v) => {
@@ -340,19 +342,19 @@ export function IssueDetail(props: {
               void act(() => api.issue.update({ id, body: { review: v as Review } }));
             }}
             options={[
-              { value: "glance", label: "看一眼就算" },
-              { value: "required", label: "必须过验收" },
+              { value: "glance", label: issuesWording().detail.glance },
+              { value: "required", label: issuesWording().detail.required },
             ]}
           />
         </Property>
       </Show>
       <More>
         <Show when={s().crewLine}>
-          <Property label="一起干活的">{s().crewLine}</Property>
+          <Property label={issuesWording().detail.crew}>{s().crewLine}</Property>
         </Show>
-        <Property label="档案">{agent()?.name ?? head().name}</Property>
+        <Property label={issuesWording().detail.profile}>{agent()?.name ?? head().name}</Property>
         <Show when={head().branch}>
-          <Property label="分支">
+          <Property label={issuesWording().detail.branch}>
             <span class="font-mono text-xs">{head().branch}</span>
           </Property>
         </Show>
@@ -363,8 +365,8 @@ export function IssueDetail(props: {
                 <span class="min-w-0 flex-1 font-mono text-xs break-all select-text">{worktree()}</span>
                 <button
                   type="button"
-                  aria-label="复制路径"
-                  title="复制路径"
+                  aria-label={issuesWording().detail.copyPath}
+                  title={issuesWording().detail.copyPath}
                   onClick={() => void navigator.clipboard?.writeText(worktree())}
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
                 >
@@ -374,9 +376,9 @@ export function IssueDetail(props: {
             </Property>
           )}
         </Show>
-        <Property label="用时">{s().usedLine(steps(), now())}</Property>
+        <Property label={issuesWording().detail.took}>{s().usedLine(steps(), now())}</Property>
         <Show when={s().resolvedFindings.length > 0}>
-          <Property label="已解决的验收意见">
+          <Property label={issuesWording().detail.resolved}>
             <For each={s().resolvedFindings}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
           </Property>
         </Show>
@@ -392,7 +394,7 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
     <div class="mt-2.5">
       <div>{props.ask.question}</div>
       <Show when={props.ask.options?.length}>
-        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={`回答：${props.ask.question}`}>
+        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={issuesWording().detail.answerTo(props.ask.question)}>
           <For each={props.ask.options}>
             {(o) => (
               <Button disabled={props.busy} onClick={() => props.onPick(o)}>
@@ -407,9 +409,9 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
 }
 
 const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: string; label: string }> = {
-  met: { icon: "mark-check", label: "它说做到了" },
-  unmet: { icon: "mark-cross", label: "它说没做到" },
-  unsure: { icon: "mark-warn", label: "它说不确定" },
+  met: { icon: "mark-check", label: issuesWording().detail.result.met },
+  unmet: { icon: "mark-cross", label: issuesWording().detail.result.unmet },
+  unsure: { icon: "mark-warn", label: issuesWording().detail.result.unsure },
 };
 
 /** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
@@ -431,13 +433,13 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             <Show when={props.checking}>
               <input
                 type="checkbox"
-                aria-label={`看过了：${r().text}`}
+                aria-label={issuesWording().detail.ticked(r().text)}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
                 class="mt-0.5 size-4 shrink-0 cursor-pointer accent-leaf"
               />
             </Show>
-            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title="它还没说" />}>
+            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title={issuesWording().detail.unsaid} />}>
               {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
             </Show>
             <span class="min-w-0 flex-1">
@@ -483,9 +485,9 @@ function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (
-    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">还没有干过活。</p>}>
+    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{issuesWording().detail.noRuns}</p>}>
       <div>
-        <div class="mb-2 text-xs text-muted">{runs().length} 次</div>
+        <div class="mb-2 text-xs text-muted">{issuesWording().detail.runCount(runs().length)}</div>
         <For each={[...runs()].reverse()}>
           {(r) => (
             <div class="flex gap-3 pb-2 text-sm">
@@ -506,19 +508,19 @@ function Runs(props: { issue: string; version: string }) {
 
 const stepsLine = (steps: SessionEvent[]) => {
   const tools = steps.filter((e) => e.type === "tool/call").length;
-  return tools === 0 ? `${steps.length} 步` : `${steps.length} 步 · 用了 ${tools} 个工具`;
+  return tools === 0 ? issuesWording().detail.stepCount(steps.length) : issuesWording().detail.stepsAndTools(steps.length, tools);
 };
 
 const stepWord: Partial<Record<SessionEvent["type"], string>> = {
-  "run/start": "开工",
-  "user/message": "听到",
-  "memory/recalled": "想起",
-  "assistant/thinking": "想",
-  "assistant/message": "说",
-  "tool/call": "用工具",
-  "llm/retry": "重试",
-  "run/error": "出错",
-  "run/end": "这一轮结束",
+  "run/start": issuesWording().detail.step["run/start"],
+  "user/message": issuesWording().detail.step["user/message"],
+  "memory/recalled": issuesWording().detail.step["memory/recalled"],
+  "assistant/thinking": issuesWording().detail.step["assistant/thinking"],
+  "assistant/message": issuesWording().detail.step["assistant/message"],
+  "tool/call": issuesWording().detail.step["tool/call"],
+  "llm/retry": issuesWording().detail.step["llm/retry"],
+  "run/error": issuesWording().detail.step["run/error"],
+  "run/end": issuesWording().detail.step["run/end"],
 };
 
 /** The session's steps, newest last; tool results and usage are left to the farm's fuller log. */
@@ -563,32 +565,32 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <Show when={props.issue.attention.state === "stuck"}>
-            <span class="text-sm text-berry">管家这一轮没答成：在频道里看它说了什么</span>
+            <span class="text-sm text-berry">{issuesWording().detail.orchestratorStuck}</span>
           </Show>
           <For each={props.issue.attention.acts}>
             {(a) => (
               <Button tone={a === props.issue.attention.lead ? "primary" : "plain"} disabled={busy()} onClick={() => void go(a)}>
-                {actLabel[a]}
+                {wording().act[a]}
               </Button>
             )}
           </For>
         </div>
       </Show>
       <div class="mt-4">
-        <Property label="谁在做">管家</Property>
+        <Property label={issuesWording().detail.who}>{issuesWording().orchestrator}</Property>
         <Show when={props.issue.description}>
-          <Property label="要做的">
+          <Property label={issuesWording().detail.job}>
             <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
         <Show when={props.issue.recurrence}>
-          <Property label="来自">定时：每次到点交给管家，答完等你看</Property>
+          <Property label={issuesWording().detail.from}>{issuesWording().detail.fromRecurrence}</Property>
         </Show>
-        <Property label="开单">{wallClockText(props.issue.createdAt)}</Property>
-        <Show when={props.issue.closedAt}>{(at) => <Property label="关单">{wallClockText(at())}</Property>}</Show>
-        <Property label="回答">在它的频道里</Property>
+        <Property label={issuesWording().detail.opened}>{wallClockText(props.issue.createdAt)}</Property>
+        <Show when={props.issue.closedAt}>{(at) => <Property label={issuesWording().detail.closedAt}>{wallClockText(at())}</Property>}</Show>
+        <Property label={issuesWording().detail.answer}>{issuesWording().detail.answered}</Property>
       </div>
-      <h2 class="mt-5 mb-2 text-sm font-semibold">每次干活</h2>
+      <h2 class="mt-5 mb-2 text-sm font-semibold">{issuesWording().detail.runs}</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
     </div>
   );
@@ -607,9 +609,9 @@ export function AnswerView(props: { answer: IssueAnswer }) {
   return (
     <div>
       <p class="text-base">{props.answer.conclusion}</p>
-      {list("依据", props.answer.evidence)}
-      {list("拿不准的", props.answer.unsure)}
-      {list("建议接着做", props.answer.next)}
+      {list(issuesWording().detail.evidence, props.answer.evidence)}
+      {list(issuesWording().detail.unsure, props.answer.unsure)}
+      {list(issuesWording().detail.next, props.answer.next)}
     </div>
   );
 }

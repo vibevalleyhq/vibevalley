@@ -1,6 +1,8 @@
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/host); nothing of Electron or Node reaches it otherwise.
 
+import { currentLocale, setLocale } from "@vibevalley/protocol/words";
+import { desktopWording, followSavedLocale } from "./words";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -11,9 +13,11 @@ import { loginShellPath, type RunningServer, startServer } from "./server";
 
 // In the repository the server is apps/server, the page apps/web/dist and the island apps/island's release build
 // (scripts/build.ts); a packaged app has them in its resources (server/, web/, island/).
+const home = process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
+followSavedLocale(home);
+
 const files = () => {
   const repo = join(app.getAppPath(), "..");
-  const home = process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
   return {
     server: app.isPackaged ? join(process.resourcesPath, "server") : join(repo, "server"),
     web: app.isPackaged ? join(process.resourcesPath, "web") : join(repo, "web", "dist"),
@@ -79,9 +83,14 @@ const loaded = (load: Promise<void>) =>
     if ((e as { errno?: number }).errno !== -3) console.error("vibevalley: the window could not load its page:", e);
   });
 
+/** The bar's load. Why the server did not come up waits for it: a load that cuts off the window's first one can leave
+ * the window without a page for a moment, and a server that fails at once would do that every time. */
+let bar: Promise<void> = Promise.resolve();
+
 /** The bar while the server comes up (apps/web public/opening.html, from the app's files), or why it did not. */
 function opening(problem?: string) {
-  void loaded(windowNow().loadFile(join(files().web, "opening.html"), problem ? { query: { problem } } : {}));
+  const load = () => loaded(windowNow().loadFile(join(files().web, "opening.html"), { query: { locale: currentLocale(), ...(problem ? { problem } : {}) } }));
+  bar = problem ? bar.then(load) : load();
 }
 
 function open(url: string) {
@@ -103,6 +112,8 @@ ipcMain.handle("host:notify", (_event, notice: Notice) => {
   if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
 });
 
+ipcMain.handle("host:locale", (_event, locale: string) => setLocale(locale === "en" ? "en" : "zh"));
+
 // The farm at a glance in the menu bar: the page says what (Follow.tsx); a click on a line brings the window up.
 let tray: Tray | undefined;
 ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
@@ -122,8 +133,8 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
     Menu.buildFromTemplate([
       ...summary.lines.map((label) => ({ label, click: show })),
       { type: "separator" },
-      { label: "打开农场", click: show },
-      { label: "退出", role: "quit" },
+      { label: desktopWording().open, click: show },
+      { label: desktopWording().quit, role: "quit" },
     ]),
   );
 });
@@ -155,7 +166,7 @@ if (!app.requestSingleInstanceLock()) {
       const why = e instanceof Error ? e.message : String(e);
       // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
       if (!window) {
-        dialog.showErrorBox("VibeValley 起不来", why);
+        dialog.showErrorBox(desktopWording().cannotStart, why);
         app.exit(1);
         return;
       }

@@ -7,6 +7,7 @@
 // speaks plain HTTP: a key can be overheard on the network it is open on. What it lets through it hands to the loopback
 // server, saying which device asks.
 
+import { lanWording } from "./words.ts";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { hostname, networkInterfaces } from "node:os";
@@ -89,7 +90,7 @@ export function lanAddress(): string {
   return best;
 }
 
-const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || "一台设备";
+const deviceName = (name: string) => [...name.split(/\s+/).filter(Boolean).join(" ")].slice(0, 40).join("") || lanWording().aDevice;
 
 /** The page's pairing route on the listener; a phone's camera opens it in the browser. */
 export const pairLink = (url: string, code: string) => url + "/pair?c=" + encodeURIComponent(code);
@@ -163,7 +164,7 @@ export const make = (options: LanOptions = {}) =>
     // forget and its dry run judge by this.
     const known = (id: string) => {
       const d = devices.get(id);
-      return d ? Effect.succeed(d) : Effect.fail(missing(`没有 ${id} 这台设备`, [lookIn.device]));
+      return d ? Effect.succeed(d) : Effect.fail(missing(lanWording().noDevice(id), [lookIn.device]));
     };
     const dropPairing = () => {
       pairing?.answer?.(false);
@@ -221,7 +222,7 @@ export const make = (options: LanOptions = {}) =>
       const done = new AbortController();
       res.on("close", () => done.abort());
       const go = async () => {
-        if (!upstream) return refuseHttp(res, 503, "VibeValley 还没起来");
+        if (!upstream) return refuseHttp(res, 503, lanWording().notUp);
         if (req.method === "POST" && path === "/api/v1/lan/pair") return forward(req, res, "", done.signal);
         if (!path.startsWith("/api/v1/")) {
           if ((req.method === "GET" || req.method === "HEAD") && path !== "/mcp" && !path.startsWith("/mcp/")) return forward(req, res, "", done.signal);
@@ -229,8 +230,8 @@ export const make = (options: LanOptions = {}) =>
           return void res.end("404 page not found\n");
         }
         const d = deviceOf(req);
-        if (!d) return refuseHttp(res, 401, "这台设备没配对，或者已经被主人移除了：回那台电脑上扫码配对");
-        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, "连进来的设备不能做这个：只能在跑着 VibeValley 的那台电脑上做");
+        if (!d) return refuseHttp(res, 401, lanWording().unpaired);
+        if (!remoteMay(req.method ?? "GET", path)) return refuseHttp(res, 403, lanWording().notRemote);
         const mine = conns.get(d) ?? new Set();
         conns.set(d, mine);
         mine.add(done);
@@ -241,7 +242,7 @@ export const make = (options: LanOptions = {}) =>
         }
       };
       go().catch(() => {
-        if (!res.headersSent) refuseHttp(res, 502, "转不过去");
+        if (!res.headersSent) refuseHttp(res, 502, lanWording().badGateway);
         else res.end();
       });
     };
@@ -252,7 +253,7 @@ export const make = (options: LanOptions = {}) =>
         if (server) return resolve();
         const s = createServer(guard);
         s.once("error", (e) => {
-          problem = "连接开不起来：" + e.message;
+          problem = lanWording().cannotOpen(e.message);
           logs.error(`vibevalley: lan access cannot listen on port ${config.lan.port}:`, e.message);
           resolve();
         });
@@ -281,7 +282,7 @@ export const make = (options: LanOptions = {}) =>
       if (problem) s.problem = problem;
       const addr = url();
       if (open && server) {
-        if (!addr) s.problem = "找不到这台电脑在局域网里的地址：连上 Wi-Fi 或网线再试";
+        if (!addr) s.problem = lanWording().noAddress;
         else s.url = addr;
       }
       const p = livePairing();
@@ -316,8 +317,8 @@ export const make = (options: LanOptions = {}) =>
       }, opening.withPermits(1)),
       startPairing: () =>
         Effect.suspend(() => {
-          if (!open || !server) return Effect.fail(refuse("还没允许连接：先打开它"));
-          if (!url()) return Effect.fail(refuse("找不到这台电脑在局域网里的地址：连上 Wi-Fi 或网线再试"));
+          if (!open || !server) return Effect.fail(refuse(lanWording().notOpen));
+          if (!url()) return Effect.fail(refuse(lanWording().noAddress));
           dropPairing();
           pairing = { code: newCode(10), expires: now() + pairingForMs, asking: "", wrong: 0 };
           return Effect.succeed(status());
@@ -329,7 +330,7 @@ export const make = (options: LanOptions = {}) =>
       answer: (allow) =>
         Effect.suspend(() => {
           const p = livePairing();
-          if (!p || !p.asking) return Effect.fail(refuse("没有设备在等你点头"));
+          if (!p || !p.asking) return Effect.fail(refuse(lanWording().noneAsking));
           const answer = p.answer;
           pairing = undefined;
           answer?.(allow);
@@ -338,14 +339,14 @@ export const make = (options: LanOptions = {}) =>
       pair: Effect.fn("Lan.pair")(function* (code, given) {
         const name = deviceName(given);
         const p = livePairing();
-        if (!open) return yield* Effect.fail(refuse("那台电脑没允许连接：回那台电脑的「连接到本机」打开它"));
-        if (!p) return yield* Effect.fail(refuse("配对码过期了：回那台电脑上换一个码"));
+        if (!open) return yield* Effect.fail(refuse(lanWording().closedThere));
+        if (!p) return yield* Effect.fail(refuse(lanWording().codeExpired));
         if (!same(code.trim().toUpperCase(), p.code)) {
           p.wrong++;
           if (p.wrong >= wrongTries) dropPairing();
-          return yield* Effect.fail(refuse("配对码不对"));
+          return yield* Effect.fail(refuse(lanWording().wrongCode));
         }
-        if (p.asking) return yield* Effect.fail(refuse("另一台设备正在等主人点头：等一会儿再试"));
+        if (p.asking) return yield* Effect.fail(refuse(lanWording().anotherAsking));
         p.asking = name;
         p.expires = now() + pairingForMs;
         logs.info(`vibevalley: lan access: "${name}" questions to pair`);
@@ -359,15 +360,15 @@ export const make = (options: LanOptions = {}) =>
         }).pipe(Effect.timeoutOption(pairingForMs), Effect.map(Option.getOrElse(() => "late" as const)));
         if (allow === "late") {
           if (pairing === p) pairing = undefined;
-          return yield* Effect.fail(refuse("主人没来得及点头，配对码过期了：回那台电脑上换一个码"));
+          return yield* Effect.fail(refuse(lanWording().ownerLate));
         }
-        if (!allow) return yield* Effect.fail(refuse("主人没让这台设备进来"));
+        if (!allow) return yield* Effect.fail(refuse(lanWording().denied));
         return yield* addDevice(name);
       }),
       previewStopPairing: () => {
         const p = livePairing();
-        if (!p) return { does: ["没有在配对的码：什么都不会动"] };
-        return { does: [`收起配对码 ${p.code}`, ...(p.asking ? [`正在等你点头的「${p.asking}」连不进来`] : [])] };
+        if (!p) return { does: [lanWording().noCode] };
+        return { does: [lanWording().dropCode(p.code), ...(p.asking ? [lanWording().dropAsking(p.asking)] : [])] };
       },
       forget: Effect.fn("Lan.forget")(function* (id) {
         yield* known(id);
@@ -380,11 +381,11 @@ export const make = (options: LanOptions = {}) =>
       previewForget: (id) =>
         Effect.map(known(id), (d) => {
           const open = conns.get(id)?.size ?? 0;
-          return { does: [`忘掉设备「${d.name}」：它的钥匙作废，要再连得重新配对`, ...(open > 0 ? [`断开它连着的 ${open} 条连接`] : [])] };
+          return { does: [lanWording().forget(d.name), ...(open > 0 ? [lanWording().cut(open)] : [])] };
         }),
       me: (device) => {
         const d = device ? devices.get(device) : undefined;
-        if (!d) return Effect.fail(refuse("这里就是跑着 VibeValley 的本机，不是连进来的设备"));
+        if (!d) return Effect.fail(refuse(lanWording().local));
         const { keyHash: _, written: __, ...shown } = d;
         return Effect.succeed(shown);
       },

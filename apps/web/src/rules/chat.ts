@@ -1,12 +1,13 @@
 // The chat's words: channels and threads, feeds and unread counts, names to @, the clocks, money (spentText) and a
 // helper's phase. Nothing here folds facts: it only reads the chat the server sent.
 
+import { wording } from "@vibevalley/protocol/words";
+import { rulesWording } from "./words";
 import {
   type Chat,
   type ChatMessage,
   type Conversation,
   everyone,
-  generalName,
   type Issue,
   orchestratorAgent,
   ownerId,
@@ -37,10 +38,10 @@ export function channelOf(chat: Chat | undefined, c: Conversation | undefined) {
   return conversationOf(chat, c.channel) ?? generalOf(chat);
 }
 
-export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : generalName);
+export const channelName = (c: Conversation | undefined) => (c?.kind === "channel" ? (c.name ?? "") : wording().general);
 
-/** A channel as it is said in a line: #name, the general one 田头. */
-export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : generalName);
+/** A channel as it is said in a line: #name, the general one by its label (田头, Farm chat). */
+export const channelLabel = (c: Conversation | undefined) => (c?.kind === "channel" ? `#${c.name ?? ""}` : wording().general);
 
 /** Where the page shows a conversation: the general is /chat. */
 export const chatPath = (c: Conversation | undefined) => (!c || c.kind === "general" ? "/chat" : `/chat/${c.id}`);
@@ -84,19 +85,19 @@ export function threadTitle(chat: Chat | undefined, thread: Conversation, issues
   switch (thread.subjectKind) {
     case "issue": {
       const issue = issues.find((i) => i.id === thread.subjectId);
-      return issue ? head(issue.title) : "工单串";
+      return issue ? head(issue.title) : rulesWording().chat.issueThread;
     }
     case "graph":
-      return `计划 ${thread.subjectId ?? ""}`;
+      return rulesWording().chat.planThread(thread.subjectId ?? "");
     case "talk":
     case undefined: {
       if (thread.subjectKind === "talk" && thread.subjectId) {
         const session = sessions.find((h) => h.id === thread.subjectId);
         const said = messagesIn(chat, thread.id).find((m) => m.from === thread.subjectId)?.name;
-        return `${session?.name ?? said ?? thread.subjectId}的串`;
+        return rulesWording().chat.talkThread(session?.name ?? said ?? thread.subjectId ?? "");
       }
       const parent = parentOf(chat, thread);
-      return parent ? head(parent.text) : "串";
+      return parent ? head(parent.text) : rulesWording().chat.thread;
     }
   }
 }
@@ -194,28 +195,29 @@ const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.g
 
 function dayLabel(at: number, now = new Date()) {
   const d = new Date(Math.round(at));
-  if (sameDay(d, now)) return "今天";
+  if (sameDay(d, now)) return rulesWording().time.today;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (sameDay(d, yesterday)) return "昨天";
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
+  if (sameDay(d, yesterday)) return rulesWording().time.yesterday;
+  return rulesWording().time.monthDay(d.getMonth() + 1, d.getDate());
 }
 
-/** zh-CN, 12-hour, two digits: 下午03:07. */
+/** 12-hour, two digits: 下午03:07, 03:07 PM. */
 export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
-  return `${d.getHours() < 12 ? "上午" : "下午"}${String(h12).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return rulesWording().time.clock(d.getHours() < 12, String(h12).padStart(2, "0"), String(d.getMinutes()).padStart(2, "0"));
 }
 
 // The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
-export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? "不到 ¥0.01" : `¥${cny.toFixed(2)}`);
+export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? rulesWording().money.underCent : `¥${cny.toFixed(2)}`);
 
-const wan = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(n >= 100000 ? 0 : 1)} 万` : `${Math.round(n)}`);
+const wan = (n: number) => (n >= 10000 ? rulesWording().big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
 
-export const spentText = (spent: Spent) => [...(spent.cny !== undefined ? [`约 ${yuan(spent.cny)}`] : []), `${wan(spent.tokens)} token`].join(" · ");
+export const spentText = (spent: Spent) =>
+  [...(spent.cny !== undefined ? [rulesWording().money.about(yuan(spent.cny))] : []), `${wan(spent.tokens)} token`].join(" · ");
 
-const span = (ms: number) => (ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} 秒` : `${Math.round(ms / 60000)} 分钟`);
+const span = (ms: number) => wording().span(ms);
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: Session, now: number) {
@@ -265,7 +267,11 @@ export function roleShort(role: string) {
   return first.length > 18 ? first.slice(0, 18) : first;
 }
 
-export const mentionOf: Record<string, string> = { [orchestratorAgent]: "@管家", [ownerId]: "@主人", [everyone]: "@所有人" };
+export const mentionOf: Record<string, string> = {
+  [orchestratorAgent]: rulesWording().chat.mention.orchestrator,
+  [ownerId]: rulesWording().chat.mention.owner,
+  [everyone]: rulesWording().chat.mention.everyone,
+};
 
 export interface Nameable {
   token: string;
@@ -279,8 +285,8 @@ export const menuMax = 6;
 /** Everyone only when there is more than one helper. */
 export const nameables = (sessions: Session[], now: number): Nameable[] => [
   ...sessions.map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  { token: mentionOf[orchestratorAgent]!, name: "管家", note: "派活、拆计划、问进度" },
-  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: "所有人", note: "叫醒在场的每个帮工" }] : []),
+  { token: mentionOf[orchestratorAgent]!, name: rulesWording().card.orchestrator, note: rulesWording().chat.orchestratorNote },
+  ...(sessions.length > 1 ? [{ token: mentionOf[everyone]!, name: rulesWording().chat.everyone, note: rulesWording().chat.everyoneNote }] : []),
 ];
 
 const typed = /(^|[^\p{L}\p{N}_@])@([\p{L}\p{N}_]*)$/u;

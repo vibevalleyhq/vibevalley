@@ -1,24 +1,20 @@
 // A task graph's own rules: reading one from a splitter's answer, editing its steps, what
 // each step is told, and which steps start.
 
+import { taskWording } from "./words.ts";
 import {
-  type Agent,
   type WorkspaceState,
   type GraphEvent,
   type GraphState,
   type Issue,
-  type Session,
   type Task,
   type TaskEdit,
   type TaskGraph,
   type IssueId,
 } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
-import { isForOrchestrator } from "../issue/state.ts";
-import { slice } from "../base/text.ts";
-import { blockedBy, canEditTask, canRemoveTask, graphProblems, graphStateText, isAcceptance, isSettled, maxTasks, taskOf, taskStateText } from "./graph.ts";
+import { blockedBy, canEditTask, canRemoveTask, graphProblems, isAcceptance, isSettled, taskOf } from "./graph.ts";
 import { graphFrom } from "./issues.ts";
-import { traitsOf } from "../agent/agent.ts";
 
 /** The farm's limits come on top. */
 export function startable(graph: TaskGraph): Task[] {
@@ -28,7 +24,7 @@ export function startable(graph: TaskGraph): Task[] {
 
 export const allSettled = (graph: TaskGraph) => graph.tasks.length > 0 && graph.tasks.every(isSettled);
 
-function frozenOf(graph: TaskGraph, task: Task): string[] {
+export function frozenOf(graph: TaskGraph, task: Task): string[] {
   const out: string[] = [];
   for (const n of acceptancesOf(graph, task)) for (const f of n.frozen ?? []) if (!out.includes(f)) out.push(f);
   return out;
@@ -85,29 +81,29 @@ function parseJson(body: string): unknown {
 
 /** Optional fields may be missing but never null; other keys are ignored. */
 function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } | string {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return "要一个对象";
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return taskWording().parse.object;
   const obj = raw as Record<string, unknown>;
   let title: string | undefined;
   if ("title" in obj) {
-    if (typeof obj.title !== "string") return `["title"] 要是字符串`;
+    if (typeof obj.title !== "string") return taskWording().parse.string(`["title"]`);
     title = obj.title;
   }
-  if (!Array.isArray(obj.tasks)) return `["tasks"] 要是数组`;
+  if (!Array.isArray(obj.tasks)) return taskWording().parse.array(`["tasks"]`);
   const tasks: StepDraft[] = [];
   for (const [i, item] of obj.tasks.entries()) {
     const at = `["tasks"][${i}]`;
-    if (typeof item !== "object" || item === null || Array.isArray(item)) return at + " 要是对象";
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return taskWording().parse.stepObject(at);
     const o = item as Record<string, unknown>;
     const text = (key: string, required: boolean): string | undefined | { problem: string } => {
-      if (!(key in o)) return required ? { problem: `${at}["${key}"] 缺了` } : undefined;
-      return typeof o[key] === "string" ? o[key] : { problem: `${at}["${key}"] 要是字符串` };
+      if (!(key in o)) return required ? { problem: taskWording().parse.missing(`${at}["${key}"]`) } : undefined;
+      return typeof o[key] === "string" ? o[key] : { problem: taskWording().parse.string(`${at}["${key}"]`) };
     };
     const texts = (key: string): string[] | undefined | { problem: string } => {
       if (!(key in o)) return undefined;
       const a = o[key];
-      if (!Array.isArray(a)) return { problem: `${at}["${key}"] 要是数组` };
+      if (!Array.isArray(a)) return { problem: taskWording().parse.array(`${at}["${key}"]`) };
       const bad = a.findIndex((x) => typeof x !== "string");
-      return bad >= 0 ? { problem: `${at}["${key}"][${bad}] 要是字符串` } : (a as string[]);
+      return bad >= 0 ? { problem: taskWording().parse.string(`${at}["${key}"][${bad}]`) } : (a as string[]);
     };
     const step: Record<string, unknown> = {};
     for (const [key, read] of [
@@ -124,7 +120,7 @@ function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } 
       if (v !== undefined) step[key] = v;
     }
     if ("acceptance" in o) {
-      if (typeof o.acceptance !== "boolean") return at + `["acceptance"] 要是布尔值`;
+      if (typeof o.acceptance !== "boolean") return taskWording().parse.boolean(at + `["acceptance"]`);
       step.acceptance = o.acceptance;
     }
     tasks.push(step as unknown as StepDraft);
@@ -134,19 +130,19 @@ function decodeSplitDraft(raw: unknown): { title?: string; tasks: StepDraft[] } 
 
 export function parseSplit(text: string): ParsedSplit {
   const blocks = [...text.matchAll(taskBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { ok: false, problems: ["没找到计划：要用一个 json 代码块给出"] };
+  if (blocks.length === 0) return { ok: false, problems: [taskWording().parse.noBlock] };
   let last = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let raw: unknown;
     try {
       raw = parseJson(blocks[i]!);
     } catch (e) {
-      last = "json 读不了：" + (e as Error).message;
+      last = taskWording().parse.unreadable((e as Error).message);
       continue;
     }
     const draft = decodeSplitDraft(raw);
     if (typeof draft === "string") {
-      last = "计划的格式不对：" + draft;
+      last = taskWording().parse.shape(draft);
       continue;
     }
     const tasks = draft.tasks.map(freshTask);
@@ -171,7 +167,9 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
   if (!canEditTask(graph, task))
     return {
       ok: false,
-      problem: task ? "「" + task.title + "」" + taskStateText[task.state] + "，不能改了" : "计划" + graphStateText[graph.state] + "，不能加步骤了",
+      problem: task
+        ? taskWording().edit.taskSettled(task.title, taskWording().taskState[task.state])
+        : taskWording().edit.graphSettled(taskWording().graphState[graph.state]),
     };
   const base: Task = task ?? { id, title: id, brief: "", needs: [], state: "waiting", tries: 0 };
   const agent = edit.agent !== undefined ? edit.agent.trim() : base.agent;
@@ -193,60 +191,10 @@ export function editTask(graph: TaskGraph, id: string, edit: TaskEdit): EditResu
 
 export function removeTask(graph: TaskGraph, id: string): EditResult {
   const task = taskOf(graph, id);
-  if (!task) return { ok: false, problem: "计划里没有「" + id + "」这一步" };
-  if (!canRemoveTask(graph, task)) return { ok: false, problem: "「" + task.title + "」" + taskStateText[task.state] + "，不能删了：可以跳过它" };
+  if (!task) return { ok: false, problem: taskWording().edit.noStep(id) };
+  if (!canRemoveTask(graph, task)) return { ok: false, problem: taskWording().edit.cannotRemove(task.title, taskWording().taskState[task.state]) };
   return checked({ ...graph, tasks: graph.tasks.filter((n) => n.id !== id).map((n) => ({ ...n, needs: n.needs.filter((x) => x !== id) })) });
 }
-
-/** What a step's session is told: the task graph, its job, what came before it, and how it is judged. */
-export function taskBrief(graph: TaskGraph, task: Task): string {
-  const index = graph.tasks.findIndex((n) => n.id === task.id) + 1;
-  const lines = [
-    `这是计划「${graph.title}」里的一步：${task.title}（步骤 ${task.id}，第 ${index}/${graph.tasks.length} 步）。`,
-    "整个计划要做的：" + graph.goal,
-    "",
-    "你这一步的工单：",
-    task.brief,
-  ];
-  if (task.scope && task.scope.length > 0) lines.push("", "只改这些地方：" + task.scope.join("、") + "。别的步骤可能同时在改别处。");
-  const before = task.needs.flatMap((id) => {
-    const n = taskOf(graph, id);
-    return n ? [n] : [];
-  });
-  if (before.length > 0) {
-    lines.push("", "前面已经做完、合进你分支里的步骤：");
-    for (const n of before) {
-      const commits = n.commits && n.commits.length > 0 ? "（" + n.commits.join("、") + "）" : "";
-      const said = n.state === "skipped" ? "跳过了，没有做" : (n.conclusion ?? "做完了");
-      lines.push("- " + n.title + commits + "：" + said);
-    }
-  }
-  if (isAcceptance(task)) {
-    lines.push(
-      "",
-      "这是一步验收：只写能复现问题、或说明要做成什么样的测试，不要去修、去实现。",
-      "做完以后会在你的分支上跑 `" + (task.check ?? "") + "`，它这时要**不通过**：通过了就说明它没抓住问题。",
-      "你留下的文件会冻结，后面的步骤不能改；收尾的那步要让它通过。",
-    );
-  } else if (task.check) lines.push("", "做完以后会在你的分支上跑 `" + task.check + "`，要能通过。");
-  const frozen = frozenOf(graph, task);
-  if (frozen.length > 0) lines.push("", "前面的验收留下的这些文件是冻结的，不能改：" + frozen.join("、") + "。验收不过就改代码，不改验收。");
-  const checks = acceptanceChecks(graph, task);
-  if (checks.length > 0) lines.push("", "你是收尾的一步：做完以后还会跑前面的验收，要能通过：" + checks.map((c) => "`" + c + "`").join("、") + "。");
-  lines.push("", "做完提交。VibeValley 会把你的分支合回计划分支，给后面的步骤用；结论里写清楚你留下了什么（接口、文件位置），后面的步骤要接着用。");
-  return lines.join("\n");
-}
-
-export const checkFailedText = (check: string, output: string) =>
-  "做完以后跑 `" + check + "` 没通过，输出的结尾：\n" + (output.trim() || "（没有输出）") + "\n\n修好，再提交。";
-
-export const acceptancePassedText = (check: string) =>
-  "验收写好了，可 `" + check + "` 现在就通过了：它没抓住要修的问题，或要做的事。改成现在会失败的验收，再提交；别去修问题本身。";
-
-export const frozenTouchedText = (files: readonly string[]) =>
-  "你改了前面的验收留下的文件：" + files.join("、") + "。验收是冻结的：把它们恢复成计划分支上的样子，从代码上修，再提交。";
-
-export const retryText = (task: Task) => "上一轮没做成。看一下报错，接着把这一步做完：" + task.title + "。";
 
 export const changeOf = (e: GraphEvent) => ({
   graph: e.graph,
@@ -257,21 +205,6 @@ export const changeOf = (e: GraphEvent) => ({
   ...(e.changes !== undefined ? { changes: e.changes } : {}),
   ...(e.commits !== undefined ? { commits: e.commits } : {}),
 });
-
-/** Only the helper an issue was last sent to splits it, and only while it is a plain open issue. */
-export function issueSplitRefusal(session: Session | undefined, issue: Issue | undefined): string {
-  if (!session) return "你已经不在场了";
-  if (session.graph) return "你在做计划里的一步：这一步不能再拆，太大就在结论里说，让主人改计划";
-  if (!issue) return "你手上没有工单：只有工单能拆";
-  if (session.refining) return "你在起草这张工单，还没开工：把要拆的想法写进草稿";
-  if (issue.graph || issue.task) return "这张工单已经是计划了";
-  if (issue.closedAt !== undefined) return "这张工单已经关了";
-  if (isForOrchestrator(issue)) return "这是派给管家的工单";
-  if (!issue.project) return "这张工单没有项目，没法开分支";
-  if (issue.sessions.length === 0 || issue.sessions.at(-1) !== session.id) return "这张工单现在不归你做";
-  if (!session.branch) return "你直接在项目里干活，没有自己的分支：拆了没处开计划的分支";
-  return "";
-}
 
 export const taskIssueID = (graph: string, key: string): IssueId => issueId(graph + "." + key);
 
@@ -397,71 +330,4 @@ export function acceptanceChecks(graph: TaskGraph, task: Task): string[] {
   if (!isLast(graph, task)) return out;
   for (const n of acceptancesOf(graph, task)) if (n.check && !out.includes(n.check) && n.check !== task.check) out.push(n.check);
   return out;
-}
-
-export function graphText(graph: TaskGraph): string {
-  const tasks = graph.tasks ?? [];
-  const merged = tasks.filter(isSettled).length;
-  let head = "「" + graph.title + "」（" + graph.id + "，项目 " + graph.project;
-  if (graph.branch) head += "，分支 " + graph.branch;
-  head += "）：" + graphStateText[graph.state];
-  if (tasks.length > 0) head += `，${merged}/${tasks.length} 步做完`;
-  if (graph.note) head += "。" + graph.note;
-  const lines = [head];
-  for (const n of tasks) {
-    let detail = taskStateText[n.state];
-    if (n.state === "waiting") {
-      const waits = blockedBy(graph, n);
-      if (waits.length > 0) detail = "等 " + waits.join("、");
-    }
-    let line = "  - " + n.id + " " + n.title + (isAcceptance(n) ? "（验收）" : "") + "：" + detail;
-    if (n.session) line += "（帮工 " + n.session + "）";
-    if (n.conclusion) line += "；" + slice(n.conclusion, 0, 80);
-    lines.push(line);
-  }
-  return lines.join("\n");
-}
-
-/** What a splitter is told: split goal into a task graph, as JSON, for the profiles there are. */
-export function splitBrief(goal: string, project: string, agents: readonly Agent[]): string {
-  const agent = agents[0]?.id ?? "lab";
-  const example = {
-    title: "按月查询打卡记录",
-    tasks: [
-      { id: "accept", title: "验收", brief: "……", needs: [], scope: ["test/month.test.ts"], check: "pnpm test test/month.test.ts", acceptance: true },
-      { id: "schema", title: "数据层", brief: "……", needs: ["accept"], scope: ["src/db"], check: "pnpm test" },
-      { id: "api", title: "查询接口", brief: "……", needs: ["schema"], agent, scope: ["src/api"], check: "pnpm test" },
-    ],
-  };
-  const lines = [
-    "这一轮你是规划师：把下面这件事拆成一张计划，交给几个帮工分头去做。你自己不写代码、不改文件、不提交。",
-    "",
-    "要做的事：" + goal.trim(),
-    `项目：${project}（你现在就在它的目录里）`,
-    "",
-    "先读代码，弄清现状，再拆。拆的规矩：",
-    `- 最多 ${maxTasks} 步，一般三到六步。一步是一个帮工在自己的分支上能做完、提交、单独验证的一件事，不要拆得太碎。`,
-    "- brief 是这一步的工单，写清：目标、要改哪里、做到什么程度算完、要留下什么给后面的步骤（接口签名、文件位置、数据格式）。帮工只看得到它自己这一步的工单和前面步骤的结论。",
-    "- needs 写这一步要等哪些步骤做完。不互相依赖的步骤会同时做：尽量让它们改不同的文件，写在 scope 里。",
-    "- 别拆成一条串行的长链（每一步都等上一步，就只能一个一个做）。有先后的按阶段分组，同一阶段里的步骤互不依赖。",
-    "- 项目里有测试或构建命令的，写进 check（比如 pnpm test），这一步做完会在它的分支上跑，过了才合。",
-    "- 修 bug，或要做的事能用测试说清楚的：第一步写验收（acceptance: true）。它只写现在会失败的测试（复现 bug，或说明做成什么样），不修、不实现；check 写只跑这些测试的命令，要因为问题本身失败，不能因为写错、编译不过失败。别的步骤都等它。它合进去以后就冻结了，后面的步骤不能改它，最后一步要让它通过。",
-    "- 最后放一步整体验证：跑全部测试、修小问题、补文档，写一段总结。",
-    "- id 用简短的英文小写单词，比如 schema、api、ui。",
-  ];
-  if (agents.length > 0) {
-    lines.push("- 能派的帮工（agent 填 id；不填就按「适合的活」挑）：");
-    for (const a of agents) {
-      lines.push(`  - ${a.id}：${a.name}，${traitsOf(a)}`);
-    }
-  }
-  lines.push(
-    "",
-    "汇报的最后，用一个 json 代码块给出整张计划，格式照这个：",
-    "```json",
-    JSON.stringify(example, null, 2),
-    "```",
-    "代码块之后写一句结论：拆成了几步、为什么这样拆。",
-  );
-  return lines.join("\n");
 }

@@ -1,28 +1,7 @@
 // What a session is doing and what it waits on.
 
-import type { Conflict, Outcome, Retry, Session, SessionAction } from "../shapes";
-
-/** What each action is, in words. */
-export const actionText: Readonly<Record<SessionAction, string>> = {
-  run_command: "跑命令",
-  read_file: "读文件",
-  edit_file: "改文件",
-  search: "搜索",
-  web: "查网页",
-  mcp: "调 MCP 工具",
-  wait: "等待",
-  other: "用工具",
-  thinking: "思考",
-  speaking_text: "写汇报",
-  none: "",
-};
-
-/** How a round ended. */
-export const outcomeLabel: Readonly<Record<Outcome, string>> = {
-  completed: "做完了",
-  failed: "没做成",
-  interrupted: "停在半路",
-};
+import type { Conflict, Retry, Session } from "../shapes";
+import { wording } from "../words";
 
 /** It takes one of the places for those working at once. */
 export const isBusy = (h: Session) => h.phase._tag === "arriving" || h.phase._tag === "working";
@@ -66,44 +45,38 @@ export function needOf(h: Session): Need | undefined {
   }
 }
 
-const span = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} 秒` : `${Math.round(ms / 60_000)} 分钟`);
-
 /** The span placeholder in phaseWords. */
 const phaseSpan = "{span}";
 
 /** phaseWords as said at now. */
 export function phaseText(h: Session, now: number): string {
-  const words = phaseWords(h);
+  const said = phaseWords(h);
   const need = needOf(h);
-  return need?.kind === "quiet" ? words.replaceAll(phaseSpan, span(now - need.since)) : words;
+  return need?.kind === "quiet" ? said.replaceAll(phaseSpan, wording().span(now - need.since)) : said;
 }
 
 /** What a session is doing in words, how long it has been quiet left as {span}. */
 export function phaseWords(h: Session): string {
+  const w = wording();
   const need = needOf(h);
-  const conflict = need?.kind === "conflict" ? `，合进 ${need.conflict.base} 会冲突（${(need.conflict.files ?? []).join("、")}）` : "";
+  const conflict = need?.kind === "conflict" ? w.phase.conflict(need.conflict.base, need.conflict.files ?? []) : "";
   const p = h.phase;
   switch (p._tag) {
     case "arriving":
-      return "刚派出去，正在开工";
+      return w.phase.arriving;
     case "working": {
-      let what = "在" + (actionText[p.doing.action] ?? "");
-      if (p.doing.label !== "") what += "：" + p.doing.label;
-      if (need?.kind === "quiet") return what + "（已经 " + phaseSpan + "没动静了）";
-      if (need?.kind === "retrying") {
-        const of = need.retry.of ? `/${need.retry.of}` : "";
-        return `${what}（模型调用失败，在重试第 ${need.retry.attempt}${of} 次）`;
-      }
+      const what = w.phase.working(w.action[p.doing.action] ?? "", p.doing.label);
+      if (need?.kind === "quiet") return w.phase.quiet(what, phaseSpan);
+      if (need?.kind === "retrying") return w.phase.retrying(what, need.retry.attempt, need.retry.of);
       return what;
     }
     case "done":
-      return "这一轮做完了，等你看" + conflict;
+      return w.phase.done(conflict);
     case "failed":
-      return "这一轮没做成";
+      return w.phase.failed;
     case "resting": {
       const outcome = h.lastRun?.outcome;
-      const last = outcome === undefined ? "没做完" : outcomeLabel[outcome];
-      return "歇着（上一轮" + last + "）" + conflict;
+      return w.phase.resting(outcome === undefined ? w.phase.unfinished : w.outcome[outcome], conflict);
     }
     default:
       return "";

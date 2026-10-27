@@ -1,5 +1,6 @@
 // Harvesting a helper's plot and the warehouse of what was harvested; the checklist's rules are src/rules/issueState.ts.
 
+import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";
 
 import type { Changes, Session } from "@vibevalley/protocol";
@@ -33,14 +34,17 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
         {(error) => (
           <div class="flex flex-col items-start gap-3">
             <Tinted color={tint("#c84a3a", 0.12)}>
-              <p class="text-[13px] text-berry">看不了改动：{reasonOf(error())}</p>
+              <p class="text-[13px] text-berry">
+                {farmWording().graph.unreadable}
+                {reasonOf(error())}
+              </p>
             </Tinted>
-            <PxButton onClick={() => props.onDone()}>先不收</PxButton>
+            <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
           </div>
         )}
       </Match>
       <Match when={true}>
-        <p class="py-10 text-center text-[13px] text-bark-600">正在看它改了什么…</p>
+        <p class="py-10 text-center text-[13px] text-bark-600">{farmWording().harvest.reading}</p>
       </Match>
     </Switch>
   );
@@ -66,13 +70,11 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
   return (
     <div class="flex flex-col">
       <div class="flex flex-wrap items-center gap-1.5">
-        <FarmTag text={`项目 ${props.changes.project}`} fill="#a5743f" ink="#f7e8c4" />
+        <FarmTag text={farmWording().harvest.project(props.changes.project)} fill="#a5743f" ink="#f7e8c4" />
         <Show when={props.changes.branch}>
           <FarmTag text={`${props.changes.branch} → ${props.changes.base}`} ink="#46301d" />
         </Show>
-        <span class={xs}>
-          {props.changes.commits.length} 个提交 · {props.changes.files.length} 个文件
-        </span>
+        <span class={xs}>{farmWording().harvest.counts(props.changes.commits.length, props.changes.files.length)}</span>
         <Show when={props.changes.files.length > 0}>
           <PlusMinus added={counts()[0]} removed={counts()[1]} />
         </Show>
@@ -82,27 +84,25 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         fallback={
           <Show when={empty()}>
             <Tinted class="mt-3">
-              <p class="text-[13px] text-bark-600">这一单没有改动。收获就是请它收工。</p>
+              <p class="text-[13px] text-bark-600">{farmWording().harvest.none}</p>
             </Tinted>
           </Show>
         }
       >
         <Tinted color={tint("#c84a3a", 0.12)} class="mt-3 py-2.5">
-          <p class="text-[13px] text-berry">合进 {props.changes.base} 会冲突，先没法收</p>
+          <p class="text-[13px] text-berry">{farmWording().harvest.conflict(props.changes.base)}</p>
           <div class="mt-1.5 flex flex-wrap gap-1">
             <For each={conflicts()}>{(f) => <FarmTag text={f} fill="#f7e8c4" ink="#c84a3a" />}</For>
           </div>
-          <p class={["mt-1.5", xs]}>让它在自己的分支上把 {props.changes.base} 合进来、解决冲突、跑一遍测试再提交；做完再来收。</p>
+          <p class={["mt-1.5", xs]}>{farmWording().harvest.resolveHow(props.changes.base)}</p>
         </Tinted>
       </Show>
       <Show when={props.changes.behind > 0 && conflicts().length === 0}>
-        <p class={["mt-2", xs]}>
-          它干活这段时间，{props.changes.base} 上多了 {Math.round(props.changes.behind)} 个提交；收获时会合在一起（多一个合并提交）。
-        </p>
+        <p class={["mt-2", xs]}>{farmWording().harvest.behind(props.changes.base, Math.round(props.changes.behind))}</p>
       </Show>
       <Show when={props.changes.uncommitted.length > 0}>
         <Tinted color={tint("#e5a93c", 0.2)} class="mt-3">
-          <p class="text-[12px] text-bark-800">还有 {props.changes.uncommitted.length} 个文件没提交，收获时会先帮它提交：</p>
+          <p class="text-[12px] text-bark-800">{farmWording().harvest.uncommitted(props.changes.uncommitted.length)}</p>
           <div class="mt-1 flex flex-wrap gap-1">
             <For each={props.changes.uncommitted}>
               {(f) => (
@@ -117,21 +117,21 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
       <div class="mt-3 flex flex-wrap gap-2">
         <Show when={acts().includes("complete")}>
           <PxButton tone="primary" onClick={() => fire(take())}>
-            {empty() ? "请它收工" : `确认收获，合进 ${props.changes.base}`}
+            {empty() ? farmWording().harvest.letGo : farmWording().harvest.take(props.changes.base)}
           </PxButton>
         </Show>
         <Show when={acts().includes("resolve")}>
           <PxButton tone="danger" onClick={() => fire(resolve())}>
-            让它解决冲突
+            {farmWording().harvest.resolve}
           </PxButton>
         </Show>
-        <PxButton onClick={() => props.onDone()}>先不收</PxButton>
+        <PxButton onClick={() => props.onDone()}>{farmWording().notNow}</PxButton>
       </div>
       <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-        <p class={["mt-2", xs]}>工单状态变了，先回到地块看看要你做的事。</p>
+        <p class={["mt-2", xs]}>{farmWording().water.moved}</p>
       </Show>
       <Show when={props.changes.commits.length > 0}>
-        <FarmSection title="提交">
+        <FarmSection title={farmWording().graph.commits}>
           <For each={props.changes.commits}>
             {(c) => (
               <div class="flex items-center gap-2 py-px">
@@ -144,7 +144,7 @@ function ReadyView(props: { session: Session; changes: Changes; onDone: () => vo
         </FarmSection>
       </Show>
       <Show when={props.changes.files.length > 0}>
-        <FarmSection title="改了的文件">
+        <FarmSection title={farmWording().harvest.files}>
           <div class="flex flex-col gap-1">
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={conflicts().includes(f.path)} />}</For>
           </div>
@@ -164,7 +164,7 @@ export function Warehouse() {
   const stored = () => harvestedOf(core());
   const graphs = () => frames.frame?.graphs ?? [];
   return (
-    <Show when={stored().length > 0} fallback={<FarmEmpty text="仓库还空着。收获进主分支的活会放在这里。" />}>
+    <Show when={stored().length > 0} fallback={<FarmEmpty text={farmWording().harvest.empty} />}>
       <div class="grid gap-2 sm:grid-cols-2">
         <For each={stored()}>
           {(i) => (
@@ -182,10 +182,10 @@ export function Warehouse() {
                 <span class="line-clamp-2 text-[13px]">{issueTitle(i, graphs())}</span>
                 <span class={["mt-1 block", xs]}>
                   {[
-                    i.graph ? "种植计划" : undefined,
+                    i.graph ? farmWording().harvest.graph : undefined,
                     i.assignee ? (agents().get(i.assignee)?.name ?? i.assignee) : undefined,
                     i.project,
-                    i.closedAt !== undefined ? `${ago(i.closedAt, now())}收的` : undefined,
+                    i.closedAt !== undefined ? farmWording().harvest.taken(ago(i.closedAt, now())) : undefined,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

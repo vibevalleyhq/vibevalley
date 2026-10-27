@@ -10,6 +10,9 @@ import { FarmConnection } from "./src/farm";
 import { FarmScreen } from "./src/FarmScreen";
 import { PairScreen } from "./src/PairScreen";
 import { deviceName } from "./src/rules";
+import { followDevice } from "./src/words";
+
+followDevice();
 
 // An end-to-end run on the iOS simulator hands the pair link as a launch argument (-vibevalleyPair <link>, read back from
 // NSUserDefaults): simctl's openurl stops at the system's "Open in VibeValley?", which nothing can press.

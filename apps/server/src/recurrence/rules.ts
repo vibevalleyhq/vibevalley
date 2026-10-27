@@ -1,6 +1,7 @@
 // When a recurrence runs: what is due, whether it was missed, what a run leaves, and
 // whether a recurrence waits for the owner's yes.
 
+import { recurrenceWording } from "./words.ts";
 import type { Recurrence, RecurrenceRequest } from "@vibevalley/protocol";
 import { actsForOwner, type Actor } from "../base/actor.ts";
 import { givenZone, minEveryMinutes, nextOf, nextRun, parseCron, recurrenceTime } from "./when.ts";
@@ -31,30 +32,31 @@ export function needsOK(req: RecurrenceRequest, by: Actor): boolean {
 }
 
 export function recurrenceProblem(req: RecurrenceRequest, now: number): string {
-  if (req.name.trim() === "") return "定时要有个名字";
-  if (req.text.trim() === "") return "定时要写到点了做什么";
-  if (req.tz !== undefined && !givenZone(req.tz)) return "不认识这个时区：" + req.tz;
+  const p = recurrenceWording().problem;
+  if (req.name.trim() === "") return p.noName;
+  if (req.text.trim() === "") return p.noText;
+  if (req.tz !== undefined && !givenZone(req.tz)) return p.zone(req.tz);
   const w = req.when;
   switch (w.kind) {
     case "once":
-      return w.at > now ? "" : "一次性的时间要在以后";
+      return w.at > now ? "" : p.past;
     case "every":
-      return w.minutes >= minEveryMinutes ? "" : `间隔至少 ${minEveryMinutes} 分钟`;
+      return w.minutes >= minEveryMinutes ? "" : p.every(minEveryMinutes);
     case "daily":
-      return recurrenceTime.test(w.time) ? "" : "时间写成 HH:MM，比如 09:00：" + w.time;
+      return recurrenceTime.test(w.time) ? "" : p.time(w.time);
     case "weekly": {
-      if (!recurrenceTime.test(w.time)) return "时间写成 HH:MM，比如 09:00：" + w.time;
+      if (!recurrenceTime.test(w.time)) return p.time(w.time);
       const days = w.days ?? [];
-      return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : "每周的哪几天：0 到 6，0 是周日";
+      return days.length > 0 && !days.some((d) => !Number.isInteger(d) || d < 0 || d > 6) ? "" : p.days;
     }
     case "cron":
       return cronProblem(w.expr, now, req.tz);
   }
-  return "不认识这种定时";
+  return p.kind;
 }
 
 export function dueText(s: Recurrence, missed: boolean): string {
-  return "⏰ 定时「" + s.name + "」到点了" + (missed ? "（服务端没开着时错过的，补一次）" : "") + "：" + s.text;
+  return recurrenceWording().due(s.name, missed, s.text);
 }
 
 // Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
@@ -65,5 +67,5 @@ function cronProblem(expr: string, now: number, tz: string | undefined): string 
   const spec = parseCron(expr);
   if (typeof spec === "string") return spec;
   const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : givenZone(tz)!;
-  return nextOf(Cron.make({ ...spec, tz: timeZone }), now) === undefined ? "这个 cron 永远不会到点：" + expr : "";
+  return nextOf(Cron.make({ ...spec, tz: timeZone }), now) === undefined ? recurrenceWording().cron.never(expr) : "";
 }

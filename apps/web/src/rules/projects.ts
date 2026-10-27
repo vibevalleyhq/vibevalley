@@ -3,6 +3,7 @@
 // helpers' worktrees. The room on an island is roomLeft, the rule the server refuses a start by: an open plot is one
 // more that may start now, a shut one waits for the farm to free up.
 
+import { rulesWording } from "./words";
 import { type Crop, dayMs, type Issue, type LanguageCount, maxRunning, type PlotView, type ProjectSummary, type Session } from "@vibevalley/protocol";
 import { isBusy, phaseText, roomLeft } from "@vibevalley/protocol/rules";
 import type { Pose } from "./cast";
@@ -49,7 +50,7 @@ export const langs: Record<string, LangDef> = {
   sass: { label: "Sass", color: "#c6538c", names: ["scss", "sass"] },
   powershell: { label: "PowerShell", color: "#012456", names: ["powershell", "ps1"] },
   terraform: { label: "Terraform", color: "#844fba", names: ["hcl", "terraform", "tf"] },
-  other: { label: "其他", color: "#a08c70", names: [] },
+  other: { label: rulesWording().project.otherLang, color: "#a08c70", names: [] },
 };
 
 const byName = new Map(Object.entries(langs).flatMap(([id, def]) => def.names.map((n) => [n, id] as const)));
@@ -145,7 +146,7 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
       column.push({ day, at, commits: n, level: level(n), future: at > today });
       // A month's name over the week its first day is in; the first week names the month it shows.
       if ((at.getDate() === 1 || (w === 0 && d === 0)) && (months.length === 0 || months.at(-1)!.week !== w))
-        months.push({ week: w, label: `${at.getMonth() + 1}月` });
+        months.push({ week: w, label: rulesWording().time.month(at.getMonth() + 1) });
     }
     grid.push(column);
   }
@@ -186,13 +187,13 @@ export interface Growth {
 }
 
 export function growthOf(last: number | undefined, now: number): Growth {
-  if (last === undefined) return { crop: "empty", label: "还没动过土" };
+  if (last === undefined) return { crop: "empty", label: rulesWording().project.growth.empty };
   const days = (now - last) / dayMs;
-  if (days <= 1) return { crop: "flowering", label: "正旺" };
-  if (days <= 7) return { crop: "leafy", label: "在长" };
-  if (days <= 30) return { crop: "sprout", label: "冒着芽" };
-  if (days <= 90) return { crop: "dry", label: "有点干了" };
-  return { crop: "withered", label: "荒了" };
+  if (days <= 1) return { crop: "flowering", label: rulesWording().project.growth.flowering };
+  if (days <= 7) return { crop: "leafy", label: rulesWording().project.growth.leafy };
+  if (days <= 30) return { crop: "sprout", label: rulesWording().project.growth.sprout };
+  if (days <= 90) return { crop: "dry", label: rulesWording().project.growth.dry };
+  return { crop: "withered", label: rulesWording().project.growth.withered };
 }
 
 /** Only repository home URLs, never credentials, arbitrary git transports or command-line options. */
@@ -210,23 +211,22 @@ export const sortProjects = (list: readonly ProjectSummary[]) =>
 
 export function since(at: number, now: number) {
   const minutes = Math.max(0, (now - at) / 60000);
-  if (minutes < 2) return "刚刚";
-  if (minutes < 60) return `${Math.round(minutes)} 分钟前`;
+  if (minutes < 2) return rulesWording().time.justNow;
+  if (minutes < 60) return rulesWording().time.minutesAgo(Math.round(minutes));
   const hours = minutes / 60;
-  if (hours < 24) return `${Math.round(hours)} 小时前`;
+  if (hours < 24) return rulesWording().time.hoursAgo(Math.round(hours));
   const days = hours / 24;
-  if (days < 45) return `${Math.round(days)} 天前`;
-  if (days < 365) return `${Math.round(days / 30)} 个月前`;
-  return `${(days / 365).toFixed(1)} 年前`;
+  if (days < 45) return rulesWording().time.daysAgo(Math.round(days));
+  if (days < 365) return rulesWording().time.monthsAgo(Math.round(days / 30));
+  return rulesWording().time.yearsAgo((days / 365).toFixed(1));
 }
 
 export const dateText = (at: number) => {
   const d = new Date(Math.round(at));
-  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  return rulesWording().time.date(d.getFullYear(), d.getMonth() + 1, d.getDate());
 };
 
-const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-export const dayText = (d: Date) => `${d.getMonth() + 1} 月 ${d.getDate()} 日 星期${weekdays[d.getDay()]}`;
+export const dayText = (d: Date) => rulesWording().time.day(d.getMonth() + 1, d.getDate(), rulesWording().time.weekdays[d.getDay()]!);
 
 /** As toLocaleString('zh-CN') writes it: 「12,345」. */
 export const number = (n: number) => (n < 0 ? "-" : "") + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -348,18 +348,18 @@ export function mapPose(h: Session): Pose {
 export function spotText(spot: Spot, now: number) {
   switch (spot.kind) {
     case "taken":
-      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? `\n分支 ${spot.session.branch}` : ""}`;
+      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? rulesWording().project.branch(spot.session.branch) : ""}`;
     case "open":
-      return "空位：派一件活来，马上开工";
+      return rulesWording().project.open;
     case "shut":
-      return `已经有 ${maxRunning} 张工单在做，等有工单做完`;
+      return rulesWording().project.shut(maxRunning);
   }
 }
 
 export const islandText = (i: Island) =>
   [
-    !i.summary ? "不在工作目录里了" : `在干 ${i.working}/${i.maxSessions}${isFull(i) ? "（满了）" : ""}`,
-    ...(i.queued.length > 0 ? [`排队 ${i.queued.length}`] : []),
+    !i.summary ? rulesWording().project.gone : rulesWording().project.working(i.working, i.maxSessions, isFull(i)),
+    ...(i.queued.length > 0 ? [rulesWording().project.queued(i.queued.length)] : []),
   ].join(" · ");
 
 /** Twice as big two to a row, smaller to fit two, one to a row on a narrow page. */

@@ -2,6 +2,7 @@
 // row is opened; a waterfall of the rounds over it and their totals under it. The orchestrator's lets a round be marked
 // wrong, which saves it as a case of its evals.
 
+import { pagesWording } from "./words";
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -37,7 +38,11 @@ import { Quiet } from "./kit";
 /** Saves the round its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 export type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
 
-const laneNames: Record<Lane, string> = { asked: "收到", model: "模型", tool: "工具" };
+const laneNames: Record<Lane, string> = {
+  asked: pagesWording().trajectory.lane.asked,
+  model: pagesWording().trajectory.lane.model,
+  tool: pagesWording().trajectory.lane.tool,
+};
 
 const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? "#2f1f131a" : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
 
@@ -55,11 +60,13 @@ const haystack = (step: SessionEvent, tag: string) => [tag, step.text, step.tool
 function summaryText(s: TrajectorySummary) {
   const hit = cacheHit(s);
   return [
-    `${s.rounds} 轮`,
-    `${s.steps} 步`,
-    `模型用时 ${secondsText(s.modelMs)}`,
-    `工具用时 ${secondsText(s.toolMs)}`,
-    ...(hit !== undefined ? [`缓存命中 ${Math.round(hit * 100)}%`, `输入 ${tokensText(s.input + s.cacheRead)} / 输出 ${tokensText(s.output)} token`] : []),
+    pagesWording().trajectory.rounds(s.rounds),
+    pagesWording().trajectory.steps(s.steps),
+    pagesWording().trajectory.modelTime(secondsText(s.modelMs)),
+    pagesWording().trajectory.toolTime(secondsText(s.toolMs)),
+    ...(hit !== undefined
+      ? [pagesWording().trajectory.cacheHit(Math.round(hit * 100)), pagesWording().trajectory.tokens(tokensText(s.input + s.cacheRead), tokensText(s.output))]
+      : []),
   ].join(" · ");
 }
 
@@ -82,7 +89,7 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
       fallback={
         <div class="flex flex-col gap-2">
           {head()}
-          <Quiet>{props.empty ?? "还没有动静。"}</Quiet>
+          <Quiet>{props.empty ?? pagesWording().trajectory.quiet}</Quiet>
         </div>
       }
     >
@@ -144,7 +151,7 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
         out.push({
           step,
           tag,
-          gutter: first ? (round.asked ? `第 ${turn} 轮` : "更早") : undefined,
+          gutter: first ? (round.asked ? pagesWording().trajectory.round(turn) : pagesWording().trajectory.earlier) : undefined,
           when: first ? ago((round.asked ?? round.steps[0]!).time, props.now) : undefined,
           markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
         });
@@ -160,7 +167,13 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
     <div class="flex h-full min-h-0 flex-col">
       <div class="flex items-center gap-3 pb-2">
         <div class="min-w-0 flex-1">{props.head}</div>
-        <TextInput aria-label="搜索轨迹" placeholder="搜索" class="w-36 sm:w-56" value={query()} onInput={(e) => setQuery(e.currentTarget.value)} />
+        <TextInput
+          aria-label={pagesWording().trajectory.search}
+          placeholder={pagesWording().trajectory.searchHint}
+          class="w-36 sm:w-56"
+          value={query()}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+        />
       </div>
       <WaterfallView steps={props.steps} end={end()} colorOf={(seq) => (bySeq().get(seq) ? spanColor(bySeq().get(seq)!) : "#9b7550")} onPick={show} />
       <div
@@ -171,7 +184,7 @@ export function Trajectory(props: { steps: SessionEvent[]; now: number; asked?: 
           atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
         }}
       >
-        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">没有对得上的步骤。</p>}>
+        <Show when={rows().length > 0} fallback={<p class="pt-2 text-sm text-muted">{pagesWording().trajectory.noMatch}</p>}>
           <For each={rows()} keyed={(r) => r.step.seq}>
             {(r) => {
               // The key, the same for the row's life; a ref reading the item's accessor while the row is made suspends it.
@@ -273,8 +286,8 @@ function ToolLine(props: { step: SessionEvent }) {
       </Show>
       {" → "}
       <Switch fallback={<span class={["font-mono", { "text-berry": props.step.ok === false }]}>{out()}</span>}>
-        <Match when={props.step.ok === undefined}>还没返回</Match>
-        <Match when={!out()}>没有输出</Match>
+        <Match when={props.step.ok === undefined}>{pagesWording().trajectory.pending}</Match>
+        <Match when={!out()}>{pagesWording().trajectory.noOutput}</Match>
       </Switch>
     </span>
   );
@@ -285,14 +298,20 @@ function ToolDetail(props: { step: SessionEvent }) {
   return (
     <div class="flex flex-col gap-1 pt-1 pb-1.5 pl-[164px] text-xs">
       <span class="text-muted">
-        {[...(props.step.tool ? [`工具 ${props.step.tool}`] : []), props.step.ok === undefined ? "进行中" : props.step.ok ? "成功" : "失败"].join(" · ")}
+        {[
+          ...(props.step.tool ? [pagesWording().trajectory.tool(props.step.tool)] : []),
+          props.step.ok === undefined ? pagesWording().trajectory.running : props.step.ok ? pagesWording().trajectory.ok : pagesWording().trajectory.failed,
+        ].join(" · ")}
       </span>
       <Show when={input()}>
-        <span class="text-muted">输入</span>
+        <span class="text-muted">{pagesWording().trajectory.input}</span>
         <pre class="font-mono whitespace-pre-wrap select-text">{input()}</pre>
       </Show>
-      <span class="text-muted">输出</span>
-      <Show when={props.step.output} fallback={<span class="text-muted">{props.step.ok === undefined ? "还没返回" : "没有输出"}</span>}>
+      <span class="text-muted">{pagesWording().trajectory.output}</span>
+      <Show
+        when={props.step.output}
+        fallback={<span class="text-muted">{props.step.ok === undefined ? pagesWording().trajectory.pending : pagesWording().trajectory.noOutput}</span>}
+      >
         <pre class="font-mono whitespace-pre-wrap select-text">{props.step.output}</pre>
       </Show>
     </div>
@@ -399,13 +418,13 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
           class="absolute top-0 right-0 hidden cursor-pointer items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium group-focus-within:flex group-hover:flex hover:underline"
         >
           <Icon name="icon-bug" size={12} />
-          这一轮做错了
+          {pagesWording().trajectory.wrong}
         </button>
       </Show>
       <Show when={props.file}>
         <div title={props.file} class="my-0.5 mr-2 ml-[164px] flex items-center gap-1.5 rounded-md bg-berry/12 px-2 py-1 text-xs">
           <Icon name="icon-bug" size={12} />
-          标成了做错的一轮，存成了一条评测
+          {pagesWording().trajectory.marked}
         </div>
       </Show>
       <Show when={writing()}>
@@ -418,9 +437,9 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
         >
           <TextInput
             ref={autofocus()}
-            aria-label="这一轮应该怎样"
+            aria-label={pagesWording().trajectory.want}
             disabled={busy()}
-            placeholder="它应该怎样：比如「先问我是哪个项目，别直接派活」"
+            placeholder={pagesWording().trajectory.wantHint}
             value={want()}
             onInput={(e) => setWant(e.currentTarget.value)}
           />
@@ -429,7 +448,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
             disabled={busy() || !want().trim()}
             class="h-7 shrink-0 cursor-pointer rounded-md bg-accent px-2.5 text-sm text-page disabled:opacity-50"
           >
-            记下
+            {pagesWording().write}
           </button>
           <button
             type="button"
@@ -437,7 +456,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string; onMarke
             onClick={() => setWriting(false)}
             class="h-7 shrink-0 cursor-pointer rounded-md border border-line px-2.5 text-sm"
           >
-            算了
+            {pagesWording().never}
           </button>
         </form>
       </Show>
@@ -456,11 +475,11 @@ export function TrajectoryList(props: { agent: string }) {
     return all?.find((h) => h.id === (picked() ?? all[0]?.id));
   };
   return (
-    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : "在读……"}</Quiet>}>
+    <Show when={list()} fallback={<Quiet>{heads.error ? reasonOf(heads.error) : pagesWording().reading}</Quiet>}>
       {(all) => (
-        <Show when={all().length > 0} fallback={<Quiet>还没派出去过。</Quiet>}>
+        <Show when={all().length > 0} fallback={<Quiet>{pagesWording().trajectory.neverSent}</Quiet>}>
           <div class="flex h-full min-h-0 flex-col gap-3 md:flex-row">
-            <ul aria-label="派出去的帮工" class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
+            <ul aria-label={pagesWording().trajectory.sent} class="flex max-h-33 shrink-0 flex-col gap-0.5 overflow-y-auto md:max-h-none md:w-60">
               <For each={all()} keyed={(h) => h.id}>
                 {(h) => {
                   const ended = () => (h().phase._tag === "closed" ? (h().phase as { at: number }).at : undefined);
@@ -481,11 +500,13 @@ export function TrajectoryList(props: { agent: string }) {
                             <span class="text-xs text-muted">{h().project}</span>
                           </Show>
                           <Show when={ended() === undefined}>
-                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">在场</span>
+                            <span class="rounded bg-hat px-1.5 text-xs text-bark-900">{pagesWording().trajectory.here}</span>
                           </Show>
                         </span>
                         <span class="text-xs text-muted">
-                          {ended() === undefined ? `${ago(h().hiredAt, now())}接活` : `${ago(h().hiredAt, now())}接活 · ${ago(ended()!, now())}走的`}
+                          {ended() === undefined
+                            ? pagesWording().trajectory.hired(ago(h().hiredAt, now()))
+                            : pagesWording().trajectory.hiredAndLeft(ago(h().hiredAt, now()), ago(ended()!, now()))}
                         </span>
                         <Show when={h().brief}>
                           <span class="truncate text-xs">{oneLine(h().brief)}</span>
@@ -497,7 +518,7 @@ export function TrajectoryList(props: { agent: string }) {
               </For>
             </ul>
             <div class="min-h-0 min-w-0 flex-1">
-              <Show when={open()} fallback={<Quiet>选一个帮工，看它的轨迹。</Quiet>}>
+              <Show when={open()} fallback={<Quiet>{pagesWording().trajectory.pick}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>
                     {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief)}` : o().name} about={o().brief} />}

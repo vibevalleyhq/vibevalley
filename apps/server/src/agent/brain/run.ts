@@ -1,5 +1,6 @@
 // What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
 
+import { agentWording } from "../words.ts";
 import type { AssistantMessage, Usage } from "@earendil-works/pi-ai";
 import { messageText } from "./messages.ts";
 
@@ -90,7 +91,7 @@ export class RunAccounting {
       usage: addUsage(this.current.usage, m.usage ?? zeroUsage()),
       contextTokens: contextOf(m),
       text: text !== "" ? text : this.current.text,
-      error: m.stopReason === "error" ? m.errorMessage || "模型出错了" : "",
+      error: m.stopReason === "error" ? m.errorMessage || agentWording().modelFailed : "",
       aborted: m.stopReason === "aborted",
     };
   }

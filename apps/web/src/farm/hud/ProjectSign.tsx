@@ -1,6 +1,7 @@
 // The project sign by the mast: whose farm this is (every plot here is that project's); a click goes back to the
 // projects' map to enter another island.
 
+import { farmWording } from "../words";
 import { Show } from "solid-js";
 import { useRouter } from "../../app/router";
 import { playSound } from "../sound";
@@ -19,8 +20,8 @@ export function ProjectSign() {
       {(at) => (
         <button
           type="button"
-          aria-label={`项目牌：${project() || "没有项目"}`}
-          title="这座农场是这个项目的；点它回地图，进别的岛"
+          aria-label={farmWording().sign.label(project() || farmWording().sign.noProject)}
+          title={farmWording().sign.hint}
           onClick={() => {
             playSound("open");
             router.navigate("/projects");
@@ -29,8 +30,8 @@ export function ProjectSign() {
           style={{ left: `${at().x}px`, top: `${at().y}px` }}
         >
           <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-[2px_2px_0_0_#3a2a1899]">
-            <span class="text-[10px] leading-3 text-cream-200">项目</span>
-            <span class="max-w-full truncate text-[13px] leading-4">{project() || "没有项目"}</span>
+            <span class="text-[10px] leading-3 text-cream-200">{farmWording().sign.project}</span>
+            <span class="max-w-full truncate text-[13px] leading-4">{project() || farmWording().sign.noProject}</span>
           </span>
           <span class="w-1.5 bg-bark-900" style={{ height: `${Math.round((screen()?.scale ?? 3) * 5)}px` }} />
         </button>

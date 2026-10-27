@@ -3,6 +3,7 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
+import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 import { session } from "../base/actor.ts";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { validateToolArguments } from "@earendil-works/pi-ai";
@@ -20,7 +21,7 @@ export interface McpShape {
 
 export class Mcp extends Context.Service<Mcp, McpShape>()("vibevalley/Mcp") {}
 
-export const unknownCaller = "没认出你是谁：这些工具只给帮工用";
+export { unknownCaller };
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
@@ -48,7 +49,7 @@ export const make = (options: McpOptions = {}) =>
         const r = await tool.execute("", checked);
         return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
       } catch (e) {
-        return "没成：" + (e instanceof Error ? e.message : String(e));
+        return failedCall(e instanceof Error ? e.message : String(e));
       }
     };
 
@@ -69,9 +70,9 @@ export const make = (options: McpOptions = {}) =>
       }));
       server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const tool = list.find((t) => t.name === req.params.name);
-        if (!tool) return text("没成：没有 " + req.params.name + " 这个工具");
+        if (!tool) return text(noTool(req.params.name));
         // Tools are never called for a caller nobody knows.
-        if (!id) return text("没成：" + unknownCaller);
+        if (!id) return text(failedCall(unknownCaller));
         return text(await call(tool, req.params.arguments));
       });
       const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

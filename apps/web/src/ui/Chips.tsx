@@ -1,3 +1,4 @@
+import { appWording } from "../app/words";
 import { createSignal, For } from "solid-js";
 
 const box = "flex min-h-8 w-full flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 focus-within:border-focus";
@@ -19,7 +20,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
             <button
               type="button"
               disabled={props.disabled}
-              aria-label={`去掉 ${v}`}
+              aria-label={appWording().chips.drop(v)}
               onClick={() => props.onChange(props.value.filter((x) => x !== v))}
               class="cursor-pointer rounded px-1 text-muted hover:bg-selected hover:text-berry"
             >
@@ -64,7 +65,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
             <div class="flex items-center gap-1.5">
               <span class="w-40 truncate font-mono text-sm">{k()}</span>
               <input
-                aria-label={`${k()} 的值`}
+                aria-label={appWording().chips.valueOf(k())}
                 disabled={props.disabled}
                 class={[field, "flex-1"]}
                 value={row()[1]}
@@ -73,11 +74,11 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
               <button
                 type="button"
                 disabled={props.disabled}
-                aria-label={`删除 ${k()}`}
+                aria-label={appWording().chips.removeKey(k())}
                 onClick={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
                 class="cursor-pointer rounded px-1.5 text-xs text-muted hover:text-berry"
               >
-                删除
+                {appWording().chips.remove}
               </button>
             </div>
           );
@@ -94,7 +95,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         }}
       >
         <input
-          aria-label="变量名"
+          aria-label={appWording().chips.name}
           disabled={props.disabled}
           placeholder="NAME"
           class={[field, "w-40"]}
@@ -102,9 +103,9 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           onInput={(e) => setKey(e.currentTarget.value)}
         />
         <input
-          aria-label="变量的值"
+          aria-label={appWording().chips.value}
           disabled={props.disabled}
-          placeholder="值"
+          placeholder={appWording().chips.valueHint}
           class={[field, "flex-1"]}
           value={val()}
           onInput={(e) => setVal(e.currentTarget.value)}
@@ -114,7 +115,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           disabled={props.disabled || !key().trim()}
           class="h-7 cursor-pointer rounded-md border border-line px-2.5 text-sm hover:bg-hover disabled:opacity-50"
         >
-          添加
+          {appWording().chips.add}
         </button>
       </form>
     </div>

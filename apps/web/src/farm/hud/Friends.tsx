@@ -2,6 +2,7 @@
 // profile with how its plots are doing and its runtime's stamina, and for each a card to send it the next job or open
 // its profile.
 
+import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import { type Agent, orchestratorAgent } from "@vibevalley/protocol";
 import { bottleSprite, quotaOf } from "../../rules/quota";
@@ -19,11 +20,11 @@ import { HudCard } from "./HudCard";
 import { setPick, usePrefs } from "../../data/prefs";
 
 const status: Record<FriendStatus, { dot: string; label: string }> = {
-  bug: { dot: "#c84a3a", label: "地里有虫" },
-  ripe: { dot: "#e5a93c", label: "熟了，等你收" },
-  busy: { dot: "#74a046", label: "在干活" },
-  rest: { dot: "#c8a46e", label: "在地里歇着" },
-  away: { dot: "transparent", label: "没在农场" },
+  bug: { dot: "#c84a3a", label: farmWording().friends.status.bug },
+  ripe: { dot: "#e5a93c", label: farmWording().friends.status.ripe },
+  busy: { dot: "#74a046", label: farmWording().friends.status.busy },
+  rest: { dot: "#c8a46e", label: farmWording().friends.status.rest },
+  away: { dot: "transparent", label: farmWording().friends.status.away },
 };
 
 /** Lit segments of `segments`, at least one while anything is left. */
@@ -82,14 +83,14 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
               </p>
               <p class="text-[12px] text-bark-800">
                 {status[props.st].label}
-                {tally() ? ` · 请过 ${Math.round(tally()!.hired)} 次，收成 ${Math.round(tally()!.harvested)} 次` : ""}
+                {tally() ? farmWording().friends.tally(Math.round(tally()!.hired), Math.round(tally()!.harvested)) : ""}
               </p>
             </div>
           </div>
           <div class="mt-2 flex items-center gap-2 bg-cream-100 px-2 py-1.5">
             <SpriteIcon name={bottleSprite(quota())} size={30} label={quota().text} />
             <div class="min-w-0 text-[12px]">
-              <p class="text-bark-800">精力 {quota().short || "—"}</p>
+              <p class="text-bark-800">{farmWording().friends.energy(quota().short || "—")}</p>
               <p class="truncate text-bark-500" title={quota().text}>
                 {runtime()?.preset.label ?? props.agent.runtime}：{quota().text}
               </p>
@@ -98,9 +99,9 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
           <p class="mt-2 text-[13px] text-bark-800">{props.agent.role}</p>
           <div class="mt-3 flex items-center gap-2">
             <div class="flex-1">
-              <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">停用了，派不出去</span>}>
+              <Show when={props.agent.enabled} fallback={<span class="text-[13px] text-bark-600">{farmWording().friends.disabled}</span>}>
                 <PxButton tone={picked() ? "plain" : "primary"} onClick={() => setPick(picked() ? "auto" : props.agent.id)}>
-                  {picked() ? "不再指定" : "下一单派它"}
+                  {picked() ? farmWording().friends.unpick : farmWording().friends.pick}
                 </PxButton>
               </Show>
             </div>
@@ -111,7 +112,7 @@ function Friend(props: { agent: Agent; st: FriendStatus }) {
                   router.navigate(`/agents/${encodeURIComponent(props.agent.id)}`);
                 }}
               >
-                档案
+                {farmWording().friends.profile}
               </PxButton>
             </Show>
           </div>
@@ -143,7 +144,7 @@ export function Friends(props: { height: number }) {
   const attention = (): FriendStatus | undefined => (statuses().includes("bug") ? "bug" : statuses().includes("ripe") ? "ripe" : undefined);
   const box = useClickAway(open, () => farm.friendsOpen(false));
   return (
-    <div ref={box} class="pointer-events-auto relative" aria-label="帮工" role="group">
+    <div ref={box} class="pointer-events-auto relative" aria-label={farmWording().friends.helpers} role="group">
       <Show when={open()}>
         {/* As wide as the helpers in a row (the button under it is narrower), wrapping only past the cap. */}
         <div class="absolute bottom-full left-0 mb-1 w-max max-w-[min(640px,90vw)]">
@@ -156,7 +157,13 @@ export function Friends(props: { height: number }) {
           </HudCard>
         </div>
       </Show>
-      <button type="button" aria-label="帮工" aria-expanded={aria(open())} onClick={() => farm.friendsOpen(!open())} class="relative cursor-pointer">
+      <button
+        type="button"
+        aria-label={farmWording().friends.helpers}
+        aria-expanded={aria(open())}
+        onClick={() => farm.friendsOpen(!open())}
+        class="relative cursor-pointer"
+      >
         <HudCard height={props.height}>
           <span class="relative h-[22px]" style={{ width: `${sorted().length === 0 ? 0 : 22 + (Math.min(3, sorted().length) - 1) * 12}px` }}>
             <For each={sorted().slice(0, 3)} keyed={(a) => a.id}>
@@ -167,7 +174,7 @@ export function Friends(props: { height: number }) {
               )}
             </For>
           </span>
-          <span>帮工</span>
+          <span>{farmWording().friends.helpers}</span>
           <Show when={busy() > 0}>
             <span class="flex h-4 min-w-4 items-center justify-center bg-leaf-500 px-1 text-[10px] leading-none text-cream-50">{busy()}</span>
           </Show>

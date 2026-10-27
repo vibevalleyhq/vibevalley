@@ -44,6 +44,8 @@ export function mobileHost(post: (m: ToNative) => void) {
     tray: null,
     voiceShortcut: null,
     titleBar: null,
+    // The phone's shell speaks the phone's language (apps/mobile words.ts).
+    locale: null,
     rtc: async (grant, on) => {
       const line = next;
       active = { line, events: on };

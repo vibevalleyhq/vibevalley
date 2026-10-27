@@ -2,9 +2,10 @@
 // out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
 // once, wherever it is read.
 
+import { issueWording } from "./words.ts";
+import { wording } from "@vibevalley/protocol/words";
 import { type Issue, type IssueAct, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import type { Next } from "@vibevalley/protocol/api";
-import { actLabel, statusLabel } from "@vibevalley/protocol/rules";
 
 /** in_progress and in_review are the session's to reach, never the owner's. */
 export type Move =
@@ -29,14 +30,14 @@ export type Move =
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
   const from = t.status;
-  if (t.graph || t.task || t.delivered === "merged_into_parent") return ["none", "这是计划里的工单，跟着计划走：在计划里改"];
-  if (from === to) return ["none", "它已经是这个状态了"];
-  if (to === "in_progress" || to === "in_review") return ["none", "处理中和等你看是帮工干出来的：挪到待办，它就开工"];
+  if (t.graph || t.task || t.delivered === "merged_into_parent") return ["none", issueWording().move.inGraph];
+  if (from === to) return ["none", issueWording().move.same];
+  if (to === "in_progress" || to === "in_review") return ["none", issueWording().move.byHelpers];
   // Run before: by a session, or by an in-process agent (the orchestrator), whoever it was.
   const sent = t.sessions.length > 0 || t.lastRun !== undefined;
   switch (from) {
     case "backlog":
-      if (to === "todo") return t.refining ? ["none", t.refining.name + " 正在起草：等它交回来再开工"] : ["start", ""];
+      if (to === "todo") return t.refining ? ["none", issueWording().move.drafting(t.refining.name)] : ["start", ""];
       if (to === "canceled") return ["drop", ""];
       break;
     case "todo":
@@ -44,13 +45,13 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
       if (to === "canceled") return ["drop", ""];
       break;
     case "in_progress":
-      return to === "canceled" ? ["cancel", ""] : ["none", "还在干这一轮：等它交回来，或者挪到已取消"];
+      return to === "canceled" ? ["cancel", ""] : ["none", issueWording().move.working];
     case "in_review":
       if (to === "todo") return ["round", ""];
       // A round that failed is never done, even with a glance acceptance: done is what was asked for, not how the round ended.
       if (to === "done") {
-        if (t.attention.stuck === "failed") return ["none", "这一轮没做成：带句话再干一轮，或者关掉"];
-        return t.review === "required" && t.reviewedAt === undefined ? ["none", "这张工单要先过验收：验收通过才能完成"] : ["complete", ""];
+        if (t.attention.stuck === "failed") return ["none", issueWording().move.failed];
+        return t.review === "required" && t.reviewedAt === undefined ? ["none", issueWording().move.needsAcceptance] : ["complete", ""];
       }
       if (to === "canceled") return ["cancel", ""];
       break;
@@ -58,9 +59,9 @@ export function statusMove(t: Issue, to: IssueStatus): [Move, string] {
     case "canceled":
       if (to === "todo" && sent) return ["reopen", ""];
       if (to === "backlog" && !sent) return ["revive", ""];
-      return sent ? ["none", "关上的工单挪回待办，就是带一句话重开"] : ["none", "没开过工就取消的工单，挪回备选再说"];
+      return sent ? ["none", issueWording().move.reopen] : ["none", issueWording().move.revive];
   }
-  return ["none", "不能从" + statusLabel[from] + "挪到" + statusLabel[to]];
+  return ["none", issueWording().move.cannot(wording().status[from], wording().status[to])];
 }
 
 export const statusMoves = (t: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(t, to)[0] !== "none");
@@ -72,15 +73,15 @@ const wordy: ReadonlySet<IssueAct> = new Set(["answer", "tell", "reject", "reope
 export function nextSteps(t: Issue): Next[] {
   const n = String(t.number);
   const acts = t.attention.acts.map((act): Next => {
-    const label = actLabel[act];
+    const label = wording().act[act];
     return wordy.has(act)
-      ? { say: `${label}：issue act ${n}，--json 带 act「${act}」和要说的 text` }
+      ? { say: issueWording().move.actWithText(label, n, act) }
       : { say: label, run: ["issue", "act", n, "--json", JSON.stringify({ act })] };
   });
   const moves = statusMoves(t).map((to): Next => {
-    const say = "挪到" + statusLabel[to];
+    const say = issueWording().move.moveTo(wording().status[to]);
     return statusMove(t, to)[0] === "round"
-      ? { say: `${say}：issue status ${n}，--json 带 status「${to}」和这一轮要它做什么的 text` }
+      ? { say: issueWording().move.roundWithText(say, n, to) }
       : { say, run: ["issue", "status", n, "--json", JSON.stringify({ status: to })] };
   });
   return [...acts, ...moves];

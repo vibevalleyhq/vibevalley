@@ -18,6 +18,8 @@ export const ownerId = "owner";
 export const everyone = "everyone";
 
 /** The channel everyone is in. */
+// The general channel's stored name, which models and chat grammar also use; the owner reads wording().general.
+// oxlint-disable-next-line vibevalley/no-cjk-literal
 export const generalName = "田头";
 
 /** Sessions working at once; also the beds on the farm. */
@@ -27,7 +29,6 @@ export const maxRunning = 6;
 export const dayMs = 86400000;
 
 /** The voice line's first words when the settings have none of their own; the voice samples say it. */
-export const defaultGreeting = "来啦！今天想种点什么？";
 
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;
@@ -1370,8 +1371,13 @@ export interface ChannelRequest {
   project?: string;
 }
 
+/** The language the farm speaks to the owner in (words/locale.ts). */
+export const LocaleValues = ["zh", "en"] as const;
+export type Locale = (typeof LocaleValues)[number];
+
 export interface SettingsStatus {
   file: string;
+  locale: Locale;
   deepseekApiKey: KeyStatus;
   agoraAppId: AgoraAppID;
   agoraAppCertificate: KeyStatus;
@@ -1438,6 +1444,7 @@ export interface VoiceSettings {
 }
 
 export interface SettingsUpdate {
+  locale?: Locale;
   deepseekApiKey?: string;
   agoraAppId?: string;
   agoraAppCertificate?: string;

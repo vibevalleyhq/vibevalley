@@ -3,6 +3,7 @@
 // is sent. Nothing here knows an endpoint by name but the composite commands, which call them by op; a new endpoint is a
 // new command with its help.
 
+import { cliWording } from "./words.ts";
 import { Config, Effect, FileSystem, Option, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
@@ -19,14 +20,14 @@ export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
     Flag.withDefault(defaultServer),
-    Flag.withDescription(`服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是 ${defaultServer}`),
+    Flag.withDescription(cliWording().flag.server(defaultServer)),
   ),
 });
 
 /** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes
  * nothing; one that only reads runs as it is; any other is refused rather than done. */
 export const DryRunFlag = GlobalFlag.Setting("dry-run")({
-  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription("只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）")),
+  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(cliWording().flag.dryRun)),
 });
 
 /** The innermost reason a request did not leave or come back: fetch's "fetch failed" hides ECONNREFUSED in its cause. */
@@ -40,8 +41,8 @@ const unreachable = (base: string) => (e: HttpClientError.HttpClientError) =>
   new Failure({
     code: exit.unreachable,
     tag: "Unreachable",
-    text: `连不上 ${base}：${whyOf(e)}`,
-    next: [{ say: "先起服务端（vp run --filter vibevalley-server start），或用 --server 指到在跑的那个" }],
+    text: cliWording().failure.unreachable(base, whyOf(e)),
+    next: [{ say: cliWording().next.startServer }],
   });
 
 const codeOf: Readonly<Record<ApiError["_tag"], number>> = {
@@ -105,22 +106,22 @@ const answer =
   <T>(schema: Schema.Codec<T>) =>
   (text: string) =>
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
-      Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: `答复不合 Schema：${issue.message}` })),
+      Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: cliWording().failure.shape(issue.message) })),
     );
 
 /** How a command writes an op: editNode is edit-node. */
 export const kebab = (op: string) => op.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
 const usage = (path: readonly string[], text: string, tag = "InvalidValue") =>
-  new Failure({ code: exit.usage, tag, text, next: [{ say: "看这条命令怎么写", run: [...path, "--help"] }] });
+  new Failure({ code: exit.usage, tag, text, next: [{ say: cliWording().next.help, run: [...path, "--help"] }] });
 
 /** --json's text: as given, `-` for stdin, `@file` for a file's. */
 const bodyText = (given: string, path: readonly string[]) =>
   given === "-"
-    ? stdinText.pipe(Effect.mapError((e) => usage(path, `读不了标准输入：${e.message}`)))
+    ? stdinText.pipe(Effect.mapError((e) => usage(path, cliWording().failure.stdin(e.message))))
     : given.startsWith("@")
       ? Effect.flatMap(FileSystem.FileSystem, (fs) => fs.readFileString(given.slice(1))).pipe(
-          Effect.mapError((e) => usage(path, `读不了 ${given.slice(1)}：${e.message}`)),
+          Effect.mapError((e) => usage(path, cliWording().failure.file(given.slice(1), e.message))),
         )
       : Effect.succeed(given);
 
@@ -129,8 +130,8 @@ const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 /** The body checked against the endpoint's Schema here, so a wrong field is named before anything is sent. */
 const checkedBody = Effect.fnUntraced(function* (e: Endpoint, given: string, path: readonly string[]) {
   const text = given === "" ? "{}" : yield* bodyText(given, path);
-  const value = yield* json(text).pipe(Effect.mapError((issue) => usage(path, `--json 不是 JSON：${issue.message}`, "InvalidJson")));
-  yield* Schema.decodeUnknownEffect(e.body!)(value).pipe(Effect.mapError((issue) => usage(path, `--json 不合 ${e.op} 的请求体：${issue.message}`)));
+  const value = yield* json(text).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.notJson(issue.message), "InvalidJson")));
+  yield* Schema.decodeUnknownEffect(e.body!)(value).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.body(e.op, issue.message))));
   return text;
 });
 
@@ -146,7 +147,7 @@ function endpointCommand(e: Endpoint) {
   const config: Record<string, Argument.Argument<unknown> | Flag.Flag<unknown>> = {};
   for (const p of e.pathParams) config[p.name] = param(p.name, p.number);
   for (const q of e.query) config[q.name] = queryFlag(q.name, q.number);
-  if (e.body) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription("请求体：JSON 文本，- 读标准输入，@文件 读文件"));
+  if (e.body) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(cliWording().flag.json));
   return Command.make(name, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
@@ -164,8 +165,8 @@ function endpointCommand(e: Endpoint) {
             new Failure({
               code: exit.usage,
               tag: "NoDryRun",
-              text: `${e.op} 会改东西，但没有试跑：去掉 --dry-run 才会做`,
-              next: [{ say: "看这条命令做什么", run: [...path, "--help"] }],
+              text: cliWording().failure.dryRun(e.op),
+              next: [{ say: cliWording().next.whatItDoes, run: [...path, "--help"] }],
             }),
           );
       }
@@ -187,7 +188,7 @@ const frames = (base: string, path: string) =>
         Stream.mapError((e) =>
           e._tag === "HttpClientError"
             ? unreachable(base)(e)
-            : new Failure({ code: exit.other, tag: "Server", text: e._tag === "Retry" ? "服务端要流重连，命令行不接着连" : `流读不下去：${e.message}` }),
+            : new Failure({ code: exit.other, tag: "Server", text: e._tag === "Retry" ? cliWording().failure.retry : cliWording().failure.stream(e.message) }),
         ),
       );
     }),
@@ -195,17 +196,17 @@ const frames = (base: string, path: string) =>
 
 export const stateCommand = Command.make(
   "state",
-  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription("一直看：每一帧一行 JSON")) },
+  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(cliWording().flag.watch)) },
   ({ watch }) =>
     Effect.flatMap(ServerFlag, (base) =>
       // The server writes each frame on one line, so a stream is one line per frame whatever stdout is; one frame alone
       // is a document.
       watch ? Stream.runForEach(frames(base, statePath), out) : Stream.runForEach(Stream.take(frames(base, statePath), 1), printBody),
     ),
-).pipe(Command.withDescription(`核心状态（GET ${statePath}）`));
+).pipe(Command.withDescription(cliWording().command.state(statePath)));
 
 export const eventsCommand = Command.make("events", {}, () => Effect.flatMap(ServerFlag, (base) => Stream.runForEach(frames(base, eventsPath), out))).pipe(
-  Command.withDescription(`副作用，一行一条（GET ${eventsPath}）`),
+  Command.withDescription(cliWording().command.events(eventsPath)),
 );
 
 /** Only what `issue run` reads of a frame; the rest is left as it came. */
@@ -231,7 +232,7 @@ export const issueRunCommand = Command.make("run", { id: Argument.String("id") }
         const now = frame.state.issues!.find((i) => i.id === issue.id);
         return now
           ? Effect.succeed(now.status)
-          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: `工单 #${issue.number} 不在了：被删掉了` }));
+          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: cliWording().failure.gone(issue.number) }));
       }),
       Stream.changes,
       Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
@@ -240,7 +241,7 @@ export const issueRunCommand = Command.make("run", { id: Argument.String("id") }
     );
     yield* printBody(yield* call(base, "issue.changes", { id: issue.id }));
   }),
-).pipe(Command.withDescription("备选的挪到待办，等它交回来，打出改动；经过的每个状态写到 stderr"));
+).pipe(Command.withDescription(cliWording().command.issueRun));
 
 /** Every endpoint as `<group> <op>`, with the hand-written commands of a group (issue run, runtime chat) beside them. */
 export function groupCommands(extra: Readonly<Record<string, readonly Command.Command.Any[]>>) {
@@ -251,6 +252,6 @@ export function groupCommands(extra: Readonly<Record<string, readonly Command.Co
   }
   for (const [group, commands] of Object.entries(extra)) groups.set(group, [...(groups.get(group) ?? []), ...commands]);
   return [...groups].map(([group, commands]) =>
-    Command.make(group).pipe(Command.withSubcommands(commands as never), Command.withDescription(`${group} 的接口`)),
+    Command.make(group).pipe(Command.withSubcommands(commands as never), Command.withDescription(cliWording().command.group(group))),
   ) as Command.Command.Any[];
 }

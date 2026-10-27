@@ -1,6 +1,7 @@
 // 帮工: the orchestrator and every profile as cards; a card opens its profile, the last card
 // makes a new one. /agents/<id> is a profile, /agents/new a new one.
 
+import { agentsWording } from "./words";
 import { createMemo, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { useQueryClient } from "@tanstack/solid-query";
@@ -40,15 +41,13 @@ function AgentsPage() {
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div class="flex max-w-xl flex-col gap-1">
             <h1 class="text-2xl font-semibold">
-              帮工 <span class="text-base font-normal text-muted">档案</span>
+              {agentsWording().list.title} <span class="text-base font-normal text-muted">{agentsWording().list.profiles}</span>
             </h1>
-            <p class="text-sm text-muted">
-              每个帮工是一种配置好的 runtime：用哪个 runtime 和模型、带什么人设和技能，在农场里是哪种小动物、穿什么。管家派活时派的就是帮工。
-            </p>
+            <p class="text-sm text-muted">{agentsWording().list.intro}</p>
           </div>
           <A href="/agents/new" class="inline-flex h-7 items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf">
             <Icon name="button-add" size={14} />
-            捏一个新帮工
+            {agentsWording().list.make}
           </A>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -67,11 +66,11 @@ function AgentsPage() {
           </For>
           <A
             href="/agents/new"
-            aria-label="捏一个新帮工"
+            aria-label={agentsWording().list.make}
             class="flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink/20 text-sm font-medium text-muted hover:border-leaf/60 hover:text-[#3f6427]"
           >
             <Icon name="button-add" size={28} />
-            捏一个新帮工
+            {agentsWording().list.make}
           </A>
         </div>
       </div>
@@ -101,20 +100,20 @@ const footer = "mt-auto flex items-center gap-3 border-t border-line pt-3 text-x
 function OrchestratorCard() {
   const look = usePrefs((p) => p.orchestratorLook);
   return (
-    <CardShell to="/orchestrator" label="管家">
+    <CardShell to="/orchestrator" label={agentsWording().list.orchestrator}>
       <div class="flex items-start gap-3 pb-3">
         <span class="flex size-20 shrink-0 items-center justify-center rounded-lg bg-hover">
           <OrchestratorFace size={68} look={look()} />
         </span>
         <span class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-base font-semibold">管家</span>
-          <span class="line-clamp-2 text-sm text-muted">不当帮工：派活、盯进度、转告结果，也接电话。</span>
+          <span class="text-base font-semibold">{agentsWording().list.orchestrator}</span>
+          <span class="line-clamp-2 text-sm text-muted">{agentsWording().list.orchestratorLine}</span>
         </span>
       </div>
       <div class={footer}>
-        <span>记性</span>
-        <span>旧账</span>
-        <span>声音</span>
+        <span>{agentsWording().tab.memory}</span>
+        <span>{agentsWording().list.ledger}</span>
+        <span>{agentsWording().list.voice}</span>
       </div>
     </CardShell>
   );
@@ -141,10 +140,10 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
         <button
           type="button"
           onClick={() => void toggle()}
-          aria-label={`${props.agent.enabled ? "停用" : "启用"} ${props.agent.name}`}
+          aria-label={agentsWording().list.toggle(props.agent.enabled ? agentsWording().list.disable : agentsWording().list.enable, props.agent.name)}
           class="cursor-pointer rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium text-muted opacity-0 group-hover:opacity-100 hover:bg-[#f6eedd] hover:text-ink focus-visible:opacity-100"
         >
-          {props.agent.enabled ? "停用" : "启用"}
+          {props.agent.enabled ? agentsWording().list.disable : agentsWording().list.enable}
         </button>
       }
     >
@@ -159,7 +158,7 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
           <span class="flex items-center gap-2">
             <span class="truncate text-base font-semibold">{props.agent.name}</span>
             <Show when={props.here > 0}>
-              <span class="shrink-0 rounded bg-hat px-1.5 text-xs text-bark-900">在场 {props.here}</span>
+              <span class="shrink-0 rounded bg-hat px-1.5 text-xs text-bark-900">{agentsWording().list.here(props.here)}</span>
             </Show>
           </span>
           <span class="line-clamp-2 text-sm text-muted">{props.agent.role}</span>
@@ -177,15 +176,16 @@ function AgentCard(props: { agent: Agent; runtime?: RuntimeInfo; tally?: AgentTa
         </div>
       </Show>
       <div class={[footer, "mt-3"]}>
-        <span title="从这份档案派出去的帮工，干的活收进主分支的次数（服务端的账本）">
-          雇过 <span class="font-medium text-ink">{Math.round(props.tally?.hired ?? 0)}</span>
+        <span title={agentsWording().list.tallyHint}>
+          {agentsWording().list.hired} <span class="font-medium text-ink">{Math.round(props.tally?.hired ?? 0)}</span>
         </span>
         <span>
-          合进 <span class="font-medium text-[#3f6427]">{Math.round(props.tally?.harvested ?? 0)}</span>
+          {agentsWording().list.merged} <span class="font-medium text-[#3f6427]">{Math.round(props.tally?.harvested ?? 0)}</span>
         </span>
         <Show when={props.errors.length > 0} fallback={<span class="min-w-0 flex-1 truncate text-right">{props.agent.tags.slice(0, 4).join(" · ")}</span>}>
           <span class="min-w-0 flex-1 truncate text-right text-berry" title={props.errors.join("\n")}>
-            派不出去：{props.errors[0]}
+            {agentsWording().cannot}
+            {props.errors[0]}
           </span>
         </Show>
       </div>

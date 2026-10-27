@@ -1,6 +1,7 @@
 // 小恐龙 on the phone: the rules are farm/phone/games/dino.ts; here the clock, the pad and the drawing, zoomed whole.
 // A or up jumps, down or B ducks; leaving the game ends the run.
 
+import { phoneWording } from "../words";
 import { createEffect, createSignal, Show } from "solid-js";
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 import { drawPattern, lcd } from "../lcd";
@@ -148,8 +149,10 @@ export function DinoGame(props: { big?: boolean }) {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-1 pt-3">
       <div class="flex w-full px-1">
-        <span>小恐龙</span>
-        <span class="ml-auto tabular-nums">最好 {five(Math.max(top(), score()))}</span>
+        <span>{phoneWording().game.dino}</span>
+        <span class="ml-auto tabular-nums">
+          {phoneWording().blocks.best} {five(Math.max(top(), score()))}
+        </span>
       </div>
       <div class="mt-1 w-full px-1 text-right tabular-nums">{five(score())}</div>
       <div class="relative mt-2" style={{ "box-shadow": `0 0 0 2px ${lcd.ink}` }}>
@@ -158,22 +161,23 @@ export function DinoGame(props: { big?: boolean }) {
           width={dinoWidth}
           height={dinoHeight}
           role="img"
-          aria-label="小恐龙的路"
+          aria-label={phoneWording().dino.road}
           class="block [image-rendering:pixelated]"
           style={{ width: `${dinoWidth * zoom()}px`, height: `${dinoHeight * zoom()}px` }}
         />
         <Show when={!playing()}>
           <div class="absolute inset-0 grid place-items-center text-center">
             <span class="px-2" style={{ background: lcd.paper }}>
-              {d()?.over ? "撞上了" : "小恐龙"} · <span class="phone-blink">按 A {d()?.over ? "再来" : "开始"}</span>
+              {d()?.over ? phoneWording().dino.crashed : phoneWording().game.dino} ·{" "}
+              <span class="phone-blink">{phoneWording().pressA(d()?.over ? phoneWording().again : phoneWording().start)}</span>
             </span>
           </div>
         </Show>
       </div>
       <p class="mt-auto mb-2 text-center leading-[1.625]" style={{ color: lcd.dark }}>
-        A 或 ↑ 跳，↓ 或 B 蹲
+        {phoneWording().dino.help}
         <br />
-        跑得越远越快，后面会有鸟
+        {phoneWording().dino.help2}
       </p>
     </div>
   );

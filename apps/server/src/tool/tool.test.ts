@@ -5,7 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import { schemas, sessionSchemas } from "./schemas.ts";
 import { toolStart } from "./tool.ts";
-import { spentText } from "./words.ts";
+import { spentText } from "./prompts.ts";
 
 describe("the tools", () => {
   // The orchestrator's parameters are its prompt's prefix: the bytes in testdata/parameters.json must not drift.

@@ -7,6 +7,8 @@
 //	node --import tsx src/cli.ts runtime chat claude
 //	node --import tsx src/cli.ts issue list
 
+import "./cli/locale.ts";
+import { cliWording } from "./cli/words.ts";
 import { Cause, Console, Effect, Exit, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
@@ -27,16 +29,16 @@ const chat = (talk: () => Promise<void>) =>
     Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: e instanceof Error ? e.message : String(e) }) }),
   );
 
-const prompt = text("prompt", "问一句就走，不进对话").pipe(Flag.withAlias("p"));
+const prompt = text("prompt", cliWording().flag.prompt).pipe(Flag.withAlias("p"));
 
 const runtimeChatCommand = Command.make(
   "chat",
   {
-    runtime: Argument.String("runtime").pipe(Argument.withDescription("claude、codex、kimi、pi……；vibevalley 是自己的 agent")),
-    model: text("model", "模型"),
-    effort: text("effort", "思考的力度"),
-    resume: text("resume", "接着这个会话"),
-    cwd: text("cwd", "在哪个文件夹；不填是当前的"),
+    runtime: Argument.String("runtime").pipe(Argument.withDescription(cliWording().flag.runtime)),
+    model: text("model", cliWording().flag.model),
+    effort: text("effort", cliWording().flag.effort),
+    resume: text("resume", cliWording().flag.resume),
+    cwd: text("cwd", cliWording().flag.cwd),
     prompt,
   },
   (o) =>
@@ -49,21 +51,21 @@ const runtimeChatCommand = Command.make(
         ...asked(o.prompt),
       }),
     ),
-).pipe(Command.withDescription("和一个农机直接聊，不经过 VibeValley：不记轨迹和花费"));
+).pipe(Command.withDescription(cliWording().command.runtimeChat));
 
 const root = Command.make(
   "vibevalley",
   {
-    cwd: text("cwd", "自己的 agent 在哪个文件夹干活；不填是当前的"),
-    name: text("name", "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）"),
-    model: text("model", "模型；不填用配置里的"),
-    mcp: text("mcp", "MCP 配置文件；不填用家目录里的 mcp.json"),
+    cwd: text("cwd", cliWording().flag.ownCwd),
+    name: text("name", cliWording().flag.name),
+    model: text("model", cliWording().flag.ownModel),
+    mcp: text("mcp", cliWording().flag.mcp),
     prompt,
   },
   (o) =>
     chat(() => ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
-  Command.withDescription("不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON"),
+  Command.withDescription(cliWording().command.root),
   Command.withSubcommands([...groupCommands({ issue: [issueRunCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
   Command.withGlobalFlags([ServerFlag, DryRunFlag]),
 );
@@ -75,8 +77,8 @@ function usageOf(e: CliError.CliError): Failure {
   return new Failure({
     code: exit.usage,
     tag: errors[0]?._tag ?? e._tag,
-    text: errors.map((x) => x.message).join("；") || e.message,
-    next: [{ say: "看这条命令怎么写", run: [...path, "--help"] }],
+    text: errors.map((x) => x.message).join(cliWording().and) || e.message,
+    next: [{ say: cliWording().next.help, run: [...path, "--help"] }],
   });
 }
 

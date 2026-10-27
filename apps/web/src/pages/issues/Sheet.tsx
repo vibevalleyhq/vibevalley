@@ -1,3 +1,4 @@
+import { issuesWording } from "./words";
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Tone } from "../../rules/cards";
@@ -66,7 +67,7 @@ export function More(props: { children: JSX.Element }) {
     <div class="mt-1">
       <button type="button" onClick={() => setOpen(!open())} class="flex cursor-pointer items-center gap-1.5 py-1 text-xs text-muted hover:text-ink">
         <Icon name="button-next" size={8} class={{ "rotate-90": open() }} />
-        {open() ? "收起" : "更多"}
+        {open() ? issuesWording().sheet.less : issuesWording().sheet.more}
       </button>
       <Show when={open()}>
         <div class="mt-1">{props.children}</div>
@@ -95,7 +96,7 @@ export function Note(props: { tone?: Tone; children: JSX.Element; class?: string
 export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (
-    <div class="flex items-center text-sm" aria-label={`在「${stageLabel[props.at]}」`}>
+    <div class="flex items-center text-sm" aria-label={issuesWording().sheet.at(stageLabel[props.at])}>
       <For each={stages}>
         {(s, i) => (
           <div class={["flex items-center", { "flex-1": i() > 0 }]}>
@@ -104,7 +105,7 @@ export function Stages(props: { at: Stage }) {
             </Show>
             <span class="flex items-center gap-1.5 whitespace-nowrap">
               <Show when={i() < ati()} fallback={<span class={["size-2 rounded-full", s === props.at ? "bg-wheat" : "bg-line"]} />}>
-                <Icon name="mark-check" size={12} label={`${stageLabel[s]}做完了`} />
+                <Icon name="mark-check" size={12} label={issuesWording().sheet.stageDone(stageLabel[s])} />
               </Show>
               <span class={s === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}>{stageLabel[s]}</span>
             </span>

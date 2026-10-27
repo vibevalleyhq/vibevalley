@@ -1,6 +1,7 @@
 // 项目: the codebases in the work root; 全部 is the whole map, a project its island, its
 // deed, what is planted (tokei's count), the tilling calendar of a year's commits and who worked it. /projects/<name>.
 
+import { projectsWording } from "./words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { type QueryObserverResult, useQueryClient } from "@tanstack/solid-query";
 import type { ProjectActivity, ProjectLanguages, ProjectSummary } from "@vibevalley/protocol";
@@ -63,23 +64,24 @@ export function ProjectsPage(props: { rest: string }) {
     <div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3 md:flex-row md:overflow-hidden">
       <div class="max-h-60 shrink-0 overflow-y-auto md:max-h-none md:w-72">
         <ListCard
-          title="项目"
-          label="项目列表"
+          title={projectsWording().title}
+          label={projectsWording().list}
           action={
             <Button icon="button-add" onClick={() => setCreating(true)}>
-              新增项目
+              {projectsWording().add}
             </Button>
           }
         >
-          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">代码库</li>
+          <li class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{projectsWording().repos}</li>
           <Switch
             fallback={
               <>
-                <ListRow to="/projects" active={!selected()} title="全部" line="整张地图：每个项目一座岛" />
+                <ListRow to="/projects" active={!selected()} title={projectsWording().all} line={projectsWording().allLine} />
                 <For each={sorted()}>
                   {(p) => {
                     const growth = () => growthOf(p.last, now());
-                    const line = () => (!p.git ? "还不是 git 仓库" : p.last !== undefined ? `${growth().label} · ${since(p.last, now())}` : growth().label);
+                    const line = () =>
+                      !p.git ? projectsWording().notGit : p.last !== undefined ? `${growth().label} · ${since(p.last, now())}` : growth().label;
                     return (
                       <ListRow
                         to={`/projects/${encodeURIComponent(p.name)}`}
@@ -95,10 +97,10 @@ export function ProjectsPage(props: { rest: string }) {
             }
           >
             <Match when={!ready(list, undefined)}>
-              <li class="px-2.5 pb-2 text-sm text-muted">在找……</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{projectsWording().finding}</li>
             </Match>
             <Match when={sorted().length === 0}>
-              <li class="px-2.5 pb-2 text-sm text-muted">工作目录下还没有项目。点「新增项目」开一块地，或从 GitHub 下载一个。</li>
+              <li class="px-2.5 pb-2 text-sm text-muted">{projectsWording().none}</li>
             </Match>
           </Switch>
         </ListCard>
@@ -110,7 +112,7 @@ export function ProjectsPage(props: { rest: string }) {
           {(name) => <ProjectPanel name={name} projects={sorted} now={now()} />}
         </Show>
       </div>
-      <Dialog open={creating()} onClose={() => setCreating(false)} title="新增项目">
+      <Dialog open={creating()} onClose={() => setCreating(false)} title={projectsWording().add}>
         <NewProjectForm
           onDone={(made) => {
             setCreating(false);
@@ -162,9 +164,9 @@ function Stat(props: { label: string; value: string }) {
 async function copyPath(path: string) {
   try {
     await navigator.clipboard.writeText(path);
-    toast(`复制好了：${path}`);
+    toast(projectsWording().copied(path));
   } catch {
-    toast("复制不了：选中路径自己复制吧。");
+    toast(projectsWording().notCopied);
   }
 }
 
@@ -182,18 +184,27 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
   return (
     <section class="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
       <span class="flex size-24 shrink-0 items-center justify-center rounded-lg bg-hover">
-        <Icon name={`plot-${growth().crop}`} size={80} label={`长势：${growth().label}`} />
+        <Icon name={`plot-${growth().crop}`} size={80} label={projectsWording().growth(growth().label)} />
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h2 class="truncate text-xl font-semibold">{props.project.name}</h2>
-          <span class="rounded bg-leaf-300/50 px-1.5 text-xs">长势 · {growth().label}</span>
+          <span class="rounded bg-leaf-300/50 px-1.5 text-xs">{projectsWording().growthTag(growth().label)}</span>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-2">
-          <Stat label="开垦于" value={worked()?.first !== undefined ? dateText(worked()!.first!) : worked() ? "还没动过土" : "…"} />
-          <Stat label="耕作" value={worked() ? `${number(worked()!.total)} 次提交` : "…"} />
-          <Stat label="庄稼" value={lines() !== undefined ? `${number(lines()!)} 行` : notCounted() ? "没数" : "…"} />
-          <Stat label="种了" value={crops() !== undefined ? `${crops()} 样` : notCounted() ? "没数" : "…"} />
+          <Stat
+            label={projectsWording().broken}
+            value={worked()?.first !== undefined ? dateText(worked()!.first!) : worked() ? projectsWording().neverDug : "…"}
+          />
+          <Stat label={projectsWording().tilled} value={worked() ? projectsWording().commits(number(worked()!.total)) : "…"} />
+          <Stat
+            label={projectsWording().crops}
+            value={lines() !== undefined ? projectsWording().lines(number(lines()!)) : notCounted() ? projectsWording().uncounted : "…"}
+          />
+          <Stat
+            label={projectsWording().planted}
+            value={crops() !== undefined ? projectsWording().kinds(crops()!) : notCounted() ? projectsWording().uncounted : "…"}
+          />
         </div>
         <div class="flex items-center gap-1.5">
           <Icon name="button-folder" size={14} />
@@ -202,8 +213,8 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
           </span>
           <button
             type="button"
-            title="复制路径"
-            aria-label="复制路径"
+            title={projectsWording().copyPath}
+            aria-label={projectsWording().copyPath}
             class="cursor-pointer rounded p-1 hover:bg-hover"
             onClick={() => void copyPath(props.project.path)}
           >
@@ -214,8 +225,8 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
       <div class="flex flex-col items-end gap-1">
         <button
           type="button"
-          title={busy() ? "在数……" : "重新统计"}
-          aria-label="重新统计"
+          title={busy() ? projectsWording().counting : projectsWording().recount}
+          aria-label={projectsWording().recount}
           disabled={busy()}
           onClick={() => {
             void props.languages.refetch();
@@ -225,7 +236,7 @@ function Deed(props: { project: ProjectSummary; languages: Asked<ProjectLanguage
         >
           <Icon name="button-refresh" size={16} />
         </button>
-        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{since(c().at, props.now)}数过</span>}</Show>
+        <Show when={counted()}>{(c) => <span class="text-xs text-muted">{projectsWording().countedAgo(since(c().at, props.now))}</span>}</Show>
       </div>
     </section>
   );
@@ -250,7 +261,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
     return d ? languageShares(d.languages) : [];
   };
   return (
-    <Card title="种了什么" action={<span class="text-xs text-muted">按行数，不算空行 · tokei 数的</span>}>
+    <Card title={projectsWording().whatPlanted} action={<span class="text-xs text-muted">{projectsWording().byLines}</span>}>
       <Switch
         fallback={
           <>
@@ -287,9 +298,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
                         <span class="text-muted">{percent(s.share)}</span>
                       </span>
                       <Bar share={s.share < 0.02 ? 0.02 : s.share} color={s.color} />
-                      <span class="text-xs text-muted">
-                        {number(s.lines)} 行 · {number(s.files)} 个文件
-                      </span>
+                      <span class="text-xs text-muted">{projectsWording().linesAndFiles(number(s.lines), number(s.files))}</span>
                     </div>
                   </div>
                 )}
@@ -305,7 +314,7 @@ function Planted(props: { languages: Asked<ProjectLanguages> }) {
           <div class="h-12 rounded-md bg-hover" />
         </Match>
         <Match when={shares().length === 0}>
-          <Quiet>这块地还空着：没有数得出来的代码。</Quiet>
+          <Quiet>{projectsWording().empty}</Quiet>
         </Match>
       </Switch>
     </Card>
@@ -317,17 +326,21 @@ function NotCounted(props: { reason: string }) {
   const code = (t: string) => <code class="rounded bg-selected px-1.5 py-px font-mono text-sm">{t}</code>;
   return (
     <div class="flex flex-col gap-2 rounded-lg bg-hover p-3 text-sm">
-      <p>{install() ? "数庄稼要用 tokei，这台机器上还没有。" : props.reason}</p>
+      <p>{install() ? projectsWording().noTokei : props.reason}</p>
       <Show when={install()}>
         <p class="text-muted">
-          在终端里装一个：{code("brew install tokei")}（或 {code("cargo install tokei")}），装好点上面的「重新统计」。
+          {projectsWording().install}
+          {code("brew install tokei")}
+          {projectsWording().or}
+          {code("cargo install tokei")}
+          {projectsWording().thenRecount}
         </p>
       </Show>
     </div>
   );
 }
 
-const levelName = ["空地", "撒了种", "发了芽", "长了叶", "开了花"];
+const levelName = projectsWording().level;
 const tile = 12;
 const tileGap = 3;
 
@@ -336,31 +349,31 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
   const worked = () => ready(props.activity, undefined);
   const calendar = createMemo(() => calendarOf(worked()?.days ?? [], new Date()));
   const streaks = createMemo(() => streaksOf(calendar()));
-  const aside = () => <span class="text-xs text-muted">过去一年 · 一格一天，提交越多长得越高</span>;
+  const aside = () => <span class="text-xs text-muted">{projectsWording().year}</span>;
   const line = () => {
     const p = pointed();
     const busiest = streaks().busiest;
     return p && !p.future
-      ? `${dayText(p.at)} · ${p.commits > 0 ? `${p.commits} 次提交，${levelName[p.level]}` : "没动土"}`
+      ? `${dayText(p.at)} · ${p.commits > 0 ? projectsWording().dayCommits(p.commits, levelName[p.level] ?? "") : projectsWording().untouched}`
       : busiest
-        ? `最忙的一天：${dayText(new Date(`${busiest.day}T12:00`))}，${busiest.commits} 次提交`
+        ? projectsWording().busiest(dayText(new Date(`${busiest.day}T12:00`)), busiest.commits)
         : " ";
   };
   return (
     <Show
       when={!(props.activity.error && !worked())}
       fallback={
-        <Card title="耕作日历" action={aside()}>
+        <Card title={projectsWording().calendar} action={aside()}>
           <p class="text-sm">{reasonOf(props.activity.error)}</p>
         </Card>
       }
     >
-      <Card title="耕作日历" action={aside()}>
+      <Card title={projectsWording().calendar} action={aside()}>
         <div class="grid grid-cols-4 gap-6">
-          <Stat label="一年里" value={worked() ? `${number(streaks().total)} 次提交` : "…"} />
-          <Stat label="动过土的日子" value={worked() ? `${streaks().days} 天` : "…"} />
-          <Stat label="最长连着干" value={worked() ? `${streaks().longest} 天` : "…"} />
-          <Stat label="最近连着干" value={worked() ? `${streaks().current} 天` : "…"} />
+          <Stat label={projectsWording().inYear} value={worked() ? projectsWording().commits(number(streaks().total)) : "…"} />
+          <Stat label={projectsWording().daysWorked} value={worked() ? projectsWording().days(streaks().days) : "…"} />
+          <Stat label={projectsWording().longest} value={worked() ? projectsWording().days(streaks().longest) : "…"} />
+          <Stat label={projectsWording().current} value={worked() ? projectsWording().days(streaks().current) : "…"} />
         </div>
         <div class="overflow-x-auto pb-1">
           <div class="min-w-[704px]">
@@ -375,12 +388,12 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
             </div>
             <div
               role="img"
-              aria-label={worked() ? `过去一年 ${streaks().total} 次提交，${streaks().days} 天动过土` : "在读提交"}
+              aria-label={worked() ? projectsWording().yearLabel(streaks().total, streaks().days) : projectsWording().readingCommits}
               class="mt-1 flex"
               onMouseLeave={() => setPointed(undefined)}
             >
               <div class="flex w-5 flex-col" style={{ gap: `${tileGap}px` }}>
-                <For each={["", "一", "", "三", "", "五", ""]}>
+                <For each={projectsWording().rows}>
                   {(d) => (
                     <span class="flex items-center text-[10px] leading-none text-muted" style={{ height: `${tile}px` }}>
                       {d}
@@ -407,7 +420,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs text-muted">{line()}</span>
           <span class="flex items-center gap-1 text-xs text-muted">
-            少
+            {projectsWording().fewer}
             <For each={levelName}>
               {(n, l) => (
                 <span title={n}>
@@ -415,7 +428,7 @@ function TillingCalendar(props: { activity: Asked<ProjectActivity> }) {
                 </span>
               )}
             </For>
-            多
+            {projectsWording().more}
           </span>
         </div>
       </Card>
@@ -435,7 +448,7 @@ function Hands(props: { activity?: ProjectActivity }) {
       .reduce((n, a) => n + a.commits, 0);
   return (
     <Show when={authors().length > 0}>
-      <Card title="谁来干过活" action={<span class="text-xs text-muted">过去一年的提交</span>}>
+      <Card title={projectsWording().who} action={<span class="text-xs text-muted">{projectsWording().whoWhen}</span>}>
         <div class="grid gap-2.5 sm:grid-cols-2">
           <For each={authors().slice(0, hands)}>
             {(author) => {
@@ -455,7 +468,7 @@ function Hands(props: { activity?: ProjectActivity }) {
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <span class="flex text-sm">
                       <span class="min-w-0 flex-1 truncate font-medium">{author.name}</span>
-                      <span class="text-xs text-muted">{number(author.commits)} 次</span>
+                      <span class="text-xs text-muted">{projectsWording().times(number(author.commits))}</span>
                     </span>
                     <Bar share={author.commits / top()} color="#74a046" />
                   </div>
@@ -465,9 +478,7 @@ function Hands(props: { activity?: ProjectActivity }) {
           </For>
         </div>
         <Show when={rest() > 0}>
-          <p class="text-xs text-muted">
-            还有 {authors().length - hands} 位，一共 {number(rest())} 次。
-          </p>
+          <p class="text-xs text-muted">{projectsWording().rest(authors().length - hands, number(rest()))}</p>
         </Show>
       </Card>
     </Show>
@@ -514,11 +525,11 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
     >
       <div>
         <Segmented
-          label="怎么来"
+          label={projectsWording().how}
           value={importing()}
           options={[
-            { value: "new", label: "开一块新地", disabled: busy() },
-            { value: "github", label: "去别人家看看", disabled: busy() },
+            { value: "new", label: projectsWording().fresh, disabled: busy() },
+            { value: "github", label: projectsWording().github, disabled: busy() },
           ]}
           onChange={(v) => {
             setImporting(v);
@@ -527,10 +538,10 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         />
       </div>
       <Show when={importing() === "github"}>
-        <Field label="GitHub 地址" hint="公开仓库的主页地址。下载到本地后，就能查看项目和安排帮工。">
+        <Field label={projectsWording().githubAddress} hint={projectsWording().githubHint}>
           <TextInput
             ref={autofocus()}
-            aria-label="GitHub 地址"
+            aria-label={projectsWording().githubAddress}
             disabled={busy()}
             placeholder="https://github.com/botiverse/raft-source"
             value={github()}
@@ -543,11 +554,11 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
           />
         </Field>
       </Show>
-      <Field label="项目名" hint="保存在工作目录里；已有同名项目不会被覆盖。">
+      <Field label={projectsWording().name} hint={projectsWording().nameHint}>
         <TextInput
-          aria-label="项目名"
+          aria-label={projectsWording().name}
           disabled={busy()}
-          placeholder="比如 raft-source"
+          placeholder={projectsWording().nameExample}
           value={name()}
           onInput={(e) => {
             setNamed(true);
@@ -562,14 +573,14 @@ function NewProjectForm(props: { onDone: (made?: ProjectSummary) => void }) {
         </p>
       </Show>
       <Show when={busy()}>
-        <p class="text-sm text-muted">{importing() === "github" ? "正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。" : "正在开地…"}</p>
+        <p class="text-sm text-muted">{importing() === "github" ? projectsWording().downloading : projectsWording().making}</p>
       </Show>
       <div class="flex justify-end gap-2 pt-2">
         <Button disabled={busy()} onClick={() => props.onDone()}>
-          取消
+          {projectsWording().cancel}
         </Button>
         <Button type="submit" tone="primary" disabled={!canSubmit()}>
-          {busy() ? "进行中…" : importing() === "github" ? "下载到工作目录" : "创建项目"}
+          {busy() ? projectsWording().busy : importing() === "github" ? projectsWording().download : projectsWording().create}
         </Button>
       </div>
     </form>

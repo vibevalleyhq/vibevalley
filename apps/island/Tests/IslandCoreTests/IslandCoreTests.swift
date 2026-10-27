@@ -5,16 +5,16 @@ import Testing
 
 @Suite struct Messages {
   @Test func readsAGlanceLine() {
-    let line = #"{"glance":{"working":2,"waiting":1,"rows":[{"issue":"i1","number":41,"title":"修登录页","doing":"阿狐 · 跑测试","tone":"working"}]}}"#
+    let line = #"{"glance":{"working":2,"waiting":1,"strip":{"working":"2 在干","waiting":"1 等你"},"rows":[{"issue":"i1","number":41,"title":"修登录页","doing":"阿狐 · 跑测试","tone":"working"}]}}"#
     #expect(
       glance(fromLine: line)
-        == Glance(working: 2, waiting: 1, rows: [IslandRow(issue: "i1", number: 41, title: "修登录页", doing: "阿狐 · 跑测试", tone: .working)]))
+        == Glance(working: 2, waiting: 1, strip: Strip(working: "2 在干", waiting: "1 等你"), rows: [IslandRow(issue: "i1", number: 41, title: "修登录页", doing: "阿狐 · 跑测试", tone: .working)]))
   }
 
   @Test func skipsWhatItDoesNotKnow() {
     #expect(glance(fromLine: "not json") == nil)
     #expect(glance(fromLine: #"{"hello":1}"#) == nil)
-    #expect(glance(fromLine: #"{"glance":{"working":1,"waiting":0,"rows":[{"issue":"i1","number":1,"title":"x","doing":"","tone":"napping"}]}}"#) == nil)
+    #expect(glance(fromLine: #"{"glance":{"working":1,"waiting":0,"strip":{"working":"1 在干","waiting":""},"rows":[{"issue":"i1","number":1,"title":"x","doing":"","tone":"napping"}]}}"#) == nil)
   }
 
   @Test func asksToOpenAnIssue() {

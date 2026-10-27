@@ -21,7 +21,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`sessionLogs.ts`（每个 Session 的快照、增量与重连补读）、`sessions.ts`（页面的日志订阅）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
-- **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
+- **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`、`locale`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
 - **灵动岛** `apps/island`：Swift 的原生小程序（AppKit 的 `NSPanel` 里放 SwiftUI），`IslandCore` 是能离开屏幕测的消息（`Messages.swift`）和位置（`Geometry.swift`），`VibeValleyIsland` 画它；桌面壳那一半在 `apps/desktop/src/island.ts`（`glanceOf`、`startIsland`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。
@@ -32,6 +32,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **服务端是核心状态唯一的持有者。** 页面经 `GET /api/v1/state` 收整份 `StateFrame`（`state`、`inbox`、`graphs`、`view`、`effects`），状态变了就再推一份；经 `GET /api/v1/live` 收 `LiveEvent`（干活过程的一步、提醒、农机变了）。页面不读事实，`/api/v1/events` 留给命令行和调试。
 - **页面不折事实，也不重写服务端的规则。** 给人看的结论由服务端算好：跟着状态走的话在出帧时填（`Session.phaseText`、`Recurrence.whenText`、`nextText`、`Progress.multiplier`），跟着草稿走的另开一个接口问（档案的问题 `POST /api/v1/agents/check`、新项目会被拒的第一处 `POST /api/v1/projects/check`、设置会被拒的第一处 `POST /api/v1/settings/check`、记性的预览 `GET /api/v1/memories/{agent}/recall`、交代冲突是工单的动作 `resolve`（`POST /api/v1/issues/{id}/act`）、播种袋的工单模板 `GET /api/v1/projects/{id}/templates`）；农机为什么不能派、额度剩几成在 `RuntimeInfo.stop`、`RuntimeInfo.quota` 里，叫什么、长什么样在 `RuntimeInfo.preset`、`RuntimeInfo.facts` 里（[档案和农机](docs/subsystems/agent.md)）；成就的说法是 `game.achievements`，进度在每帧的 `view.achievements`（[游戏](docs/subsystems/game.md)）。服务端和页面都要的规则在 `packages/protocol/src/rules`，页面 import 的就是服务端用的那份。
 - **`src/rules/` 只是读帧的纯函数**：哪些频道、未读几条、庄稼熟没熟、看板怎么分栏，只给页面用；跟着墙上时钟走的画面（走路、动画、小游戏的局面）也只在页面。
+- **页面的话在词表里，语言读一次**：每个目录一份 `words.ts`（中英各一份），语言是服务端发的 `index.html` 上的 `data-locale`，开页时读定；设置里换了语言就整页重开，帧里服务端写的话也一起换。页面开起来以后经 `host.locale` 告诉宿主，桌面壳的菜单栏和灵动岛跟着说（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。开机的进度条（`public/opening.html`，也写进 `index.html`）按同一个 `data-locale` 或桌面壳给的 `?locale=` 选字。
 - **一条状态流**：`data/frames.ts` 给整个页面开一条 `/api/v1/state`，断了一秒后重连；连着、在连、断了（`link`）在外框的小灯和农场的提示里说。没有模拟服务器：连不上就说连不上，页面是空的，不换成假数据。
 - **REST 的读取经查询模块**（`data/query.ts`）：`QueryClient` 和 `QueryObserver` 拥有缓存、重试、轮询和请求去重，Solid 只订阅观察者的结果。一个查询键一种形状（`["projects"]` 只有 `ProjectSummary[]`）；帧里的变化让相关查询失效再读。等待、失败是结果值，`ready(query, fallback)` 选择成功数据；重新读取不挂起状态帧，换查询键时的旧值由 `placeholderData` 决定。卸载页面先退订观察者，请求回来只更新缓存。
 - **干活过程由一个读取模块持有**：`SessionLogs` 为正在看的每个 Session 共享一份日志，先订阅再读快照；直播流每次连上都补读，断线期间已经完成、不再发事件的步骤也能回来。快照替换保留窗口，读取期间收到的步骤按 `seq` 和 `revision` 合并，旧直播片段不能盖掉新快照。最后一个读者离开就释放日志；工作台、农场、轨迹和消息下的步骤都经 `createSessionEvents` 读，不按帮工的阶段猜刷新时机。日志的信号不挂起同页的时间线和改动查询。
@@ -58,7 +59,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 
 **打开页面**：`index.html` 构建时嵌进 `opening.html` 里同一段条（`apps/web/vite.config.ts` 的 `opening`），所以页面的脚本还没跑起来时就是这条；`Root` 的 `<Loading>` 第一次安定下来时把它拿掉，农场自己的「进村」条在同一个位置接着走。
 
-**灵动岛（macOS）**：服务端起来后，桌面壳起 `VibeValleyIsland`（开发时是 `apps/island/.build/release`，`scripts/build.ts` 编它；打包的应用在 `Contents/Resources/island`），带上页面的像素字；不是 macOS 或没编出来就只是不显示。桌面壳的主进程自己订阅 `/api/v1/state`（断了一秒后重连），每一帧用 `glanceOf` 算成一份摘要：在做、等你回答、等你验收、卡住了的工单各一行，等你的在前；在做的写帮工和它这一刻在干什么（`phaseText`），等你的写等什么（`attentionLabel`、`stuckLabel`）。摘要变了才写一行 `{"glance": …}` 到岛的 stdin。岛贴着内置屏的刘海（`safeAreaInsets` 和刘海两边的菜单栏算出位置），没有内置屏时挂在主屏菜单栏正中；收起时刘海左边是在干几个，右边是等你几个；指针移上去展开成一行一张工单（最多 6 行）；点一行，岛在 stdout 写 `{"open": "<工单>"}`，桌面壳把窗口叫到前面、开到 `/issues/<工单>`。没有在做也没有等你的，岛不出来。窗口不抢焦点，所有桌面上都有，全屏的应用上不出现。桌面壳退出时关掉岛的 stdin，岛跟着退出。
+**灵动岛（macOS）**：服务端起来后，桌面壳起 `VibeValleyIsland`（开发时是 `apps/island/.build/release`，`scripts/build.ts` 编它；打包的应用在 `Contents/Resources/island`），带上页面的像素字；不是 macOS 或没编出来就只是不显示。桌面壳的主进程自己订阅 `/api/v1/state`（断了一秒后重连），每一帧用 `glanceOf` 算成一份摘要：在做、等你回答、等你验收、卡住了的工单各一行，等你的在前；在做的写帮工和它这一刻在干什么（`phaseText`），等你的写等什么（词表的 `attention`、`stuck`）；刘海两边的两句也写在摘要里（`strip`，桌面壳的词表）。摘要变了才写一行 `{"glance": …}` 到岛的 stdin。岛贴着内置屏的刘海（`safeAreaInsets` 和刘海两边的菜单栏算出位置），没有内置屏时挂在主屏菜单栏正中；收起时刘海左边是在干几个，右边是等你几个；指针移上去展开成一行一张工单（最多 6 行）；点一行，岛在 stdout 写 `{"open": "<工单>"}`，桌面壳把窗口叫到前面、开到 `/issues/<工单>`。没有在做也没有等你的，岛不出来。窗口不抢焦点，所有桌面上都有，全屏的应用上不出现。桌面壳退出时关掉岛的 stdin，岛跟着退出。
 
 **退出**：退出前先停服务端（还在起来的，等它起来再停）：SIGTERM，让它存好状态，8 秒没退就 SIGKILL；注销快捷键。macOS 上关窗口不退出，点 Dock 图标再开窗口。
 
@@ -100,7 +101,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **只给真实数据。** 服务端没开时换成模拟农场，提示再大也会被当成真的；没有服务端就说没有。
 - **窗口先开，再等服务端。** 等服务端时没有窗口，双击以后几秒（第一次开、要建库时十来秒）屏幕上什么都没有，像没打开。加载条是一个不靠服务端、也不跑页面脚本的静态文件，所以能在服务端起来之前从应用自己的文件里打开；页面的 `index.html` 带着同一段，换页时画面不跳。放弃了在 Electron 里另画一个窗口（两份样子），和弹系统的启动画面（不像游戏，起不来时也说不了原因）。
 - **灵动岛是原生的，单独一个进程。** 刘海边上要像系统的一部分：不抢焦点、所有桌面都在、点击区域就是岛的形状、动画跟着系统，这些是 AppKit 的窗口才做得好的。放在 Electron 里用 `type: 'panel'` 的网页窗口能做出样子，但它是一个 Chromium 页面挂在刘海上；写成 Node 原生插件要和 Electron 同一个进程，崩了一起倒。单独的进程经 stdin、stdout 一行一个 JSON 说话，崩了只是岛不见。不用 boring.notch 那样的私有接口把岛盖到全屏应用上：苹果的私有接口随时会变，全屏时本来也不该挡。
-- **岛的数据由桌面壳的主进程读，不经页面。** 窗口关掉以后页面就不在了，靠页面推的东西会停；岛要的是农场一直在干什么。规则用 `@vibevalley/protocol` 里页面也在用的说法（`phaseText`、`attentionLabel`），摘要在主进程算好，岛只画。
+- **岛的数据由桌面壳的主进程读，不经页面。** 窗口关掉以后页面就不在了，靠页面推的东西会停；岛要的是农场一直在干什么。规则用 `@vibevalley/protocol` 里页面也在用的说法（`phaseText`、`wording()`），摘要在主进程算好，岛只画，自己不带一个字：语言跟着桌面壳（[话放在哪](docs/subsystems/foundation.md#话放在哪)）。
 - **子进程自己发布就绪地址。** 宿主先绑端口 0、读出端口、关掉再交给服务端，关掉到重绑之间端口可能被抢；从人读的日志里找地址，日志措辞就成了协议。绑定结果只有子进程知道，所以由它写一行 JSON 说出来。
 - **宿主接口封闭、缺的是 null。** 页面问「我在哪个壳里」再分支，每加一个宿主就要改每一处；按能力有没有来画，加宿主只是实现一遍接口。
 - **连进来的浏览器用 cookie 带钥匙。** 页面的状态流和 REST 都走 `fetch`，同源的 cookie 自动带上，页面不用改；监听只认 cookie 和 `Bearer` 头，不把钥匙转给本机的服务端。

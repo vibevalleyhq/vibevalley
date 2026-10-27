@@ -2,6 +2,7 @@
 // applies a batch's ops in order and writes back what changed. A stale update (baseRev behind) is taken only when the
 // block's text has not changed since baseRev; otherwise it is a conflict and the block keeps what it has.
 
+import { docWording } from "./words.ts";
 import type {
   Block,
   BlockInput,
@@ -48,7 +49,7 @@ export function result(status: DocOpStatus, blockId: string, rev = 0, more: { yo
 
 const applied = (b: Block) => result("applied", b.id, b.rev);
 const rejected = (id: string, reason: string) => result("rejected", id, 0, { reason });
-const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: "这一块已经删掉了" });
+const gone = (b: Block) => result("conflict", b.id, b.rev, { reason: docWording().op.deleted });
 
 export const parentOf = (b: Block) => b.parentId ?? "";
 
@@ -68,7 +69,7 @@ export function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly st
   const out: Record<string, unknown> = { ...attrs };
   for (const name of attrNames) if (patch[name] !== undefined && patch[name] !== null) out[name] = patch[name];
   for (const name of unset) {
-    if (!(attrNames as readonly string[]).includes(name)) throw new Error(`没有属性 ${name}`);
+    if (!(attrNames as readonly string[]).includes(name)) throw new Error(docWording().op.noAttr(name));
     delete out[name];
   }
   return out;
@@ -127,7 +128,7 @@ export class Page {
   private liveParent(parent: string): string | undefined {
     while (parent !== "") {
       const b = this.find(parent);
-      if (!b) throw new Error(`没有块 ${parent}`);
+      if (!b) throw new Error(docWording().op.noBlock(parent));
       if (!b.deleted) return b.id;
       parent = parentOf(b);
     }
@@ -136,10 +137,10 @@ export class Page {
 
   /** Checks a block the client made, and fills in what the server decides; a string is why it cannot be. */
   private fresh(b: BlockInput): Block | string {
-    if (!b.id) return "新块没有 id";
-    if (this.find(b.id) || this.taken(b.id)) return "块 " + b.id + " 已经有了";
-    if (!knownType(b.type)) return "不认识的块类型 " + b.type;
-    if (!validKey(b.orderKey)) return "不是有效的顺序键：" + b.orderKey;
+    if (!b.id) return docWording().op.noId;
+    if (this.find(b.id) || this.taken(b.id)) return docWording().op.taken(b.id);
+    if (!knownType(b.type)) return docWording().op.unknownType(b.type);
+    if (!validKey(b.orderKey)) return docWording().op.badKey(b.orderKey);
     let parent: string | undefined;
     try {
       parent = this.liveParent(b.parentId ?? "");
@@ -180,7 +181,7 @@ export class Page {
         return this.updateText(op);
       case "set_attrs": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, "没有这一块");
+        if (!b) return rejected(op.blockId, docWording().op.missing);
         if (b.deleted) return gone(b);
         try {
           b.attrs = patched(b.attrs, op.attrs ?? {}, op.unset);
@@ -192,9 +193,9 @@ export class Page {
       }
       case "set_type": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, "没有这一块");
+        if (!b) return rejected(op.blockId, docWording().op.missing);
         if (b.deleted) return gone(b);
-        if (!knownType(op.type)) return rejected(b.id, "不认识的块类型 " + op.type);
+        if (!knownType(op.type)) return rejected(b.id, docWording().op.unknownType(op.type));
         b.type = op.type;
         b.attrs = attrsOf(op.attrs);
         b.text = textFor(op.type, b.text);
@@ -205,14 +206,14 @@ export class Page {
         return this.move(op);
       case "delete_block": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, "没有这一块");
+        if (!b) return rejected(op.blockId, docWording().op.missing);
         if (b.deleted) return result("noop", b.id, b.rev);
         this.setDeleted(b, true);
         return applied(b);
       }
       case "restore_block": {
         const b = this.find(op.blockId);
-        if (!b) return rejected(op.blockId, "没有这一块");
+        if (!b) return rejected(op.blockId, docWording().op.missing);
         if (!b.deleted) return result("noop", b.id, b.rev);
         try {
           const parent = this.liveParent(parentOf(b));
@@ -229,14 +230,14 @@ export class Page {
       case "merge_blocks":
         return this.merge(op);
     }
-    return rejected("", `不认识的改动 ${(op as { op: string }).op}`);
+    return rejected("", docWording().op.unknownOp((op as { op: string }).op));
   }
 
   private updateText(o: DocOpUpdateText): DocOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, "没有这一块");
-    if (!withText[b.type]) return rejected(b.id, "这一块没有字");
-    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, `没有第 ${o.baseRev} 版`);
+    if (!b) return rejected(o.blockId, docWording().op.missing);
+    if (!withText[b.type]) return rejected(b.id, docWording().op.noText);
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, docWording().op.noRev(o.baseRev));
     const yours = textFor(b.type, o.text);
     if (b.deleted) {
       this.lost(b, yours);
@@ -244,7 +245,7 @@ export class Page {
     }
     if (!this.unchangedSince(b, o.baseRev)) {
       this.lost(b, yours);
-      return result("conflict", b.id, b.rev, { yours, reason: "这一块刚被别人改过" });
+      return result("conflict", b.id, b.rev, { yours, reason: docWording().op.changed });
     }
     if (sameText(yours, b.text)) return applied(b);
     b.text = yours;
@@ -265,16 +266,16 @@ export class Page {
 
   private move(o: DocOpMoveBlock): DocOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, "没有这一块");
+    if (!b) return rejected(o.blockId, docWording().op.missing);
     if (b.deleted) return gone(b);
-    if (!validKey(o.orderKey)) return rejected(b.id, "不是有效的顺序键：" + o.orderKey);
+    if (!validKey(o.orderKey)) return rejected(b.id, docWording().op.badKey(o.orderKey));
     let parent: string | undefined;
     try {
       parent = this.liveParent(o.parentId ?? "");
     } catch (e) {
       return rejected(b.id, (e as Error).message);
     }
-    for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, "不能挪到自己下面");
+    for (let at = parent ?? ""; at !== ""; at = parentOf(this.find(at)!)) if (at === b.id) return rejected(b.id, docWording().op.underSelf);
     if (parent === undefined) delete b.parentId;
     else b.parentId = parent;
     b.orderKey = o.orderKey;
@@ -284,9 +285,9 @@ export class Page {
 
   private split(o: DocOpSplitBlock): DocOpResult {
     const b = this.find(o.blockId);
-    if (!b) return rejected(o.blockId, "没有这一块");
-    if (!withText[b.type]) return rejected(b.id, "这一块没有字");
-    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, `没有第 ${o.baseRev} 版`);
+    if (!b) return rejected(o.blockId, docWording().op.missing);
+    if (!withText[b.type]) return rejected(b.id, docWording().op.noText);
+    if (o.baseRev > b.rev || o.baseRev < 1) return rejected(b.id, docWording().op.noRev(o.baseRev));
     if (b.deleted) return gone(b);
     const nb = this.fresh(o.newBlock);
     if (typeof nb === "string") return rejected(b.id, nb);
@@ -297,8 +298,8 @@ export class Page {
       // The offset was into a text that is no longer there: the block keeps all of its text and the new one starts empty.
       at = runeLen(b.text);
       status = "conflict";
-      reason = "这一块刚被别人改过，从末尾拆开了";
-    } else if (at < 0 || at > runeLen(b.text)) return rejected(b.id, `拆分位置 ${at} 不在字里（${runeLen(b.text)} 个字）`);
+      reason = docWording().op.splitAtEnd;
+    } else if (at < 0 || at > runeLen(b.text)) return rejected(b.id, docWording().op.splitOutside(at, runeLen(b.text)));
     const [left, right] = splitAt(b.text, at);
     b.text = left;
     nb.text = textFor(nb.type, right);
@@ -311,12 +312,12 @@ export class Page {
   private merge(o: DocOpMergeBlocks): DocOpResult {
     const target = this.find(o.targetId);
     const source = this.find(o.sourceId);
-    if (!target) return rejected(o.targetId, "没有这一块");
-    if (!source) return rejected(o.sourceId, "没有这一块");
-    if (target.id === source.id) return rejected(target.id, "不能并进自己");
+    if (!target) return rejected(o.targetId, docWording().op.missing);
+    if (!source) return rejected(o.sourceId, docWording().op.missing);
+    if (target.id === source.id) return rejected(target.id, docWording().op.intoSelf);
     if (source.deleted) return result("noop", target.id, target.rev);
     if (target.deleted) return gone(target);
-    if (!withText[target.type]) return rejected(target.id, "这一块没有字");
+    if (!withText[target.type]) return rejected(target.id, docWording().op.noText);
     // Both texts as they are now: there is nothing stale to conflict with.
     target.text = textFor(target.type, joined(target.text, source.text));
     let last = this.children(target.id).at(-1)?.orderKey ?? "";

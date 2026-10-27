@@ -68,13 +68,16 @@ export interface Host {
   /** The window has no title bar of its own and the page reaches its top edge: top is the strip the window is dragged
    * by, left what its buttons (macOS's traffic lights) take at the strip's start; null: the window has its own. */
   readonly titleBar: { readonly top: number; readonly left: number } | null;
+  /** Told the language the page speaks (protocol's Locale) when it loads, so the host's own words (the tray's menu, the
+   * island, its dialogs) match; null where the host says nothing of its own. */
+  readonly locale: ((locale: "zh" | "en") => void) | null;
 }
 
 /** The property a host's preload (or injected script) sets on window. */
 export const hostKey = "vibevalleyHost";
 
 /** A browser tab: no host around the page. */
-export const browserHost: Host = { name: "browser", notify: null, tray: null, voiceShortcut: null, rtc: null, titleBar: null };
+export const browserHost: Host = { name: "browser", notify: null, tray: null, voiceShortcut: null, rtc: null, titleBar: null, locale: null };
 
 let phone: Host | undefined;
 

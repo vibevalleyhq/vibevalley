@@ -3,11 +3,12 @@
 // tool that has not returned) is pushed again under the same number. What is written is never rewritten: later steps
 // only follow it, and the step still being written (the draft) is on disk only once it is sealed.
 
+import { sessionWording } from "./words.ts";
+import { wording } from "@vibevalley/protocol/words";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
-import { actionText } from "@vibevalley/protocol/rules";
 import { Schema } from "effect";
 import { cut } from "../base/text.ts";
 import { FileWriter } from "../base/files.ts";
@@ -29,7 +30,7 @@ const decodeEvents = Schema.decodeUnknownSync(Schema.Array(SessionEventSchema));
 export function clipOutput(text: string): string {
   const n = text.length;
   if (n <= outputHead + outputTail + 40) return text;
-  return `${text.slice(0, outputHead)}\n… 省略 ${n - outputHead - outputTail} 个字 …\n${text.slice(n - outputTail)}`;
+  return `${text.slice(0, outputHead)}\n${sessionWording().log.clipped(n - outputHead - outputTail)}\n${text.slice(n - outputTail)}`;
 }
 
 export function readJournal(file: string): SessionEvent[] | undefined {
@@ -214,7 +215,7 @@ export class Journal {
       type: "tool/call",
       text: start.text,
       action: start.action,
-      actionText: actionText[start.action],
+      actionText: wording().action[start.action],
       tool: start.tool,
       ...(start.input ? { input: cut(start.input, inputMax) } : {}),
     };

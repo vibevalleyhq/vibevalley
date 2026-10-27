@@ -1,6 +1,8 @@
 // VibeValley's own agent as an oar runtime, built on oar's runtime-author SPI the way oar's scripted runtime is: one turn
 // is one run of the agent until it settles.
 
+import { ownersLanguage } from "../../prompts.ts";
+import { agentWording } from "../words.ts";
 import { defineRuntime, type McpServer as OarMcpServer, type SessionOptions, type TurnOutcome, UnsupportedOptionError } from "@botiverse/oar";
 import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } from "@botiverse/oar/kernel";
 import type { AgentToolResult, ThinkingLevel } from "@earendil-works/pi-agent-core";
@@ -20,11 +22,11 @@ export const vibevalleyRuntime = "vibevalley";
 /** DeepSeek's two. */
 export const efforts = ["high", "max"] as const;
 
-export const helperInstructions = `你是一个编码 agent，在主人电脑上的一个项目目录里干活：读写代码、跑命令、查资料。
+export const helperInstructions = () => `你是一个编码 agent，在主人电脑上的一个项目目录里干活：读写代码、跑命令、查资料。
 - 先弄清楚再动手：读相关的文件，看清现状；改完跑能跑的检查（lint、类型检查、测试）确认。
 - 能自己查到的不问；真正要拿主意的才问，一次问清。
 - 几件互不相干、各自要花工夫的事，用 spawn_agent 派帮手同时做。
-- 回答用中文，简短，先说结论。`;
+- 回答用${ownersLanguage()}，简短，先说结论。`;
 
 export interface RuntimeOptions {
   /** $VIBEVALLEY_HOME, else ~/.vibevalley, when absent. */
@@ -51,23 +53,18 @@ const toMcp = (s: OarMcpServer): McpServer =>
         ...(s.env ? { env: { ...s.env } } : {}),
       };
 
-const refusedOptions = {
-  launchArgs: "VibeValley 跑在 server 进程里，没有命令行参数",
-  serviceTier: "DeepSeek 没有服务档位",
-} as const;
-
 export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   const home = options.home ?? defaultHome;
   const llmOf = options.llm;
 
   const start = async (_installation: unknown, o: SessionOptions) => {
     // oar's refusableOrder, for these two.
-    for (const option of ["serviceTier", "launchArgs"] as const) if (o[option] !== undefined) throw new UnsupportedOptionError(option, refusedOptions[option]);
-    if (o.effort && !(efforts as readonly string[]).includes(o.effort))
-      throw new Error(`${vibevalleyRuntime} 只有 ${efforts.join("、")} 两档思考强度，没有「${o.effort}」`);
+    for (const option of ["serviceTier", "launchArgs"] as const)
+      if (o[option] !== undefined) throw new UnsupportedOptionError(option, agentWording().refused[option]);
+    if (o.effort && !(efforts as readonly string[]).includes(o.effort)) throw new Error(agentWording().efforts(vibevalleyRuntime, efforts, o.effort));
     const llm = llmOf(o.model ?? "");
     const kernel = createSessionKernel(o.resume);
-    const instructions = o.systemPrompt ?? [helperInstructions, ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
+    const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
     const tasks = options.tasks?.(kernel.sessionId);
     const agent = await Brain.start({
       time: options.time,
@@ -246,7 +243,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
   return defineRuntime({
     id: vibevalleyRuntime,
     session: start,
-    refusedSessionOptions: refusedOptions,
+    refusedSessionOptions: agentWording().refused,
     installation: async () => {
       try {
         llmOf("");

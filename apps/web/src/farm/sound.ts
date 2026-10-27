@@ -2,6 +2,7 @@
 // Levels come in three steps of loudness: clicks about -28, work on the beds and state changes about -24, rewards about -20. Kept below speech on
 // purpose: once voice is on, the microphone sits next to these.
 
+import { farmWording } from "./words";
 import { createSynth, renderRecipe, type Pen, type Recipe, type Synth } from "@vibevalley/engine/audio";
 import type { GameEffect, Issue, Session } from "@vibevalley/protocol";
 import type { BedFxKind } from "./tools";
@@ -184,44 +185,44 @@ export const SOUNDS = {
 export type SoundName = keyof typeof SOUNDS;
 
 export const SOUND_GROUPS: readonly { title: string; names: readonly SoundName[] }[] = [
-  { title: "界面", names: ["tap", "nope", "pick", "open", "close"] },
-  { title: "农具", names: ["water", "spray", "weed", "harvest", "shovel"] },
-  { title: "地里", names: ["plant", "arrive", "ripe", "bug"] },
-  { title: "院子", names: ["rustle", "splash", "thud", "woof", "yip", "pant", "meow", "mew", "purr"] },
-  { title: "奖励", names: ["coin", "levelUp", "achievement"] },
-  { title: "语音", names: ["voiceOn", "voiceOff", "ring"] },
+  { title: farmWording().sound.group.ui, names: ["tap", "nope", "pick", "open", "close"] },
+  { title: farmWording().sound.group.tools, names: ["water", "spray", "weed", "harvest", "shovel"] },
+  { title: farmWording().sound.group.field, names: ["plant", "arrive", "ripe", "bug"] },
+  { title: farmWording().sound.group.yard, names: ["rustle", "splash", "thud", "woof", "yip", "pant", "meow", "mew", "purr"] },
+  { title: farmWording().sound.group.reward, names: ["coin", "levelUp", "achievement"] },
+  { title: farmWording().sound.group.voice, names: ["voiceOn", "voiceOff", "ring"] },
 ];
 
 export const SOUND_LABEL: Readonly<Record<SoundName, string>> = {
-  tap: "点击",
-  nope: "点不了",
-  pick: "拿工具",
-  open: "展开",
-  close: "收起",
-  water: "浇水",
-  spray: "杀虫",
-  weed: "除草",
-  harvest: "收获",
-  shovel: "铲除",
-  plant: "播种",
-  ripe: "熟了",
-  bug: "长虫",
-  coin: "金币",
-  levelUp: "升级",
-  achievement: "成就",
-  arrive: "帮工到了",
-  rustle: "草叶沙沙",
-  splash: "扑通",
-  thud: "踩土",
-  woof: "小狗叫",
-  meow: "小猫叫",
-  mew: "小猫短叫",
-  purr: "小猫呼噜",
-  yip: "小狗跳",
-  pant: "小狗喘气",
-  voiceOn: "语音接通",
-  voiceOff: "语音挂断",
-  ring: "来电",
+  tap: farmWording().sound.label.tap,
+  nope: farmWording().sound.label.nope,
+  pick: farmWording().sound.label.pick,
+  open: farmWording().sound.label.open,
+  close: farmWording().sound.label.close,
+  water: farmWording().water.water,
+  spray: farmWording().tool.bug.label,
+  weed: farmWording().tool.weed.label,
+  harvest: farmWording().tool.harvest.label,
+  shovel: farmWording().tool.shovel.label,
+  plant: farmWording().aim.sow,
+  ripe: farmWording().sound.label.ripe,
+  bug: farmWording().sound.label.bug,
+  coin: farmWording().sound.label.coin,
+  levelUp: farmWording().sound.label.levelUp,
+  achievement: farmWording().sound.label.achievement,
+  arrive: farmWording().sound.label.arrive,
+  rustle: farmWording().sound.label.rustle,
+  splash: farmWording().sound.label.splash,
+  thud: farmWording().sound.label.thud,
+  woof: farmWording().sound.label.woof,
+  meow: farmWording().sound.label.meow,
+  mew: farmWording().sound.label.mew,
+  purr: farmWording().sound.label.purr,
+  yip: farmWording().sound.label.yip,
+  pant: farmWording().sound.label.pant,
+  voiceOn: farmWording().sound.label.voiceOn,
+  voiceOff: farmWording().sound.label.voiceOff,
+  ring: farmWording().sound.label.ring,
 };
 
 /** Offline, for measuring levels. Needs OfflineAudioContext. */

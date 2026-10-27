@@ -1,6 +1,7 @@
 // Pairing: the camera reads the QR code the farm's 连接到本机 shows (or the link is pasted, or arrives as a
 // vibevalley:// link); the phone names itself and waits for the owner to nod on that computer.
 
+import { mobileWording } from "./words";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -19,7 +20,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   }, [choice.link]);
 
   const scan = async () => {
-    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem("没有相机的权限：到系统设置里打开，或者粘贴链接");
+    if (!permission?.granted && !(await requestPermission()).granted) return setCameraProblem(mobileWording().noCamera);
     setScanning(true);
   };
 
@@ -37,7 +38,7 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
           }}
         />
         <Pressable style={s.cancel} onPress={() => setScanning(false)}>
-          <Text style={s.cancelText}>不扫了</Text>
+          <Text style={s.cancelText}>{mobileWording().stopScan}</Text>
         </Pressable>
       </View>
     );
@@ -45,18 +46,18 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
   return (
     <View style={s.page}>
       <View style={s.card}>
-        <Text style={s.title}>连进农场</Text>
-        <Text style={s.muted}>在跑农场的电脑上打开「设置」的「连接到本机」，点「添加设备」，扫它的二维码。配对要那台电脑上的主人点头。</Text>
+        <Text style={s.title}>{mobileWording().title}</Text>
+        <Text style={s.muted}>{mobileWording().intro}</Text>
         {choice.link ? (
           <Text style={s.mono}>{choice.link.url}</Text>
         ) : (
           <>
             <Pressable style={s.button} onPress={scan}>
-              <Text style={s.buttonText}>扫二维码</Text>
+              <Text style={s.buttonText}>{mobileWording().scan}</Text>
             </Pressable>
             <TextInput
               style={s.input}
-              placeholder="或者粘贴配对链接"
+              placeholder={mobileWording().paste}
               autoCapitalize="none"
               autoCorrect={false}
               value={typed}
@@ -68,21 +69,21 @@ export function PairScreen({ connection, choice }: { connection: FarmConnection;
             />
           </>
         )}
-        <Text style={s.label}>这台手机叫</Text>
+        <Text style={s.label}>{mobileWording().name}</Text>
         <TextInput style={s.input} value={choice.name} onChangeText={(name) => connection.setName(name)} editable={!choice.asking} maxLength={40} />
         {choice.asking ? (
           <View style={s.row} accessibilityRole="progressbar">
             <ActivityIndicator color={colors.accent} />
-            <Text style={s.muted}>等那台电脑上的主人点头……</Text>
+            <Text style={s.muted}>{mobileWording().waiting}</Text>
           </View>
         ) : (
           <Pressable style={[s.button, !choice.link && s.off]} disabled={!choice.link} onPress={() => void connection.pair()}>
-            <Text style={s.buttonText}>请主人放行</Text>
+            <Text style={s.buttonText}>{mobileWording().ask}</Text>
           </Pressable>
         )}
         {choice.link ? (
           <Pressable onPress={() => void connection.cancel()}>
-            <Text style={s.cancelText}>取消配对</Text>
+            <Text style={s.cancelText}>{mobileWording().cancel}</Text>
           </Pressable>
         ) : null}
         {problem ? (

@@ -1,6 +1,7 @@
 // 管家: who the orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong),
 // 旧账 (the conversation it folded away) and 声音 (what it says on a call); /orchestrator/<tab>.
 
+import { pagesWording } from "../words";
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../data/api";
@@ -15,10 +16,10 @@ import { TrajectoryLog } from "../Trajectory";
 import { usePrefs } from "../../data/prefs";
 
 const tabs = [
-  { id: "memory", label: "记性" },
-  { id: "trajectory", label: "轨迹" },
-  { id: "archive", label: "旧账" },
-  { id: "voice", label: "声音" },
+  { id: "memory", label: pagesWording().orchestrator.tab.memory },
+  { id: "trajectory", label: pagesWording().orchestrator.tab.trajectory },
+  { id: "archive", label: pagesWording().orchestrator.tab.archive },
+  { id: "voice", label: pagesWording().orchestrator.tab.voice },
 ] as const;
 
 /** `rest` is the path after /orchestrator/. */
@@ -34,17 +35,18 @@ export function OrchestratorPage(props: { rest: string }) {
       </span>
       <div class="flex min-w-0 flex-col gap-0.5">
         <A href="/agents" class="text-xs text-muted hover:underline">
-          ← 全部帮工
+          {pagesWording().orchestrator.all}
         </A>
-        <h1 class="text-2xl font-semibold">管家</h1>
+        <h1 class="text-2xl font-semibold">{pagesWording().orchestrator.title}</h1>
         <p class="text-sm text-muted">
-          管家不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。{look() ? `长相是${look()!.name}，在农场的管家面板里换。` : ""}
+          {pagesWording().orchestrator.intro}
+          {look() ? pagesWording().orchestrator.look(look()!.name) : ""}
         </p>
       </div>
     </div>
   );
   const bar = () => (
-    <div role="tablist" aria-label="管家的" class="flex gap-1 border-b border-line pb-2">
+    <div role="tablist" aria-label={pagesWording().orchestrator.tabs} class="flex gap-1 border-b border-line pb-2">
       <For each={tabs}>
         {(t) => (
           <button
@@ -70,10 +72,10 @@ export function OrchestratorPage(props: { rest: string }) {
           <div class="min-h-0 flex-1">
             <TrajectoryLog
               id={orchestratorAgent}
-              asked="收到"
-              empty="管家还没开过口。"
-              title="管家每一轮的经过"
-              about="它收到的话、调的每个工具（点一行看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。"
+              asked={pagesWording().trajectory.lane.asked}
+              empty={pagesWording().orchestrator.quiet}
+              title={pagesWording().orchestrator.trajectory}
+              about={pagesWording().orchestrator.about}
               onMarkWrong={(on, want) => api.orchestrator.markWrong({ body: { on, want } })}
             />
           </div>

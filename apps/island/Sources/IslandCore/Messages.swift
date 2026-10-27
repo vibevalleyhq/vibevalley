@@ -29,19 +29,33 @@ public struct IslandRow: Codable, Equatable, Sendable, Identifiable {
   }
 }
 
-/** The farm at a glance: how many at work, how many wait on the owner, and the rows, those waiting first. */
+/** The strip's two words, in the farm's language: the app writes them, the island only shows them. */
+public struct Strip: Codable, Equatable, Sendable {
+  public var working: String
+  public var waiting: String
+
+  public init(working: String, waiting: String) {
+    self.working = working
+    self.waiting = waiting
+  }
+}
+
+/** The farm at a glance: how many at work, how many wait on the owner, the strip's words, and the rows, those waiting
+ * first. */
 public struct Glance: Codable, Equatable, Sendable {
   public var working: Int
   public var waiting: Int
+  public var strip: Strip
   public var rows: [IslandRow]
 
-  public init(working: Int, waiting: Int, rows: [IslandRow]) {
+  public init(working: Int, waiting: Int, strip: Strip, rows: [IslandRow]) {
     self.working = working
     self.waiting = waiting
+    self.strip = strip
     self.rows = rows
   }
 
-  public static let empty = Glance(working: 0, waiting: 0, rows: [])
+  public static let empty = Glance(working: 0, waiting: 0, strip: Strip(working: "", waiting: ""), rows: [])
 }
 
 private struct GlanceLine: Decodable {

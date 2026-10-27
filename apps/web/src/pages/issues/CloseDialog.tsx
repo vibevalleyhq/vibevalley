@@ -1,3 +1,4 @@
+import { issuesWording } from "./words";
 import { createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
 import type { ChangedFile, Changes, Issue, Session } from "@vibevalley/protocol";
@@ -28,28 +29,28 @@ export function CloseIssueDialog(props: { issue: Issue; session: Session; review
     if (closed) props.onClose();
   };
   return (
-    <Dialog open onClose={props.onClose} title={`关上「${issueTitle(props.issue)}」`} wide={reviewing()}>
+    <Dialog open onClose={props.onClose} title={issuesWording().close.title(issueTitle(props.issue))} wide={reviewing()}>
       <Show when={!reviewing()} fallback={<ChangesReview issue={props.issue.id} onDone={props.onClose} />}>
         <div>
           <p class="text-base">
             {working()
-              ? `${props.session.name} 还在干这张工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。`
+              ? issuesWording().close.working(props.session.name)
               : acts().includes("complete")
-                ? `完成就是把 ${props.session.name} 的分支合进项目的主分支，先看一遍改动；取消就是让它收工，改动不合进去。`
-                : `这张工单现在不能完成。取消会让 ${props.session.name} 离开，改动不合进主分支。`}
+                ? issuesWording().close.completable(props.session.name)
+                : issuesWording().close.notCompletable(props.session.name)}
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <Show when={acts().includes("complete")}>
               <Button tone="primary" onClick={() => setReviewing(true)}>
-                看改动，完成
+                {issuesWording().close.review}
               </Button>
             </Show>
             <Show when={acts().includes("close")}>
               <Button tone="danger" onClick={() => void cancel()}>
-                {working() ? "叫停并取消" : "取消工单"}
+                {working() ? issuesWording().close.stopAndCancel : issuesWording().close.cancel}
               </Button>
             </Show>
-            <Button onClick={() => props.onClose()}>算了</Button>
+            <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
           </div>
         </div>
       </Show>
@@ -77,16 +78,19 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
   return (
     <Switch>
       <Match when={changes.isPending}>
-        <p class="py-10 text-center text-sm text-muted">正在看它改了什么…</p>
+        <p class="py-10 text-center text-sm text-muted">{issuesWording().changes.reading}</p>
       </Match>
       <Match when={changes.error}>
         {(error) => (
           <div>
             <Note tone="berry">
-              <span class="text-berry">看不了改动：{reasonOf(error())}</span>
+              <span class="text-berry">
+                {issuesWording().changes.unreadable}
+                {reasonOf(error())}
+              </span>
             </Note>
             <Button class="mt-4" onClick={() => props.onDone()}>
-              先放着
+              {issuesWording().later}
             </Button>
           </div>
         )}
@@ -102,27 +106,25 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
                 fallback={
                   <Show when={empty()}>
                     <Note>
-                      <span class="text-muted">这一单没有改动。完成就是请它收工。</span>
+                      <span class="text-muted">{issuesWording().changes.none}</span>
                     </Note>
                   </Show>
                 }
               >
                 <Note tone="berry">
-                  <div class="font-semibold text-berry">合进 {c().base} 会冲突，先没法完成</div>
+                  <div class="font-semibold text-berry">{issuesWording().changes.conflict(c().base)}</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().conflicts}>{(f) => <span class="rounded bg-page px-1.5 font-mono text-xs text-berry">{f}</span>}</For>
                   </div>
-                  <div class="mt-1.5 text-xs text-muted">让它在自己的分支上把 {c().base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。</div>
+                  <div class="mt-1.5 text-xs text-muted">{issuesWording().changes.resolveHow(c().base)}</div>
                 </Note>
               </Show>
               <Show when={c().behind > 0 && c().conflicts.length === 0}>
-                <p class="text-xs text-muted">
-                  它干活这段时间，{c().base} 上多了 {c().behind} 个提交；完成时会合在一起（多一个合并提交）。
-                </p>
+                <p class="text-xs text-muted">{issuesWording().changes.behind(c().base, c().behind)}</p>
               </Show>
               <Show when={c().uncommitted.length > 0}>
                 <Note tone="wheat">
-                  <div>还有 {c().uncommitted.length} 个文件没提交，完成时会先帮它提交：</div>
+                  <div>{issuesWording().changes.uncommitted(c().uncommitted.length)}</div>
                   <div class="mt-1.5 flex flex-wrap gap-1">
                     <For each={c().uncommitted}>
                       {(f) => (
@@ -137,18 +139,18 @@ export function ChangesReview(props: { issue: string; onDone: () => void }) {
               <div class="flex flex-wrap gap-2">
                 <Show when={acts().includes("complete")}>
                   <Button tone="primary" onClick={() => void take()}>
-                    {empty() ? "完成，请它收工" : `完成，合进 ${c().base}`}
+                    {empty() ? issuesWording().changes.letGo : issuesWording().changes.merge(c().base)}
                   </Button>
                 </Show>
                 <Show when={acts().includes("resolve")}>
                   <Button tone="danger" onClick={() => void resolve()}>
-                    让它解决冲突
+                    {issuesWording().changes.resolve}
                   </Button>
                 </Show>
-                <Button onClick={() => props.onDone()}>先放着</Button>
+                <Button onClick={() => props.onDone()}>{issuesWording().later}</Button>
               </div>
               <Show when={!acts().includes("complete") && !acts().includes("resolve")}>
-                <p class="text-xs text-muted">工单状态变了，先回到工单看看要你做的事。</p>
+                <p class="text-xs text-muted">{issuesWording().changes.moved}</p>
               </Show>
               <ChangesBody changes={c()} />
             </div>
@@ -163,15 +165,15 @@ export function ChangesHead(props: { changes: Changes }) {
   const counts = () => lineCounts(props.changes);
   return (
     <div class="flex flex-wrap items-center gap-2 text-sm">
-      <span class="rounded bg-selected px-1.5 text-xs">项目 {props.changes.project}</span>
+      <span class="rounded bg-selected px-1.5 text-xs">
+        {issuesWording().task.project} {props.changes.project}
+      </span>
       <Show when={props.changes.branch}>
         <span class="font-mono text-xs">
           {props.changes.branch} → {props.changes.base}
         </span>
       </Show>
-      <span class="text-xs text-muted">
-        {props.changes.commits.length} 个提交 · {props.changes.files.length} 个文件
-      </span>
+      <span class="text-xs text-muted">{issuesWording().changes.counts(props.changes.commits.length, props.changes.files.length)}</span>
       <Show when={props.changes.files.length > 0}>
         <PlusMinus added={counts()[0]} removed={counts()[1]} />
       </Show>
@@ -186,7 +188,7 @@ export function ChangesBody(props: { changes: Changes }) {
     <>
       <Show when={props.changes.commits.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">提交 {props.changes.commits.length}</h3>
+          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{issuesWording().changes.commits(props.changes.commits.length)}</h3>
           <For each={props.changes.commits}>
             {(m) => (
               <div class="flex items-center gap-2.5 py-0.5">
@@ -200,7 +202,7 @@ export function ChangesBody(props: { changes: Changes }) {
       </Show>
       <Show when={props.changes.files.length > 0}>
         <section>
-          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">改了的文件 {props.changes.files.length}</h3>
+          <h3 class="mt-2 mb-1 text-xs font-semibold text-muted">{issuesWording().changes.files(props.changes.files.length)}</h3>
           <div class="divide-y divide-line overflow-hidden rounded-md border border-line">
             <For each={props.changes.files}>{(f) => <FileRow file={f} conflict={props.changes.conflicts.includes(f.path)} />}</For>
           </div>
@@ -243,9 +245,9 @@ function FileRow(props: { file: ChangedFile; conflict: boolean }) {
           {props.file.path}
         </span>
         <Show when={props.conflict}>
-          <span class="rounded bg-berry/15 px-1.5 text-xs text-berry">冲突</span>
+          <span class="rounded bg-berry/15 px-1.5 text-xs text-berry">{issuesWording().changes.conflictMark}</span>
         </Show>
-        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-xs text-muted">二进制</span>}>
+        <Show when={props.file.added >= 0} fallback={<span class="font-mono text-xs text-muted">{issuesWording().changes.binary}</span>}>
           <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
         </Show>
       </button>
@@ -275,21 +277,21 @@ export function ReopenDialog(props: { issue: Issue; onClose: () => void; onReope
     if (got) props.onReopened();
   };
   return (
-    <Dialog open onClose={props.onClose} title="重开这张工单">
-      <p class="text-base">「{issueTitle(props.issue)}」由同一个帮工档案的新帮工接着做，它会知道这张工单原来要做什么、上一次是怎么关的。</p>
+    <Dialog open onClose={props.onClose} title={issuesWording().reopen.title}>
+      <p class="text-base">{issuesWording().reopen.line(issueTitle(props.issue))}</p>
       <TextArea
         ref={autofocus()}
         class="mt-4"
         rows={3}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
-        placeholder="这次要它做什么（不填就是接着做完）"
-        aria-label="这次要做什么"
+        placeholder={issuesWording().reopen.what}
+        aria-label={issuesWording().reopen.whatLabel}
       />
       <div class="mt-5 flex justify-end gap-2">
-        <Button onClick={() => props.onClose()}>算了</Button>
+        <Button onClick={() => props.onClose()}>{issuesWording().never}</Button>
         <Button tone="primary" onClick={() => void reopen()}>
-          重开
+          {issuesWording().reopen.reopen}
         </Button>
       </div>
     </Dialog>

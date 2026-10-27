@@ -2,6 +2,7 @@
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
+import { pagesWording } from "../words";
 import {
   type Block,
   type BlockAttrs,
@@ -524,7 +525,7 @@ export class DocEditor {
           ack = await this.api.doc.submit({ id: this.docId, body: { batchId: batch.id, lastSeq: this.seq, ops: batch.ops } });
         } catch (e) {
           // Kept with its batch id, so sending it again cannot take it twice.
-          this.error = `没存上：${reasonOf(e)}`;
+          this.error = pagesWording().docs.notSaved(reasonOf(e));
           this.changed();
           break;
         }
@@ -536,9 +537,9 @@ export class DocEditor {
           if (!b) continue;
           b.problem =
             r.status === "conflict"
-              ? `${r.reason ?? "这一块刚被别人改过"}：你写的没存上，留在修订里了`
+              ? pagesWording().docs.conflict(r.reason ?? pagesWording().docs.changed)
               : r.status === "rejected"
-                ? `没存上：${r.reason ?? ""}`
+                ? pagesWording().docs.notSaved(r.reason ?? "")
                 : undefined;
           if (r.status === "conflict") b.sent = [];
         }

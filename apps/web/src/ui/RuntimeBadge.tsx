@@ -1,3 +1,4 @@
+import { appWording } from "../app/words";
 import { ready, useRuntimes, useSprites } from "../data/query";
 import { runtimeName } from "../rules/skills";
 
@@ -5,7 +6,7 @@ import { runtimeName } from "../rules/skills";
 export function RuntimeBadge(props: { runtime: string; size: number }) {
   const runtimes = useRuntimes();
   const sprites = useSprites();
-  const label = () => `运行工具：${runtimeName(ready(runtimes, []), props.runtime)}`;
+  const label = () => appWording().runtime(runtimeName(ready(runtimes, []), props.runtime));
   const icon = () => {
     const name = `logo-${props.runtime}`;
     return name in ready(sprites, {}) ? name : "icon-wrench";

@@ -2,6 +2,7 @@
 // the farm, stop or dismiss a helper, harvest) and the page's own clock and effects (which earn nothing), plays each
 // sound, and keeps the frames and side events it saw, to copy as JSON lines.
 
+import { farmWording } from "../words";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -100,7 +101,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
     try {
       await f();
     } catch (e) {
-      toasts.add({ type: ToastType.error, title: "调试台", description: reasonOf(e), timeout: 4500 });
+      toasts.add({ type: ToastType.error, title: farmWording().debug.title, description: reasonOf(e), timeout: 4500 });
     }
   };
   const sessions = () => core()?.sessions ?? [];
@@ -113,18 +114,18 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   const level = () => Math.round(frames.frame?.view.level.level ?? 1);
   return (
     <aside
-      aria-label="调试台"
+      aria-label={farmWording().debug.title}
       class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-[#14110ef5] p-3 font-mono text-[12px] text-paper shadow-px"
     >
       <header class="flex items-center gap-2">
-        <span class="flex-1 text-[13px] text-hat">调试台</span>
+        <span class="flex-1 text-[13px] text-hat">{farmWording().debug.title}</span>
         <button type="button" class={btn()} onClick={() => props.onClose()}>
-          关闭 `
+          {farmWording().debug.close}
         </button>
       </header>
       <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <Section
-          title="通话"
+          title={farmWording().debug.call}
           aside={
             <span>
               call={core()?.call} orchestrator={core()?.orchestrator}
@@ -133,17 +134,17 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
         >
           <div class="flex gap-1.5">
             <button type="button" class={btn("hat")} onClick={() => void run(() => api.orchestrator.open())}>
-              开工
+              {farmWording().debug.open}
             </button>
             <button type="button" class={btn()} onClick={() => void everyone("dismiss")}>
-              收工
+              {farmWording().debug.dismiss}
             </button>
           </div>
         </Section>
-        <Section title="天色" aside={<span>{clockText(day().tod)}</span>}>
+        <Section title={farmWording().debug.sky} aside={<span>{clockText(day().tod)}</span>}>
           <input
             type="range"
-            aria-label="时间"
+            aria-label={farmWording().debug.time}
             min={0}
             max={0.999}
             step={0.005}
@@ -155,7 +156,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             <For
               each={
                 [
-                  [0, "停"],
+                  [0, farmWording().debug.stop],
                   [1, "1×"],
                   [10, "10×"],
                   [60, "60×"],
@@ -175,10 +176,10 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             </For>
           </div>
         </Section>
-        <Section title="游戏进度" aside={<span>Lv.{level()}</span>}>
+        <Section title={farmWording().debug.progress} aside={<span>Lv.{level()}</span>}>
           <div class="flex gap-1.5">
             <button type="button" class={btn()} onClick={() => localEffects.add({ kind: "levelUp", level: level() + 1 })}>
-              升一级（带横幅）
+              {farmWording().debug.levelUp}
             </button>
             <button
               type="button"
@@ -201,13 +202,13 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 });
               }}
             >
-              弹一个成就
+              {farmWording().debug.achievement}
             </button>
           </div>
         </Section>
-        <Section title={`帮工 · ${sessions().length}`}>
+        <Section title={farmWording().debug.helpers(sessions().length)}>
           <Show when={sessions().length === 0}>
-            <span class="text-ink-300">地里没人。</span>
+            <span class="text-ink-300">{farmWording().debug.nobody}</span>
           </Show>
           <For each={sessions()}>
             {(h) => (
@@ -217,26 +218,26 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                 </button>
                 <Show when={h.phase._tag === "done"}>
                   <button type="button" class={btn("hat")} onClick={() => void run(() => api.issue.status({ id: issueOf(h), body: { status: "done" } }))}>
-                    收获
+                    {farmWording().tool.harvest.label}
                   </button>
                 </Show>
                 <button type="button" class={btn()} onClick={() => void run(() => api.session.stop({ id: h.id }))}>
-                  叫停
+                  {farmWording().debug.halt}
                 </button>
                 <button type="button" class={btn("bad")} onClick={() => void run(() => api.issue.status({ id: issueOf(h), body: { status: "canceled" } }))}>
-                  收工
+                  {farmWording().debug.dismiss}
                 </button>
               </div>
             )}
           </For>
         </Section>
-        <Section title="全部">
+        <Section title={farmWording().debug.all}>
           <div class="flex gap-1.5">
             <button type="button" class={btn()} onClick={() => void everyone("stop")}>
-              全部叫停
+              {farmWording().debug.haltAll}
             </button>
             <button type="button" class={btn("bad")} onClick={() => void everyone("dismiss")}>
-              全部收工
+              {farmWording().debug.dismissAll}
             </button>
           </div>
         </Section>
@@ -256,14 +257,14 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
           )}
         </For>
         <Section
-          title={`帧和事件 · ${props.log.entries().length}`}
+          title={farmWording().debug.frames(props.log.entries().length)}
           aside={
             <span class="flex gap-1">
               <button type="button" class={btn()} onClick={() => props.log.setPaused(!props.log.paused())}>
-                {props.log.paused() ? "接着记" : "暂停"}
+                {props.log.paused() ? farmWording().debug.resume : farmWording().debug.pause}
               </button>
               <button type="button" class={btn()} onClick={() => props.log.clear()}>
-                清空
+                {farmWording().debug.clear}
               </button>
               <button
                 type="button"
@@ -279,7 +280,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
                     .catch(() => undefined)
                 }
               >
-                复制 .jsonl
+                {farmWording().debug.copy}
               </button>
             </span>
           }

@@ -48,6 +48,10 @@ describe("memory", () => {
     ]);
     expect(memoryNotesOf(Array.from({ length: 9 }, (_, i) => `记住：第 ${i} 条`).join("\n"))).toHaveLength(5);
     expect(memoryNotesOf("结论：做完了。")).toEqual([]);
+    expect(memoryNotesOf("Remember: tests run with pnpm test\n- **Remember (all projects):** commit messages in English")).toEqual([
+      { text: "tests run with pnpm test", everywhere: false },
+      { text: "commit messages in English", everywhere: true },
+    ]);
     expect(memoryJobText("给打卡接口加分页", "加好了（3f2a1bc）", "completed")).toBe("给打卡接口加分页 → 加好了（3f2a1bc）");
     expect(memoryJobText("给打卡接口加分页", "pnpm test 没过", "failed")).toBe("给打卡接口加分页 → 没做成：pnpm test 没过");
     const known = [{ id: "1", agent: "lab", kind: "note", text: "这个项目用 pnpm test 跑测试", project: "clock", at: 0, recalled: 0 }] as never;

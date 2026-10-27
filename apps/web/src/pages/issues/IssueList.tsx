@@ -1,3 +1,4 @@
+import { issuesWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { orchestratorAgent } from "@vibevalley/protocol";
@@ -46,7 +47,7 @@ export function IssueList(props: {
     });
 
   return (
-    <Show when={!props.loading} fallback={<EmptyNote>在读……</EmptyNote>}>
+    <Show when={!props.loading} fallback={<EmptyNote>{issuesWording().reading}</EmptyNote>}>
       <div class="@container min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <For each={groupRows(props.cards, props.grouping, rowFacts)} keyed={(g) => g.key}>
           {(g) => {
@@ -59,12 +60,12 @@ export function IssueList(props: {
               props.grouping === "status"
                 ? laneLabel[g().lane!]
                 : props.grouping === "project"
-                  ? g().key || "没有项目"
+                  ? g().key || issuesWording().list.noProject
                   : props.grouping === "agent"
                     ? g().key
                       ? nameOf()(g().key)
-                      : "还没选帮工"
-                    : "全部工单";
+                      : issuesWording().noHelper
+                    : issuesWording().list.all;
             const icon = (): JSX.Element => {
               const key = g().key;
               switch (props.grouping) {
@@ -84,7 +85,7 @@ export function IssueList(props: {
                   <button
                     type="button"
                     onClick={() => fold(g().key)}
-                    aria-label={isFolded() ? `展开 ${label()}` : `收起 ${label()}`}
+                    aria-label={isFolded() ? issuesWording().list.unfold(label()) : issuesWording().list.fold(label())}
                     class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2.5 text-left"
                   >
                     <Icon name="button-next" size={10} class={{ "rotate-90": !isFolded() }} />
@@ -93,7 +94,11 @@ export function IssueList(props: {
                     <span class="text-xs text-muted">{g().rows.length}</span>
                   </button>
                   <Show when={canAdd(g())}>
-                    <IconButton icon="button-add" label={`在「${label()}」写一张`} onClick={() => setAdding(adding() === g().key ? null : g().key)} />
+                    <IconButton
+                      icon="button-add"
+                      label={issuesWording().list.writeIn(label())}
+                      onClick={() => setAdding(adding() === g().key ? null : g().key)}
+                    />
                   </Show>
                 </header>
                 <Show when={!isFolded()}>
@@ -111,7 +116,7 @@ export function IssueList(props: {
                     <OlderLink hidden={hidden()} onClick={props.onOlder} />
                   </Show>
                   <Show when={g().rows.length === 0 && adding() !== g().key}>
-                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">没有工单</p>
+                    <p class="py-1.5 pr-3 pl-9 text-xs text-faint">{issuesWording().list.none}</p>
                   </Show>
                 </Show>
               </section>

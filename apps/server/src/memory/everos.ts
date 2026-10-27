@@ -4,6 +4,8 @@
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
+import { memoryWording } from "./words.ts";
+import { everosWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Clock, Effect, Schema } from "effect";
 import { type HttpClient, HttpClientRequest } from "effect/http";
@@ -147,7 +149,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   return {
     name: "everos",
-    unavailable: () => (c.url ? undefined : "没填地址"),
+    unavailable: () => (c.url ? undefined : memoryWording().noUrl),
     // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
     stop: Effect.gen(function* () {
       if (!(yield* life.stop)) return;
@@ -169,8 +171,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
       if (!c.read || q.text.trim() === "") return { found: [] };
-      if (q.project === "") return { found: [], coverage: "不支持跨项目检索，请指定一个项目；本次未包含 EverOS" };
-      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: "此查询需要指定帮工档案，本次未包含 EverOS" };
+      if (q.project === "") return { found: [], coverage: memoryWording().coverage.everosAcross };
+      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: memoryWording().coverage.everosAgent };
       const kind: MemoryKind = q.kind || "note";
       const hits = yield* find(q.agent, q.text, q.limit, kind, q.project);
       return {
@@ -179,7 +181,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
           .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
       };
     }),
-    list: () => Effect.fail(new SourceError({ message: "EverOS 的记忆不在这里列出" })),
+    list: () => Effect.fail(new SourceError({ message: memoryWording().everosList })),
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (!c.write || run.outcome === "interrupted") return;
@@ -187,7 +189,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       const messages: Message[] = [];
       if (!told.has(run.session) && run.job.trim() !== "") messages.push({ sender_id: user, role: "user", timestamp: at, content: run.job });
       let said = run.said.trim() === "" ? run.summary : run.said;
-      if (run.outcome === "failed") said = "（这一轮没做成）" + said;
+      if (run.outcome === "failed") said = everosWords.failed + said;
       if (said.trim() !== "") messages.push({ sender_id: agentOf(run.agent), role: "assistant", timestamp: at, content: said });
       if (messages.length === 0) return;
       yield* add(sessionOf(run.session), run.project, messages);
@@ -207,8 +209,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       const project = n.project.trim();
       const at = yield* Clock.currentTimeMillis;
       yield* add(session, project, [
-        { sender_id: user, role: "user", timestamp: at, content: `记住（${project ? `项目 ${project}` : "所有项目"}）：${n.text}` },
-        { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: `记下了：${n.text}` },
+        { sender_id: user, role: "user", timestamp: at, content: everosWords.remember(project ?? "", n.text) },
+        { sender_id: agentOf(n.agent), role: "assistant", timestamp: at, content: everosWords.noted(n.text) },
       ]);
       yield* Effect.ensuring(
         flush(session, project),
@@ -216,7 +218,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       );
       return undefined;
     }),
-    forget: () => Effect.fail(new SourceError({ message: "EverOS 里的记忆到 EverOS 里删" })),
+    forget: () => Effect.fail(new SourceError({ message: memoryWording().everosForget })),
     can: { list: false, forget: false, transcripts: true },
   };
 }

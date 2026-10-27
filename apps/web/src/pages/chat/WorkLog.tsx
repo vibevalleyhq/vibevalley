@@ -1,3 +1,4 @@
+import { chatWording } from "./words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -48,7 +49,7 @@ export function TurnSteps(props: { session: string; run: string | undefined; orc
             <Icon name={open() ? "button-collapse" : "button-enlarge"} size={10} class="opacity-60" />
           </button>
           <Show when={open()}>
-            <WorkLog steps={steps()} now={now()} asked="收到" class="mt-1.5" />
+            <WorkLog steps={steps()} now={now()} asked={chatWording().log.heard} class="mt-1.5" />
           </Show>
         </div>
       )}
@@ -62,7 +63,10 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   const rounds = () => roundsOf(shown());
   const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
   return (
-    <div class={["max-h-[352px] divide-y divide-line overflow-y-auto rounded-md border border-line bg-page", props.class]} aria-label="干活过程">
+    <div
+      class={["max-h-[352px] divide-y divide-line overflow-y-auto rounded-md border border-line bg-page", props.class]}
+      aria-label={chatWording().log.process}
+    >
       <For each={rounds()} keyed={(r) => r.asked?.seq ?? -1}>
         {(r, i) => (
           <RoundView
@@ -91,14 +95,14 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       <button
         type="button"
         onClick={() => setToggled(!open())}
-        aria-label={open() ? "收起这一轮" : "展开这一轮"}
+        aria-label={open() ? chatWording().log.fold : chatWording().log.unfold}
         class="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-hover"
       >
         <Icon name="button-next" size={12} class={["transition-transform duration-150", { "rotate-90": open() }]} />
         <span class="text-sm font-semibold">{props.label}</span>
         <span class="min-w-0 flex-1 truncate text-xs text-muted">
-          {props.round.steps.length} 步 · {tookText(roundMs(props.round, end()))}
-          {props.live ? " · 进行中" : ""}
+          {chatWording().log.steps(props.round.steps.length, tookText(roundMs(props.round, end())))}
+          {props.live ? chatWording().log.live : ""}
         </span>
         <Show when={props.round.asked}>{(asked) => <When at={asked().time} now={props.now} />}</Show>
       </button>
@@ -121,7 +125,7 @@ function RoundView(props: { round: Round; last: boolean; live: boolean; now: num
       </For>
       <Show when={!open() && props.round.steps.length > shown().length}>
         <button type="button" onClick={() => setToggled(true)} class="cursor-pointer self-start pl-1.5 text-sm text-water hover:underline">
-          看这一轮的 {props.round.steps.length} 步
+          {chatWording().log.see(props.round.steps.length)}
         </button>
       </Show>
     </div>
@@ -168,7 +172,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean }) {
       </div>
       <Show when={long()}>
         <button type="button" onClick={() => setOpen(!open())} class="mt-1 cursor-pointer text-sm text-water hover:underline">
-          {open() ? "收起" : "展开全部"}
+          {open() ? chatWording().log.less : chatWording().log.all}
         </button>
       </Show>
     </div>
@@ -207,22 +211,22 @@ function Step(props: { step: SessionEvent; now: number }) {
   return (
     <Switch>
       <Match when={props.step.type === "user/message"}>
-        <Box fill="#e5a93c24" label={sub() ? "帮手接到" : "带话"} step={props.step} now={props.now}>
+        <Box fill="#e5a93c24" label={sub() ? chatWording().log.subagentGot : chatWording().log.told} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={4} />
         </Box>
       </Match>
       <Match when={props.step.type === "memory/recalled"}>
-        <Box fill="#b4cb7c26" label="想起了" step={props.step} now={props.now}>
+        <Box fill="#b4cb7c26" label={chatWording().log.recalled} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/thinking"}>
-        <Box edge faint label={sub() ? "帮手想了想" : "想了想"} step={props.step} now={props.now}>
+        <Box edge faint label={sub() ? chatWording().log.subagentThought : chatWording().log.thought} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={2} />
         </Box>
       </Match>
       <Match when={props.step.type === "assistant/message"}>
-        <Box fill="#2f1f130f" label={sub() ? "帮手说" : "它说"} step={props.step} now={props.now}>
+        <Box fill="#2f1f130f" label={sub() ? chatWording().log.subagentSaid : chatWording().log.said} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </Match>
@@ -245,9 +249,9 @@ function Step(props: { step: SessionEvent; now: number }) {
 function ToolStep(props: { step: SessionEvent; now: number }) {
   const [open, setOpen] = createSignal(false);
   const farm = () => farmToolText(props.step.text);
-  const kind = () => (farm() ? "田头" : (props.step.actionText ?? ""));
+  const kind = () => (farm() ? chatWording().log.farm : (props.step.actionText ?? ""));
   const input = () => readableInput(props.step);
-  const state = () => (props.step.ok === undefined ? "进行中" : props.step.ok ? "成功" : "失败");
+  const state = () => (props.step.ok === undefined ? chatWording().log.running : props.step.ok ? chatWording().log.ok : chatWording().log.failed);
   return (
     <div>
       <button
@@ -268,11 +272,14 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
       </button>
       <Show when={open()}>
         <div class="flex flex-col gap-1.5 pt-1 pr-2 pb-2 pl-8">
-          {props.step.tool && <span class="text-xs text-muted">工具 {props.step.tool}</span>}
+          {props.step.tool && <span class="text-xs text-muted">{chatWording().log.tool(props.step.tool)}</span>}
           <Show when={input()}>
             {(text) => <pre class="max-h-40 overflow-auto rounded-md bg-ink px-2.5 py-2 font-mono text-xs whitespace-pre-wrap text-[#eedcb2]">{text()}</pre>}
           </Show>
-          <Show when={props.step.output} fallback={<span class="text-xs text-muted">{props.step.ok === undefined ? "还没返回" : "没有输出"}</span>}>
+          <Show
+            when={props.step.output}
+            fallback={<span class="text-xs text-muted">{props.step.ok === undefined ? chatWording().log.pending : chatWording().log.noOutput}</span>}
+          >
             {(out) => <pre class="max-h-56 overflow-auto rounded-md bg-hover px-2.5 py-2 font-mono text-xs whitespace-pre-wrap">{out()}</pre>}
           </Show>
         </div>

@@ -1,7 +1,8 @@
+import { chatWording } from "./words";
+import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome } from "@vibevalley/protocol";
-import { outcomeLabel } from "@vibevalley/protocol/rules";
 import {
   chatPath,
   feedOf,
@@ -30,9 +31,9 @@ import { TurnSteps } from "./WorkLog";
 import { useAgent } from "../../data/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {
-  completed: { label: outcomeLabel.completed, fill: "#b4cb7c", icon: "icon-harvest" },
-  failed: { label: outcomeLabel.failed, fill: "#e9a092", icon: "icon-bug" },
-  interrupted: { label: outcomeLabel.interrupted, fill: "#e2c995", icon: "icon-shovel" },
+  completed: { label: wording().outcome.completed, fill: "#b4cb7c", icon: "icon-harvest" },
+  failed: { label: wording().outcome.failed, fill: "#e9a092", icon: "icon-bug" },
+  interrupted: { label: wording().outcome.interrupted, fill: "#e2c995", icon: "icon-shovel" },
 };
 
 /** A conversation's messages, newest at the bottom; filter keeps those containing it. */
@@ -66,15 +67,19 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
 
   return (
     // Reversed, so it stays at the newest while you are there and older pages load above without a jump.
-    <div class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label="消息">
+    <div class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto" role="log" aria-label={chatWording().messages.label}>
       <div class="flex flex-col px-4 pt-3 pb-4">
         <div class="flex justify-center pb-2">
           <Show
             when={hasOlder() && !searching()}
-            fallback={<span class="text-xs text-muted">{searching() ? `含「${(props.filter ?? "").trim()}」的消息` : "消息的开头"}</span>}
+            fallback={
+              <span class="text-xs text-muted">
+                {searching() ? chatWording().messages.containing((props.filter ?? "").trim()) : chatWording().messages.start}
+              </span>
+            }
           >
             <button type="button" onClick={() => void history.loadOlder(id()!)} class="cursor-pointer rounded px-2 py-1 text-xs text-faint hover:text-ink">
-              更早的消息
+              {chatWording().messages.older}
             </button>
           </Show>
         </div>
@@ -86,7 +91,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
           )}
         </Show>
         <Show when={items().length === 0}>
-          <p class="py-8 text-center text-sm text-muted">{searching() ? "没有找到" : props.emptyText}</p>
+          <p class="py-8 text-center text-sm text-muted">{searching() ? chatWording().messages.notFound : props.emptyText}</p>
         </Show>
         <For each={items()} keyed={(item) => item.message.id}>
           {(item) => (
@@ -102,7 +107,7 @@ export function MessageList(props: { conversation: Conversation | undefined; fil
           )}
         </For>
         <Show when={waiting()}>
-          <Frame face={<OrchestratorFace size={36} />} name="管家" meta="在想…">
+          <Frame face={<OrchestratorFace size={36} />} name={chatWording().orchestrator} meta={chatWording().messages.thinking}>
             <div class="flex h-5 items-center">
               <ThinkingDots />
             </div>
@@ -167,7 +172,7 @@ function Dispatch(props: { text: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open())}
-        aria-label={open() ? "收起派活" : "展开派活"}
+        aria-label={open() ? chatWording().messages.foldDispatch : chatWording().messages.unfoldDispatch}
         aria-expanded={aria(open())}
         class="mt-[5px] cursor-pointer"
       >
@@ -192,13 +197,13 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
     <Frame
       face={<SenderFace m={props.m} />}
       dot={session() && <Dot tone={phaseDot(session()!.phase)} size={11} />}
-      name={props.m.fromKind === "owner" ? "主人" : props.m.name}
+      name={props.m.fromKind === "owner" ? chatWording().messages.owner : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}`}
       continues={props.continues}
     >
       <Show when={props.m.kind === "dispatch"}>
         <div class="mb-1">
-          <Tag icon="icon-seeds" label="派活" fill="#f3d38a" />
+          <Tag icon="icon-seeds" label={chatWording().messages.dispatch} fill="#f3d38a" />
         </div>
       </Show>
       <Show when={props.m.kind === "report"}>
@@ -218,7 +223,7 @@ function MessageRow(props: { m: ChatMessage; continues: boolean; thread?: Conver
         {(spent) => (
           <div class="mt-1 flex items-center gap-1 text-xs text-muted">
             <Icon name="icon-coin" size={12} />
-            这一轮花了 {spentText(spent())}
+            {chatWording().messages.spent(spentText(spent()))}
           </div>
         )}
       </Show>
@@ -248,9 +253,11 @@ function ThreadPreview(props: { thread: Conversation }) {
     >
       <span class="flex w-full items-center gap-1.5">
         <Icon name="button-thread" size={16} />
-        <span class="text-sm font-semibold text-accent">{props.thread.replies > 0 ? `${props.thread.replies} 条回复` : "工单串"}</span>
+        <span class="text-sm font-semibold text-accent">
+          {props.thread.replies > 0 ? chatWording().replies(props.thread.replies) : chatWording().jobs.thread}
+        </span>
         <Show when={unread() > 0}>
-          <Tag label={`${unread()} 条新`} fill="#b4cb7c" />
+          <Tag label={chatWording().messages.unread(unread())} fill="#b4cb7c" />
         </Show>
         <Show when={session()} fallback={<span class="flex-1" />}>
           {(s) => (
@@ -265,7 +272,7 @@ function ThreadPreview(props: { thread: Conversation }) {
       <Show when={last()}>
         {(m) => (
           <span class="flex w-full items-center gap-2 text-sm">
-            <span class="shrink-0 font-medium">{m().fromKind === "owner" ? "主人" : m().name}</span>
+            <span class="shrink-0 font-medium">{m().fromKind === "owner" ? chatWording().messages.owner : m().name}</span>
             <span class="min-w-0 flex-1 truncate text-muted">{m().text.replace(/\s+/g, " ")}</span>
             <span class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</span>
           </span>

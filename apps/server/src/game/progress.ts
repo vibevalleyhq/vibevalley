@@ -26,7 +26,7 @@ import { graphOf } from "../task/rules.ts";
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
 export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
 
-const achievementOf = (id: string) => achievements.find((a) => a.id === id);
+const achievementOf = (id: string) => achievements().find((a) => a.id === id);
 
 const isTitle = (a: AchievementDef) => a.category !== "starter";
 
@@ -158,7 +158,7 @@ export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, Progr
 
   // Tiers reached by this entry: each earns its coins once.
   const unlocked: Unlock[] = [];
-  for (const a of achievements) {
+  for (const a of achievements()) {
     const count = counts[a.id] ?? 0;
     const had = tierOf(p, a.id);
     a.tiers.forEach((need, i) => {
@@ -272,4 +272,4 @@ export function catchUp(state: WorkspaceState): Entry[] {
 }
 
 /** Every achievement, in the page's order. */
-export const achievementsInWords = (): Achievement[] => achievements.map(achievementInWords);
+export const achievementsInWords = (): Achievement[] => achievements().map(achievementInWords);

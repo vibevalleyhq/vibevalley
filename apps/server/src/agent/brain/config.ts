@@ -1,6 +1,7 @@
 // The model the agent talks to, and MCP servers in the shape Claude Code and Cursor use:
 // { "mcpServers": { name: { command, args, env } | { url } } }.
 
+import { agentWording } from "../words.ts";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
@@ -13,7 +14,7 @@ import { getModel, type Model, models } from "../../ai/models.ts";
 export const defaultModel = "deepseek-flash";
 
 /** Said for the command line; the farm says where to put one in the app. */
-export const noDeepSeekKey = "没有 DeepSeek 的密钥：设 DEEPSEEK_API_KEY，或者写进 vibevalley.yaml 的 deepseek.api_key。";
+export const noDeepSeekKey = () => agentWording().noDeepSeekKey;
 
 export interface LLM {
   readonly model: Model;
@@ -25,7 +26,7 @@ export interface LLM {
 /** id empty is defaultModel; the key is the caller's to find. */
 export function deepseek(id: string, key: string | (() => string | undefined), stream: StreamFn): LLM {
   const apiKey = typeof key === "string" ? () => key : key;
-  if (!apiKey()) throw new Error(noDeepSeekKey);
+  if (!apiKey()) throw new Error(noDeepSeekKey());
   const name = id || defaultModel;
   const known = getModel("deepseek", name);
   const model = known ?? { ...models.find((m) => m.id === defaultModel)!, id: name, name };

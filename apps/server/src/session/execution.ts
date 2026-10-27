@@ -3,6 +3,8 @@
 // that takes inputs for several issues keeps the first in session_run.issue and links all of them in session_run_issue.
 // An input still queued is not linked. A run whose end could not be written stays ending: the next input waits for it.
 
+import { sessionWording } from "./words.ts";
+import { agentWording } from "../agent/words.ts";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { messageText } from "../agent/brain/messages.ts";
 import type { Outcome, RunTrigger } from "@vibevalley/protocol";
@@ -131,7 +133,7 @@ export class AgentExecution {
           self.summary = text;
           if (m.stopReason === "error") {
             self.outcome = "failed";
-            self.summary = m.errorMessage || "模型出错了";
+            self.summary = m.errorMessage || agentWording().modelFailed;
             self.journal.note("run/error", self.summary);
           } else if (m.stopReason === "aborted") self.outcome = "interrupted";
           return;
@@ -177,7 +179,7 @@ export class AgentExecution {
       this.closed = true;
       if (this.run && !this.ending) {
         this.outcome = "interrupted";
-        this.summary = "VibeValley 停下了，这一轮中断了";
+        this.summary = sessionWording().log.stopped;
       }
       return this.finish();
     });

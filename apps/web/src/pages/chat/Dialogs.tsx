@@ -1,5 +1,6 @@
 // A channel has no members to pick: helpers are in the channel their job was arranged in.
 
+import { chatWording } from "./words";
 import { For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Conversation } from "@vibevalley/protocol";
@@ -15,7 +16,12 @@ function ProjectInput(props: { value: string; onChange: (v: string) => void }) {
   const projects = useProjects();
   return (
     <>
-      <TextInput value={props.value} onInput={(e) => props.onChange(e.currentTarget.value)} placeholder="比如 clock-in" list="chat-projects" />
+      <TextInput
+        value={props.value}
+        onInput={(e) => props.onChange(e.currentTarget.value)}
+        placeholder={chatWording().dialog.projectExample}
+        list="chat-projects"
+      />
       <datalist id="chat-projects">
         <For each={ready(projects, [])}>{(p) => <option value={p.name} />}</For>
       </datalist>
@@ -44,7 +50,7 @@ function Form(props: {
       {props.children}
       <Show when={props.error}>{(error) => <p class="text-sm text-berry">{error()}</p>}</Show>
       <div class="flex justify-end gap-3 pt-2">
-        <Button onClick={() => props.onCancel()}>取消</Button>
+        <Button onClick={() => props.onCancel()}>{chatWording().dialog.cancel}</Button>
         <Button type="submit" tone="primary" disabled={props.busy || !ok()}>
           {props.submit}
         </Button>
@@ -56,7 +62,7 @@ function Form(props: {
 /** onCreated gets the new channel's id. */
 export function NewChannelDialog(props: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title="创建频道">
+    <Dialog open={props.open} onClose={() => props.onClose()} title={chatWording().newChannel}>
       <NewChannelForm onClose={() => props.onClose()} onCreated={(id) => props.onCreated(id)} />
     </Dialog>
   );
@@ -71,14 +77,25 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
     props.onClose();
   };
   return (
-    <Form submit="创建频道" onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()} ready={form.ready()}>
-      <Field label="名称" hint="字母、数字、汉字、- 和 _，不超过 24 个字">
-        <TextInput ref={autofocus()} required value={form.name()} placeholder="例如 clock-in" onInput={(e) => form.setName(e.currentTarget.value)} />
+    <Form submit={chatWording().newChannel} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()} ready={form.ready()}>
+      <Field label={chatWording().dialog.name} hint={chatWording().dialog.nameHint}>
+        <TextInput
+          ref={autofocus()}
+          required
+          value={form.name()}
+          placeholder={chatWording().dialog.nameExample}
+          onInput={(e) => form.setName(e.currentTarget.value)}
+        />
       </Field>
-      <Field label="描述（可不填）">
-        <TextArea rows={3} value={form.description()} onInput={(e) => form.setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
+      <Field label={chatWording().dialog.description}>
+        <TextArea
+          rows={3}
+          value={form.description()}
+          onInput={(e) => form.setDescription(e.currentTarget.value)}
+          placeholder={chatWording().dialog.descriptionHint}
+        />
       </Field>
-      <Field label="默认项目（可不填）" hint="在这个频道里派活、没说项目时，就在这个项目里干">
+      <Field label={chatWording().dialog.project} hint={chatWording().dialog.projectHint}>
         <ProjectInput value={form.project()} onChange={form.setProject} />
       </Field>
     </Form>
@@ -87,7 +104,7 @@ function NewChannelForm(props: { onClose: () => void; onCreated: (id: string) =>
 
 export function ChannelSettingsDialog(props: { channel: Conversation; open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={`# ${channelName(props.channel)} 的设置`}>
+    <Dialog open={props.open} onClose={() => props.onClose()} title={chatWording().dialog.settingsOf(channelName(props.channel))}>
       <ChannelSettingsForm channel={props.channel} onClose={() => props.onClose()} />
     </Dialog>
   );
@@ -100,11 +117,16 @@ function ChannelSettingsForm(props: { channel: Conversation; onClose: () => void
     if ((await form.save()) !== undefined) props.onClose();
   };
   return (
-    <Form submit="保存" onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
-      <Field label="描述（可不填）">
-        <TextArea rows={3} value={form.description()} onInput={(e) => form.setDescription(e.currentTarget.value)} placeholder="这个频道是做什么的？" />
+    <Form submit={chatWording().dialog.save} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
+      <Field label={chatWording().dialog.description}>
+        <TextArea
+          rows={3}
+          value={form.description()}
+          onInput={(e) => form.setDescription(e.currentTarget.value)}
+          placeholder={chatWording().dialog.descriptionHint}
+        />
       </Field>
-      <Field label="默认项目（可不填）" hint="空着就没有：派活时管家要问在哪个项目">
+      <Field label={chatWording().dialog.project} hint={chatWording().dialog.projectNone}>
         <ProjectInput value={form.project()} onChange={form.setProject} />
       </Field>
     </Form>

@@ -1,9 +1,14 @@
+import { farmWording } from "../words";
 // Each closes after its timeout (5 s by default), held while the pointer is over the stack; past `limit` they hide.
 
 export const ToastType = { info: "info", warn: "warn", error: "error", achievement: "achievement" } as const;
 export type ToastType = (typeof ToastType)[keyof typeof ToastType];
 
-export const noticeTitle: Partial<Record<ToastType, string>> = { info: "提示", warn: "没派成", error: "出错了" };
+export const noticeTitle: Partial<Record<ToastType, string>> = {
+  info: farmWording().fx.notice,
+  warn: farmWording().noticeTitle.warn,
+  error: farmWording().noticeTitle.error,
+};
 
 export interface ToastData {
   readonly id: number;

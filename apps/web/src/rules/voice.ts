@@ -1,6 +1,7 @@
 // The voice form's choices: what each stage offers, the limits on the numbers
 // and what 恢复默认 on one part touches. Why settings cannot be saved is the server's answer (setting.check).
 
+import { rulesWording } from "./words";
 import {
   type Area,
   type Language,
@@ -17,19 +18,33 @@ import {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-export const areaLabel: Record<Area, string> = { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" };
+export const areaLabel: Record<Area, string> = {
+  US: rulesWording().voice.area.US,
+  EU: rulesWording().voice.area.EU,
+  AP: rulesWording().voice.area.AP,
+  CN: rulesWording().voice.area.CN,
+};
 export const languageLabel: Record<Language, string> = {
-  "zh-CN": "普通话",
-  "zh-HK": "粤语（香港）",
-  "zh-TW": "中文（台湾）",
-  "en-US": "英语（美国）",
-  "ja-JP": "日语",
-  "ko-KR": "韩语",
+  "zh-CN": rulesWording().voice.language["zh-CN"],
+  "zh-HK": rulesWording().voice.language["zh-HK"],
+  "zh-TW": rulesWording().voice.language["zh-TW"],
+  "en-US": rulesWording().voice.language["en-US"],
+  "ja-JP": rulesWording().voice.language["ja-JP"],
+  "ko-KR": rulesWording().voice.language["ko-KR"],
 };
 
-export const asrLabel: Record<VoiceASR["vendor"], string> = { ares: "声网 ARES", deepgram: "Deepgram", microsoft: "微软" };
-export const answerLabel: Record<VoiceAnswer["vendor"], string> = { orchestrator: "管家", agora: "声网托管", deepseek: "DeepSeek", openai: "自己的接口" };
-export const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: "微软" };
+export const asrLabel: Record<VoiceASR["vendor"], string> = {
+  ares: rulesWording().voice.asr.ares,
+  deepgram: "Deepgram",
+  microsoft: rulesWording().voice.asr.microsoft,
+};
+export const answerLabel: Record<VoiceAnswer["vendor"], string> = {
+  orchestrator: rulesWording().card.orchestrator,
+  agora: rulesWording().voice.answer.agora,
+  deepseek: "DeepSeek",
+  openai: rulesWording().voice.answer.openai,
+};
+export const ttsLabel: Record<VoiceTTS["vendor"], string> = { minimax: "MiniMax", openai: "OpenAI", microsoft: rulesWording().voice.asr.microsoft };
 
 /** What each starts with when picked: the one in use if it is the same vendor, else these. */
 export const asrStart: Record<VoiceASR["vendor"], VoiceASR> = {
@@ -51,19 +66,19 @@ export const ttsStart: Record<VoiceTTS["vendor"], VoiceTTS> = {
 
 /** Any other id can be typed. */
 export const minimaxVoices = [
-  { id: "Chinese (Mandarin)_Gentle_Youth", label: "温润青年" },
-  { id: "male-qn-qingse", label: "青涩青年" },
-  { id: "male-qn-jingying", label: "精英青年" },
-  { id: "male-qn-badao", label: "霸道青年" },
-  { id: "male-qn-daxuesheng", label: "青年大学生" },
-  { id: "female-shaonv", label: "少女" },
-  { id: "female-yujie", label: "御姐" },
-  { id: "female-chengshu", label: "成熟女性" },
-  { id: "female-tianmei", label: "甜美女性" },
-  { id: "presenter_male", label: "男性主持人" },
-  { id: "presenter_female", label: "女性主持人" },
-  { id: "audiobook_male_1", label: "男性有声书" },
-  { id: "audiobook_female_1", label: "女性有声书" },
+  { id: "Chinese (Mandarin)_Gentle_Youth", label: rulesWording().voice.minimax.gentle },
+  { id: "male-qn-qingse", label: rulesWording().voice.minimax.qingse },
+  { id: "male-qn-jingying", label: rulesWording().voice.minimax.jingying },
+  { id: "male-qn-badao", label: rulesWording().voice.minimax.badao },
+  { id: "male-qn-daxuesheng", label: rulesWording().voice.minimax.student },
+  { id: "female-shaonv", label: rulesWording().voice.minimax.girl },
+  { id: "female-yujie", label: rulesWording().voice.minimax.yujie },
+  { id: "female-chengshu", label: rulesWording().voice.minimax.mature },
+  { id: "female-tianmei", label: rulesWording().voice.minimax.sweet },
+  { id: "presenter_male", label: rulesWording().voice.minimax.presenterMale },
+  { id: "presenter_female", label: rulesWording().voice.minimax.presenterFemale },
+  { id: "audiobook_male_1", label: rulesWording().voice.minimax.audiobookMale },
+  { id: "audiobook_female_1", label: rulesWording().voice.minimax.audiobookFemale },
 ] as const;
 
 /** Any other name can be typed. */
@@ -88,9 +103,9 @@ export const voiceLimits: Record<VoiceNumber, { min: number; max: number }> = {
 };
 
 export const numberLabel: Record<VoiceNumber, string> = {
-  silenceMs: "停顿多久算说完（毫秒）",
-  interruptMs: "说多久能打断他（毫秒）",
-  idleSeconds: "没人时多久离开（秒）",
+  silenceMs: rulesWording().voice.number.silenceMs,
+  interruptMs: rulesWording().voice.number.interruptMs,
+  idleSeconds: rulesWording().voice.number.idleSeconds,
 };
 
 /** The line: credentials' area, how it listens and who answers. The agent: what it says and in what voice. */

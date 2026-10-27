@@ -1,3 +1,6 @@
+import { mentionOf } from "../../rules/chat";
+import { orchestratorAgent } from "@vibevalley/protocol";
+import { chatWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../data/api";
@@ -19,7 +22,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
     target: () => ({ conversation: props.conversation?.id }),
     failed: (reason) => {
       setProblem(reason);
-      toast(`没发出去：${reason}`, "bad");
+      toast(chatWording().composer.notSent(reason), "bad");
     },
     edited: () => setProblem(undefined),
   });
@@ -28,7 +31,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
   return (
     <div class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label="叫谁" class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
+        <div role="listbox" aria-label={chatWording().composer.who} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
@@ -42,7 +45,7 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
                 }}
                 class={["flex cursor-pointer items-center gap-2 rounded-md px-2 py-1", { "bg-selected": i() === box.active() }]}
               >
-                <Show when={n().session} fallback={n().name === "管家" ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
+                <Show when={n().session} fallback={n().token === mentionOf[orchestratorAgent] ? <OrchestratorFace size={20} /> : <span class="size-5" />}>
                   {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
                 </Show>
                 <span class="font-mono text-xs">{n().token}</span>
@@ -72,15 +75,15 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
           class="block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-base outline-none [field-sizing:content] placeholder:text-faint"
         />
         <div class="flex items-center gap-1 px-2 pb-2">
-          <span class="text-xs text-faint">@ 叫人</span>
+          <span class="text-xs text-faint">{chatWording().composer.mention}</span>
           <span class="flex-1" />
           <DictationButton field={() => input} value={box.text()} onValue={box.edit} size={16} class="rounded-md hover:bg-hover" />
           <Show when={box.stoppable()}>
             <button
               type="button"
               onClick={() => void stop()}
-              aria-label="叫停管家"
-              title="叫管家停下这一轮，派出去的帮工照常干活"
+              aria-label={chatWording().composer.stop}
+              title={chatWording().composer.stopHint}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
             >
               <Icon name="button-stop" size={14} />
@@ -90,8 +93,8 @@ export function Composer(props: { conversation: Conversation | undefined; placeh
             type="button"
             onClick={() => void box.send()}
             disabled={!box.canSend()}
-            aria-label="发送"
-            title="回车发送 · Shift+回车换行"
+            aria-label={chatWording().composer.send}
+            title={chatWording().composer.sendHint}
             class={[
               "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
               box.canSend() ? "border-accent bg-accent hover:bg-leaf" : "border-transparent opacity-50",

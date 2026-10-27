@@ -5,14 +5,10 @@ import { describe, expect, it, test } from "vite-plus/test";
 import { checkCases, goldenCases } from "../testing/golden.ts";
 import {
   pullRequestConclusion,
-  criteriaHead,
-  refinementBrief,
   refinementDescription,
-  refinementOpening,
   filledKinds,
   filledTemplate,
   issueJob,
-  answerOpening,
   kept,
   nextTaskId,
   parseRefinement,
@@ -20,6 +16,7 @@ import {
   milestonesOf,
   splitJob,
 } from "./rules.ts";
+import { answerOpening, criteriaHead, refinementBrief, refinementOpening } from "./prompts.ts";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 test("the recorded cases", () => {

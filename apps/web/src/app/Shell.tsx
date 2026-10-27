@@ -2,6 +2,7 @@
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
 
+import { appWording } from "./words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
@@ -16,7 +17,7 @@ import { usePrefs } from "../data/prefs";
 /** The head's height, the rail's top slot's too. */
 const head = 66;
 
-const linkWords = { connecting: "连接中", open: "已连上", lost: "断了，重连中" } as const;
+const linkWords = { connecting: appWording().link.connecting, open: appWording().link.open, lost: appWording().link.lost } as const;
 
 /** A place's picture at 26 px: the agents' is a helper's face. */
 export function PlaceIcon(props: { place: Place }) {
@@ -47,11 +48,11 @@ function Rail(props: { here?: Place }) {
   const look = usePrefs((p) => p.orchestratorLook);
   const settings = places.find((p) => p.id === "settings")!;
   return (
-    <nav aria-label="工作台" class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
+    <nav aria-label={appWording().rail} class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3">
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/" label="回农场" current fill="#e5a93c">
+        <Slot to="/" label={appWording().farm} current fill="#e5a93c">
           <OrchestratorFace size={38} look={look()} />
         </Slot>
       </div>
@@ -68,7 +69,7 @@ function Rail(props: { here?: Place }) {
         <Slot to={settings.path} label={`${settings.label} · ${settings.hint}`} current={props.here === settings}>
           <PlaceIcon place={settings} />
         </Slot>
-        <Slot to="/" label="回农场">
+        <Slot to="/" label={appWording().farm}>
           <Icon name="icon-seeds" size={26} />
         </Slot>
         <span role="status" title={linkWords[frames.link]} class="flex h-4 items-center">
@@ -88,7 +89,7 @@ function Desk(props: { place?: Place }) {
   const core = useCore();
   const live = () => core()?.call === "live";
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
-  const status = () => (live() ? `开工中 · ${working()} 个在干活` : "没开工");
+  const status = () => (live() ? appWording().working(working()) : appWording().off);
   return (
     <div class="flex shrink-0 items-center gap-3 border-b border-line px-5" style={{ height: `${head}px` }}>
       <Show when={props.place} fallback={<span class="flex-1" />}>
