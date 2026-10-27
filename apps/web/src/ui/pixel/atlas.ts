@@ -2,6 +2,8 @@
 // pictures are drawn `density` times denser than the village's art pixels, so a sprite's size in art pixels is its
 // manifest size over the density, which is the map's width over the level's (384).
 
+import { type Accessor, createSignal, onSettled } from "solid-js";
+
 export interface Size {
   readonly w: number;
   readonly h: number;
@@ -79,4 +81,39 @@ export class SpriteAtlas {
     const s = this.sprites.get(name);
     return s ? { x: s.ax / s.w, y: (s.ay + 1 / this.density) / s.h } : { x: 0.5, y: 1 };
   }
+}
+
+let loading: Promise<SpriteAtlas> | undefined;
+
+/** Fetched once per page; a failed load is tried again on the next call. */
+export function loadAtlas(): Promise<SpriteAtlas> {
+  loading ??= fetch("/pixel/sprites.json")
+    .then((r) => {
+      if (!r.ok) throw new Error(`/pixel/sprites.json: ${r.status}`);
+      return r.text();
+    })
+    .then(
+      (text) => SpriteAtlas.parse(text),
+      (e: unknown) => {
+        loading = undefined;
+        throw e;
+      },
+    );
+  return loading;
+}
+
+/** The atlas, undefined until it is loaded (and while it cannot be). */
+export function useAtlas(): Accessor<SpriteAtlas | undefined> {
+  const [atlas, setAtlas] = createSignal<SpriteAtlas>();
+  onSettled(() => {
+    let live = true;
+    loadAtlas().then(
+      (a) => live && setAtlas(() => a),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  });
+  return atlas;
 }

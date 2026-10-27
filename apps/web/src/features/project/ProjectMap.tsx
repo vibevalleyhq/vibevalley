@@ -9,7 +9,7 @@ import { type Agent, maxRunning, type Session } from "@vibevalley/protocol";
 import { phaseText } from "@vibevalley/protocol/rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
 import { badgeColors, CardColors } from "../../ui/pixel/card";
-import type { SpriteAtlas, SpriteInfo } from "../../ui/pixel/atlas";
+import { type SpriteAtlas, type SpriteInfo, useAtlas } from "../../ui/pixel/atlas";
 import { castOf, castSprite, cropSprite } from "../../ui/cast";
 import {
   growthOf,
@@ -35,7 +35,6 @@ import { autofocus } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useAgents, useProjects } from "../../base/query";
 import { PixelCard } from "../../ui/pixel";
-import { useVillage } from "../../farm/support";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { AgentFace } from "../../ui/Face";
@@ -60,8 +59,7 @@ export function useIslands(): () => Island[] {
 const go = (navigate: (to: string) => void, id: string) => navigate(`/issues/${encodeURIComponent(id)}`);
 
 export function ProjectMap() {
-  const village = useVillage();
-  const atlas = () => village().village?.atlas;
+  const atlas = useAtlas();
   const islands = useIslands();
   const projects = useProjects();
   const loading = () => !ready(projects, undefined);
