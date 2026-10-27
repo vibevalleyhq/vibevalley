@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（25 篇）
 
 ### feature
 
@@ -17,6 +17,10 @@
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
 - 2026-10-09 [手机竖屏版面](.agents/notes/proposed/feature/2026-10-09-mobile-layout.md)
 - 2026-10-09 [每个动作至少播完一小段](.agents/notes/proposed/feature/2026-10-09-action-queue.md)
+
+### simplification
+
+- 2026-10-27 [工单只有两个写操作：挪状态、说话](.agents/notes/proposed/simplification/2026-10-27-issue-two-writes.md)
 
 ### architecture
 
