@@ -190,7 +190,7 @@ export const eventsCommand = Command.make("events", {}, () => Effect.flatMap(Ser
   Command.withDescription(cliWording().command.events(eventsPath)),
 );
 
-/** Only what `issue run` reads of a frame; the rest is left as it came. */
+/** Only what `issue work` reads of a frame; the rest is left as it came. */
 const IssuesOfFrame = Schema.fromJsonString(
   Schema.Struct({ state: Schema.Struct({ issues: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String, status: S.IssueStatus }))) }) }),
 );

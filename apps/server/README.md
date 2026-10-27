@@ -6,7 +6,7 @@ Effect v4 on Node 24, run from source with tsx (`vp run start`); the database is
 
 ```
 src/main.ts        the server: loads the configuration, takes the home's lease, serves; --ready-json, --web
-src/cli.ts         the command line: every endpoint, state and events, issue run, chatting with a runtime or the farm's own agent
+src/cli.ts         the command line: every endpoint, state and events, issue work, chatting with a runtime or the farm's own agent
 src/services.ts    every service in build order, then what runs at start
 src/handlers.ts    each endpoint handed to the service that owns it
 src/http/          the router over the endpoint table, the streams, /mcp and /v1/chat/completions, the page
