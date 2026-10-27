@@ -1,0 +1,73 @@
+// What the documents page says: the list, a document's blocks and the editor's state.
+
+import { localized } from "@vibevalley/protocol/words";
+
+const zh = {
+  docs: {
+    /** A memory item block's mark. */
+    memoryItem: "记性",
+    list: "文档列表",
+    title: "文档",
+    newTitle: "新文档的标题",
+    new: "新文档",
+    none: "还没有文档。写个标题，点「新文档」。",
+    all: "全部文档",
+    saving: "在存……",
+    saved: "都存好了",
+    blocks: (n: number) => `${n} 块`,
+    helpersWriting: "帮工在写",
+    doc: "文档",
+    demo: "演示：几个帮工一起写",
+    append: "在末尾写一段",
+    owner: "主人",
+    memory: "记性",
+    done: "做完了",
+    notDone: "没做完",
+    writing: (who: string) => `${who} 在写`,
+    wrote: (who: string) => `${who} 写的`,
+    image: (alt: string, src: string) => `图片：${alt} ${src}`.trim(),
+    issue: (id: string) => `工单 ${id}`,
+    unknown: (type: string) => `这一块是「${type}」，这个版本的客户端还画不了，只能看不能改`,
+    block: (id: string) => `块 ${id}`,
+    heading: "标题",
+    notSaved: (why: string) => `没存上：${why}`,
+    changed: "这一块刚被别人改过",
+    conflict: (why: string) => `${why}：你写的没存上，留在修订里了`,
+  },
+};
+
+const en: typeof zh = {
+  docs: {
+    /** A memory item block's mark. */
+    memoryItem: "Memory",
+    list: "Documents",
+    title: "Documents",
+    newTitle: "The new document's title",
+    new: "New document",
+    none: "No documents yet. Write a title and press New document.",
+    all: "All documents",
+    saving: "Saving…",
+    saved: "All saved",
+    blocks: (n) => (n === 1 ? "1 block" : `${n} blocks`),
+    helpersWriting: "helpers writing",
+    doc: "Document",
+    demo: "Demo: several helpers writing at once",
+    append: "Write a paragraph at the end",
+    owner: "Owner",
+    memory: "Memory",
+    done: "Done",
+    notDone: "Not done",
+    writing: (who) => `${who} is writing`,
+    wrote: (who) => `${who} wrote it`,
+    image: (alt, src) => `Image: ${alt} ${src}`.trim(),
+    issue: (id) => `Ticket ${id}`,
+    unknown: (type) => `This block is a "${type}", which this version cannot draw yet: it can be read, not changed`,
+    block: (id) => `Block ${id}`,
+    heading: "Heading",
+    notSaved: (why) => `Not saved: ${why}`,
+    changed: "Someone else just changed this block",
+    conflict: (why) => `${why}: what you wrote was not saved and stays in the revision`,
+  },
+};
+
+export const docWording = localized({ zh, en });

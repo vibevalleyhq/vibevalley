@@ -2,7 +2,7 @@
 // (voice.dictate), which hands it to the transcription address in 声音's 听写, and the words come back for the field it
 // was started from. Recorded as 16 kHz mono WAV, which every transcriber takes. One recording at a time.
 
-import { appWording } from "../../base/words";
+import { voiceWording } from "./words";
 import { api, reasonOf } from "../../base/api";
 
 export type DictationPhase = "idle" | "recording" | "transcribing";
@@ -114,7 +114,7 @@ export class Dictation {
     } catch (e) {
       drop();
       this.owner = undefined;
-      this.set("idle", e instanceof Error && e.name === "NotAllowedError" ? appWording().dictation.noMic : appWording().dictation.cannot(reasonOf(e)));
+      this.set("idle", e instanceof Error && e.name === "NotAllowedError" ? voiceWording().dictation.noMic : voiceWording().dictation.cannot(reasonOf(e)));
     }
   }
 
@@ -148,7 +148,7 @@ export class Dictation {
         all.set(c, at);
         at += c.length;
       }
-      if (all.length === 0) throw new Error(appWording().dictation.nothing);
+      if (all.length === 0) throw new Error(voiceWording().dictation.nothing);
       const said = await api.voice.dictate({ body: { audio: base64Of(wavOf(all)), format: "wav" } });
       if (this.owner === owner && said.text) r.onWords(said.text);
       this.set("idle", null);

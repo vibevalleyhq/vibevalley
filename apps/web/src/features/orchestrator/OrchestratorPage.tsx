@@ -1,7 +1,8 @@
 // 管家: who the orchestrator is, and its 记性, 轨迹 (every round, a round markable as wrong),
 // 旧账 (the conversation it folded away) and 声音 (what it says on a call); /orchestrator/<tab>.
 
-import { pagesWording } from "../../base/words/pages";
+import { orchestratorWording } from "./words";
+import { sessionWording } from "../session/words";
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../base/api";
@@ -16,10 +17,10 @@ import { TrajectoryLog } from "../session/Trajectory";
 import { usePrefs } from "../../base/prefs";
 
 const tabs = [
-  { id: "memory", label: pagesWording().orchestrator.tab.memory },
-  { id: "trajectory", label: pagesWording().orchestrator.tab.trajectory },
-  { id: "archive", label: pagesWording().orchestrator.tab.archive },
-  { id: "voice", label: pagesWording().orchestrator.tab.voice },
+  { id: "memory", label: orchestratorWording().orchestrator.tab.memory },
+  { id: "trajectory", label: orchestratorWording().orchestrator.tab.trajectory },
+  { id: "archive", label: orchestratorWording().orchestrator.tab.archive },
+  { id: "voice", label: orchestratorWording().orchestrator.tab.voice },
 ] as const;
 
 /** `rest` is the path after /orchestrator/. */
@@ -35,18 +36,18 @@ export function OrchestratorPage(props: { rest: string }) {
       </span>
       <div class="flex min-w-0 flex-col gap-0.5">
         <A href="/agents" class="text-xs text-muted hover:underline">
-          {pagesWording().orchestrator.all}
+          {orchestratorWording().orchestrator.all}
         </A>
-        <h1 class="text-2xl font-semibold">{pagesWording().orchestrator.title}</h1>
+        <h1 class="text-2xl font-semibold">{orchestratorWording().orchestrator.title}</h1>
         <p class="text-sm text-muted">
-          {pagesWording().orchestrator.intro}
-          {look() ? pagesWording().orchestrator.look(look()!.name) : ""}
+          {orchestratorWording().orchestrator.intro}
+          {look() ? orchestratorWording().orchestrator.look(look()!.name) : ""}
         </p>
       </div>
     </div>
   );
   const bar = () => (
-    <div role="tablist" aria-label={pagesWording().orchestrator.tabs} class="flex gap-1 border-b border-line pb-2">
+    <div role="tablist" aria-label={orchestratorWording().orchestrator.tabs} class="flex gap-1 border-b border-line pb-2">
       <For each={tabs}>
         {(t) => (
           <button
@@ -72,10 +73,10 @@ export function OrchestratorPage(props: { rest: string }) {
           <div class="min-h-0 flex-1">
             <TrajectoryLog
               id={orchestratorAgent}
-              asked={pagesWording().trajectory.lane.asked}
-              empty={pagesWording().orchestrator.quiet}
-              title={pagesWording().orchestrator.trajectory}
-              about={pagesWording().orchestrator.about}
+              asked={sessionWording().trajectory.lane.asked}
+              empty={orchestratorWording().orchestrator.quiet}
+              title={orchestratorWording().orchestrator.trajectory}
+              about={orchestratorWording().orchestrator.about}
               onMarkWrong={(on, want) => api.orchestrator.markWrong({ body: { on, want } })}
             />
           </div>

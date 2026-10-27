@@ -1,5 +1,5 @@
-// What the chat page says: the channels and helpers, a channel's tabs (chat, jobs, schedules), threads, the message
-// list, the composer and the work logs under messages.
+// What the chat page says: the channels and helpers, a channel's tabs (chat, jobs, schedules), threads and their
+// names, the names to @, the message list and the composer.
 
 import { localized } from "@vibevalley/protocol/words";
 

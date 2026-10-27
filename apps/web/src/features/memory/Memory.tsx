@@ -1,7 +1,8 @@
 // What an agent remembers: a profile's shared memory, the orchestrator's memory, and the orchestrator's archive of conversations
 // folded away.
 
-import { pagesWording } from "../../base/words/pages";
+import { memoryWording } from "./words";
+import { appWording } from "../../base/words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
@@ -95,28 +96,28 @@ export function MemoryPanel(props: { agent: string }) {
   const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.project === undefined : m.project === shown()));
   const whose = (m: Memory) =>
     m.author === "owner"
-      ? pagesWording().memory.yours
+      ? memoryWording().memory.yours
       : m.author === "orchestrator"
-        ? pagesWording().memory.orchestrators
+        ? memoryWording().memory.orchestrators
         : m.session
-          ? pagesWording().memory.sessions(sessions().get(m.session) ?? m.session)
-          : pagesWording().memory.own;
+          ? memoryWording().memory.sessions(sessions().get(m.session) ?? m.session)
+          : memoryWording().memory.own;
   return (
     <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted">{pagesWording().memory.intro}</p>
+      <p class="text-sm text-muted">{memoryWording().memory.intro}</p>
       <Show when={sources().size > 1}>
         <Sources sources={[...sources().values()]} />
       </Show>
-      <Section title={pagesWording().memory.jobs} count={jobs().length}>
-        <Show when={jobs().length > 0} fallback={<Quiet>{pagesWording().memory.noJobs}</Quiet>}>
+      <Section title={memoryWording().memory.jobs} count={jobs().length}>
+        <Show when={jobs().length > 0} fallback={<Quiet>{memoryWording().memory.noJobs}</Quiet>}>
           <For each={jobs()} keyed={(m) => m.id}>
             {(m) => (
               <div class={[item, "flex overflow-hidden"]}>
                 <span class="w-[3px] shrink-0 bg-leaf" />
                 <div class="flex flex-col gap-0.5 px-3 py-2">
                   <span class="flex flex-wrap gap-2 text-xs text-muted">
-                    <span class="font-medium text-ink">{m().session ? (sessions().get(m().session!) ?? m().session) : pagesWording().memory.helper}</span>
-                    <span>{m().project ?? pagesWording().memory.allProjects}</span>
+                    <span class="font-medium text-ink">{m().session ? (sessions().get(m().session!) ?? m().session) : memoryWording().memory.helper}</span>
+                    <span>{m().project ?? memoryWording().memory.allProjects}</span>
                     <span>{ago(m().at, now())}</span>
                   </span>
                   <span class="text-sm">{m().text}</span>
@@ -128,13 +129,13 @@ export function MemoryPanel(props: { agent: string }) {
       </Section>
       <RecallPreview agent={props.agent} />
       <WriteNote onWrite={(text, project) => act().write(text, project)} withProject />
-      <Section title={pagesWording().memory.notes} count={notes().length}>
+      <Section title={memoryWording().memory.notes} count={notes().length}>
         <Show when={projects().length > 0}>
           <div class="flex flex-wrap gap-1">
             <For
               each={[
-                ["", pagesWording().memory.all] as const,
-                [everywhere, pagesWording().memory.allProjects] as const,
+                ["", memoryWording().memory.all] as const,
+                [everywhere, memoryWording().memory.allProjects] as const,
                 ...projects().map((p) => [p, p] as const),
               ]}
             >
@@ -142,7 +143,7 @@ export function MemoryPanel(props: { agent: string }) {
             </For>
           </div>
         </Show>
-        <Show when={filtered().length > 0} fallback={<Quiet>{notes().length > 0 ? pagesWording().memory.emptyHere : pagesWording().memory.nothing}</Quiet>}>
+        <Show when={filtered().length > 0} fallback={<Quiet>{notes().length > 0 ? memoryWording().memory.emptyHere : memoryWording().memory.nothing}</Quiet>}>
           <For each={filtered()} keyed={(m) => m.id}>
             {(m) => {
               const src = () => (m().source ? sources().get(m().source!) : undefined);
@@ -155,14 +156,14 @@ export function MemoryPanel(props: { agent: string }) {
                       faded={m().fading === true}
                       onForget={() => void act().forget(m().id)}
                       meta={[
-                        m().project ?? pagesWording().memory.allProjects,
+                        m().project ?? memoryWording().memory.allProjects,
                         whose(m()),
                         ago(m().at, now()),
                         m().recalled > 0
-                          ? pagesWording().memory.recalled(Math.round(m().recalled), m().recalledAt ? ago(m().recalledAt!, now()) : undefined)
-                          : pagesWording().memory.neverRecalled,
+                          ? memoryWording().memory.recalled(Math.round(m().recalled), m().recalledAt ? ago(m().recalledAt!, now()) : undefined)
+                          : memoryWording().memory.neverRecalled,
                       ]}
-                      warning={m().fading ? pagesWording().memory.fading(memoryKeep) : undefined}
+                      warning={m().fading ? memoryWording().memory.fading(memoryKeep) : undefined}
                     />
                   }
                 >
@@ -170,7 +171,7 @@ export function MemoryPanel(props: { agent: string }) {
                     <MemoryItem
                       memory={m()}
                       onForget={s().canForget ? () => void act().forget(m().id) : undefined}
-                      meta={[pagesWording().memory.inSource(s().label), ...(s().canForget ? [] : [pagesWording().memory.forgetThere(s().label)])]}
+                      meta={[memoryWording().memory.inSource(s().label), ...(s().canForget ? [] : [memoryWording().memory.forgetThere(s().label)])]}
                     />
                   )}
                 </Show>
@@ -186,23 +187,23 @@ export function MemoryPanel(props: { agent: string }) {
 /** Where its memories live besides the farm's own, and what each lets the panel do. */
 function Sources(props: { sources: MemorySourceInfo[] }) {
   return (
-    <Section title={pagesWording().memory.sources} count={props.sources.filter((s) => s.on).length}>
+    <Section title={memoryWording().memory.sources} count={props.sources.filter((s) => s.on).length}>
       <For each={props.sources}>
         {(s) => (
           <div class={[item, "flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-xs text-muted"]}>
             <span class="text-sm font-medium text-ink">{s.label}</span>
-            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? pagesWording().memory.on : pagesWording().memory.off(s.off ?? "")}</span>
+            <span class={s.on ? "text-accent" : "text-berry"}>{s.on ? memoryWording().memory.on : memoryWording().memory.off(s.off ?? "")}</span>
             <Show when={s.on}>
-              <span>{s.canList ? pagesWording().memory.listed : pagesWording().memory.unlisted}</span>
-              <span>{s.canForget ? pagesWording().memory.forgettable : pagesWording().memory.forgetElsewhere}</span>
+              <span>{s.canList ? memoryWording().memory.listed : memoryWording().memory.unlisted}</span>
+              <span>{s.canForget ? memoryWording().memory.forgettable : memoryWording().memory.forgetElsewhere}</span>
               <Show when={s.transcripts}>
-                <span>{pagesWording().memory.transcripts}</span>
+                <span>{memoryWording().memory.transcripts}</span>
               </Show>
             </Show>
           </div>
         )}
       </For>
-      <p class="text-xs text-muted">{pagesWording().memory.sourcesNote}</p>
+      <p class="text-xs text-muted">{memoryWording().memory.sourcesNote}</p>
     </Section>
   );
 }
@@ -224,26 +225,26 @@ function RecallPreview(props: { agent: string }) {
   const lines = () => preview()?.lines ?? [];
   return (
     <Section
-      title={pagesWording().memory.next}
-      aside={lines().length > 0 && preview() ? pagesWording().memory.preview(lines().length, preview()!.chars, preview()!.limit) : undefined}
+      title={memoryWording().memory.next}
+      aside={lines().length > 0 && preview() ? memoryWording().memory.preview(lines().length, preview()!.chars, preview()!.limit) : undefined}
     >
       <div class="flex flex-col gap-1.5 sm:flex-row">
         <Select
           class="sm:w-40"
-          label={pagesWording().memory.where}
-          placeholder={pagesWording().memory.pick}
+          label={memoryWording().memory.where}
+          placeholder={memoryWording().memory.pick}
           value={where()}
           options={projects().map((p) => ({ value: p, label: p }))}
           onChange={setProject}
         />
         <TextInput
-          aria-label={pagesWording().memory.words}
-          placeholder={pagesWording().memory.wordsHint}
+          aria-label={memoryWording().memory.words}
+          placeholder={memoryWording().memory.wordsHint}
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
         />
       </div>
-      <Show when={lines().length > 0} fallback={<Quiet>{where() ? pagesWording().memory.blank : pagesWording().memory.noProjects}</Quiet>}>
+      <Show when={lines().length > 0} fallback={<Quiet>{where() ? memoryWording().memory.blank : memoryWording().memory.noProjects}</Quiet>}>
         <p class={[item, "px-3 py-2 text-sm whitespace-pre-wrap"]}>{lines().join("\n")}</p>
       </Show>
     </Section>
@@ -256,23 +257,23 @@ export function OrchestratorMemoryPanel() {
   const act = memoryActions(orchestratorAgent);
   const now = useNow();
   return (
-    <Show when={view()} fallback={<Quiet>{pagesWording().memory.orchestratorReading}</Quiet>}>
+    <Show when={view()} fallback={<Quiet>{memoryWording().memory.orchestratorReading}</Quiet>}>
       {(v) => {
         const carried = () => v().carried ?? v().memories.length;
         return (
           <div class="flex flex-col gap-4">
-            <p class="text-sm text-muted">{pagesWording().memory.orchestratorIntro}</p>
+            <p class="text-sm text-muted">{memoryWording().memory.orchestratorIntro}</p>
             <WriteNote onWrite={(text) => act.write(text)} />
-            <Section title={pagesWording().memory.notes} count={v().memories.length}>
-              <Show when={v().memories.length > 0} fallback={<Quiet>{pagesWording().memory.orchestratorNothing}</Quiet>}>
+            <Section title={memoryWording().memory.notes} count={v().memories.length}>
+              <Show when={v().memories.length > 0} fallback={<Quiet>{memoryWording().memory.orchestratorNothing}</Quiet>}>
                 <For each={v().memories} keyed={(m) => m.id}>
                   {(m, i) => (
                     <MemoryItem
                       memory={m()}
                       faded={i() >= carried()}
                       onForget={() => void act.forget(m().id)}
-                      meta={[m().session === orchestratorAgent ? pagesWording().memory.orchestratorOwn : pagesWording().memory.told, ago(m().at, now())]}
-                      warning={i() >= carried() ? pagesWording().memory.tooOld : undefined}
+                      meta={[m().session === orchestratorAgent ? memoryWording().memory.orchestratorOwn : memoryWording().memory.told, ago(m().at, now())]}
+                      warning={i() >= carried() ? memoryWording().memory.tooOld : undefined}
                     />
                   )}
                 </For>
@@ -308,7 +309,7 @@ export function ArchivePanel() {
   const hits = () => data()?.hits ?? [];
   return (
     <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted">{pagesWording().memory.archiveIntro}</p>
+      <p class="text-sm text-muted">{memoryWording().memory.archiveIntro}</p>
       <form
         class="flex gap-2"
         onSubmit={(e) => {
@@ -317,17 +318,17 @@ export function ArchivePanel() {
         }}
       >
         <TextInput
-          aria-label={pagesWording().memory.search}
-          placeholder={pagesWording().memory.searchHint}
+          aria-label={memoryWording().memory.search}
+          placeholder={memoryWording().memory.searchHint}
           value={query()}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
         <Button type="submit" icon="button-search" disabled={!query().trim()}>
-          {pagesWording().memory.find}
+          {memoryWording().memory.find}
         </Button>
       </form>
       <Show when={hits().length > 0}>
-        <Section title={pagesWording().memory.found} count={hits().length}>
+        <Section title={memoryWording().memory.found} count={hits().length}>
           <For each={hits()}>
             {(h) => (
               <div class={[item, "flex flex-col gap-0.5 px-3 py-2"]}>
@@ -340,10 +341,10 @@ export function ArchivePanel() {
           </For>
         </Section>
       </Show>
-      <Section title={pagesWording().memory.compacted} count={data()?.files.length ?? 0}>
-        <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : pagesWording().reading}</Quiet>}>
+      <Section title={memoryWording().memory.compacted} count={data()?.files.length ?? 0}>
+        <Show when={data()?.files} fallback={<Quiet>{listing.error ? reasonOf(listing.error) : appWording().reading}</Quiet>}>
           {(files) => (
-            <Show when={files().length > 0} fallback={<Quiet>{pagesWording().memory.noArchive}</Quiet>}>
+            <Show when={files().length > 0} fallback={<Quiet>{memoryWording().memory.noArchive}</Quiet>}>
               <For each={files()} keyed={(f) => f.name}>
                 {(f) => (
                   <div class={[item, "overflow-hidden"]}>
@@ -355,7 +356,7 @@ export function ArchivePanel() {
                     >
                       <span class="min-w-0 flex-1 truncate font-mono text-sm">{f().name}</span>
                       <span class="text-xs text-muted">
-                        {ago(f().at, now())} · {pagesWording().memory.chars(Math.round(f().chars))}
+                        {ago(f().at, now())} · {memoryWording().memory.chars(Math.round(f().chars))}
                       </span>
                     </button>
                     <Show when={open()?.name === f().name}>
@@ -384,20 +385,20 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
   };
   return (
     <div class="flex flex-col gap-1">
-      <span class="text-xs font-medium text-muted">{pagesWording().memory.note}</span>
+      <span class="text-xs font-medium text-muted">{memoryWording().memory.note}</span>
       <TextArea
-        aria-label={pagesWording().memory.note}
+        aria-label={memoryWording().memory.note}
         rows={2}
-        placeholder={props.withProject ? pagesWording().memory.noteProject : pagesWording().memory.noteOrchestrator}
+        placeholder={props.withProject ? memoryWording().memory.noteProject : memoryWording().memory.noteOrchestrator}
         value={text()}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <div class="flex items-center gap-2 pt-1">
         <Show when={props.withProject} fallback={<span class="flex-1" />}>
           <TextInput
-            aria-label={pagesWording().memory.project}
+            aria-label={memoryWording().memory.project}
             class="font-mono"
-            placeholder={pagesWording().memory.projectHint}
+            placeholder={memoryWording().memory.projectHint}
             list="memory-projects"
             value={project()}
             onInput={(e) => setProject(e.currentTarget.value)}
@@ -407,12 +408,12 @@ function WriteNote(props: { onWrite: (text: string, project?: string) => Promise
           </datalist>
         </Show>
         <Button tone="primary" disabled={!text().trim()} onClick={() => void write()}>
-          {pagesWording().write}
+          {appWording().write}
         </Button>
       </div>
       <Show
         when={error()}
-        fallback={<span class="text-xs text-faint">{props.withProject ? pagesWording().memory.noteHintProject : pagesWording().memory.noteHint}</span>}
+        fallback={<span class="text-xs text-faint">{props.withProject ? memoryWording().memory.noteHintProject : memoryWording().memory.noteHint}</span>}
       >
         <span class="text-xs text-berry">{error()}</span>
       </Show>
@@ -438,7 +439,7 @@ function MemoryItem(props: { memory: Memory; onForget?: () => void; meta: string
           onClick={() => props.onForget?.()}
           class="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-xs text-muted opacity-0 group-hover:opacity-100 hover:bg-hover hover:text-berry focus-visible:opacity-100"
         >
-          {pagesWording().memory.forget}
+          {memoryWording().memory.forget}
         </button>
       </Show>
     </div>

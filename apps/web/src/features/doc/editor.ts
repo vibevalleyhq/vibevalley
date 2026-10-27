@@ -2,7 +2,7 @@
 // waiting to go, one batch on the wire at a time. What comes back replaces the blocks, except the text of a block the
 // owner is still typing or composing a word in. The page draws it and calls in; a change notifies the subscribers.
 
-import { pagesWording } from "../../base/words/pages";
+import { docWording } from "./words";
 import {
   type Block,
   type BlockAttrs,
@@ -514,7 +514,7 @@ export class DocEditor {
           ack = await this.api.doc.submit({ id: this.docId, body: { batchId: batch.id, lastSeq: this.seq, ops: batch.ops } });
         } catch (e) {
           // Kept with its batch id, so sending it again cannot take it twice.
-          this.error = pagesWording().docs.notSaved(reasonOf(e));
+          this.error = docWording().docs.notSaved(reasonOf(e));
           this.changed();
           break;
         }
@@ -526,9 +526,9 @@ export class DocEditor {
           if (!b) continue;
           b.problem =
             r.status === "conflict"
-              ? pagesWording().docs.conflict(r.reason ?? pagesWording().docs.changed)
+              ? docWording().docs.conflict(r.reason ?? docWording().docs.changed)
               : r.status === "rejected"
-                ? pagesWording().docs.notSaved(r.reason ?? "")
+                ? docWording().docs.notSaved(r.reason ?? "")
                 : undefined;
           if (r.status === "conflict") b.sent = [];
         }

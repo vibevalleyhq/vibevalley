@@ -3,7 +3,7 @@
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
-import { appWording } from "../../base/words";
+import { voiceWording } from "./words";
 import type { RtcLine } from "@vibevalley/protocol/host";
 import { currentHost } from "../../base/host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
@@ -129,7 +129,7 @@ export class VoiceCall {
                 if (mine()) await line!.renew(fresh.token);
               } catch (e) {
                 if (!mine()) return;
-                this.problem = appWording().call.renew(reasonOf(e));
+                this.problem = voiceWording().call.renew(reasonOf(e));
                 this.changed();
               }
             })(),
@@ -159,7 +159,7 @@ export class VoiceCall {
       if (!cancelled)
         this.set(
           "idle",
-          e instanceof Error && e.name === "NotAllowedError" ? appWording().call.noMic : reasonOf(e),
+          e instanceof Error && e.name === "NotAllowedError" ? voiceWording().call.noMic : reasonOf(e),
           e instanceof VibeValleyApiError && e.error?._tag === "VoiceUnavailable" ? e.error.settings : undefined,
         );
     }

@@ -1,4 +1,4 @@
-// What the catalog says: the shelves of pictures, the cursors and the sounds, and a picture's details.
+// What the catalog says: the shelves of pictures and their names, the cursors and the sounds, and a picture's details.
 
 import { localized } from "@vibevalley/protocol/words";
 

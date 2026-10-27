@@ -1,4 +1,5 @@
-// What connecting to this machine says: the pane that lets a phone or another computer in, and the page it pairs on.
+// What connecting to this machine says: the pane that lets a phone or another computer in, the devices by kind, and
+// the page it pairs on.
 
 import { localized } from "@vibevalley/protocol/words";
 
@@ -37,6 +38,16 @@ const zh = {
     refuse: "不让",
   },
   devices: { android: "安卓手机", windows: "Windows 电脑", device: "一台设备" },
+  pair: {
+    title: "连进那台电脑",
+    intro: "这台设备连进那台电脑上的 VibeValley，和主人一样看帮工、派活、在田头说话。配对要那台电脑上的主人点头。",
+    code: "配对码",
+    codeHint: "在那台电脑的「连接到本机」里点「添加设备」",
+    name: "这台设备叫",
+    nameHint: "主人在设备列表里看到的名字",
+    ask: "请主人放行",
+    waiting: "等那台电脑上的主人点头……",
+  },
 };
 
 const en: typeof zh = {
@@ -75,6 +86,17 @@ const en: typeof zh = {
     refuse: "Refuse",
   },
   devices: { android: "Android phone", windows: "Windows PC", device: "A device" },
+  pair: {
+    title: "Connect to that computer",
+    intro:
+      "This device connects to VibeValley on that computer and, like the owner, sees helpers, sends work and talks in the farm chat. Pairing needs the owner's approval on that computer.",
+    code: "Pairing code",
+    codeHint: "On that computer, press Add a device under Connect to this machine",
+    name: "This device is called",
+    nameHint: "The name the owner sees in the list of devices",
+    ask: "Ask the owner to let it in",
+    waiting: "Waiting for the owner on that computer to approve…",
+  },
 };
 
 export const lanWording = localized({ zh, en });

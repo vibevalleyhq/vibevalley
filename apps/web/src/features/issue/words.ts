@@ -1,5 +1,5 @@
-// What the issues pages say: the board and the list, a ticket's sheet (to do, at work, closed), a plan's, closing and
-// reopening, and the acts' boxes.
+// What the issues pages say: the board and the list (its lanes, views, groupings and orderings), a card's lines, a
+// ticket's sheet (to do, at work, closed) and where it stands, a plan's, closing and reopening, and the acts' boxes.
 
 import { localized } from "@vibevalley/protocol/words";
 

@@ -1,5 +1,6 @@
 // What the page's frame says: the places on the rail, the connection to the server, the shared controls (chips,
-// key-value rows, toasts, faces), the settings forms' shared words, and the voice: calls and dictation.
+// key-value rows, toasts, faces, a secret's field, a helper's look), the settings forms' shared words, and the words
+// every feature says alike: times, money, the manager's name, reading and writing down.
 
 import { localized } from "@vibevalley/protocol/words";
 
@@ -35,24 +36,6 @@ const zh = {
   owner: "主",
   orchestrator: "管家",
   unreachable: "暂时连不上服务端，请等它恢复后重试。",
-  dictation: {
-    unset: "听写还没配：在「声音」页的「听写」里填地址和模型",
-    recording: "在听…再点一下停",
-    transcribing: "在认字…",
-    failed: (why: string) => `上次没认出来：${why}`,
-    start: "听写：点一下开始说，再点一下停",
-    stop: "停下听写",
-    label: "听写",
-    noMic: "录不了音：没有麦克风权限",
-    cannot: (why: string) => `录不了音：${why}`,
-    nothing: "没录上",
-  },
-  call: {
-    renew: (why: string) => `令牌续期失败：${why}`,
-    noMic: "没有麦克风权限",
-    cannotHear: (why: string) => `声网：听不到对面：${why}`,
-    agora: (code: number, msg: string) => `声网：${code} ${msg}`,
-  },
   form: {
     asking: "在问服务端……",
     unreachable: (why: string) => `问不到服务端：${why}`,
@@ -105,6 +88,9 @@ const zh = {
     outfit: { farmer: "农夫", gardener: "园丁", rain: "雨衣", winter: "冬装" },
     pose: { idle: "待命", walk: "走过来", think: "琢磨", work: "干活", cheer: "做完", worry: "长虫了" },
   },
+  reading: "在读……",
+  write: "记下",
+  secret: { hide: "藏起来", peek: "看一眼", hideShort: "藏", peekShort: "看" },
 };
 
 const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -140,24 +126,6 @@ const en: typeof zh = {
   owner: "Me",
   orchestrator: "Manager",
   unreachable: "The server cannot be reached for now: try again when it is back.",
-  dictation: {
-    unset: "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
-    recording: "Listening… click again to stop",
-    transcribing: "Transcribing…",
-    failed: (why) => `Last time it was not recognized: ${why}`,
-    start: "Dictation: click to start speaking, again to stop",
-    stop: "Stop dictation",
-    label: "Dictation",
-    noMic: "Cannot record: no microphone permission",
-    cannot: (why) => `Cannot record: ${why}`,
-    nothing: "Nothing was recorded",
-  },
-  call: {
-    renew: (why) => `Renewing the token failed: ${why}`,
-    noMic: "No microphone permission",
-    cannotHear: (why) => `Agora: cannot hear the other side: ${why}`,
-    agora: (code, msg) => `Agora: ${code} ${msg}`,
-  },
   form: {
     asking: "Asking the server…",
     unreachable: (why) => `The server cannot be asked: ${why}`,
@@ -211,6 +179,9 @@ const en: typeof zh = {
     outfit: { farmer: "Farmer", gardener: "Gardener", rain: "Raincoat", winter: "Winter coat" },
     pose: { idle: "Standing by", walk: "Walking over", think: "Pondering", work: "Working", cheer: "Done", worry: "Bugs!" },
   },
+  reading: "Reading…",
+  write: "Remember it",
+  secret: { hide: "Hide", peek: "Peek", hideShort: "Hide", peekShort: "Show" },
 };
 
 export const appWording = localized({ zh, en });

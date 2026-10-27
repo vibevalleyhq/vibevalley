@@ -1,6 +1,6 @@
 // The dictation button every input row has.
 
-import { appWording } from "../../base/words";
+import { voiceWording } from "./words";
 import { onSettled } from "solid-js";
 import { dictation, insertDictated } from "./dictation";
 import { createExternal } from "../../base/external";
@@ -25,16 +25,16 @@ export function DictationButton(props: {
   const off = () => ready(settings, undefined)?.dictation.url === "";
   const look = (): [string, string] =>
     off()
-      ? ["button-record", appWording().dictation.unset]
+      ? ["button-record", voiceWording().dictation.unset]
       : phase() === "recording"
-        ? ["button-stop", appWording().dictation.recording]
+        ? ["button-stop", voiceWording().dictation.recording]
         : phase() === "transcribing"
-          ? ["button-wait", appWording().dictation.transcribing]
-          : ["button-record", problem() ? appWording().dictation.failed(problem() ?? "") : appWording().dictation.start];
+          ? ["button-wait", voiceWording().dictation.transcribing]
+          : ["button-record", problem() ? voiceWording().dictation.failed(problem() ?? "") : voiceWording().dictation.start];
   return (
     <button
       type="button"
-      aria-label={phase() === "recording" ? appWording().dictation.stop : appWording().dictation.label}
+      aria-label={phase() === "recording" ? voiceWording().dictation.stop : voiceWording().dictation.label}
       title={look()[1]}
       disabled={off() || phase() === "transcribing"}
       onClick={() =>

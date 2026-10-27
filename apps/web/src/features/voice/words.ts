@@ -116,6 +116,24 @@ const zh = {
     },
     number: { silenceMs: "停顿多久算说完（毫秒）", interruptMs: "说多久能打断他（毫秒）", idleSeconds: "没人时多久离开（秒）" },
   },
+  dictation: {
+    unset: "听写还没配：在「声音」页的「听写」里填地址和模型",
+    recording: "在听…再点一下停",
+    transcribing: "在认字…",
+    failed: (why: string) => `上次没认出来：${why}`,
+    start: "听写：点一下开始说，再点一下停",
+    stop: "停下听写",
+    label: "听写",
+    noMic: "录不了音：没有麦克风权限",
+    cannot: (why: string) => `录不了音：${why}`,
+    nothing: "没录上",
+  },
+  call: {
+    renew: (why: string) => `令牌续期失败：${why}`,
+    noMic: "没有麦克风权限",
+    cannotHear: (why: string) => `声网：听不到对面：${why}`,
+    agora: (code: number, msg: string) => `声网：${code} ${msg}`,
+  },
 };
 
 const en: typeof zh = {
@@ -239,6 +257,24 @@ const en: typeof zh = {
       audiobookFemale: "Female audiobook",
     },
     number: { silenceMs: "Pause that ends a turn (ms)", interruptMs: "Speech that interrupts it (ms)", idleSeconds: "Leave when nobody is there (s)" },
+  },
+  dictation: {
+    unset: "Dictation is not set up: fill in the address and the model under Dictation on the Voice page",
+    recording: "Listening… click again to stop",
+    transcribing: "Transcribing…",
+    failed: (why) => `Last time it was not recognized: ${why}`,
+    start: "Dictation: click to start speaking, again to stop",
+    stop: "Stop dictation",
+    label: "Dictation",
+    noMic: "Cannot record: no microphone permission",
+    cannot: (why) => `Cannot record: ${why}`,
+    nothing: "Nothing was recorded",
+  },
+  call: {
+    renew: (why) => `Renewing the token failed: ${why}`,
+    noMic: "No microphone permission",
+    cannotHear: (why) => `Agora: cannot hear the other side: ${why}`,
+    agora: (code, msg) => `Agora: ${code} ${msg}`,
   },
 };
 

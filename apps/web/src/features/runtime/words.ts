@@ -1,4 +1,5 @@
-// What the machines page says: each runtime's installation, account, abilities, settings and models.
+// What the machines page says: each runtime's installation, account and quota, abilities, settings and models; and
+// the skill library the runtimes report.
 
 import { localized } from "@vibevalley/protocol/words";
 
