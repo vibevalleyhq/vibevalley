@@ -1,11 +1,11 @@
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
+import { yuan } from "../../base/format";
 import { farmWording } from "../words";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
 import { bottleSprite, quotaLevel, quotaOf, resetText, usableRuntimes, windowLabel } from "../../features/runtime/quota";
-import { yuan } from "../../features/channel/rules";
 import { aria, useClickAway } from "../../base/util";
 import { ready, useRuntimes } from "../../base/query";
 import { CardColors, PxButton, SpriteIcon } from "../../ui/pixel";

@@ -1,6 +1,6 @@
 import { appWording } from "../base/words";
 import { ready, useRuntimes, useSprites } from "../base/query";
-import { runtimeName } from "../features/runtime/skills";
+import { runtimeName } from "./runtimes";
 
 /** The execution tool named by a profile or session, using the server's catalog label. */
 export function RuntimeBadge(props: { runtime: string; size: number }) {

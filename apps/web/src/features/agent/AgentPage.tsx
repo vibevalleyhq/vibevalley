@@ -26,7 +26,7 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 import { api, reasonOf } from "../../base/api";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../ui/cast";
-import { runtimeName } from "../runtime/skills";
+import { runtimeName } from "../../ui/runtimes";
 import { toast } from "../../ui/toasts";
 import { A } from "../../ui/A";
 import { useRouter, useSearch } from "../../base/router";

@@ -18,7 +18,8 @@ import {
   type SettingsUpdate,
 } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { queries, ready, useQuery, useSettings } from "../../base/query";
+import { saveSettings } from "../../base/settings";
+import { ready, useQuery, useSettings } from "../../base/query";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
 import { Segmented } from "../../ui/Segmented";
@@ -29,13 +30,6 @@ const from: Record<KeySource, string> = { settings: settingsWording().from.setti
 const keyLine = (k: KeyStatus) => (k.source ? settingsWording().inUse(k.hint ?? "", from[k.source]) : settingsWording().none);
 
 export type SettingsPart = "deepseek" | "agora" | "memory";
-
-/** Saves, and the settings the server answers with are the cached ones from then on. */
-export async function saveSettings(update: SettingsUpdate) {
-  const saved = await api.setting.save({ body: update });
-  queries.setQueryData(["settings"], saved);
-  return saved;
-}
 
 type Key = "deepseekApiKey" | "agoraAppId" | "agoraAppCertificate";
 

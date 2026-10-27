@@ -1,5 +1,5 @@
 // A runtime's account, as the runtimes page and the farm's bottle both say it: how much is left, its windows in
-// words, when it resets, and the machine each runtime is drawn as.
+// words, when it resets.
 
 import { rulesWording } from "../../base/words/rules";
 import type { RuntimeInfo } from "@vibevalley/protocol";
@@ -72,19 +72,3 @@ export function bottleSprite(q: Quota) {
       return "energy-gold";
   }
 }
-
-/** Each runtime's farm machine; the farm's own agent wears the app's sprout. */
-const machines: Record<string, string> = {
-  claude: "machine-tractor",
-  codex: "machine-watercart",
-  opencode: "machine-wheelbarrow",
-  pi: "machine-pump",
-  cursor: "machine-seeder",
-  grok: "machine-windmill",
-  kimi: "machine-beehive",
-  antigravity: "machine-lantern",
-  vibevalley: "app-sprout",
-  dsh: "machine-dsh",
-};
-
-export const machineOf = (runtime: string): string | undefined => machines[runtime];

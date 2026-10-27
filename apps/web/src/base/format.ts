@@ -1,5 +1,6 @@
+import type { Spent } from "@vibevalley/protocol";
 import { rulesWording } from "./words/rules";
-// Times and numbers in words: how long ago, how long it took, the time of day, a moment.
+// Times, numbers and money in words: how long ago, how long it took, the time of day, a moment, what a round cost.
 
 export function ago(at: number, now: number) {
   const s = Math.max(0, Math.round((now - at) / 1000));
@@ -33,3 +34,11 @@ export function momentText(at: number) {
   const d = new Date(Math.round(at));
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
+
+// The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
+export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? rulesWording().money.underCent : `¥${cny.toFixed(2)}`);
+
+const wan = (n: number) => (n >= 10000 ? rulesWording().big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
+
+export const spentText = (spent: Spent) =>
+  [...(spent.cny !== undefined ? [rulesWording().money.about(yuan(spent.cny))] : []), `${wan(spent.tokens)} token`].join(" · ");

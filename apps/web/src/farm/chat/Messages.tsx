@@ -1,13 +1,13 @@
 // The rows of the farm's chat window: bubbles for what is said (yours on the right in green), a turn report with its
 // outcome, the thread a message has, the message a thread hangs from, and a long message folded to its first lines.
 
+import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Agent, ChatMessage, Conversation, Outcome } from "@vibevalley/protocol";
 import { farmClock, readsLong } from "./text";
-import { spentText } from "../../features/channel/rules";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
 import { PxMarkdown, SpriteIcon } from "../../ui/pixel";

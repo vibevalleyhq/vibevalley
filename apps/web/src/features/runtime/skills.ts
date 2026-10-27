@@ -22,9 +22,6 @@ export function installedSkills(runtimes: readonly RuntimeInfo[]): InstalledSkil
   return [...byName].map(([name, v]) => ({ name, ...v })).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-/** A runtime's name as the catalog labels it. */
-export const runtimeName = (catalog: readonly RuntimeInfo[], runtime: string) => catalog.find((r) => r.id === runtime)?.preset.label ?? runtime;
-
 /** Every word of the query is somewhere in the texts, ignoring case. */
 export function matches(query: string, texts: readonly (string | undefined)[]) {
   const hay = texts.filter(Boolean).join("\n").toLowerCase();

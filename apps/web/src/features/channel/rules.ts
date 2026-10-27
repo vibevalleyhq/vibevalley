@@ -1,5 +1,5 @@
-// The chat's words: channels and threads, feeds and unread counts, names to @, the clocks, money (spentText) and a
-// helper's phase. Nothing here folds facts: it only reads the chat the server sent.
+// The chat's words: channels and threads, feeds and unread counts, names to @, the clocks and a helper's
+// phase. Nothing here folds facts: it only reads the chat the server sent.
 
 import { wording } from "@vibevalley/protocol/words";
 import { rulesWording } from "../../base/words/rules";
@@ -13,7 +13,6 @@ import {
   ownerId,
   type Phase,
   type Session,
-  type Spent,
   type WorkspaceState,
 } from "@vibevalley/protocol";
 
@@ -187,14 +186,6 @@ export function workbenchClock(at: number) {
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
   return rulesWording().time.clock(d.getHours() < 12, String(h12).padStart(2, "0"), String(d.getMinutes()).padStart(2, "0"));
 }
-
-// The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
-export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? rulesWording().money.underCent : `¥${cny.toFixed(2)}`);
-
-const wan = (n: number) => (n >= 10000 ? rulesWording().big(n, n >= 100000 ? 0 : 1) : `${Math.round(n)}`);
-
-export const spentText = (spent: Spent) =>
-  [...(spent.cny !== undefined ? [rulesWording().money.about(yuan(spent.cny))] : []), `${wan(spent.tokens)} token`].join(" · ");
 
 const span = (ms: number) => wording().span(ms);
 

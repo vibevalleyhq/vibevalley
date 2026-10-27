@@ -3,6 +3,7 @@
 // harvest, and the log of what happened. The words of the states and actions are the server's (stateTag, stateText,
 // actionText).
 
+import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 
@@ -11,7 +12,6 @@ import { api, reasonOf } from "../../base/api";
 import { doingOf } from "../hud/rules";
 import { farm } from "../store";
 import { stationOfSession } from "../world/plots";
-import { spentText } from "../../features/channel/rules";
 import { lineCounts } from "../../features/issue/state";
 import { aria, Keyed } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";

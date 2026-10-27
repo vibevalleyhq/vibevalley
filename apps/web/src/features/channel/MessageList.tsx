@@ -1,22 +1,10 @@
+import { spentText } from "../../base/format";
 import { chatWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ChatMessage, type Conversation, orchestratorAgent, type Outcome, ownerId } from "@vibevalley/protocol";
-import {
-  chatPath,
-  feedOf,
-  parentAt,
-  phaseDot,
-  phaseText,
-  roleShort,
-  runtimeLabel,
-  spentText,
-  threadOwnerOf,
-  unreadIn,
-  orchestratorTyping,
-  workbenchClock,
-} from "./rules";
+import { chatPath, feedOf, parentAt, phaseDot, phaseText, roleShort, runtimeLabel, threadOwnerOf, unreadIn, orchestratorTyping, workbenchClock } from "./rules";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
 import { useCore } from "../../base/frame";

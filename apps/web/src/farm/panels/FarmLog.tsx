@@ -1,11 +1,12 @@
 // The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
+import { spentText } from "../../base/format";
 import { farmWording } from "../words";
 import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
-import { generalOf, spentText } from "../../features/channel/rules";
+import { generalOf } from "../../features/channel/rules";
 import { useCore } from "../../base/frame";
 import { useReports, useRoom } from "../../features/channel/rooms";
 import { useAgent } from "../../base/agents";
