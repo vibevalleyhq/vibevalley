@@ -63,7 +63,7 @@ group by d.recipient_id;
 -- name: AllOpenDeliveries :many
 -- The deliveries still open, with what an inbox shows of each: what the chat keeps in memory (channel/deliveries.ts).
 select d.recipient_id, d.message_id, m.number, d.reason, d.wakes, d.held_by, d.state, d.launch, m.channel_id, m.sender_id, m.kind, m.body,
-       m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
+       m.meta, m.reply_number, m.created_at, p.name, p.kind as sender_kind, c.type as channel_type, c.root_id, c.root_number, c.subject_kind, c.subject_id,
        coalesce(ch.name, c.name, '')::text as channel_name
 from channel_delivery d
 join channel_message m on m.id = d.message_id
@@ -72,3 +72,13 @@ join channel c on c.id = m.channel_id
 left join channel ch on ch.id = c.parent_id
 where d.state in ('pending', 'announced', 'handed')
 order by m.id;
+
+-- name: DropOpenOf :many
+-- A message deleted: what it was still waiting to hand goes.
+update channel_delivery set state = 'dropped', dropped_why = 'deleted'
+where message_id = sqlc.arg(message_id) and state in ('pending', 'announced', 'handed')
+returning recipient_id;
+
+-- name: WaitingOn :many
+-- Who a message is still waiting to be handed to.
+select recipient_id from channel_delivery where message_id = sqlc.arg(message_id) and state in ('pending', 'announced', 'handed');

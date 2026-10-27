@@ -8,6 +8,8 @@ const row = (message: string, number: number, channel = "c"): DeliveryRow => ({
   wakes: true,
   held_by: null,
   state: "pending",
+  meta: null,
+  reply_number: null,
   launch: null,
   channel_id: channel,
   sender_id: "owner",

@@ -186,6 +186,10 @@ export const Spent: Codec<T.Spent> = Schema.Struct({
   cny: Schema.optionalKey(Schema.Finite),
 });
 
+export const Reaction: Codec<T.Reaction> = Schema.Struct({ emoji: Schema.String, by: Schema.mutable(Schema.Array(Schema.String)) });
+
+export const Attachment: Codec<T.Attachment> = Schema.Struct({ id: Schema.String, name: Schema.String, type: Schema.String, size: Schema.Number });
+
 export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   id: Schema.String,
   number: Schema.Number,
@@ -204,6 +208,13 @@ export const ChatMessage: Codec<T.ChatMessage> = Schema.Struct({
   spoken: Schema.optionalKey(Schema.Boolean),
   sendKey: Schema.optionalKey(Schema.String),
   at: Schema.Number,
+  revision: Schema.Number,
+  replyTo: Schema.optionalKey(Schema.Number),
+  edited: Schema.optionalKey(Schema.Number),
+  deleted: Schema.optionalKey(Schema.Number),
+  pinned: Schema.optionalKey(Schema.Number),
+  reactions: Schema.optionalKey(Schema.mutable(Schema.Array(Reaction))),
+  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Attachment))),
 });
 
 export const ChannelType: Codec<T.ChannelType> = Schema.Literals(T.ChannelTypeValues);
@@ -1373,6 +1384,8 @@ export const CommentRequest: Codec<T.CommentRequest> = Schema.Struct({
 export const SayRequest: Codec<T.SayRequest> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
+  replyTo: Schema.optionalKey(Schema.Number),
+  attachments: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   station: Schema.optionalKey(Schema.Number),
   agent: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
@@ -2080,3 +2093,13 @@ export const DocAck: Codec<T.DocAck> = Schema.Struct({
   results: Schema.mutable(Schema.Array(DocOpResult)),
   blocks: Schema.mutable(Schema.Array(Block)),
 });
+
+export const MessageEdit: Codec<T.MessageEdit> = Schema.Struct({ id: Schema.String, text: Schema.String });
+
+export const ReactionToggle: Codec<T.ReactionToggle> = Schema.Struct({ id: Schema.String, emoji: Schema.String });
+
+export const AttachmentUpload: Codec<T.AttachmentUpload> = Schema.Struct({ name: Schema.String, type: Schema.String, data: Schema.String });
+
+export const MessageSearch: Codec<T.MessageSearch> = Schema.Struct({ text: Schema.String, channel: Schema.optionalKey(Schema.String) });
+
+export const MessageHit: Codec<T.MessageHit> = Schema.Struct({ message: ChatMessage, channel: Schema.String, address: Schema.String });

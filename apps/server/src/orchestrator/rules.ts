@@ -5,7 +5,8 @@ import { orchestratorWording } from "./words.ts";
 import { lineWords, quotaWords, situationWords, sourceHead } from "./prompts.ts";
 import { ownerId, type RunTriggerKind, type RuntimeInfo } from "@vibevalley/protocol";
 import { head } from "../base/text.ts";
-import { type InboxMessage, messageLine } from "../channel/rules.ts";
+import { type InboxMessage } from "../channel/rules.ts";
+import { messageLine } from "../channel/prompts.ts";
 import { quotaLow, yuan } from "../runtime/money.ts";
 
 /** The model the orchestrator answers as on the OpenAI chat/completions protocol: on the voice line and on the farm's own chatCompletionsPath. */

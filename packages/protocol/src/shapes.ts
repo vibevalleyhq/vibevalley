@@ -235,7 +235,37 @@ export interface ChatMessage {
   /** The key the owner's send carried, on the owner's own messages: a page knows its line by it. */
   sendKey?: string;
   at: number;
+  /** Its channel's revision when it was last written or changed: of two copies, the higher one is now. */
+  revision: number;
+  /** The number of the message in the same channel it answers. */
+  replyTo?: number;
+  /** When its words were last changed. */
+  edited?: number;
+  /** Deleted then: its words and attachments are gone, its number stays. */
+  deleted?: number;
+  pinned?: number;
+  /** In the order they first came. */
+  reactions?: Reaction[];
+  attachments?: Attachment[];
 }
+
+export interface Reaction {
+  emoji: string;
+  /** Participants, in the order they reacted. */
+  by: string[];
+}
+
+/** A file said with a message: id is the sha256 of its bytes, served at attachmentPath. */
+export interface Attachment {
+  id: string;
+  name: string;
+  /** A media type: image/png, application/pdf… */
+  type: string;
+  size: number;
+}
+
+/** The one read that is not a POST, since an <img src> can only GET. */
+export const attachmentPath = (id: string) => `/api/v1/attachment/${id}`;
 
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
@@ -1349,6 +1379,10 @@ export interface SayRequest {
   /** The channel it is said in. */
   id: string;
   text: string;
+  /** The number of the message there it answers. */
+  replyTo?: number;
+  /** Ids from channel.attachment.create. */
+  attachments?: string[];
   station?: number;
   agent?: string;
   project?: string;
@@ -2374,4 +2408,38 @@ export interface DocAck {
   seq: number;
   results: DocOpResult[];
   blocks: Block[];
+}
+
+export interface MessageEdit {
+  /** The message. */
+  id: string;
+  text: string;
+}
+
+export interface ReactionToggle {
+  /** The message. */
+  id: string;
+  emoji: string;
+}
+
+/** At most attachmentMax bytes, as base64. */
+export interface AttachmentUpload {
+  name: string;
+  type: string;
+  data: string;
+}
+
+export const attachmentMax = 25 * 1024 * 1024;
+
+export interface MessageSearch {
+  text: string;
+  /** A channel: it and its threads; none is the whole farm. */
+  channel?: string;
+}
+
+/** A message found, with where it is: the channel it is in (or a thread's channel) and its address there. */
+export interface MessageHit {
+  message: ChatMessage;
+  channel: string;
+  address: string;
 }

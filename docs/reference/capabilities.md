@@ -46,6 +46,15 @@
 | `channel.default.set` | `/api/v1/channel/default/set` | ✓ | ✓ |   |
 | `channel.message.list` | `/api/v1/channel/message/list` | ✓ | ✓ | ✓ |
 | `channel.markRead` | `/api/v1/channel/markRead` | ✓ | ✓ |   |
+| `channel.message.update` | `/api/v1/channel/message/update` | ✓ | ✓ |   |
+| `channel.message.delete` | `/api/v1/channel/message/delete` | ✓ | ✓ |   |
+| `channel.message.previewDelete` | `/api/v1/channel/message/previewDelete` | ✓ | ✓ |   |
+| `channel.message.search` | `/api/v1/channel/message/search` | ✓ | ✓ | ✓ |
+| `channel.reaction.toggle` | `/api/v1/channel/reaction/toggle` | ✓ | ✓ |   |
+| `channel.pin.toggle` | `/api/v1/channel/pin/toggle` | ✓ | ✓ |   |
+| `channel.pin.list` | `/api/v1/channel/pin/list` | ✓ | ✓ | ✓ |
+| `channel.thread.create` | `/api/v1/channel/thread/create` | ✓ | ✓ |   |
+| `channel.attachment.create` | `/api/v1/channel/attachment/create` | ✓ | ✓ |   |
 
 ## recurrence
 

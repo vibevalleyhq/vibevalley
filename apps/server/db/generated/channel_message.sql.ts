@@ -13,6 +13,8 @@ export const InsertMessageParams = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
 })
 export type InsertMessageParams = typeof InsertMessageParams.Type
 
@@ -23,14 +25,14 @@ export const InsertMessageResult = Schema.Struct({
 export type InsertMessageResult = typeof InsertMessageResult.Type
 
 
-export const InsertMessageSql = "-- What is said, in order: a message's id is a uuidv7 and sorts by time; its number is its place in its channel (channel/store.ts).\n\n-- name: InsertMessage :one\ninsert into channel_message (id, channel_id, number, sender_id, kind, body, meta, send_key, created_at)\nvalues ($1, $2, (select coalesce(max(number), 0) + 1 from channel_message where channel_id = $2),\n        $3, $4, $5, $6, $7, $8)\nreturning number;"
+export const InsertMessageSql = "-- What is said, in order: a message's id is a uuidv7 and sorts by time; its number is its place in its channel (channel/store.ts).\n\n-- name: InsertMessage :one\ninsert into channel_message (id, channel_id, number, sender_id, kind, body, meta, send_key, created_at, revision, reply_number)\nvalues ($1, $2, (select coalesce(max(number), 0) + 1 from channel_message where channel_id = $2),\n        $3, $4, $5, $6, $7, $8, $9,\n        $10)\nreturning number;"
 
 export const insertMessage = Effect.fn("InsertMessage")(function* (params: InsertMessageParams) {
   const sql = yield* SqlClient.SqlClient
   return yield* SqlSchema.findOne({
     Request: InsertMessageParams,
     Result: InsertMessageResult,
-    execute: (p) => sql.unsafe(InsertMessageSql, [p["id"], p["channel"], p["sender"], p["kind"], p["body"], p["meta"], p["send_key"], p["created_at"]]),
+    execute: (p) => sql.unsafe(InsertMessageSql, [p["id"], p["channel"], p["sender"], p["kind"], p["body"], p["meta"], p["send_key"], p["created_at"], p["revision"], p["reply_number"]]),
   })(params)
 })
 
@@ -67,6 +69,12 @@ export const MessageByIDResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -74,7 +82,7 @@ export const MessageByIDResult = Schema.Struct({
 export type MessageByIDResult = typeof MessageByIDResult.Type
 
 
-export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
+export const MessageByIDSql = "-- name: MessageByID :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.id = $1;"
 
 export const messageByID = Effect.fn("MessageByID")(function* (params: MessageByIDParams) {
   const sql = yield* SqlClient.SqlClient
@@ -102,6 +110,12 @@ export const MessageBySendKeyResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -109,7 +123,7 @@ export const MessageBySendKeyResult = Schema.Struct({
 export type MessageBySendKeyResult = typeof MessageBySendKeyResult.Type
 
 
-export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
+export const MessageBySendKeySql = "-- name: MessageBySendKey :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id where m.sender_id = $1 and m.send_key = $2;"
 
 export const messageBySendKey = Effect.fn("MessageBySendKey")(function* (params: MessageBySendKeyParams) {
   const sql = yield* SqlClient.SqlClient
@@ -136,6 +150,12 @@ export const OwnerMentionsResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -147,7 +167,7 @@ export const OwnerMentionsResult = Schema.Struct({
 export type OwnerMentionsResult = typeof OwnerMentionsResult.Type
 
 
-export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.channel_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
+export const OwnerMentionsSql = "-- name: OwnerMentions :many\n-- The owner's unresolved mentions, independently of the history window. Reading or replying in that channel completes them.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_mention n\njoin channel_message m on m.id = n.message_id\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nleft join channel_read_cursor r on r.participant_id = 'owner' and r.channel_id = c.id\nwhere n.target_id = 'owner' and m.sender_id <> 'owner'\n  and m.number > coalesce(r.read_number, 0)\n  and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'owner' and reply.number > m.number)\norder by m.id;"
 
 export const ownerMentions = Effect.fn("OwnerMentions")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -176,6 +196,12 @@ export const MessagesBeforeResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -183,7 +209,7 @@ export const MessagesBeforeResult = Schema.Struct({
 export type MessagesBeforeResult = typeof MessagesBeforeResult.Type
 
 
-export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
+export const MessagesBeforeSql = "-- name: MessagesBefore :many\n-- Newest first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number < $2 order by m.number desc limit $3::int;"
 
 export const messagesBefore = Effect.fn("MessagesBefore")(function* (params: MessagesBeforeParams) {
   const sql = yield* SqlClient.SqlClient
@@ -212,6 +238,12 @@ export const MessagesAfterResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -219,7 +251,7 @@ export const MessagesAfterResult = Schema.Struct({
 export type MessagesAfterResult = typeof MessagesAfterResult.Type
 
 
-export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
+export const MessagesAfterSql = "-- name: MessagesAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number > $2 order by m.number limit $3::int;"
 
 export const messagesAfter = Effect.fn("MessagesAfter")(function* (params: MessagesAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -246,6 +278,12 @@ export const RecentReportsResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -253,7 +291,7 @@ export const RecentReportsResult = Schema.Struct({
 export type RecentReportsResult = typeof RecentReportsResult.Type
 
 
-export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
+export const RecentReportsSql = "-- name: RecentReports :many\n-- Newest first: the turn reports anywhere on the farm, for its log.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' order by m.id desc limit $1::int;"
 
 export const recentReports = Effect.fn("RecentReports")(function* (params: RecentReportsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -281,6 +319,12 @@ export const ReportsAfterResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -288,7 +332,7 @@ export const ReportsAfterResult = Schema.Struct({
 export type ReportsAfterResult = typeof ReportsAfterResult.Type
 
 
-export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
+export const ReportsAfterSql = "-- name: ReportsAfter :many\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.kind = 'report' and m.id > $1 order by m.id limit $2::int;"
 
 export const reportsAfter = Effect.fn("ReportsAfter")(function* (params: ReportsAfterParams) {
   const sql = yield* SqlClient.SqlClient
@@ -361,7 +405,7 @@ export const OwnerUnreadResult = Schema.Struct({
 export type OwnerUnreadResult = typeof OwnerUnreadResult.Type
 
 
-export const OwnerUnreadSql = "-- name: OwnerUnread :one\n-- What the owner has not read in a channel: others' words past its read number, the farm's notices left out.\nselect count(*)::int as n from channel_message\nwhere channel_id = $1 and number > $2 and sender_id <> 'owner' and kind <> 'notice';"
+export const OwnerUnreadSql = "-- name: OwnerUnread :one\n-- What the owner has not read in a channel: others' words past its read number, the farm's notices left out.\nselect count(*)::int as n from channel_message\nwhere channel_id = $1 and number > $2 and sender_id <> 'owner' and kind <> 'notice' and deleted_at is null;"
 
 export const ownerUnread = Effect.fn("OwnerUnread")(function* (params: OwnerUnreadParams) {
   const sql = yield* SqlClient.SqlClient
@@ -484,6 +528,12 @@ export const MessageByNumberResult = Schema.Struct({
   ["meta"]: Schema.NullOr(Schema.String),
   ["send_key"]: Schema.NullOr(Schema.String),
   ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
   ["sender_name"]: Schema.String,
   ["sender_kind"]: Schema.String,
   ["sender_agent"]: Schema.NullOr(Schema.String),
@@ -491,7 +541,7 @@ export const MessageByNumberResult = Schema.Struct({
 export type MessageByNumberResult = typeof MessageByNumberResult.Type
 
 
-export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
+export const MessageByNumberSql = "-- name: MessageByNumber :one\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.number = $2;"
 
 export const messageByNumber = Effect.fn("MessageByNumber")(function* (params: MessageByNumberParams) {
   const sql = yield* SqlClient.SqlClient
@@ -524,4 +574,205 @@ export const ownerLastMessages = Effect.fn("OwnerLastMessages")(function* () {
     Result: OwnerLastMessagesResult,
     execute: () => sql.unsafe(OwnerLastMessagesSql, []),
   })({})
+})
+
+export const MessagesChangedAfterParams = Schema.Struct({
+  ["channel_id"]: Schema.String,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type MessagesChangedAfterParams = typeof MessagesChangedAfterParams.Type
+
+
+export const MessagesChangedAfterResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["channel_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["sender_id"]: Schema.String,
+  ["kind"]: Schema.String,
+  ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
+  ["sender_name"]: Schema.String,
+  ["sender_kind"]: Schema.String,
+  ["sender_agent"]: Schema.NullOr(Schema.String),
+})
+export type MessagesChangedAfterResult = typeof MessagesChangedAfterResult.Type
+
+
+export const MessagesChangedAfterSql = "-- name: MessagesChangedAfter :many\n-- What changed in a channel after a revision, in the order it changed: a follower's catch-up.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.revision > $2 order by m.revision limit $3::int;"
+
+export const messagesChangedAfter = Effect.fn("MessagesChangedAfter")(function* (params: MessagesChangedAfterParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: MessagesChangedAfterParams,
+    Result: MessagesChangedAfterResult,
+    execute: (p) => sql.unsafe(MessagesChangedAfterSql, [p["channel_id"], p["revision"], p["n"]]),
+  })(params)
+})
+
+export const EditMessageParams = Schema.Struct({
+  ["body"]: Schema.String,
+  ["at"]: Schema.NullOr(Schema.Number),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["id"]: Schema.String,
+})
+export type EditMessageParams = typeof EditMessageParams.Type
+
+
+export const EditMessageSql = "-- name: EditMessage :exec\nupdate channel_message set body = $1, edited_at = $2, revision = $3 where id = $4;"
+
+export const editMessage = Effect.fn("EditMessage")(function* (params: EditMessageParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: EditMessageParams,
+    execute: (p) => sql.unsafe(EditMessageSql, [p["body"], p["at"], p["revision"], p["id"]]),
+  })(params)
+})
+
+export const DeleteMessageParams = Schema.Struct({
+  ["at"]: Schema.NullOr(Schema.Number),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["id"]: Schema.String,
+})
+export type DeleteMessageParams = typeof DeleteMessageParams.Type
+
+
+export const DeleteMessageSql = "-- name: DeleteMessage :exec\n-- Its words, attachments and reactions go; its number stays.\nupdate channel_message set body = '', meta = null, reactions = null, deleted_at = $1, revision = $2 where id = $3;"
+
+export const deleteMessage = Effect.fn("DeleteMessage")(function* (params: DeleteMessageParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: DeleteMessageParams,
+    execute: (p) => sql.unsafe(DeleteMessageSql, [p["at"], p["revision"], p["id"]]),
+  })(params)
+})
+
+export const SetReactionsParams = Schema.Struct({
+  ["reactions"]: Schema.NullOr(Schema.String),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["id"]: Schema.String,
+})
+export type SetReactionsParams = typeof SetReactionsParams.Type
+
+
+export const SetReactionsSql = "-- name: SetReactions :exec\nupdate channel_message set reactions = $1, revision = $2 where id = $3;"
+
+export const setReactions = Effect.fn("SetReactions")(function* (params: SetReactionsParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetReactionsParams,
+    execute: (p) => sql.unsafe(SetReactionsSql, [p["reactions"], p["revision"], p["id"]]),
+  })(params)
+})
+
+export const SetPinnedParams = Schema.Struct({
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["id"]: Schema.String,
+})
+export type SetPinnedParams = typeof SetPinnedParams.Type
+
+
+export const SetPinnedSql = "-- name: SetPinned :exec\nupdate channel_message set pinned_at = $1, revision = $2 where id = $3;"
+
+export const setPinned = Effect.fn("SetPinned")(function* (params: SetPinnedParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.void({
+    Request: SetPinnedParams,
+    execute: (p) => sql.unsafe(SetPinnedSql, [p["pinned_at"], p["revision"], p["id"]]),
+  })(params)
+})
+
+export const PinnedInParams = Schema.Struct({
+  ["channel_id"]: Schema.String,
+})
+export type PinnedInParams = typeof PinnedInParams.Type
+
+
+export const PinnedInResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["channel_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["sender_id"]: Schema.String,
+  ["kind"]: Schema.String,
+  ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
+  ["sender_name"]: Schema.String,
+  ["sender_kind"]: Schema.String,
+  ["sender_agent"]: Schema.NullOr(Schema.String),
+})
+export type PinnedInResult = typeof PinnedInResult.Type
+
+
+export const PinnedInSql = "-- name: PinnedIn :many\n-- Newest pinned first.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent from channel_message m join channel_participant p on p.id = m.sender_id\nwhere m.channel_id = $1 and m.pinned_at is not null order by m.pinned_at desc;"
+
+export const pinnedIn = Effect.fn("PinnedIn")(function* (params: PinnedInParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: PinnedInParams,
+    Result: PinnedInResult,
+    execute: (p) => sql.unsafe(PinnedInSql, [p["channel_id"]]),
+  })(params)
+})
+
+export const SearchMessagesParams = Schema.Struct({
+  ["text"]: Schema.String,
+  ["channel"]: Schema.String,
+  ["n"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type SearchMessagesParams = typeof SearchMessagesParams.Type
+
+
+export const SearchMessagesResult = Schema.Struct({
+  ["id"]: Schema.String,
+  ["channel_id"]: Schema.String,
+  ["number"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["sender_id"]: Schema.String,
+  ["kind"]: Schema.String,
+  ["body"]: Schema.String,
+  ["meta"]: Schema.NullOr(Schema.String),
+  ["send_key"]: Schema.NullOr(Schema.String),
+  ["created_at"]: Schema.Number,
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+  ["reply_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["edited_at"]: Schema.NullOr(Schema.Number),
+  ["deleted_at"]: Schema.NullOr(Schema.Number),
+  ["pinned_at"]: Schema.NullOr(Schema.Number),
+  ["reactions"]: Schema.NullOr(Schema.String),
+  ["sender_name"]: Schema.String,
+  ["sender_kind"]: Schema.String,
+  ["sender_agent"]: Schema.NullOr(Schema.String),
+  ["channel_type"]: Schema.String,
+  ["root_number"]: Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 }))),
+  ["top_id"]: Schema.NullOr(Schema.String),
+  ["channel_name"]: Schema.NullOr(Schema.String),
+})
+export type SearchMessagesResult = typeof SearchMessagesResult.Type
+
+
+export const SearchMessagesSql = "-- name: SearchMessages :many\n-- Newest first: messages with these words, anywhere on the farm or in one channel and its threads.\nselect m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions,\n       p.name as sender_name, p.kind as sender_kind, p.agent_id as sender_agent,\n       c.type as channel_type, c.root_number, coalesce(c.parent_id, c.id)::text as top_id,\n       coalesce(ch.name, c.name, '')::text as channel_name\nfrom channel_message m\njoin channel_participant p on p.id = m.sender_id\njoin channel c on c.id = m.channel_id\nleft join channel ch on ch.id = c.parent_id\nwhere m.deleted_at is null and m.kind <> 'notice' and strpos(lower(m.body), lower($1)) > 0\n  and ($2::text = '' or c.id = $2 or c.parent_id = $2)\norder by m.id desc limit $3::int;"
+
+export const searchMessages = Effect.fn("SearchMessages")(function* (params: SearchMessagesParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findAll({
+    Request: SearchMessagesParams,
+    Result: SearchMessagesResult,
+    execute: (p) => sql.unsafe(SearchMessagesSql, [p["text"], p["channel"], p["n"]]),
+  })(params)
 })

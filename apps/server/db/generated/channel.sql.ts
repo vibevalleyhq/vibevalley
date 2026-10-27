@@ -160,11 +160,12 @@ export const AllChannelsResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["peer_id"]: Schema.NullOr(Schema.String),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type AllChannelsResult = typeof AllChannelsResult.Type
 
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\" from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- What the chat keeps in memory (channel/model.ts), loaded when it starts.\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\" from channel order by id;"
 
 export const allChannels = Effect.fn("AllChannels")(function* () {
   const sql = yield* SqlClient.SqlClient
@@ -197,11 +198,12 @@ export const RecentChannelsResult = Schema.Struct({
   ["project"]: Schema.NullOr(Schema.String),
   ["parent_id"]: Schema.NullOr(Schema.String),
   ["peer_id"]: Schema.NullOr(Schema.String),
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
 })
 export type RecentChannelsResult = typeof RecentChannelsResult.Type
 
 
-export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
+export const RecentChannelsSql = "-- name: RecentChannels :many\nselect \"channel\".\"id\", \"channel\".\"type\", \"channel\".\"is_default\", \"channel\".\"root_id\", \"channel\".\"root_number\", \"channel\".\"subject_kind\", \"channel\".\"subject_id\", \"channel\".\"last_number\", \"channel\".\"reply_count\", \"channel\".\"created_at\", \"channel\".\"name\", \"channel\".\"description\", \"channel\".\"project\", \"channel\".\"parent_id\", \"channel\".\"peer_id\", \"channel\".\"revision\" from channel order by coalesce(last_number, 0) desc, id desc limit $1::int;"
 
 export const recentChannels = Effect.fn("RecentChannels")(function* (params: RecentChannelsParams) {
   const sql = yield* SqlClient.SqlClient
@@ -259,5 +261,28 @@ export const inboxOf = Effect.fn("InboxOf")(function* (params: InboxOfParams) {
     Request: InboxOfParams,
     Result: InboxOfResult,
     execute: (p) => sql.unsafe(InboxOfSql, [p["participant"], p["channel"]]),
+  })(params)
+})
+
+export const BumpRevisionParams = Schema.Struct({
+  ["id"]: Schema.String,
+})
+export type BumpRevisionParams = typeof BumpRevisionParams.Type
+
+
+export const BumpRevisionResult = Schema.Struct({
+  ["revision"]: Schema.Int.check(Schema.isBetween({ minimum: -2147483648, maximum: 2147483647 })),
+})
+export type BumpRevisionResult = typeof BumpRevisionResult.Type
+
+
+export const BumpRevisionSql = "-- name: BumpRevision :one\n-- In the transaction that writes or changes a message there: the revision it is written with.\nupdate channel set revision = revision + 1 where id = $1 returning revision;"
+
+export const bumpRevision = Effect.fn("BumpRevision")(function* (params: BumpRevisionParams) {
+  const sql = yield* SqlClient.SqlClient
+  return yield* SqlSchema.findOne({
+    Request: BumpRevisionParams,
+    Result: BumpRevisionResult,
+    execute: (p) => sql.unsafe(BumpRevisionSql, [p["id"]]),
   })(params)
 })

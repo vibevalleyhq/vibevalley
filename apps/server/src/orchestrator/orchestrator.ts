@@ -23,7 +23,7 @@ import { Llm } from "../ai/llm.ts";
 import { localeMinute } from "../base/time.ts";
 import { selfTools } from "../agent/brain/self.ts";
 import { projectsDir, Settings } from "../base/config.ts";
-import { Channels, type OrchestratorNews } from "../channel/chat.ts";
+import { Channels, type OrchestratorNews, type SayMore } from "../channel/chat.ts";
 import { Core } from "../core/core.ts";
 import type { ApiError } from "../errors.ts";
 import { Issues, type OrchestratorWork } from "../issue/issue.ts";
@@ -81,7 +81,7 @@ interface Intake {
 export interface OrchestratorShape {
   /** The owner's words in a channel, from any door (the page, a chat app); the owner speaking opens the farm. sendKey:
    * the client's key for this send, a retry with the same key is the message already said. */
-  readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string) => Effect.Effect<void, ApiError>;
+  readonly say: (text: string, pick: Pick, channel: string | undefined, sendKey: string, more?: SayMore) => Effect.Effect<void, ApiError>;
   /** A voice transcript the owner chose for the orchestrator to overhear. */
   readonly heard: (text: string, agent: string, sendKey: string) => Effect.Effect<void, ApiError>;
   /** Something to tell the owner on the phone: given as from an issue, after what the orchestrator is on, it answers in the default channel
@@ -384,11 +384,11 @@ export const make = (options: OrchestratorOptions = {}) =>
     };
 
     return Orchestrator.of({
-      say: Effect.fn("Orchestrator.say")(function* (text, pick, channel, sendKey) {
+      say: Effect.fn("Orchestrator.say")(function* (text, pick, channel, sendKey, more) {
         const a = pick.agent ? store.agent(pick.agent) : undefined;
         const picked: Pick = { ...(a ? { agent: a.id } : {}), ...((pick.project ?? "").trim() ? { project: pick.project!.trim() } : {}) };
         yield* core.open();
-        const { message, again } = yield* chat.say(text, channel, sendKey);
+        const { message, again } = yield* chat.say(text, channel, sendKey, more);
         if (!again && (picked.agent || picked.project)) selected.set(message.id, picked);
       }),
       heard: Effect.fn("Orchestrator.heard")(function* (text, agent, sendKey) {

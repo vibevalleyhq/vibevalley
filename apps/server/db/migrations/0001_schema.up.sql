@@ -32,6 +32,8 @@ CREATE TABLE channel (
   parent_id     text references channel (id),
   -- A direct channel is the owner's and one other participant's: the peer.
   peer_id       text unique references channel_participant (id),
+  -- Moves on with every message written or changed here: what a follower catches up from (channel_message.revision).
+  revision      integer not null default 0,
   check ((type = 'thread') = (root_id is not null)),
   check ((type = 'direct') = (peer_id is not null)),
   check (type <> 'direct' or name is null),
@@ -49,7 +51,26 @@ CREATE TABLE channel_message (
   meta            text,
   send_key        text,
   created_at      double precision not null,
-  unique (channel_id, number)
+  -- The channel's revision when it was last written or changed.
+  revision        integer not null,
+  -- The number of the message in the same channel it answers.
+  reply_number    integer,
+  edited_at       double precision,
+  -- Deleted: its words gone, its number kept.
+  deleted_at      double precision,
+  pinned_at       double precision,
+  -- {"emoji": ["participant", …]}, in the order they came.
+  reactions       text,
+  unique (channel_id, number),
+  unique (channel_id, revision)
+);
+CREATE TABLE channel_attachment (
+  -- The sha256 of its bytes, kept under the home directory's attachments/: the same file is kept once.
+  id          text primary key,
+  name        text not null,
+  type        text not null,
+  size        integer not null,
+  created_at  double precision not null
 );
 CREATE TABLE channel_mention (
   message_id  text not null references channel_message (id) on delete cascade,

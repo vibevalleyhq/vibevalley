@@ -1,5 +1,5 @@
-// What is said in each channel the page shows, framework-free: its newest page read once (channel.history), then
-// followed from the last number (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
+// What is said in each channel the page shows, framework-free: its newest page read once (channel.message.list), then
+// followed from the newest revision it has (base/gateway.ts), older pages on asking. A channel stays read after nobody shows
 // it, and its follower comes back from where it left off. The farm's reports are a feed of their own.
 
 import type { ChatMessage, ChannelEvent } from "@vibevalley/protocol";
@@ -19,12 +19,18 @@ export interface Followed {
 
 const empty: Followed = { messages: [], complete: false, ready: false };
 
-/** A message is not changed once written: a number seen again keeps the copy there is. */
+/** Of two copies of a message, the one with the higher revision is how it is now. */
 export function merged(was: readonly ChatMessage[], more: readonly ChatMessage[]): ChatMessage[] {
   const by = new Map(was.map((m) => [m.number, m]));
-  for (const m of more) if (!by.has(m.number)) by.set(m.number, m);
+  for (const m of more) {
+    const had = by.get(m.number);
+    if (!had || m.revision > had.revision) by.set(m.number, m);
+  }
   return [...by.values()].sort((a, b) => a.number - b.number);
 }
+
+/** Where a channel's follower goes on from: the newest change it has. */
+const revisionOf = (messages: readonly ChatMessage[]) => messages.reduce((n, m) => Math.max(n, m.revision), 0);
 
 /** Following again after the line broke or the farm ended it. */
 const againMs = 1000;
@@ -67,8 +73,12 @@ function again(id: string, e: Entry) {
 
 function onEvent(id: string, e: Entry, ev: ChannelEvent) {
   switch (ev._tag) {
-    case "Message":
+    case "Message": {
+      // A change to a message older than the pages read is read with them when they are.
+      const first = e.followed.messages[0]?.number;
+      if (!e.followed.complete && first !== undefined && ev.message.number < first) return;
       return set(e, { ...e.followed, messages: merged(e.followed.messages, [ev.message]) });
+    }
     case "Reset":
       // Too far behind to catch up: the newest page again, and on from there.
       halt(e);
@@ -87,7 +97,7 @@ async function start(id: string, e: Entry) {
   }
   e.stop = followChannel(
     id,
-    e.followed.messages.at(-1)?.number ?? 0,
+    revisionOf(e.followed.messages),
     (ev) => onEvent(id, e, ev),
     () => again(id, e),
   );

@@ -1,7 +1,7 @@
 // Each handler only forwards to the service that owns the rule.
 
 import { gatewayWording } from "./words.ts";
-import { docOwner, type IssueUpdate } from "@vibevalley/protocol";
+import { docOwner, type IssueUpdate, ownerId } from "@vibevalley/protocol";
 import type { Handlers } from "@vibevalley/protocol/api";
 import { Agents } from "./agent/agent.ts";
 import { missing, lookIn, reasonOf, refused } from "./errors.ts";
@@ -90,6 +90,7 @@ export const handlers = Effect.gen(function* () {
           { ...(body.agent ? { agent: body.agent } : {}), ...(body.project ? { project: body.project } : {}) },
           body.id,
           body.sendKey ?? "",
+          { ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}), ...(body.attachments ? { attachments: body.attachments } : {}) },
         ),
       ),
     "setting.get": () => Effect.sync(setting.status),
@@ -147,6 +148,15 @@ export const handlers = Effect.gen(function* () {
     "channel.default.set": ({ id }) => channels.makeDefault(id),
     "channel.message.list": ({ id, before, limit }) => channels.history(id, before, limit),
     "channel.markRead": ({ id, ...body }) => channels.markRead(id, body.number).pipe(Effect.mapError((e) => missing(reasonOf(e), [lookIn.channel]))),
+    "channel.message.update": ({ id, text }) => channels.edit(id, text),
+    "channel.message.delete": ({ id }) => channels.remove(id),
+    "channel.message.previewDelete": ({ id }) => channels.previewRemove(id),
+    "channel.message.search": ({ text, channel }) => channels.search(text, channel),
+    "channel.reaction.toggle": ({ id, emoji }) => channels.react(id, ownerId, emoji),
+    "channel.pin.toggle": ({ id }) => channels.pin(id),
+    "channel.pin.list": ({ id }) => channels.pins(id),
+    "channel.thread.create": ({ id }) => channels.threadUnder(id),
+    "channel.attachment.create": (upload) => channels.attach(upload),
     "recurrence.create": (body) => recurrences.add(body, owner),
     "recurrence.list": () => Effect.sync(recurrences.list),
     "recurrence.update": ({ id, ...body }) => (body.enabled === undefined ? Effect.void : Effect.asVoid(recurrences.setEnabled(id, body.enabled))),

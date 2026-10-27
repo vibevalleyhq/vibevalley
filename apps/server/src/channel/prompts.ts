@@ -1,7 +1,20 @@
 // What a helper is told of the chat when it is woken for messages or busy with unread ones: said to the model, in
 // Chinese whatever the owner's locale.
 
-import { messageLine, summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./rules.ts";
+import { summaryChannels, type UnreadRow, wakeMessages, type InboxMessage } from "./rules.ts";
+
+/** The words' own line breaks are marked, so no message can pass for a header; what it answers, a change, a deletion and
+ * its files are said in the line. */
+export function messageLine(m: InboxMessage): string {
+  const from = m.fromKind === "session" ? m.from + " " + m.name : m.name;
+  const head = `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
+  if (m.deleted) return head + " （这条已删除）";
+  const files = (m.attachments ?? []).map((a) => `\n  │ [附件 ${a.name}：${a.path}]`).join("");
+  return `${head}${m.edited ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}`;
+}
+
+/** One line each, in order: how the orchestrator and a session read what came to them. */
+export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");
 
 const rowText = (r: UnreadRow) => `${r.target} ${r.unread} 条` + (r.mentionsYou ? "（提到了你）" : "") + (r.latest ? "，最后是 " + r.latest : "");
 

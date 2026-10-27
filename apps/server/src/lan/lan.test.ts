@@ -5,12 +5,12 @@ import type { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
+import { attachmentPath, lanKeyCookie, type LanPaired } from "@vibevalley/protocol";
 import { rpcPath } from "@vibevalley/protocol/rpc";
 import { Context, Effect, Layer } from "effect";
 import { app } from "../http/app.ts";
 import { testConfig } from "../testing/layers.ts";
-import { Lan } from "./lan.ts";
+import { Lan, remoteMay } from "./lan.ts";
 import { until } from "../testing/until.ts";
 import { quietApp } from "../testing/world.ts";
 
@@ -80,6 +80,10 @@ const upgradeAt = (addr: string, headers: Record<string, string>) =>
   });
 
 describe("lan access", () => {
+  it("lets a device read the chat's files, by GET only", () => {
+    expect([remoteMay("GET", attachmentPath("ab12")), remoteMay("POST", attachmentPath("ab12")), remoteMay("GET", "/mcp")]).toEqual([true, false, false]);
+  });
+
   it.live("is shut until opened", () =>
     Effect.gen(function* () {
       const lan = yield* farm();
