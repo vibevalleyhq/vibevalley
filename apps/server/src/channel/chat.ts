@@ -91,7 +91,6 @@ export interface Info {
   readonly name: string;
   readonly description: string;
   readonly project: string;
-  /** The farm's default channel. */
   readonly default: boolean;
 }
 
@@ -262,7 +261,6 @@ interface Written {
 export interface ChannelShape {
   /** The channel what names none goes to (ChatMessage.channel, a connector's, a call's). */
   readonly defaultChannel: () => string;
-  /** This channel is the default from now on. */
   readonly makeDefault: (id: string) => Effect.Effect<void, ApiError>;
   /** The owner's words; again: sendKey was sent before, and the message is that one. */
   readonly say: (text: string, channel: string | undefined, sendKey: string) => Effect.Effect<{ message: ChatMessage; again: boolean }, ApiError>;

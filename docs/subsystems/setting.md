@@ -18,7 +18,7 @@
 - 配置：`apps/server/src/base/config.ts`（`Config`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`projectsDir`、服务 `Settings`）。`src/main.ts` 用 `--config` 指一个别的文件；命令行只读家目录的。
 - 设置：`apps/server/src/setting`：`setting.ts`（`Setting`、`settings.json` 的形状、取钥匙的方法、交给别的服务的 `VoiceConfig`、`DictationConfig`、`MemorySourceConfig`）、`rules.ts`（`settingsProblem`、`keyHint`、记性来源的校验和合并、语音的校验和只存差异）。规则的黄金数据在 `setting/testdata/rules.jsonl.gz`。
 - 抹密钥：`apps/server/src/base/redact.ts`（`redact`、`redactOutput`）。
-- 接口：`setting.load`、`setting.check`、`setting.save`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
+- 接口：`setting.get`、`setting.check`、`setting.update`（[capabilities.md](docs/reference/capabilities.md)），形状是 `SettingsStatus`、`SettingsUpdate`、`Check`、`KeyStatus`。
 - 页面：`apps/web/src/features/setting/SettingsPage.tsx`，表单 `SettingsForm.tsx`。
 
 ## 模型和不变量
@@ -70,7 +70,7 @@
 - **只在设置里有的**：语音服务的 ASR、LLM、TTS key，听写（地址、模型、key），记性的来源（地址、key、开关）。听写没填地址就是关着（`dictation()` 是 `undefined`）。
 - **钥匙不出服务端**：`status()` 对每把钥匙只给来源和末四位（`keyHint`：`…` 加最后 4 个 UTF-16 码元）；Agora 的 App ID 不算钥匙，整串给。
 - **一次更新**：没给的字段不动，给了空字符串就清掉（清掉后露出配置里的那把）；值去掉两头空白。听写的地址和模型都空时整项删掉；记性来源整张换掉，没给 key 的来源沿用这一种原来存的 key。
-- **格式不对就一样都不存**（`settingsProblem`）：DeepSeek 的钥匙带空格或不到 8 个字；Agora 的 App ID、Certificate 不是 32 位十六进制；语音服务的 key 带空格；听写的地址不是 `http(s)://` 开头或没填模型；记性来源不认识、同一种接了两个、打开了却没地址、地址不对、key 带空格；语音设置不对（`voiceProblem`）。`setting.check` 只回这句话，`setting.save` 把它当 409 拒绝。不调 DeepSeek、Agora 去验证钥匙。
+- **格式不对就一样都不存**（`settingsProblem`）：DeepSeek 的钥匙带空格或不到 8 个字；Agora 的 App ID、Certificate 不是 32 位十六进制；语音服务的 key 带空格；听写的地址不是 `http(s)://` 开头或没填模型；记性来源不认识、同一种接了两个、打开了却没地址、地址不对、key 带空格；语音设置不对（`voiceProblem`）。`setting.check` 只回这句话，`setting.update` 把它当 409 拒绝。不调 DeepSeek、Agora 去验证钥匙。
 - **语音只存和默认不同的**：默认是 `defaultVoice()`，配置的 `voice.id` 改它的音色；存的时候只留和默认不同的项，全一样就不存。以后改了默认，主人没动过的那几项跟着变；「恢复默认」回到它。
 - **一次取齐**：`voiceConfig()`（语音设置、三把 key 和 DeepSeek 钥匙）、`dictation()`（地址和 key）、`memorySources()`（地址和 key）各从同一份设置里一次读出，地址不会和另一次保存的 key 配在一起。
 
@@ -83,7 +83,7 @@
 
 **开机**：`loadConfig` 读出 `Config` → 作为 `Settings` 交给各服务；`Setting` 建的时候记下配置里的三把钥匙和语音的默认，读一次 `settings.json`。
 
-**主人填一把钥匙**：设置页先 `setting.check` 看格式，再 `setting.save`；服务端校验、合进内存里的那份、整份写回 `settings.json`，回新的 `SettingsStatus`。
+**主人填一把钥匙**：设置页先 `setting.check` 看格式，再 `setting.update`；服务端校验、合进内存里的那份、整份写回 `settings.json`，回新的 `SettingsStatus`。
 
 **用的时候现取**：
 
@@ -98,7 +98,7 @@
 
 - **谁依赖配置**：几乎所有服务的 `make` 都拿 `Settings`；每个键归哪个子系统，见本篇「配置键」的表。
 - **谁依赖设置**：`orchestrator`、`runtime`、`voice`、`memory` 拿 `Setting`，只调取值的方法；`handlers.ts` 调 `status`、`check`、`save`，`check` 的结果里补上 `project` 的 GitHub 状态。
-- **「连接到本机」**：配对过的设备能看设置、能检查（`setting.load`、`setting.check`），不能保存：`setting.save` 没有 `remote`（[连接到本机](docs/subsystems/lan.md)）。
+- **「连接到本机」**：配对过的设备能看设置、能检查（`setting.get`、`setting.check`），不能保存：`setting.update` 没有 `remote`（[连接到本机](docs/subsystems/lan.md)）。
 - **桌面版**：起服务端时设 `VIBEVALLEY_PORT=0` 和登录 shell 的 `PATH`，别的照环境和家目录的配置（[客户端](docs/subsystems/app.md)）。
 - **不归这里**：`runtime` 算 pi 那台农机的余额时，照 pi 自己的规则找 pi 的 DeepSeek 钥匙（`piDeepseek`）：那是 pi 的配置。
 

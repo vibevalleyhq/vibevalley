@@ -8,7 +8,7 @@
 |---|---|
 | 像素村：384×256 的格子、放大和裁边、LDtk 地图、寻路、光、院子的动静 | 地的样子（庄稼和牌子）怎么算：`apps/server/src/game/view.ts` 的 `plotOf`，[工单](docs/subsystems/issue.md)；金币、连胜、成就和账本（[游戏](docs/subsystems/game.md)） |
 | 帮工走去哪、什么姿势、在哪块地上 | 帮工的阶段和在做什么（[帮工](docs/subsystems/session.md)） |
-| 快捷栏的农具：点一块地做什么、用不上时说为什么 | 农具调的接口背后的规则（`issue.status`、`issue.comment`，[工单](docs/subsystems/issue.md)） |
+| 快捷栏的农具：点一块地做什么、用不上时说为什么 | 农具调的接口背后的规则（`issue.status.update`、`issue.comment.create`，[工单](docs/subsystems/issue.md)） |
 | 地图：每个项目一座岛，地是它的 worktree 和空位 | 项目的上限、worktree（[项目](docs/subsystems/project.md)） |
 | 农场手机：来电响铃、接听去哪、通话记录、小游戏 | 哪些事算来电、怎么说（Inbox，[通知](docs/subsystems/notice.md)） |
 | 系统通知和菜单栏的说法（[客户端](docs/subsystems/app.md)「通知和菜单栏」） | 通知送到页面没开着的手机上（连接器，[田头](docs/subsystems/channel.md)） |
@@ -103,9 +103,9 @@
 **播种袋**（`farm/panels/SeedForms.tsx`：农场点空地打开，地图点一座岛的空位也打开它）：
 
 1. **种在这座农场的项目**：写着「种在 <项目>」和它的栈（Go、Node（bun）……），袋子里不选项目。不属于哪个项目的那座农场里，袋子说先进一个项目的农场，按钮去「项目」地图（一个项目也没有时去开一个）。
-2. **挑种子**：问服务端 `project.templates`，页面不带种子的副本，只画它给的。从上到下是「最近」（这个项目里派出去过的工单标题，新的在前、不重复、最多 5 条），「常见的活」（按类分：修问题、测试、新功能、整理、依赖、文档、检查、发版，每类一个页签、一个庄稼图标，一次只摊开一类），「自己写」的文本框，和「谁来种」。选一颗常见的活，文本框里是它的标题和一行「做到什么程度算完」，光标选中第一个〔…〕空，填上就能种；那一行里的命令照项目的栈写好（`go test ./...`、`bun run test`……），认不出栈就写「测试」「构建」这类泛称。 读取失败时显示原因和「重新拿种子袋」，服务恢复后可以在原袋子里重试，已写的工单文字保留。
+2. **挑种子**：问服务端 `project.template.list`，页面不带种子的副本，只画它给的。从上到下是「最近」（这个项目里派出去过的工单标题，新的在前、不重复、最多 5 条），「常见的活」（按类分：修问题、测试、新功能、整理、依赖、文档、检查、发版，每类一个页签、一个庄稼图标，一次只摊开一类），「自己写」的文本框，和「谁来种」。选一颗常见的活，文本框里是它的标题和一行「做到什么程度算完」，光标选中第一个〔…〕空，填上就能种；那一行里的命令照项目的栈写好（`go test ./...`、`bun run test`……），认不出栈就写「测试」「构建」这类泛称。 读取失败时显示原因和「重新拿种子袋」，服务恢复后可以在原袋子里重试，已写的工单文字保留。
 
-播种是经田头发一条消息（`channel.say`）：选的或写的那段话原样发，带档案和项目，农场的还带地号（岛上没有农场的地，不带，服务端照常挑一块），管家照着派活。「开始」就是播种；「草稿」不播种：这段话成为这个项目的一张备选工单（`writeIssue`：`issue.create` 再 `issue.draft`，选了谁来种就是它的帮工），袋子关上，打开它的详情（[工单](docs/subsystems/issue.md#怎么走)「起草」）。
+播种是经田头发一条消息（`channel.message.send`）：选的或写的那段话原样发，带档案和项目，农场的还带地号（岛上没有农场的地，不带，服务端照常挑一块），管家照着派活。「开始」就是播种；「草稿」不播种：这段话成为这个项目的一张备选工单（`writeIssue`：`issue.create` 再 `issue.draft`，选了谁来种就是它的帮工），袋子关上，打开它的详情（[工单](docs/subsystems/issue.md#怎么走)「起草」）。
 
 指着一块地时 `aimTool` 写出点下去做什么，用不上就写原因、什么都不发；点击保留指向时的农具（`PlotAim`），执行前再读最新工单动作，地上的帮工换了就拒绝这次点击。Esc 放下工具，手上已经是手时打开菜单。
 
@@ -115,7 +115,7 @@
 
 - **核心状态**：读 `StateFrame`（形状在 `packages/protocol`）的 `state`、`view`、`inbox`、`effects`；地的样子是 `plotOf`（`game/view.ts`），来电是 `inbox`（`notice/inbox.ts`），皮不重写这两条规则。
 - **工单、帮工**：农具按工单允许的动作调用 `issue.act`；播种是经田头发一条带档案和项目（农场的还带地号）的消息。
-- **种子**：播种袋读 `project.templates`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
+- **种子**：播种袋读 `project.template.list`（`issue` 服务从工单里读出「最近」，`project` 服务看项目根目录认栈，工单模板的目录在 `apps/server/src/agent/template_catalog.json`），页面不带副本（理由见下「种子的目录和填法在服务端」）。
 - **项目**：地图读项目列表里的 `maxSessions`，项目页每 30 秒问一次；工单和帮工跟着核心状态来。
 - **游戏**：金币、升级、成就到了一档是服务端推来的 `GameEffect`，皮只画效果、响声音、弹通知。
 - **素材流水线（`design/`）**：生图 `design/pixel/gen.sh`，切图 `design/pixel/process.py` 写出 `apps/web/public/pixel/` 和 `sprites.json`（不手改）；原图在 vibevalley-art，`design/art.sh` 链接进来。操作命令见[开发](docs/development.md#素材音效和官网)。

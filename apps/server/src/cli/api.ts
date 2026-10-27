@@ -83,7 +83,6 @@ export const request = Effect.fn("Cli.request")(function* (base: string, path: s
   return text;
 });
 
-/** One op with its input, as a command calls another. */
 const call = (base: string, op: keyof Handlers, input?: Readonly<Record<string, unknown>>) =>
   request(base, pathOf(op), input === undefined ? undefined : JSON.stringify(input));
 

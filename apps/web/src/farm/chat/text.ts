@@ -5,7 +5,7 @@ import type { Channel } from "@vibevalley/protocol";
 import { channelLabel } from "../../features/channel";
 import { farmWording } from "../words";
 
-/** A channel as the farm names it: the default one is the farm's 田头 (its words' chat.label), any other its #name. */
+/** The farm calls the default channel by its words' chat.label (田头). */
 export const farmChannelLabel = (c: Channel | undefined) => (!c || c.default ? farmWording().chat.label : channelLabel(c));
 
 export const farmClock = (at: number) => {

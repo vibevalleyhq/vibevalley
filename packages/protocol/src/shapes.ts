@@ -17,8 +17,7 @@ export const ownerId = "owner";
 /** Who @所有人 is. */
 export const everyone = "everyone";
 
-/** What the farm's first channel is called, made default when the farm has none. A name like any other: stored, and in
- * its address (#general). */
+/** The first channel, made default when the farm has none; then a name like any other, stored and in its address. */
 export const firstChannelName = "general";
 
 /** Sessions working at once; also the beds on the farm. */
@@ -32,7 +31,7 @@ export const dayMs = 86400000;
 /** An agent's memories past this go, the longest unused first. */
 export const memoryKeep = 300;
 
-/** Every endpoint is a POST at its op (api.ts): issue.status.update at /api/v1/issue/status/update. */
+/** Every endpoint is a POST at its op, named as in api.ts. */
 export const pathOf = (op: string) => "/api/v1/" + op.replaceAll(".", "/");
 
 /** The three long-lived streams; the client asks for them by path. */
@@ -244,8 +243,6 @@ export type ChannelType = (typeof ChannelTypeValues)[number];
 export const SubjectKindValues = ["issue", "graph", "talk"] as const;
 export type SubjectKind = (typeof SubjectKindValues)[number];
 
-/** Anywhere something is said, as Discord's: a channel, a direct channel between the owner and one other, or a thread
- * under a message of a channel. */
 export interface Channel {
   id: string;
   type: ChannelType;

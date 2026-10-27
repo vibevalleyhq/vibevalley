@@ -282,11 +282,9 @@ describe("the chat", () => {
             const n = yield* heard.of(said.id);
             expect([n.channel, n.type, n.target]).toEqual([direct!.id, "direct", "@owner"]);
             expect(yield* Effect.promise(() => f.deliveryOf(orchestratorAgent, said.id))).toMatchObject({ reason: "direct", wakes: true });
-            // No one else is there: the helper named is neither woken nor handed it, and the message names no one.
             expect(yield* Effect.promise(() => f.deliveryOf("w3", said.id))).toBeUndefined();
             expect(x.runsOf("w3")).toHaveLength(before);
             expect(f.messagesOf(direct!.id).at(-1)?.mentions).toBeUndefined();
-            // It answers there, the owner has it unread, and it finds the place by its address.
             yield* f.chat.orchestratorSays(direct!.id, "好，说吧", "");
             yield* until(() => (f.channel(direct!.id)?.unread ?? 0) === 1, "the answer unread");
             expect((yield* f.chat.read(orchestratorAgent, { target: "@主人" })).messages.map((m) => m.text)).toEqual(["@w3 你先别动，我们单独说", "好，说吧"]);
@@ -298,7 +296,6 @@ describe("the chat", () => {
           }),
         config,
       );
-      // Made once: a restart finds it.
       yield* run((g) => Effect.sync(() => expect(directs(g)).toHaveLength(1)), config);
     });
   });
@@ -331,7 +328,6 @@ describe("the chat", () => {
         yield* f.chat.updateChannel(channel.id, undefined, "");
         expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
         expect(channelOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
-        // The default moves as data: what names no channel goes to the new one, and the old is a channel like any.
         const general = f.chat.defaultChannel();
         yield* f.chat.makeDefault(channel.id);
         expect([f.chat.defaultChannel(), defaultOf(f.core.state().chat)?.id, channelOf(f.core.state().chat, general)?.default]).toEqual([

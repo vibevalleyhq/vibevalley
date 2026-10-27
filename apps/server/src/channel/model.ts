@@ -43,7 +43,6 @@ export class ChatModel {
     return this.threadBySubject.get(subjectKey(kind, id));
   }
 
-  /** A channel by its name. */
   channelByName(name: string): ChannelRow | undefined {
     for (const c of this.byId.values()) if (c.name === name && c.type === "channel") return c;
     return undefined;

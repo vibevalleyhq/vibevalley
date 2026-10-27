@@ -43,6 +43,7 @@
 | `channel.message.send` | `/api/v1/channel/message/send` | ✓ | ✓ |   |
 | `channel.create` | `/api/v1/channel/create` | ✓ | ✓ | ✓ |
 | `channel.update` | `/api/v1/channel/update` | ✓ | ✓ | ✓ |
+| `channel.default.set` | `/api/v1/channel/default/set` | ✓ | ✓ |   |
 | `channel.message.list` | `/api/v1/channel/message/list` | ✓ | ✓ | ✓ |
 | `channel.markRead` | `/api/v1/channel/markRead` | ✓ | ✓ |   |
 

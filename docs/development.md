@@ -62,11 +62,11 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 
 先起服务端（见上）。另开终端，命令行在根目录是 `vp run --filter vibevalley-server cli`；下面写成 `vibevalley`。它默认连 `http://127.0.0.1:8787`，别的地址用 `--server` 或 `VIBEVALLEY_SERVER`。
 
-命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条 `<组> <操作>` 命令（`issue create`、`issue status <id>`），`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
+命令行搭在 `effect/cli` 上（`apps/server/src/cli.ts`、`src/cli/`），接口表里每个接口是一条命令，命令的词就是操作名（`issue.create` 是 `issue create`，`issue.status.update` 是 `issue status update <id>`，操作名里的大写写成 `-`：`issue preview-delete`），`about` 的字段（多是 `<id>`）是位置参数；`vibevalley --help`、`vibevalley issue --help`、`vibevalley issue status update --help` 列出命令和参数。它的输出是给脚本和 agent 读的：
 
 - **stdout 只放结果**：一个 JSON 文档（终端里排开，不是终端时一行）；`state --watch`、`events` 一行一帧。失败时 stdout 是空的。
-- **请求体** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段。
-- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `DELETE` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
+- **输入** `--json` 收 JSON 文本、`-`（读标准输入）或 `@文件`，和位置参数并成一份，发出去以前照接口的 Schema 查一遍，对不上就不发，说是哪个字段；输入只有位置参数的命令不收 `--json`。
+- **试跑** `--dry-run`：会删、会合、会关、会让帮工走的命令（接口表里带 `dryRun` 的：`issue status update`、`issue act` 和每一个删除，`cli.test.ts` 查每个 `delete` 都有）只回答会做什么（`{"does":[…]}`），什么都不动；它和真做走同一处判断，所以真做会拒的，试跑也拒、话一样。只读的命令照常跑；别的改东西、还没有试跑的命令带着 `--dry-run` 会被拒（`NoDryRun`），不会悄悄做了。
 - **失败**是 stderr 最后一行的 JSON：`{"error":{"tag":…,"message":…,"next":[{"say":…,"run":[…]}]}}`，`next` 是接着能做什么，`run` 是能直接跑的命令（不带 `vibevalley`）：找不到的（`Missing`）总说去哪儿找（列出它们的命令），工单和计划的拒绝给出它们现在能做的动作。退出码分得出是哪一种：
 
   | 退出码 | 意思 |
@@ -77,7 +77,7 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
   | 3 | 服务端拒绝（`Refused`，和语音、连接器、连接到本机的拒绝） |
   | 4 | 没有这个东西（`Missing`） |
   | 5 | 连不上服务端 |
-  | 130 | 按了 Ctrl+C：`state --watch`、`issue run` 放下请求再走 |
+  | 130 | 按了 Ctrl+C：`state --watch`、`issue work` 放下请求再走 |
 
 1. 建工单。把 `…` 换成标题和项目，用返回的工单 ID 替换后面的 `<id>`。
 
@@ -88,13 +88,13 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 2. 派活。命令把备选挪到待办，等帮工交回来，再打出改动。
 
    ```bash
-   vibevalley issue run <id>
+   vibevalley issue work <id>
    ```
 
 3. 如果不满意，写清要改什么，再干一轮。
 
    ```bash
-   vibevalley issue status <id> --json '{"status":"todo","text":"…"}'
+   vibevalley issue status update <id> --json '{"status":"todo","text":"…"}'
    ```
 
    反复运行下面的命令。先等 `status` 变成 `in_progress`，再等它回到 `in_review`。
@@ -106,8 +106,8 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 4. 如果满意，收下改动。先试跑，看它会怎么交付（合进主分支还是开 PR、合之前跑不跑检查）；再去掉 `--dry-run` 真做。
 
    ```bash
-   vibevalley issue status <id> --dry-run --json '{"status":"done"}'
-   vibevalley issue status <id> --json '{"status":"done"}'
+   vibevalley issue status update <id> --dry-run --json '{"status":"done"}'
+   vibevalley issue status update <id> --json '{"status":"done"}'
    ```
 
 状态规则和理由见子系统 [工单](docs/subsystems/issue.md#怎么走)。不派真的帮工、在隔离的沙箱里把这几步走一遍，见 [acceptance/server.md](.agents/skills/acceptance/server.md) 的 `--scripted-helper`。

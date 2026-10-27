@@ -1,5 +1,5 @@
-// The farm's endpoints: each one's op, input, answer and who may call it. Each is a POST at its op's path (pathOf);
-// the server routes and the clients call by this list (apps/server/src/http/api.ts, VibeValleyApi).
+// Each endpoint is a POST at its op's path (pathOf); the server routes and the clients call by this list
+// (apps/server/src/http/api.ts, VibeValleyApi).
 
 import { type Effect, Schema } from "effect";
 import type * as T from "./shapes";
@@ -269,20 +269,18 @@ export { pathOf };
 /** How the command line writes a word of an op: previewDelete is preview-delete. */
 export const kebab = (word: string) => word.replace(/[A-Z]/g, (c, i: number) => (i > 0 ? "-" : "") + c.toLowerCase());
 
-/** An op as the command line runs it: its words, what it is about, and the rest of its input as --json. */
 export const commandOf = (op: keyof Handlers, about: readonly string[] = [], input?: unknown): string[] => [
   ...op.split(".").map(kebab),
   ...about,
   ...(input === undefined ? [] : ["--json", JSON.stringify(input)]),
 ];
 
-/** An op that only reads: its verb gets, lists, checks or previews; every other one may change something. */
+/** Only get, list, check, recall and preview read; every other verb may change something. */
 export const readsOnly = (op: string) => /^(get|list|check|recall|preview[A-Z]\w*)$/.test(op.split(".").at(-1) ?? "");
 
 /** The fields an endpoint's input takes, what it is about among them; none when it takes nothing. */
 export const fieldsOf = (e: Endpoint): readonly string[] => Object.keys((e.input as unknown as { fields?: object } | undefined)?.fields ?? {});
 
-/** What an input is about, beside its body's fields, as one object. */
 const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.Codec<unknown> =>
   Schema.Struct({ ...ids, ...(body ? (body as unknown as Schema.Struct<Schema.Struct.Fields>).fields : {}) }) as unknown as Schema.Codec<unknown>;
 

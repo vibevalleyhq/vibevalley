@@ -117,7 +117,7 @@ export function gate() {
   return { opened, open: () => open() };
 }
 
-/** The farm's default channel, from one state frame: what names no channel is said there. */
+/** The farm's default channel's id: "" when the frame names none. */
 export async function defaultChannel(api: VibeValleyApi): Promise<string> {
   const abort = new AbortController();
   const frame = await new Promise<StateFrame>((resolve, reject) => {

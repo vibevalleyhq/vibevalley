@@ -6,7 +6,6 @@ import { compareText } from "../base/text.ts";
 /** The database keeps them all; the state these many. What is said in them is the rooms' (Channels.follow). */
 export const keepChannels = 100;
 
-/** A channel or a direct channel: not under another. */
 export const isTop = (c: Channel) => c.type !== "thread";
 
 const emptyChat = (): Chat => ({ channels: [] });

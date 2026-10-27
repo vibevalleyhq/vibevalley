@@ -23,7 +23,6 @@ export const defaultOf = (chat: Chat | undefined) => chat?.channels.find((c) => 
 
 export const channelOf = (chat: Chat | undefined, id: string | undefined) => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
-/** The channels, the default first, then by id. */
 export function topsOf(chat: Chat | undefined): Channel[] {
   return (chat?.channels.filter((c) => c.type === "channel") ?? []).sort((a, b) => {
     if (a.default) return -1;
@@ -39,17 +38,14 @@ export function topOf(chat: Chat | undefined, c: Channel | undefined) {
   return channelOf(chat, c.parent) ?? defaultOf(chat);
 }
 
-/** The owner's direct channels, by id. */
 export const directsOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "direct") ?? []).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-/** A channel's name; a direct channel is named by its peer, which the server puts in its title. */
+/** A direct channel is named by its peer, which the server puts in its title. */
 export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? (c.title ?? "") : (c?.name ?? ""));
 
-/** A channel as it is said in a line: #name, and a direct channel by its peer's name alone. */
 export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
 
-/** Where the page shows a channel: the default one is /chat. */
 export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
 
 const findLast = <T>(xs: T[] | undefined, test: (x: T) => boolean) => {

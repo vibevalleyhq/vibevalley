@@ -9,7 +9,6 @@ import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
 import { api, newSendKey, reasonOf } from "../../base/api";
 
-/** Says a line in a channel, with the picked helper. */
 export async function say(text: string, channel: Channel, sendKey: string, agent: string | undefined) {
   await api.channel.message.send({ id: channel.id, text, agent, sendKey });
 }
@@ -51,7 +50,6 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     disposed = true;
   });
   const intent = (): Omit<SayRequest, "sendKey"> => ({ ...ways.target(), text: text().trim() });
-  /** The channel a line goes to, as the core state has it: none named is the default one. */
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = core()?.chat?.channels ?? [];
     return id ? all.find((c) => c.id === id) : all.find((c) => c.default);

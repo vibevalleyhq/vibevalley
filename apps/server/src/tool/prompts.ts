@@ -100,7 +100,6 @@ export const noSuchStatus = (word: string, allowed: readonly IssueStatus[]) =>
   "没有「" + word + "」这个状态：" + allowed.map((s) => wording().status[s]).join("、");
 export const noSuchPriority = (word: string) => "没有「" + word + "」这个优先级：" + PriorityValues.map((p) => wording().priority[p]).join("、");
 
-/** A channel in one line: its name, whether it is the default, what it is for, its default project. */
 export const channelLine = (c: { readonly name: string; readonly default?: boolean; readonly description?: string; readonly project?: string }) =>
   "#" + c.name + (c.default ? "（默认）" : "") + (c.description ? "：" + c.description : "") + (c.project ? "（默认项目 " + c.project + "）" : "");
 

@@ -25,7 +25,6 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   const settings = await api.setting.get();
   expect(settings.locale).toBe("en");
   expect(settings.voiceDefaults.greeting).toBe("Hey there! What shall we grow today?");
-  // The default channel keeps its stored name in either language.
   await nav.getByRole("link", { name: /^Chat · / }).click();
   await expect(page.getByRole("heading", { name: "general" })).toBeVisible();
   await nav.getByRole("link", { name: /^Machines · / }).click();

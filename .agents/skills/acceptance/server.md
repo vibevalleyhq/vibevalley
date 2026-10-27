@@ -39,14 +39,14 @@
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
      vv issue create --json "{\"title\":\"写打卡并提交\",\"project\":\"clock\",\"assignee\":\"docs\"}"
-     vv issue run 1
-     vv issue status 1 --dry-run --json "{\"status\":\"done\"}"
-     vv issue status 1 --json "{\"status\":\"done\"}"
+     vv issue work 1
+     vv issue status update 1 --dry-run --json "{\"status\":\"done\"}"
+     vv issue status update 1 --json "{\"status\":\"done\"}"
      git -C "$(vv project list | jq -r ".[0].path")" log --oneline main
    '
    ```
 
-   每条命令的 stdout 是一个 JSON 文档：`issue run` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
+   每条命令的 stdout 是一个 JSON 文档：`issue work` 等帮工交回来、打出改动（经过的状态在 stderr），`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「写打卡」写 `clock.ts` 并提交，别的字眼见 `helper.ts`）；档案要用不带思考力度的（`docs`、`night`），带了的（`lab`）会被它拒。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/acceptance/page.md) 的截图命令。
 
@@ -57,7 +57,7 @@
 
 ## 出错时
 
-- **`issue run` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
+- **`issue work` 被拒**：档案带了思考力度（换 `docs`、`night`），或标题里没有帮工认得的字眼（见 `helper.ts`）。
 - **表结构对不上**：`db/generated` 不是最新的，`vp run --filter vibevalley-server db:generate`。
 
 ## 收拾

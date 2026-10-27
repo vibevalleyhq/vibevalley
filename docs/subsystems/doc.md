@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 文档和块的模型、块的类型和 marks、顺序键 | 一篇文章怎么分给几个帮工写（[计划](docs/subsystems/task.md)，还没接上） |
-| op 管线：一批 op 一个事务、批号去重、文档的 seq、每个 op 的结果 | 帮工怎么拿到工具、是谁在调（[田头](docs/subsystems/channel.md) 的 `/mcp`，`mcp`） |
+| op 管线：一批 op 一个事务、批号去重、文档的 seq、每个 op 的结果 | 帮工怎么拿到工具、是谁在调（[频道](docs/subsystems/channel.md) 的 `/mcp`，`mcp`） |
 | 块的修订（每一版的字、没被采用的冲突版本） | 工单和记性本身：`issue_ref`、`memory_item` 块只存它们的 id |
 | Markdown 导入和导出 | |
 
@@ -18,7 +18,7 @@
 - 表：`doc`（一篇一行，`seq`）、`doc_block`（每一块，含墓碑；`attrs`、`spans` 存 JSON 文本）、`doc_block_revision`（每一块每一版的字，`kind` 是 `normal` 或 `conflict`）、`doc_change`（每一批：`seq`、`batch_id`、谁、改了哪些块、每个 op 的结果）。
 - 页面：`apps/web/src/features/doc/`：`DocsPage.tsx` 是「文档」页（左边列表和新建，右边打开的那篇；窄屏只放一边）和块的画法、按键，`editor.ts` 的 `DocEditor` 管本地的块、待发的 op、防抖和问别人写的；不在 `apps/web/src/features/doc/blocks.ts` 以外重写规则：那里只有码点偏移、编辑时保留 marks、编号和行首的 Markdown。
 - 帮工的工具：`doc_read`、`doc_append`、`doc_update`（`apps/server/src/tool/tool.ts`，经 `/mcp` 只给 Session）。
-- 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`docOwner`）；`doc.demo`（`POST /api/v1/docs/{id}/demo`）只有本机的主人能调。
+- 接口：`doc.list`、`doc.create`、`doc.import`、`doc.get`、`doc.submit`、`doc.markdown.get`（[capabilities.md](docs/reference/capabilities.md)），主人和「连接到本机」能调，写的人记成 `owner`（`docOwner`）；`doc.demo`（`POST /api/v1/doc/demo`）只有本机的主人能调。
 
 ## 模型和不变量
 

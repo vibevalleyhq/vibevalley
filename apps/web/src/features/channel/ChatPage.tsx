@@ -262,7 +262,6 @@ function Section(props: { title: string; count: number; action?: JSX.Element; ch
   );
 }
 
-/** What stands before a channel's name: # for a channel, @ for a direct one. */
 const markOf = (c: Channel | undefined) => (c?.type === "direct" ? "@" : "#");
 
 function ChannelRow(props: { channel: Channel; here: boolean; unread: number; onClick?: () => void }) {
