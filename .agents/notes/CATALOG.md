@@ -6,7 +6,7 @@
 
 ### feature
 
-- 2026-10-27 [channel 照 Discord 分成频道、私聊和串](.agents/notes/proposed/feature/2026-10-27-channel-types.md)
+- 2026-10-27 [channel 照 Discord 分成频道、私聊和串，接口按单数资源排](.agents/notes/proposed/feature/2026-10-27-channel-types.md)
 - 2026-10-22 [记忆树：让主人看见农场在长](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
 - 2026-10-21 [电话就是管家的嘴：默认由管家自己接电话，验证这条线真的接上了](.agents/notes/proposed/feature/2026-10-21-voice-is-the-orchestrators-mouth.md)
 - 2026-10-21 [管家以工单为单位，照主人的意图记下、指派、开工、叫停和换人](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-works-in-issues.md)
