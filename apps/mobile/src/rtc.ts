@@ -12,7 +12,7 @@ import {
   type RtcConnection,
 } from "react-native-agora";
 import { PermissionsAndroid, Platform } from "react-native";
-import type { Rtc, RtcLine } from "@vibevalley/host";
+import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 import { level } from "./rules";
 
 const fail = (code: number, what: string) => {

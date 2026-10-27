@@ -1,4 +1,4 @@
-import type { FromNative, RtcEvents, RtcLine, ToNative } from "@vibevalley/host";
+import type { FromNative, RtcEvents, RtcLine, ToNative } from "@vibevalley/protocol/host";
 import { mobileWording } from "./words";
 import { notify } from "./notify";
 import { nativeRtc } from "./rtc";

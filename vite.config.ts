@@ -27,7 +27,7 @@ export default defineConfig({
       ],
       "web:check": [
         "vp check",
-        "vp run --filter @vibevalley/engine --filter @vibevalley/host --filter vibevalley-mobile --filter vibevalley-desktop --filter vibevalley-web test",
+        "vp run --filter @vibevalley/engine --filter vibevalley-mobile --filter vibevalley-desktop --filter vibevalley-web test",
         "vp run --filter vibevalley-web build",
       ],
       "desktop:test": { command: "vp run --filter vibevalley-desktop e2e", cache: false },

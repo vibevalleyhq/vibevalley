@@ -7,7 +7,7 @@ import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { VibeValleyApi } from "@vibevalley/protocol";
-import type { Notice } from "@vibevalley/host";
+import type { Notice } from "@vibevalley/protocol/host";
 
 // The server and the agents it runs read keys from the environment: a test must never reach a real model, voice service or
 // chat bot with the owner's keys, nor read the owner's VIBEVALLEY_* settings. HOME is the test's folder too: the coding agents'

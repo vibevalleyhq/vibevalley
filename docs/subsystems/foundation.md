@@ -32,7 +32,7 @@
 
 - **一门语言**：服务端、页面、桌面壳、规则都是 TypeScript。服务端在 Node 24 上用 tsx 直接跑源码，不打包；页面由 Vite 构建；脚本用 `vpx` 直接跑，单元测试用 `vp test`。
 - **`packages/protocol` 只有形状和纯函数**：不碰文件、网络和时钟以外的东西，服务端和页面都能 import；`effect` 是它唯一的依赖（Schema）。
-- **`packages/host` 是页面向宿主要东西的唯一入口**（[客户端](docs/subsystems/app.md)）。
+- **`@vibevalley/protocol/host` 是页面向宿主要东西的唯一入口**：契约和 protocol 的别处放在一起，桌面壳、手机壳各自实现（[客户端](docs/subsystems/app.md)）。
 
 **模块和服务**
 
@@ -85,7 +85,7 @@
   | 模块 | 一个模块的服务接口 | 它和它下面的层：测试库池、模块自己拥有的 git 和子进程 | 编码 agent、模型、聊天软件、GitHub、声网 | `TestClock`；真时间只用于真进程的期限和等后台 | 300 毫秒 | 碰得到的 |
   | 流程 | 整座农场（`flows/farm.ts`） | 全部模块、真 git | 同上 | 同上 | 2 秒 | `src/flows` |
   | 页面 | HTTP 和 SSE | 一个真的服务端进程 | 环境里没有钥匙，runtime 换成照字眼干活的帮工 | 真时间，随时间走的画面用 `page.clock` | 3 秒 | `apps/web/test` |
-  | 整个应用 | 宿主接口（`packages/host`） | Electron、模拟器 | — | 真时间 | 不设 | `apps/desktop`、`apps/mobile` |
+  | 整个应用 | 宿主接口（`@vibevalley/protocol/host`） | Electron、模拟器 | — | 真时间 | 不设 | `apps/desktop`、`apps/mobile` |
   | 真模型 | 管家的提示和工具描述 | 真模型 | — | — | 不计；手动跑，先问主人 | 评测样例、`acceptance` skill |
 
   一个行为在能看见它的最低一层测；模块测试主要在验证一个决定时，把决定抽成纯函数、模块测试只留一个接线；流程测试只写跨模块的用户故事。边界由检查守：`testing/pyramid.test.ts`（流程的农场只在 `src/flows`，`rules.ts` 和它的测试留在进程里）、`apps/web/src/pageTests.test.ts`（页面测试只经浏览器、Playwright 和协议）、lint `vibevalley/no-test-sleep`（不靠时间等）。预算超两倍的由 `testing/budgets.ts` 和 `apps/web/test/budgets.ts` 在每次跑完列出来，不算失败。

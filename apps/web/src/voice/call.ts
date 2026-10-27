@@ -4,7 +4,8 @@
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
 import { appWording } from "../app/words";
-import { currentHost, type RtcLine } from "@vibevalley/host";
+import type { RtcLine } from "@vibevalley/protocol/host";
+import { currentHost } from "../host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import { api, reasonOf } from "../data/api";

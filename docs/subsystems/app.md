@@ -1,6 +1,6 @@
 # 客户端
 
-VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；`/` 是像素农场（`src/farm`），其余是工作台（`src/pages`）。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经 `@vibevalley/host` 给页面。
+VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端在 `/` 提供，桌面壳、浏览器和手机的壳打开的都是它。它读服务端折好的帧（`StateFrame`），经 `@vibevalley/protocol` 的 `VibeValleyApi` 发命令，自己不折事实、不重写服务端的规则；`/` 是像素农场（`src/farm`），其余是工作台（`src/pages`）。桌面版是 Electron 壳 `apps/desktop`：用自己的 Node 带着服务端起来、打开它的页面，另有菜单栏、系统通知和语音快捷键；手机的壳是 `apps/mobile`（Expo、React Native）：扫码配对，在 WebView 里打开那台电脑经「连接到本机」放出的页面，另有系统通知和锁屏也不断的通话。两个壳都经宿主接口 `@vibevalley/protocol/host` 给页面。
 
 ## 管什么，不管什么
 
@@ -21,7 +21,7 @@ VibeValley 只有一份界面：Solid 2 写的页面 `apps/web`，由服务端�
 - **数据层** `src/data/`：`frames.ts`（状态流，和框架无关：`subscribe`、`get`）、`frame.ts`（接成 Solid 的 store：`createFrames`、`useFrames`、`useCore`）、`external.ts`（`createExternal`：把框架无关的 store 接成信号）、`api.ts`（`api`、`reasonOf`）、`live.ts`（`/api/v1/live`）、`gateway.ts`（房间的那条 WebSocket：Effect RPC 的 `Rooms`，页面里只有这里用 Effect）、`rooms.ts`（按房间存说的话：最新一页、订阅、往前翻页、串的头一条、全农场的汇报；`useRoom`、`useMessage`、`useReports`）、`sessionLogs.ts`（每个 Session 的快照、增量与重连补读）、`sessions.ts`（页面的日志订阅）、`query.ts`（`queries`、`ready` 和按对象的读取）、`agents.ts`、`issues.ts`。
 - **工作台** `src/app/`：`router.ts` 是路由（浏览器历史上的一个信号，`navigate`），`A.tsx` 是页内的链接，`places.ts` 是左栏的地方，`Shell.tsx` 是外框；每个地方一个 `src/pages/<地方>/`，共用的版面在 `pages/kit.tsx`，共用的组件在 `src/ui/`。
 - **页面的规则** `src/rules/`：只读帧和回答的纯函数（看板的分栏、频道的未读、一轮的瀑布图、通知的说法、远端和配对），各带 vitest。
-- **宿主** `packages/host`：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`、`locale`）、`currentHost()`、没有宿主时的 `browserHost`；`mobile.ts` 是手机壳和页面之间的桥（`ToNative`、`FromNative`、`mobileHost`）。
+- **宿主**：接口在 `@vibevalley/protocol/host`（`packages/protocol/src/host.ts`）：`Host`（`notify`、`tray`、`voiceShortcut`、`rtc`、`titleBar`、`locale`），和手机壳的桥（`ToNative`、`FromNative`，页面这一头是 `mobileHost`）；页面在 `src/host.ts` 里找自己的宿主（`currentHost()`、没有宿主时的 `browserHost`）。桌面壳的 preload、手机壳各自实现它。
 - **灵动岛** `apps/island`：Swift 的原生小程序（AppKit 的 `NSPanel` 里放 SwiftUI），`IslandCore` 是能离开屏幕测的消息（`Messages.swift`）和位置（`Geometry.swift`），`VibeValleyIsland` 画它；桌面壳那一半在 `apps/desktop/src/island.ts`（`glanceOf`、`startIsland`）。
 - **桌面壳** `apps/desktop`：`src/main.ts`（窗口、菜单栏、通知、快捷键、单实例、退出）、`src/server.ts`（`loginShellPath`、`startServer`）、`src/preload.ts`（把宿主接口交给页面）；`scripts/build.ts`、`scripts/package.ts`（`vp run package:mac`）。
 - **手机壳** `apps/mobile`：`App.tsx`（跟随当前农场选择）、`src/PairScreen.tsx`（扫码、粘贴、配对或取消）、`src/FarmScreen.tsx`（WebView 和桥）、`src/farm.ts`（`FarmConnection`：当前农场、配对和系统钥匙串提交）、`src/rtc.ts`（声网的原生 SDK）、`src/notify.ts`、`src/rules.ts`；`ios/`、`android/` 由 `expo prebuild` 从 `app.json` 生成，不进仓库（[README](apps/mobile/README.md)）。

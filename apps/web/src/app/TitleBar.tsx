@@ -2,7 +2,7 @@
 // and what is clickable in the strip stays clickable (style.css).
 
 import { Show } from "solid-js";
-import { currentHost } from "@vibevalley/host";
+import { currentHost } from "../host";
 
 /** The strip's height, and where the window's buttons end along it; both 0 where the window has its own title bar. */
 export const titleBar = currentHost().titleBar ?? { top: 0, left: 0 };

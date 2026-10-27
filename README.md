@@ -106,8 +106,7 @@ vp run --filter vibevalley-server start --web ../web/dist   # 服务端，127.0.
 apps/server/       TypeScript 服务端（Effect v4、PGlite）：src/ 按概念分的服务（工单、执行、项目、群聊、管家、频道和连接器、游戏……），db/ 表结构和查询
 apps/web/          页面（Solid 2）：农场、像素村、田头、工单、文档、配置页、语音；服务端在 / 提供
 apps/desktop/      Electron 壳：带着服务端起来，打开它的页面；package:mac 打成 macOS 应用
-packages/protocol/ 形状、接口和几处共用的规则的唯一来源，服务端和页面都 import 它
-packages/host/     宿主接口：通知、菜单栏、快捷键，没有的是 null
+packages/protocol/ 形状、接口、几处共用的规则和宿主接口的唯一来源，服务端、页面和两个壳都 import 它
 site/              官网 vibevalley.dev（Astro）
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作

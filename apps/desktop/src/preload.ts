@@ -1,7 +1,7 @@
-// The host interface for the page (@vibevalley/host), over IPC to the main process.
+// The host interface for the page (@vibevalley/protocol/host), over IPC to the main process.
 
 import { contextBridge, ipcRenderer } from "electron";
-import { type Host, hostKey } from "@vibevalley/host";
+import { type Host, hostKey } from "@vibevalley/protocol/host";
 
 /** The main process registers it (main.ts voiceShortcut). */
 const voiceShortcut = "Alt+Shift+Space";
