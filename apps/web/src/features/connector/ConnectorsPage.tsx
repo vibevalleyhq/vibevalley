@@ -7,7 +7,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus, generalName } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { channelLabel, channelsOf } from "../channel/rules";
+import { channelLabel, channelsOf } from "../channel";
 import { momentText, wallClockText } from "../../base/format";
 import { toast } from "../../ui/toasts";
 import { Keyed } from "../../base/util";

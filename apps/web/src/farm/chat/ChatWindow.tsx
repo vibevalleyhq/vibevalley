@@ -7,11 +7,10 @@ import { farmWording } from "../words";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { type Agent, type ChatMessage, type Conversation, type WorkspaceState } from "@vibevalley/protocol";
 import { newSendKey } from "../../base/api";
-import { arrived, pending, say } from "../../features/channel/composing";
-import { liveCaptions, type SpokenLine } from "../../features/voice/captions";
-import { playSound } from "../../ui/pixel/sound";
-import { farm } from "../store";
 import {
+  arrived,
+  pending,
+  say,
   channelLabel,
   channelOf,
   conversationOf,
@@ -23,17 +22,20 @@ import {
   threadOwnerOf,
   threadTitle,
   unreadIn,
-} from "../../features/channel/rules";
-import { voiceCall, type VoiceCall } from "../../features/voice/call";
+  useMarkRead,
+  rooms,
+  useMessage,
+  useRoom,
+} from "../../features/channel";
+import { liveCaptions, type SpokenLine, voiceCall, type VoiceCall, createCall } from "../../features/voice";
+import { playSound } from "../../ui/pixel/sound";
+import { farm } from "../store";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
-import { useMarkRead } from "../../features/channel/data";
-import { rooms, useMessage, useRoom } from "../../features/channel/rooms";
-import { TurnSteps } from "../../features/session/WorkLog";
+import { TurnSteps } from "../../features/session";
 import { useCore } from "../../base/frame";
 import { ready, useAgents } from "../../base/query";
 import { OrchestratorFace } from "../../ui/Face";
-import { createCall } from "../../features/voice/createCall";
 import { PxButton, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { ChannelMenu } from "./ChannelMenu";

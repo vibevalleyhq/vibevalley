@@ -9,8 +9,7 @@ import { fire } from "../commands";
 import { harvestedOf } from "../hud/rules";
 import { farm } from "../store";
 import { issueOf } from "../world/plots";
-import { changeKind, lineCounts, nothingChanged } from "../../features/issue/state";
-import { issueTitle } from "../../features/issue/rules";
+import { changeKind, lineCounts, nothingChanged, issueTitle, useIssueChanges } from "../../features/issue";
 import { ago } from "../../base/format";
 import { useRouter } from "../../base/router";
 import { useNow } from "../../base/util";
@@ -19,7 +18,6 @@ import { ready, useAgents } from "../../base/query";
 import { FarmSection, PxButton, SpriteIcon } from "../../ui/pixel";
 import { commands } from "../state";
 import { FarmEmpty, FarmTag, FileRow, PlusMinus, tint, Tinted } from "./bits";
-import { useIssueChanges } from "../../features/issue/data";
 
 const xs = "text-[12px] text-bark-600";
 

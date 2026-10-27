@@ -12,7 +12,7 @@ import { api, reasonOf } from "../../base/api";
 import { doingOf } from "../hud/rules";
 import { farm } from "../store";
 import { stationOfSession } from "../world/plots";
-import { lineCounts } from "../../features/issue/state";
+import { lineCounts } from "../../features/issue";
 import { aria, Keyed } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";
 import { ready, useProjects, useQuery } from "../../base/query";
@@ -20,7 +20,7 @@ import { AgentFace } from "../../ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-import { type Answer, graphs, useGraphChanges } from "../../features/task/data";
+import { type Answer, graphs, useGraphChanges } from "../../features/task";
 import { useAgent, useWorkAgents } from "../../base/agents";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {

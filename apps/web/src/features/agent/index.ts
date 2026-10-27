@@ -1,0 +1,1 @@
+export { AgentsRoute } from "./AgentsPage";

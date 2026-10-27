@@ -5,7 +5,7 @@ import { farmWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { ChangedFile } from "@vibevalley/protocol";
-import { changeKind, patchLines, patchMarkOf } from "../../features/issue/state";
+import { changeKind, patchLines, patchMarkOf } from "../../features/issue";
 import { aria } from "../../base/util";
 import { SpriteIcon } from "../../ui/pixel";
 

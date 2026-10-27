@@ -14,7 +14,7 @@ import { Markdown } from "../../ui/Markdown";
 import { ChangesBody, ChangesHead } from "./CloseDialog";
 import { useNameOf } from "./hooks";
 import { Fold, IssueSheet, More, Note, Property } from "./Sheet";
-import { type Answer, graphs, useGraphChanges } from "../task/data";
+import { type Answer, graphs, useGraphChanges } from "../task";
 
 const spentText = (s: Spent) =>
   [s.cny !== undefined ? `¥${s.cny.toFixed(2)}` : undefined, s.tokens > 0 ? `${Math.round(s.tokens)} token` : undefined].filter(Boolean).join(" · ") || "—";

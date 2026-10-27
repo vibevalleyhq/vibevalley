@@ -7,7 +7,7 @@ import { currentHost } from "../../base/host";
 import { freshOf } from "@vibevalley/protocol/rules";
 import { currentLocale } from "@vibevalley/protocol/words";
 import { traySummary } from "./tray";
-import { voiceCall } from "../voice/call";
+import { voiceCall } from "../voice";
 import { rawFrame } from "../../base/frame";
 
 export function Follow() {

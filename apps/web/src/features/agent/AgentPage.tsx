@@ -42,9 +42,9 @@ import { Icon } from "../../ui/Icon";
 import { PoseSprite } from "../../ui/PoseSprite";
 import { Segmented } from "../../ui/Segmented";
 import { Toggle } from "../../ui/layout";
-import { MemoryPanel } from "../memory/Memory";
-import { useSkills } from "../runtime/SkillsPage";
-import { TrajectoryList } from "../session/Trajectory";
+import { MemoryPanel } from "../memory";
+import { useSkills } from "../runtime";
+import { TrajectoryList } from "../session";
 
 const unknownFacts: RuntimeFacts = { steer: false, refused: {}, capabilities: [], inProcess: false };
 const factsOf = (info: RuntimeInfo | undefined) => info?.facts ?? unknownFacts;

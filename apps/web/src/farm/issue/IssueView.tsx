@@ -10,20 +10,28 @@ import type { JSX } from "@solidjs/web";
 
 import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
-import { createIssueActs } from "../../features/issue/acts";
+import {
+  createIssueActs,
+  changesLine,
+  type CriterionRow,
+  issueState,
+  nothingChanged,
+  noStepsText,
+  runText,
+  useIssueChanges,
+  useIssueHistory,
+  useIssueRuns,
+  useIssueTimeline,
+} from "../../features/issue";
 import { farm, overlayOf } from "../store";
 import { cropLabel, issueOf, plotOf, stationOfSession } from "../world/plots";
 import { castPrefix } from "../../ui/cast";
-import { issueThreadOf } from "../../features/channel/rules";
-import { changesLine, type CriterionRow, issueState, nothingChanged, noStepsText } from "../../features/issue/state";
-import { runText } from "../../features/issue/rules";
+import { issueThreadOf } from "../../features/channel";
 import { tookText, wallClockText } from "../../base/format";
 import { aria, useNow } from "../../base/util";
 import { useRouter } from "../../base/router";
-import { createSessionEvents } from "../../features/session/data";
-import { WorkLog } from "../../features/session/WorkLog";
+import { createSessionEvents, WorkLog } from "../../features/session";
 import { useCore, useFrames } from "../../base/frame";
-import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../features/issue/data";
 import { ready } from "../../base/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../../ui/pixel";
 import { farmActWords } from "../labels";

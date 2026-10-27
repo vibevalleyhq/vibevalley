@@ -1,20 +1,16 @@
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
 // first five are the server's settings in a card, the rest whole pages of their own.
 
-import { voiceWording } from "../voice/words";
-import { runtimesWording } from "../runtime/words";
-import { lanWording } from "../lan/words";
-import { connectorWording } from "../connector/words";
+import { voiceWording, VoiceForm } from "../voice";
+import { runtimesWording, SkillsPage } from "../runtime";
+import { lanWording, LanPage } from "../lan";
+import { connectorWording, ConnectorsPage } from "../connector";
 import { settingsWording } from "./words";
 import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../ui/A";
 import { Keyed } from "../../base/util";
 import { Card, ListCard, ListRow } from "../../ui/layout";
-import { ConnectorsPage } from "../connector/ConnectorsPage";
-import { LanPage } from "../lan/LanPage";
 import { GitHub, LanguageForm, SettingsForm } from "./SettingsForm";
-import { SkillsPage } from "../runtime/SkillsPage";
-import { VoiceForm } from "../voice/VoiceForm";
 
 export const sections = [
   { id: "deepseek", label: "DeepSeek", line: settingsWording().sections.deepseek.line },

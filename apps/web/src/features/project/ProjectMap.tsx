@@ -29,7 +29,7 @@ import {
   spotText,
 } from "./rules";
 import { toast } from "../../ui/toasts";
-import { writeIssue } from "../issue/write";
+import { writeIssue } from "../issue";
 import { useRouter } from "../../base/router";
 import { autofocus } from "../../base/util";
 import { useCore, useFrames } from "../../base/frame";

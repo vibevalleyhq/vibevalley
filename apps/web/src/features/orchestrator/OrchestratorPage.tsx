@@ -10,9 +10,9 @@ import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
-import { ArchivePanel, OrchestratorMemoryPanel } from "../memory/Memory";
-import { VoiceForm } from "../voice/VoiceForm";
-import { TrajectoryLog } from "../session/Trajectory";
+import { ArchivePanel, OrchestratorMemoryPanel } from "../memory";
+import { VoiceForm } from "../voice";
+import { TrajectoryLog } from "../session";
 import { usePrefs } from "../../base/prefs";
 
 const tabs = [

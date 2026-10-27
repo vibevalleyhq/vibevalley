@@ -15,7 +15,7 @@ import { useCore } from "../../base/frame";
 import { ready, useRuntimes } from "../../base/query";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { Icon } from "../../ui/Icon";
-import { useSkills } from "../runtime/SkillsPage";
+import { useSkills } from "../runtime";
 import { AgentPage } from "./AgentPage";
 import { usePrefs } from "../../base/prefs";
 

@@ -7,13 +7,12 @@ import { farmWording } from "../words";
 import { For, Show } from "solid-js";
 import type { Conversation } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { createComposer } from "../../features/channel/composing";
+import { createComposer, threadOwnerOf } from "../../features/channel";
 
-import { threadOwnerOf } from "../../features/channel/rules";
 import { aria } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { AgentFace } from "../../ui/Face";
-import { DictationButton } from "../../features/voice/DictationButton";
+import { DictationButton } from "../../features/voice";
 import { SpriteIcon } from "../../ui/pixel";
 
 import { useAgent } from "../../base/agents";

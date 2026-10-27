@@ -13,8 +13,7 @@ import { beds, issueOf, lockedPlot, plotOf, sessionAtStation, stationOfSession }
 import type { Village } from "../world/load";
 import { plotH } from "../world/world";
 import { useFrames } from "../../base/frame";
-import { useRoom } from "../../features/channel/rooms";
-import { generalOf } from "../../features/channel/rules";
+import { useRoom, generalOf } from "../../features/channel";
 import { badgeColors, CardColors, PixelCard, plainText, type Piece } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { useVillage } from "../support";

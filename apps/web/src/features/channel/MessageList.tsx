@@ -14,7 +14,7 @@ import { Markdown } from "../../ui/Markdown";
 import { Dot, PhaseGlyph, SenderFace, Tag, ThinkingDots } from "./bits";
 import { useMarkRead } from "./data";
 import { rooms, useMessage, useRoom } from "./rooms";
-import { TurnSteps } from "../session/WorkLog";
+import { TurnSteps } from "../session";
 import { useAgent } from "../../base/agents";
 
 const outcomeTag: Record<Outcome, { label: string; fill: string; icon: string }> = {

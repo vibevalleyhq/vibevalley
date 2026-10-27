@@ -13,7 +13,7 @@ import { PixelCard } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { phoneState } from "../support";
 import { useCore } from "../../base/frame";
-import { unreadTotal } from "../../features/channel/rules";
+import { unreadTotal } from "../../features/channel";
 
 export function PhoneButton(props: { height: number }) {
   const open = useFarm((s) => s.phoneOpen);
