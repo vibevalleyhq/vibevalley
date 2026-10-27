@@ -5,7 +5,7 @@
 import type { Page, Route } from "@playwright/test";
 import type { Agent, Changes, Issue, IssueHistory, IssueAttention, IssueTimeline, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { expect, test } from "./fixtures";
+import { buttons, expect, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 async function firstFrame(url: string): Promise<StateFrame> {
@@ -103,8 +103,9 @@ test("a real round: the helper asks with options, one click answers, and it hand
   // Exact: the folded steps hold the helper's whole last message, which says it too.
   await expect(view.getByText("跑了 echo hi", { exact: true })).toBeVisible();
   await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成", exact: true })).toBeVisible();
-  // Done need not be a merge: the branch can be kept.
-  await expect(view.getByRole("region", { name: "要你做的" }).getByRole("button", { name: "完成，分支留着" })).toBeVisible();
+  const deliver = view.getByRole("combobox", { name: "交付" });
+  await expect(deliver).toHaveValue("change");
+  await expect(deliver.locator("option", { hasText: "分支留着不合" })).toHaveCount(1);
   await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("你带了话，接着做一轮");
   await page.screenshot({ path: test.info().outputPath("real-round.png") });
 });
@@ -118,7 +119,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
     page,
     server,
     made,
-    { state: "asking", since: now - 3 * minute, lead: "answer", acts: ["answer", "close"] },
+    { state: "asking", since: now - 3 * minute, lead: "answer", acts: buttons("answer", "close") },
     {
       status: "in_review",
       questions: [{ question: "这份评估是全交给 w3，还是我和它分着做？", options: ["全交给 w3", "分着做"] }],
@@ -143,7 +144,6 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   const ask = view.getByRole("region", { name: "要你做的" });
   await expect(ask.getByText("这份评估是全交给 w3，还是我和它分着做？")).toBeVisible();
   await expect(view.getByRole("button", { name: "完成", exact: true })).toHaveCount(0);
-  await expect(view.getByRole("button", { name: "验收通过" })).toHaveCount(0);
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("0 / 4 条做到了");
   await expect(view.getByRole("region", { name: "做出了什么" })).toContainText("还没有改动");
   await expect(view.getByRole("region", { name: "怎么走到这一步" })).toContainText("问你：这份评估");
@@ -154,8 +154,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
   await page.setViewportSize({ width: 1280, height: 800 });
 
   let said: unknown;
-  // An option is the answer act, done by the server (issue.act).
-  await page.route(`**${pathOf("issue.act")}`, async (route) => {
+  await page.route(`**${pathOf("issue.comment.create")}`, async (route) => {
     said = route.request().postDataJSON();
     await route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(made) });
   });
@@ -163,7 +162,7 @@ test("a helper waiting on a question: 等你回答, its options answer it, and n
     .getByRole("group", { name: /^回答：/ })
     .getByRole("button", { name: "分着做" })
     .click();
-  await expect.poll(() => said as { act?: string; text?: string } | undefined).toMatchObject({ act: "answer", text: "分着做" });
+  await expect.poll(() => said as { text?: string } | undefined).toMatchObject({ text: "分着做" });
 });
 
 test("work handed back: 等你验收, the helper's word on each criterion, and 打回 asks what failed", async ({ page, server, api }) => {
@@ -173,10 +172,9 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
     page,
     server,
     made,
-    { state: "reviewing", since: now - minute, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
+    { state: "reviewing", since: now - minute, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
     {
       status: "in_review",
-      review: "required",
       criteria: ["勾上后重开浏览器还登着", "不勾时关掉浏览器就登出"],
       checks: [
         { criterion: 0, result: "met", proof: "bun test auth 通过" },
@@ -196,8 +194,7 @@ test("work handed back: 等你验收, the helper's word on each criterion, and �
   await expect(ask).toContainText("阿狐交回来了，等你验收");
   await expect(view.getByRole("region", { name: "做到哪了" })).toContainText("1 / 2 条做到了");
   await expect(view.getByText("bun test auth 通过")).toBeVisible();
-  await expect(ask.getByRole("button", { name: "验收通过" })).toBeVisible();
-  await expect(view.getByRole("button", { name: "完成", exact: true })).toHaveCount(0);
+  await expect(ask.getByRole("button", { name: "完成", exact: true })).toBeVisible();
   await view.getByRole("checkbox", { name: "看过了：勾上后重开浏览器还登着" }).check();
   const findings = ask.getByRole("textbox", { name: "哪里没过" });
   await ask.getByRole("button", { name: "打回", exact: true }).click();
@@ -217,7 +214,7 @@ test("an answer handed back: its conclusion on the page, 知道了 completes it,
     page,
     server,
     made,
-    { state: "reviewing", since: now - minute, lead: "acknowledge", acts: ["acknowledge", "reject", "tell", "close"] },
+    { state: "reviewing", since: now - minute, lead: "acknowledge", acts: buttons("acknowledge", "reject", "tell", "close") },
     { status: "in_review", answer },
     { lastRun: { outcome: "completed", summary: "查清楚了", at: now - minute, answer } },
     { milestones: [{ at: now - minute, kind: "reported", who: "阿狐", text: "交回来了：查清楚了" }] },
@@ -240,7 +237,7 @@ test("a failed round: 卡住了, says why and leads with 接着修", async ({ pa
     page,
     server,
     made,
-    { state: "stuck", stuck: "failed", since: now - 5 * minute, lead: "cure", acts: ["cure", "tell", "close"] },
+    { state: "stuck", stuck: "failed", since: now - 5 * minute, lead: "cure", acts: buttons("cure", "tell", "close") },
     { status: "in_review" },
     { phase: { _tag: "failed" }, lastRun: { outcome: "failed", summary: "余额不够了（HTTP 402）", at: now - 5 * minute } },
     { milestones: [{ at: now - 5 * minute, kind: "failed", who: "阿狐", text: "没做成：余额不够了（HTTP 402）" }] },
@@ -260,7 +257,7 @@ test("a done issue asks nothing: 已完成, and says it went into main", async (
     page,
     server,
     made,
-    { state: "done", since: now - 2 * minute, acts: ["reopen"] },
+    { state: "done", since: now - 2 * minute, acts: buttons("reopen") },
     { status: "done", delivered: "merged", closedAt: now - 2 * minute, criteria: ["模板能选"], checks: [{ criterion: 0, result: "met" }] },
     {},
     {

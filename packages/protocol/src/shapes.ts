@@ -873,11 +873,6 @@ export interface TemplateBlank {
   end: number;
 }
 
-export interface IssueDispatchRequest {
-  /** Fields the owner changed and has not saved: saved first, so the act sees them. */
-  edit?: IssueUpdate;
-}
-
 export interface LanguageCount {
   name: string;
   files: number;
@@ -1122,8 +1117,6 @@ export interface Issue {
   status: IssueStatus;
   moves: IssueStatus[];
   pullRequest?: PullRequest;
-  review: Review;
-  /** What it delivers: a change that goes into the project, or an answer that stays on the issue. */
   deliver: Deliverable;
   reviewedAt?: number;
   findings: Finding[];
@@ -1183,24 +1176,10 @@ export type Attention = (typeof AttentionValues)[number];
 export const StuckReasonValues = ["failed", "conflict", "interrupted", "quiet"] as const;
 export type StuckReason = (typeof StuckReasonValues)[number];
 
-/** What the owner can do to an issue from its page. tell is a word to the helper, answer the same to its question;
- * reject sends it back with findings; acknowledge takes what the orchestrator answered as done. */
-export const IssueActValues = [
-  "start",
-  "answer",
-  "accept",
-  "reject",
-  "complete",
-  "keep",
-  "acknowledge",
-  "resolve",
-  "resume",
-  "cure",
-  "tell",
-  "stop",
-  "close",
-  "reopen",
-] as const;
+/** A button on an issue's page, by what it says. tell is a word to the helper, answer the same to its question; reject
+ * sends it back with findings; acknowledge takes what an answer issue found as done; cure, resolve and resume send it
+ * back with the server's own words for why it stopped. */
+export const IssueActValues = ["start", "answer", "reject", "complete", "acknowledge", "resolve", "resume", "cure", "tell", "stop", "close", "reopen"] as const;
 export type IssueAct = (typeof IssueActValues)[number];
 
 /** since: when it came to stand so, when known. lead is the one thing the owner is asked to do, if any; acts are all
@@ -1210,8 +1189,17 @@ export interface IssueAttention {
   since?: number;
   stuck?: StuckReason;
   lead?: IssueAct;
-  acts: IssueAct[];
+  acts: IssueAction[];
 }
+
+/** What pressing an issue's button sends: move is issue.status.update, say issue.comment.create, stop session.stop. */
+export type IssueAction =
+  | { readonly act: IssueAct; readonly does: "move"; readonly status: IssueStatus; readonly words: ActWords }
+  | { readonly act: IssueAct; readonly does: "say" }
+  | { readonly act: IssueAct; readonly does: "stop" };
+
+export const ActWordsValues = ["none", "optional", "required"] as const;
+export type ActWords = (typeof ActWordsValues)[number];
 
 export const MilestoneKindValues = [
   "opened",
@@ -1287,13 +1275,11 @@ export interface IssueUpdate {
   project?: string;
   assignee?: string;
   priority?: Priority;
-  review?: Review;
   criteria?: string[];
   deliver?: Deliverable;
+  /** Its place on the board: before this issue, or last when empty. Only while it is not sent. */
+  before?: string;
 }
-
-export const ReviewValues = ["glance", "required"] as const;
-export type Review = (typeof ReviewValues)[number];
 
 export interface Finding {
   id: string;
@@ -1303,33 +1289,18 @@ export interface Finding {
   resolved?: boolean;
 }
 
-/** One of what the owner may do (Issue.attention.acts). text: what answer, tell and reopen say, and reject's findings
- * one a line unless findings is given; sendKey: answer and tell said again with the same key are said once. */
-export interface IssueActRequest {
-  act: IssueAct;
-  text?: string;
-  findings?: string[];
-  sendKey?: string;
-}
-
-export interface IssueReviewRequest {
-  pass: boolean;
-  findings?: string[];
-  text?: string;
-}
-
 export interface IssueRequest {
   title: string;
   description?: string;
   project?: string;
   assignee?: string;
   priority?: Priority;
-  review?: Review;
   deliver?: Deliverable;
 }
 
-/** What an issue delivers, said when it is written: a change (its branch, into the project) or an answer (on the issue). */
-export const DeliverableValues = ["change", "answer"] as const;
+/** What an issue delivers: a change (its branch, merged into the project or by a pull request), a change kept on its
+ * branch for the owner to take in, or an answer (on the issue). Its helper does the same work for change and branch. */
+export const DeliverableValues = ["change", "branch", "answer"] as const;
 export type Deliverable = (typeof DeliverableValues)[number];
 
 /** What a completed issue delivered: its branch merged into the project's main branch, into its parent's branch (a step of
@@ -2141,15 +2112,11 @@ export interface RecurrenceUpdate {
   enabled?: boolean;
 }
 
-export interface MoveIssueRequest {
-  before?: string;
-}
-
 export interface IssueStatusRequest {
   status: IssueStatus;
+  /** Moving back to todo: another round with these words (findings, while it waits for acceptance), or, while it is
+   * stuck, none for the server's own; reopening: what to do this time. */
   text?: string;
-  /** Moving to done: complete it with its branch kept, not merged. */
-  keepBranch?: boolean;
   /** Moving to todo: the profile that takes it on. Another than its own hands it over: the last session leaves, its branch
    * kept, and this one goes on in the same issue. */
   agent?: string;

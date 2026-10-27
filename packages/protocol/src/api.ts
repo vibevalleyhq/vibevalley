@@ -138,21 +138,15 @@ export interface Handlers<R = never> {
   readonly "issue.delete": (a: { readonly id: string }) => Effect.Effect<void, ApiError, R>;
   /** What issue.delete would do, refused as it would be; nothing changes. */
   readonly "issue.previewDelete": (a: { readonly id: string }) => Effect.Effect<T.Preview, ApiError, R>;
-  readonly "issue.move": (a: { readonly id: string } & T.MoveIssueRequest) => Effect.Effect<T.Issue[], ApiError, R>;
-  /** Moving an issue is what it does: todo sends it out (or waits for room), done merges, canceled sends its session home,
-   * todo again after a round or a close is another round with text. Issue.moves lists where it may go. */
+  /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is
+   * another round (the words are the findings; stuck, none takes the server's own); done is accepted and delivered as the
+   * issue says; canceled sends its session home. Issue.moves lists where it may go. */
   readonly "issue.status.update": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Issue, ApiError, R>;
   /** What issue.status.update would do with the same body, refused as it would be; nothing changes. */
   readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Effect.Effect<T.Preview, ApiError, R>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then
    * leaves; with questions open, the word is their answer. The issue stays in the backlog until it is moved to todo. */
   readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Effect.Effect<T.Issue, ApiError, R>;
-  /** Starts a queued todo now, if its project and the farm have room; otherwise it keeps its place in the queue. */
-  readonly "issue.dispatch": (a: { readonly id: string } & T.IssueDispatchRequest) => Effect.Effect<T.Dispatched, ApiError, R>;
-  /** One of what the issue's attention offers the owner, done as the issue's page does it; any other is refused. */
-  readonly "issue.act": (a: { readonly id: string } & T.IssueActRequest) => Effect.Effect<T.Issue, ApiError, R>;
-  /** What issue.act would do with the same body, refused as it would be; nothing changes. */
-  readonly "issue.previewAct": (a: { readonly id: string } & T.IssueActRequest) => Effect.Effect<T.Preview, ApiError, R>;
   readonly "graph.split": (a: T.GraphSplitRequest) => Effect.Effect<string, ApiError, R>;
   readonly "graph.task.update": (a: { readonly id: string; readonly task: string } & T.TaskEdit) => Effect.Effect<string, ApiError, R>;
   readonly "graph.task.delete": (a: { readonly id: string; readonly task: string }) => Effect.Effect<string, ApiError, R>;
@@ -288,7 +282,6 @@ const input = (ids: Schema.Struct.Fields, body?: Schema.Codec<unknown>): Schema.
 const recurrenceDeleteInput = input({ id: Schema.String });
 const issueDeleteInput = input({ id: Schema.String });
 const issueStatusUpdateInput = input({ id: Schema.String }, S.IssueStatusRequest);
-const issueActInput = input({ id: Schema.String }, S.IssueActRequest);
 const graphTaskDeleteInput = input({ id: Schema.String, task: Schema.String });
 const agentDeleteInput = input({ id: Schema.String });
 const memoryDeleteInput = input({ agent: Schema.String, memory: Schema.String });
@@ -516,13 +509,6 @@ export const endpoints: readonly Endpoint[] = [
     can: ["owner", "remote"],
   },
   {
-    op: "issue.move",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.MoveIssueRequest),
-    result: Schema.mutable(Schema.Array(S.Issue)),
-    can: ["owner", "remote"],
-  },
-  {
     op: "issue.status.update",
     about: ["id"],
     input: issueStatusUpdateInput,
@@ -542,28 +528,6 @@ export const endpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: Schema.String }, S.IssueRefineRequest),
     result: S.Issue,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "issue.dispatch",
-    about: ["id"],
-    input: input({ id: Schema.String }, S.IssueDispatchRequest),
-    result: S.Dispatched,
-    can: ["owner", "remote"],
-  },
-  {
-    op: "issue.act",
-    about: ["id"],
-    input: issueActInput,
-    result: S.Issue,
-    can: ["owner", "remote"],
-    dryRun: "issue.previewAct",
-  },
-  {
-    op: "issue.previewAct",
-    about: ["id"],
-    input: issueActInput,
-    result: S.Preview,
     can: ["owner", "remote"],
   },
   {

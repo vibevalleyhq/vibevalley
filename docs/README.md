@@ -78,7 +78,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 取消 | cancel | 动作 `close`；工单挪到 `canceled`（已取消） | 不做了：帮工收工，分支上有提交就留着 | 收工（那是帮工离开） |
 | 关上 | closed | `isClosed`：`done` 或 `canceled` | 已完成和已取消的合称：看板的「已关」一列 | |
 | 聊清楚、安排活、完成 | talk it through, get it worked, finish | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` | 一张工单的三段 | |
-| 验收 | acceptance; accept, send back | review（`Issue.review`；动作 `accept`、`reject`） | 每张工单都有：判交回来的活过没过；`glance` 是完成就算，`required` 是先过验收才能完成 | 审核 |
+| 验收 | acceptance; accept, send back | review（完成就是通过；打回是带话挪回待办，`reject`） | 每张工单都有：判交回来的活过没过；挪到已完成就是通过，管家验过的记在 `Issue.reviewedAt` | 审核 |
 | 验收意见 | review note | finding（`Issue.findings`） | 没过验收的一条意见；下次验收通过才算解决 | 草 |
 | 问题 | question | questions（`Issue.questions`、`Question`） | 帮工问了主人、还没回答的；有问题时工单「等你回答」 | 缺肥 |
 | 账本 | ledger | ledger | 值得记的事；金币、连胜、成就由它折出来 | 事件日志 |

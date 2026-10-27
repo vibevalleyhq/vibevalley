@@ -1,7 +1,7 @@
 import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
-import { type Deliverable, DeliverableValues, type Review, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { api } from "../../base/api";
 import { rememberPick } from "./write";
 import { isRefined, newIssueTitle } from "./rules";
@@ -23,7 +23,6 @@ interface Draft {
   project: string;
   agent: string;
   priority: Priority;
-  acceptance: Review;
   deliver: Deliverable;
 }
 
@@ -34,7 +33,6 @@ const draftOf = (i: Issue): Draft => ({
   project: i.project ?? "",
   agent: i.assignee ?? "",
   priority: i.priority,
-  acceptance: i.review,
   deliver: i.deliver,
 });
 
@@ -84,7 +82,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       project: x.project,
       assignee: x.agent,
       priority: x.priority,
-      review: x.acceptance,
       deliver: x.deliver,
       criteria: criteriaList(x.criteria),
     };
@@ -144,16 +141,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const told = dispatchedNotice(props.onDone);
     return busyWith(async () => {
       told(saved(await api.issue.status.update({ id, status: "todo", edit: update(x) })));
-    });
-  };
-  const tryNow = () => {
-    const id = props.item.id;
-    const edit = unsaved();
-    const done = props.onDone;
-    return busyWith(async () => {
-      const got = saved(await api.issue.dispatch({ id, edit }));
-      if (got.queued) throw new Error(got.queued);
-      done(id);
     });
   };
   const unqueue = () => {
@@ -305,18 +292,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         />
       </Property>
       <More>
-        {/* Every issue has an acceptance; this is who must pass it before it is completed. */}
-        <Property label={issuesWording().detail.review}>
-          <Pick
-            label={issuesWording().detail.review}
-            value={d().acceptance}
-            onChange={(v) => edit({ acceptance: v as Review })}
-            options={[
-              { value: "glance", label: issuesWording().detail.glance },
-              { value: "required", label: issuesWording().detail.required },
-            ]}
-          />
-        </Property>
         <Property label={issuesWording().task.written}>{wallClockText(props.item.createdAt)}</Property>
       </More>
       <Show when={queued()}>
@@ -338,11 +313,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onClick={() => void start()}
           >
             {issuesWording().todo.start}
-          </Button>
-        </Show>
-        <Show when={queued() !== undefined}>
-          <Button tone="primary" disabled={!canSave() || !d().agent} onClick={() => void tryNow()}>
-            {issuesWording().todo.tryNow}
           </Button>
         </Show>
         <Button

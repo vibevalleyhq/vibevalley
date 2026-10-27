@@ -1,7 +1,31 @@
 import { describe, expect, test } from "vite-plus/test";
-import type { IssueAttention, Session } from "@vibevalley/protocol";
+import type { IssueAttention, Session, IssueAct, IssueAction } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { farmCues, type FarmSoundInput } from "./cues";
+
+const buttons = (...names: IssueAct[]): IssueAction[] =>
+  names.map((act): IssueAction => {
+    switch (act) {
+      case "tell":
+      case "answer":
+        return { act, does: "say" };
+      case "stop":
+        return { act, does: "stop" };
+      case "complete":
+      case "acknowledge":
+        return { act, does: "move", status: "done", words: "none" };
+      case "close":
+        return { act, does: "move", status: "canceled", words: "none" };
+      case "reject":
+      case "reopen":
+        return { act, does: "move", status: "todo", words: "required" };
+      case "start":
+      case "cure":
+      case "resolve":
+      case "resume":
+        return { act, does: "move", status: "todo", words: "none" };
+    }
+  });
 
 const base: FarmSoundInput = { tool: "hand", bedFx: [], open: {} };
 
@@ -48,10 +72,10 @@ describe("farmCues", () => {
     const working: IssueAttention = { state: "working", acts: [] };
     const before = [issue("b", working), issue("c", working), issue("d", working)];
     const after = [
-      issue("b", { state: "reviewing", acts: ["complete"] }),
-      issue("c", { state: "stuck", stuck: "failed", acts: ["cure"] }),
+      issue("b", { state: "reviewing", acts: buttons("complete") }),
+      issue("c", { state: "stuck", stuck: "failed", acts: buttons("cure") }),
       // Handed back with a question: where it stands is asking, and its plot is neither ripe nor buggy.
-      issue("d", { state: "asking", acts: ["answer"] }),
+      issue("d", { state: "asking", acts: buttons("answer") }),
     ];
     expect(farmCues({ ...base, issues: before }, { ...base, issues: after })).toEqual([{ name: "ripe", hold: 220 }, { name: "bug" }]);
   });

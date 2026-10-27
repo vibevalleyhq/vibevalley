@@ -5,7 +5,7 @@
 import type { Page } from "@playwright/test";
 import type { Agent, Issue, Session, StateFrame } from "@vibevalley/protocol";
 import { readStream, statePath, pathOf } from "@vibevalley/protocol";
-import { expect, gate, test } from "./fixtures";
+import { buttons, expect, gate, test } from "./fixtures";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 test.use({ farm: "farm-chat" });
@@ -169,8 +169,7 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
     status: "in_review",
     moves: ["done", "canceled"],
     criteria: ["勾上后重开浏览器还登着"],
-    review: "required",
-    attention: { state: "reviewing", since: Date.now() - 60_000, lead: "accept", acts: ["accept", "reject", "tell", "close"] },
+    attention: { state: "reviewing", since: Date.now() - 60_000, lead: "complete", acts: buttons("complete", "reject", "tell", "close") },
   };
   const fixture: StateFrame = {
     ...frame,
@@ -187,9 +186,8 @@ test("a click on a helper's plot opens its issue: its state, the box and the off
   const view = page.getByRole("dialog", { name: "阿狐的地" });
   await expect(view).toBeVisible();
   await expect(view.getByLabel("现在怎样")).toContainText("等你验收");
-  await expect(view.getByRole("button", { name: "验收通过" })).toBeVisible();
+  await expect(view.getByRole("button", { name: "收获" }).first()).toBeVisible();
   await expect(view.getByRole("button", { name: "打回" })).toBeVisible();
-  await expect(view.getByRole("button", { name: "收获" })).toHaveCount(0);
   // Each fold opens whatever was opened before it: content first mounted by a click once held the whole update while
   // its queries were in flight, and the fold stayed shut.
   for (const name of ["详情", "每次干活", "帮工的每一步", "怎么走到这一步"]) {

@@ -51,7 +51,7 @@ export function HarvestReview(props: { session: Session; onDone: () => void }) {
 function ReadyView(props: { session: Session; changes: Changes; onDone: () => void }) {
   const now = useNow();
   const core = useCore();
-  const acts = () => core()?.issues?.find((i) => i.id === issueOf(props.session))?.attention.acts ?? [];
+  const acts = () => (core()?.issues?.find((i) => i.id === issueOf(props.session))?.attention.acts ?? []).map((a) => a.act);
   const counts = () => lineCounts(props.changes);
   const empty = () => nothingChanged(props.changes);
   const conflicts = () => props.changes.conflicts;

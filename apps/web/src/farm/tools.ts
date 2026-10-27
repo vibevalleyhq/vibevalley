@@ -65,7 +65,10 @@ export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot
   const unlock = bed.unlockLevel;
   if (unlock !== undefined) return { ok: false, text: level >= unlock ? farmWording().aim.flowerbed : farmWording().aim.clearAt(unlock) };
   const crop = plot.crop;
-  const act = actForTool(tool, issue?.attention.acts ?? []);
+  const act = actForTool(
+    tool,
+    (issue?.attention.acts ?? []).map((a) => a.act),
+  );
   const unavailable = issue ? farmWording().aim.unavailable(wording().attention[issue.attention.state]) : farmWording().aim.unread;
   switch (tool) {
     case "hand":

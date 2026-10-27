@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
+import { type IssueAct, type IssueAction, readStream, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 
 interface Server {
   url: string;
@@ -125,3 +125,28 @@ export async function defaultChannel(api: VibeValleyApi): Promise<string> {
   });
   return frame.state.chat?.channels.find((c) => c.default)?.id ?? "";
 }
+
+/** An issue's buttons by name, as the server sends them (Issue.attention.acts). */
+export const buttons = (...names: IssueAct[]): IssueAction[] =>
+  names.map((act): IssueAction => {
+    switch (act) {
+      case "tell":
+      case "answer":
+        return { act, does: "say" };
+      case "stop":
+        return { act, does: "stop" };
+      case "complete":
+      case "acknowledge":
+        return { act, does: "move", status: "done", words: "none" };
+      case "close":
+        return { act, does: "move", status: "canceled", words: "none" };
+      case "reject":
+      case "reopen":
+        return { act, does: "move", status: "todo", words: "required" };
+      case "start":
+      case "cure":
+      case "resolve":
+      case "resume":
+        return { act, does: "move", status: "todo", words: "none" };
+    }
+  });

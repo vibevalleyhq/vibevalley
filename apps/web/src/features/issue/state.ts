@@ -128,7 +128,7 @@ export function issueState(issue: Issue, sessions: Session[], session: Session |
     ask: ownerQuestion(attention, issue, head),
     /** The lead act and the rest the owner may do, as the server says. */
     lead: attention.lead,
-    others: attention.acts.filter((a) => a !== attention.lead),
+    others: attention.acts.map((a) => a.act).filter((a) => a !== attention.lead),
     criteria: rows,
     met: rows.filter((r) => r.result === "met").length,
     doing: attention.state === "working" && current.action !== "none" ? issuesWording().issue.doing(current.actionText ?? "", current.label) : undefined,

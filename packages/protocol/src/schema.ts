@@ -545,8 +545,6 @@ export const PullRequest: Codec<T.PullRequest> = Schema.Struct({
   state: PullRequestState,
 });
 
-export const Review: Codec<T.Review> = Schema.Literals(T.ReviewValues);
-
 export const Finding: Codec<T.Finding> = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
@@ -576,12 +574,20 @@ export const Attention: Codec<T.Attention> = Schema.Literals(T.AttentionValues);
 export const StuckReason: Codec<T.StuckReason> = Schema.Literals(T.StuckReasonValues);
 export const IssueAct: Codec<T.IssueAct> = Schema.Literals(T.IssueActValues);
 
+export const ActWords: Codec<T.ActWords> = Schema.Literals(T.ActWordsValues);
+
+export const IssueAction: Codec<T.IssueAction> = Schema.Union([
+  Schema.Struct({ act: IssueAct, does: Schema.Literal("move"), status: IssueStatus, words: ActWords }),
+  Schema.Struct({ act: IssueAct, does: Schema.Literal("say") }),
+  Schema.Struct({ act: IssueAct, does: Schema.Literal("stop") }),
+]);
+
 export const IssueAttention: Codec<T.IssueAttention> = Schema.Struct({
   state: Attention,
   since: Schema.optionalKey(Schema.Number),
   stuck: Schema.optionalKey(StuckReason),
   lead: Schema.optionalKey(IssueAct),
-  acts: Schema.mutable(Schema.Array(IssueAct)),
+  acts: Schema.mutable(Schema.Array(IssueAction)),
 });
 
 export const MilestoneKind: Codec<T.MilestoneKind> = Schema.Literals(T.MilestoneKindValues);
@@ -633,7 +639,6 @@ export const Issue: Codec<T.Issue> = Schema.Struct({
   status: IssueStatus,
   moves: Schema.mutable(Schema.Array(IssueStatus)),
   pullRequest: Schema.optionalKey(PullRequest),
-  review: Review,
   deliver: Deliverable,
   reviewedAt: Schema.optionalKey(Schema.Number),
   findings: Schema.mutable(Schema.Array(Finding)),
@@ -1171,13 +1176,9 @@ export const IssueUpdate: Codec<T.IssueUpdate> = Schema.Struct({
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  review: Schema.optionalKey(Review),
   criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
   deliver: Schema.optionalKey(Deliverable),
-});
-
-export const IssueDispatchRequest: Codec<T.IssueDispatchRequest> = Schema.Struct({
-  edit: Schema.optionalKey(IssueUpdate),
+  before: Schema.optionalKey(Schema.String),
 });
 
 export const PullRequestCapability: Codec<T.PullRequestCapability> = Schema.Struct({
@@ -1333,26 +1334,12 @@ export const IssueRefineRequest: Codec<T.IssueRefineRequest> = Schema.Struct({
   edit: Schema.optionalKey(IssueUpdate),
 });
 
-export const IssueActRequest: Codec<T.IssueActRequest> = Schema.Struct({
-  act: IssueAct,
-  text: Schema.optionalKey(Schema.String),
-  findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  sendKey: Schema.optionalKey(Schema.String),
-});
-
-export const IssueReviewRequest: Codec<T.IssueReviewRequest> = Schema.Struct({
-  pass: Schema.Boolean,
-  findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
-  text: Schema.optionalKey(Schema.String),
-});
-
 export const IssueRequest: Codec<T.IssueRequest> = Schema.Struct({
   title: Schema.String,
   description: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   assignee: Schema.optionalKey(Schema.String),
   priority: Schema.optionalKey(Priority),
-  review: Schema.optionalKey(Review),
   deliver: Schema.optionalKey(Deliverable),
 });
 
@@ -1836,14 +1823,9 @@ export const RecurrenceUpdate: Codec<T.RecurrenceUpdate> = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
 });
 
-export const MoveIssueRequest: Codec<T.MoveIssueRequest> = Schema.Struct({
-  before: Schema.optionalKey(Schema.String),
-});
-
 export const IssueStatusRequest: Codec<T.IssueStatusRequest> = Schema.Struct({
   status: IssueStatus,
   text: Schema.optionalKey(Schema.String),
-  keepBranch: Schema.optionalKey(Schema.Boolean),
   agent: Schema.optionalKey(Schema.String),
   edit: Schema.optionalKey(IssueUpdate),
 });

@@ -10,7 +10,6 @@ import {
   IssueStatusValues,
   orchestratorAgent,
   type RecurrenceWhen,
-  type Review,
   type TaskEdit,
 } from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle, attentionWantsOwner } from "@vibevalley/protocol/rules";
@@ -388,8 +387,8 @@ export const make = Effect.gen(function* () {
       descriptions.stop,
       Effect.fn("Tools.stop")(
         function* (t: Issue) {
-          const c = yield* callerOf(who);
-          yield* issue.act(t.id, { act: "stop" }, "", c.actor);
+          yield* callerOf(who);
+          yield* issue.stop(t.id);
           return answers.stop.stopped(t.number);
         },
         Effect.catch((e) => Effect.succeed(said(e))),
@@ -513,7 +512,6 @@ export const make = Effect.gen(function* () {
         return yield* withIssue(p.issue, (t) => {
           const priority = p.priority ? priorityOf(p.priority) : undefined;
           if (p.priority && !priority) return Effect.succeed(noSuchPriority(p.priority));
-          if (p.acceptance && p.acceptance !== "glance" && p.acceptance !== "required") return Effect.succeed(answers.issueUpdate.noAcceptanceValue);
           let assignee: string | undefined;
           if (p.agent) {
             const a = agents.named(p.agent);
@@ -529,7 +527,7 @@ export const make = Effect.gen(function* () {
                 ...(p.project !== undefined ? { project: p.project } : {}),
                 ...(assignee ? { assignee } : {}),
                 ...(priority ? { priority } : {}),
-                ...(p.acceptance ? { review: p.acceptance as Review } : {}),
+                ...(p.deliver ? { deliver: p.deliver } : {}),
                 ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
               },
               c.actor,
@@ -561,10 +559,7 @@ export const make = Effect.gen(function* () {
                 if (typeof chosen === "string") return answers.issueStatus.notMoved(chosen);
                 agent = chosen.id;
               }
-              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, {
-                ...(agent ? { agent } : {}),
-                ...(p.keep_branch ? { keepBranch: true } : {}),
-              });
+              const done = yield* issue.setStatus(t.id, to, p.text ?? "", c.here, c.actor, agent ? { agent } : {});
               // Completing says what it delivered, which follows the issue: merged, no change, its branch kept, or a PR still open.
               if (to === "done" && done.status === "done") return `#${done.number} ${closedText(done)}`;
               if (to === "done" && done.pullRequest?.state === "open") return answers.issueStatus.prOpenNote(done.number, done.pullRequest.url);

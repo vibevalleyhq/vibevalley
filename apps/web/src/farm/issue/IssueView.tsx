@@ -5,10 +5,11 @@
 
 import { appWording } from "../../base/words";
 import { farmWording } from "../words";
+import { wording } from "@vibevalley/protocol/words";
 import { createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 
-import type { Review, Agent, Issue, IssueAct, Session } from "@vibevalley/protocol";
+import { type Agent, type Deliverable, DeliverableValues, type Issue, type IssueAct, type Session } from "@vibevalley/protocol";
 import { api, reasonOf } from "../../base/api";
 import {
   createIssueActs,
@@ -88,7 +89,7 @@ function PlotDetail(props: { session: Session; onDone: () => void }) {
             farm.review(s.id);
             props.onDone();
           }}
-          onClose={(s) => api.issue.act({ id: issueOf(s), act: "close" }).then(() => props.onDone())}
+          onClose={(s) => api.issue.status.update({ id: issueOf(s), status: "canceled" }).then(() => props.onDone())}
           onThread={
             hasThread()
               ? () => {
@@ -167,9 +168,9 @@ function IssueBody(props: {
   const agent = useAgent(() => s().head.agent);
   const state = () => s().attention.state;
 
-  const setReview = (a: Review) => {
+  const setDeliver = (d: Deliverable) => {
     const id = props.issue.id;
-    return acts.act(() => api.issue.update({ id, review: a }));
+    return acts.act(() => api.issue.update({ id, deliver: d }));
   }; /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
     <PxButton tone={lead() ? "primary" : a === "close" || acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onClick={() => go(a)}>
@@ -178,7 +179,10 @@ function IssueBody(props: {
   );
   /** The block asks for the lead and its own others; the rest go in the row at the bottom. */
   const blockActs = () => (s().ask ? s().others.filter((a) => a !== "close" && a !== "stop") : []);
-  const rowActs = () => (s().ask ? s().attention.acts.filter((a) => a === "close" || a === "stop") : s().attention.acts);
+  const rowActs = () => {
+    const all = s().attention.acts.map((a) => a.act);
+    return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
+  };
   const boxShown = () => state() === "asking" || state() === "canceled" || box() !== undefined;
 
   return (
@@ -370,24 +374,17 @@ function IssueBody(props: {
                 </Row>
               </Show>
               <Show when={!s().inTask}>
-                <Row label={farmWording().plot.review}>
+                <Row label={farmWording().plot.deliver}>
                   <div class="flex flex-wrap items-center gap-1.5">
-                    <For
-                      each={
-                        [
-                          ["glance", farmWording().plot.glance],
-                          ["required", farmWording().plot.required],
-                        ] as const
-                      }
-                    >
-                      {([a, label]) => (
+                    <For each={DeliverableValues}>
+                      {(d) => (
                         <PxButton
                           size="sm"
-                          tone={props.issue.review === a ? "primary" : "plain"}
-                          disabled={busy() || props.issue.review === a || !s().open}
-                          onClick={() => void setReview(a)}
+                          tone={props.issue.deliver === d ? "primary" : "plain"}
+                          disabled={busy() || props.issue.deliver === d || !s().open}
+                          onClick={() => void setDeliver(d)}
                         >
-                          {label}
+                          {wording().deliverable[d]}
                         </PxButton>
                       )}
                     </For>

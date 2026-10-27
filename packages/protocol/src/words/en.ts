@@ -26,7 +26,7 @@ export const en: Words = {
     canceled: "Canceled",
   },
   priority: { urgent: "Urgent", high: "High", medium: "Normal", low: "Low" },
-  deliverable: { change: "A change, merged into the project", answer: "An answer, reading only" },
+  deliverable: { change: "A change, merged into the project", branch: "A change, left on its branch", answer: "An answer, reading only" },
   delivered: {
     merged: "merged into main",
     merged_into_parent: "merged into the plan's branch",
@@ -51,10 +51,8 @@ export const en: Words = {
   act: {
     start: "Start",
     answer: "Answer",
-    accept: "Accept",
     reject: "Send back",
     complete: "Complete",
-    keep: "Complete, keep the branch",
     acknowledge: "Got it",
     resolve: "Have it resolve the conflict",
     resume: "Carry on",

@@ -10,13 +10,13 @@ select * from issue where id = sqlc.arg(id);
 select * from issue where number = sqlc.arg(number);
 
 -- name: AddIssue :exec
-insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, review, deliver)
+insert into issue (id, number, title, description, project, assignee, priority, rank, created_at, recurrence, deliver)
 values (sqlc.arg(id), (select coalesce(max(number), 0) + 1 from issue), sqlc.arg(title), sqlc.arg(description), sqlc.narg(project), sqlc.narg(assignee),
-        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(review), sqlc.arg(deliver));
+        sqlc.arg(priority), (select coalesce(max(rank), 0) + 1 from issue), sqlc.arg(created_at), sqlc.narg(recurrence), sqlc.arg(deliver));
 
 -- name: EditIssue :exec
 update issue set title = sqlc.arg(title), description = sqlc.arg(description), project = sqlc.narg(project), assignee = sqlc.narg(assignee),
-  priority = sqlc.arg(priority), review = sqlc.arg(review), criteria = sqlc.narg(criteria), deliver = sqlc.arg(deliver) where id = sqlc.arg(id);
+  priority = sqlc.arg(priority), criteria = sqlc.narg(criteria), deliver = sqlc.arg(deliver) where id = sqlc.arg(id);
 
 -- name: RefineIssue :exec
 -- A draft handed back: its words, its criteria and what it asks, in one write.

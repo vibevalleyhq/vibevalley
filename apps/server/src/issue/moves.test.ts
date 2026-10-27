@@ -26,9 +26,6 @@ describe("status moves", () => {
         expect(m !== "none" || why !== "").toBe(true);
       }
     }
-    const required = issue("in_review", true, { review: "required" });
-    expect(statusMoves(required)).toEqual(["todo", "canceled"]);
-    expect(statusMoves({ ...required, reviewedAt: 1 })).toEqual(["todo", "done", "canceled"]);
     expect(statusMoves(issue("backlog", false, { refining: { session: sessionId("w2"), name: "试验田" } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_progress", false, { lastRun: { startedAt: 1 } }))).toEqual(["canceled"]);
     expect(statusMoves(issue("in_review", false, { graph: { state: "draft" } as never }))).toEqual([]);
@@ -54,7 +51,7 @@ describe("status moves", () => {
 describe("moves and the attention", () => {
   const session = (lastRun: "completed" | "failed" | "interrupted") =>
     ({ id: "w1", phase: { _tag: "done" }, lastRun: { outcome: lastRun, summary: "", at: 1 } }) as unknown as Session;
-  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], review: "glance", createdAt: 0 } as unknown as Issue;
+  const base = { status: "in_review", sessions: ["w1"], questions: [], findings: [], createdAt: 0 } as unknown as Issue;
   const answeredSession = {
     ...session("completed"),
     lastRun: { outcome: "completed", summary: "", at: 1, answer: { conclusion: "慢在读配置", evidence: ["clock.ts:1"], unsure: [], next: [] } },
@@ -62,20 +59,17 @@ describe("moves and the attention", () => {
   it("an answer issue waits on a conclusion it can read", () => {
     const answerIssue = { ...base, deliver: "answer" } as Issue;
     expect(attentionOf(answerIssue, session("completed"))).toMatchObject({ state: "stuck", stuck: "failed", lead: "cure" });
-    expect(attentionOf(answerIssue, answeredSession)).toMatchObject({
-      state: "reviewing",
-      lead: "acknowledge",
-      acts: ["acknowledge", "reject", "tell", "close"],
-    });
+    const answered = attentionOf(answerIssue, answeredSession);
+    expect([answered.state, answered.lead, answered.acts.map((a) => a.act)]).toEqual(["reviewing", "acknowledge", ["acknowledge", "reject", "tell", "close"]]);
     expect(attentionOf({ ...base, deliver: "change" }, session("completed"))).toMatchObject({ state: "reviewing", lead: "complete" });
   });
-  it("an act to done is offered exactly when the move to done is, whatever the round came to", () => {
+  it("a button that moves is a move the table allows, and done is offered exactly when the move to done is", () => {
     const cases: [Partial<Issue>, Session | undefined][] = [
       [{}, session("completed")],
       [{}, session("failed")],
       [{}, session("interrupted")],
-      [{ review: "required" }, session("completed")],
-      [{ review: "required", reviewedAt: 5 }, session("completed")],
+      [{ reviewedAt: 5 }, session("completed")],
+      [{ deliver: "branch" }, session("completed")],
       [{ deliver: "answer" }, session("completed")],
       [{ deliver: "answer" }, answeredSession],
       [{ sessions: [], deliver: "answer", lastRun: { startedAt: 1, endedAt: 2, outcome: "completed" } }, undefined],
@@ -85,8 +79,10 @@ describe("moves and the attention", () => {
     for (const [more, s] of cases) {
       const t = { ...base, ...more };
       const attention = attentionOf(t, s);
-      const offered = attention.acts.some((a) => a === "complete" || a === "acknowledge");
-      expect({ more, offered }).toEqual({ more, offered: statusMoves({ ...t, attention }).includes("done") });
+      const moves = statusMoves({ ...t, attention });
+      const offered = attention.acts.some((a) => a.does === "move" && a.status === "done");
+      expect({ more, offered }).toEqual({ more, offered: moves.includes("done") });
+      for (const a of attention.acts) if (a.does === "move") expect({ more, act: a.act, allowed: moves.includes(a.status) }).toMatchObject({ allowed: true });
     }
   });
 
@@ -126,23 +122,30 @@ describe("moves and the attention", () => {
 });
 
 describe("next steps after a refusal", () => {
-  it("are the issue's acts and moves as commands; one that needs words says so and runs nothing", () => {
+  it("are the issue's buttons and the moves they leave out as commands; one that needs words says so and runs nothing", () => {
     const t = {
       number: 41,
       status: "in_review",
       sessions: ["w1"],
-      review: "glance",
-      attention: { state: "reviewing", lead: "complete", acts: ["complete", "tell", "close"] },
+      attention: {
+        state: "reviewing",
+        lead: "complete",
+        acts: [
+          { act: "complete", does: "move", status: "done", words: "none" },
+          { act: "tell", does: "say" },
+          { act: "stop", does: "stop" },
+          { act: "close", does: "move", status: "canceled", words: "none" },
+        ],
+      },
     } as unknown as Issue;
     const next = nextSteps(t);
     expect(next.filter((n) => n.run).map((n) => n.run)).toEqual([
-      ["issue", "act", "41", "--json", '{"act":"complete"}'],
-      ["issue", "act", "41", "--json", '{"act":"close"}'],
       ["issue", "status", "update", "41", "--json", '{"status":"done"}'],
+      ["session", "stop", "w1"],
       ["issue", "status", "update", "41", "--json", '{"status":"canceled"}'],
     ]);
     expect(next.filter((n) => !n.run).map((n) => n.say)).toEqual([
-      "带话：issue act 41，--json 带 act「tell」和要说的 text",
+      "带话：issue comment create 41，--json 带要说的 text",
       "挪到待办：issue status update 41，--json 带 status「todo」和这一轮要它做什么的 text",
     ]);
   });

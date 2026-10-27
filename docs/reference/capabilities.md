@@ -85,13 +85,9 @@
 | `issue.update` | `/api/v1/issue/update` | ✓ | ✓ |   |
 | `issue.delete` | `/api/v1/issue/delete` | ✓ | ✓ |   |
 | `issue.previewDelete` | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |
-| `issue.move` | `/api/v1/issue/move` | ✓ | ✓ |   |
 | `issue.status.update` | `/api/v1/issue/status/update` | ✓ | ✓ |   |
 | `issue.status.previewUpdate` | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ |   |
 | `issue.refine` | `/api/v1/issue/refine` | ✓ | ✓ |   |
-| `issue.dispatch` | `/api/v1/issue/dispatch` | ✓ | ✓ |   |
-| `issue.act` | `/api/v1/issue/act` | ✓ | ✓ |   |
-| `issue.previewAct` | `/api/v1/issue/previewAct` | ✓ | ✓ |   |
 
 ## session
 

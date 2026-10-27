@@ -72,7 +72,7 @@ export function IssuesPage(props: { rest: string }) {
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
-    await run(() => api.issue.move({ id: c.id, before }));
+    await run(() => api.issue.update({ id: c.id, before }));
   };
 
   /** Asked about first where it cannot be undone. A 待办 dropped back on its own lane goes last. */

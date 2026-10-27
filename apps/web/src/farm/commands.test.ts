@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vite-plus/test";
-import type { Issue, IssueAttention, Session, StateFrame } from "@vibevalley/protocol";
+import type { Issue, IssueAct, IssueAction, IssueAttention, Session, StateFrame } from "@vibevalley/protocol";
 import { farmCommands } from "./commands";
 import { farm, resetFarm } from "./store";
 import { beds } from "./world/plots";
@@ -7,6 +7,30 @@ import type { Tool } from "./tools";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 afterEach(resetFarm);
+
+const buttons = (...names: IssueAct[]): IssueAction[] =>
+  names.map((act): IssueAction => {
+    switch (act) {
+      case "tell":
+      case "answer":
+        return { act, does: "say" };
+      case "stop":
+        return { act, does: "stop" };
+      case "complete":
+      case "acknowledge":
+        return { act, does: "move", status: "done", words: "none" };
+      case "close":
+        return { act, does: "move", status: "canceled", words: "none" };
+      case "reject":
+      case "reopen":
+        return { act, does: "move", status: "todo", words: "required" };
+      case "start":
+      case "cure":
+      case "resolve":
+      case "resume":
+        return { act, does: "move", status: "todo", words: "none" };
+    }
+  });
 
 const helper: Session = {
   id: sessionId("helper"),
@@ -32,7 +56,6 @@ function frame(attention: IssueAttention, session: Session = helper): StateFrame
     sessions: [session.id],
     status: "in_review",
     moves: [],
-    review: "required",
     findings: [],
     questions: [],
     attention,
@@ -51,15 +74,15 @@ const aim = (f: StateFrame, tool: Tool) => {
   return farmCommands(() => f).aim(beds[0]!);
 };
 
-test("a ripe crop cannot be harvested before the issue accepts it, then can after acceptance", () => {
-  const f = frame({ state: "reviewing", lead: "accept", acts: ["accept", "reject", "tell", "close"] });
+test("a crop is harvested exactly when the issue offers completing it", () => {
+  const f = frame({ state: "asking", lead: "answer", acts: buttons("answer", "close") });
   expect(aim(f, "harvest").aim.ok).toBe(false);
-  f.state.issues![0]!.attention = { state: "reviewing", lead: "complete", acts: ["complete", "tell", "close"] };
+  f.state.issues![0]!.attention = { state: "reviewing", lead: "complete", acts: buttons("complete", "tell", "close") };
   expect(aim(f, "harvest").aim.ok).toBe(true);
 });
 
 test("a failed round can be cured even before its crop image catches up", () => {
-  const f = frame({ state: "stuck", stuck: "failed", lead: "cure", acts: ["cure", "tell", "close"] }, { ...helper, phase: { _tag: "failed" } });
+  const f = frame({ state: "stuck", stuck: "failed", lead: "cure", acts: buttons("cure", "tell", "close") }, { ...helper, phase: { _tag: "failed" } });
   expect(aim(f, "bug").aim.ok).toBe(true);
   expect(aim(f, "harvest").aim.ok).toBe(false);
 });
@@ -74,15 +97,15 @@ test("an issue in a task graph offers no farm actions even while its helper is w
 });
 
 test("watering offers a word only when the issue allows tell", () => {
-  expect(aim(frame({ state: "asking", lead: "answer", acts: ["answer", "close"] }), "water").aim.ok).toBe(false);
-  expect(aim(frame({ state: "reviewing", acts: ["complete", "tell", "close"] }), "water").aim.ok).toBe(true);
+  expect(aim(frame({ state: "asking", lead: "answer", acts: buttons("answer", "close") }), "water").aim.ok).toBe(false);
+  expect(aim(frame({ state: "reviewing", acts: buttons("complete", "tell", "close") }), "water").aim.ok).toBe(true);
 });
 
 test("a click is refused when the issue stops allowing its action after aiming", async () => {
-  const f = frame({ state: "reviewing", acts: ["complete", "tell", "close"] });
+  const f = frame({ state: "reviewing", acts: buttons("complete", "tell", "close") });
   farm.hold("harvest");
   const commands = farmCommands(() => f);
   const pointed = commands.aim(beds[0]!);
-  f.state.issues![0]!.attention = { state: "reviewing", acts: ["accept", "reject", "tell", "close"] };
+  f.state.issues![0]!.attention = { state: "asking", acts: buttons("answer", "close") };
   expect((await commands.act(pointed)).kind).toBe("refused");
 });

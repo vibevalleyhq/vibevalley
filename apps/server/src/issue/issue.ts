@@ -7,15 +7,12 @@ import {
   type Question,
   type Changes,
   type CriterionCheck,
-  type Dispatched,
   type Finding,
   type IssueRun,
   type IssueAnswer,
   type Deliverable,
   type Outcome,
   type Issue,
-  type IssueReviewRequest,
-  type IssueActRequest,
   type Delivery,
   type IssueCanceled,
   type SessionClose,
@@ -33,6 +30,7 @@ import {
   type RunTrigger,
   type Recurrence,
   type Session,
+  type SessionId,
   type TaskGraph,
 } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
@@ -83,7 +81,7 @@ import * as qq from "../../db/generated/issue_queue.sql.ts";
 import * as qs from "../../db/generated/issue_session.sql.ts";
 import { IssueSessions } from "./sessions.ts";
 import { actsForOwner, type Actor } from "../base/actor.ts";
-import { conflictBrief, conflictOf, parseAnswer } from "../session/rules.ts";
+import { conflictBrief, parseAnswer } from "../session/rules.ts";
 
 export interface OrchestratorWork {
   readonly issue: Issue;
@@ -103,23 +101,17 @@ export interface IssueShape {
   /** On the owner's word only (actsForOwner). */
   readonly edit: (id: string, upd: IssueUpdate, by: Actor) => Effect.Effect<Issue, ApiError>;
   readonly remove: (id: string) => Effect.Effect<void, ApiError>;
-  readonly move: (id: string, before: string) => Effect.Effect<Issue[], ApiError>;
   readonly queue: (id: string, queued: boolean) => Effect.Effect<Issue, ApiError>;
   readonly start: (id: string, channel: string) => Effect.Effect<Dispatched, ApiError>;
-  readonly dispatchQueued: (id: string) => Effect.Effect<Dispatched, ApiError>;
   readonly reopen: (id: string, text: string, channel: string) => Effect.Effect<string, ApiError>;
-  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. keepBranch: moving
-   * to done, completed with its branch kept, not merged. */
-  /** On the owner's word only (actsForOwner). */
+  /** agent: moving to todo, the profile (id or name) that takes it on; another than its own hands it over. On the owner's
+   * word only (actsForOwner). */
   readonly setStatus: (id: string, to: IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Effect.Effect<Issue, ApiError>;
-  /** One of what the issue's attention offers the owner (Issue.attention.acts), done as its page's button does it: the
-   * page, the command line and the orchestrator's tools all go by it. Any act the attention does not offer is refused. */
-  readonly act: (id: string, req: IssueActRequest, channel: string, by: Actor) => Effect.Effect<Issue, ApiError>;
+  /** Stops the turn of the session working it; the session stays, and a word starts the next. */
+  readonly stop: (id: string) => Effect.Effect<void, ApiError>;
   /** What setStatus would do with the same request, refused as it would be; nothing changes. edit: the owner's unsaved
    * fields, as the move would see them once saved. */
   readonly previewStatus: (id: string, to: IssueStatus, text: string, opt?: StatusOptions, edit?: IssueUpdate) => Effect.Effect<Preview, ApiError>;
-  /** What act would do with the same request, refused as it would be; nothing changes. */
-  readonly previewAct: (id: string, req: IssueActRequest) => Effect.Effect<Preview, ApiError>;
   /** What remove would do, refused as it would be; nothing changes. */
   readonly previewRemove: (id: string) => Effect.Effect<Preview, ApiError>;
   /** An issue's id from what the owner and the orchestrator call it: #41 or 41, its id, or the id of a session that worked it. */
@@ -128,7 +120,6 @@ export interface IssueShape {
   /** The owner's look counts for the game; anyone else's does not. */
   readonly changes: (id: string, by: Actor) => Effect.Effect<Changes, ApiError>;
   readonly merge: (id: string) => Effect.Effect<string, ApiError>;
-  readonly resolve: (id: string) => Effect.Effect<void, ApiError>;
   readonly cancel: (id: string) => Effect.Effect<void, ApiError>;
   readonly review: (id: string, req: IssueReviewRequest) => Effect.Effect<Issue, ApiError>;
   readonly refine: (id: string, word: string, channel: string) => Effect.Effect<Issue, ApiError>;
@@ -151,7 +142,19 @@ export interface IssueShape {
 
 export interface StatusOptions {
   readonly agent?: string;
-  readonly keepBranch?: boolean;
+}
+
+/** What starting an issue came to: the session sent, or why it waits in the queue. */
+export interface Dispatched {
+  readonly session?: SessionId;
+  readonly queued?: string;
+}
+
+/** A verdict on what was handed back: passed, or not, with the findings (or words) it is mended by. */
+export interface IssueReviewRequest {
+  readonly pass: boolean;
+  readonly findings?: readonly string[];
+  readonly text?: string;
 }
 
 export class Issues extends Context.Service<Issues, IssueShape>()("vibevalley/Issue") {}
@@ -257,7 +260,6 @@ export const make = (options: IssueOptions = {}) =>
         status: "backlog",
         moves: [],
         ...(pullRequest ? { pullRequest } : {}),
-        review: row.review as Issue["review"],
         deliver: row.deliver as Deliverable,
         ...(row.reviewed_at !== null ? { reviewedAt: row.reviewed_at } : {}),
         findings: column.findings(row.findings) ?? [],
@@ -348,7 +350,6 @@ export const make = (options: IssueOptions = {}) =>
           priority: req.priority ?? "medium",
           created_at: yield* Clock.currentTimeMillis,
           recurrence: recurrence ?? null,
-          review: req.review || "glance",
           // The orchestrator never changes code: what it is given is answered.
           deliver: req.deliver ?? (req.assignee === orchestratorAgent ? "answer" : "change"),
         }),
@@ -678,7 +679,7 @@ export const make = (options: IssueOptions = {}) =>
      * refused as saving them would be: only how it is accepted and what it delivers change once it is sent. */
     const withEdit = Effect.fn("Issues.withEdit")(function* (t: Issue, edit: IssueUpdate | undefined) {
       if (!edit) return t;
-      const reworded = Object.keys(edit).some((k) => k !== "review" && k !== "deliver");
+      const reworded = Object.keys(edit).some((k) => k !== "deliver");
       if (reworded) yield* unsent(t.id);
       return { ...t, ...Object.fromEntries(Object.entries(edit).filter(([, v]) => v !== undefined)) };
     });
@@ -691,12 +692,13 @@ export const make = (options: IssueOptions = {}) =>
       const [move, why] = statusMove(t, to);
       const said = text.trim();
       if (move === "none") return yield* Effect.fail(refused(why, nextSteps(t)));
-      if (move === "round" && !taker && !said) return yield* Effect.fail(refused(issueWording().roundNeedsWords));
+      // Stuck, it goes back with the server's own words for why; otherwise the owner says what this round is for.
+      if (move === "round" && !taker && !said && t.attention.state !== "stuck") return yield* Effect.fail(refused(issueWording().roundNeedsWords));
       let delivery: "kept" | "none" | "merge" | undefined;
       let commits = 0;
       if (move === "complete") {
         commits = yield* commitsOf(t);
-        delivery = opt.keepBranch || commits === 0 ? (opt.keepBranch && commits > 0 ? "kept" : "none") : "merge";
+        delivery = commits === 0 ? "none" : t.deliver === "branch" ? "kept" : "merge";
       }
       return { t, to, move, said, taker, delivery, commits };
     });
@@ -705,6 +707,29 @@ export const make = (options: IssueOptions = {}) =>
       const last = t.sessions.at(-1);
       return (last !== undefined ? sessions.sessionOf(last)?.name : undefined) ?? issueWording().helper;
     };
+
+    const stuckWords = Effect.fn("Issues.stuckWords")(function* (t: Issue) {
+      const last = t.sessions.at(-1);
+      switch (t.attention.stuck) {
+        case "conflict": {
+          const conflict = sessions.sessionOf(yield* liveSession(t.id))?.conflict;
+          if (!conflict) return yield* Effect.fail(refused(issueWording().noConflict(helperName(t))));
+          return conflictBrief(conflict.base, conflict.files);
+        }
+        case "failed": {
+          const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
+          const unread = t.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
+          return unread
+            ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
+            : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title);
+        }
+        case "interrupted":
+          return resumeWords();
+        case "quiet":
+        case undefined:
+          return yield* Effect.fail(refused(issueWording().roundNeedsWords));
+      }
+    });
 
     /** A settled move in words, one step a line; what it reads to say so (who would go, the room, a merge's conflicts) is read, not changed. */
     const movesWords = Effect.fn("Issues.movesWords")(function* (p: Effect.Success<ReturnType<typeof settledMove>>) {
@@ -721,9 +746,23 @@ export const make = (options: IssueOptions = {}) =>
         }
         case "unqueue":
           return [issueWording().does.unqueue(n)];
-        case "round":
+        case "round": {
           if (p.taker) return [issueWording().does.leaves(helperName(t)), issueWording().does.takesOver(p.taker.name)];
-          return t.sessions.length === 0 ? [issueWording().does.orchestratorRound(n, p.said)] : [issueWording().does.round(helperName(t), p.said)];
+          const helper = helperName(t);
+          if (t.sessions.length === 0) return [issueWording().does.orchestratorRound(n, p.said)];
+          if (!p.said) {
+            yield* stuckWords(t);
+            return [
+              t.attention.stuck === "conflict"
+                ? issueWording().does.resolve(helper)
+                : t.attention.stuck === "interrupted"
+                  ? issueWording().does.resume(helper, resumeWords())
+                  : issueWording().does.cure(helper),
+            ];
+          }
+          if (t.attention.state === "reviewing") return [issueWording().does.reject(t.number, findingsOf(p.said).length, helper)];
+          return [issueWording().does.round(helper, p.said)];
+        }
         case "reopen":
           return [issueWording().does.reopen(n, p.taker?.name), ...(p.said ? [issueWording().does.thisTime(p.said)] : [])];
         case "revive":
@@ -850,6 +889,15 @@ export const make = (options: IssueOptions = {}) =>
       yield* Effect.forkScoped(refreshPullRequests.pipe(logged("refresh pull requests"), Effect.repeat(Schedule.spaced(pollEvery)), Effect.delay(pollEvery)));
     }
 
+    /** On the board before another unsent issue, or last; only unsent issues have a place. */
+    const place = Effect.fn("Issues.place")(function* (id: string, before: string) {
+      const order: string[] = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
+      const at = order.indexOf(before);
+      order.splice(at < 0 ? order.length : at, 0, id);
+      yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
+      for (const each of order) yield* publish(each);
+    });
+
     const timeline = Effect.fn("Issues.timeline")(function* (id: string) {
       const issue = yield* get(id);
       const runs = yield* sessions.runs(issue.id);
@@ -877,7 +925,8 @@ export const make = (options: IssueOptions = {}) =>
           upd.project === undefined &&
           upd.assignee === undefined &&
           upd.priority === undefined &&
-          upd.criteria === undefined;
+          upd.criteria === undefined &&
+          upd.before === undefined;
         let was: Issue;
         if (whileOpen) {
           was = yield* get(id);
@@ -896,13 +945,13 @@ export const make = (options: IssueOptions = {}) =>
             project: nullText(upd.project ?? was.project),
             assignee: nullText(upd.assignee ?? was.assignee),
             priority: upd.priority ?? was.priority,
-            review: upd.review || was.review || "glance",
             criteria: jsonOrNull(criteria, criteria.length > 0),
             deliver: upd.deliver ?? was.deliver,
             id,
           }),
         );
-        yield* publish(id);
+        if (upd.before !== undefined) yield* place(id, upd.before);
+        else yield* publish(id);
         return yield* get(id);
       }),
       remove: Effect.fn("Issues.remove")(function* (id) {
@@ -913,96 +962,18 @@ export const make = (options: IssueOptions = {}) =>
         yield* reloadSessions;
         yield* core.apply({ type: "issueGone", id } as never);
       }),
-      move: Effect.fn("Issues.move")(function* (id, before) {
-        yield* unsent(id);
-        const order: string[] = (yield* list).filter((t) => t.sessions.length === 0 && !t.graph && !t.task && t.id !== id).map((t) => t.id);
-        const at = order.indexOf(before);
-        order.splice(at < 0 ? order.length : at, 0, id);
-        yield* inTx(Effect.forEach(order, (each, rank) => db(q.placeIssue({ rank, id: each })), { discard: true }));
-        for (const each of order) yield* publish(each);
-        return yield* list;
-      }),
       queue: (id, queued) => queueRow(id, queued, chat.defaultChannel()),
       start: (id, channel) => start(id, channel),
-      /** Under the queue's lock; without room it keeps its place. */
-      dispatchQueued: Effect.fn("Issues.dispatchQueued")(function* (id) {
-        const issue = yield* get(id);
-        if (issue.status !== "todo" || issue.queuedAt === undefined || issue.graph || issue.task || isForOrchestrator(issue))
-          return yield* Effect.fail(refused(issueWording().onlyQueued));
-        const [, agent, project] = yield* ready(id);
-        const full = sessions.noRoom(agent.runtime, project);
-        if (full) return { queued: issueWording().stillQueued(full) };
-        return yield* start(id, "");
-      }, trying.withPermits(1)),
       reopen: (id, text, channel) => reopen(id, text, channel),
       idOf,
-      act: Effect.fn("Issues.act")(function* (ref, req, channel, by) {
-        const t = yield* get(ref);
-        const id = t.id;
-        const name = wording().act[req.act];
-        if (!t.attention.acts.includes(req.act))
-          return yield* Effect.fail(refused(issueWording().cannotAct(t.number, wording().attention[t.attention.state], name), nextSteps(t)));
-        const said = (req.text ?? "").trim();
-        const saying = said ? Effect.succeed(said) : Effect.fail(refused(issueWording().actNeedsWords(name)));
-        switch (req.act) {
-          case "start":
-            yield* shape.setStatus(id, "todo", said, channel, by);
-            break;
-          case "answer":
-          case "tell":
-            yield* comment(id, yield* saying, req.sendKey ?? "");
-            break;
-          case "accept":
-            yield* shape.review(id, { pass: true });
-            break;
-          case "reject": {
-            const findings = req.findings ?? findingsOf(said);
-            if (findings.length === 0) return yield* Effect.fail(refused(issueWording().rejectNeedsFindings));
-            yield* shape.review(id, { pass: false, findings });
-            break;
-          }
-          case "complete":
-          case "acknowledge":
-            yield* shape.setStatus(id, "done", said, channel, by);
-            break;
-          case "keep":
-            yield* shape.setStatus(id, "done", said, channel, by, { keepBranch: true });
-            break;
-          case "close":
-            yield* shape.setStatus(id, "canceled", said, channel, by);
-            break;
-          // Sent before: another session, told what to do; never sent: back to the backlog, nothing to tell.
-          case "reopen":
-            yield* t.sessions.length > 0 ? shape.setStatus(id, "todo", yield* saying, channel, by) : shape.setStatus(id, "backlog", "", channel, by);
-            break;
-          case "resolve":
-            yield* shape.resolve(id);
-            break;
-          case "resume":
-            yield* comment(id, resumeWords());
-            break;
-          case "cure": {
-            const last = t.sessions.at(-1);
-            // An answer that could not be read goes back with what was wrong with it; a failed round with the job again.
-            const lastRun = last !== undefined ? sessions.sessionOf(last)?.lastRun : undefined;
-            const unread = t.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
-            yield* comment(
-              id,
-              unread
-                ? answerCureWords(parseAnswer(sessions.find(last ?? "")?.lastText ?? "").problem)
-                : cureWords((last !== undefined ? sessions.sessionOf(last)?.brief : undefined) ?? t.title),
-            );
-            break;
-          }
-          case "stop":
-            yield* sessions.stop(yield* liveSession(id));
-            break;
-        }
-        return yield* get(id);
+      stop: Effect.fn("Issues.stop")(function* (id) {
+        yield* sessions.stop(yield* liveSession(id));
       }),
-      setStatus: Effect.fn("Issues.setStatus")(function* (id, to, text, channel, by, opt = {}) {
+      setStatus: Effect.fn("Issues.setStatus")(function* (ref, to, text, channel, by, opt = {}) {
         if (!actsForOwner(by)) return yield* Effect.fail(refused(needsOwner));
-        const t = yield* get(id);
+        const t = yield* get(ref);
+        // Read by its number too: every write below goes by its id.
+        const id = t.id;
         const { move, said, taker, delivery } = yield* settledMove(t, to, text, opt);
         switch (move) {
           case "start":
@@ -1020,9 +991,11 @@ export const make = (options: IssueOptions = {}) =>
               yield* reopen(id, said, channel, { kind: "comment" }, taker);
               break;
             }
-            // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again.
+            // A session on the farm hears it in its thread; with none (the orchestrator's), its doer is asked again. While it
+            // waits for acceptance the words are the findings, written down and given as the next round's job.
             if (t.sessions.length === 0) yield* start(id, channel, { kind: "comment" }, said);
-            else yield* comment(id, said);
+            else if (said && t.attention.state === "reviewing") yield* shape.review(id, { pass: false, findings: findingsOf(said) });
+            else yield* comment(id, said || (yield* stuckWords(t)));
             break;
           case "reopen":
             yield* reopen(id, said, channel, { kind: "comment" }, taker);
@@ -1033,6 +1006,13 @@ export const make = (options: IssueOptions = {}) =>
           // What it delivers follows the issue: nothing to take in (no commits), or its branch kept by the owner's choice,
           // touches no git and opens no pull request; the rest is merged into the main branch or by a pull request.
           case "complete": {
+            // Completing is the acceptance: whatever it was sent back for is settled.
+            if (t.findings.some((f) => !f.resolved))
+              yield* judged(
+                id,
+                t.reviewedAt ?? 0,
+                t.findings.map((f) => ({ ...f, resolved: true })),
+              );
             if (delivery === "kept" || delivery === "none") {
               // Written down before its session goes home, so that leaving does not take it for canceled.
               yield* complete(id, delivery);
@@ -1061,52 +1041,6 @@ export const make = (options: IssueOptions = {}) =>
         const t = yield* withEdit(yield* get(id), edit);
         return { does: yield* movesWords(yield* settledMove(t, to, text, opt)) };
       }),
-      previewAct: Effect.fn("Issues.previewAct")(function* (ref, req) {
-        const t = yield* get(ref);
-        const name = wording().act[req.act];
-        if (!t.attention.acts.includes(req.act))
-          return yield* Effect.fail(refused(issueWording().cannotAct(t.number, wording().attention[t.attention.state], name), nextSteps(t)));
-        const said = (req.text ?? "").trim();
-        const saying = said ? Effect.succeed(said) : Effect.fail(refused(issueWording().actNeedsWords(name)));
-        const asStatus = (to: IssueStatus, text: string, opt: StatusOptions = {}) => Effect.flatMap(settledMove(t, to, text, opt), movesWords);
-        const helper = helperName(t);
-        const does: readonly string[] = yield* (() => {
-          switch (req.act) {
-            case "start":
-              return asStatus("todo", said);
-            case "answer":
-              return Effect.map(saying, (w) => [issueWording().does.answer(helper, w), issueWording().does.questionsCleared]);
-            case "tell":
-              return Effect.map(saying, (w) => [issueWording().does.tell(helper, w)]);
-            case "accept":
-              return Effect.succeed([issueWording().does.accept(t.number)]);
-            case "reject": {
-              const findings = req.findings ?? findingsOf(said);
-              return findings.length === 0
-                ? Effect.fail(refused(issueWording().rejectNeedsFindings))
-                : Effect.succeed([issueWording().does.reject(t.number, findings.length, helper)]);
-            }
-            case "complete":
-            case "acknowledge":
-              return asStatus("done", said);
-            case "keep":
-              return asStatus("done", said, { keepBranch: true });
-            case "close":
-              return asStatus("canceled", said);
-            case "reopen":
-              return t.sessions.length > 0 ? Effect.flatMap(saying, (w) => asStatus("todo", w)) : asStatus("backlog", "");
-            case "resolve":
-              return Effect.succeed([issueWording().does.resolve(helper)]);
-            case "resume":
-              return Effect.succeed([issueWording().does.resume(helper, resumeWords())]);
-            case "cure":
-              return Effect.succeed([issueWording().does.cure(helper)]);
-            case "stop":
-              return Effect.succeed([issueWording().does.stop(helper)]);
-          }
-        })();
-        return { does: [...does] };
-      }),
       previewRemove: Effect.fn("Issues.previewRemove")(function* (id) {
         const t = yield* unsent(id);
         return {
@@ -1126,17 +1060,6 @@ export const make = (options: IssueOptions = {}) =>
         return changes;
       }),
       merge,
-      /** The owner asks the session to settle its conflicts: the ones the farm marked on it, else the ones merging would meet now. */
-      resolve: Effect.fn("Issues.resolve")(function* (id) {
-        const session = yield* liveSession(id);
-        const h = sessions.sessionOf(session);
-        if (!h) return yield* Effect.fail(missing(issueWording().helperRef(session), [lookIn.session]));
-        // A preview that fails (git broken) is said as it is, not taken for no conflict.
-        const changes = h.conflict ? undefined : yield* sessions.changes(session);
-        const conflict = h.conflict ?? (changes ? conflictOf(changes) : undefined);
-        if (!conflict) return yield* Effect.fail(refused(issueWording().noConflict(h.name)));
-        yield* chat.tellSession(ownerId, session, conflictBrief(conflict.base, conflict.files), "");
-      }),
       cancel,
       review: Effect.fn("Issues.review")(function* (id, req) {
         const t = yield* get(id);
