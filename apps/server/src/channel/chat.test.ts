@@ -294,6 +294,7 @@ describe("the chat", () => {
             expect((yield* f.chat.topOf(direct!.id)).id).toBe(f.chat.defaultChannel());
             expect(yield* Effect.flip(f.chat.read("w3", { target: "@owner" }))).toMatchObject({ reason: expect.stringContaining("没有私聊") });
             expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["general"]);
+            expect(yield* Effect.flip(f.chat.makeDefault(direct!.id))).toMatchObject({ _tag: "Refused" });
           }),
         config,
       );
@@ -330,6 +331,16 @@ describe("the chat", () => {
         yield* f.chat.updateChannel(channel.id, undefined, "");
         expect(yield* f.chat.channelByName("clock-in")).toMatchObject({ project: "", description: "打卡页" });
         expect(channelOf(f.core.state().chat, channel.id)?.project).toBeUndefined();
+        // The default moves as data: what names no channel goes to the new one, and the old is a channel like any.
+        const general = f.chat.defaultChannel();
+        yield* f.chat.makeDefault(channel.id);
+        expect([f.chat.defaultChannel(), defaultOf(f.core.state().chat)?.id, channelOf(f.core.state().chat, general)?.default]).toEqual([
+          channel.id,
+          channel.id,
+          undefined,
+        ]);
+        expect((yield* f.chat.channels()).map((c) => c.name)).toEqual(["clock-in", "general"]);
+        expect((yield* f.chat.say("没写频道", undefined, "")).message.channel).toBe(channel.id);
       }),
     ),
   );

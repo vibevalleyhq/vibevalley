@@ -54,6 +54,7 @@ test("the direct channel with the orchestrator: listed apart, talked in alone, w
   await box.click();
   await box.pressSequentially("单独问一句 @");
   await expect(page.getByRole("listbox", { name: "叫谁" })).toBeHidden();
+  await expect(page.getByText("@ 叫人")).toHaveCount(0);
   await box.fill("单独问一句：地里怎么样");
   await box.press("Enter");
   const log = page.getByRole("log", { name: "消息" });

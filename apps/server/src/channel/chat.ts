@@ -1344,7 +1344,8 @@ export const make = Effect.gen(function* () {
       locked(
         Effect.gen(function* () {
           const row = model.channel(id);
-          if (!row || row.type !== "channel") return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (!row) return yield* Effect.fail(missing(channelWording().noChannel(id), [lookIn.channel]));
+          if (row.type !== "channel") return yield* Effect.fail(refused(channelWording().defaultIsChannel));
           if (id === defaultId) return;
           const was = defaultId;
           yield* tx(Effect.andThen(db(qc.clearDefault()), db(qc.makeDefault({ id }))));

@@ -52,7 +52,13 @@ export function FarmComposer(props: { channel: Channel | undefined; thread: bool
   let input: HTMLTextAreaElement | undefined;
   const owner = () => (props.thread && props.channel ? threadOwnerOf(props.channel, core()?.sessions ?? []) : undefined);
   const placeholder = () =>
-    props.thread ? (owner() ? farmWording().chat.inThread(owner()!.name) : farmWording().chat.inThreadAnyone) : farmWording().chat.toOrchestrator;
+    props.thread
+      ? owner()
+        ? farmWording().chat.inThread(owner()!.name)
+        : farmWording().chat.inThreadAnyone
+      : props.channel?.type === "direct"
+        ? farmWording().chat.toOrchestratorAlone
+        : farmWording().chat.toOrchestrator;
 
   const box = createComposer(core, () => input, {
     target: () => ({ id: props.channel?.id ?? "", agent: props.thread || pick() === "auto" ? undefined : pick() }),

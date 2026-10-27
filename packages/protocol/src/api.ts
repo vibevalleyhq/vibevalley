@@ -342,7 +342,7 @@ export const endpoints: readonly Endpoint[] = [
   },
   {
     op: "channel.message.send",
-    about: [],
+    about: ["id"],
     input: S.SayRequest,
     result: undefined,
     can: ["owner", "remote"],

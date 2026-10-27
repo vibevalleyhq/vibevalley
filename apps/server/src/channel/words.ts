@@ -34,6 +34,7 @@ const zh = {
   absent: (who: readonly string[]) => who.join("、") + " 不在场，没送到",
   noHelper: (id: string) => `没有 ${id} 这个帮工`,
   noChannel: (id: string) => `没有 ${id} 这个频道`,
+  defaultIsChannel: "默认频道只能是一个频道，不能是私聊或串",
   noDirect: (target: string) => `${target}：你和对方之间没有私聊`,
 };
 
@@ -65,6 +66,7 @@ const en: typeof zh = {
   absent: (who) => who.join(", ") + (who.length === 1 ? " is" : " are") + " not here; not delivered",
   noHelper: (id) => `There is no helper ${id}`,
   noChannel: (id) => `There is no channel ${id}`,
+  defaultIsChannel: "Only a channel can be the default, not a direct channel or a thread",
   noDirect: (target) => `${target}: there is no direct channel between you`,
 };
 

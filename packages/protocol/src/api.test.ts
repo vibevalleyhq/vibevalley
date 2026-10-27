@@ -30,6 +30,11 @@ describe("the endpoint table", () => {
     expect(wrong).toEqual([]);
   });
 
+  test("says an input with an id is about it, but where the server gives the id", () => {
+    const unsaid = endpoints.filter((e) => !e.op.endsWith(".create") && fieldsOf(e).includes("id") && !e.about.includes("id")).map((e) => e.op);
+    expect(unsaid).toEqual([]);
+  });
+
   test("says what each input is about only with fields the input has", () => {
     const missing = endpoints
       .filter((e) => e.about.length > 0)
