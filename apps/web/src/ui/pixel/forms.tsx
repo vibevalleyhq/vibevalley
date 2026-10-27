@@ -1,4 +1,4 @@
-import { farmWording } from "../../farm/words";
+import { pixelWording } from "./words";
 import { createSignal, For } from "solid-js";
 import { splitChips } from "./chips";
 import { pxRing, pxText } from "./style";
@@ -29,7 +29,7 @@ export function PxChipsInput(props: {
             {chip}
             <button
               type="button"
-              aria-label={farmWording().drop(chip)}
+              aria-label={pixelWording().drop(chip)}
               disabled={props.disabled}
               onClick={() => props.onChange(props.value.filter((c) => c !== chip))}
               class={[focusRing, "cursor-pointer px-1 py-0.5 opacity-70 enabled:hover:opacity-100 disabled:cursor-default"]}

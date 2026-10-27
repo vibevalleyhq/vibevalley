@@ -1,4 +1,4 @@
-import { farmWording } from "../../farm/words";
+import { pixelWording } from "./words";
 import { createEffect, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { pxText, pxWindow } from "./style";
@@ -69,7 +69,7 @@ export function FarmDialog(props: { title: string; size: FarmDialogSize; icon?: 
           <h2 class={[pxText.lg, "min-w-0 flex-1 truncate"]}>{props.title}</h2>
           <button
             type="button"
-            aria-label={farmWording().close}
+            aria-label={pixelWording().close}
             onClick={() => props.onClose()}
             class="group grid size-9 shrink-0 cursor-pointer place-items-center outline-none hover:bg-cream-200 focus-visible:outline-2 focus-visible:outline-leaf-500 focus-visible:outline-solid"
           >
@@ -107,7 +107,7 @@ export function PxDialog(props: { title: string; open?: boolean; onClose: () => 
       <div class={[pxText.sm, "max-h-[85dvh] overflow-y-auto p-6"]}>
         <div class="mb-5 flex items-center gap-3">
           <h2 class={[pxText.xl, "min-w-0 flex-1"]}>{props.title}</h2>
-          <PxButton size="icon" label={farmWording().close} onClick={() => props.onClose()}>
+          <PxButton size="icon" label={pixelWording().close} onClick={() => props.onClose()}>
             <SpriteIcon name="button-close" size={16} />
           </PxButton>
         </div>

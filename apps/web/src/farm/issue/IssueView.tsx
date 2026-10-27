@@ -26,7 +26,7 @@ import { useCore, useFrames } from "../../base/frame";
 import { useIssueChanges, useIssueHistory, useIssueRuns, useIssueTimeline } from "../../features/issue/data";
 import { ready } from "../../base/query";
 import { FarmDialog, FarmSection, PxButton, PxTextArea, SpriteIcon, toasts, ToastType } from "../../ui/pixel";
-import { farmActWords } from "../../ui/pixel/labels";
+import { farmActWords } from "../labels";
 import { tint } from "../panels/bits";
 import { commands, useFarm } from "../state";
 import { useVillage } from "../support";
