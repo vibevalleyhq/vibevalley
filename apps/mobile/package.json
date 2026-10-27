@@ -1,5 +1,5 @@
 {
-  "name": "vibevalley-mobile",
+  "name": "@vibevalley/mobile",
   "version": "1.0.0",
   "private": true,
   "main": "index.ts",

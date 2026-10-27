@@ -5,12 +5,12 @@
   "scripts": {
     "prepare": "vp config --hooks --no-agent",
     "golden:update": "vpx scripts/golden-update.ts",
-    "desktop:dev": "vp run --filter vibevalley-desktop dev",
+    "desktop:dev": "vp run --filter @vibevalley/desktop dev",
     "notes:catalog": "vpx scripts/agent-notes.ts --write",
     "site:check": "pnpm --dir site install && pnpm --dir site run check",
     "site:build": "pnpm --dir site install && pnpm --dir site run build",
     "site:deploy": "pnpm --dir site install && pnpm --dir site run deploy",
-    "package:mac": "vp run --filter vibevalley-desktop package",
+    "package:mac": "vp run --filter @vibevalley/desktop package",
     "capabilities": "vpx scripts/capabilities.ts",
     "api:client": "vpx scripts/api-client.ts"
   },

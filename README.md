@@ -85,8 +85,8 @@ open apps/desktop/dist/mac-arm64/VibeValley.app
 ### 或者分开跑（开发时）
 
 ```bash
-vp install && vp run --filter vibevalley-web build      # 页面
-vp run --filter vibevalley-server start --web ../web/dist   # 服务端，127.0.0.1:8787，浏览器打开它
+vp install && vp run --filter @vibevalley/web build      # 页面
+vp run --filter @vibevalley/server start --web ../web/dist   # 服务端，127.0.0.1:8787，浏览器打开它
 ```
 
 数据同样在 `~/.vibevalley`（`VIBEVALLEY_HOME`）。钥匙在「设置」里填，存在 `$VIBEVALLEY_HOME/settings.json`；也可以写进 `$VIBEVALLEY_HOME/vibevalley.yaml`（或 `--config` 给的文件）和相应的环境变量。设置里的钥匙优先，详见[设置和配置](docs/subsystems/setting.md)。

@@ -14,7 +14,7 @@ description: 为 VibeValley 的一类改动写验收的一份分册（.agents/sk
 按顺序问，答「能」就去做那件事，不写分册：
 
 1. 能不能改代码，让这类错误写不出来（类型、不变量、只留一个入口）？
-2. 能不能写成测试或检查，进 `vp run server:check`、`vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run docs:verify`？服务端的测试能用 oar 的 `scriptedRuntime`、真的 git 仓库和照脚本回答的模型（`ai/testing.ts`），页面的 Playwright 对着真的服务端，大部分行为都能这样测。
+2. 能不能写成测试或检查，进 `vp run server:check`、`vp run web:check`、`vp run --filter @vibevalley/web e2e`、`vp run docs:verify`？服务端的测试能用 oar 的 `scriptedRuntime`、真的 git 仓库和照脚本回答的模型（`ai/testing.ts`），页面的 Playwright 对着真的服务端，大部分行为都能这样测。
 
 只有要真的跑起来看、要判断（画面对不对、交互顺不顺、真的帮工能不能开工）的，才写分册。一份分册里能改成检查的步骤，也宜改成检查，分册里只留一句命令。
 

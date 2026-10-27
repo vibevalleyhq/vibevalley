@@ -24,3 +24,9 @@ test("every version the workspace uses is in pnpm-workspace.yaml's catalogs", ()
   }
   expect(written, 'say "catalog:" and put the version in pnpm-workspace.yaml').toEqual([]);
 });
+
+test("every package is named @vibevalley/<its folder>, the root vibevalley", () => {
+  const named = manifests.map((file) => [file, (JSON.parse(readFileSync(join(root, file), "utf8")) as { name?: string }).name]);
+  const want = (file: string) => (file === "package.json" ? "vibevalley" : `@vibevalley/${file.split("/")[1]}`);
+  expect(named.filter(([file, name]) => name !== want(file!))).toEqual([]);
+});

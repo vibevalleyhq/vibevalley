@@ -140,7 +140,7 @@
 
 - `apps/server/src/orchestrator/orchestrator.test.ts`（照脚本回答的模型，`ai/testing.ts`）：只接 DeepSeek 的模型；派活、在频道听主人的话（电话里的也是）；输入带着从哪来；字流给电话；起不来的原因只说一次；同一个 `sendKey` 只听一次；听到播种袋选的档案；长汇报截了再听；只在主人开口时合并；自己定的定时等主人同意；巡查只报一次；主人标做错的一轮存成样例。
 - `orchestrator/rules.test.ts`：现状的差异（大半变了就给全文）；截别人的长话、不截主人的；用量那一行字；每个来源的开头；巡查的说法和黄金数据。
-- 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter vibevalley-server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。
+- 评测：`orchestrator/evals.test.ts`（每种 `expect` 都判得对，每个样例录下的那一轮必须过不了它的 `expect`）；真模型重放 `evals.live.test.ts`（`vp run --filter @vibevalley/server evals`，照 [acceptance/orchestrator-evals.md](.agents/skills/acceptance/orchestrator-evals.md)）。
 - `tool/tool.test.ts`：管家和帮工每个工具生成的参数逐字节对照 `testdata/parameters.json`；钱的说法；轨迹里工具的名字和说法。
 - `agent/brain/agent.test.ts`：跑工具、回结果、工具失败告诉模型为什么；`send` 插话、`later` 排队；步数上限；接着原来的会话；压长对话；技能；帮手同时干活；定时到点叫醒；压缩之间系统提示不变、记性的变化放进输入；压缩后重做系统提示；叫停正在跑的一轮和正在跑的工具；工具变了算前缀变了；闲着时压缩开头一样；该写摘要却调了工具就再要一次；快被叫醒时不压；压缩留下最后几句；不给的工具在拼好以后才去掉。`run.test.ts`、`runtime.test.ts`（农机 `vibevalley` 的一轮、插话、排队、撤回、中止、接着、MCP、失败）、`openai.test.ts`（只取最新一句、照 OpenAI 的格式分块、整段回答、流式和结束、照 OpenAI 的样子拒绝）、`tools.test.ts`；`loop.test.ts` 钉着循环的样子（事件的次序、截断的调用、没有的工具和不收的参数、一轮一句、一起跑的工具的次序）。
 - `agent/loop/agent.test.ts`：同样的情形，外加流里、工具里、准备请求时叫停，叫停以后不再开工具，模型出错、经线路的回答被截断、被拒的请求，跑着时再开一轮被拒。

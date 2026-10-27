@@ -22,15 +22,15 @@ export default defineConfig({
       "server:check": [
         "vp check",
         "vp run --filter @vibevalley/protocol test",
-        "vp run --filter vibevalley-server db:check",
-        "vp run --filter vibevalley-server test",
+        "vp run --filter @vibevalley/server db:check",
+        "vp run --filter @vibevalley/server test",
       ],
       "web:check": [
         "vp check",
-        "vp run --filter @vibevalley/engine --filter vibevalley-mobile --filter vibevalley-desktop --filter vibevalley-web test",
-        "vp run --filter vibevalley-web build",
+        "vp run --filter @vibevalley/engine --filter @vibevalley/mobile --filter @vibevalley/desktop --filter @vibevalley/web test",
+        "vp run --filter @vibevalley/web build",
       ],
-      "desktop:test": { command: "vp run --filter vibevalley-desktop e2e", cache: false },
+      "desktop:test": { command: "vp run --filter @vibevalley/desktop e2e", cache: false },
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.

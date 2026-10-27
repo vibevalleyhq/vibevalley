@@ -15,7 +15,7 @@ Tests/IslandCoreTests/              the messages and the placement (Swift Testin
 The shapes in `Messages.swift` are `Glance` and `IslandRow` in `apps/desktop/src/island.ts`: change both together.
 
 ```bash
-vp run --filter vibevalley-island test           # swift test; macOS only (CI's island job runs it as is)
+vp run --filter @vibevalley/island test           # swift test; macOS only (CI's island job runs it as is)
 swift build -c release --package-path apps/island # what apps/desktop scripts/build.ts runs; the app finds .build/release/VibeValleyIsland
 ```
 

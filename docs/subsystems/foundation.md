@@ -70,7 +70,7 @@
 **存盘**
 
 - **一个 PGlite 库**：`base/db.ts` 在家目录的库文件夹里开 PGlite（编成 WASM 的 Postgres，在服务端进程里），测试用内存库。一条连接，所以行的先后就是提交的先后（消息的编号靠它）。时间存毫秒的 `bigint`。
-- **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter vibevalley-server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
+- **SQL 只在 effect-sqlc**：查询在 `db/queries/<表>.sql`，一张表一个文件，只写这张表（联查别的表可以，写不行）；服务里不手写 SQL，只调 `db/generated` 的函数，再把行读成自己的形状。改完跑 `vp run --filter @vibevalley/server db:generate`，`server:check` 跑 `db:check` 查生成的是不是最新。
 - **表名是 `<模块>` 或 `<模块>_<概念>`**，单数，模块是拥有它的 `src` 文件夹（`issue`、`issue_session`、`channel_message`、`session_run`、`game_ledger`、`lan_device`）。索引名以表名开头。
 - **一份表结构，不认旧数据**：`0001_schema.up.sql` 是整个库，改表直接改它，不另加迁移；`migrations/` 里只能有这一个文件。开机时 `PgliteMigrator` 在空库上跑它；旧库不升级：库的文件夹旁边 `db.schema` 记着建它的基线的哈希，对不上就把整个文件夹挪到 `db.<旧哈希>-<时间>`（不删）再新建一个，日志里说一句；没有 `db.schema` 的当作今天的。测试的库在内存里，由 `Database` 自己管：每个进程第一个库跑完基线就存一份文件，之后的库从这份文件起；一座农场关的时候它的库不关，关掉外键检查逐表 `DELETE`、序号从 1 重来，清空后留给下一座（同时开着的农场各拿一个；比 `TRUNCATE` 便宜，它要给每张表重建文件）。只有没人改过表结构的才留：第一个库装了一个事件触发器，任何 DDL 都在会话上打个记号（测试为了让写失败加的触发器、删改的表），有记号的库关掉。存盘的格式只有现在这一种：表、家目录里的文件、环境变量、存下的取值都只认今天的名字。
 - **运行时新建的行主键是 uuidv7**：`base/ids.ts` 的 `newId()`（带时间，同一毫秒里接着数，同一进程里单调），存成 `text`；协议里的 id 都是 `string`。不用 uuid 的：从文件来的自然键（档案、技能、项目、农机、连接器）、单例、几列组成的主键。工单另有从 1 数的 `number`，消息在对话里有从 1 数的 `number`。`code()` 是给人念的配对码，不是 id。
@@ -116,7 +116,7 @@
 **加一张表或改表**
 
 1. 在 `0001_schema.up.sql` 里拥有它的那一段直接改：表名 `<模块>_<概念>`，索引以表名开头，主键 `text` 存 uuidv7。
-2. 写 `db/queries/<表>.sql`，跑 `vp run --filter vibevalley-server db:generate`。
+2. 写 `db/queries/<表>.sql`，跑 `vp run --filter @vibevalley/server db:generate`。
 3. 服务里调生成的函数，新行的 id 用 `newId()`。
 4. 删掉本机的库重建；`schema.test.ts` 查命名、基线和查询文件。
 
@@ -179,6 +179,6 @@
 - `apps/server/src/core/golden.test.ts`（折法、地块、共用规则）和各模块的黄金数据测试；`vp run golden:update` 后 `git diff` 只该动有意改的。
 - `vp check`：格式、lint 和全部包的类型。
 - `vp run server:check`：`vp check`、protocol 的测试、`db:check`、服务端的 vitest。
-- `vp run web:check`、`vp run --filter vibevalley-web e2e`、`vp run desktop:test`：类型、各包的规则测试、页面能构建，Playwright 对着真的服务端和整个应用。
+- `vp run web:check`、`vp run --filter @vibevalley/web e2e`、`vp run desktop:test`：类型、各包的规则测试、页面能构建，Playwright 对着真的服务端和整个应用。
 - `vp run docs:verify`：旧名字、能力表是否最新。
 - 话：`vp check` 的 `vibevalley/no-cjk-literal`；`agent/seed.test.ts`（种子和模板的英文版只有字不同）；`session/rules.test.ts`、`memory/memory.test.ts`（英文的记号也认）；`apps/web/test/english.spec.ts`（换成 English，工作台和服务端的话都变）。

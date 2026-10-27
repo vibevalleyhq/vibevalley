@@ -42,19 +42,19 @@ scripts/                   文档、Note、旧名字的检查，和验证服务�
 vp install                                                      # 根目录：装 apps/*、packages/* 的依赖（Vite+ 带的 pnpm 12，pnpm workspace）
 vp check                                                        # 改完任何代码：格式（oxfmt）、lint（oxlint，带类型）和全部包的类型；--fix 改格式
 vpx scripts/comment-review.ts                                   # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，你逐条核实再删或改（vv-comments；--all <目录> 清一块已有的）
-vp run --filter vibevalley-server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
-vp run --filter vibevalley-server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
+vp run --filter @vibevalley/server start                         # 服务端，127.0.0.1:8787；后面加 --web ../web/dist 同时提供页面
+vp run --filter @vibevalley/server cli issue list                # 命令行：调农场的接口（help 列出全部），runtime chat <农机> 直接聊
 vp run server:check                                             # 改完服务端或 packages/protocol：类型（vp check）、规则的测试、查询是否最新、vitest
-vp run --filter vibevalley-server db:generate                   # 改完 db/queries 或 db/migrations：用 effect-sqlc 重写 db/generated
+vp run --filter @vibevalley/server db:generate                   # 改完 db/queries 或 db/migrations：用 effect-sqlc 重写 db/generated
 vp run golden:update                                            # 有意改了规则：用现在的结果重写各处的黄金数据，再看 diff（后面加 <模块> 只重写那一处，核心状态的是 core）
-vp run --filter vibevalley-server evals                         # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；acceptance 的管家评测分册）
+vp run --filter @vibevalley/server evals                         # 改了管家的提示或工具描述：真模型重放管家的样例（要 DEEPSEEK_API_KEY、花钱，先问主人；acceptance 的管家评测分册）
 vp run web:check                                                # 改完 apps/、packages/：类型（vp check），engine、宿主的桥、手机壳和页面规则的测试，页面能构建
-vp run --filter vibevalley-web e2e                              # 改完页面：构建，再 Playwright 对着真的服务端（每个 worker 一个，临时家目录，环境里没有钥匙）
-vp run --filter vibevalley-web e2e:dev                          # 改了页面的响应式写法：Playwright 跑在 Solid 的开发版上，它的诊断（没被追踪的读、不该建的原语、追踪几千个源）连调用栈打出来
+vp run --filter @vibevalley/web e2e                              # 改完页面：构建，再 Playwright 对着真的服务端（每个 worker 一个，临时家目录，环境里没有钥匙）
+vp run --filter @vibevalley/web e2e:dev                          # 改了页面的响应式写法：Playwright 跑在 Solid 的开发版上，它的诊断（没被追踪的读、不该建的原语、追踪几千个源）连调用栈打出来
 vp run desktop:test                                             # 改完 apps/desktop 或页面：Playwright 起整个 Electron 应用（临时家目录），附截图
 vp run desktop:dev                                              # 桌面版：构建壳和页面，带着 apps/server 起来；改页面窗口自己刷新，改服务端或 protocol 服务端自己重启
-vp run --filter vibevalley-island test                          # 改完灵动岛（swift test）：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
-vp run --filter vibevalley-mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
+vp run --filter @vibevalley/island test                          # 改完灵动岛（swift test）：消息和位置的测试（macOS）；样子用它的 --snapshot 画出来看（apps/island/README.md）
+vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；建原生工程、跑模拟器上的端到端见 apps/mobile/README.md
 vp run package:mac                                              # macOS 应用和 .dmg（apps/desktop/dist）：壳、页面、灵动岛和带着生产依赖的 apps/server
 vp run capabilities                                             # 改了 api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）

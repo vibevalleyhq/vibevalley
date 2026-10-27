@@ -30,7 +30,7 @@ const have = existsSync(out) ? readdirSync(out).filter((n) => n.endsWith(".ts"))
 if (check) {
   const stale = [...new Set([...have, ...made.keys()])].filter((n) => made.get(n) !== (have.includes(n) ? readFileSync(join(out, n), "utf8") : undefined));
   if (stale.length > 0) {
-    console.error(`db/generated is stale (${stale.join(", ")}): vp run --filter vibevalley-server db:generate`);
+    console.error(`db/generated is stale (${stale.join(", ")}): vp run --filter @vibevalley/server db:generate`);
     process.exit(1);
   }
 } else {

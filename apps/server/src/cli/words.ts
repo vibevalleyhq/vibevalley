@@ -31,7 +31,7 @@ const zh = {
   next: {
     help: "看这条命令怎么写",
     whatItDoes: "看这条命令做什么",
-    startServer: "先起服务端（vp run --filter vibevalley-server start），或用 --server 指到在跑的那个",
+    startServer: "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个",
   },
   /** Joins the parser's several mistakes into one line. */
   and: "；",
@@ -91,7 +91,7 @@ const en: typeof zh = {
   next: {
     help: "See how this command is written",
     whatItDoes: "See what this command does",
-    startServer: "Start the server first (vp run --filter vibevalley-server start), or point --server at one that runs",
+    startServer: "Start the server first (vp run --filter @vibevalley/server start), or point --server at one that runs",
   },
   and: "; ",
   failure: {
