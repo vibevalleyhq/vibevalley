@@ -1,7 +1,8 @@
 // Tools that answer in words. A tool that fails throws; the model reads the error's message as a failed result.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { Effect } from "effect";
+import { type Effect, Schema } from "effect";
+import { type JsonSchema, parametersOf } from "../../ai/tools.ts";
 
 /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */
 export const stopped = "已停下";
@@ -17,22 +18,6 @@ export function clip(text: string, limit = maxResultChars): string {
   return r.slice(0, head).join("") + `\n\n…（省略了 ${r.length - limit} 个字符）…\n\n` + r.slice(r.length - tail).join("");
 }
 
-export type Schema = Record<string, unknown>;
-
-export function objectSchema(properties: Record<string, Schema> = {}, ...required: string[]): Schema {
-  if (Object.keys(properties).length === 0) return { type: "object", properties: {} };
-  return {
-    type: "object",
-    properties,
-    additionalProperties: true,
-    ...(required.length > 0 ? { required } : {}),
-  };
-}
-export const stringSchema = (): Schema => ({ type: "string" });
-export const integerSchema = (): Schema => ({ type: "integer" });
-export const numberSchema = (): Schema => ({ type: "number" });
-export const booleanSchema = (): Schema => ({ type: "boolean" });
-
 export interface ToolContext {
   readonly callId: string;
   readonly signal: AbortSignal;
@@ -43,7 +28,7 @@ export interface TextToolSpec<P> {
   /** The name when absent. */
   readonly label?: string;
   readonly description: string;
-  readonly parameters: Schema;
+  readonly parameters: JsonSchema;
   readonly run: (params: P, tc: ToolContext) => string | Promise<string>;
 }
 
@@ -81,3 +66,14 @@ export type Runner = (effect: Effect.Effect<string, Error>, options: { readonly 
 
 export const effectTool = <P>(spec: EffectToolSpec<P>, runner: Runner): AgentTool =>
   textTool<P>({ ...spec, run: (params, tc) => runner(spec.run(params), { signal: tc.signal }) });
+
+export interface SchemaToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<TextToolSpec<S["Type"]>, "parameters"> {
+  readonly parameters: S;
+}
+
+/** A tool whose parameters are a Schema: the model is shown parametersOf, and the arguments are read by the Schema
+ * before run (a refusal is the failed result the model reads). */
+export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaToolSpec<S>): AgentTool {
+  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
+  return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
+}

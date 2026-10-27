@@ -14,7 +14,8 @@ import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Remi
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./agentTaskTools.ts";
-import { effectTool, objectSchema, stopped } from "./tool.ts";
+import { effectTool, stopped } from "./tool.ts";
+import { objectSchema } from "../../ai/tools.ts";
 import { fauxLLM, tempHome } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
 import { plainLog } from "../../base/log.ts";

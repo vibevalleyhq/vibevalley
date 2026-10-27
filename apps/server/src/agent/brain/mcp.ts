@@ -7,7 +7,8 @@ import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotoc
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "./config.ts";
-import { type Schema, textTool } from "./tool.ts";
+import { textTool } from "./tool.ts";
+import type { JsonSchema } from "../../ai/tools.ts";
 import { afterRealTime } from "../../base/time.ts";
 
 /** Also for connecting. */
@@ -128,7 +129,7 @@ export async function connectMcp(server: McpServer, signal?: AbortSignal): Promi
 }
 
 function mcpTool(client: Client, server: string, t: { name: string; description?: string; inputSchema?: object }): AgentTool {
-  const parameters = (t.inputSchema as Schema | undefined) ?? { type: "object", properties: {} };
+  const parameters = (t.inputSchema as JsonSchema | undefined) ?? { type: "object", properties: {} };
   return textTool<Record<string, unknown> | null>({
     name: mcpToolName(server, t.name),
     label: server + " · " + t.name,

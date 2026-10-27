@@ -6,7 +6,7 @@ import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { jsonOf } from "../../base/json.ts";
-import { numberSchema, objectSchema, stringSchema, textTool } from "./tool.ts";
+import { schemaTool } from "./tool.ts";
 import type { Time } from "../../base/time.ts";
 import type { CallbackLog } from "../../base/log.ts";
 
@@ -119,27 +119,17 @@ export class Reminders {
   }
 
   private makeTools(): AgentTool[] {
-    const add = textTool<{
-      name: string;
-      message: string;
-      at?: string;
-      every_minutes?: number;
-      cron?: string;
-    }>({
+    const add = schemaTool({
       name: "reminder",
       description:
         "定一个以后要做的事：到点时你会收到 message，像有人对你说的一样，然后去做。三选一：at（某个时刻，ISO 时间，比如 2026-10-13T09:00:00+08:00）、every_minutes（每隔几分钟）、cron（五段：分 时 日 月 周，本机时区）。message 写清楚到时候要做什么、做完告诉谁。",
-      parameters: objectSchema(
-        {
-          name: stringSchema(),
-          message: stringSchema(),
-          at: stringSchema(),
-          every_minutes: numberSchema(),
-          cron: stringSchema(),
-        },
-        "name",
-        "message",
-      ),
+      parameters: Schema.Struct({
+        name: Schema.String,
+        message: Schema.String,
+        at: Schema.optionalKey(Schema.String),
+        every_minutes: Schema.optionalKey(Schema.Number),
+        cron: Schema.optionalKey(Schema.String),
+      }),
       run: (p) => {
         if ([p.at, p.every_minutes, p.cron].filter((x) => x !== undefined && x !== null).length !== 1)
           throw new Error("at、every_minutes、cron 要正好给一个。");
@@ -164,19 +154,19 @@ export class Reminders {
         return "定好了：\n" + describeReminder(reminder);
       },
     });
-    const list = textTool<object>({
+    const list = schemaTool({
       name: "list_reminders",
       description: "列出定好的事。",
-      parameters: objectSchema(),
+      parameters: Schema.Struct({}),
       run: () => {
         const reminders = this.load();
         return reminders.length === 0 ? "没有定好的事。" : reminders.map(describeReminder).join("\n");
       },
     });
-    const cancel = textTool<{ id: string }>({
+    const cancel = schemaTool({
       name: "cancel_reminder",
       description: "取消一件定好的事（id 从 list_reminders 看）。",
-      parameters: objectSchema({ id: stringSchema() }, "id"),
+      parameters: Schema.Struct({ id: Schema.String }),
       run: (p) => {
         const reminders = this.load();
         const j = reminders.find((x) => x.id === p.id);

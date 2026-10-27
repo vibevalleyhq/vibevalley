@@ -20,6 +20,8 @@ export function parametersOf(parameters: Schema.Struct<Schema.Struct.Fields>): J
 
 function shaped(node: JsonSchema): JsonSchema {
   if (Array.isArray(node.anyOf) && node.anyOf.some((n: JsonSchema) => n.type === "number")) return { type: "number" };
+  // One literal comes as a union of one.
+  if (Array.isArray(node.anyOf) && node.anyOf.length === 1) return shaped(node.anyOf[0] as JsonSchema);
   switch (node.type) {
     case "object": {
       const properties = (node.properties ?? {}) as Record<string, JsonSchema>;

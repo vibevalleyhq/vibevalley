@@ -3,10 +3,10 @@
 // core state, never the caller's to choose. Every answer is words a model acts on, a refusal too ("没成：……").
 // Stateless: each request is served by a server of its own, so nothing is kept between calls.
 
+import { coerceArguments, type JsonSchema } from "../ai/tools.ts";
 import { failedCall, noTool, unknownCaller } from "./prompts.ts";
 import { session } from "../base/actor.ts";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { validateToolArguments } from "@earendil-works/pi-ai";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -45,8 +45,8 @@ export const make = (options: McpOptions = {}) =>
 
     const call = async (tool: AgentTool, args: unknown): Promise<string> => {
       try {
-        const checked: unknown = validateToolArguments(tool, { type: "toolCall", id: "", name: tool.name, arguments: (args ?? {}) as never });
-        const r = await tool.execute("", checked);
+        // Coerced as the brain's calls are; each tool's Schema then reads or refuses them.
+        const r = await tool.execute("", coerceArguments(args ?? {}, tool.parameters as JsonSchema));
         return r.content.map((c) => (c.type === "text" ? c.text : "")).join("");
       } catch (e) {
         return failedCall(e instanceof Error ? e.message : String(e));
