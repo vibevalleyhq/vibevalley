@@ -20,7 +20,7 @@ import { AgentFace } from "../../ui/Face";
 import { FarmSection, PxButton, PxField, PxPick, PxTextArea, PxTextInput, SpriteIcon } from "../../ui/pixel";
 import { useFarm } from "../state";
 import { FarmEmpty, FarmTag, FileRow, Said, tint, Tinted } from "./bits";
-import { type Answer, graphs, useGraphChanges } from "../../data/graphs";
+import { type Answer, graphs, useGraphChanges } from "../../features/task/data";
 import { useAgent, useWorkAgents } from "../../data/agents";
 
 const stateTone: Record<GraphState, [fill: string, ink: string]> = {

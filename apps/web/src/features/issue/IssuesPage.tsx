@@ -20,7 +20,7 @@ import { DisplayMenu } from "./DisplayMenu";
 import { run, useGraphs, useNameOf } from "./hooks";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
-import { TaskDetail } from "../../pages/issues/TaskDetail";
+import { TaskDetail } from "../task/TaskDetail";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
 const lookKey = "vibevalley.board.look";
