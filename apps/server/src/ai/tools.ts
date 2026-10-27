@@ -1,0 +1,139 @@
+// A tool's parameters, from its Schema to the JSON Schema the model is shown, and a model's arguments back to what the
+// Schema reads, as pi-ai's validateToolArguments makes them (testdata/arguments.jsonl.gz).
+
+import { Schema } from "effect";
+
+export type JsonSchema = Readonly<Record<string, unknown>>;
+
+/** An object's parameters in the shape the model has always been shown (brain/tool.ts's objectSchema): no properties
+ * is an open object; otherwise any property is let through and the required ones are listed. */
+export function objectSchema(properties: Record<string, JsonSchema> = {}, ...required: string[]): JsonSchema {
+  if (Object.keys(properties).length === 0) return { type: "object", properties: {} };
+  return { type: "object", properties, additionalProperties: true, ...(required.length > 0 ? { required } : {}) };
+}
+
+/** A Struct's JSON Schema in objectSchema's shape and key order: integers without the safe bounds Schema adds, numbers
+ * without the non-finite strings, enums as strings. The bytes lead every request, so a change here changes the prompt. */
+export function parametersOf(parameters: Schema.Struct<Schema.Struct.Fields>): JsonSchema {
+  return Object.keys(parameters.fields).length === 0 ? objectSchema() : shaped(Schema.toJsonSchemaDocument(parameters).schema);
+}
+
+function shaped(node: JsonSchema): JsonSchema {
+  if (Array.isArray(node.anyOf) && node.anyOf.some((n: JsonSchema) => n.type === "number")) return { type: "number" };
+  switch (node.type) {
+    case "object": {
+      const properties = (node.properties ?? {}) as Record<string, JsonSchema>;
+      const out = Object.fromEntries(Object.entries(properties).map(([name, p]) => [name, shaped(p)]));
+      return objectSchema(out, ...((node.required as string[] | undefined) ?? []));
+    }
+    case "array":
+      return { type: "array", items: shaped(node.items as JsonSchema) };
+    case "string":
+      return Array.isArray(node.enum) ? { type: "string", enum: node.enum } : { type: "string" };
+    case "integer":
+    case "number":
+    case "boolean":
+      return { type: node.type };
+    default:
+      throw new Error(`a tool parameter the model is not shown: ${JSON.stringify(node)}`);
+  }
+}
+
+/** A model's arguments as pi-ai's validateToolArguments leaves them before checking: a null on an optional field the
+ * schema does not allow null for is no field, and a value of another JSON type becomes the schema's where it reads as
+ * one ("10" for 10, true for 1, 3 for "3", "true" or 1 for true; a required string's null is ""). */
+export function coerceArguments(args: unknown, schema: JsonSchema): unknown {
+  const copy: unknown = structuredClone(args);
+  dropOptionalNulls(copy, schema);
+  return coerce(copy, schema);
+}
+
+const typesOf = (schema: JsonSchema): string[] =>
+  typeof schema.type === "string" ? [schema.type] : Array.isArray(schema.type) ? schema.type.filter((t): t is string => typeof t === "string") : [];
+
+function dropOptionalNulls(value: unknown, schema: JsonSchema): void {
+  if (Array.isArray(value)) {
+    const items = schema.items as JsonSchema | undefined;
+    if (items && !Array.isArray(items)) for (const v of value) dropOptionalNulls(v, items);
+    return;
+  }
+  const properties = schema.properties as Record<string, JsonSchema> | undefined;
+  if (typeof value !== "object" || value === null || !properties) return;
+  const object = value as Record<string, unknown>;
+  const required = new Set((schema.required as string[] | undefined) ?? []);
+  for (const [key, p] of Object.entries(properties)) {
+    if (!(key in object)) continue;
+    if (object[key] === null && !required.has(key) && !typesOf(p).includes("null")) delete object[key];
+    else dropOptionalNulls(object[key], p);
+  }
+}
+
+function matches(value: unknown, type: string): boolean {
+  switch (type) {
+    case "number":
+      return typeof value === "number";
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "string":
+      return typeof value === "string";
+    case "null":
+      return value === null;
+    case "array":
+      return Array.isArray(value);
+    case "object":
+      return typeof value === "object" && value !== null && !Array.isArray(value);
+    default:
+      return false;
+  }
+}
+
+function primitive(value: unknown, type: string): unknown {
+  switch (type) {
+    case "number":
+    case "integer": {
+      if (value === null) return 0;
+      if (typeof value === "string" && value.trim() !== "") {
+        const n = Number(value);
+        if (type === "number" ? Number.isFinite(n) : Number.isInteger(n)) return n;
+      }
+      if (typeof value === "boolean") return value ? 1 : 0;
+      return value;
+    }
+    case "boolean":
+      if (value === null) return false;
+      if (value === "true" || value === 1) return true;
+      if (value === "false" || value === 0) return false;
+      return value;
+    case "string":
+      if (value === null) return "";
+      return typeof value === "number" || typeof value === "boolean" ? String(value) : value;
+    case "null":
+      return value === "" || value === 0 || value === false ? null : value;
+    default:
+      return value;
+  }
+}
+
+function coerce(value: unknown, schema: JsonSchema): unknown {
+  let next = value;
+  const types = typesOf(schema);
+  if (types.length > 0 && !(types.length > 1 && types.some((t) => matches(next, t))))
+    for (const t of types) {
+      const candidate = primitive(next, t);
+      if (candidate !== next) {
+        next = candidate;
+        break;
+      }
+    }
+  if (types.includes("object") && matches(next, "object")) {
+    const object = next as Record<string, unknown>;
+    for (const [key, p] of Object.entries((schema.properties ?? {}) as Record<string, JsonSchema>)) if (key in object) object[key] = coerce(object[key], p);
+  }
+  if (types.includes("array") && Array.isArray(next) && schema.items && !Array.isArray(schema.items)) {
+    const items = schema.items as JsonSchema;
+    for (let i = 0; i < next.length; i++) next[i] = coerce(next[i], items);
+  }
+  return next;
+}
