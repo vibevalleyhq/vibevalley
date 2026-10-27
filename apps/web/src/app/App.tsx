@@ -10,7 +10,7 @@ import { AgentsRoute } from "../features/agent/AgentsPage";
 import { CatalogPage } from "../pages/catalog/CatalogPage";
 import { DocsPage } from "../pages/docs/DocsPage";
 import { IssuesPage } from "../features/issue/IssuesPage";
-import { OrchestratorPage } from "../pages/orchestrator/OrchestratorPage";
+import { OrchestratorPage } from "../features/orchestrator/OrchestratorPage";
 import { PairPage } from "../pages/pair/PairPage";
 import { ProjectsPage } from "../pages/projects/ProjectsPage";
 import { RuntimesPage } from "../pages/runtimes/RuntimesPage";

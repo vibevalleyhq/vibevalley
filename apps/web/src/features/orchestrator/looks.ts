@@ -1,4 +1,4 @@
-import { farmWording } from "../words";
+import { farmWording } from "../../farm/words";
 // The orchestrator's looks and the pets the owner can pick (data/prefs.ts keeps the choice), and their sprites.
 
 /** The orchestrator's looks: sprite orchestrator-<id>, the plain one is farmer. */

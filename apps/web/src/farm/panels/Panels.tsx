@@ -6,7 +6,7 @@ import { farmWording } from "../words";
 import { For, Match, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { farm, type FarmOverlay, type FarmPanel } from "../store";
-import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../kit/looks";
+import { lookReady, orchestratorLooks, orchestratorSprite, petName } from "../../features/orchestrator/looks";
 import { aria, Keyed } from "../../base/util";
 import { useCore } from "../../base/frame";
 import { FarmDialog, type FarmDialogSize, SpriteIcon } from "../../ui/pixel";

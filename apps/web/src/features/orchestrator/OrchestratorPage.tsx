@@ -5,14 +5,14 @@ import { pagesWording } from "../../base/words/pages";
 import { For, Match, Switch } from "solid-js";
 import { orchestratorAgent } from "@vibevalley/protocol";
 import { api } from "../../base/api";
-import { orchestratorLooks } from "../../farm/kit/looks";
+import { orchestratorLooks } from "./looks";
 import { A } from "../../ui/A";
 import { useRouter } from "../../base/router";
 import { aria } from "../../base/util";
 import { OrchestratorFace } from "../../ui/Face";
-import { ArchivePanel, OrchestratorMemoryPanel } from "../../features/memory/Memory";
-import { VoiceForm } from "../settings/VoiceForm";
-import { TrajectoryLog } from "../../features/session/Trajectory";
+import { ArchivePanel, OrchestratorMemoryPanel } from "../memory/Memory";
+import { VoiceForm } from "../../pages/settings/VoiceForm";
+import { TrajectoryLog } from "../session/Trajectory";
 import { usePrefs } from "../../base/prefs";
 
 const tabs = [

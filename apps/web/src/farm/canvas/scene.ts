@@ -25,7 +25,7 @@ import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from "pixi.js
 import { castPrefix } from "../../ui/cast";
 import { playSound } from "../../ui/pixel/sound";
 import { clock, farmState } from "../store";
-import { orchestratorLooks, orchestratorSprite } from "../kit/looks";
+import { orchestratorLooks, orchestratorSprite } from "../../features/orchestrator/looks";
 import { frameVillage } from "../world/framing";
 import { villageHitAt, type VillageHit } from "../world/hits";
 import type { Box, Point } from "../world/level";
