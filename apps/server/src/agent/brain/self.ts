@@ -3,8 +3,8 @@
 import type { Tool } from "../loop/agent.ts";
 import { archiveFiles, remember, rewriteMemory, searchArchive } from "./memory.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
-import { schemaTool } from "./tool.ts";
-import { Schema } from "effect";
+import { schemaEffectTool, schemaTool } from "./tool.ts";
+import { Effect, Schema } from "effect";
 
 export interface SelfOptions {
   readonly home: string;
@@ -56,18 +56,16 @@ export function selfTools(o: SelfOptions): Tool[] {
   return [loadSkill, ...(o.memory ? [rememberTool, rewrite] : []), search];
 }
 
-export type Subagent = (brief: string, label: string, signal: AbortSignal) => Promise<string>;
+/** Interrupting it calls the subagent back. */
+export type Subagent = (brief: string, label: string) => Effect.Effect<string, Error>;
 
 export const subagentTool = (spawn: Subagent) =>
-  schemaTool({
+  schemaEffectTool({
     name: "spawn_agent",
     description:
       "派一个帮手去做一件独立的事（查资料、读一片代码、改一个模块、跑一组检查），它做完把结果汇报给你。它看不到你们的对话：brief 里写清楚要做什么、在哪、做到什么程度算完、汇报什么。几件互不相干的事可以在同一步里派几个，它们会同时做。",
     parameters: Schema.Struct({ brief: Schema.String, label: Schema.optionalKey(Schema.String) }),
-    run: (p, tc) => {
-      if (!p.brief?.trim()) throw new Error("brief 是空的。");
-      return spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join(""), tc.signal);
-    },
+    run: (p) => (p.brief.trim() ? spawn(p.brief, p.label ?? [...p.brief].slice(0, 20).join("")) : Effect.fail(new Error("brief 是空的。"))),
   });
 
 export const subagentInstructions = (parent: string) =>

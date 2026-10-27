@@ -1,19 +1,19 @@
 import { type AssistantMessage, type TextContent, type ToolCall, type Usage, zeroUsage } from "../../ai/messages.ts";
 import { type Answer, answer, assistantMessage, text, toolCall } from "../../ai/testing.ts";
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
-import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
+import { type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./agent.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
-import { AgentTaskRunner } from "./agentTaskTools.ts";
+import { makeTaskRunner } from "./agentTaskTools.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
 import { textTool } from "./tool.ts";
 import { objectSchema } from "../../ai/tools.ts";
 import { wallTime } from "../../base/time.ts";
-import { plainLog } from "../../base/log.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -47,9 +47,7 @@ const echo = textTool<object>({
 async function receiptAgent(steps: readonly Step[], extra: Partial<BrainOptions> = {}) {
   const { llm } = scriptedLLM(steps);
   const dir = home();
-  const agent = await Brain.start({
-    time: wallTime,
-    log: plainLog,
+  const agent = await openBrain(standaloneOwner(), {
     name: "receipt",
     instructions: "",
     llm,
@@ -134,7 +132,7 @@ describe("a run's receipt", () => {
     );
     const answer = agent.ask(userMessage("A", wallTime.now()));
     await until(() => entered);
-    agent.later(userMessage("B", wallTime.now()));
+    await agent.later(userMessage("B", wallTime.now()));
     release();
     expect(await answer).toBe("");
     await until(() => receipts.length === 1);
@@ -158,9 +156,7 @@ describe("a run's receipt", () => {
   it("keeps an answer cut off by closing, with what it used", async () => {
     const { llm } = scriptedLLM([billed("partial", 7, 3, 2, { hangAfter: 7 })]);
     const dir = home();
-    const agent = await Brain.start({
-      time: wallTime,
-      log: plainLog,
+    const agent = await openBrain(standaloneOwner(), {
       name: "partial",
       instructions: "",
       llm,
@@ -174,7 +170,7 @@ describe("a run's receipt", () => {
     });
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
-    agent.send(userMessage("start", wallTime.now()));
+    void agent.send(userMessage("start", wallTime.now()));
     await until(() => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"));
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
@@ -261,7 +257,7 @@ describe("the agent's own tasks", () => {
       async (r) => {
         await r.ask("查三样");
         await until(() => sent.length === 3 && told === 3);
-        expect(await store.load()).toEqual([]);
+        expect(await Effect.runPromise(store.load)).toEqual([]);
       },
       { tasks: store, reminders: false },
     );
@@ -293,7 +289,7 @@ describe("the agent's own tasks", () => {
         expect(await r.ask("查")).toBe("派好了");
         await until(() => started);
         await r.agent.stop();
-        const g = await store.load();
+        const g = await Effect.runPromise(store.load);
         expect(g[0]).toMatchObject({ state: "waiting" });
         expect(g[0]!.tries ?? 0).toBe(0);
       },
@@ -342,9 +338,16 @@ describe("the agent's own tasks", () => {
 
   it("carries the open graph into a fold's summary", async () => {
     const store = memoryStore();
-    const runner = new AgentTaskRunner(store, undefined, new AbortController().signal, () => {}, plainLog);
-    expect(await runner.summary()).toBe("");
-    await store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
-    expect(await runner.summary()).toBe("【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读");
+    const summaries = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const runner = yield* makeTaskRunner(store, undefined, () => Effect.void);
+          const before = yield* runner.summary;
+          yield* store.change((g) => engine.add(g, [{ id: "a", brief: "读" }])[0]);
+          return [before, yield* runner.summary];
+        }),
+      ),
+    );
+    expect(summaries).toEqual(["", "【整理对话时的任务，以 tasks 为准】\n任务（1 件，1 件可以做）：\n- [可以做] a 读"]);
   });
 });

@@ -1,11 +1,7 @@
-// The farm's Llm on the command line and in the live evals: a fetch of its own, run to Promises here.
+// The command line and the live evals have no farm to give the Llm its HttpClient: it gets a fetch of its own.
 
 import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
-import type { LlmOn } from "../agent/brain/config.ts";
-import { make } from "../ai/llm.ts";
+import { type LlmShape, make } from "../ai/llm.ts";
 
-export const standaloneLlm = (): LlmOn => ({
-  service: Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer))),
-  run: (effect, options) => Effect.runPromise(effect, options),
-});
+export const standaloneLlm = (): LlmShape => Effect.runSync(make.pipe(Effect.provide(FetchHttpClient.layer)));

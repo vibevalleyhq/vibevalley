@@ -36,7 +36,7 @@ vp run package:mac       # apps/desktop/dist：VibeValley.app（mac-arm64/）和
 - `vp run desktop:test`：Playwright 起整个 Electron 应用。
 - `vp run docs:verify`：Note、skill、链接和旧名字。
 
-测试从不连真的模型：服务端用 pi-ai 的假模型，帮工用 oar 的测试 runtime。管家的真模型评测（`vp run --filter vibevalley-server evals`）要 DeepSeek 的钥匙、花钱，先问主人。
+测试从不连真的模型：服务端用照脚本回答的模型（`ai/testing.ts`），帮工用 oar 的测试 runtime。管家的真模型评测（`vp run --filter vibevalley-server evals`）要 DeepSeek 的钥匙、花钱，先问主人。
 
 ## 分支、提交和 PR
 

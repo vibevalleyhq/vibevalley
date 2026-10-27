@@ -1,4 +1,4 @@
-// Time for the code that lives outside Effect (the brain, the connectors, the journal, a call's host): read and waited
+// Time for the code that lives outside Effect (the connectors, the journal, a call's host): read and waited
 // on the Clock of the service that made it, so that a test's TestClock moves it as it moves the services.
 // The one file in apps/server/src that may touch the wall clock (vibevalley/no-wall-clock): wallTime below.
 

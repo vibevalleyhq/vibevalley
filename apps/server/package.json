@@ -12,7 +12,6 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "catalog:",
     "@botiverse/oar": "catalog:",
-    "@earendil-works/pi-agent-core": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
     "@effect/platform-node": "catalog:",
     "@effect/sql-pglite": "catalog:",

@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { helperInstructions, vibevalleyRuntimeOf } from "./runtime.ts";
 import { answer, text as words, toolCall } from "../../ai/testing.ts";
+import { standaloneOwner } from "./agent.ts";
 import { lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until } from "./testing.ts";
 import { wallTime } from "../../base/time.ts";
-import { plainLog } from "../../base/log.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -35,7 +35,7 @@ async function open(steps: readonly Step[], extra: { resume?: string; home?: str
   const { llm, requests, pending } = scriptedLLM(steps);
   const h = extra.home ?? home();
   const cwd = extra.cwd ?? home();
-  const runtime = vibevalleyRuntimeOf({ time: wallTime, log: plainLog, home: () => h, llm: () => llm });
+  const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), home: () => h, llm: () => llm });
   const session = await runtime.session(
     { via: "bundled" },
     {
@@ -157,14 +157,14 @@ rl.on('line', (line) => {
 
   it("lists DeepSeek's models, is bundled, and says why it cannot run", async () => {
     const { llm } = scriptedLLM();
-    const runtime = vibevalleyRuntimeOf({ time: wallTime, log: plainLog, llm: () => llm });
+    const runtime = vibevalleyRuntimeOf({ time: wallTime, owner: standaloneOwner(), llm: () => llm });
     const models = await runtime.listModels();
     expect(models.kind === "ok" && models.models.some((m) => m.id === "deepseek-flash" && m.effortLevels?.join(",") === "high,max" && m.default)).toBe(true);
     expect(await runtime.installation()).toEqual({ kind: "available", via: "bundled" });
     await expect(runtime.session({ via: "bundled" }, { cwd: tmpdir(), effort: "low" })).rejects.toThrow(/只有 high、max/);
     const keyless = vibevalleyRuntimeOf({
       time: wallTime,
-      log: plainLog,
+      owner: standaloneOwner(),
       llm: () => {
         throw new Error("没有 DeepSeek 的密钥");
       },

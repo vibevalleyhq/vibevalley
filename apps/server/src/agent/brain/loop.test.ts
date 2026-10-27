@@ -103,10 +103,10 @@ describe("a run's turns", () => {
       home(),
       [answer([toolCall("nap", {})]), answer("一"), answer("二")],
       async (r) => {
-        r.agent.send(userMessage("开始", wallTime.now()));
+        await r.agent.send(userMessage("开始", wallTime.now()));
         await until(() => napping);
-        r.agent.send(userMessage("甲", wallTime.now()));
-        r.agent.send(userMessage("乙", wallTime.now()));
+        await r.agent.send(userMessage("甲", wallTime.now()));
+        await r.agent.send(userMessage("乙", wallTime.now()));
         wake.open();
         await until(() => r.agent.history().length >= 7);
         expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "assistant:一", "user:乙", "assistant:二"]);
@@ -133,7 +133,7 @@ describe("a run's turns", () => {
       home(),
       [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],
       async (r) => {
-        r.agent.send(userMessage("一起", wallTime.now()));
+        await r.agent.send(userMessage("一起", wallTime.now()));
         await until(() => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"));
         slowDone.open();
         await until(() => r.has("agent_settled"));

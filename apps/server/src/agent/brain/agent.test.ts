@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { it as effectIt } from "@effect/vitest";
-import { Effect, Exit, FiberSet, Scope, Stream } from "effect";
+import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { resumedUnknown, sessionUnfinished } from "./agent.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
@@ -13,7 +13,7 @@ import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type 
 import { stopped, textTool } from "./tool.ts";
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "../../ai/testing.ts";
 import { objectSchema } from "../../ai/tools.ts";
-import { timeHere, wallTime } from "../../base/time.ts";
+import { wallTime } from "../../base/time.ts";
 import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
 
 const homes: (() => void)[] = [];
@@ -39,14 +39,33 @@ const settled = (r: Rig) => r.events.find((e) => e.type === "agent_settled") as 
 const repeat = <A>(n: number, a: A) => Array.from({ length: n }, () => a);
 
 describe("the agent", () => {
-  it("does not start an ask for an already aborted signal", async () => {
+  it("stops waiting for an ask that is interrupted, and goes on with the run", async () => {
     const dir = home();
-    await withAgent(dir, [], async (r) => {
-      const ended = new AbortController();
-      ended.abort();
-      await expect(r.agent.ask(userMessage("不该开始", wallTime.now()), ended.signal)).rejects.toThrow("aborted");
-      expect(r.requests).toHaveLength(0);
+    const wake = gate();
+    let napping = false;
+    const nap = textTool<object>({
+      name: "nap",
+      description: "睡一会",
+      parameters: objectSchema(),
+      run: async () => {
+        napping = true;
+        await wake.opened;
+        return "醒了";
+      },
     });
+    await withAgent(
+      dir,
+      [answer([toolCall("nap", {})]), answer("睡好了")],
+      async (r) => {
+        const asking = Effect.runFork(r.agent.brain.ask(userMessage("睡", wallTime.now())));
+        await until(() => napping);
+        await Effect.runPromise(Fiber.interrupt(asking));
+        wake.open();
+        await until(() => r.has("agent_settled"));
+        expect(messageText(r.agent.history().at(-1)!)).toBe("睡好了");
+      },
+      { tools: [nap] },
+    );
   });
 
   it("shares the actual close with every concurrent caller", async () => {
@@ -62,7 +81,7 @@ describe("the agent", () => {
       dir,
       [],
       async (r) => {
-        r.agent.send(userMessage("说", wallTime.now()));
+        await r.agent.send(userMessage("说", wallTime.now()));
         await until(() => r.has("message_end"));
         try {
           const first = r.agent.close();
@@ -86,38 +105,31 @@ describe("the agent", () => {
     );
   });
 
-  effectIt.effect("cuts off a run under way when its owner's fibers end", () =>
-    Effect.gen(function* () {
-      let [started, cut] = [false, false];
-      const owner = yield* Scope.make();
-      const { llm } = scriptedLLM();
-      const asked = Effect.onInterrupt(
-        Effect.andThen(
-          Effect.sync(() => (started = true)),
-          Effect.never,
-        ),
-        () => Effect.sync(() => (cut = true)),
-      );
-      const held = {
-        ...llm,
-        run: yield* Scope.provide(FiberSet.makeRuntimePromise<never>(), owner),
-        service: { ...llm.service, stream: () => Stream.fromEffect(asked) },
-      };
-      yield* Effect.promise(() =>
-        withAgent(
-          home(),
-          [],
-          async (r) => {
-            r.agent.send(userMessage("说", wallTime.now()));
-            await until(() => started);
-            await Effect.runPromise(Scope.close(owner, Exit.void));
-            await until(() => cut);
-          },
-          { llm: held },
-        ),
-      );
-    }),
-  );
+  it("cuts off a run under way when its owner's scope closes", async () => {
+    let [started, cut] = [false, false];
+    const owner = Scope.makeUnsafe();
+    const { llm } = scriptedLLM();
+    const asked = Effect.onInterrupt(
+      Effect.andThen(
+        Effect.sync(() => (started = true)),
+        Effect.never,
+      ),
+      () => Effect.sync(() => (cut = true)),
+    );
+    const held = { ...llm, service: { ...llm.service, stream: () => Stream.fromEffect(asked) } };
+    await withAgent(
+      home(),
+      [],
+      async (r) => {
+        void r.agent.send(userMessage("说", wallTime.now()));
+        await until(() => started);
+        await Effect.runPromise(Scope.close(owner, Exit.void));
+        await until(() => cut);
+      },
+      { llm: held },
+      { run: (effect) => Effect.runPromise(effect), scope: owner },
+    );
+  });
 
   it("runs a tool and gives its result back", async () => {
     const dir = home();
@@ -185,10 +197,10 @@ describe("the agent", () => {
       dir,
       [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
       async (r) => {
-        r.agent.send(userMessage("开始", wallTime.now()));
+        await r.agent.send(userMessage("开始", wallTime.now()));
         await until(() => napping);
-        r.agent.later(userMessage("完了再说这个", wallTime.now()));
-        r.agent.send(userMessage("顺便", wallTime.now()));
+        await r.agent.later(userMessage("完了再说这个", wallTime.now()));
+        await r.agent.send(userMessage("顺便", wallTime.now()));
         wake.open();
         await until(() => r.agent.history().length >= 7);
         expect(said(r.agent.history())).toEqual([
@@ -320,12 +332,11 @@ describe("the agent", () => {
     expect(JSON.parse(readFileSync(join(dir, "reminders.json"), "utf8"))).toEqual([]);
   });
 
-  // On the brain's Time (base/time.ts): an hour and its 20 s ticks are moved through, not waited for.
   effectIt.effect("is woken when a reminder comes due an hour later, at the next 20 s tick, not before", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-03-01T08:00:00.000Z"));
-      const time = yield* timeHere;
       const move = Effect.runPromiseWith(yield* Effect.context<never>());
+      const scope = yield* Effect.scope;
       const dir = home();
       writeFileSync(
         join(dir, "reminders.json"),
@@ -342,7 +353,8 @@ describe("the agent", () => {
             await until(() => r.has("agent_settled"));
             expect(messageText(r.agent.history()[1]!)).toBe("收到：【提醒「早报」到点了（reminder-1）】\n汇总昨天的进展");
           },
-          { time },
+          {},
+          { run: move, scope },
         ),
       );
     }),
@@ -395,7 +407,7 @@ describe("the agent", () => {
       dir,
       [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })],
       async (r) => {
-        r.agent.send(userMessage("说", wallTime.now()));
+        await r.agent.send(userMessage("说", wallTime.now()));
         await until(() => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"));
         await r.agent.stop();
         await until(() => r.has("agent_settled"));
@@ -409,7 +421,7 @@ describe("the agent", () => {
   it("is stopped while a tool runs", async () => {
     const dir = home();
     await withAgent(dir, [answer([toolCall("bash", { command: "sleep 5" })])], async (r) => {
-      r.agent.send(userMessage("睡", wallTime.now()));
+      await r.agent.send(userMessage("睡", wallTime.now()));
       await until(() => r.has("tool_execution_start"));
       await r.agent.stop();
       await until(() => r.has("agent_settled"));
@@ -586,7 +598,7 @@ describe("the agent", () => {
         writeFileSync(file, lines.map((m) => JSON.stringify(m)).join("\n") + "\n");
         expect(sessionUnfinished(file)).toBe(isUnfinished);
         await withAgent(dir, [step((c) => answer(JSON.stringify(results(c))))], async (r) => {
-          expect(r.agent.resume(30 * 60_000)).toBe(resumed);
+          expect(await r.agent.resume(30 * 60_000)).toBe(resumed);
           if (!resumed) {
             // Not resumed: nothing was started to wait for.
             expect(r.requests.length).toBe(0);

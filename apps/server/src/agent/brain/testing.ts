@@ -4,12 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Message } from "../../ai/messages.ts";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "../../ai/testing.ts";
-import { Brain, type BrainEvent, type BrainOptions } from "./agent.ts";
+import { type BrainEvent, type BrainHandle, type BrainOptions, type BrainOwner, openBrain, standaloneOwner } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import type { LLM } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
 import { wallTime } from "../../base/time.ts";
-import { plainLog } from "../../base/log.ts";
 
 export type { Reply, Request, Step };
 
@@ -23,10 +22,9 @@ export const results = (r: { messages: readonly Message[] }) =>
   r.messages.flatMap((m) => (m.role === "toolResult" ? [{ failed: m.isError, text: messageText(m) }] : []));
 export const answered = (r: { messages: readonly Message[] }) => r.messages.at(-1)?.role === "toolResult";
 
-/** The brain's model on a script; its runs are on fibers of their own. */
 export function scriptedLLM(steps: readonly Step[] = []) {
   const script = Effect.runSync(scriptedLlm(steps));
-  const llm: LLM = { model: testModel, service: script.llm, run: (effect, options) => Effect.runPromise(effect, options), apiKey: () => "k" };
+  const llm: LLM = { model: testModel, service: script.llm, apiKey: () => "k" };
   return {
     llm,
     requests: script.requests,
@@ -49,7 +47,7 @@ export async function until(f: () => boolean, ms = 5_000) {
 }
 
 export interface Rig {
-  readonly agent: Brain;
+  readonly agent: BrainHandle;
   readonly events: BrainEvent[];
   readonly requests: Request[];
   readonly script: Pick<ReturnType<typeof scriptedLLM>, "append" | "pending">;
@@ -57,11 +55,16 @@ export interface Rig {
   readonly ask: (text: string) => Promise<string>;
 }
 
-export async function withAgent(dir: string, steps: readonly Step[], body: (r: Rig) => Promise<void>, extra: Partial<BrainOptions> = {}) {
+/** owner: a test on its TestClock gives one that runs on the test's fibers. */
+export async function withAgent(
+  dir: string,
+  steps: readonly Step[],
+  body: (r: Rig) => Promise<void>,
+  extra: Partial<BrainOptions> = {},
+  owner: BrainOwner = standaloneOwner(),
+) {
   const { llm, requests, append, pending } = scriptedLLM(steps);
-  const agent = await Brain.start({
-    time: wallTime,
-    log: plainLog,
+  const agent = await openBrain(owner, {
     name: "test",
     instructions: "你是测试用的助手。",
     llm,

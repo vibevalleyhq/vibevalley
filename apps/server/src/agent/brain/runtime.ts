@@ -9,12 +9,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { models, type ThinkingLevel } from "../../ai/models.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
-import { Brain, type BrainEvent } from "./agent.ts";
+import { type BrainEvent, type BrainOwner, openBrain } from "./agent.ts";
 import { codingTools } from "./coding.ts";
 import { defaultModel, type LLM, type McpServer } from "./config.ts";
 import { messageText, userMessage } from "./messages.ts";
 import type { Time } from "../../base/time.ts";
-import type { CallbackLog } from "../../base/log.ts";
 
 export const vibevalleyRuntime = "vibevalley";
 
@@ -36,8 +35,8 @@ export interface RuntimeOptions {
   readonly tasks?: (session: string) => AgentTaskStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */
   readonly time: Time;
-  /** The sessions' logger: the Runtimes service's, or plainLog on the command line. */
-  readonly log: CallbackLog;
+  /** Where the sessions' brains run: the Runtimes service's fibers and scope, or standaloneOwner on the command line. */
+  readonly owner: BrainOwner;
 }
 
 const defaultHome = () => process.env.VIBEVALLEY_HOME || join(homedir(), ".vibevalley");
@@ -65,9 +64,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const kernel = createSessionKernel(o.resume);
     const instructions = o.systemPrompt ?? [helperInstructions(), ...(o.appendSystemPrompt ? [o.appendSystemPrompt] : [])].join("\n\n");
     const tasks = options.tasks?.(kernel.sessionId);
-    const agent = await Brain.start({
-      time: options.time,
-      log: options.log,
+    const agent = await openBrain(options.owner, {
       name: "helper",
       instructions,
       llm,
@@ -88,7 +85,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
     const frame = (type: string, native: unknown, events: Parameters<typeof kernel.frame>[0]["events"] = []) => kernel.frame({ type, native, events });
     const begin = (input: string) => {
       active = true;
-      agent.send(userMessage(input, options.time.now()));
+      void agent.send(userMessage(input, options.time.now()));
     };
     const end = (outcome: TurnOutcome) => {
       if (!active) return;
@@ -192,7 +189,7 @@ export function vibevalleyRuntimeOf(options: RuntimeOptions) {
           if (!active) return { kind: "rejected", code: "no_active_turn", reason: "no active turn" };
           const refused = inputImagesRefusal(capabilities, inputOptions?.images);
           if (refused !== null) return refused;
-          agent.send(userMessage(input, options.time.now()));
+          void agent.send(userMessage(input, options.time.now()));
           return { kind: "accepted" };
         }),
       queue: (input, inputOptions) =>

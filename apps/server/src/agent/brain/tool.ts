@@ -65,3 +65,16 @@ export function schemaTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: 
   const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
   return textTool<unknown>({ ...spec, parameters: parametersOf(spec.parameters), run: (p, tc) => spec.run(read(p), tc) });
 }
+
+export interface SchemaEffectToolSpec<S extends Schema.Struct<Schema.Struct.Fields>> extends Omit<EffectToolSpec<S["Type"]>, "parameters"> {
+  readonly parameters: S;
+}
+
+export function schemaEffectTool<S extends Schema.Struct<Schema.Struct.Fields>>(spec: SchemaEffectToolSpec<S>): Tool {
+  const read = Schema.decodeUnknownSync(spec.parameters as unknown as Schema.Codec<S["Type"]>);
+  return effectTool<unknown>({
+    ...spec,
+    parameters: parametersOf(spec.parameters),
+    run: (p) => Effect.flatMap(Effect.try({ try: () => read(p), catch: asError }), spec.run),
+  });
+}
