@@ -1,6 +1,7 @@
 // The orchestrator's evals on the real model, and so never in the default run: VIBEVALLEY_EVALS_LIVE=1 with DEEPSEEK_API_KEY
 // (vp run evals in apps/server), and it costs money. Each case is sampled VIBEVALLEY_EVAL_N times (5) and passes when all but one of them
-// do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model.
+// do; VIBEVALLEY_EVALS adds a folder of cases (a home's orchestrator/evals), VIBEVALLEY_EVAL_MODEL another model, and
+// VIBEVALLEY_EVAL_ONLY (names, comma-separated) replays only those cases: after a prompt is mended for one, only it is paid for.
 
 import { standaloneLlm } from "../cli/llm.ts";
 import type { Tool } from "../agent/loop/agent.ts";
@@ -102,7 +103,11 @@ describe.skipIf(!live || !key)("the orchestrator's evals, live", () => {
     const n = Number(process.env.VIBEVALLEY_EVAL_N || 5);
     expect(Number.isInteger(n) && n >= 1).toBe(true);
     const need = Math.max(n - 1, 1);
-    const cases = [...casesIn(committed), ...(process.env.VIBEVALLEY_EVALS ? casesIn(process.env.VIBEVALLEY_EVALS) : [])];
+    const only = (process.env.VIBEVALLEY_EVAL_ONLY ?? "").split(",").filter(Boolean);
+    const cases = [...casesIn(committed), ...(process.env.VIBEVALLEY_EVALS ? casesIn(process.env.VIBEVALLEY_EVALS) : [])].filter(
+      ({ file }) => only.length === 0 || only.some((o) => basename(file).startsWith(o)),
+    );
+    expect(cases.length).toBeGreaterThan(0);
     const tools = await orchestratorTools();
     const rows = ["| case | model | passed | tokens |", "|---|---|---|---|"];
     const short: string[] = [];
