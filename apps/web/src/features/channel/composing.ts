@@ -3,7 +3,7 @@
 // someone from a menu that follows the caret. A failed send keeps the draft and its key, so a retry is the same message,
 // not a second one. A window only draws it and says where a line goes and how a failure shows.
 
-import { createMemo, createSignal, onSettled } from "solid-js";
+import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type WorkspaceState } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./rules";
@@ -93,10 +93,11 @@ export function createComposer(core: () => WorkspaceState | undefined, input: ()
     if (!t) return;
     const next = insertName(text(), caret(), t.start, n.token);
     edit(next.text, next.caret);
-    requestAnimationFrame(() => {
-      input()?.focus();
-      input()?.setSelectionRange(next.caret, next.caret);
-    });
+    // The box's new value is written now, not a frame later: a key typed in between would land where the old caret
+    // was, and the caret put back after it.
+    flush();
+    input()?.focus();
+    input()?.setSelectionRange(next.caret, next.caret);
   };
 
   // A line that is a command runs it: the box empties once it went through, and keeps the line when it did not.
