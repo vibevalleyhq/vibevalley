@@ -10,7 +10,7 @@
     "name": "The own agent's name (its home is ~/.vibevalley/agent/<name>)",
     "ownModel": "The model; the configuration's when empty",
     "mcp": "The MCP configuration file; mcp.json in the home when empty",
-    "server": "The server's address; VIBEVALLEY_SERVER when empty, else {fallback}",
+    "server": "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
     "dryRun": "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
     "json": "The request body: JSON text, - to read stdin, @file to read a file",
     "watch": "Keep watching: one JSON line per frame"

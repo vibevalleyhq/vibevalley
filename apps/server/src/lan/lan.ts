@@ -16,6 +16,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import {
+  artifactPrefix,
   attachmentPath,
   eventsPath,
   type LanDevice,
@@ -126,7 +127,8 @@ const remote = new Set([
   ...[statePath, eventsPath, livePath].map((path) => "GET " + path),
 ]);
 
-export const remoteMay = (method: string, path: string) => remote.has(method + " " + path) || (method === "GET" && path.startsWith(attachmentPath("")));
+export const remoteMay = (method: string, path: string) =>
+  remote.has(method + " " + path) || (method === "GET" && (path.startsWith(attachmentPath("")) || path.startsWith(artifactPrefix)));
 
 export interface LanOptions {
   readonly address?: () => string;

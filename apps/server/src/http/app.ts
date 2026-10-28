@@ -17,12 +17,14 @@ import { subscriptions } from "./rpc.ts";
 import { mossLine } from "./moss.ts";
 import { streams } from "./streams.ts";
 import { attachments } from "./attachment.ts";
+import { artifactContent } from "./artifact.ts";
 
 const routes = (config: Config) =>
   Layer.mergeAll(
     Layer.unwrap(Effect.map(handlers, (h) => api(h))),
     streams,
     attachments,
+    artifactContent,
     subscriptions,
     mossLine,
     mcpRoute,

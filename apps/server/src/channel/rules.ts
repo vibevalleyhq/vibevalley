@@ -204,6 +204,8 @@ export interface InboxMessage {
   readonly deleted?: boolean;
   /** Files said with it, where they are on this computer. */
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
+  /** The artifact it announces (artifact/): what to read it by. */
+  readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
 }
 
 export type SearchHas = "file" | "image" | "link";

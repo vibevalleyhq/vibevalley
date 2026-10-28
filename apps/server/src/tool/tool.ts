@@ -1,9 +1,20 @@
 import { maybe, t } from "@vibevalley/i18n";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { resolve, sep } from "node:path";
 // The tools agents call, defined once: the orchestrator gets them in process, a session over /mcp. A
 // tool's rule lives in the service that owns it; a tool reads its arguments, says who is calling, and words the answer.
 // Every tool answers in a sentence, a refusal included: the model acts on it.
 
-import { type Agent, DeliverableValues, type Issue, IssueStatusValues, defaultOrchestrator, type CronWhen, type TaskEdit } from "@vibevalley/protocol";
+import {
+  type Agent,
+  artifactMax,
+  DeliverableValues,
+  type Issue,
+  IssueStatusValues,
+  defaultOrchestrator,
+  type CronWhen,
+  type TaskEdit,
+} from "@vibevalley/protocol";
 import { closedText, phaseText, shortTitle } from "@vibevalley/protocol/rules";
 import { openFindings } from "../issue/state.ts";
 import { isOpen, maxTasks } from "../task/graph.ts";
@@ -12,13 +23,14 @@ import { graphText } from "../task/prompts.ts";
 import { inboxLines } from "../channel/prompts.ts";
 import { Clock, Context, Data, Effect, Layer, Schema } from "effect";
 import { Agents } from "../agent/agent.ts";
+import { Artifacts } from "../artifact/artifact.ts";
 import type { Actor } from "../base/actor.ts";
 import { effectTool } from "@vibevalley/agent/core/tool";
 import type { Tool } from "@vibevalley/agent/core/loop";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { Channels, type Info, type Spoken } from "../channel/chat.ts";
 import { Docs } from "../doc/doc.ts";
-import { type ApiError, reasonOf } from "../errors.ts";
+import { type ApiError, reasonOf, refused } from "../errors.ts";
 import { Issues } from "../issue/issue.ts";
 import { foundText, Memories, type SearchQuery } from "../memory/memory.ts";
 import { Projects } from "../project/project.ts";
@@ -133,6 +145,7 @@ export const make = Effect.gen(function* () {
   const cron = yield* Crons;
   const issue = yield* Issues;
   const tasks = yield* Tasks;
+  const artifacts = yield* Artifacts;
 
   /** An answer, or "没成：" and why. */
   const answered = <E>(e: Effect.Effect<string, E>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(said(err))));
@@ -378,6 +391,158 @@ export const make = Effect.gen(function* () {
             Effect.catch((e) => Effect.succeed(answers.tell.failed(said(e)))),
           );
         });
+      }),
+    );
+
+  // Artifacts (artifact/): the orchestrator's and a session's take the same endpoints; a session's are made for its issue
+  // and announced in its issue thread, the orchestrator's where it is answering.
+  const artifactSaid = (e: Effect.Effect<string, ApiError>) => Effect.catch(e, (err) => Effect.succeed(answers.failed(reasonOf(err))));
+
+  /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved
+   * with its links, so neither .. nor a link leads out of the directory. */
+  const artifactWords = (c: Caller, content: string | undefined, file: string | undefined) =>
+    Effect.gen(function* () {
+      if (content !== undefined && file !== undefined) return yield* Effect.fail(refused(answers.artifact.both));
+      if (content !== undefined) return content;
+      if (file === undefined || file.trim() === "") return yield* Effect.fail(refused(answers.artifact.noContent));
+      const cwd = c.session ? run.find(c.session)?.place.cwd : undefined;
+      if (!cwd) return yield* Effect.fail(refused(answers.artifact.noPlace));
+      return yield* Effect.tryPromise({
+        try: async () => {
+          const root = await realpath(cwd);
+          const full = await realpath(resolve(root, file)).catch(() => {
+            throw new Error(answers.artifact.notFile(file));
+          });
+          if (full !== root && !full.startsWith(root + sep)) throw new Error(answers.artifact.outside(file));
+          const info = await stat(full);
+          if (!info.isFile()) throw new Error(answers.artifact.notFile(file));
+          // Read whole only when it may be kept; a bigger one is refused by its size as artifact.create would.
+          if (info.size > artifactMax) return "x".repeat(artifactMax + 1);
+          return readFile(full, "utf8");
+        },
+        catch: (e) => refused(e instanceof Error ? e.message : String(e)),
+      });
+    });
+
+  const artifactList = (who: Who) =>
+    tool(
+      "artifact.list",
+      descriptions["artifact.list"],
+      Effect.fn("Tools.artifactList")(function* (p: Orchestrator<"artifact.list">) {
+        yield* callerOf(who);
+        let issueId: string | undefined;
+        if (p.issue) {
+          const item = yield* findIssue(p.issue);
+          if (typeof item === "string") return item;
+          issueId = item.id;
+        }
+        const channel = p.channel ? yield* Effect.result(chat.placeOf("", p.channel)) : undefined;
+        if (channel?._tag === "Failure") return answers.failed(reasonOf(channel.failure));
+        const all = yield* artifacts.list({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel: channel.success } : {}) });
+        return all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n");
+      }),
+    );
+  const sessionArtifactList = (who: Who) =>
+    sessionSchemaTool(
+      "artifact.list",
+      sessionDescriptions["artifact.list"],
+      Effect.fn("Tools.artifactList")(function* (p: Session<"artifact.list">) {
+        const c = yield* callerOf(who);
+        const own = run.sessionOf(c.session)?.issue;
+        const channel = p.channel ? yield* Effect.result(chat.placeOf(c.session, p.channel)) : undefined;
+        if (channel?._tag === "Failure") return answers.failed(reasonOf(channel.failure));
+        const all = yield* artifacts.list(channel ? { channel: channel.success } : own ? { issue: own } : {});
+        return all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n");
+      }),
+    );
+  const artifactGet = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)(
+      "artifact.get",
+      (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.get"],
+      Effect.fn("Tools.artifactGet")(function* (p: { readonly id: string }) {
+        yield* callerOf(who);
+        return yield* artifactSaid(Effect.map(artifacts.get(p.id.trim()), answers.artifact.detail));
+      }),
+    );
+  const artifactContent = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)(
+      "artifact.content.get",
+      (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.content.get"],
+      Effect.fn("Tools.artifactContent")(function* (p: { readonly id: string; readonly version?: number }) {
+        yield* callerOf(who);
+        return yield* artifactSaid(
+          Effect.flatMap(artifacts.get(p.id.trim()), (a) =>
+            Effect.map(artifacts.content(a.id, p.version), (c) => answers.artifact.content(a.title, c.version, c.content)),
+          ),
+        );
+      }),
+    );
+  const artifactCreate = (who: Who) =>
+    tool(
+      "artifact.create",
+      descriptions["artifact.create"],
+      Effect.fn("Tools.artifactCreate")(function* (p: Orchestrator<"artifact.create">) {
+        const c = yield* callerOf(who);
+        let issueId: string | undefined;
+        if (p.issue) {
+          const item = yield* findIssue(p.issue);
+          if (typeof item === "string") return item;
+          issueId = item.id;
+        }
+        return yield* artifactSaid(
+          Effect.gen(function* () {
+            const content = yield* artifactWords(c, p.content, undefined);
+            const made = yield* artifacts.create(
+              { from: c.agent, by: c.agent },
+              {
+                title: p.title,
+                kind: p.kind,
+                content,
+                ...(p.note ? { note: p.note } : {}),
+                channel: p.channel ?? c.here,
+                ...(issueId ? { issue: issueId } : {}),
+              },
+            );
+            return answers.artifact.made(made);
+          }),
+        );
+      }),
+    );
+  const sessionArtifactCreate = (who: Who) =>
+    sessionSchemaTool(
+      "artifact.create",
+      sessionDescriptions["artifact.create"],
+      Effect.fn("Tools.artifactCreate")(function* (p: Session<"artifact.create">) {
+        const c = yield* callerOf(who);
+        const own = run.sessionOf(c.session)?.issue;
+        return yield* artifactSaid(
+          Effect.gen(function* () {
+            const content = yield* artifactWords(c, p.content, p.file);
+            const made = yield* artifacts.create(
+              { from: c.session, by: c.agent },
+              { title: p.title, kind: p.kind, content, ...(p.note ? { note: p.note } : {}), ...(own ? { issue: own } : {}) },
+            );
+            return answers.artifact.made(made);
+          }),
+        );
+      }),
+    );
+  const artifactVersion = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)(
+      "artifact.version.create",
+      (table === "orchestrator" ? descriptions : sessionDescriptions)["artifact.version.create"],
+      Effect.fn("Tools.artifactVersion")(function* (p: { readonly id: string; readonly content?: string; readonly file?: string; readonly note?: string }) {
+        const c = yield* callerOf(who);
+        return yield* artifactSaid(
+          Effect.gen(function* () {
+            const content = yield* artifactWords(c, p.content, p.file);
+            const made = yield* artifacts.version(
+              { from: c.session || c.agent, by: c.agent },
+              { id: p.id.trim(), content, ...(p.note ? { note: p.note } : {}) },
+            );
+            return answers.artifact.versioned(made);
+          }),
+        );
       }),
     );
 
@@ -845,6 +1010,11 @@ export const make = Effect.gen(function* () {
       taskAct(who),
       memorySearch(who, true),
       memoryCreate(who, true),
+      artifactList(who),
+      artifactGet("orchestrator")(who),
+      artifactContent("orchestrator")(who),
+      artifactCreate(who),
+      artifactVersion("orchestrator")(who),
     ],
     session: (who) => [
       messageSend(who),
@@ -857,6 +1027,11 @@ export const make = Effect.gen(function* () {
       blockCreate(who),
       blockUpdate(who),
       issueSplit(who),
+      sessionArtifactList(who),
+      artifactGet("session")(who),
+      artifactContent("session")(who),
+      sessionArtifactCreate(who),
+      artifactVersion("session")(who),
     ],
     start: toolStart,
     sessionLine: (w) => sessionLine(w, clock.currentTimeMillisUnsafe(), numberOf(w)),

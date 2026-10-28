@@ -9,7 +9,8 @@ export function messageLine(m: InboxMessage): string {
   const head = `[target=${m.target} msg=${m.number}${m.replyTo !== undefined ? ` reply=${m.replyTo}` : ""} from=${from}]`;
   if (m.deleted) return head + " （这条已删除）";
   const files = (m.attachments ?? []).map((a) => `\n  │ [附件 ${a.name}：${a.path}]`).join("");
-  return `${head}${m.edited ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}`;
+  const made = m.artifact ? `\n  │ [产出「${m.artifact.title}」第 ${m.artifact.version} 版：id=${m.artifact.id}，原文用 artifact_content_get 读]` : "";
+  return `${head}${m.edited ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}`;
 }
 
 export const inboxLines = (messages: readonly InboxMessage[]) => messages.map(messageLine).join("\n");

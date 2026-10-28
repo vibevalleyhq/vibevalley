@@ -22,8 +22,13 @@ export const places: readonly Place[] = [
   { id: "settings", label: t("web.base.place.settings.label"), hint: t("web.base.place.settings.hint"), icon: "settings", path: "/settings" },
 ];
 
+/** Places the rail does not list: reached from what links to them (an artifact from its card). */
+export const unlisted: readonly Place[] = [
+  { id: "artifacts", label: t("web.artifact.place.label"), hint: t("web.artifact.place.hint"), icon: "web", path: "/artifacts" },
+];
+
 /** The place a path is in (/orchestrator is the agents' too); undefined for the farm. */
 export function placeOf(path: string): Place | undefined {
   if (path.startsWith("/orchestrator")) return places.find((p) => p.id === "agents");
-  return places.find((p) => path === p.path || path.startsWith(`${p.path}/`));
+  return [...places, ...unlisted].find((p) => path === p.path || path.startsWith(`${p.path}/`));
 }

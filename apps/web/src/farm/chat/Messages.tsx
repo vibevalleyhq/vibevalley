@@ -17,6 +17,8 @@ import { farmClock, readsLong } from "./text";
 import { AgentFace, OrchestratorFace, OwnerFace } from "../../ui/Face";
 import { useCore } from "../../base/frame";
 import { PxMarkdown, SpriteIcon } from "../../ui/pixel";
+import { A } from "../../ui/A";
+import { artifactHref } from "../../features/artifact";
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
 
@@ -325,6 +327,23 @@ export function ChatBubble(props: { m: ChatMessage; mine: boolean; first: boolea
             </div>
           )}
         </Show>
+      </Show>
+      <Show when={props.m.deleted === undefined ? props.m.artifact : undefined}>
+        {(card) => (
+          // Opened in the workbench: a page runs in a sandbox there, never in the farm's window.
+          <A
+            href={artifactHref(card().id, card().version)}
+            data-testid="artifact-card"
+            data-key={card().id}
+            data-version={card().version}
+            class="mt-1 flex items-center gap-2 border-2 border-bark-500 bg-cream-50 px-2 py-1 text-[12px] text-bark-900 hover:bg-cream-hover"
+          >
+            <SpriteIcon name="icon-deed" size={14} />
+            <span class="min-w-0 truncate">
+              {card().title} · {t("web.artifact.card.version", { version: card().version })}
+            </span>
+          </A>
+        )}
       </Show>
       <Show when={(props.m.reactions ?? []).length > 0}>
         <div class="mt-1 flex flex-wrap gap-1">
