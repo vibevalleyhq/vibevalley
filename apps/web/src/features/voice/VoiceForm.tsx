@@ -51,7 +51,7 @@ import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Segmented } from "../../ui/Segmented";
 import { Card, Quiet, SecretInput } from "../../ui/layout";
-import { IconLink } from "../../ui/IconButton";
+import { IconLink, OutLink } from "../../ui/IconButton";
 import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Hint } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
@@ -152,8 +152,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
     else next.delete(k);
     setCleared(next);
   };
-  const secret = (k: Key, label: string, current: () => KeyStatus) => (
-    <KeyField small label={label} status={current()} removing={cleared().has(k)} onRemove={remove(k)}>
+  const secret = (k: Key, label: string, current: () => KeyStatus, link?: { readonly href: string; readonly label: string }) => (
+    <KeyField small label={label} status={current()} removing={cleared().has(k)} onRemove={remove(k)} link={link}>
       <SecretInput
         aria-label={label}
         placeholder={t("web.base.form.keepEmpty")}
@@ -244,7 +244,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </div>
               <Card
                 title={t("web.voice.voice.credentials")}
-                action={<IconLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
+                action={<OutLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
                 class="max-w-4xl"
               >
                 <Cols>
@@ -385,34 +385,35 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               </Card>
             </Show>
             <Show when={props.view === "dictation"}>
-              <Card
-                title={t("web.voice.voice.dictation")}
-                action={
-                  dictation().via === "moss" ? (
-                    <IconLink href="https://platform.mosi.cn/" label={t("web.voice.voice.moss.console")} />
-                  ) : (
-                    <IconLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />
-                  )
-                }
-                class="max-w-4xl"
-              >
-                <Segmented
-                  label={t("web.voice.voice.dictationVia")}
-                  testid="dictation-via"
-                  value={dictation().via}
-                  options={[
-                    { value: "moss", label: "MOSS" },
-                    { value: "own", label: t("web.voice.voice.dictationOwn") },
-                  ]}
-                  onChange={(via) => setDictation({ ...dictation(), via })}
-                />
-                <p class="text-sm text-muted">{dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}</p>
+              {/* The page's title already says 听写: the card has none of its own. */}
+              <Card class="max-w-4xl">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <Segmented
+                    label={t("web.voice.voice.dictationVia")}
+                    testid="dictation-via"
+                    value={dictation().via}
+                    options={[
+                      { value: "moss", label: "MOSS" },
+                      { value: "own", label: t("web.voice.voice.dictationOwn") },
+                    ]}
+                    onChange={(via) => setDictation({ ...dictation(), via })}
+                  />
+                  <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+                    {dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}
+                    <Show when={dictation().via === "own"}>
+                      <OutLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />
+                    </Show>
+                  </p>
+                </div>
                 <Show
                   when={dictation().via === "own"}
                   fallback={
                     <Cols>
                       <div data-testid="dictation-moss-key" class="contents">
-                        {secret("mossKey", t("web.voice.voice.dictationMossKey"), () => base().mossKey)}
+                        {secret("mossKey", t("web.voice.voice.dictationMossKey"), () => base().mossKey, {
+                          href: "https://platform.mosi.cn/",
+                          label: t("web.voice.voice.moss.console"),
+                        })}
                       </div>
                     </Cols>
                   }
@@ -423,7 +424,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                         aria-label={t("web.voice.voice.dictationAddressLabel")}
                         data-testid="dictation-url"
                         class="font-mono"
-                        placeholder="http://127.0.0.1:8080/v1"
+                        placeholder={t("web.base.form.example", { value: "http://127.0.0.1:8080/v1" })}
                         value={dictation().url}
                         onInput={(e) => {
                           setDictation({ ...dictation(), url: e.currentTarget.value });
@@ -435,7 +436,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                         aria-label={t("web.voice.voice.dictationModelLabel")}
                         data-testid="dictation-model"
                         class="font-mono"
-                        placeholder="qwen3"
+                        placeholder={t("web.base.form.example", { value: "qwen3" })}
                         value={dictation().model}
                         onInput={(e) => {
                           setDictation({ ...dictation(), model: e.currentTarget.value });

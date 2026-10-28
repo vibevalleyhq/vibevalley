@@ -9,6 +9,7 @@ import { type Place, placeOf, places } from "./places";
 import { useCore, useFrames } from "../base/frame";
 import { OrchestratorFace } from "../ui/Face";
 import { Icon } from "../ui/Icon";
+import { Hint } from "../ui/Tip";
 import { A } from "../ui/A";
 import { useRouter } from "../base/router";
 import { titleBar } from "../ui/TitleBar";
@@ -99,9 +100,10 @@ function Desk(props: { place?: Place }) {
         {(place) => (
           <>
             <PlaceIcon place={place()} />
-            <div class="flex min-w-0 flex-1 items-baseline gap-3">
+            {/* What the place is goes beside its name, on hover: a sentence under every head was read once and then only took room. */}
+            <div class="flex min-w-0 flex-1 items-center gap-1.5">
               <h1 class="truncate text-lg font-semibold">{place().label}</h1>
-              <span class="hidden truncate text-xs text-muted sm:inline">{place().hint}</span>
+              <Hint text={place().hint} />
             </div>
           </>
         )}

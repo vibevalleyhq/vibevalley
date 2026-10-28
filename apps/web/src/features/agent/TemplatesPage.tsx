@@ -12,6 +12,7 @@ import { ready, useAgentTemplates, useRuntimes } from "../../base/query";
 import { toast } from "../../ui/toasts";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { A } from "../../ui/A";
+import { Hint } from "../../ui/Tip";
 import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/Face";
 import { TextInput } from "../../ui/Field";
@@ -44,8 +45,10 @@ export function TemplatesPage() {
           <A href="/agents" class="text-xs text-muted hover:underline">
             {t("web.agent.all")}
           </A>
-          <h1 class="text-2xl font-semibold">{t("web.agent.templates.title")}</h1>
-          <p class="max-w-2xl text-sm text-muted">{t("web.agent.templates.intro")}</p>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-2xl font-semibold">{t("web.agent.templates.title")}</h1>
+            <Hint text={t("web.agent.templates.intro")} />
+          </div>
         </div>
         <form
           class="flex items-center gap-2"

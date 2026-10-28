@@ -6,7 +6,7 @@ import type { KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { createContext, Show, useContext, type Accessor } from "solid-js";
 import { matches } from "../base/search";
-import { IconButton, IconLink } from "./IconButton";
+import { IconButton, OutLink } from "./IconButton";
 import { KeyMark } from "./KeyField";
 import { SecretInput } from "./layout";
 import { Hint } from "./Tip";
@@ -112,7 +112,7 @@ export function KeyRow(props: {
         />
       </Show>
       {props.after}
-      <Show when={props.link}>{(l) => <IconLink href={l().href} label={l().label} />}</Show>
+      <Show when={props.link}>{(l) => <OutLink href={l().href} label={l().label} />}</Show>
     </SettingRow>
   );
 }

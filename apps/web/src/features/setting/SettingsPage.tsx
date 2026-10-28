@@ -154,7 +154,9 @@ export function SettingsPage(props: { rest: string }) {
                   <ConnectorsPage id={id()} />
                 </Match>
                 <Match when={section().id === "devices"}>
-                  <LanPage />
+                  <Page title={t("web.setting.nav.devices")}>
+                    <LanPage />
+                  </Page>
                 </Match>
               </Switch>
             </div>

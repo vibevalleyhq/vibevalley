@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createUniqueId } from "solid-js";
 import { Icon } from "./Icon";
+import type { IconName } from "./icons";
 
 // What a page does not need to say until asked: a bubble over its anchor while the pointer or the focus is on it.
 
@@ -20,7 +21,8 @@ export function Tip(props: { text: string; children: JSX.Element; class?: string
 }
 
 /** An info icon that says `text` on hover or focus; it describes, it does not label (a field's label stays its own). */
-export function Hint(props: { text: string }) {
+/** icon: info for what a thing is; another for a fact of another kind beside it (where the settings are kept). */
+export function Hint(props: { text: string; icon?: IconName }) {
   const id = createUniqueId();
   return (
     <Tip text={props.text} id={id}>
@@ -29,7 +31,7 @@ export function Hint(props: { text: string }) {
         aria-describedby={id}
         class="inline-flex cursor-help rounded text-faint outline-none hover:text-muted focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <Icon name="info" size={14} />
+        <Icon name={props.icon ?? "info"} size={14} />
       </span>
     </Tip>
   );
