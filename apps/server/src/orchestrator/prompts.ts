@@ -131,3 +131,6 @@ export const patrolText = (channelName: string, found: readonly PatrolNote[]) =>
   "\n\n看看要不要提醒主人（一两句，说在 #" +
   channelName +
   "）、催帮工或者叫停；都不用管就什么也别说。";
+
+/** What a farm tool answers in an eval's replay when the case recorded nothing for the call it got (evals.ts). */
+export const noResult = "（评测里没有这个工具的结果）";

@@ -18,12 +18,11 @@ import { memoryFile } from "../agent/brain/memory.ts";
 import { type BrainMessage, transcript } from "../agent/brain/messages.ts";
 import { world } from "../testing/world.ts";
 import { Tools } from "../tool/tool.ts";
-import { casesIn, check, committed, type EvalCase, isInput } from "./evals.ts";
+import { casesIn, check, committed, type EvalCase, isInput, stubbed } from "./evals.ts";
 import { agentPrompt, systemPrompt } from "./prompts.ts";
 
 const live = process.env.VIBEVALLEY_EVALS_LIVE === "1";
 const key = process.env.DEEPSEEK_API_KEY ?? "";
-const noResult = "（评测里没有这个工具的结果）";
 
 /** The orchestrator's tool definitions, from a farm that is let go at once: every call is answered by stubs. */
 const orchestratorTools = () =>
@@ -35,23 +34,6 @@ const orchestratorTools = () =>
       }).pipe(Effect.provide(world())),
     ),
   );
-
-/** Every farm tool answers with what the case recorded for it, in the order it was called; none touches the farm. Its own
- * tools (memory, archive) work on the replay's own home. */
-function stubbed(tools: readonly Tool[], did: readonly BrainMessage[]): Tool[] {
-  const recorded = new Map<string, Extract<BrainMessage, { role: "toolResult" }>[]>();
-  for (const m of did) if (m.role === "toolResult") recorded.set(m.toolName, [...(recorded.get(m.toolName) ?? []), m]);
-  return tools.map((t) => ({
-    ...t,
-    execute: () =>
-      Effect.suspend(() => {
-        const next = recorded.get(t.name)?.shift();
-        if (!next) return Effect.succeed({ content: [{ type: "text" as const, text: noResult }] });
-        if (next.isError) return Effect.fail(new Error(next.content.map((c) => (c.type === "text" ? c.text : "")).join("")));
-        return Effect.succeed({ content: next.content });
-      }),
-  }));
-}
 
 /** One sample: the brain as the orchestrator makes it, with the case's memory and channel; the turn the input begins, and
  * the tokens it took. */
