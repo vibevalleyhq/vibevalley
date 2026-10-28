@@ -1,12 +1,10 @@
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 import { type PickOption, pickItems } from "./pick";
-import { pxDrop, pxRing, pxText } from "./style";
+import { pxDrop, pxFocus, pxRing, pxText } from "./style";
 import { aria } from "../../base/util";
 import { PxWindow } from "./base";
 import { PxTip } from "./field";
 import { SpriteIcon } from "./icons";
-
-const focusRing = "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid";
 
 export interface SegmentOption<T> {
   value: T;
@@ -37,7 +35,7 @@ export function PxSegmented<T extends string | number | boolean>(props: {
             class={[
               pxText.xs,
               pxRing,
-              focusRing,
+              pxFocus,
               "h-7 cursor-pointer px-3 whitespace-nowrap enabled:active:translate-x-px enabled:active:translate-y-px disabled:cursor-default disabled:opacity-35",
               o.value === props.value ? "bg-leaf-500 text-cream-50" : "text-bark-800 enabled:hover:bg-cream-300",
             ]}
@@ -123,7 +121,7 @@ export function PxPick(props: {
         class={[
           pxText.sm,
           pxRing,
-          focusRing,
+          pxFocus,
           "flex h-9 w-full cursor-pointer items-center gap-2 bg-cream-100 px-3 text-left disabled:cursor-default disabled:opacity-50",
         ]}
       >
@@ -178,7 +176,7 @@ export function PxSwitchField(props: {
       aria-checked={aria(props.checked)}
       disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
-      class={[focusRing, "inline-flex max-w-full cursor-pointer items-center gap-3 text-left text-bark-900 disabled:cursor-default disabled:opacity-50"]}
+      class={[pxFocus, "inline-flex max-w-full cursor-pointer items-center gap-3 text-left text-bark-900 disabled:cursor-default disabled:opacity-50"]}
     >
       {/* The inner line is the padding: the 20 px thumb travels 16 px. */}
       <span

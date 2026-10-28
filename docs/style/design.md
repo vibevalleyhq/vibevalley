@@ -23,9 +23,19 @@ VibeValley 的界面叫「田间工作台」：工作的地方是一张铺在田
 | 线和影 | 1px 的 `line`，`shadow-raise`、`shadow-float` | 2px 的树皮色框，`shadow-px` 和 `ui/pixel/style.ts` 的 `pxWindow`、`pxFrame` |
 | 动效 | 缓动和三档时长（下面「动效」） | `steps()` 走帧，一像素一像素地动 |
 | 主题 | 浅色、深色（设置 › 外观） | 只有画出来的那一套 |
-| 令牌的检查 | `no-hex-color`、`design-tokens` | 不查：画出来的颜色和尺寸是画的一部分 |
+| 令牌的检查 | `no-hex-color`、`design-tokens` | `no-hex-color`：画出来的颜色也有名字；尺寸是画的一部分，不查 |
 
 头像（`ui/Face.tsx`）、农机的 logo、项目的岛、额度瓶在工作台里也是画，照像素皮。
+
+### 像素皮的令牌
+
+像素皮不跟着主题换，但它的值和工作台一样有名字、只写在一处：
+
+- **颜色**按家族起名（`style.css` 的 `@theme`）：`cream`（纸和木板的底）、`bark`（框和字）、`leaf`（好、主操作）、`wheat`（在等）、`berry`（坏、危险）、`water`、`ink`（夜和调试台），手机屏的 `lcd`（和 `farm/phone/lcd.ts` 画布用的同一组绿）、首页的 `dusk` 和 `glow`；阴影和暗幕的 `px-drop`、`px-shade`、`px-dent`、`px-scrim`。写死的颜色由 `no-hex-color` 拦，头像的颜色是数据（`ui/cast.ts`），照原样。
+- **字**只有 12px 和 24px（FusionPixel 只在这两档清楚），由 `ui/pixel/style.ts` 的 `pxText` 给；读的长文字（汇报、说明）用 `pxText.read`，是系统字体。
+- **框和影**：`pxWindow`（窗）、`pxFrame`（厚框）、`pxRing`（框里一圈 2px）、`pxInset`（凹下去的井）、`pxDrop` 和 `shadow-px`（浮在板子上的投影）、`shadow-px-shade`（地图上的牌子和卡片，更深一些，不然看不出来）。
+- **焦点**只有一种：`pxFocus`，叶色的 2px 外框，离边一个像素。
+- **动效**走帧：关键帧用 `steps()`，一个像素一个像素地动，每个动画写自己的减少动效的停法。
 
 ## 令牌
 

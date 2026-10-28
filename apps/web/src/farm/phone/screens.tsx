@@ -155,7 +155,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               type="button"
               onClick={() => props.onScreen(s)}
               aria-pressed={aria(props.screen === s)}
-              class={["flex-1 cursor-pointer py-1", { "hover:bg-[#b9cf8c]": props.screen !== s }]}
+              class={["flex-1 cursor-pointer py-1", { "hover:bg-lcd-light": props.screen !== s }]}
               style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
             >
               {s === "missed" ? t("web.farm.phone.missed", { n: missed().length }) : t("web.farm.phone.log")}
@@ -194,7 +194,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     type="button"
                     onClick={() => props.onAnswer(c())}
                     aria-label={t("shared.join.labeled", { label: c().who, text: c().words.label })}
-                    class={[row, "cursor-pointer hover:bg-[#b9cf8c]"]}
+                    class={[row, "cursor-pointer hover:bg-lcd-light"]}
                   >
                     <SmallFace>
                       <CallerFace call={c()} size={28} />
@@ -327,7 +327,7 @@ function AppGrid(props: { apps: readonly App[] }) {
         {(a) => (
           <button type="button" onClick={() => a.go()} aria-label={a.label} class="group flex cursor-pointer flex-col items-center gap-1">
             <span
-              class="relative grid size-11 place-items-center bg-[#e8f0c8] group-hover:bg-[#f2f7dc] group-active:translate-y-px"
+              class="relative grid size-11 place-items-center bg-lcd-pale group-hover:bg-lcd-pale-hover group-active:translate-y-px"
               style={{ "box-shadow": `inset 0 0 0 2px ${lcd.dark}` }}
             >
               {a.icon()}

@@ -226,11 +226,18 @@ export default defineConfig({
         },
       },
       {
-        // The workbench's colours follow the theme and its other values are on the design ladders (scripts/oxlint-plugin.ts:
-        // no-hex-color, design-tokens; docs/style/design.md); the pixel skin and the avatars are drawn and keep theirs.
+        // The workbench's values are on the design ladders (scripts/oxlint-plugin.ts: design-tokens; docs/style/design.md);
+        // the pixel skin and the avatars are drawn to their own sizes.
         files: ["apps/web/src/**"],
         excludeFiles: ["apps/web/src/farm/**", "apps/web/src/tree/**", "apps/web/src/ui/pixel/**", "apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
-        rules: { "vibevalley/no-hex-color": "error", "vibevalley/design-tokens": "error" },
+        rules: { "vibevalley/design-tokens": "error" },
+      },
+      {
+        // Every colour of the page is named in style.css, the pixel skin's too: its palette does not follow the theme, but
+        // a drawn colour has a name like any other. The avatars' colours are data (ui/cast.ts) and keep their values.
+        files: ["apps/web/src/**"],
+        excludeFiles: ["apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
+        rules: { "vibevalley/no-hex-color": "error" },
       },
       {
         // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).

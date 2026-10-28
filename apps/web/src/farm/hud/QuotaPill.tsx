@@ -19,7 +19,7 @@ function UsageLines(props: { usage: AccountUsage | null }) {
   return (
     <Switch fallback={<p class="text-[12px] text-bark-400">{t("web.farm.quota.unreported")}</p>}>
       <Match when={props.usage?.status === "login_required"}>
-        <p class="text-[12px] text-[#b8682a]">{t("web.farm.quota.signedOut")}</p>
+        <p class="text-[12px] text-wheat-700">{t("web.farm.quota.signedOut")}</p>
       </Match>
       <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
         {(u) => <p class="text-[12px] text-bark-400">{t("web.farm.quota.unreadable", { why: u().reason })}</p>}

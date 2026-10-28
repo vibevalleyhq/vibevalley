@@ -176,7 +176,7 @@ function Entering(props: { mapped: boolean }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fill() * 100)}
-          class="h-4 w-64 border-2 border-bark-900 bg-bark-900/60 p-0.5 shadow-[2px_2px_0_0_#3a2a1899]"
+          class="h-4 w-64 border-2 border-bark-900 bg-bark-900/60 p-0.5 shadow-px-shade"
         >
           <div class="h-full bg-leaf-500 transition-[width] duration-200" style={{ width: `${fill() * 100}%` }} />
         </div>

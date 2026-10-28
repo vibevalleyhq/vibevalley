@@ -336,7 +336,7 @@ export function MergeGame() {
         </For>
         <Show when={overlay()}>
           {(o) => (
-            <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
+            <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
               <span>
                 {o()[0]}
                 <br />

@@ -5,7 +5,7 @@ import { type ToastData, type ToastStore, toasts } from "./toasts";
 import { createExternal } from "../../base/external";
 import { SpriteIcon } from "./icons";
 
-const tone: Record<string, string> = { warn: "bg-[#f3b07a4d]", error: "bg-berry/15" };
+const tone: Record<string, string> = { warn: "bg-peach/30", error: "bg-berry/15" };
 
 /**
  * The stack of toasts, top centre over the page. The pointer over it holds their timeouts; a drag right or down past

@@ -195,6 +195,33 @@
   --color-rim: #fff4d8;
   --color-ground: #2b3320;
   --shadow-px: 2px 2px 0 #1e140a73;
+  /* What stands on the farm's map (the HUD's signs and cards): darker than shadow-px, which would vanish into the grass. */
+  --shadow-px-shade: 2px 2px 0 0 var(--color-px-shade);
+  /* The pixel skin's colours past its families above, by what they are for (the pixel skin is drawn, so they do not follow
+     the theme; vibevalley/no-hex-color keeps them named here too). */
+  --color-leaf-edge: #7a5f4029;
+  --color-px-shade: #3a2a1899;
+  --color-px-dent: #2f1f1340;
+  --color-px-scrim: #1e140a73;
+  --color-water-500: #4f8fbd;
+  --color-wheat-700: #b8682a;
+  --color-berry-500: #c84a3a;
+  --color-berry-hover: #be4637;
+  --color-berry-800: #6c2b26;
+  --color-berry-900: #5a2420;
+  --color-bark-950: #1e140b;
+  --color-bark-850: #3a2a18;
+  --color-peach: #f3b07a;
+  /* The phone's screen, an old handheld's green LCD: the same greens farm/phone/lcd.ts draws the canvas with. */
+  --color-lcd-paper: #c9dc9a;
+  --color-lcd-light: #b9cf8c;
+  --color-lcd-pale: #e8f0c8;
+  --color-lcd-pale-hover: #f2f7dc;
+  /* The title screen's evening: the sky's dusk and the warm light of a window. */
+  --color-dusk-800: #2a1d2e;
+  --color-dusk-900: #1e1424;
+  --color-glow: #ffe9a8;
+  --color-glow-soft: #f3e2b8;
 }
 
 /* Sharp at 12 and 24 px only. */

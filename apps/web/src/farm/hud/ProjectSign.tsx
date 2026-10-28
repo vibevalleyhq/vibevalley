@@ -29,7 +29,7 @@ export function ProjectSign() {
           class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col items-center font-pixel hover:brightness-110"
           style={{ left: `${at().x}px`, top: `${at().y}px` }}
         >
-          <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-[2px_2px_0_0_#3a2a1899]">
+          <span class="flex max-w-40 flex-col items-center border-2 border-bark-900 bg-bark-500 px-2.5 py-1 text-cream-50 shadow-px-shade">
             <span class="text-[10px] leading-3 text-cream-200">{t("web.farm.sign.project")}</span>
             <span class="max-w-full truncate text-[13px] leading-4">{project() || t("web.farm.sign.noProject")}</span>
           </span>

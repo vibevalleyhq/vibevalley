@@ -108,8 +108,8 @@ export function ChatRow(props: {
             // Capped by its column: a one-line dispatch note is as wide as its whole line until it truncates.
             "max-w-full px-3 py-2 text-[12px] leading-[1.625]",
             props.mine
-              ? "bg-leaf-500 text-cream-50 shadow-[0_2px_0_0_#3f6427]"
-              : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_#7a5f4029]",
+              ? "bg-leaf-500 text-cream-50 shadow-[0_2px_0_0_var(--color-leaf-700)]"
+              : "border-[1.5px] border-cream-300 bg-cream-100 text-bark-900 shadow-[0_2px_0_0_var(--color-leaf-edge)]",
           ]}
         >
           {props.children}
@@ -263,7 +263,7 @@ function FarmEdit(props: { m: ChatMessage; onDone: () => void }) {
             done();
           }
         }}
-        class="min-w-48 resize-none bg-cream-50 px-1.5 py-1 font-pixel text-[12px] text-bark-900 outline-none [field-sizing:content] shadow-[inset_0_0_0_2px_#c8a46e]"
+        class="min-w-48 resize-none bg-cream-50 px-1.5 py-1 font-pixel text-[12px] text-bark-900 outline-none [field-sizing:content] shadow-[inset_0_0_0_2px_var(--color-cream-300)]"
       />
       <span class={small}>{t("web.farm.chat.actions.editHint")}</span>
     </div>

@@ -70,9 +70,9 @@ export function TitleScreen() {
   });
 
   return (
-    <div class="absolute inset-0 z-[60] overflow-hidden bg-[#2a1d2e] font-pixel" role="dialog" aria-label={t("web.farm.title.label")}>
+    <div class="absolute inset-0 z-[60] overflow-hidden bg-dusk-800 font-pixel" role="dialog" aria-label={t("web.farm.title.label")}>
       <TitleStage scene={startScene()} />
-      <div class="absolute inset-y-0 left-0 w-[min(46rem,70vw)] bg-gradient-to-r from-[#1e1424]/75 via-[#1e1424]/35 to-transparent" />
+      <div class="absolute inset-y-0 left-0 w-[min(46rem,70vw)] bg-gradient-to-r from-dusk-900/75 via-dusk-900/35 to-transparent" />
       <div class="relative flex h-full flex-col justify-center gap-8 overflow-y-auto px-[6vw] py-8 sm:gap-10">
         <header class="title-float">
           <h1 class="text-[clamp(40px,6vw,72px)] leading-none text-cream-50" style={deep}>
@@ -94,8 +94,8 @@ export function TitleScreen() {
                   onClick={() => choose(item().id)}
                   style={{ "--delay": `${i() * 90}ms`, "box-shadow": "2px 2px 0 0 #3a2a1899" }}
                   class={[
-                    "title-in flex cursor-pointer items-center gap-2 border-2 border-[#3a2a18] px-4 py-2.5 text-left text-[24px] leading-[1.4] text-bark-900 transition-transform duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
-                    on() ? "translate-x-2 bg-[#ffe9a8]" : "bg-[#f3e2b8]",
+                    "title-in flex cursor-pointer items-center gap-2 border-2 border-bark-850 px-4 py-2.5 text-left text-[24px] leading-[1.4] text-bark-900 transition-transform duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
+                    on() ? "translate-x-2 bg-glow" : "bg-glow-soft",
                   ]}
                 >
                   <PickedMark shown={on()} />
@@ -105,7 +105,7 @@ export function TitleScreen() {
             }}
           </For>
           <Show when={note()}>
-            <p role="status" class="bg-[#ffe9a8] px-2 py-1 text-[12px] text-bark-900">
+            <p role="status" class="bg-glow px-2 py-1 text-[12px] text-bark-900">
               {note()}
             </p>
           </Show>

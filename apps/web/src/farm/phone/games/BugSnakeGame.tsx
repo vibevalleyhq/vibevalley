@@ -146,7 +146,7 @@ export function BugSnakeGame() {
           style={{ width: `${width * zoom}px`, height: `${height * zoom}px` }}
         />
         <Show when={!g() || g()!.over !== null || !playing()}>
-          <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
+          <div class="absolute inset-0 grid place-items-center bg-lcd-paper/80 text-center">
             <span>
               {g()?.over ? ended[g()!.over!] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs")}
               <br />

@@ -94,7 +94,7 @@ function TopLeft() {
       <HudTap label={t("web.farm.hud.look")} onClick={() => open("orchestrator")}>
         <span class="inline-block pr-0.5 pb-0.5">
           <span
-            class="box-border flex items-center justify-center border-2 shadow-[2px_2px_0_0_#3a2a1899]"
+            class="box-border flex items-center justify-center border-2 shadow-px-shade"
             style={{ width: `${top + 2}px`, height: `${top}px`, background: CardColors.paper, "border-color": CardColors.ink }}
           >
             <SpriteIcon name={face()} size={top - 8} />
@@ -104,7 +104,7 @@ function TopLeft() {
       <HudTap label={t("web.farm.panel.graphs")} onClick={() => open("graphs")}>
         <span class="inline-block pr-0.5 pb-0.5 text-left">
           <span
-            class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-[2px_2px_0_0_#3a2a1899]"
+            class="box-border flex flex-col justify-center border-2 px-1.5 py-0.5 shadow-px-shade"
             style={{ height: `${top}px`, background: CardColors.paper, "border-color": CardColors.ink }}
           >
             <span class="flex items-center gap-[3px] text-[12px] leading-[14px]">
@@ -230,7 +230,7 @@ function ToolBar() {
           >
             <span class="inline-block pr-0.5 pb-0.5">
               <span
-                class="box-border flex items-center justify-center gap-[3px] border-2 shadow-[2px_2px_0_0_#3a2a1899]"
+                class="box-border flex items-center justify-center gap-[3px] border-2 shadow-px-shade"
                 style={{
                   width: "52px",
                   height: `${bottom}px`,

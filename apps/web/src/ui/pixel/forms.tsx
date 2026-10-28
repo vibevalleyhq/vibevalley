@@ -2,10 +2,8 @@ import { t } from "@vibevalley/i18n";
 
 import { createSignal, For } from "solid-js";
 import { splitChips } from "./chips";
-import { pxRing, pxText } from "./style";
+import { pxFocus, pxRing, pxText } from "./style";
 import { SpriteIcon } from "./icons";
-
-const focusRing = "outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-500 focus-visible:outline-solid";
 
 /** Enter or a comma adds what is typed, and so does leaving the box; Backspace in an empty box takes the last chip off. */
 export function PxChipsInput(props: {
@@ -33,7 +31,7 @@ export function PxChipsInput(props: {
               aria-label={t("web.ui.pixel.drop", { chip })}
               disabled={props.disabled}
               onClick={() => props.onChange(props.value.filter((c) => c !== chip))}
-              class={[focusRing, "cursor-pointer px-1 py-0.5 opacity-70 enabled:hover:opacity-100 disabled:cursor-default"]}
+              class={[pxFocus, "cursor-pointer px-1 py-0.5 opacity-70 enabled:hover:opacity-100 disabled:cursor-default"]}
             >
               <SpriteIcon name="button-close" size={10} />
             </button>

@@ -76,7 +76,7 @@ function createLog() {
 }
 
 const btn = (tone: "plain" | "hat" | "bad" = "plain") =>
-  `h-7 cursor-pointer px-2.5 text-[12px] ${tone === "hat" ? "bg-hat text-ink-950 hover:brightness-110" : tone === "bad" ? "bg-[#5a2420] text-paper hover:bg-[#6c2b26]" : "bg-ink-800 text-paper hover:bg-ink-700"}`;
+  `h-7 cursor-pointer px-2.5 text-[12px] ${tone === "hat" ? "bg-hat text-ink-950 hover:brightness-110" : tone === "bad" ? "bg-berry-900 text-paper hover:bg-berry-800" : "bg-ink-800 text-paper hover:bg-ink-700"}`;
 
 function Section(props: { title: string; aside?: JSX.Element; children: JSX.Element }) {
   return (
@@ -114,7 +114,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
   return (
     <aside
       aria-label={t("web.farm.debug.title")}
-      class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-[#14110ef5] p-3 font-mono text-[12px] text-paper shadow-px"
+      class="absolute top-2 right-2 bottom-2 z-50 flex w-[380px] flex-col gap-2 overflow-hidden bg-ink-950/96 p-3 font-mono text-[12px] text-paper shadow-px"
     >
       <header class="flex items-center gap-2">
         <span class="flex-1 text-[13px] text-hat">{t("web.farm.debug.title")}</span>
@@ -149,7 +149,7 @@ function Panel(props: { log: ReturnType<typeof createLog>; onClose: () => void }
             step={0.005}
             value={day().tod}
             onInput={(e) => clock.setTimeOfDay(Number(e.currentTarget.value))}
-            class="accent-[#f2b53a]"
+            class="accent-hat"
           />
           <div class="flex gap-1">
             <For

@@ -123,7 +123,7 @@ export function PixelCard(props: {
   return (
     <div class="inline-block pr-0.5 pb-0.5">
       <div
-        class={["box-border flex border-2 shadow-[2px_2px_0_0_#3a2a1899]", { "items-center justify-center": centred() }]}
+        class={["box-border flex border-2 shadow-px-shade", { "items-center justify-center": centred() }]}
         style={{
           background: props.paper ?? CardColors.paper,
           "border-color": CardColors.ink,
