@@ -4,7 +4,17 @@
 import { type FromNative, fromNativeKey, type Host, hostKey, mobileHost } from "@vibevalley/protocol/host";
 
 /** A browser tab: no host around the page. */
-export const browserHost: Host = { name: "browser", notify: null, tray: null, voiceShortcut: null, rtc: null, titleBar: null, locale: null };
+export const browserHost: Host = {
+  name: "browser",
+  notify: null,
+  tray: null,
+  voiceShortcut: null,
+  rtc: null,
+  titleBar: null,
+  locale: null,
+  reveal: null,
+  theme: null,
+};
 
 let phone: Host | undefined;
 

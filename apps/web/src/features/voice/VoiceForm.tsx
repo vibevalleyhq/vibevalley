@@ -1,5 +1,6 @@
 import { t } from "@vibevalley/i18n";
-// 声音: the call's line on /settings/voice (credentials, how it listens, who answers, dictation) and the orchestrator's voice
+// 声音: the line's settings in 设置 › 语音 (/settings/call: credentials, how it listens, who answers; /settings/moss:
+// MOSS Live's key; /settings/dictation) and the orchestrator's voice
 // on /orchestrator/voice (what it says, in what voice). Each part saves only its own fields over the settings as they are
 // now: the other part may have been saved meanwhile.
 
@@ -55,6 +56,7 @@ import { KeyField, SaveBar } from "../../ui/KeyField";
 import { Hint } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { MossCheck } from "./MossCheck";
+import { KeyRow, SettingsGroup } from "../../ui/settings";
 
 type Key = "agoraAppId" | "agoraAppCertificate" | "asrKey" | "llmKey" | "ttsKey" | "dictationKey" | "mossKey";
 
@@ -63,14 +65,18 @@ const keyFrom: Record<KeySource, string> = { settings: t("web.base.form.from.set
 const options = <T extends string>(labels: Record<T, string>) => (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 const plain = <T extends string>(values: readonly T[]) => values.map((value) => ({ value, label: value }));
 
-export function VoiceForm(props: { part: VoicePart }) {
+/** Which of the line's settings a page shows: the call (credentials, listening, who answers), MOSS Live's key, or
+ * dictation. They save together, each only what it changed. */
+export type LineView = "call" | "moss" | "dictation";
+
+export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
   const settings = useSettings();
   return (
     <Show
       when={ready(settings, undefined)}
       fallback={<Quiet>{settings.error ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error) }) : t("web.base.form.asking")}</Quiet>}
     >
-      {(status) => <Keyed key={status().file}>{() => <Form status={untrack(status)} part={props.part} />}</Keyed>}
+      {(status) => <Keyed key={status().file}>{() => <Form status={untrack(status)} part={props.part} view={props.view ?? "call"} />}</Keyed>}
     </Show>
   );
 }
@@ -86,7 +92,7 @@ function useProblem(update: () => SettingsUpdate) {
   return () => ready(check, undefined)?.problem;
 }
 
-function Form(props: { status: SettingsStatus; part: VoicePart }) {
+function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }) {
   // A plain copy: the form starts from it once, and reading the store's fields later would be untracked reads.
   const start = untrack(() => snapshot(props.status));
   const [draft, setDraft] = createSignal<VoiceSettings>(start.voice);
@@ -176,10 +182,13 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
       onSave={() => void submit()}
       onUndo={undo}
       left={<Show when={error() ?? problem()}>{(e) => <p class="text-berry">{e()}</p>}</Show>}
+      // 恢复默认 puts back the call's own settings: on MOSS Live's key or dictation it would touch what is not shown.
       extra={
-        <Button tone="quiet" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
-          {t("web.base.form.reset")}
-        </Button>
+        <Show when={props.part === "agent" || props.view === "call"}>
+          <Button tone="quiet" disabled={atDefaults()} onClick={() => set(withPart(props.part, draft(), base().voiceDefaults))}>
+            {t("web.base.form.reset")}
+          </Button>
+        </Show>
       }
     />
   );
@@ -205,191 +214,203 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
       fallback={
         <div class="flex h-full min-h-0 flex-col gap-3">
           <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-            <div class="flex max-w-4xl items-center gap-2 px-1 pt-1">
-              <h2 class="text-xl font-semibold">{t("web.voice.voice.section.label")}</h2>
-              <Hint
-                text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
-              />
-              <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-[#e3efd2] text-[#3f6427]" : "bg-[#f6ddd8] text-berry"]}>
-                {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
-              </span>
-              <span class="flex-1" />
-              <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
-              <Hint text={t("web.base.form.storedIn", { file: base().file })} />
-            </div>
-            <Card
-              title={t("web.voice.voice.credentials")}
-              action={<IconLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
-              class="max-w-4xl"
-            >
-              <Cols>
-                <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
-                  <TextInput
-                    aria-label="Agora App ID"
-                    class="font-mono"
-                    placeholder={t("web.voice.voice.hex")}
-                    value={appId()}
-                    onInput={(e) => {
-                      setAppId(e.currentTarget.value);
-                    }}
-                  />
-                </KeyField>
-                {secret("agoraAppCertificate", "App Certificate", () => base().agoraAppCertificate)}
-                <Labeled label={t("web.voice.voice.area")} hint={t("web.voice.voice.areaHint")}>
-                  <Segmented
-                    label={t("web.voice.voice.area")}
-                    value={draft().area}
-                    options={AreaValues.map((a) => ({ value: a, label: areaLabel[a] }))}
-                    onChange={(area) => set({ ...draft(), area })}
-                  />
-                </Labeled>
-              </Cols>
-            </Card>
-            <Card title="MOSS Live" action={<IconLink href="https://platform.mosi.cn/" label={t("web.voice.voice.moss.console")} />} class="max-w-4xl">
-              <div class="flex items-end gap-2">
-                <div class="min-w-0 flex-1">{secret("mossKey", "API Key", () => base().mossKey)}</div>
-                <MossCheck typed={() => secrets().mossKey ?? ""} />
+            <Show when={props.view === "moss"}>
+              <SettingsGroup>
+                <KeyRow
+                  label="API Key"
+                  hint={t("web.voice.voice.moss.keyHint")}
+                  status={base().mossKey}
+                  value={secrets().mossKey ?? ""}
+                  onInput={(v) => setSecrets({ ...secrets(), mossKey: v })}
+                  removing={cleared().has("mossKey")}
+                  onRemove={remove("mossKey")}
+                  link={{ href: "https://platform.mosi.cn/", label: t("web.voice.voice.moss.console") }}
+                  after={<MossCheck typed={() => secrets().mossKey ?? ""} />}
+                />
+              </SettingsGroup>
+            </Show>
+            <Show when={props.view === "call"}>
+              <div class="flex max-w-4xl items-center gap-2 px-1">
+                <span class={["rounded px-1.5 py-0.5 text-xs", credentialsReady() ? "bg-[#e3efd2] text-[#3f6427]" : "bg-[#f6ddd8] text-berry"]}>
+                  {credentialsReady() ? t("web.voice.voice.ready") : t("web.voice.voice.missing")}
+                </span>
+                <Hint
+                  text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
+                />
+                <span class="flex-1" />
+                <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
+                <Hint text={t("web.base.form.storedIn", { file: base().file })} />
               </div>
-            </Card>
-            <Card title={t("web.voice.voice.listen")} action={<span class="text-sm text-muted">{t("web.voice.voice.listenParts")}</span>} class="max-w-4xl">
-              <Cols>
-                <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
-                  <Segmented
-                    label={t("web.voice.voice.asr")}
-                    value={asr().vendor}
-                    options={options(asrLabel)}
-                    onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
-                  />
-                </Labeled>
-                <Labeled label={t("web.voice.voice.language")} hint={t("web.voice.voice.languageHint")}>
-                  <Select
-                    label={t("web.voice.voice.language")}
-                    value={draft().language}
-                    options={LanguageValues.map((l) => ({ value: l, label: t("shared.join.aside", { text: languageLabel[l], aside: l }) }))}
-                    onChange={(l) => l && set({ ...draft(), language: l as VoiceSettings["language"] })}
-                  />
-                </Labeled>
-                <Show when={asr().vendor === "deepgram" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "deepgram" }>) : undefined}>
-                  {(a) => (
-                    <Labeled label={t("web.voice.voice.deepgramModel")}>
-                      <Segmented
-                        label={t("web.voice.voice.deepgramModel")}
-                        value={a().model}
-                        options={plain(ModelValues)}
-                        onChange={(model) => set({ ...draft(), asr: { vendor: "deepgram", model } })}
-                      />
-                    </Labeled>
-                  )}
-                </Show>
-                <Show when={asr().vendor === "microsoft" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "microsoft" }>) : undefined}>
-                  {(a) => (
-                    <>
-                      <Labeled label={t("web.voice.voice.azureArea")} hint={t("web.voice.voice.azureAreaHint")}>
-                        <TextInput
-                          aria-label={t("web.voice.voice.asrArea")}
-                          class="font-mono"
-                          value={a().region}
-                          onInput={(e) => set({ ...draft(), asr: { vendor: "microsoft", region: e.currentTarget.value } })}
+              <Card
+                title={t("web.voice.voice.credentials")}
+                action={<IconLink href="https://console.agora.io/" label={t("web.voice.voice.console")} />}
+                class="max-w-4xl"
+              >
+                <Cols>
+                  <KeyField small label="App ID" status={base().agoraAppId} removing={cleared().has("agoraAppId")} onRemove={remove("agoraAppId")}>
+                    <TextInput
+                      aria-label="Agora App ID"
+                      class="font-mono"
+                      placeholder={t("web.voice.voice.hex")}
+                      value={appId()}
+                      onInput={(e) => {
+                        setAppId(e.currentTarget.value);
+                      }}
+                    />
+                  </KeyField>
+                  {secret("agoraAppCertificate", "App Certificate", () => base().agoraAppCertificate)}
+                  <Labeled label={t("web.voice.voice.area")} hint={t("web.voice.voice.areaHint")}>
+                    <Segmented
+                      label={t("web.voice.voice.area")}
+                      value={draft().area}
+                      options={AreaValues.map((a) => ({ value: a, label: areaLabel[a] }))}
+                      onChange={(area) => set({ ...draft(), area })}
+                    />
+                  </Labeled>
+                </Cols>
+              </Card>
+              <Card title={t("web.voice.voice.listen")} action={<span class="text-sm text-muted">{t("web.voice.voice.listenParts")}</span>} class="max-w-4xl">
+                <Cols>
+                  <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
+                    <Segmented
+                      label={t("web.voice.voice.asr")}
+                      value={asr().vendor}
+                      options={options(asrLabel)}
+                      onChange={(v) => set({ ...draft(), asr: v === asr().vendor ? asr() : asrStart[v] })}
+                    />
+                  </Labeled>
+                  <Labeled label={t("web.voice.voice.language")} hint={t("web.voice.voice.languageHint")}>
+                    <Select
+                      label={t("web.voice.voice.language")}
+                      value={draft().language}
+                      options={LanguageValues.map((l) => ({ value: l, label: t("shared.join.aside", { text: languageLabel[l], aside: l }) }))}
+                      onChange={(l) => l && set({ ...draft(), language: l as VoiceSettings["language"] })}
+                    />
+                  </Labeled>
+                  <Show when={asr().vendor === "deepgram" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "deepgram" }>) : undefined}>
+                    {(a) => (
+                      <Labeled label={t("web.voice.voice.deepgramModel")}>
+                        <Segmented
+                          label={t("web.voice.voice.deepgramModel")}
+                          value={a().model}
+                          options={plain(ModelValues)}
+                          onChange={(model) => set({ ...draft(), asr: { vendor: "deepgram", model } })}
                         />
                       </Labeled>
-                      {secret("asrKey", t("web.voice.voice.microsoftKey"), () => base().asrKey)}
-                    </>
+                    )}
+                  </Show>
+                  <Show when={asr().vendor === "microsoft" ? (asr() as Extract<VoiceSettings["asr"], { vendor: "microsoft" }>) : undefined}>
+                    {(a) => (
+                      <>
+                        <Labeled label={t("web.voice.voice.azureArea")} hint={t("web.voice.voice.azureAreaHint")}>
+                          <TextInput
+                            aria-label={t("web.voice.voice.asrArea")}
+                            class="font-mono"
+                            value={a().region}
+                            onInput={(e) => set({ ...draft(), asr: { vendor: "microsoft", region: e.currentTarget.value } })}
+                          />
+                        </Labeled>
+                        {secret("asrKey", t("web.voice.voice.microsoftKey"), () => base().asrKey)}
+                      </>
+                    )}
+                  </Show>
+                  {number("silenceMs")}
+                  {number("interruptMs")}
+                  {number("idleSeconds")}
+                </Cols>
+              </Card>
+              <Card title={t("web.voice.voice.think")} action={<span class="text-sm text-muted">{answerLabel[answer().vendor]}</span>} class="max-w-4xl">
+                <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
+                  <Segmented
+                    label={t("web.voice.voice.who")}
+                    value={answer().vendor}
+                    options={options(answerLabel)}
+                    onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
+                  />
+                </Labeled>
+                <Show when={answer().vendor === "agora" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "agora" }>) : undefined}>
+                  {(a) => (
+                    <Labeled label={t("web.voice.voice.model")}>
+                      <Segmented
+                        label={t("web.voice.voice.model")}
+                        value={a().model}
+                        options={plain(VoiceAnswerAgoraModelValues)}
+                        onChange={(model) => set({ ...draft(), answer: { vendor: "agora", model } })}
+                      />
+                    </Labeled>
                   )}
                 </Show>
-                {number("silenceMs")}
-                {number("interruptMs")}
-                {number("idleSeconds")}
-              </Cols>
-            </Card>
-            <Card title={t("web.voice.voice.think")} action={<span class="text-sm text-muted">{answerLabel[answer().vendor]}</span>} class="max-w-4xl">
-              <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
-                <Segmented
-                  label={t("web.voice.voice.who")}
-                  value={answer().vendor}
-                  options={options(answerLabel)}
-                  onChange={(v) => set({ ...draft(), answer: v === answer().vendor ? answer() : answerStart[v] })}
-                />
-              </Labeled>
-              <Show when={answer().vendor === "agora" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "agora" }>) : undefined}>
-                {(a) => (
-                  <Labeled label={t("web.voice.voice.model")}>
-                    <Segmented
-                      label={t("web.voice.voice.model")}
-                      value={a().model}
-                      options={plain(VoiceAnswerAgoraModelValues)}
-                      onChange={(model) => set({ ...draft(), answer: { vendor: "agora", model } })}
-                    />
-                  </Labeled>
-                )}
-              </Show>
-              <Show when={answer().vendor === "deepseek" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "deepseek" }>) : undefined}>
-                {(a) => (
-                  <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.deepseekModel")}>
-                    <TextInput
-                      aria-label={t("web.voice.voice.deepseekModelLabel")}
-                      class="font-mono"
-                      value={a().model}
-                      onInput={(e) => set({ ...draft(), answer: { vendor: "deepseek", model: e.currentTarget.value } })}
-                    />
-                  </Labeled>
-                )}
-              </Show>
-              <Show when={answer().vendor === "openai" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "openai" }>) : undefined}>
-                {(a) => (
-                  <Cols>
-                    <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.llmAddress")}>
+                <Show when={answer().vendor === "deepseek" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "deepseek" }>) : undefined}>
+                  {(a) => (
+                    <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.deepseekModel")}>
                       <TextInput
-                        aria-label={t("web.voice.voice.llmAddressLabel")}
-                        class="font-mono"
-                        value={a().url}
-                        onInput={(e) => set({ ...draft(), answer: { ...a(), url: e.currentTarget.value } })}
-                      />
-                    </Labeled>
-                    <Labeled label={t("web.voice.voice.model")}>
-                      <TextInput
-                        aria-label={t("web.voice.voice.llmModel")}
+                        aria-label={t("web.voice.voice.deepseekModelLabel")}
                         class="font-mono"
                         value={a().model}
-                        onInput={(e) => set({ ...draft(), answer: { ...a(), model: e.currentTarget.value } })}
+                        onInput={(e) => set({ ...draft(), answer: { vendor: "deepseek", model: e.currentTarget.value } })}
                       />
                     </Labeled>
-                    {secret("llmKey", t("web.voice.voice.llmKey"), () => base().llmKey)}
-                  </Cols>
-                )}
-              </Show>
-            </Card>
-            <Card
-              title={t("web.voice.voice.dictation")}
-              action={<IconLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />}
-              class="max-w-4xl"
-            >
-              <p class="text-sm text-muted">{t("web.voice.voice.dictationIntro")}</p>
-              <Cols>
-                <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.dictationAddress")}>
-                  <TextInput
-                    aria-label={t("web.voice.voice.dictationAddressLabel")}
-                    class="font-mono"
-                    placeholder="http://127.0.0.1:8080/v1"
-                    value={dictation().url}
-                    onInput={(e) => {
-                      setDictation({ ...dictation(), url: e.currentTarget.value });
-                    }}
-                  />
-                </Labeled>
-                <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.dictationModel")}>
-                  <TextInput
-                    aria-label={t("web.voice.voice.dictationModelLabel")}
-                    class="font-mono"
-                    placeholder="qwen3"
-                    value={dictation().model}
-                    onInput={(e) => {
-                      setDictation({ ...dictation(), model: e.currentTarget.value });
-                    }}
-                  />
-                </Labeled>
-                {secret("dictationKey", t("web.voice.voice.dictationKey"), () => base().dictationKey)}
-              </Cols>
-            </Card>
+                  )}
+                </Show>
+                <Show when={answer().vendor === "openai" ? (answer() as Extract<VoiceSettings["answer"], { vendor: "openai" }>) : undefined}>
+                  {(a) => (
+                    <Cols>
+                      <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.llmAddress")}>
+                        <TextInput
+                          aria-label={t("web.voice.voice.llmAddressLabel")}
+                          class="font-mono"
+                          value={a().url}
+                          onInput={(e) => set({ ...draft(), answer: { ...a(), url: e.currentTarget.value } })}
+                        />
+                      </Labeled>
+                      <Labeled label={t("web.voice.voice.model")}>
+                        <TextInput
+                          aria-label={t("web.voice.voice.llmModel")}
+                          class="font-mono"
+                          value={a().model}
+                          onInput={(e) => set({ ...draft(), answer: { ...a(), model: e.currentTarget.value } })}
+                        />
+                      </Labeled>
+                      {secret("llmKey", t("web.voice.voice.llmKey"), () => base().llmKey)}
+                    </Cols>
+                  )}
+                </Show>
+              </Card>
+            </Show>
+            <Show when={props.view === "dictation"}>
+              <Card
+                title={t("web.voice.voice.dictation")}
+                action={<IconLink href="https://github.com/soniqo/speech-swift" label={t("web.voice.voice.speechServer")} />}
+                class="max-w-4xl"
+              >
+                <p class="text-sm text-muted">{t("web.voice.voice.dictationIntro")}</p>
+                <Cols>
+                  <Labeled label={t("web.voice.voice.address")} hint={t("web.voice.voice.dictationAddress")}>
+                    <TextInput
+                      aria-label={t("web.voice.voice.dictationAddressLabel")}
+                      class="font-mono"
+                      placeholder="http://127.0.0.1:8080/v1"
+                      value={dictation().url}
+                      onInput={(e) => {
+                        setDictation({ ...dictation(), url: e.currentTarget.value });
+                      }}
+                    />
+                  </Labeled>
+                  <Labeled label={t("web.voice.voice.model")} hint={t("web.voice.voice.dictationModel")}>
+                    <TextInput
+                      aria-label={t("web.voice.voice.dictationModelLabel")}
+                      class="font-mono"
+                      placeholder="qwen3"
+                      value={dictation().model}
+                      onInput={(e) => {
+                        setDictation({ ...dictation(), model: e.currentTarget.value });
+                      }}
+                    />
+                  </Labeled>
+                  {secret("dictationKey", t("web.voice.voice.dictationKey"), () => base().dictationKey)}
+                </Cols>
+              </Card>
+            </Show>
           </div>
           <div class="max-w-4xl">{bar()}</div>
         </div>
@@ -398,7 +419,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart }) {
       <div class="flex max-w-4xl flex-col gap-3">
         <p class="text-sm text-muted">
           {t("web.voice.voice.persona.intro")}
-          <A class="underline" href="/settings/voice">
+          <A class="underline" href="/settings/call">
             {t("web.voice.voice.section.label")}
           </A>
           {t("web.voice.voice.persona.page")}

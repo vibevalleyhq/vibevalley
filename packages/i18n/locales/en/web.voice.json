@@ -1,8 +1,7 @@
 {
   "voice": {
     "section": {
-      "label": "Voice",
-      "line": "Calling the manager"
+      "label": "Voice"
     },
     "noSettings": "The server's settings cannot be asked ({why}).",
     "range": "{min} to {max}, default {fallback}",
@@ -86,7 +85,8 @@
       "console": "MOSS platform",
       "check": "Check that it connects",
       "checking": "Connecting…",
-      "ok": "Connected"
+      "ok": "Connected",
+      "keyHint": "A key from the MOSS platform, used only by this machine's server"
     }
   },
   "choices": {
@@ -152,9 +152,7 @@
     "agora": "Agora: {code} {msg}"
   },
   "moss": {
-    "section": "Try talking to it",
     "intro": "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
-    "keyAt": "The API key is in Voice",
     "persona": "Persona (MOSS's own when empty)",
     "personaHint": "E.g.: You are my steward; keep it short.",
     "instructions": "Rules",
@@ -192,6 +190,8 @@
       "gapsTip": "Times, within one answer, a piece finished playing before the next arrived.",
       "stopsTip": "Answers MOSS stopped itself; hover for the reasons (playback_timeout: playback was not reported in time).",
       "stops": "Stopped"
-    }
+    },
+    "tryIt": "Try it",
+    "notInChat": "Nothing goes to the chat"
   }
 }

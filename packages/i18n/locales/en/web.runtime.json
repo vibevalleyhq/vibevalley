@@ -79,10 +79,6 @@
   "unreported": "Not reported.",
   "none": "None.",
   "library": {
-    "section": {
-      "label": "Skills",
-      "line": "Skills helpers can carry"
-    },
     "book": "Skill book",
     "search": "Search skills",
     "searchHint": "Search names, descriptions, machines…",

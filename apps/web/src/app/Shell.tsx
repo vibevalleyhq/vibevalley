@@ -124,7 +124,8 @@ export function Shell(props: { children: JSX.Element }) {
     return () => window.removeEventListener("keydown", key);
   });
   return (
-    <div class="flex h-full">
+    // The interface size (设置 › 外观) scales the workbench only: zoom keeps its fixed pixel sizes in proportion.
+    <div class="flex h-full [zoom:var(--workbench-zoom,1)]">
       <QuickSwitcher />
       <Rail here={here()} />
       <main class="flex min-w-0 flex-1 flex-col">

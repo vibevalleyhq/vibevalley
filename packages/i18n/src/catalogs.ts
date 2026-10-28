@@ -1327,7 +1327,7 @@ export const catalogs = {
         runtimes: { label: "农具", hint: "机器上的编码 agent" },
         projects: { label: "项目", hint: "每个项目一座岛" },
         catalog: { label: "图鉴", hint: "素材：农场用的每张图、每个指针、每个声音" },
-        settings: { label: "设置", hint: "钥匙、语言、记性、连接器、技能、声音、连接到本机" },
+        settings: { label: "设置", hint: "通用、外观、模型、记性、技能、语音、连接" },
       },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
@@ -1635,7 +1635,7 @@ export const catalogs = {
     },
     "web.connector": {
       connectors: {
-        section: { label: "连接器", line: "微信 飞书 QQ" },
+        section: { label: "连接器" },
         label: { weixin: "微信", feishu: "飞书" },
         how: { weixin: "扫码登录，私聊机器人", feishu: "扫码自动建机器人", qq: "填 QQ 机器人的 AppID" },
         notes: {
@@ -2629,7 +2629,7 @@ export const catalogs = {
     },
     "web.lan": {
       lan: {
-        section: { label: "连接到本机", line: "手机和别的电脑" },
+        section: { label: "连接到本机" },
         open: "开着",
         closed: "关着",
         intro: "打开以后，同一个局域网里的手机或另一台电脑扫码配对以后，就能用这台电脑上的 VibeValley：看帮工、派活、在群聊里说话。",
@@ -2960,7 +2960,6 @@ export const catalogs = {
       unreported: "不报告。",
       none: "没有。",
       library: {
-        section: { label: "技能", line: "帮工能带的技能" },
         book: "技能书",
         search: "搜索技能",
         searchHint: "搜名字、说明、农机……",
@@ -3082,14 +3081,6 @@ export const catalogs = {
       },
     },
     "web.setting": {
-      sections: {
-        title: "设置",
-        label: "设置的分区",
-        deepseek: { line: "管家用的钥匙" },
-        language: { label: "语言", line: "界面和管家说哪种话" },
-        memory: { label: "记性" },
-        github: { line: "gh 和登录，能不能提 PR" },
-      },
       language: {
         title: "语言",
         line: "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
@@ -3118,7 +3109,74 @@ export const catalogs = {
         everything: "读全部",
         everythingHint: "不只读 VibeValley 替帮工记的，主人在里面的记忆每个帮工都读得到",
       },
-      github: { noGh: "没装 gh", note: "能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。", recheck: "重新检测" },
+      github: {
+        noGh: "没装 gh",
+        note: "能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。",
+        recheck: "重新检测",
+        cli: "gh 命令行",
+        cliHint: "合并时开 PR、读仓库用它",
+        login: "登录",
+        loginHint: "gh auth login 登录的账号",
+        notLoggedIn: "没登录",
+      },
+      nav: {
+        label: "设置的分区",
+        search: "搜索设置…",
+        general: "通用",
+        appearance: "外观",
+        models: "模型",
+        about: "关于",
+        memory: "记性",
+        skills: "技能",
+        call: "通话线路",
+        dictation: "听写",
+        chat: "聊天软件",
+        devices: "设备",
+      },
+      groups: { options: "选项", helpers: "帮工", voice: "语音", connect: "连接" },
+      words: {
+        general: "语言 language 启动 打开 工作台 农场",
+        appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
+        models: "DeepSeek key 钥匙 模型 管家",
+        about: "版本 家目录 设置文件 version",
+        memory: "Nowledge EverOS 记性 记忆",
+        skills: "技能 skill",
+        call: "声网 Agora 电话 识别 合成 谁接电话 区域",
+        moss: "MOSS 试音 key 实时",
+        dictation: "听写 转写 语音输入",
+        github: "gh PR 登录",
+        chat: "微信 飞书 QQ 连接器 配对",
+        devices: "手机 配对 连接到本机 局域网",
+      },
+      scope: { farm: "对整个农场", device: "只对这台设备" },
+      general: {
+        languageHint: "界面、管家和帮工说的话都用它",
+        start: "启动时打开",
+        startHint: "打开应用、或者打开首页时先进哪里",
+        starts: { workbench: "工作台", farm: "农场" },
+      },
+      appearance: {
+        intro: "只改工作台；农场、记忆树是画出来的，有自己的颜色和昼夜。",
+        theme: "主题",
+        themeHint: "跟随系统时随电脑的浅色和深色变",
+        themes: { light: "浅色", dark: "深色", system: "跟随系统" },
+        scale: "界面大小",
+        scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
+      },
+      models: { intro: "管家和 VibeValley 自己的帮工用的模型。", deepseekHint: "管家和 VibeValley 自己的帮工用它" },
+      memory: { intro: "帮工还能去外面的记性里查、往里记。" },
+      about: {
+        version: "版本",
+        versionHint: "这台电脑上的服务端",
+        files: "文件",
+        home: "家目录",
+        homeHint: "农场的一切都在这里",
+        settings: "设置文件",
+        settingsHint: "钥匙和这几页的设置",
+        copy: "复制路径",
+        copied: "路径复制好了",
+        reveal: "在访达里显示",
+      },
     },
     "web.tree": {
       kind: { leaf: "叶", fruit: "果", seed: "种子" },
@@ -3210,7 +3268,7 @@ export const catalogs = {
     },
     "web.voice": {
       voice: {
-        section: { label: "声音", line: "和管家打电话" },
+        section: { label: "声音" },
         noSettings: "问不到服务端的设置（{why}）。",
         range: "{min} 到 {max}，默认 {fallback}",
         saved: "存好了，下一通电话就用上。",
@@ -3292,7 +3350,7 @@ export const catalogs = {
           stop: "停下 {name}",
           play: "试听 {name}",
         },
-        moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了" },
+        moss: { console: "MOSS 开放平台", check: "测一下能不能接通", checking: "在接…", ok: "接通了", keyHint: "MOSS 开放平台的 key，只在这台电脑的服务端用" },
       },
       choices: {
         area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
@@ -3330,9 +3388,7 @@ export const catalogs = {
       },
       call: { renew: "令牌续期失败：{why}", noMic: "没有麦克风权限", cannotHear: "声网：听不到对面：{why}", agora: "声网：{code} {msg}" },
       moss: {
-        section: "试着跟它说话",
         intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
-        keyAt: "API Key 在「声音」里",
         persona: "人设（不填用 MOSS 默认的）",
         personaHint: "比如：你是我的管家，说话简短。",
         instructions: "规则",
@@ -3371,6 +3427,8 @@ export const catalogs = {
           stopsTip: "MOSS 自己停下回答的次数，悬停看原因（比如 playback_timeout：没及时报告播放进度）。",
           stops: "被停",
         },
+        tryIt: "试音",
+        notInChat: "说的话不进田头",
       },
     },
   },
@@ -4766,7 +4824,7 @@ export const catalogs = {
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         projects: { label: "Projects", hint: "An island for each project" },
         catalog: { label: "Catalog", hint: "Assets: every picture, cursor and sound the farm uses" },
-        settings: { label: "Settings", hint: "Keys, language, memory, connectors, skills, voice, connecting to this machine" },
+        settings: { label: "Settings", hint: "General, appearance, models, memory, skills, voice, connections" },
       },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
@@ -5096,7 +5154,7 @@ export const catalogs = {
     },
     "web.connector": {
       connectors: {
-        section: { label: "Connectors", line: "WeChat, Feishu, QQ" },
+        section: { label: "Connectors" },
         label: { weixin: "WeChat", feishu: "Feishu" },
         how: { weixin: "Scan to sign in, message the bot", feishu: "Scan to make a bot", qq: "Fill in the QQ bot's AppID" },
         notes: {
@@ -6146,7 +6204,7 @@ export const catalogs = {
     },
     "web.lan": {
       lan: {
-        section: { label: "Connect to this machine", line: "Phones and other computers" },
+        section: { label: "Connect to this machine" },
         open: "On",
         closed: "Off",
         intro:
@@ -6490,7 +6548,6 @@ export const catalogs = {
       unreported: "Not reported.",
       none: "None.",
       library: {
-        section: { label: "Skills", line: "Skills helpers can carry" },
         book: "Skill book",
         search: "Search skills",
         searchHint: "Search names, descriptions, machines…",
@@ -6623,14 +6680,6 @@ export const catalogs = {
       },
     },
     "web.setting": {
-      sections: {
-        title: "Settings",
-        label: "Settings sections",
-        deepseek: { line: "The manager's key" },
-        language: { label: "Language", line: "What language the page and the manager speak" },
-        memory: { label: "Memory" },
-        github: { line: "gh and sign-in, whether PRs can be opened" },
-      },
       language: {
         title: "Language",
         line: "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
@@ -6663,6 +6712,69 @@ export const catalogs = {
         noGh: "gh is not installed",
         note: "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
         recheck: "Check again",
+        cli: "gh command line",
+        cliHint: "Used to open PRs and read repositories when merging",
+        login: "Login",
+        loginHint: "The account gh auth login signed in",
+        notLoggedIn: "Not signed in",
+      },
+      nav: {
+        label: "Settings sections",
+        search: "Search settings…",
+        general: "General",
+        appearance: "Appearance",
+        models: "Models",
+        about: "About",
+        memory: "Memory",
+        skills: "Skills",
+        call: "Call line",
+        dictation: "Dictation",
+        chat: "Chat apps",
+        devices: "Devices",
+      },
+      groups: { options: "Options", helpers: "Helpers", voice: "Voice", connect: "Connections" },
+      words: {
+        general: "language start open workbench farm",
+        appearance: "theme dark light size zoom scale font",
+        models: "DeepSeek key model orchestrator",
+        about: "version home folder settings file",
+        memory: "Nowledge EverOS memory recall",
+        skills: "skill library",
+        call: "Agora phone call recognition speech who answers area",
+        moss: "MOSS try key realtime",
+        dictation: "dictation transcription voice input",
+        github: "gh PR login",
+        chat: "WeChat Feishu Lark QQ connectors pairing",
+        devices: "phone pairing connect to this machine LAN",
+      },
+      scope: { farm: "For the whole farm", device: "This device only" },
+      general: {
+        languageHint: "The page, the orchestrator and the helpers all speak it",
+        start: "Open on start",
+        startHint: "Where the app, or the home page, opens",
+        starts: { workbench: "Workbench", farm: "Farm" },
+      },
+      appearance: {
+        intro: "The workbench only; the farm and the memory tree are drawn and keep their own colours and day.",
+        theme: "Theme",
+        themeHint: "With the system, it follows the computer's light and dark",
+        themes: { light: "Light", dark: "Dark", system: "System" },
+        scale: "Interface size",
+        scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
+      },
+      models: { intro: "The models the orchestrator and VibeValley's own helpers use.", deepseekHint: "The orchestrator and VibeValley's own helpers use it" },
+      memory: { intro: "Helpers can also look things up in, and write to, memory outside the farm." },
+      about: {
+        version: "Version",
+        versionHint: "The server on this machine",
+        files: "Files",
+        home: "Home folder",
+        homeHint: "Everything of the farm is here",
+        settings: "Settings file",
+        settingsHint: "The keys and these pages' settings",
+        copy: "Copy the path",
+        copied: "Path copied",
+        reveal: "Show in Finder",
       },
     },
     "web.tree": {
@@ -6755,7 +6867,7 @@ export const catalogs = {
     },
     "web.voice": {
       voice: {
-        section: { label: "Voice", line: "Calling the manager" },
+        section: { label: "Voice" },
         noSettings: "The server's settings cannot be asked ({why}).",
         range: "{min} to {max}, default {fallback}",
         saved: "Saved: the next call uses it.",
@@ -6838,7 +6950,13 @@ export const catalogs = {
           stop: "Stop {name}",
           play: "Listen to {name}",
         },
-        moss: { console: "MOSS platform", check: "Check that it connects", checking: "Connecting…", ok: "Connected" },
+        moss: {
+          console: "MOSS platform",
+          check: "Check that it connects",
+          checking: "Connecting…",
+          ok: "Connected",
+          keyHint: "A key from the MOSS platform, used only by this machine's server",
+        },
       },
       choices: {
         area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
@@ -6888,10 +7006,8 @@ export const catalogs = {
         agora: "Agora: {code} {msg}",
       },
       moss: {
-        section: "Try talking to it",
         intro:
           "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
-        keyAt: "The API key is in Voice",
         persona: "Persona (MOSS's own when empty)",
         personaHint: "E.g.: You are my steward; keep it short.",
         instructions: "Rules",
@@ -6930,6 +7046,8 @@ export const catalogs = {
           stopsTip: "Answers MOSS stopped itself; hover for the reasons (playback_timeout: playback was not reported in time).",
           stops: "Stopped",
         },
+        tryIt: "Try it",
+        notInChat: "Nothing goes to the chat",
       },
     },
   },
@@ -8652,7 +8770,6 @@ export interface Messages {
   "web.connector.connectors.secret": undefined;
   "web.connector.connectors.secretHint": undefined;
   "web.connector.connectors.section.label": undefined;
-  "web.connector.connectors.section.line": undefined;
   "web.connector.connectors.since": undefined;
   "web.connector.connectors.state.connected": undefined;
   "web.connector.connectors.state.off": undefined;
@@ -9646,7 +9763,6 @@ export interface Messages {
   "web.lan.lan.removeWhich": { readonly name: string | number };
   "web.lan.lan.scan": undefined;
   "web.lan.lan.section.label": undefined;
-  "web.lan.lan.section.line": undefined;
   "web.lan.lan.stop": undefined;
   "web.lan.pair.ask": undefined;
   "web.lan.pair.code": undefined;
@@ -9935,8 +10051,6 @@ export interface Messages {
   "web.runtime.library.removeIt": undefined;
   "web.runtime.library.search": undefined;
   "web.runtime.library.searchHint": undefined;
-  "web.runtime.library.section.label": undefined;
-  "web.runtime.library.section.line": undefined;
   "web.runtime.library.when": undefined;
   "web.runtime.library.whenHint": undefined;
   "web.runtime.library.where": undefined;
@@ -10080,9 +10194,41 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
+  "web.setting.about.copied": undefined;
+  "web.setting.about.copy": undefined;
+  "web.setting.about.files": undefined;
+  "web.setting.about.home": undefined;
+  "web.setting.about.homeHint": undefined;
+  "web.setting.about.reveal": undefined;
+  "web.setting.about.settings": undefined;
+  "web.setting.about.settingsHint": undefined;
+  "web.setting.about.version": undefined;
+  "web.setting.about.versionHint": undefined;
+  "web.setting.appearance.intro": undefined;
+  "web.setting.appearance.scale": undefined;
+  "web.setting.appearance.scaleHint": undefined;
+  "web.setting.appearance.theme": undefined;
+  "web.setting.appearance.themeHint": undefined;
+  "web.setting.appearance.themes.dark": undefined;
+  "web.setting.appearance.themes.light": undefined;
+  "web.setting.appearance.themes.system": undefined;
+  "web.setting.general.languageHint": undefined;
+  "web.setting.general.start": undefined;
+  "web.setting.general.startHint": undefined;
+  "web.setting.general.starts.farm": undefined;
+  "web.setting.general.starts.workbench": undefined;
+  "web.setting.github.cli": undefined;
+  "web.setting.github.cliHint": undefined;
+  "web.setting.github.login": undefined;
+  "web.setting.github.loginHint": undefined;
   "web.setting.github.noGh": undefined;
+  "web.setting.github.notLoggedIn": undefined;
   "web.setting.github.note": undefined;
   "web.setting.github.recheck": undefined;
+  "web.setting.groups.connect": undefined;
+  "web.setting.groups.helpers": undefined;
+  "web.setting.groups.options": undefined;
+  "web.setting.groups.voice": undefined;
   "web.setting.keys.deepseekHint": undefined;
   "web.setting.keys.saved": undefined;
   "web.setting.language.en": undefined;
@@ -10090,13 +10236,23 @@ export interface Messages {
   "web.setting.language.line": undefined;
   "web.setting.language.title": undefined;
   "web.setting.language.zh": undefined;
-  "web.setting.sections.deepseek.line": undefined;
-  "web.setting.sections.github.line": undefined;
-  "web.setting.sections.label": undefined;
-  "web.setting.sections.language.label": undefined;
-  "web.setting.sections.language.line": undefined;
-  "web.setting.sections.memory.label": undefined;
-  "web.setting.sections.title": undefined;
+  "web.setting.memory.intro": undefined;
+  "web.setting.models.deepseekHint": undefined;
+  "web.setting.models.intro": undefined;
+  "web.setting.nav.about": undefined;
+  "web.setting.nav.appearance": undefined;
+  "web.setting.nav.call": undefined;
+  "web.setting.nav.chat": undefined;
+  "web.setting.nav.devices": undefined;
+  "web.setting.nav.dictation": undefined;
+  "web.setting.nav.general": undefined;
+  "web.setting.nav.label": undefined;
+  "web.setting.nav.memory": undefined;
+  "web.setting.nav.models": undefined;
+  "web.setting.nav.search": undefined;
+  "web.setting.nav.skills": undefined;
+  "web.setting.scope.device": undefined;
+  "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };
   "web.setting.source.closed": undefined;
   "web.setting.source.configure": { readonly label: string | number };
@@ -10115,6 +10271,18 @@ export interface Messages {
   "web.setting.source.userHint": undefined;
   "web.setting.source.write": undefined;
   "web.setting.source.writeHint": undefined;
+  "web.setting.words.about": undefined;
+  "web.setting.words.appearance": undefined;
+  "web.setting.words.call": undefined;
+  "web.setting.words.chat": undefined;
+  "web.setting.words.devices": undefined;
+  "web.setting.words.dictation": undefined;
+  "web.setting.words.general": undefined;
+  "web.setting.words.github": undefined;
+  "web.setting.words.memory": undefined;
+  "web.setting.words.models": undefined;
+  "web.setting.words.moss": undefined;
+  "web.setting.words.skills": undefined;
   "web.tree.aboutToFall": undefined;
   "web.tree.allHelpers": undefined;
   "web.tree.allProjects": undefined;
@@ -10261,8 +10429,8 @@ export interface Messages {
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.instructions": undefined;
   "web.voice.moss.intro": undefined;
-  "web.voice.moss.keyAt": undefined;
   "web.voice.moss.mute": undefined;
+  "web.voice.moss.notInChat": undefined;
   "web.voice.moss.nothingSaid": undefined;
   "web.voice.moss.persona": undefined;
   "web.voice.moss.personaHint": undefined;
@@ -10286,8 +10454,8 @@ export interface Messages {
   "web.voice.moss.qos.up": undefined;
   "web.voice.moss.qos.upTip": undefined;
   "web.voice.moss.said": undefined;
-  "web.voice.moss.section": undefined;
   "web.voice.moss.talk": undefined;
+  "web.voice.moss.tryIt": undefined;
   "web.voice.moss.unmute": undefined;
   "web.voice.moss.up": undefined;
   "web.voice.moss.you": undefined;
@@ -10333,6 +10501,7 @@ export interface Messages {
   "web.voice.voice.moss.check": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.console": undefined;
+  "web.voice.voice.moss.keyHint": undefined;
   "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.nextCall": undefined;
   "web.voice.voice.noSettings": { readonly why: string | number };
@@ -10367,7 +10536,6 @@ export interface Messages {
   "web.voice.voice.ready": undefined;
   "web.voice.voice.saved": undefined;
   "web.voice.voice.section.label": undefined;
-  "web.voice.voice.section.line": undefined;
   "web.voice.voice.speechServer": undefined;
   "web.voice.voice.think": undefined;
   "web.voice.voice.who": undefined;

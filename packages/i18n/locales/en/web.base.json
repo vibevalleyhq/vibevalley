@@ -30,7 +30,7 @@
     },
     "settings": {
       "label": "Settings",
-      "hint": "Keys, language, memory, connectors, skills, voice, connecting to this machine"
+      "hint": "General, appearance, models, memory, skills, voice, connections"
     }
   },
   "link": {

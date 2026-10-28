@@ -13,7 +13,7 @@ const elsewhere = [
   { label: t("web.farm.menu.agents"), to: "/agents" },
   { label: t("web.farm.menu.runtimes"), to: "/runtimes" },
   { label: t("web.farm.menu.skills"), to: "/settings/skills" },
-  { label: t("web.farm.menu.connectors"), to: "/settings/connectors" },
+  { label: t("web.farm.menu.connectors"), to: "/settings/chat" },
   { label: t("web.farm.menu.projects"), to: "/projects" },
   { label: t("web.farm.menu.catalog"), to: "/catalog" },
 ];

@@ -6,7 +6,7 @@ import { createSignal, For, Show } from "solid-js";
 import { createExternal } from "../../base/external";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
-import { IconButton, IconLink } from "../../ui/IconButton";
+import { IconButton } from "../../ui/IconButton";
 import { Card } from "../../ui/layout";
 import { Hint, Tip } from "../../ui/Tip";
 import { mossLine } from "./mossLine";
@@ -42,15 +42,7 @@ export function MossPlayground() {
   const idle = () => line().phase === "idle";
   return (
     <div class="flex max-w-4xl flex-col gap-3">
-      <Card
-        title="MOSS Live"
-        action={
-          <div class="flex items-center gap-1">
-            <Hint text={t("web.voice.moss.intro")} />
-            <IconLink href="/settings/voice" icon="settings" label={t("web.voice.moss.keyAt")} />
-          </div>
-        }
-      >
+      <Card title={t("web.voice.moss.tryIt")} action={<span class="text-xs text-muted">{t("web.voice.moss.notInChat")}</span>}>
         <div class="flex flex-col gap-3 p-4">
           <label class="flex flex-col gap-1 text-xs font-medium text-muted">
             {t("web.voice.moss.persona")}

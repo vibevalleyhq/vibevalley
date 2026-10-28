@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { currentLocale, setLocale } from "@vibevalley/i18n";
 import { followSavedLocale } from "./locale";
 import { setAppMenu } from "./menu";
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { farmFraming, type Notice, type TraySummary } from "@vibevalley/protocol/host";
@@ -125,6 +125,15 @@ function openIssue(issue: string) {
 ipcMain.handle("host:notify", (_event, notice: Notice) => {
   notices.push(notice);
   if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
+});
+
+// Only a path on this machine, shown in Finder; never opened or run.
+ipcMain.handle("host:reveal", (_event, path: string) => {
+  if (typeof path === "string" && path.startsWith("/")) shell.showItemInFolder(path);
+});
+// The window's own parts (menus, scroll bars, the title strip) follow the theme the page chose.
+ipcMain.handle("host:theme", (_event, theme: string) => {
+  nativeTheme.themeSource = theme === "light" || theme === "dark" ? theme : "system";
 });
 
 ipcMain.handle("host:locale", (_event, locale: string) => {

@@ -72,7 +72,7 @@ export function ConnectorsPage(props: { id?: string }) {
           <For each={ConnectorIDValues}>
             {(c) => (
               <ListRow
-                to={`/settings/connectors/${c}`}
+                to={`/settings/chat/${c}`}
                 active={c === selected()}
                 title={connectorLabel[c]}
                 line={of(c) && of(c)!.state !== "off" ? stateLabel[of(c)!.state] : connectorHow[c]}

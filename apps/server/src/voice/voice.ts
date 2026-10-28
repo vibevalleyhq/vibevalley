@@ -100,7 +100,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         stt = new DeepgramSTT({ model: asr.model, language: voice.language });
         break;
       case "microsoft":
-        if (!keys.asrKey) return unavailable(t("server.voice.noAsrKey"), "voice");
+        if (!keys.asrKey) return unavailable(t("server.voice.noAsrKey"), "call");
         stt = new MicrosoftSTT({ key: keys.asrKey, region: asr.region, language: voice.language });
         break;
       default: {
@@ -119,7 +119,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         llm = new OpenAI({ model: answer.model, ...speech });
         break;
       case "deepseek":
-        if (!deepseekKey) return unavailable(t("server.voice.noDeepseekKey"), "deepseek");
+        if (!deepseekKey) return unavailable(t("server.voice.noDeepseekKey"), "models");
         llm = new OpenAI({
           apiKey: deepseekKey,
           url: deepseekChat,
@@ -128,7 +128,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         });
         break;
       case "openai":
-        if (!keys.llmKey) return unavailable(t("server.voice.noLlmKey"), "voice");
+        if (!keys.llmKey) return unavailable(t("server.voice.noLlmKey"), "call");
         llm = new OpenAI({ apiKey: keys.llmKey, url: answer.url, model: answer.model, ...speech });
         break;
       default: {
@@ -146,7 +146,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
         tts = new OpenAITTS({ voice: item.voice });
         break;
       case "microsoft":
-        if (!keys.ttsKey) return unavailable(t("server.voice.noTtsKey"), "voice");
+        if (!keys.ttsKey) return unavailable(t("server.voice.noTtsKey"), "call");
         tts = new MicrosoftTTS({ key: keys.ttsKey, region: item.region, voiceName: item.voiceName });
         break;
       default: {
@@ -157,7 +157,7 @@ export function vendorsFor(voice: VoiceSettings, keys: VoiceKeys, deepseekKey: s
     return { stt, llm, tts };
   } catch (e) {
     // The SDK throws on a configuration it refuses; that is a problem with the settings, not the server's.
-    return unavailable(t("server.voice.unusable", { why: message(e) }), "voice");
+    return unavailable(t("server.voice.unusable", { why: message(e) }), "call");
   }
 }
 
@@ -401,7 +401,7 @@ export const make = (options: VoiceOptions = {}) =>
     // Asked each time: credentials saved from the title screen work without a restart.
     const creds = () => {
       const c = settings.agora();
-      return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "voice"));
+      return c ? Effect.succeed(c) : Effect.fail(unavailable(t("server.voice.noAgora"), "call"));
     };
 
     // The voice line: local only, like the farm; the tunnel is the one way in from outside.
@@ -823,7 +823,7 @@ export const make = (options: VoiceOptions = {}) =>
       mossLine: (page) => relay(page, settings.mossKey(), options.moss),
       dictate: Effect.fn("Voice.dictate")(function* (audio64, given) {
         const d = settings.dictation();
-        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "voice"));
+        if (!d) return yield* Effect.fail(unavailable(t("server.voice.dictation.unset"), "call"));
         const format = given.trim().replace(/^\./, "").toLowerCase();
         const kind = dictateFormats[format];
         if (!kind)
@@ -856,11 +856,11 @@ export const make = (options: VoiceOptions = {}) =>
               headers: d.key ? { authorization: "Bearer " + d.key } : {},
               signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
             }),
-          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "voice"),
+          catch: (e) => unavailable(t("server.voice.dictation.unreachable", { why: message(e) }), "call"),
         });
         const raw = (yield* Effect.tryPromise({
           try: () => res.text(),
-          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: message(e) }), "voice"),
+          catch: (e) => unavailable(t("server.voice.dictation.cut", { why: message(e) }), "call"),
         })).slice(0, 1 << 20);
         const got = Schema.decodeUnknownOption(DictationResponse)(raw);
         const detail = got._tag === "Some" ? got.value.error?.message : undefined;

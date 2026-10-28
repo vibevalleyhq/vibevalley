@@ -1,8 +1,7 @@
 {
   "voice": {
     "section": {
-      "label": "声音",
-      "line": "和管家打电话"
+      "label": "声音"
     },
     "noSettings": "问不到服务端的设置（{why}）。",
     "range": "{min} 到 {max}，默认 {fallback}",
@@ -86,7 +85,8 @@
       "console": "MOSS 开放平台",
       "check": "测一下能不能接通",
       "checking": "在接…",
-      "ok": "接通了"
+      "ok": "接通了",
+      "keyHint": "MOSS 开放平台的 key，只在这台电脑的服务端用"
     }
   },
   "choices": {
@@ -152,9 +152,7 @@
     "agora": "声网：{code} {msg}"
   },
   "moss": {
-    "section": "试着跟它说话",
     "intro": "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进田头。",
-    "keyAt": "API Key 在「声音」里",
     "persona": "人设（不填用 MOSS 默认的）",
     "personaHint": "比如：你是我的管家，说话简短。",
     "instructions": "规则",
@@ -192,6 +190,8 @@
       "gapsTip": "同一个回答里，上一段放完了下一段还没到的次数。",
       "stopsTip": "MOSS 自己停下回答的次数，悬停看原因（比如 playback_timeout：没及时报告播放进度）。",
       "stops": "被停"
-    }
+    },
+    "tryIt": "试音",
+    "notInChat": "说的话不进田头"
   }
 }

@@ -12,6 +12,8 @@ const host: Host = {
   tray: (summary) => ipcRenderer.invoke("host:tray", { title: summary.title, lines: [...summary.lines] }),
   rtc: null,
   locale: (locale) => void ipcRenderer.invoke("host:locale", locale),
+  reveal: (path) => void ipcRenderer.invoke("host:reveal", path),
+  theme: (theme) => void ipcRenderer.invoke("host:theme", theme),
   // On macOS the window's title bar is hidden and its traffic lights sit over the page (main.ts trafficLights).
   titleBar: process.platform === "darwin" ? { top: 28, left: 76 } : null,
   voiceShortcut: {

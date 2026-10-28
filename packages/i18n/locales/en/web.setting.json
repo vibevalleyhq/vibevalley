@@ -1,21 +1,4 @@
 {
-  "sections": {
-    "title": "Settings",
-    "label": "Settings sections",
-    "deepseek": {
-      "line": "The manager's key"
-    },
-    "language": {
-      "label": "Language",
-      "line": "What language the page and the manager speak"
-    },
-    "memory": {
-      "label": "Memory"
-    },
-    "github": {
-      "line": "gh and sign-in, whether PRs can be opened"
-    }
-  },
   "language": {
     "title": "Language",
     "line": "The page's words, what the manager and the helpers answer you, and the reports sent to chat apps all use this language. The page reopens when it changes.",
@@ -50,6 +33,89 @@
   "github": {
     "noGh": "gh is not installed",
     "note": "Which projects can open PRs is on the Projects page; opening a PR on completion is turned on in the configuration (github.pr_projects).",
-    "recheck": "Check again"
+    "recheck": "Check again",
+    "cli": "gh command line",
+    "cliHint": "Used to open PRs and read repositories when merging",
+    "login": "Login",
+    "loginHint": "The account gh auth login signed in",
+    "notLoggedIn": "Not signed in"
+  },
+  "nav": {
+    "label": "Settings sections",
+    "search": "Search settings…",
+    "general": "General",
+    "appearance": "Appearance",
+    "models": "Models",
+    "about": "About",
+    "memory": "Memory",
+    "skills": "Skills",
+    "call": "Call line",
+    "dictation": "Dictation",
+    "chat": "Chat apps",
+    "devices": "Devices"
+  },
+  "groups": {
+    "options": "Options",
+    "helpers": "Helpers",
+    "voice": "Voice",
+    "connect": "Connections"
+  },
+  "words": {
+    "general": "language start open workbench farm",
+    "appearance": "theme dark light size zoom scale font",
+    "models": "DeepSeek key model orchestrator",
+    "about": "version home folder settings file",
+    "memory": "Nowledge EverOS memory recall",
+    "skills": "skill library",
+    "call": "Agora phone call recognition speech who answers area",
+    "moss": "MOSS try key realtime",
+    "dictation": "dictation transcription voice input",
+    "github": "gh PR login",
+    "chat": "WeChat Feishu Lark QQ connectors pairing",
+    "devices": "phone pairing connect to this machine LAN"
+  },
+  "scope": {
+    "farm": "For the whole farm",
+    "device": "This device only"
+  },
+  "general": {
+    "languageHint": "The page, the orchestrator and the helpers all speak it",
+    "start": "Open on start",
+    "startHint": "Where the app, or the home page, opens",
+    "starts": {
+      "workbench": "Workbench",
+      "farm": "Farm"
+    }
+  },
+  "appearance": {
+    "intro": "The workbench only; the farm and the memory tree are drawn and keep their own colours and day.",
+    "theme": "Theme",
+    "themeHint": "With the system, it follows the computer's light and dark",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "scale": "Interface size",
+    "scaleHint": "Scales the whole workbench; the farm keeps its whole-number scaling"
+  },
+  "models": {
+    "intro": "The models the orchestrator and VibeValley's own helpers use.",
+    "deepseekHint": "The orchestrator and VibeValley's own helpers use it"
+  },
+  "memory": {
+    "intro": "Helpers can also look things up in, and write to, memory outside the farm."
+  },
+  "about": {
+    "version": "Version",
+    "versionHint": "The server on this machine",
+    "files": "Files",
+    "home": "Home folder",
+    "homeHint": "Everything of the farm is here",
+    "settings": "Settings file",
+    "settingsHint": "The keys and these pages' settings",
+    "copy": "Copy the path",
+    "copied": "Path copied",
+    "reveal": "Show in Finder"
   }
 }

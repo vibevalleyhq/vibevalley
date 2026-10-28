@@ -1535,6 +1535,9 @@ export { LocaleValues, type Locale } from "@vibevalley/i18n";
 
 export interface SettingsStatus {
   file: string;
+  /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for 关于. */
+  home: string;
+  version: string;
   locale: Locale;
   deepseekApiKey: KeyStatus;
   agoraAppId: AgoraAppID;
