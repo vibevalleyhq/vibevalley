@@ -109,7 +109,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["**/*.test.ts", "**/*.test.tsx", "apps/server/src/testing/**", "apps/server/src/agent/brain/testing.ts"],
+        files: ["**/*.test.ts", "**/*.test.tsx", "apps/server/src/testing/**", "packages/*/src/testing.ts", "packages/testkit/src/**"],
         rules: {
           "typescript/no-unsafe-argument": "off",
           "typescript/no-unsafe-assignment": "off",
@@ -119,9 +119,9 @@ export default defineConfig({
         },
       },
       {
-        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives. The
-        // command line prints.
-        files: ["apps/server/src/**"],
+        // The server logs through Effect (src/base/log.ts for callbacks): levels, and the logger the layer gives; so does
+        // the agent it runs on. The command line prints.
+        files: ["apps/server/src/**", "packages/ai/src/**", "packages/agent/src/**"],
         rules: { "no-console": "error", "vibevalley/no-wall-clock": "error" },
       },
       {
@@ -129,10 +129,11 @@ export default defineConfig({
         // deadlines); tests drive time as they need.
         files: [
           "apps/server/src/base/time.ts",
-          "apps/server/src/agent/brain/realTime.ts",
+          "packages/agent/src/realTime.ts",
           "apps/server/src/**/*.test.ts",
+          "packages/*/src/**/*.test.ts",
           "apps/server/src/testing/**",
-          "apps/server/src/agent/brain/testing.ts",
+          "packages/*/src/testing.ts",
         ],
         rules: { "vibevalley/no-wall-clock": "off" },
       },
@@ -161,6 +162,7 @@ export default defineConfig({
           "**/*.test.tsx",
           "apps/server/src/testing/**",
           "apps/server/src/**/testing.ts",
+          "packages/*/src/testing.ts",
           // Made-up memories shown until the server sums them up.
           "apps/web/src/tree/mock.ts",
         ],
@@ -169,6 +171,59 @@ export default defineConfig({
       {
         files: ["apps/server/src/cli.ts", "apps/server/src/cli/**", "apps/server/src/**/*.test.ts", "apps/server/src/testing/**"],
         rules: { "no-console": "off" },
+      },
+      {
+        // The model's package knows nothing of the agent, and neither knows the farm: no app, no owner's words, no
+        // contract with the page (the later override for packages/agent replaces this one there).
+        files: ["packages/ai/src/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+                { name: "@vibevalley/i18n", message: "The agent says nothing to the owner: return a value or an error the server words." },
+                { name: "@vibevalley/protocol", message: "The agent knows nothing of the farm's contract." },
+              ],
+              patterns: [
+                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." },
+                { group: ["@vibevalley/agent", "@vibevalley/agent/*"], message: "packages/ai knows nothing of the agent." },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["packages/agent/src/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." },
+                { name: "@vibevalley/i18n", message: "The agent says nothing to the owner: return a value or an error the server words." },
+                { name: "@vibevalley/protocol", message: "The agent knows nothing of the farm's contract." },
+              ],
+              patterns: [{ group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." }],
+            },
+          ],
+        },
+      },
+      {
+        // The loop and its tools stand alone: the brain is built on core, never the other way.
+        files: ["packages/agent/src/core/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              paths: [{ name: "bun:test", message: "Tests run on vitest: import from vite-plus/test." }],
+              patterns: [
+                { group: ["**/apps/**", "@vibevalley/server", "@vibevalley/server/*"], message: "A package does not reach into an app." },
+                { group: ["../*"], message: "core does not import the brain: the brain imports core." },
+              ],
+            },
+          ],
+        },
       },
       {
         // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).

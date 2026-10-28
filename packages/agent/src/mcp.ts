@@ -1,16 +1,17 @@
 // MCP servers' tools for the agent. Only initialize, tools/list (every page) and tools/call: no resources, prompts or
 // sampling. A server that cannot be reached is left out and said why; the others still come.
 
-import type { Tool } from "../loop/agent.ts";
+import { existsSync, readFileSync } from "node:fs";
+import { Schema } from "effect";
+import type { Tool } from "./core/loop.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { McpServer } from "./config.ts";
-import { textTool } from "./tool.ts";
+import { textTool } from "./core/tool.ts";
 import type { JsonSchema } from "@vibevalley/ai/tools";
 import { afterRealTime } from "./realTime.ts";
-import { mcp as mcpWords } from "./prompts.ts";
+import { mcpConfig, mcp as mcpWords } from "./prompts.ts";
 
 /** Also for connecting. */
 export const callTimeoutMs = 120_000;
@@ -172,4 +173,64 @@ export async function connectAll(servers: readonly McpServer[], signal?: AbortSi
     failed,
     close: async () => void (await Promise.all(connections.map((c) => c.close()))),
   };
+}
+
+/** MCP servers in the shape Claude Code and Cursor use: { "mcpServers": { name: { command, args, env } | { url } } }. */
+export interface McpServer {
+  readonly name: string;
+  readonly url?: string;
+  readonly headers?: Record<string, string>;
+  readonly command?: string;
+  readonly args?: string[];
+  readonly env?: Record<string, string>;
+  readonly cwd?: string;
+}
+
+interface McpEntry {
+  readonly command?: string;
+  readonly args?: string[];
+  readonly env?: Record<string, string>;
+  readonly cwd?: string;
+  readonly url?: string;
+  readonly headers?: Record<string, string>;
+  readonly disabled?: boolean;
+}
+
+const McpEntrySchema: Schema.Codec<McpEntry> = Schema.Struct({
+  command: Schema.optionalKey(Schema.String),
+  args: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String))),
+  env: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  cwd: Schema.optionalKey(Schema.String),
+  url: Schema.optionalKey(Schema.String),
+  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  disabled: Schema.optionalKey(Schema.Boolean),
+});
+const McpConfigSchema = Schema.fromJsonString(Schema.Struct({ mcpServers: Schema.optionalKey(Schema.Record(Schema.String, McpEntrySchema)) }));
+
+/** A missing file has none; unreadable JSON or a wrong shape is an error. */
+export function readMcpConfig(path: string): McpServer[] {
+  const data = existsSync(path) ? readFileSync(path, "utf8") : "{}";
+  if (data.trim() === "") throw new Error(mcpConfig.notJson(path));
+  let config: { mcpServers?: Record<string, McpEntry> };
+  try {
+    config = Schema.decodeUnknownSync(McpConfigSchema)(data);
+  } catch (e) {
+    throw new Error(mcpConfig.badShape(path, String(e)), { cause: e });
+  }
+  const entries = config.mcpServers ?? {};
+  const out: McpServer[] = [];
+  for (const name of Object.keys(entries).sort()) {
+    const e = entries[name]!;
+    if (e.disabled) continue;
+    if (e.url) out.push({ name, url: e.url, ...(e.headers ? { headers: e.headers } : {}) });
+    else if (e.command)
+      out.push({
+        name,
+        command: e.command,
+        ...(e.args ? { args: e.args } : {}),
+        ...(e.env ? { env: e.env } : {}),
+        ...(e.cwd ? { cwd: e.cwd } : {}),
+      });
+  }
+  return out;
 }

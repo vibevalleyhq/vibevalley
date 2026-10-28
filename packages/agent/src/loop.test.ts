@@ -4,11 +4,10 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { wallTime } from "../../base/time.ts";
-import { gate } from "../../testing/until.ts";
+import { gate } from "@vibevalley/testkit/until";
 import { messageText, userMessage } from "./messages.ts";
 import { type Rig, results, tempHome, until, withAgent } from "./testing.ts";
-import { textTool } from "./tool.ts";
+import { textTool } from "./core/tool.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -103,10 +102,10 @@ describe("a run's turns", () => {
       home(),
       [answer([toolCall("nap", {})]), answer("一"), answer("二")],
       async (r) => {
-        await r.agent.send(userMessage("开始", wallTime.now()));
+        await r.agent.send(userMessage("开始", Date.now()));
         await until(() => napping);
-        await r.agent.send(userMessage("甲", wallTime.now()));
-        await r.agent.send(userMessage("乙", wallTime.now()));
+        await r.agent.send(userMessage("甲", Date.now()));
+        await r.agent.send(userMessage("乙", Date.now()));
         wake.open();
         await until(() => r.agent.history().length >= 7);
         expect(said(r)).toEqual(["user:开始", "assistant:", "toolResult:醒了", "user:甲", "assistant:一", "user:乙", "assistant:二"]);
@@ -133,7 +132,7 @@ describe("a run's turns", () => {
       home(),
       [answer([text("两个"), toolCall("slow", {}), toolCall("fast", {})]), answer("都好了")],
       async (r) => {
-        await r.agent.send(userMessage("一起", wallTime.now()));
+        await r.agent.send(userMessage("一起", Date.now()));
         await until(() => slowStarted && r.events.some((e) => e.type === "tool_execution_end" && e.toolName === "fast"));
         slowDone.open();
         await until(() => r.has("agent_settled"));

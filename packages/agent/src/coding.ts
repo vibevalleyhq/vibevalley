@@ -1,11 +1,11 @@
 // Tools to read and change a work directory and run commands in it. No sandbox: a host gives these only to agents that
 // are meant to change things (not the orchestrator).
 
-import type { Tool } from "../loop/agent.ts";
+import type { Tool } from "./core/loop.ts";
 import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
-import { schemaTool, stopped } from "./tool.ts";
+import { schemaTool, stopped } from "./core/tool.ts";
 import { Schema } from "effect";
 import { afterRealTime } from "./realTime.ts";
 import { coding as words } from "./prompts.ts";

@@ -6,8 +6,8 @@ import * as q from "../../db/generated/agent_task.sql.ts";
 import { Db } from "../base/db.ts";
 import { newId } from "../base/ids.ts";
 import { jsonOrNone } from "../base/json.ts";
-import { type By, finished, type State, type AgentTask } from "./brain/agentTask.ts";
-import { asError, type AgentTaskStore } from "./brain/agentTaskStore.ts";
+import { type By, finished, type State, type AgentTask } from "@vibevalley/agent/agentTask";
+import { asError, type AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
 
 const afterOf = jsonOrNone(Schema.mutable(Schema.Array(Schema.String)));
 const fromRow = (r: q.OpenAgentTasksResult): AgentTask => ({

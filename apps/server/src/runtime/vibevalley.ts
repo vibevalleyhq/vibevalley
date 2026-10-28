@@ -7,11 +7,12 @@ import { createSessionKernel, inputImagesRefusal, sealSession, withdrawHeld } fr
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { models, type ThinkingLevel } from "@vibevalley/ai/models";
-import type { AgentTaskStore } from "../agent/brain/agentTaskStore.ts";
-import { type BrainEvent, type BrainOwner, openBrain } from "../agent/brain/agent.ts";
-import { codingTools } from "../agent/brain/coding.ts";
-import { defaultModel, type LLM, type McpServer } from "../agent/brain/config.ts";
-import { messageText, userMessage } from "../agent/brain/messages.ts";
+import type { AgentTaskStore } from "@vibevalley/agent/agentTaskStore";
+import { type BrainEvent, type BrainOwner, openBrain } from "@vibevalley/agent/brain";
+import { codingTools } from "@vibevalley/agent/coding";
+import { defaultModel, type ModelClient } from "@vibevalley/ai/client";
+import type { McpServer } from "@vibevalley/agent/mcp";
+import { messageText, userMessage } from "@vibevalley/agent/messages";
 import { helperInstructions } from "./prompts.ts";
 import type { Time } from "../base/time.ts";
 
@@ -26,7 +27,7 @@ export interface RuntimeOptions {
   /** $VIBEVALLEY_HOME, else ~/.vibevalley, when absent. */
   readonly home?: () => string;
   /** Asked each session, so a key saved meanwhile is used; "" is the default model. Throws when there is no model to use. */
-  readonly llm: (model: string) => LLM;
+  readonly llm: (model: string) => ModelClient;
   /** Where a session keeps its own tasks; absent, it keeps none. */
   readonly tasks?: (session: string) => AgentTaskStore;
   /** The sessions' clock: the Runtimes service's, or the wall clock on the command line. */

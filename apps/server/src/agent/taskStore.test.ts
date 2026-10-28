@@ -3,8 +3,8 @@ import { Effect, Layer } from "effect";
 import * as q from "../../db/generated/agent_task.sql.ts";
 import { DbLayer } from "../base/db.ts";
 import { testDatabase } from "../testing/layers.ts";
-import { add, finished, AgentTaskError, update } from "./brain/agentTask.ts";
-import { memoryStore } from "./brain/agentTaskStore.ts";
+import { add, finished, AgentTaskError, update } from "@vibevalley/agent/agentTask";
+import { memoryStore } from "@vibevalley/agent/agentTaskStore";
 import { dbStores } from "./taskStore.ts";
 
 describe("an agent's own tasks, kept", () => {

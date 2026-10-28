@@ -12,7 +12,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { Context, Effect, FiberSet, Layer } from "effect";
 import { Settings } from "../base/config.ts";
 import { Sessions } from "../session/session.ts";
-import type { Tool } from "../agent/loop/agent.ts";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import { type Caller, Tools } from "../tool/tool.ts";
 
 export interface McpShape {

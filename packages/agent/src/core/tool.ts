@@ -2,7 +2,7 @@
 
 import { Effect, Schema } from "effect";
 import { type JsonSchema, parametersOf } from "@vibevalley/ai/tools";
-import type { Tool } from "../loop/agent.ts";
+import type { Tool } from "./loop.ts";
 import { toolResult } from "./prompts.ts";
 
 /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off. */

@@ -3,7 +3,7 @@
 
 import { Effect } from "effect";
 import type { ToolDeclaration, Usage } from "@vibevalley/ai/messages";
-import { complete, type LLM } from "./config.ts";
+import { complete, type ModelClient } from "@vibevalley/ai/client";
 import { archive } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, requestContext, transcript } from "./messages.ts";
 import { applySummary } from "./session.ts";
@@ -34,7 +34,7 @@ export function cutPoint(messages: readonly BrainMessage[], keepRecent: number, 
 export interface CompactionOptions {
   readonly home: string;
   readonly session: string;
-  readonly llm: LLM;
+  readonly llm: ModelClient;
   readonly budget: number;
   readonly keepRecent: number;
   /** The assistant's last words kept as they were, when that keeps the kept part under half the budget. */

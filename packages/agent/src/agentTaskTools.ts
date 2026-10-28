@@ -4,12 +4,12 @@
 // own tasks are its to do; nothing here does them.
 
 import { Effect, FiberSet, Schema, type Scope } from "effect";
-import type { Tool } from "../loop/agent.ts";
+import type { Tool } from "./core/loop.ts";
 import { head } from "./text.ts";
 import * as engine from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import type { Subagent } from "./self.ts";
-import { schemaEffectTool } from "./tool.ts";
+import { schemaEffectTool } from "./core/tool.ts";
 import { agentTaskTools as words } from "./prompts.ts";
 
 /** Every change, whoever makes it, is told to changed. */

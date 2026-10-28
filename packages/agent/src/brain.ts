@@ -8,11 +8,12 @@ import { Clock, Deferred, Effect, Exit, FiberHandle, FiberSet, Ref, Schedule, Sc
 import { join } from "node:path";
 import type { ToolCall, ToolDeclaration, Usage } from "@vibevalley/ai/messages";
 import type { ThinkingLevel } from "@vibevalley/ai/models";
-import { type Agent, type AgentEvent, make, type Tool } from "../loop/agent.ts";
+import { type Agent, type AgentEvent, make, type Tool } from "./core/loop.ts";
 import { finished, type AgentTask } from "./agentTask.ts";
 import type { AgentTaskStore } from "./agentTaskStore.ts";
 import { applyPlan, type Compacted, type CompactionOptions, compactInPlace, estimateTokens, planCompaction, type Summarized } from "./compaction.ts";
-import type { LLM, McpServer } from "./config.ts";
+import type { ModelClient } from "@vibevalley/ai/client";
+import type { McpServer } from "./mcp.ts";
 import { connectAll, type McpConnections } from "./mcp.ts";
 import { memoryFileLines, readMemory } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, type CustomMessage, customMessage, messageText, requestContext, userMessage } from "./messages.ts";
@@ -23,7 +24,7 @@ import { type Subagent, selfTools, subagentInstructions, subagentTool } from "./
 import { SessionFile } from "./session.ts";
 import { defaultSkillDirs, scanSkills, type SkillInfo, skillIndex } from "./skills.ts";
 import { type AgentTaskRunner, makeTaskRunner, taskTools, watchedStore } from "./agentTaskTools.ts";
-import { stopped } from "./tool.ts";
+import { stopped } from "./core/tool.ts";
 import { agent as words } from "./prompts.ts";
 
 type Own = CustomMessage | CompactionSummaryMessage;
@@ -55,7 +56,7 @@ export interface BrainOptions {
   /** Also the session file's name unless session says otherwise. */
   readonly name: string;
   readonly instructions: string;
-  readonly llm: LLM;
+  readonly llm: ModelClient;
   readonly thinkingLevel?: ThinkingLevel;
   readonly home: string;
   readonly cwd: string;

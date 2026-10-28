@@ -7,13 +7,6 @@ export const mcpConfig = {
   badShape: (path: string, error: string) => `${path} 不是 JSON 或配置形状不对：${error}`,
 };
 
-export const toolResult = {
-  /** A tool result when the run was stopped while it worked, and the end of a tool the stop cut off (tool.ts). */
-  stopped: "已停下",
-  /** Between the head and the tail of a clipped tool result, the number of characters left out (tool.ts clip). */
-  clippedNote: (omitted: number) => `\n\n…（省略了 ${omitted} 个字符）…\n\n`,
-};
-
 export const skills = {
   noSuchSkill: (name: string, known: readonly string[]) => `没有叫 ${name} 的技能。有：${known.join("、") || "（没有）"}`,
   cannotRead: (path: string) => `读不到 ${path}`,

@@ -3,20 +3,19 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { memoryStore } from "./agentTaskStore.ts";
-import { openBrain, standaloneOwner } from "./agent.ts";
+import { openBrain, standaloneOwner } from "./brain.ts";
 import { codingTools, htmlText } from "./coding.ts";
-import { readMcpConfig } from "./config.ts";
+import { readMcpConfig } from "./mcp.ts";
 import { connectAll, mcpContentText, mcpToolName } from "./mcp.ts";
 import { archive, forgetLine, readMemory } from "./memory.ts";
 import { describeReminder, dueReminders, nextRun, parseCron, type Reminder, Reminders } from "./reminders.ts";
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { taskTools } from "./agentTaskTools.ts";
-import { effectTool } from "./tool.ts";
+import { effectTool } from "./core/tool.ts";
 import { objectSchema, toolArguments } from "@vibevalley/ai/tools";
-import type { Tool } from "../loop/agent.ts";
+import type { Tool } from "./core/loop.ts";
 import { scriptedLLM, tempHome } from "./testing.ts";
-import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -152,7 +151,7 @@ describe("skills and memory", () => {
 
   it("remember, rewrite and search the archive", async () => {
     const dir = home();
-    const tools = selfTools({ now: wallTime.now, home: dir, skills: () => [], memory: true });
+    const tools = selfTools({ now: Date.now, home: dir, skills: () => [], memory: true });
     await call(tools, "remember", { note: "用户喜欢\n简短的回答" });
     expect(readMemory(dir).prompt).toMatch(/^- \d{4}-\d\d-\d\d 用户喜欢 简短的回答$/);
     await call(tools, "rewrite_memory", { content: "- 只说中文" });
@@ -160,7 +159,7 @@ describe("skills and memory", () => {
     expect(await call(tools, "search_archive", { query: "端口" })).toBe("还没有归档的旧对话。");
     archive(dir, "s", "## 用户\n服务端口是 8787\n## 助手\n好", new Date());
     expect(await call(tools, "search_archive", { query: "端口" })).toMatch(/s-.*\.md:2\n## 用户\n服务端口是 8787/);
-    expect(selfTools({ now: wallTime.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
+    expect(selfTools({ now: Date.now, home: dir, skills: () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill", "search_archive"]);
     const lines = readMemory(dir).lines;
     expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
     forgetLine(dir, lines[0]!.id);
@@ -186,7 +185,7 @@ describe("reminders", () => {
   it("run a missed reminder once", async () => {
     const dir = home();
     // Each reminder is made at a moment of its own: the clock moves on a millisecond each time it is read.
-    let at = wallTime.now();
+    let at = Date.now();
     const s = new Reminders(dir, () => ++at);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m" }))).toMatch(/正好给一个/);
     expect(await fails(call(s.tools, "reminder", { name: "x", message: "m", cron: "nope" }))).toMatch(/cron 写得不对/);
@@ -210,7 +209,7 @@ describe("reminders", () => {
 
   it("come due only once the claim is stored", () => {
     const dir = home();
-    const s = new Reminders(dir, wallTime.now);
+    const s = new Reminders(dir, Date.now);
     const now = new Date();
     writeFileSync(
       join(dir, "reminders.json"),
@@ -235,7 +234,7 @@ describe("reminders", () => {
 
   it("do not run a persisted reminder whose shape is wrong", () => {
     const dir = home();
-    const s = new Reminders(dir, wallTime.now);
+    const s = new Reminders(dir, Date.now);
     const damaged = JSON.stringify([
       {
         id: "important",
@@ -252,7 +251,7 @@ describe("reminders", () => {
 
   it("do not read a damaged file as an empty list", async () => {
     const dir = home();
-    const s = new Reminders(dir, wallTime.now);
+    const s = new Reminders(dir, Date.now);
     const damaged = `[{"id":"important"`;
     writeFileSync(join(dir, "reminders.json"), damaged);
     await fails(call(s.tools, "reminder", { name: "new", message: "work", every_minutes: 5 }));

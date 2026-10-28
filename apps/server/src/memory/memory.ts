@@ -8,7 +8,7 @@ import { type ArchiveListing, type Memory, type MemoryList, type MemorySourceInf
 import { Clock, Context, Effect, Layer } from "effect";
 import { HttpClient } from "effect/http";
 import { Agents } from "../agent/agent.ts";
-import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "../agent/brain/memory.ts";
+import { archiveFiles, forgetLine, type MemoryLine, readArchive, readMemory, remember, searchArchive } from "@vibevalley/agent/memory";
 import { agentHome, Settings } from "../base/config.ts";
 import { type ApiError, memoriesOf, missing, refused } from "../errors.ts";
 import { Setting } from "../setting/setting.ts";

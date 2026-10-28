@@ -44,6 +44,10 @@ describe("the test pyramid", () => {
     expect(leaving).toEqual([]);
   });
 
+  it("follows imports into the workspace's packages", () => {
+    expect(reach("src/cli/chat.ts")).toEqual(["src/cli/chat.ts", "../../packages/agent/src/coding.ts", "node:child_process"]);
+  });
+
   it("has a layer for every test file", () => {
     const shape = Object.groupBy(
       all.filter((f) => f.endsWith(".test.ts")),

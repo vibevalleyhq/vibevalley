@@ -4,11 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Message } from "@vibevalley/ai/messages";
 import { type Reply, type Request, scriptedLlm, type Step, testModel } from "@vibevalley/ai/testing";
-import { type BrainEvent, type BrainHandle, type BrainOptions, type BrainOwner, openBrain, standaloneOwner } from "./agent.ts";
+import { type BrainEvent, type BrainHandle, type BrainOptions, type BrainOwner, openBrain, standaloneOwner } from "./brain.ts";
 import { codingTools } from "./coding.ts";
-import type { LLM } from "./config.ts";
+import type { ModelClient } from "@vibevalley/ai/client";
 import { messageText, userMessage } from "./messages.ts";
-import { wallTime } from "../../base/time.ts";
 
 export type { Reply, Request, Step };
 
@@ -24,7 +23,7 @@ export const answered = (r: { messages: readonly Message[] }) => r.messages.at(-
 
 export function scriptedLLM(steps: readonly Step[] = []) {
   const script = Effect.runSync(scriptedLlm(steps));
-  const llm: LLM = { model: testModel, service: script.llm, apiKey: () => "k" };
+  const llm: ModelClient = { model: testModel, service: script.llm, apiKey: () => "k" };
   return {
     llm,
     requests: script.requests,
@@ -83,7 +82,7 @@ export async function withAgent(
       requests,
       script: { append, pending },
       has: (type) => events.some((e) => e.type === type),
-      ask: (text) => agent.ask(userMessage(text, wallTime.now())),
+      ask: (text) => agent.ask(userMessage(text, Date.now())),
     });
   } finally {
     await agent.close();

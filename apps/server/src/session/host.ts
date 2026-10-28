@@ -10,14 +10,14 @@ import { t } from "@vibevalley/i18n";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Usage } from "@vibevalley/ai/messages";
-import type { Tool } from "../agent/loop/agent.ts";
+import type { Tool } from "@vibevalley/agent/core/loop";
 import type { OrchestratorState } from "@vibevalley/protocol";
 import { Effect, type Scope } from "effect";
-import { type BrainEvent, type BrainHandle, openBrain, sessionUnfinished } from "../agent/brain/agent.ts";
-import type { LLM } from "../agent/brain/config.ts";
-import { memoryFile } from "../agent/brain/memory.ts";
-import { type BrainMessage, type CustomMessage, customMessage, messageText } from "../agent/brain/messages.ts";
-import { readLines, replay } from "../agent/brain/session.ts";
+import { type BrainEvent, type BrainHandle, openBrain, sessionUnfinished } from "@vibevalley/agent/brain";
+import type { ModelClient } from "@vibevalley/ai/client";
+import { memoryFile } from "@vibevalley/agent/memory";
+import { type BrainMessage, type CustomMessage, customMessage, messageText } from "@vibevalley/agent/messages";
+import { readLines, replay } from "@vibevalley/agent/session";
 import { newId } from "../base/ids.ts";
 import { type ApiError, missing, refused } from "../errors.ts";
 import { AgentExecution, type RunInput } from "./execution.ts";
@@ -100,7 +100,7 @@ export interface HostOptions<R> {
   readonly cwd: string;
   readonly instructions: string;
   /** Asked when the agent starts: a model missing a key throws, and the input that started it says why. */
-  readonly llm: () => LLM;
+  readonly llm: () => ModelClient;
   /** The tools; each reads the route of the input taken last. */
   readonly tools: (current: () => R) => Tool[];
   readonly wakeSoon?: (withinMs: number) => boolean;

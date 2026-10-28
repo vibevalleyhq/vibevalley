@@ -2,7 +2,7 @@ import { list, t } from "@vibevalley/i18n";
 // A task graph's rules. Texts are measured as JavaScript does.
 
 import type { GraphAction, Spent, Task, TaskAction, TaskGraph } from "@vibevalley/protocol";
-import { dagLayers, dagIDValid, type DagNode, dagProblems } from "../agent/brain/dag.ts";
+import { dagLayers, dagIDValid, type DagNode, dagProblems } from "@vibevalley/agent/dag";
 
 /** More steps than this means the job should be split into tasks. */
 export const isOpen = (graph: { state: string }) => graph.state !== "done" && graph.state !== "abandoned";

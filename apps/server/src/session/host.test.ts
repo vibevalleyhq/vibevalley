@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { testConfig } from "../testing/layers.ts";
 import { aTurn, until } from "../testing/until.ts";
 import { world } from "../testing/world.ts";
-import { scriptedLLM } from "../agent/brain/testing.ts";
+import { scriptedLLM } from "@vibevalley/agent/testing";
 import { answer, text, toolCall } from "@vibevalley/ai/testing";
 import { Sessions } from "./session.ts";
 import { Caller } from "./host.ts";

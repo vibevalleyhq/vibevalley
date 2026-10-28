@@ -4,17 +4,16 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { it as effectIt } from "@effect/vitest";
 import { Effect, Exit, Fiber, Scope, Stream } from "effect";
 import { TestClock } from "effect/testing";
-import { resumedUnknown, sessionUnfinished } from "./agent.ts";
+import { resumedUnknown, sessionUnfinished } from "./brain.ts";
 import { cutPoint, summaryInPlace, summaryInstructions } from "./compaction.ts";
 import { forgetLine, memoryFile, readMemory, remember } from "./memory.ts";
 import { type BrainMessage, type CompactionSummaryMessage, messageText, userMessage } from "./messages.ts";
 import { SessionFile } from "./session.ts";
 import { answered, lastUser, type Request, results, type Rig, scriptedLLM, type Step, systemPrompt, tempHome, toolsOf, until, withAgent } from "./testing.ts";
-import { stopped, textTool } from "./tool.ts";
+import { stopped, textTool } from "./core/tool.ts";
 import { type Answer, answer, assistantMessage, text, thinking, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { wallTime } from "../../base/time.ts";
-import { gate, nextTurn, whenTrue } from "../../testing/until.ts";
+import { gate, nextTurn, whenTrue } from "@vibevalley/testkit/until";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -57,7 +56,7 @@ describe("the agent", () => {
       dir,
       [answer([toolCall("nap", {})]), answer("睡好了")],
       async (r) => {
-        const asking = Effect.runFork(r.agent.brain.ask(userMessage("睡", wallTime.now())));
+        const asking = Effect.runFork(r.agent.brain.ask(userMessage("睡", Date.now())));
         await until(() => napping);
         await Effect.runPromise(Fiber.interrupt(asking));
         wake.open();
@@ -81,7 +80,7 @@ describe("the agent", () => {
       dir,
       [],
       async (r) => {
-        await r.agent.send(userMessage("说", wallTime.now()));
+        await r.agent.send(userMessage("说", Date.now()));
         await until(() => r.has("message_end"));
         try {
           const first = r.agent.close();
@@ -121,7 +120,7 @@ describe("the agent", () => {
       home(),
       [],
       async (r) => {
-        void r.agent.send(userMessage("说", wallTime.now()));
+        void r.agent.send(userMessage("说", Date.now()));
         await until(() => started);
         await Effect.runPromise(Scope.close(owner, Exit.void));
         await until(() => cut);
@@ -197,10 +196,10 @@ describe("the agent", () => {
       dir,
       [answer([toolCall("nap", {})]), step((c) => answer("第二次听到：" + lastUser(c))), step((c) => answer("第三次听到：" + lastUser(c)))],
       async (r) => {
-        await r.agent.send(userMessage("开始", wallTime.now()));
+        await r.agent.send(userMessage("开始", Date.now()));
         await until(() => napping);
-        await r.agent.later(userMessage("完了再说这个", wallTime.now()));
-        await r.agent.send(userMessage("顺便", wallTime.now()));
+        await r.agent.later(userMessage("完了再说这个", Date.now()));
+        await r.agent.send(userMessage("顺便", Date.now()));
         wake.open();
         await until(() => r.agent.history().length >= 7);
         expect(said(r.agent.history())).toEqual([
@@ -407,7 +406,7 @@ describe("the agent", () => {
       dir,
       [answer([text("这是一段很长很长很长很长很长很长很长很长很长很长很长很长很长很长很长的回答".repeat(20))], { hangAfter: 50 })],
       async (r) => {
-        await r.agent.send(userMessage("说", wallTime.now()));
+        await r.agent.send(userMessage("说", Date.now()));
         await until(() => r.events.some((e) => e.type === "message_update" && e.assistantMessageEvent.type === "text_delta"));
         await r.agent.stop();
         await until(() => r.has("agent_settled"));
@@ -421,7 +420,7 @@ describe("the agent", () => {
   it("is stopped while a tool runs", async () => {
     const dir = home();
     await withAgent(dir, [answer([toolCall("bash", { command: "sleep 5" })])], async (r) => {
-      await r.agent.send(userMessage("睡", wallTime.now()));
+      await r.agent.send(userMessage("睡", Date.now()));
       await until(() => r.has("tool_execution_start"));
       await r.agent.stop();
       await until(() => r.has("agent_settled"));
@@ -542,7 +541,7 @@ describe("the agent", () => {
   });
 
   it("cuts where the last words stay", () => {
-    const u = (text: string) => userMessage(text, wallTime.now());
+    const u = (text: string) => userMessage(text, Date.now());
     const a = (words: string) => assistantMessage(words);
     const call = assistantMessage([toolCall("x", {})]);
     const result: BrainMessage = {

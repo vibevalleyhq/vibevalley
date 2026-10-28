@@ -1,11 +1,11 @@
 // What the agent reminded itself to do later, in reminders.json in its home. One missed while the agent was away runs once
 // when it is back, not once per miss. Cron is in the machine's time zone.
 
-import type { Tool } from "../loop/agent.ts";
+import type { Tool } from "./core/loop.ts";
 import { Cron, Result, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { schemaTool } from "./tool.ts";
+import { schemaTool } from "./core/tool.ts";
 import { reminders as reminderWords } from "./prompts.ts";
 
 export interface Reminder {

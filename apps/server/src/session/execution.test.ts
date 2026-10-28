@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 import { SqlClient } from "effect/sql";
-import type { CoreEvent } from "../agent/brain/agent.ts";
+import type { CoreEvent } from "@vibevalley/agent/brain";
 import type { StopReason } from "@vibevalley/ai/messages";
 import { assistantMessage, text, thinking } from "@vibevalley/ai/testing";
 import { until } from "../testing/until.ts";

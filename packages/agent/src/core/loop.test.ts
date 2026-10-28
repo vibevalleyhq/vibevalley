@@ -4,7 +4,7 @@ import type { Context, Message, ToolResultMessage, UserMessage } from "@vibevall
 import { make as llmOver } from "@vibevalley/ai/llm";
 import { answer, chunk, http, type Request, scriptedLlm, type Step, testModel, text, toolCall } from "@vibevalley/ai/testing";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { type AgentEvent, type AgentOptions, AgentBusy, make, type Tool } from "./agent.ts";
+import { type AgentEvent, type AgentOptions, AgentBusy, make, type Tool } from "./loop.ts";
 
 const user = (t: string): UserMessage => ({ role: "user", content: t, timestamp: 1 });
 const done = (t: string): Tool => ({ name: t, description: "", parameters: objectSchema(), execute: () => Effect.succeed({ content: [text(t)] }) });

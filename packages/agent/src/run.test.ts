@@ -4,16 +4,15 @@ import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import * as engine from "./agentTask.ts";
 import { memoryStore } from "./agentTaskStore.ts";
-import { type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./agent.ts";
+import { type BrainEvent, type BrainOptions, openBrain, standaloneOwner } from "./brain.ts";
 import { applyPlan, planCompaction } from "./compaction.ts";
 import { type BrainMessage, messageText, userMessage } from "./messages.ts";
 import { RunAccounting, type RunResult } from "./run.ts";
 import { SessionFile } from "./session.ts";
 import { makeTaskRunner } from "./agentTaskTools.ts";
 import { answered, lastUser, type Request, scriptedLLM, type Step, systemPrompt, tempHome, until, withAgent } from "./testing.ts";
-import { textTool } from "./tool.ts";
+import { textTool } from "./core/tool.ts";
 import { objectSchema } from "@vibevalley/ai/tools";
-import { wallTime } from "../../base/time.ts";
 
 const homes: (() => void)[] = [];
 const home = () => {
@@ -74,7 +73,7 @@ describe("a run's receipt", () => {
       [billed([tool], 10, 2, 3), billed([tool], 20, 4, 5), billed("first", 30, 6, 7), billed("second", 40, 8, 9)],
       { tools: [echo] },
     );
-    expect(await agent.ask(userMessage("one", wallTime.now()))).toBe("first");
+    expect(await agent.ask(userMessage("one", Date.now()))).toBe("first");
     await until(() => receipts.length === 1);
     expect(receipts[0]).toMatchObject({
       id: 1,
@@ -82,7 +81,7 @@ describe("a run's receipt", () => {
       usage: { input: 60, output: 12, cacheRead: 15 },
       contextTokens: 43,
     });
-    expect(await agent.ask(userMessage("two", wallTime.now()))).toBe("second");
+    expect(await agent.ask(userMessage("two", Date.now()))).toBe("second");
     await until(() => receipts.length === 2);
     expect(receipts[1]).toMatchObject({ id: 2, usage: { input: 40 } });
     expect(agent.progress().lifetime).toMatchObject({ input: 100, output: 20, cacheRead: 24 });
@@ -92,10 +91,10 @@ describe("a run's receipt", () => {
   it("keeps a failure's words and goes by the last answer", async () => {
     const failed = { stopReason: "error", errorMessage: "broken" } as const;
     const { agent, receipts } = await receiptAgent([billed("failed words", 7, 2, 1, failed), billed("recovered", 3, 1, 0)]);
-    expect(await agent.ask(userMessage("fail", wallTime.now()))).toBe("failed words");
+    expect(await agent.ask(userMessage("fail", Date.now()))).toBe("failed words");
     await until(() => receipts.length === 1);
     expect(receipts[0]).toMatchObject({ error: "broken", usage: { input: 7 } });
-    await agent.ask(userMessage("retry", wallTime.now()));
+    await agent.ask(userMessage("retry", Date.now()));
     await until(() => receipts.length === 2);
     expect(receipts[1]).toMatchObject({ error: "", usage: { input: 3 } });
     await agent.close();
@@ -130,9 +129,9 @@ describe("a run's receipt", () => {
         maxSteps: 3,
       },
     );
-    const answer = agent.ask(userMessage("A", wallTime.now()));
+    const answer = agent.ask(userMessage("A", Date.now()));
     await until(() => entered);
-    await agent.later(userMessage("B", wallTime.now()));
+    await agent.later(userMessage("B", Date.now()));
     release();
     expect(await answer).toBe("");
     await until(() => receipts.length === 1);
@@ -170,7 +169,7 @@ describe("a run's receipt", () => {
     });
     const events: BrainEvent[] = [];
     agent.subscribe((e) => events.push(e));
-    void agent.send(userMessage("start", wallTime.now()));
+    void agent.send(userMessage("start", Date.now()));
     await until(() => events.some((e) => e.type === "message_update" && messageText(e.message) === "partial"));
     expect(agent.progress().current.settled).toBe(false);
     await Promise.all(Array.from({ length: 8 }, () => agent.close()));
@@ -190,9 +189,9 @@ describe("a compaction", () => {
   it("replays its whole kept tail", () => {
     const dir = home();
     const messages: BrainMessage[] = [
-      userMessage("old", wallTime.now()),
+      userMessage("old", Date.now()),
       assistantMessage("old answer"),
-      userMessage("keep", wallTime.now()),
+      userMessage("keep", Date.now()),
       assistantMessage("a"),
       assistantMessage("b"),
       assistantMessage("c"),
