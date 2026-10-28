@@ -2,7 +2,7 @@
 
 由 [scripts/agent-notes.ts](scripts/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（23 篇）
 
 ### feature
 
@@ -37,7 +37,6 @@
 
 ### testing
 
-- 2026-10-28 [页面测试只测接线，判断下沉，元素按标记找](.agents/notes/proposed/testing/2026-10-28-page-tests-wiring-only.md)
 - 2026-10-26 [把模块层往下压：项目检查成端口，重启留在内存，项目的决定成规则](.agents/notes/proposed/testing/2026-10-26-press-the-module-layer-down.md)
 
 ## rejected（2 篇）
