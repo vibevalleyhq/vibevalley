@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // /pair: another device joins the farm (连接到本机). The owner's QR code opens it with the code; the device names itself
 // and questions, the owner nods on the farm's computer, and the key the farm hands back is kept in a cookie.
 
-import { lanWording } from "./words";
 import { createSignal, Show } from "solid-js";
 import { api, reasonOf } from "../../base/api";
 import { deviceGuess, keyCookie } from "./rules";
@@ -37,26 +37,26 @@ export function PairPage() {
           if (!asking()) void ask();
         }}
       >
-        <h1 class="text-lg font-semibold">{lanWording().pair.title}</h1>
-        <p class="text-sm text-muted">{lanWording().pair.intro}</p>
+        <h1 class="text-lg font-semibold">{t("web.lan.pair.title")}</h1>
+        <p class="text-sm text-muted">{t("web.lan.pair.intro")}</p>
         <Show when={!given}>
-          <Field label={lanWording().pair.code} hint={lanWording().pair.codeHint}>
+          <Field label={t("web.lan.pair.code")} hint={t("web.lan.pair.codeHint")}>
             <TextInput value={code()} onInput={(e) => setCode(e.currentTarget.value)} autocapitalize="characters" autocomplete="off" />
           </Field>
         </Show>
-        <Field label={lanWording().pair.name} hint={lanWording().pair.nameHint}>
+        <Field label={t("web.lan.pair.name")} hint={t("web.lan.pair.nameHint")}>
           <TextInput value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength={40} />
         </Field>
         <Show
           when={asking()}
           fallback={
             <Button tone="primary" type="submit" disabled={!code().trim()} class="self-start">
-              {lanWording().pair.ask}
+              {t("web.lan.pair.ask")}
             </Button>
           }
         >
           <p role="status" class="text-sm">
-            {lanWording().pair.waiting}
+            {t("web.lan.pair.waiting")}
           </p>
         </Show>
         <Show when={problem()}>

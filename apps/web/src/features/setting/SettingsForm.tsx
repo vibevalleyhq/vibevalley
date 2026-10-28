@@ -2,7 +2,6 @@ import { t } from "@vibevalley/i18n";
 // The DeepSeek key, the language and the memory sources (setting.load, setting.save), a part at a time; and what the
 // server found of gh.
 
-import { appWording } from "../../base/words";
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import {
   type GitHubStatus,
@@ -75,15 +74,15 @@ const draftsOf = (status: SettingsStatus) =>
 /** Where the settings are kept, said on hover: a card's header puts it beside its title. */
 export function SettingsFile() {
   const settings = useSettings();
-  return <Show when={ready(settings, undefined)}>{(s) => <Hint text={appWording().form.storedIn(s().file)} />}</Show>;
+  return <Show when={ready(settings, undefined)}>{(s) => <Hint text={t("web.base.form.storedIn", { file: s().file })} />}</Show>;
 }
 
 /** Built again for each part (Keyed by the page): a saved form starts over from what the server answered. */
 export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();
   return (
-    <Pick fallback={<Quiet>{appWording().form.asking}</Quiet>}>
-      <Match when={settings.error}>{(e) => <Quiet>{appWording().form.unreachable(reasonOf(e()))}</Quiet>}</Match>
+    <Pick fallback={<Quiet>{t("web.base.form.asking")}</Quiet>}>
+      <Match when={settings.error}>{(e) => <Quiet>{t("web.base.form.unreachable", { why: reasonOf(e()) })}</Quiet>}</Match>
       <Match when={ready(settings, undefined)}>{(status) => <Form part={props.part} status={untrack(status)} />}</Match>
     </Pick>
   );
@@ -305,7 +304,7 @@ export function GitHub() {
   };
   return (
     <div class="flex flex-col gap-2">
-      <Pick fallback={<Quiet>{status.error ? appWording().form.unreachable(reasonOf(status.error)) : appWording().form.asking}</Quiet>}>
+      <Pick fallback={<Quiet>{status.error ? t("web.base.form.unreachable", { why: reasonOf(status.error) }) : t("web.base.form.asking")}</Quiet>}>
         <Match when={now()}>
           {(s) => (
             <div class="flex items-center gap-2 text-sm">

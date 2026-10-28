@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // A runtime's account, as the runtimes page and the farm's bottle both say it: how much is left, its windows in
 // words, when it resets.
 
@@ -18,20 +19,20 @@ export const quotaLevel = (left: number | undefined): QuotaLevel => (left === un
 
 /** Runtimes name their windows in English; the common ones are said in the page's words. */
 export function windowLabel(label: string) {
-  if (label === "Current session") return runtimesWording().quota.session;
-  if (label === "Weekly included usage") return runtimesWording().quota.weekly;
+  if (label === "Current session") return t("web.runtime.quota.session");
+  if (label === "Weekly included usage") return t("web.runtime.quota.weekly");
   const week = /^Current week \((.+)\)$/.exec(label);
-  if (week) return runtimesWording().quota.week(week[1]!);
-  return label.replace(/·\s*1 week/, runtimesWording().quota.oneWeek);
+  if (week) return t("web.runtime.quota.week", { models: week[1]! });
+  return label.replace(/·\s*1 week/, t("web.runtime.quota.oneWeek"));
 }
 
 export function resetText(at: number, now = Date.now()) {
   const ms = at - now;
-  if (ms <= 0) return runtimesWording().quota.now;
+  if (ms <= 0) return t("web.runtime.quota.now");
   const hours = ms / 3600000;
-  if (hours < 1) return runtimesWording().quota.minutes(Math.min(60, Math.max(1, Math.round(ms / 60000))));
-  if (hours < 24) return runtimesWording().quota.hours(Math.round(hours));
-  return runtimesWording().quota.on(runtimesWording().quota.weekdays[new Date(at).getDay()]!);
+  if (hours < 1) return t("web.runtime.quota.minutes", { m: Math.min(60, Math.max(1, Math.round(ms / 60000))) });
+  if (hours < 24) return t("web.runtime.quota.hours", { h: Math.round(hours) });
+  return t("web.runtime.quota.on", { weekday: runtimesWording().quota.weekdays[new Date(at).getDay()]! });
 }
 
 export interface Quota {
@@ -47,9 +48,9 @@ const money = (currency: string, amount: number) => `${currency === "CNY" ? "¥"
 /** A runtime's account as a bottle. */
 export function quotaOf(info: RuntimeInfo | undefined): Quota {
   const usage = info?.usage;
-  const text = info?.quota?.text ?? runtimesWording().quota.unreported;
+  const text = info?.quota?.text ?? t("web.runtime.quota.unreported");
   // Not logged in: nothing to work with, which is an empty bottle, not an unknown one.
-  if (usage?.status === "login_required") return { level: "empty", fill: 0, short: runtimesWording().quota.signedOut, text };
+  if (usage?.status === "login_required") return { level: "empty", fill: 0, short: t("web.runtime.quota.signedOut"), text };
   if (usage?.status === "balance") {
     const first = usage.balances[0];
     return { level: usage.available ? "gold" : "empty", fill: usage.available ? 1 : 0.06, short: first ? money(first.currency, first.amount) : "", text };

@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // A session's log by round (shownEvents, roundsOf, spansOf, roundMs), the work log's words and colours, the trajectory's
 // waterfall and totals, and how steps arriving live merge in (mergeSteps).
 
-import { sessionWording } from "./words";
 import { appWording } from "../../base/words";
 import type { SessionEvent } from "@vibevalley/protocol";
 import { tookText } from "../../base/format";
@@ -89,40 +89,40 @@ export function farmToolText(text: string) {
     case undefined:
       return undefined;
     case "channel_message_send":
-      return sessionWording().rounds.farm.channel_message_send;
+      return t("web.session.rounds.farm.channel_message_send");
     case "channel_message_list":
-      return sessionWording().rounds.farm.channel_message_list;
+      return t("web.session.rounds.farm.channel_message_list");
     case "channel_unread_list":
-      return sessionWording().rounds.farm.channel_unread_list;
+      return t("web.session.rounds.farm.channel_unread_list");
     case "session_list":
-      return sessionWording().rounds.farm.session_list;
+      return t("web.session.rounds.farm.session_list");
     default:
-      return sessionWording().rounds.farm.other(m);
+      return t("web.session.rounds.farm.other", { tool: m });
   }
 }
 
 export function spanLabel(step: SessionEvent) {
   switch (step.type) {
     case "user/message":
-      return sessionWording().rounds.span.heard;
+      return t("web.session.rounds.span.heard");
     case "memory/recalled":
-      return sessionWording().rounds.span.recalled;
+      return t("web.session.rounds.span.recalled");
     case "assistant/thinking":
-      return sessionWording().rounds.span.thinking;
+      return t("web.session.rounds.span.thinking");
     case "assistant/message":
-      return sessionWording().rounds.span.said;
+      return t("web.session.rounds.span.said");
     case "llm/retry":
-      return sessionWording().rounds.span.retry;
+      return t("web.session.rounds.span.retry");
     case "llm/usage":
-      return sessionWording().rounds.span.cache;
+      return t("web.session.rounds.span.cache");
     case "run/error":
-      return sessionWording().rounds.span.error;
+      return t("web.session.rounds.span.error");
     case "run/start":
     case "run/end":
     case "tool/result":
       return "";
     case "tool/call":
-      return farmToolText(step.text) ? sessionWording().rounds.span.farm : (step.actionText ?? sessionWording().rounds.span.tool);
+      return farmToolText(step.text) ? t("web.session.rounds.span.farm") : (step.actionText ?? t("web.session.rounds.span.tool"));
   }
 }
 
@@ -186,9 +186,9 @@ export function readableInput(step: SessionEvent) {
 /** What started a round, as its fold says it: the first word is the issue, later ones are words carried to it. */
 export function roundLabel(r: Round, firstAsked: number | undefined, asked?: string) {
   const a = r.asked;
-  if (!a) return sessionWording().rounds.earlier;
-  if (a.under !== undefined) return sessionWording().rounds.subagentGot;
-  return asked ?? (a.seq === firstAsked ? sessionWording().rounds.job : sessionWording().rounds.told);
+  if (!a) return t("web.session.rounds.earlier");
+  if (a.under !== undefined) return t("web.session.rounds.subagentGot");
+  return asked ?? (a.seq === firstAsked ? t("web.session.rounds.job") : t("web.session.rounds.told"));
 }
 
 /** Folded to `lines` when longer. */
@@ -198,7 +198,7 @@ export const isLongText = (text: string, lines: number) => text.length > lines *
 export function turnLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
-  return tools > 0 ? sessionWording().rounds.usedTools(tools) : sessionWording().rounds.process;
+  return tools > 0 ? t("web.session.rounds.usedTools", { n: tools }) : t("web.session.rounds.process");
 }
 
 export type Lane = "asked" | "model" | "tool";
@@ -328,7 +328,7 @@ export function summaryOf(log: SessionEvent[], end: number): TrajectorySummary {
 export const cacheHit = (s: TrajectorySummary) => (s.input + s.cacheRead > 0 ? s.cacheRead / (s.input + s.cacheRead) : undefined);
 
 /** Under ten seconds to a tenth. */
-export const secondsText = (ms: number) => (ms < 10000 ? appWording().time.tenths((ms / 1000).toFixed(1)) : tookText(ms));
+export const secondsText = (ms: number) => (ms < 10000 ? t("web.base.time.tenths", { s: (ms / 1000).toFixed(1) }) : tookText(ms));
 
 export const tokensText = (n: number) => (n < 10000 ? `${n}` : appWording().big(n, 1));
 
@@ -343,21 +343,21 @@ export function tagOf(step: SessionEvent, asked?: string, job = false): string {
   const sub = step.under !== undefined;
   switch (step.type) {
     case "user/message":
-      return sub ? sessionWording().rounds.subagentGot : (asked ?? (job ? sessionWording().rounds.job : sessionWording().rounds.told));
+      return sub ? t("web.session.rounds.subagentGot") : (asked ?? (job ? t("web.session.rounds.job") : t("web.session.rounds.told")));
     case "memory/recalled":
-      return sessionWording().rounds.span.recalled;
+      return t("web.session.rounds.span.recalled");
     case "assistant/thinking":
-      return sub ? sessionWording().rounds.tag.subagentThought : sessionWording().rounds.tag.thought;
+      return sub ? t("web.session.rounds.tag.subagentThought") : t("web.session.rounds.tag.thought");
     case "assistant/message":
-      return sub ? sessionWording().rounds.tag.subagentSaid : sessionWording().rounds.tag.said;
+      return sub ? t("web.session.rounds.tag.subagentSaid") : t("web.session.rounds.tag.said");
     case "llm/retry":
-      return sessionWording().rounds.span.retry;
+      return t("web.session.rounds.span.retry");
     case "llm/usage":
-      return sessionWording().rounds.tag.usage;
+      return t("web.session.rounds.tag.usage");
     case "run/error":
-      return sessionWording().rounds.span.error;
+      return t("web.session.rounds.span.error");
     case "tool/call":
-      if (farmToolText(step.text) !== undefined) return sessionWording().rounds.span.farm;
+      if (farmToolText(step.text) !== undefined) return t("web.session.rounds.span.farm");
       return step.tool ? toolName(step.tool) : spanLabel(step);
     case "run/start":
     case "run/end":

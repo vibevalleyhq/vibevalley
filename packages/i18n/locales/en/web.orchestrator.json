@@ -1,0 +1,51 @@
+{
+  "looks": {
+    "farmer": {
+      "name": "Young farmer",
+      "blurb": "Straw hat and overalls, always smiling."
+    },
+    "foreman": {
+      "name": "Foreman",
+      "blurb": "Hard hat and safety vest, walkie-talkie always on, there at a call."
+    },
+    "auntie": {
+      "name": "Farm auntie",
+      "blurb": "Headscarf and apron, every plot's work in her notebook."
+    },
+    "grandpa": {
+      "name": "Old hand",
+      "blurb": "White beard, a lifetime of farming, never in a hurry."
+    },
+    "gardener": {
+      "name": "Gardener",
+      "blurb": "A flower in a wide straw hat, shears in the apron pocket."
+    },
+    "robot": {
+      "name": "Robot manager",
+      "blurb": "A round farm robot whose face screen smiles."
+    }
+  },
+  "pet": {
+    "dog": "Puppy",
+    "ragdoll": "Colorpoint ragdoll",
+    "bluecat": "Blue cat"
+  },
+  "orchestrator": {
+    "tab": {
+      "memory": "Memory",
+      "trajectory": "Trajectory",
+      "archive": "Archive",
+      "voice": "Voice"
+    },
+    "all": "← All profiles",
+    "title": "Manager",
+    "intro": "The manager is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
+    "look": "It looks like {name}.",
+    "profile": "Edit its profile",
+    "tabs": "The manager's",
+    "heard": "Heard",
+    "quiet": "The manager has not spoken yet.",
+    "trajectory": "Each of the manager's rounds",
+    "about": "What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click \"This round went wrong\" on what it heard, write what it should have done, and it is kept as an eval."
+  }
+}

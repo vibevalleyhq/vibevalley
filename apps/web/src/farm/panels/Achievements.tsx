@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // 任务与成就: the farm's level, coins and worn title, the starter tasks, the beds cleared by level, each wall of
 // achievements with its medals and how far along it is, and the secrets found. The catalogue is the server's
 // (game.achievements), the standings come with the frame (view.achievements).
@@ -22,12 +23,12 @@ const walls: AchievementCategory[] = ["harvest", "craft", "thrift", "team"];
 const tierText = farmWording().achievements.tier;
 
 const categoryText: Record<AchievementCategory, string> = {
-  starter: farmWording().achievements.category.starter,
-  harvest: farmWording().achievements.category.harvest,
-  craft: farmWording().achievements.category.craft,
-  thrift: farmWording().achievements.category.thrift,
-  team: farmWording().achievements.category.team,
-  secret: farmWording().achievements.category.secret,
+  starter: t("web.farm.achievements.category.starter"),
+  harvest: t("web.farm.achievements.category.harvest"),
+  craft: t("web.farm.achievements.category.craft"),
+  thrift: t("web.farm.achievements.category.thrift"),
+  team: t("web.farm.achievements.category.team"),
+  secret: t("web.farm.achievements.category.secret"),
 };
 
 const pip: Record<number, string> = { 1: "#c07a43", 2: "#a9b4bf", 3: "#e5a93c" };
@@ -119,7 +120,7 @@ export function Achievements() {
       <Standing catalog={catalog()} />
       <Starter list={of("starter")} st={st()} />
       <div>
-        <Heading text={farmWording().achievements.clearing} />
+        <Heading text={t("web.farm.achievements.clearing")} />
         <div class="flex flex-wrap gap-2">
           <For each={beds.filter((b) => b.unlockLevel !== undefined)}>
             {(b) => {
@@ -129,7 +130,7 @@ export function Achievements() {
                   class="flex items-center gap-1 px-3 py-1 text-[12px]"
                   style={{ background: done() ? tint("#b4cb7c", 0.7) : "#e2c995", color: done() ? "#2f1f13" : "#67482d" }}
                 >
-                  {farmWording().achievements.clearAt(b.unlockLevel!)}
+                  {t("web.farm.achievements.clearAt", { level: b.unlockLevel! })}
                   <Show when={done()}>
                     <SpriteIcon name="mark-check" size={12} />
                   </Show>
@@ -166,10 +167,12 @@ function Standing(props: { catalog: readonly Achievement[] }) {
       <div class="flex min-w-[160px] max-w-[280px] flex-col">
         <div class="flex flex-wrap items-end gap-2">
           <span class="text-[20px] text-leaf-700">Lv.{Math.round(lv().level)}</span>
-          <span class="text-[12px] text-bark-600">{farmWording().achievements.toLevel(need() - Math.round(lv().xp), Math.round(commits()))}</span>
+          <span class="text-[12px] text-bark-600">
+            {t("web.farm.achievements.toLevel", { left: need() - Math.round(lv().xp), total: Math.round(commits()) })}
+          </span>
         </div>
         <span class="mt-1.5">
-          <Bar value={lv().xp} max={need()} label={farmWording().achievements.toNext} />
+          <Bar value={lv().xp} max={need()} label={t("web.farm.achievements.toNext")} />
         </span>
       </div>
       <div class="flex items-center gap-2">
@@ -178,8 +181,8 @@ function Standing(props: { catalog: readonly Achievement[] }) {
           <p class="text-[20px]">{thousands(Math.round(p().coins))}</p>
           <p class="text-[12px] text-bark-600">
             {p().streak > 1
-              ? farmWording().achievements.streak(Math.round(p().streak), (p().multiplier ?? 1).toFixed(1))
-              : farmWording().achievements.coinsOnMerge}
+              ? t("web.farm.achievements.streak", { n: Math.round(p().streak), multiplier: (p().multiplier ?? 1).toFixed(1) })
+              : t("web.farm.achievements.coinsOnMerge")}
           </p>
         </div>
       </div>
@@ -214,13 +217,13 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
           {(w) => <Medal a={w().a} tier={w().tier} size={32} />}
         </Show>
         <span>
-          <span class="block text-[12px] text-bark-600">{farmWording().achievements.title}</span>
+          <span class="block text-[12px] text-bark-600">{t("web.farm.achievements.title")}</span>
           <span class="block text-[13px]">
             {worn() && title()
               ? tierTitle(worn()!, Math.round(title()!.tier))
               : earned().length
-                ? farmWording().achievements.pick
-                : farmWording().achievements.earnFirst}
+                ? t("web.farm.achievements.pick")
+                : t("web.farm.achievements.earnFirst")}
           </span>
         </span>
       </button>
@@ -228,9 +231,9 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
         <div
           class="absolute top-full right-0 z-10 mt-2 max-h-80 w-64 overflow-y-auto bg-cream-50 p-1.5 shadow-px"
           role="menu"
-          aria-label={farmWording().achievements.titles}
+          aria-label={t("web.farm.achievements.titles")}
         >
-          <p class="px-2 pt-1 pb-1.5 text-[12px] text-bark-600">{farmWording().achievements.titles}</p>
+          <p class="px-2 pt-1 pb-1.5 text-[12px] text-bark-600">{t("web.farm.achievements.titles")}</p>
           <For each={earned()}>
             {(e) => {
               const on = () => title()?.id === e.a.id && title()?.tier === e.tier;
@@ -247,7 +250,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
                   <Medal a={e.a} tier={e.tier} size={28} />
                   <span class={["flex-1 text-[13px]", { "text-leaf-700": on() }]}>{tierTitle(e.a, e.tier)}</span>
                   <Show when={on()}>
-                    <SpriteIcon name="mark-check" size={14} label={farmWording().achievements.worn} />
+                    <SpriteIcon name="mark-check" size={14} label={t("web.farm.achievements.worn")} />
                   </Show>
                 </button>
               );
@@ -263,7 +266,7 @@ function TitlePicker(props: { p: Progress; catalog: readonly Achievement[] }) {
               }}
               class="w-full cursor-pointer px-2 py-1.5 text-left text-[13px] text-bark-600 hover:bg-cream-100"
             >
-              {farmWording().achievements.none}
+              {t("web.farm.achievements.none")}
             </button>
           </Show>
         </div>
@@ -280,14 +283,14 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
       fallback={
         <Tinted color={tint("#b4cb7c", 0.4)} class="flex items-center gap-2">
           <SpriteIcon name="emblem-starter" size={28} />
-          <span class="text-[13px] text-bark-800">{farmWording().achievements.starterDone}</span>
+          <span class="text-[13px] text-bark-800">{t("web.farm.achievements.starterDone")}</span>
         </Tinted>
       }
     >
       <div>
         <Heading
-          text={farmWording().achievements.starter(done(), props.list.length)}
-          aside={props.list[0] ? farmWording().achievements.perStarter(Math.round(props.list[0].tiers[0]?.coins ?? 0)) : undefined}
+          text={t("web.farm.achievements.starter", { done: done(), of: props.list.length })}
+          aside={props.list[0] ? t("web.farm.achievements.perStarter", { coins: Math.round(props.list[0].tiers[0]?.coins ?? 0) }) : undefined}
         />
         <div class="grid gap-1.5 sm:grid-cols-2">
           <For each={props.list}>
@@ -303,7 +306,7 @@ function Starter(props: { list: readonly Achievement[]; st: Standings }) {
                       class={["h-9 w-9 object-contain [image-rendering:pixelated]", { "opacity-60": !ok() }]}
                     />
                     <Show when={ok()}>
-                      <SpriteIcon name="stamp-done" size={20} label={farmWording().achievements.done} class="absolute -right-1.5 -bottom-1" />
+                      <SpriteIcon name="stamp-done" size={20} label={t("web.farm.achievements.done")} class="absolute -right-1.5 -bottom-1" />
                     </Show>
                   </span>
                   <span class="min-w-0 flex-1">
@@ -343,7 +346,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
             {tierTitle(props.a, standing().tier < 1 ? 1 : standing().tier)}
           </span>
           <Show when={props.a.tiers.length > 1}>
-            <span class="flex" aria-label={farmWording().achievements.tiers(standing().tier, props.a.tiers.length)}>
+            <span class="flex" aria-label={t("web.farm.achievements.tiers", { tier: standing().tier, of: props.a.tiers.length })}>
               <For each={props.a.tiers}>
                 {(t, i) => (
                   <span
@@ -365,7 +368,7 @@ function Card(props: { a: Achievement; p: Progress; st: Standings }) {
                   value={Math.min(standing().count, next())}
                   max={next()}
                   height={6}
-                  label={farmWording().achievements.toTier(tierText[standing().tier + 1] ?? "")}
+                  label={t("web.farm.achievements.toTier", { tier: tierText[standing().tier + 1] ?? "" })}
                 />
               </span>
               <span class="text-[12px] text-bark-600">
@@ -398,8 +401,8 @@ function Secrets(props: { list: readonly Achievement[]; p: Progress; st: Standin
           <div class="flex items-center gap-3 bg-cream-100 p-2.5">
             <SpriteIcon name="medal-locked" size={60} />
             <div>
-              <p class="text-[13px] text-bark-600">{farmWording().achievements.secrets(left())}</p>
-              <p class="text-[12px] text-bark-600">{farmWording().achievements.secretsLine}</p>
+              <p class="text-[13px] text-bark-600">{t("web.farm.achievements.secrets", { n: left() })}</p>
+              <p class="text-[12px] text-bark-600">{t("web.farm.achievements.secretsLine")}</p>
             </div>
           </div>
         </Show>

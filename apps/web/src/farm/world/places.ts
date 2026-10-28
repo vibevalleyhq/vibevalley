@@ -1,4 +1,5 @@
-import { farmWording } from "../words";
+import { t } from "@vibevalley/i18n";
+
 // What a click in the yard opens. The ids match the LDtk Prop and Area `spot` fields;
 // a place opens a farm panel, a workbench page, or the chat (the phone unfolded to 田头).
 
@@ -17,16 +18,16 @@ export interface YardPlace {
 }
 
 export const yardPlaces: readonly YardPlace[] = [
-  { id: "shop", label: farmWording().panel.shop, hint: farmWording().yard.shop.hint, panel: "shop" },
-  { id: "warehouse", label: farmWording().panel.warehouse, hint: farmWording().yard.warehouse.hint, panel: "warehouse" },
-  { id: "tasks", label: farmWording().panel.graphs, hint: farmWording().yard.tasks.hint, panel: "graphs" },
-  { id: "log", label: farmWording().panel.log, hint: farmWording().yard.log.hint, panel: "log" },
-  { id: "taskBoard", label: farmWording().yard.taskBoard.label, hint: farmWording().yard.taskBoard.hint, panel: "taskBoard" },
-  { id: "agents", label: farmWording().menu.agents, hint: farmWording().yard.agents.hint, route: "/agents" },
+  { id: "shop", label: t("web.farm.panel.shop"), hint: t("web.farm.yard.shop.hint"), panel: "shop" },
+  { id: "warehouse", label: t("web.farm.panel.warehouse"), hint: t("web.farm.yard.warehouse.hint"), panel: "warehouse" },
+  { id: "tasks", label: t("web.farm.panel.graphs"), hint: t("web.farm.yard.tasks.hint"), panel: "graphs" },
+  { id: "log", label: t("web.farm.panel.log"), hint: t("web.farm.yard.log.hint"), panel: "log" },
+  { id: "taskBoard", label: t("web.farm.yard.taskBoard.label"), hint: t("web.farm.yard.taskBoard.hint"), panel: "taskBoard" },
+  { id: "agents", label: t("web.farm.menu.agents"), hint: t("web.farm.yard.agents.hint"), route: "/agents" },
   // Changing its look is the HUD's face (换管家的样子); the orchestrator in the yard is someone to talk to.
-  { id: "manager", label: farmWording().orchestrator, hint: farmWording().yard.manager.hint, chat: true },
-  { id: "runtimes", label: farmWording().yard.runtimes.label, hint: farmWording().yard.runtimes.hint, route: "/runtimes" },
-  { id: "skills", label: farmWording().yard.skills.label, hint: farmWording().yard.skills.hint, route: "/settings/skills" },
+  { id: "manager", label: t("web.farm.orchestrator"), hint: t("web.farm.yard.manager.hint"), chat: true },
+  { id: "runtimes", label: t("web.farm.yard.runtimes.label"), hint: t("web.farm.yard.runtimes.hint"), route: "/runtimes" },
+  { id: "skills", label: t("web.farm.yard.skills.label"), hint: t("web.farm.yard.skills.hint"), route: "/settings/skills" },
 ];
 
 export const yardPlace = (id: string) => yardPlaces.find((p) => p.id === id);

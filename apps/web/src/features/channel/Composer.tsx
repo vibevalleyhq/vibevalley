@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 import { ownerId } from "@vibevalley/protocol";
 import { attachFiles, draftOf, drafts, setEditingId, uploadsIn } from "./draft";
 import { EmojiPicker } from "./EmojiPicker";
 import { followed } from "./follow";
-import { chatWording } from "./words";
+
 import { createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { Channel } from "@vibevalley/protocol";
@@ -39,7 +40,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     },
     failed: (reason) => {
       setProblem(reason);
-      toast(chatWording().composer.notSent(reason), "bad");
+      toast(t("web.channel.composer.notSent", { why: reason }), "bad");
     },
     edited: (value) => {
       setProblem(undefined);
@@ -90,7 +91,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   return (
     <div class="border-t border-line px-4 pt-3 pb-4">
       <Show when={box.offered().length > 0}>
-        <div role="listbox" aria-label={chatWording().composer.who} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
+        <div role="listbox" aria-label={t("web.channel.composer.who")} class="mb-1.5 flex flex-col rounded-lg border border-line bg-page p-1 shadow-float">
           <For each={box.offered()} keyed={(n) => n.token}>
             {(n, i) => (
               <div
@@ -123,13 +124,13 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           <div class="mb-1.5 flex items-center gap-2 rounded-md bg-hover px-3 py-1.5 text-xs text-muted">
             <Icon name="reply" size={12} />
             <span class="min-w-0 flex-1 truncate">
-              {chatWording().composer.replying(m().from === ownerId ? chatWording().messages.owner : m().name)}：{m().text}
+              {t("web.channel.composer.replying", { name: m().from === ownerId ? t("web.channel.messages.owner") : m().name })}：{m().text}
             </span>
             <button
               type="button"
               class="cursor-pointer rounded p-0.5 hover:bg-page"
-              aria-label={chatWording().composer.cancelReply}
-              title={chatWording().composer.cancelReply}
+              aria-label={t("web.channel.composer.cancelReply")}
+              title={t("web.channel.composer.cancelReply")}
               onClick={() => drafts.reply(props.channel!.id, undefined)}
             >
               <Icon name="close" size={12} />
@@ -147,7 +148,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
                 <button
                   type="button"
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
-                  aria-label={chatWording().composer.removeFile(f().name)}
+                  aria-label={t("web.channel.composer.removeFile", { name: f().name })}
                   onClick={() => drafts.drop(props.channel!.id, f().id)}
                 >
                   <Icon name="close" size={10} />
@@ -166,7 +167,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
                 class="relative flex items-center overflow-hidden rounded-md border border-line bg-page px-2 py-1 text-xs text-muted"
               >
                 <span class="absolute inset-y-0 left-0 bg-leaf/20" style={{ width: `${u().percent}%` }} />
-                <span class="relative max-w-48 truncate">{chatWording().media.uploadingFile(u().name, u().percent)}</span>
+                <span class="relative max-w-48 truncate">{t("web.channel.media.uploadingFile", { name: u().name, percent: u().percent })}</span>
               </span>
             )}
           </For>
@@ -195,7 +196,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
         />
         <div class="flex items-center gap-1 px-2 pb-2">
           <Show when={props.channel?.type !== "direct"}>
-            <span class="text-xs text-faint">{chatWording().composer.mention}</span>
+            <span class="text-xs text-faint">{t("web.channel.composer.mention")}</span>
           </Show>
           <span class="flex-1" />
           <input
@@ -215,8 +216,8 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             type="button"
             onClick={() => picker?.click()}
             disabled={!props.channel}
-            aria-label={chatWording().composer.attach}
-            title={chatWording().composer.attach}
+            aria-label={t("web.channel.composer.attach")}
+            title={t("web.channel.composer.attach")}
             class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
           >
             <Icon name="attach" size={16} />
@@ -227,9 +228,9 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               ref={(el) => (emojiButton = el)}
               onClick={() => setEmoji(!emoji())}
               disabled={!props.channel}
-              aria-label={chatWording().emoji.open}
+              aria-label={t("web.channel.emoji.open")}
               aria-expanded={aria(emoji())}
-              title={chatWording().emoji.open}
+              title={t("web.channel.emoji.open")}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-hover disabled:cursor-default disabled:opacity-40"
             >
               <Icon name="react" size={16} />
@@ -250,8 +251,8 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <button
               type="button"
               onClick={() => void stop()}
-              aria-label={chatWording().composer.stop}
-              title={chatWording().composer.stopHint}
+              aria-label={t("web.channel.composer.stop")}
+              title={t("web.channel.composer.stopHint")}
               class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-line text-berry hover:bg-hover"
             >
               <Icon name="stop" size={14} />
@@ -261,8 +262,8 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             type="button"
             onClick={() => void box.send()}
             disabled={!box.canSend()}
-            aria-label={chatWording().composer.send}
-            title={chatWording().composer.sendHint}
+            aria-label={t("web.channel.composer.send")}
+            title={t("web.channel.composer.sendHint")}
             class={[
               "inline-flex size-7 cursor-pointer items-center justify-center rounded-md border disabled:cursor-default",
               box.canSend() ? "border-accent bg-accent hover:bg-leaf" : "border-transparent opacity-50",
@@ -302,11 +303,11 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
       {props.children}
       <Show when={over()}>
         <div class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-page/85 text-base font-semibold text-accent">
-          {chatWording().media.drop}
+          {t("web.channel.media.drop")}
         </div>
       </Show>
     </div>
   );
 }
 
-const uploadFailed = (reason: string) => toast(chatWording().composer.uploadFailed(reason), "bad");
+const uploadFailed = (reason: string) => toast(t("web.channel.composer.uploadFailed", { why: reason }), "bad");

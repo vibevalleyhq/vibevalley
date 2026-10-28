@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
+import { format, placeholderKinds, placeholders } from "../packages/i18n/src/format.ts";
 
 const root = join(import.meta.dirname, "..");
 const pkg = join(root, "packages/i18n");
@@ -28,8 +29,7 @@ interface Nested {
 const han = /\p{Script=Han}/u;
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
 const same = new Set((JSON.parse(readFileSync(join(pkg, "same.json"), "utf8")) as { keys: string[] }).keys);
-const placeholder = /\{([A-Za-z_$][\w$]*)\}/g;
-const placeholdersOf = (text: string) => [...new Set([...text.matchAll(placeholder)].map((m) => m[1]!))].sort();
+const placeholdersOf = (text: string) => placeholders(text).sort();
 
 const namespaces = (locale: Locale) =>
   existsSync(join(localesDir, locale))
@@ -71,8 +71,12 @@ function generated(): string {
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");
   for (const [key, text] of [...zh].sort(([a], [b]) => (a < b ? -1 : 1))) {
     // A message's params are every language's: an English plural may name a count the Chinese does not say.
-    const names = [...new Set([text, ...all.map((m) => m.get(key) ?? "")].flatMap(placeholdersOf))].sort();
-    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: string | number`).join("; ")} }` : "undefined"};`);
+    const kinds = new Map<string, string>();
+    for (const one of [text, ...all.map((m) => m.get(key) ?? "")])
+      for (const [n, kind] of placeholderKinds(one)) if (kinds.get(n) === undefined || kind !== "value") kinds.set(n, kind);
+    const typeOf = (kind: string | undefined) => (kind === "plural" ? "number" : kind === "select" ? "boolean" : "string | number");
+    const names = [...kinds.keys()].sort();
+    lines.push(`  ${quote(key)}: ${names.length ? `{ ${names.map((n) => `readonly ${n}: ${typeOf(kinds.get(n))}`).join("; ")} }` : "undefined"};`);
   }
   lines.push("}", "");
   return lines.join("\n");
@@ -204,6 +208,9 @@ function templateOf(fn: Function): string | undefined {
   let text = a;
   names.forEach((n, i) => (text = text.split(sentinel(i)).join(`{${n}}`)));
   if (text.includes("\u0001")) return undefined;
+  // A param that picks a branch (a flag, an optional value) answers differently when it is empty or missing.
+  const filled = (v: string) => names.reduce((s, n) => s.split(`{${n}}`).join(v), text);
+  if (call(names.map(() => "")) !== filled("") || call(names.map(() => undefined)) !== filled("undefined")) return undefined;
   if (
     shape(one, "1") !==
     shape(
@@ -213,6 +220,48 @@ function templateOf(fn: Function): string | undefined {
   )
     return undefined;
   return text;
+}
+
+/** A function that picks by one param, as a plural on a count or a select on a flag; kept only if formatting it gives
+ * what the function gives for every sample. */
+function choiceOf(fn: Function): string | undefined {
+  const names = paramNames(fn);
+  if (names.length === 0 || names.length !== fn.length) return undefined;
+  const call = (args: unknown[]) => {
+    try {
+      const r = (fn as (...a: unknown[]) => unknown)(...args);
+      return typeof r === "string" && !/undefined|NaN|\[object /.test(r) ? r : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const named = (r: string) => names.reduce((s, n, i) => s.split(sentinel(i)).join(`{${n}}`), r);
+  const agrees = (message: string, samples: unknown[][]) =>
+    samples.every((args) => {
+      const want = call(args);
+      const params = Object.fromEntries(names.map((n, i) => [n, args[i] as string | number | boolean]));
+      return want !== undefined && format(message, params) === want;
+    });
+  const others = (i: number, v: unknown) => names.map((_, j) => (j === i ? v : sentinel(j)));
+  for (let i = 0; i < names.length; i++) {
+    const n = names[i]!;
+    const one = call(others(i, 1));
+    const many = call(others(i, 7));
+    if (one !== undefined && many !== undefined) {
+      const body = (r: string, count: number) => named(r).split(String(count)).join("#");
+      const message = `{${n}, plural, one {${body(one, 1)}} other {${body(many, 7)}}}`;
+      const samples = [0, 1, 2, 5, 11, 21, 100].map((c) => others(i, c));
+      if (body(one, 1) !== body(many, 7) && agrees(message, samples)) return message;
+    }
+    const yes = call(others(i, true));
+    const no = call(others(i, false));
+    // A param put into the text as it is prints true or false: that is a value, not a flag.
+    if (yes !== undefined && no !== undefined && yes !== no && !/true|false/.test(yes + no)) {
+      const message = `{${n}, select, true {${named(yes)}} other {${named(no)}}}`;
+      if (agrees(message, [others(i, true), others(i, false)])) return message;
+    }
+  }
+  return undefined;
 }
 
 interface Converted {
@@ -234,8 +283,8 @@ function convert(zh: unknown, en: unknown): { zh: Converted; en: Nested } {
         zo[k] = zv;
         eo[k] = ev;
       } else if (typeof zv === "function" && typeof ev === "function") {
-        const zt = templateOf(zv);
-        const et = templateOf(ev);
+        const zt = templateOf(zv) ?? choiceOf(zv);
+        const et = templateOf(ev) ?? choiceOf(ev);
         const zn = paramNames(zv);
         if (zt !== undefined && et !== undefined && paramNames(ev).join() === zn.join()) {
           zo[k] = zt;

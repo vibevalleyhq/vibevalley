@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import { chatWording } from "./words";
 import { For, onSettled, untrack } from "solid-js";
 import { Portal } from "@solidjs/web";
@@ -46,7 +47,7 @@ export function EmojiPicker(props: { anchor: HTMLElement | undefined; onPick: (e
       <div
         ref={(el) => (box = el)}
         role="dialog"
-        aria-label={chatWording().emoji.open}
+        aria-label={t("web.channel.emoji.open")}
         style={{ left: `${at.left}px`, top: `${at.top}px`, width: `${width}px`, "max-height": `${height}px` }}
         class="fixed z-50 flex flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-page p-2 text-ink shadow-float"
       >

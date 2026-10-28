@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The tools the owner holds over the plots, and what a click with one means. aimTool is the
 // rule: the screen shows it while pointing and follows it on a click.
 
@@ -9,12 +10,12 @@ import { type Bed, isRipe } from "./world/plots";
 export type Tool = "hand" | "water" | "bug" | "weed" | "harvest" | "shovel";
 
 export const tools: readonly { readonly id: Tool; readonly label: string; readonly hint: string; readonly icon: string }[] = [
-  { id: "hand", label: farmWording().tool.hand.label, hint: farmWording().tool.hand.hint, icon: "icon-hand" },
-  { id: "water", label: farmWording().water.water, hint: farmWording().tool.water.hint, icon: "icon-water" },
-  { id: "bug", label: farmWording().tool.bug.label, hint: farmWording().tool.bug.hint, icon: "icon-bug" },
-  { id: "weed", label: farmWording().tool.weed.label, hint: farmWording().tool.weed.hint, icon: "icon-weed" },
-  { id: "harvest", label: farmWording().tool.harvest.label, hint: farmWording().tool.harvest.hint, icon: "icon-harvest" },
-  { id: "shovel", label: farmWording().tool.shovel.label, hint: farmWording().tool.shovel.hint, icon: "icon-shovel" },
+  { id: "hand", label: t("web.farm.tool.hand.label"), hint: t("web.farm.tool.hand.hint"), icon: "icon-hand" },
+  { id: "water", label: t("web.farm.water.water"), hint: t("web.farm.tool.water.hint"), icon: "icon-water" },
+  { id: "bug", label: t("web.farm.tool.bug.label"), hint: t("web.farm.tool.bug.hint"), icon: "icon-bug" },
+  { id: "weed", label: t("web.farm.tool.weed.label"), hint: t("web.farm.tool.weed.hint"), icon: "icon-weed" },
+  { id: "harvest", label: t("web.farm.tool.harvest.label"), hint: t("web.farm.tool.harvest.hint"), icon: "icon-harvest" },
+  { id: "shovel", label: t("web.farm.tool.shovel.label"), hint: t("web.farm.tool.shovel.hint"), icon: "icon-shovel" },
 ];
 
 /** The keys 1–6 pick the tools in this order. */
@@ -63,32 +64,32 @@ export function actForTool(tool: Tool, acts: readonly IssueAct[]): IssueAct | un
 
 export function aimTool(tool: Tool, bed: Bed, session: Session | undefined, plot: PlotView, level: number, issue?: Issue): Aim {
   const unlock = bed.unlockLevel;
-  if (unlock !== undefined) return { ok: false, text: level >= unlock ? farmWording().aim.flowerbed : farmWording().aim.clearAt(unlock) };
+  if (unlock !== undefined) return { ok: false, text: level >= unlock ? t("web.farm.aim.flowerbed") : t("web.farm.aim.clearAt", { level: unlock }) };
   const crop = plot.crop;
   const act = actForTool(
     tool,
     (issue?.attention.acts ?? []).map((a) => a.act),
   );
-  const unavailable = issue ? farmWording().aim.unavailable(wording().attention[issue.attention.state]) : farmWording().aim.unread;
+  const unavailable = issue ? farmWording().aim.unavailable(wording().attention[issue.attention.state]) : t("web.farm.aim.unread");
   switch (tool) {
     case "hand":
-      return { ok: true, text: session ? farmWording().aim.look : farmWording().aim.sow };
+      return { ok: true, text: session ? t("web.farm.aim.look") : t("web.farm.aim.sow") };
     case "water":
       return session && act
-        ? { ok: true, text: farmWording().aim.water(session.name) }
-        : { ok: false, text: session ? unavailable : farmWording().aim.nothingYet };
+        ? { ok: true, text: t("web.farm.aim.water", { name: session.name }) }
+        : { ok: false, text: session ? unavailable : t("web.farm.aim.nothingYet") };
     case "bug":
-      return session && act ? { ok: true, text: farmWording().aim.bug } : { ok: false, text: session ? unavailable : farmWording().aim.noBugs };
+      return session && act ? { ok: true, text: t("web.farm.aim.bug") } : { ok: false, text: session ? unavailable : t("web.farm.aim.noBugs") };
     case "weed":
-      return { ok: false, text: crop === "weeds" ? farmWording().aim.weeds : farmWording().aim.noWeeds };
+      return { ok: false, text: crop === "weeds" ? t("web.farm.aim.weeds") : t("web.farm.aim.noWeeds") };
     case "harvest":
       return session && act
-        ? { ok: true, text: isRipe(crop) ? farmWording().aim.harvestRipe : farmWording().aim.harvestLook }
-        : { ok: false, text: session ? unavailable : farmWording().aim.nothingToHarvest };
+        ? { ok: true, text: isRipe(crop) ? t("web.farm.aim.harvestRipe") : t("web.farm.aim.harvestLook") }
+        : { ok: false, text: session ? unavailable : t("web.farm.aim.nothingToHarvest") };
     case "shovel":
       return session && act
-        ? { ok: true, text: act === "stop" ? farmWording().aim.shovelStop : farmWording().aim.shovelDismiss }
-        : { ok: false, text: session ? unavailable : farmWording().aim.noShovel };
+        ? { ok: true, text: act === "stop" ? t("web.farm.aim.shovelStop") : t("web.farm.aim.shovelDismiss") }
+        : { ok: false, text: session ? unavailable : t("web.farm.aim.noShovel") };
   }
 }
 

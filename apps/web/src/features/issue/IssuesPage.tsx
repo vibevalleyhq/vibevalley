@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import { issuesWording } from "./words";
 import { createMemo, createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import type { JSX } from "@solidjs/web";
@@ -86,7 +87,7 @@ export function IssuesPage(props: { rest: string }) {
     if (move === "start" && c.kind === "todo") {
       if (!c.issue.assignee || !c.issue.project) {
         open(c.id);
-        toast(issuesWording().page.pickFirst);
+        toast(t("web.issue.page.pickFirst"));
         return;
       }
       const got = await run(() => api.issue.status.update({ id: c.id, status: "todo" }));
@@ -99,7 +100,7 @@ export function IssuesPage(props: { rest: string }) {
     const f = filter();
     const made = await run(() => writeIssue(text, where.agent || f.agent, where.project || f.project));
     if (!made) return;
-    if (made.refused) toast(issuesWording().page.notDrafted(made.refused));
+    if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
     open(made.issue.id);
   };
   const addInList: ListAdd = (text, where) => void add(text, where);
@@ -109,7 +110,7 @@ export function IssuesPage(props: { rest: string }) {
     <div class="relative flex h-full flex-col">
       <Show when={history.error()}>
         <p class="px-3 pt-2 text-sm text-berry">
-          {issuesWording().page.historyUnread}
+          {t("web.issue.page.historyUnread")}
           {reasonOf(history.error())}
         </p>
       </Show>
@@ -198,13 +199,13 @@ function Detail(props: {
   return (
     <Switch>
       <Match when={!card() && !props.known}>
-        <p class="text-sm text-muted">{issuesWording().reading}</p>
+        <p class="text-sm text-muted">{t("web.issue.reading")}</p>
       </Match>
       <Match when={!card()}>
         {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
         <div>
-          <h1 class="text-lg font-semibold">{issuesWording().page.notFound}</h1>
-          <p class="mt-3 text-sm text-muted">{issuesWording().page.notFoundLine(props.id)}</p>
+          <h1 class="text-lg font-semibold">{t("web.issue.page.notFound")}</h1>
+          <p class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</p>
         </div>
       </Match>
       <Match when={shows("todo")} keyed>
@@ -257,11 +258,11 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={issuesWording().page.sheet}
+        aria-label={t("web.issue.page.sheet")}
         class="relative h-fit w-full max-w-[1080px] rounded-xl border border-line bg-page px-6 py-5 shadow-float"
       >
         <div class="absolute top-3 right-3">
-          <IconButton icon="close" label={issuesWording().page.close} onClick={props.onClose} />
+          <IconButton icon="close" label={t("web.issue.page.close")} onClick={props.onClose} />
         </div>
         {props.children}
       </div>
@@ -291,38 +292,38 @@ function Toolbar(props: {
             <input
               value={props.filter.query}
               onInput={(e) => props.onFilter({ ...props.filter, query: e.currentTarget.value })}
-              placeholder={issuesWording().page.find}
-              aria-label={issuesWording().page.findLabel}
+              placeholder={t("web.issue.page.find")}
+              aria-label={t("web.issue.page.findLabel")}
               class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
           </label>
-          <Icon name="filter" size={16} label={issuesWording().page.filter} />
+          <Icon name="filter" size={16} label={t("web.issue.page.filter")} />
           <SelectOf
-            label={issuesWording().page.byProject}
+            label={t("web.issue.page.byProject")}
             value={props.filter.project}
             class={select}
-            none={issuesWording().page.allProjects}
+            none={t("web.issue.page.allProjects")}
             options={projects().map((p) => ({ value: p, label: p }))}
             onChange={(project) => props.onFilter({ ...props.filter, project })}
           />
           <SelectOf
-            label={issuesWording().page.byHelper}
+            label={t("web.issue.page.byHelper")}
             value={props.filter.agent}
             class={select}
-            none={issuesWording().page.allHelpers}
+            none={t("web.issue.page.allHelpers")}
             options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
           <Show when={filterAny(props.filter)}>
-            <span class="text-xs text-muted">{issuesWording().page.shown(props.shown, props.cards.length)}</span>
+            <span class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</span>
             <button type="button" onClick={() => props.onFilter(noFilter)} class="cursor-pointer text-sm text-water hover:underline">
-              {issuesWording().page.clear}
+              {t("web.issue.page.clear")}
             </button>
           </Show>
         </div>
         <div class="ml-auto flex items-center gap-1.5">
           <Segmented
-            label={issuesWording().page.view}
+            label={t("web.issue.page.view")}
             value={props.look.view}
             onChange={(view) => props.onLook({ ...props.look, view })}
             options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}

@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // 种田 2048 on the phone: the rules are farm/phone/games/merge.ts; here the pad, swipes and the drawing, each stage a
 // 12×12 picture. The field is kept while the phone is away or a call comes in. Arrows (or a swipe on the field) slide,
 // B takes one slide back, A starts, goes on after 丰收, and asks before starting over.
 
-import { phoneWording } from "../words";
 import { createSignal, For, Show } from "solid-js";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";
 import { lcd } from "../lcd";
@@ -278,32 +278,36 @@ export function MergeGame() {
   const overlay = () => {
     const now = g();
     return !now
-      ? [phoneWording().game.merge, phoneWording().merge.start]
+      ? [t("web.farm.phone.game.merge"), t("web.farm.phone.merge.start")]
       : asking()
-        ? [phoneWording().merge.restartAsk, phoneWording().merge.restartKeys]
+        ? [t("web.farm.phone.merge.restartAsk"), t("web.farm.phone.merge.restartKeys")]
         : cheer()
-          ? [phoneWording().merge.harvest, phoneWording().merge.goOn]
+          ? [t("web.farm.phone.merge.harvest"), t("web.farm.phone.merge.goOn")]
           : now.over
-            ? [phoneWording().merge.full(score()), phoneWording().merge.overKeys]
+            ? [t("web.farm.phone.merge.full", { score: score() }), t("web.farm.phone.merge.overKeys")]
             : null;
   };
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center gap-1.5 px-2 pt-2">
       <div class="flex w-full px-1">
-        <span>{phoneWording().game.merge}</span>
+        <span>{t("web.farm.phone.game.merge")}</span>
         <span class="ml-auto tabular-nums">
-          {phoneWording().blocks.best} {Math.max(top(), score())}
+          {t("web.farm.phone.blocks.best")} {Math.max(top(), score())}
         </span>
       </div>
       <div class="flex w-full px-1">
         <span class="tabular-nums">
-          {phoneWording().blocks.score} {score()}
+          {t("web.farm.phone.blocks.score")} {score()}
         </span>
-        <span class="ml-auto">{reached() ? phoneWording().merge.reached(mergeStageName(reached())) : ""}</span>
+        <span class="ml-auto">{reached() ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}</span>
       </div>
       <div
         role="img"
-        aria-label={g() ? phoneWording().merge.field(board().filter((c) => c).length, mergeStageName(Math.max(reached(), 1))) : phoneWording().game.merge}
+        aria-label={
+          g()
+            ? t("web.farm.phone.merge.field", { n: board().filter((c) => c).length, top: mergeStageName(Math.max(reached(), 1)) })
+            : t("web.farm.phone.game.merge")
+        }
         class="relative grid shrink-0 touch-none"
         style={{
           width: `${side}px`,
@@ -342,7 +346,7 @@ export function MergeGame() {
           )}
         </Show>
       </div>
-      <div class="flex gap-0.5" aria-label={phoneWording().merge.stages}>
+      <div class="flex gap-0.5" aria-label={t("web.farm.phone.merge.stages")}>
         <For each={mergeStages}>
           {(name, i) => (
             <span title={name}>
@@ -352,9 +356,9 @@ export function MergeGame() {
         </For>
       </div>
       <p class="mt-auto mb-1 text-center leading-[1.625]" style={{ color: lcd.dark }}>
-        {phoneWording().merge.help}
+        {t("web.farm.phone.merge.help")}
         <br />
-        {phoneWording().merge.help2}
+        {t("web.farm.phone.merge.help2")}
       </p>
     </div>
   );

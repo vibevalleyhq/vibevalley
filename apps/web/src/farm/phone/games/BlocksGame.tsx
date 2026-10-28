@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 方块 on the phone: the rules are farm/phone/games/blocks.ts; here the clock, the pad and the drawing.
 // Leaving the game (or putting the phone away) pauses it where it is.
 
-import { phoneWording } from "../words";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, type PieceKind, pieceKinds, shift, slam, turn } from "./blocks";
 import { lcd } from "../lcd";
@@ -119,31 +119,33 @@ export function BlocksGame(props: { big?: boolean }) {
           width={blocksWidth * cell()}
           height={blocksHeight * cell()}
           class="block [image-rendering:pixelated]"
-          aria-label={phoneWording().blocks.well}
+          aria-label={t("web.farm.phone.blocks.well")}
           role="img"
         />
         <Show when={!g() || g()!.over || !playing()}>
           <div class="absolute inset-0 grid place-items-center bg-[#c9dc9a]/80 text-center">
             <span>
-              {g()?.over ? phoneWording().blocks.noRoom : g() ? phoneWording().paused : phoneWording().game.blocks}
+              {g()?.over ? t("web.farm.phone.blocks.noRoom") : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.blocks")}
               <br />
-              <span class="phone-blink">{phoneWording().pressA(g() && !g()!.over ? phoneWording().resume : phoneWording().start)}</span>
+              <span class="phone-blink">
+                {t("web.farm.phone.pressA", { what: g() && !g()!.over ? t("web.farm.phone.resume") : t("web.farm.phone.start") })}
+              </span>
             </span>
           </div>
         </Show>
       </div>
       <div class="flex min-w-0 flex-1 flex-col gap-2">
         <Next kind={g()?.next} />
-        <Stat label={phoneWording().blocks.score} value={g()?.score ?? 0} />
-        <Stat label={phoneWording().blocks.lines} value={g()?.lines ?? 0} />
-        <Stat label={phoneWording().blocks.level} value={g()?.level ?? 1} />
-        <Stat label={phoneWording().blocks.best} value={Math.max(top(), g()?.score ?? 0)} />
+        <Stat label={t("web.farm.phone.blocks.score")} value={g()?.score ?? 0} />
+        <Stat label={t("web.farm.phone.blocks.lines")} value={g()?.lines ?? 0} />
+        <Stat label={t("web.farm.phone.blocks.level")} value={g()?.level ?? 1} />
+        <Stat label={t("web.farm.phone.blocks.best")} value={Math.max(top(), g()?.score ?? 0)} />
         <p class="mt-auto mb-1 leading-[1.625]" style={{ color: lcd.dark }}>
-          {phoneWording().blocks.help}
+          {t("web.farm.phone.blocks.help")}
           <br />
-          {phoneWording().blocks.help2}
+          {t("web.farm.phone.blocks.help2")}
           <br />
-          {phoneWording().blocks.help3}
+          {t("web.farm.phone.blocks.help3")}
         </p>
       </div>
     </div>
@@ -154,7 +156,7 @@ function Next(props: { kind: PieceKind | undefined }) {
   const cells = () => (props.kind ? cellsOf({ kind: props.kind, turn: 0, x: 0, y: 0 }) : []);
   return (
     <div>
-      <span>{phoneWording().blocks.next}</span>
+      <span>{t("web.farm.phone.blocks.next")}</span>
       <svg width={36} height={20} viewBox="0 0 4 2" shape-rendering="crispEdges" class="mt-1 block p-1" style={{ background: lcd.light }} aria-hidden="true">
         <For each={cells()}>{([x, y]) => <rect x={x} y={y === 0 ? 0 : 1} width={0.9} height={0.9} fill={lcd.ink} />}</For>
       </svg>

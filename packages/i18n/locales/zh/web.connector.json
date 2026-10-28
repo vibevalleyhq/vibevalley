@@ -1,0 +1,62 @@
+{
+  "connectors": {
+    "section": {
+      "label": "连接器",
+      "line": "微信 飞书 QQ"
+    },
+    "label": {
+      "weixin": "微信",
+      "feishu": "飞书",
+      "qq": "QQ"
+    },
+    "how": {
+      "weixin": "扫码登录，私聊机器人",
+      "feishu": "扫码自动建机器人",
+      "qq": "填 QQ 机器人的 AppID"
+    },
+    "always": "帮工能在这台电脑上跑命令，所以只认主人；回复时引用某条汇报，你的话会进那件活的工单串。VibeValley 只往外连，不开端口。",
+    "state": {
+      "off": "没连接",
+      "waiting": "等你扫码",
+      "scanned": "已扫码，等手机确认",
+      "verify": "要输入手机上的数字",
+      "pairing": "等你发配对码",
+      "connected": "已连接",
+      "paused": "暂停中"
+    },
+    "title": "连接器",
+    "list": "连接器列表",
+    "intro": "在聊天软件里和管家说话：派活、问进度、收汇报。",
+    "know": "要知道的",
+    "disconnect": "断开",
+    "weixinIntro": "用手机微信扫一个码，就能在微信里和管家说话：派活、问进度，帮工的汇报和提问也会发到微信上。",
+    "feishuIntro": "用手机飞书扫一个码，飞书会替你建一个机器人；在飞书里和它说话，就是和管家说话。",
+    "scan": "{app}扫码登录",
+    "pairing": "机器人连上了。最后一步：用你自己的{app}，私聊这个机器人，发：",
+    "pairingNote": "发了这个码的人就是主人：以后只有这个人的话进得来。码只能用一次。",
+    "owner": "主人",
+    "channel": "接在",
+    "since": "连上的时间",
+    "lastInbound": "上次收到你的话",
+    "pending": "等着发给你的",
+    "pendingCount": "{n} 条：你下次说话时一起发",
+    "noPending": "没有",
+    "paused": "登录过期了，{clock} 后再试；也可以断开重新连。",
+    "whichChannel": "接在哪个频道",
+    "qqBefore": "在",
+    "qqPlatform": "QQ 开放平台",
+    "qqAfter": "建一个机器人，打开单聊消息，把它的 AppID 和 AppSecret 填在这里。",
+    "secretHint": "只存在这台电脑的数据库里，不会再显示。",
+    "secret": "机器人密钥",
+    "connectQq": "连接 QQ 机器人",
+    "scanWith": "用手机{app}扫这个码。",
+    "scanned": "扫好了，在手机上点确认。",
+    "digits": "输入手机上显示的数字：",
+    "gettingQr": "在拿二维码……",
+    "qr": "{app}登录二维码",
+    "phoneDigits": "手机上的数字",
+    "ok": "确定",
+    "cannotScan": "扫不了？在手机上打开这个链接：",
+    "newCode": "换一个码"
+  }
+}

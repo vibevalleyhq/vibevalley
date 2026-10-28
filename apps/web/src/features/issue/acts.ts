@@ -1,10 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // The owner's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx)
 // and the farm's (farm/issue/IssueView.tsx). What a button sends is the server's (Issue.attention.acts, perform); this
 // says which take words from the box, which open the box first, which open a dialog, what a reopen tells, and keeps the
 // box, its words and the busy flag. A page only says how it runs a button its own way (the farm's commands with their
 // effects) and how it shows a failure.
 
-import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { createSignal } from "solid-js";
 import type { Issue, IssueAct, IssueAction } from "@vibevalley/protocol";
@@ -81,7 +81,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
       const helper = got.sessions.at(-1);
       if (helper) {
         setText("");
-        ways.told(issuesWording().acts.reopened, issuesWording().acts.goesOn(helper));
+        ways.told(t("web.issue.acts.reopened"), t("web.issue.acts.goesOn", { helper }));
       }
     });
   };
@@ -123,9 +123,9 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     /** What a button says: with its box open, what pressing it again does. */
     label: (a: IssueAct) =>
       a === "reject" && box() === "reject"
-        ? issuesWording().acts.rejectWith
+        ? t("web.issue.acts.rejectWith")
         : a === "tell" && box() === "tell"
-          ? issuesWording().acts.carry
+          ? t("web.issue.acts.carry")
           : (ways.words?.[a] ?? wording().act[a]),
     /** Pressing it now would send nothing. */
     disabled: (a: IssueAct) => busy() || (a === "answer" && !text().trim()) || (a === "reject" && box() === "reject" && !text().trim()),

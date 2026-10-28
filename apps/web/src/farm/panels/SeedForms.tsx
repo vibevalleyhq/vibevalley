@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // Sowing an empty bed and watering a helper's: the sowing form sows in the farm's current project (the sign by the
 // mast), offers its seeds (its templates and recent words) and who sows; the watering form takes a
 // few words to the helper.
@@ -104,7 +105,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
     if (!canSow() || !p) return;
     try {
       const got = await writeIssue(text(), agentOf(sower()) ?? "", p);
-      if (got.refused) toasts.add({ type: ToastType.info, title: farmWording().sow.notDrafted, description: got.refused });
+      if (got.refused) toasts.add({ type: ToastType.info, title: t("web.farm.sow.notDrafted"), description: got.refused });
       props.onDone();
       router.navigate(`/issues/${encodeURIComponent(got.issue.id)}`);
     } catch (e) {
@@ -122,10 +123,10 @@ export function SowForm(props: { station: number; onDone: () => void }) {
       when={project()}
       fallback={
         <div class="flex flex-col items-start gap-2.5">
-          <p class="text-[14px] text-bark-900">{farmWording().sow.homeless}</p>
-          <p class={xs}>{projects().length > 0 ? farmWording().sow.toMap : farmWording().sow.noProjects}</p>
+          <p class="text-[14px] text-bark-900">{t("web.farm.sow.homeless")}</p>
+          <p class={xs}>{projects().length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noProjects")}</p>
           <PxButton tone="primary" onClick={() => (props.onDone(), router.navigate("/projects"))}>
-            {projects().length > 0 ? farmWording().sow.map : farmWording().sow.makeProject}
+            {projects().length > 0 ? t("web.farm.sow.map") : t("web.farm.sow.makeProject")}
           </PxButton>
         </div>
       }
@@ -134,7 +135,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
             <p class="min-w-0 flex-1 truncate text-[14px] text-bark-900">
-              {farmWording().sow.plantIn(p())}
+              {t("web.farm.sow.plantIn", { project: p() })}
               <Show when={bag()?.stack.label}>
                 <span class={["ml-2", xs]}>{bag()!.stack.label}</span>
               </Show>
@@ -143,32 +144,32 @@ export function SowForm(props: { station: number; onDone: () => void }) {
           <div class="mt-3 flex flex-col">
             <Switch>
               <Match when={templates.isPending && !!project()}>
-                <p class={["mt-2.5", xs]}>{farmWording().sow.rummaging}</p>
+                <p class={["mt-2.5", xs]}>{t("web.farm.sow.rummaging")}</p>
               </Match>
               <Match when={templates.error}>
                 {(e) => (
                   <div class="mt-2.5 flex flex-wrap items-center gap-2">
                     <p class="text-[12px] text-berry">
-                      {farmWording().sow.noSeeds}
+                      {t("web.farm.sow.noSeeds")}
                       {reasonOf(e())}
                     </p>
                     <PxButton size="sm" disabled={templates.isFetching} onClick={() => void templates.refetch()}>
-                      {farmWording().sow.retry}
+                      {t("web.farm.sow.retry")}
                     </PxButton>
                   </div>
                 )}
               </Match>
             </Switch>
             <Show when={seeds().recent.length > 0}>
-              <p class={["mt-2.5", xs]}>{farmWording().sow.recent}</p>
+              <p class={["mt-2.5", xs]}>{t("web.farm.sow.recent")}</p>
               <div class="mt-1.5 flex flex-wrap gap-1.5">
                 <For each={seeds().recent}>{(r) => <Chip text={r} on={text() === r} onClick={() => take(r)} />}</For>
               </div>
             </Show>
             <Show when={seeds().kinds.length > 0}>
-              <p class={["mt-2.5", xs]}>{farmWording().sow.kinds}</p>
+              <p class={["mt-2.5", xs]}>{t("web.farm.sow.kinds")}</p>
               {/* One kind at a time: its tab, then its seeds. */}
-              <div role="tablist" aria-label={farmWording().sow.kinds} class="mt-1.5 flex flex-wrap gap-1">
+              <div role="tablist" aria-label={t("web.farm.sow.kinds")} class="mt-1.5 flex flex-wrap gap-1">
                 <For each={seeds().kinds} keyed={(k) => k.kind.id}>
                   {(k) => (
                     <button
@@ -199,7 +200,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 )}
               </Show>
             </Show>
-            <p class={["mt-2.5", xs]}>{farmWording().sow.own}</p>
+            <p class={["mt-2.5", xs]}>{t("web.farm.sow.own")}</p>
             <div class="mt-1.5">
               <PxTextArea
                 ref={(el) => (words = el)}
@@ -207,13 +208,13 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                 selection={selection()}
                 onChange={setText}
                 rows={3}
-                placeholder={farmWording().sow.jobHint}
-                label={farmWording().sow.job}
+                placeholder={t("web.farm.sow.jobHint")}
+                label={t("web.farm.sow.job")}
               />
             </div>
-            <p class={["mt-3", xs]}>{farmWording().sow.who}</p>
-            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={farmWording().sow.who}>
-              <WhoTile active={sower() === byOrchestrator} label={farmWording().sow.orchestratorPicks} onClick={() => setWho(byOrchestrator)}>
+            <p class={["mt-3", xs]}>{t("web.farm.sow.who")}</p>
+            <div class="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={t("web.farm.sow.who")}>
+              <WhoTile active={sower() === byOrchestrator} label={t("web.farm.sow.orchestratorPicks")} onClick={() => setWho(byOrchestrator)}>
                 <span class="flex h-11 w-11 items-center justify-center bg-cream-200 text-[16px] text-bark-600">?</span>
               </WhoTile>
               <For each={agents()} keyed={(a) => a.id}>
@@ -225,12 +226,12 @@ export function SowForm(props: { station: number; onDone: () => void }) {
               </For>
             </div>
             <div class="mt-3 flex items-center gap-2">
-              <p class={["min-w-0 flex-1", xs]}>{farmWording().sow.how(p())}</p>
+              <p class={["min-w-0 flex-1", xs]}>{t("web.farm.sow.how", { project: p() })}</p>
               <PxButton disabled={!canSow()} onClick={() => void write()}>
-                {farmWording().sow.draft}
+                {t("web.farm.sow.draft")}
               </PxButton>
               <PxButton tone="primary" disabled={!canSow()} onClick={sow}>
-                {farmWording().sow.start}
+                {t("web.farm.sow.start")}
               </PxButton>
             </div>
             <Show when={refused()}>
@@ -265,9 +266,9 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
   };
   return (
     <div class="flex flex-col">
-      <p class="text-[13px] text-bark-800">{props.session.phase._tag === "working" ? farmWording().water.working : farmWording().water.idle}</p>
-      <p class={["mt-1", xs]}>{farmWording().water.thread}</p>
-      <p class={["mt-1", xs]}>{farmWording().water.job(props.session.brief)}</p>
+      <p class="text-[13px] text-bark-800">{props.session.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</p>
+      <p class={["mt-1", xs]}>{t("web.farm.water.thread")}</p>
+      <p class={["mt-1", xs]}>{t("web.farm.water.job", { brief: props.session.brief })}</p>
       <div class="mt-3 flex flex-wrap gap-1.5">
         <For each={dropsOfAdvice}>{(s) => <Chip text={s} on={text() === s} onClick={() => setText(s)} />}</For>
       </div>
@@ -277,17 +278,17 @@ export function WaterForm(props: { session: Session; onDone: () => void }) {
             value={text()}
             onChange={setText}
             rows={2}
-            placeholder={farmWording().water.hint}
-            label={farmWording().plot.tell(props.session.name)}
+            placeholder={t("web.farm.water.hint")}
+            label={t("web.farm.plot.tell", { who: props.session.name })}
             autoFocus
           />
         </div>
         <PxButton tone="primary" disabled={!text().trim() || !canTell()} onClick={() => void water()}>
-          {farmWording().water.water}
+          {t("web.farm.water.water")}
         </PxButton>
       </div>
       <Show when={!canTell()}>
-        <p class="mt-1.5 text-[12px] text-bark-600">{farmWording().water.moved}</p>
+        <p class="mt-1.5 text-[12px] text-bark-600">{t("web.farm.water.moved")}</p>
       </Show>
       <Show when={refused()}>
         <p class="mt-1.5 text-[12px] text-berry">{refused()}</p>

@@ -1,0 +1,108 @@
+{
+  "ground": {
+    "check": "Checks",
+    "grass": "Grass",
+    "night": "Night"
+  },
+  "tab": {
+    "sprites": "Pictures",
+    "cursors": "Cursors",
+    "sounds": "Sounds"
+  },
+  "shelves": "The catalog's shelves",
+  "find": "Find a picture",
+  "background": "Background",
+  "categories": "Categories",
+  "all": "All",
+  "count": "{n} pictures, cut from design/pixel/raw.",
+  "pick": "Click one for a big view: its size, anchor, animation frames, and which source sheet it was cut from and how to redraw it.",
+  "findHint": "Find: name, kind, animal, outfit (bear, raincoat, lang-, icon-…)",
+  "noMatch": "Nothing matches.",
+  "moves": "anim",
+  "copied": "Copied",
+  "copy": "Copy",
+  "anchor": "Anchor",
+  "head": "Head",
+  "zoom": "Zoom",
+  "marks": "Anchor and head",
+  "stop": "Stop",
+  "play": "Play",
+  "frames": "{n} frames",
+  "fps": "Frames per second",
+  "perSecond": "{n} fps",
+  "size": "Size",
+  "pixels": "{w} × {h} px",
+  "from": "From",
+  "unrecorded": "Not recorded (an old picture no longer used)",
+  "redraw": "Redraw",
+  "recut": "Cut again",
+  "cursorsIntro": "The mouse on the farm: normally, over something clickable, and holding a tool.",
+  "cursorsFind": "Find: a cursor's name (glove, water, harvest…)",
+  "cursors": "Cursors · {n}",
+  "cursorsNote": "The red dot is where a click lands. Normally a glove, a pointing finger over something clickable; holding a tool, that tool, sparkling where it can be used and with a no-entry mark where it cannot. Cut from design/pixel/raw/ui-cursors.png (design/pixel/process.py ui-cursors).",
+  "noCursors": "This build has no cursor pictures (assets/cursors).",
+  "soundsIntro": "Every sound on the farm: click one to hear it.",
+  "soundsFind": "Find: a sound's name or group (water, yard, coin…)",
+  "soundsRecipes": "The sounds are synthesized on the fly, with no audio files: the recipes are in",
+  "soundsMusic": ". With sound off they are silent. There is no background music yet; the prompts for Suno are in",
+  "period": ".",
+  "playSound": "Play {name}",
+  "shelf": {
+    "helpers": {
+      "label": "Helpers",
+      "hint": "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings"
+    },
+    "orchestrator": {
+      "label": "Manager",
+      "hint": "Six looks, each with talking, listening and a portrait"
+    },
+    "dog": {
+      "label": "Dog",
+      "hint": "Sleep, wake, stretch, wag, bark, jump, roll over…"
+    },
+    "plots": {
+      "label": "Plots",
+      "hint": "From bare soil to ripe, weedy, dry, withered and locked"
+    },
+    "yard": {
+      "label": "Yard",
+      "hint": "The map, props, plants in front of the camera, little animals"
+    },
+    "map": {
+      "label": "Map",
+      "hint": "An island for each project, the compass, clouds, queued seed bags, stumps for free spots"
+    },
+    "machines": {
+      "label": "Machines",
+      "hint": "Each is a runtime"
+    },
+    "icons": {
+      "label": "Icons",
+      "hint": "For panels, entries and hints"
+    },
+    "acts": {
+      "label": "Doing",
+      "hint": "The little icons over a helper's head: read, edit, run a command, search…"
+    },
+    "medals": {
+      "label": "Medals and badges",
+      "hint": "Medals, badge emblems, stamps, coins"
+    },
+    "logos": {
+      "label": "Logos",
+      "hint": "The agents on the machines, the chat apps, the web and desktop icons"
+    },
+    "langs": {
+      "label": "Languages",
+      "hint": "What a project page has planted"
+    },
+    "ui": {
+      "label": "Interface",
+      "hint": "The energy bottle, the farm chat's buttons, the calendar's cells"
+    },
+    "other": {
+      "label": "Other",
+      "hint": "What fits no shelf"
+    }
+  }
+}

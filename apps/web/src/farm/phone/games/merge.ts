@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // 合成: 2048 with crops. Slide the field; two of a stage grow into the next; a seed is sown
 // on an empty cell after every slide that moves something. One slide back can be taken.
 
@@ -28,7 +29,7 @@ export interface Merge {
   readonly previous: Merge | null;
 }
 
-export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : phoneWording().merge.past(stage - mergeGoal + 1));
+export const mergeStageName = (stage: number) => (stage <= mergeGoal ? mergeStages[stage - 1]! : t("web.farm.phone.merge.past", { n: stage - mergeGoal + 1 }));
 
 export const mergeTop = (g: Merge) => Math.max(0, ...g.board);
 

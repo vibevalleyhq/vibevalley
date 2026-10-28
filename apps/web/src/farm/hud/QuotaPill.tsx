@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // How much the runtimes' accounts have left: a bottle at the HUD's top right, filled to the lowest of them; open, each
 // runtime's machine, usage windows, today's spend and a stop it is under.
 
@@ -17,17 +18,17 @@ const levelInk = { plenty: "#3f6427", low: "#b8862a", gold: "#b8862a", empty: "#
 
 function UsageLines(props: { usage: AccountUsage | null }) {
   return (
-    <Switch fallback={<p class="text-[12px] text-bark-400">{farmWording().quota.unreported}</p>}>
+    <Switch fallback={<p class="text-[12px] text-bark-400">{t("web.farm.quota.unreported")}</p>}>
       <Match when={props.usage?.status === "login_required"}>
-        <p class="text-[12px] text-[#b8682a]">{farmWording().quota.signedOut}</p>
+        <p class="text-[12px] text-[#b8682a]">{t("web.farm.quota.signedOut")}</p>
       </Match>
       <Match when={props.usage?.status === "unavailable" ? props.usage : undefined}>
-        {(u) => <p class="text-[12px] text-bark-400">{farmWording().quota.unreadable(u().reason)}</p>}
+        {(u) => <p class="text-[12px] text-bark-400">{t("web.farm.quota.unreadable", { why: u().reason })}</p>}
       </Match>
       <Match when={props.usage?.status === "balance" ? props.usage : undefined}>
         {(u) => (
           <p class="text-[12px]" style={{ color: u().available ? "#2f1f13" : "#c84a3a" }}>
-            {farmWording().quota.balance(u().provider, u().available)}
+            {t("web.farm.quota.balance", { provider: u().provider, enough: u().available })}
           </p>
         )}
       </Match>
@@ -116,7 +117,7 @@ export function QuotaPill(props: { height: number }) {
       <div ref={box} class="pointer-events-auto relative">
         <button
           type="button"
-          aria-label={shown() === undefined ? farmWording().quota.all : farmWording().quota.lowest(String(shown()))}
+          aria-label={shown() === undefined ? t("web.farm.quota.all") : t("web.farm.quota.lowest", { pct: String(shown()) })}
           aria-expanded={aria(open())}
           onClick={() => setOpen(!open())}
           class="cursor-pointer"
@@ -127,17 +128,17 @@ export function QuotaPill(props: { height: number }) {
               size={28}
             />
             <span style={{ color: lowest() === undefined ? "#2f1f13" : levelInk[quotaLevel(lowest())] }}>
-              {shown() === undefined ? farmWording().quota.quota : `${shown()}%`}
+              {shown() === undefined ? t("web.farm.quota.quota") : `${shown()}%`}
             </span>
           </HudCard>
         </button>
         <Show when={open()}>
-          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={farmWording().quota.left}>
+          <div class="absolute top-full right-0 z-10 mt-2 w-[352px] bg-cream-50 p-3 shadow-px" role="dialog" aria-label={t("web.farm.quota.left")}>
             <div class="flex items-center">
-              <span class="flex-1 text-[13px]">{farmWording().quota.left}</span>
+              <span class="flex-1 text-[13px]">{t("web.farm.quota.left")}</span>
               <PxButton
                 size="icon"
-                label={farmWording().quota.refresh}
+                label={t("web.farm.quota.refresh")}
                 onClick={() => runtimes().forEach((r) => void commands.refreshRuntime(r.id).catch(() => {}))}
               >
                 <SpriteIcon name="button-refresh" size={14} />
@@ -148,7 +149,7 @@ export function QuotaPill(props: { height: number }) {
                 {(r) => <Machine info={r()} />}
               </For>
             </div>
-            <p class="mt-2 text-[12px] text-bark-400">{farmWording().quota.note}</p>
+            <p class="mt-2 text-[12px] text-bark-400">{t("web.farm.quota.note")}</p>
           </div>
         </Show>
       </div>

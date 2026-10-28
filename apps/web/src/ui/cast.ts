@@ -1,23 +1,23 @@
+import { t } from "@vibevalley/i18n";
 // A helper's look: the words for its animal and clothes, a random
 // one for a new profile, and the drawing for each pose.
 
-import { appWording } from "../base/words";
 import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {
-  bear: appWording().cast.species.bear,
-  rabbit: appWording().cast.species.rabbit,
-  fox: appWording().cast.species.fox,
-  cat: appWording().cast.species.cat,
-  owl: appWording().cast.species.owl,
-  hedgehog: appWording().cast.species.hedgehog,
-  raccoon: appWording().cast.species.raccoon,
+  bear: t("web.base.cast.species.bear"),
+  rabbit: t("web.base.cast.species.rabbit"),
+  fox: t("web.base.cast.species.fox"),
+  cat: t("web.base.cast.species.cat"),
+  owl: t("web.base.cast.species.owl"),
+  hedgehog: t("web.base.cast.species.hedgehog"),
+  raccoon: t("web.base.cast.species.raccoon"),
 };
 export const outfitLabel: Record<Outfit, string> = {
-  farmer: appWording().cast.outfit.farmer,
-  gardener: appWording().cast.outfit.gardener,
-  rain: appWording().cast.outfit.rain,
-  winter: appWording().cast.outfit.winter,
+  farmer: t("web.base.cast.outfit.farmer"),
+  gardener: t("web.base.cast.outfit.gardener"),
+  rain: t("web.base.cast.outfit.rain"),
+  winter: t("web.base.cast.outfit.winter"),
 };
 
 export const swatches = {
@@ -85,12 +85,12 @@ export const cropSprite = (crop: Crop) => `plot-${crop}`;
 
 /** The creator's stage: each pose on the bed it goes with. */
 export const stagePoses: readonly { pose: Pose; label: string; crop: Crop }[] = [
-  { pose: "idle", label: appWording().cast.pose.idle, crop: "empty" },
-  { pose: "walk", label: appWording().cast.pose.walk, crop: "seeded" },
-  { pose: "think", label: appWording().cast.pose.think, crop: "sprout" },
-  { pose: "work", label: appWording().cast.pose.work, crop: "leafy" },
-  { pose: "cheer", label: appWording().cast.pose.cheer, crop: "wheat" },
-  { pose: "worry", label: appWording().cast.pose.worry, crop: "withered" },
+  { pose: "idle", label: t("web.base.cast.pose.idle"), crop: "empty" },
+  { pose: "walk", label: t("web.base.cast.pose.walk"), crop: "seeded" },
+  { pose: "think", label: t("web.base.cast.pose.think"), crop: "sprout" },
+  { pose: "work", label: t("web.base.cast.pose.work"), crop: "leafy" },
+  { pose: "cheer", label: t("web.base.cast.pose.cheer"), crop: "wheat" },
+  { pose: "worry", label: t("web.base.cast.pose.worry"), crop: "withered" },
 ];
 
 /** A swatch, or the parchment colour for one that is not #rrggbb. */

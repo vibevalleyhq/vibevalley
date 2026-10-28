@@ -1,0 +1,51 @@
+{
+  "sound": {
+    "group": {
+      "ui": "Interface",
+      "tools": "Tools",
+      "field": "In the field",
+      "yard": "Yard",
+      "reward": "Rewards",
+      "voice": "Voice"
+    },
+    "label": {
+      "tap": "Tap",
+      "nope": "Nope",
+      "pick": "Pick a tool",
+      "open": "Open",
+      "close": "Close",
+      "water": "Water",
+      "spray": "Spray",
+      "weed": "Weed",
+      "harvest": "Harvest",
+      "shovel": "Shovel",
+      "plant": "Sow",
+      "ripe": "Ripe",
+      "bug": "Bugs",
+      "coin": "Coin",
+      "levelUp": "Level up",
+      "achievement": "Achievement",
+      "arrive": "Helper arrives",
+      "rustle": "Rustling grass",
+      "splash": "Splash",
+      "thud": "Footstep",
+      "woof": "Puppy barks",
+      "meow": "Kitten meows",
+      "mew": "Kitten mews",
+      "purr": "Kitten purrs",
+      "yip": "Puppy jumps",
+      "pant": "Puppy pants",
+      "voiceOn": "Call connected",
+      "voiceOff": "Call ended",
+      "ring": "Ringing"
+    }
+  },
+  "close": "Close",
+  "optional": "  optional",
+  "drop": "Remove {chip}",
+  "noticeTitle": {
+    "info": "Notice",
+    "warn": "Not sent",
+    "error": "Something went wrong"
+  }
+}

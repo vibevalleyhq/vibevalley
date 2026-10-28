@@ -1,6 +1,6 @@
+import { t } from "@vibevalley/i18n";
 // An issue's lane, title and status and priority words.
 
-import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
 import { closedText } from "@vibevalley/protocol/rules";
 import { type WorkspaceState, type Issue, type IssueStatus, type Run, type RunTrigger, type Session, type TaskGraph } from "@vibevalley/protocol";
@@ -44,19 +44,19 @@ export const issueIs = (issue: Issue, id: string) => issue.id === id || issue.se
 export function taskLine(g: TaskGraph) {
   switch (g.state) {
     case "splitting":
-      return issuesWording().graph.splitting;
+      return t("web.issue.graph.splitting");
     case "draft":
-      return issuesWording().graph.draft;
+      return t("web.issue.graph.draft");
     case "running":
-      return issuesWording().graph.running(Math.round(g.settled ?? 0), g.tasks.length);
+      return t("web.issue.graph.running", { done: Math.round(g.settled ?? 0), total: g.tasks.length });
     case "paused":
-      return issuesWording().graph.paused;
+      return t("web.issue.graph.paused");
     case "ready":
-      return issuesWording().graph.ready;
+      return t("web.issue.graph.ready");
     case "done":
-      return issuesWording().graph.done;
+      return t("web.issue.graph.done");
     case "abandoned":
-      return issuesWording().graph.abandoned;
+      return t("web.issue.graph.abandoned");
   }
 }
 
@@ -73,10 +73,10 @@ export function issueSession(core: WorkspaceState | undefined, issue: Issue): Se
 export type Lane = "todo" | "working" | "waiting" | "closed";
 export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
 export const laneLabel: Record<Lane, string> = {
-  todo: issuesWording().boardLabels.lane.todo,
-  working: issuesWording().boardLabels.lane.working,
-  waiting: issuesWording().boardLabels.lane.waiting,
-  closed: issuesWording().boardLabels.lane.closed,
+  todo: t("web.issue.boardLabels.lane.todo"),
+  working: t("web.issue.boardLabels.lane.working"),
+  waiting: t("web.issue.boardLabels.lane.waiting"),
+  closed: t("web.issue.boardLabels.lane.closed"),
 };
 
 /** The status a lane's header is drawn with: the one its cards mostly have. */
@@ -86,9 +86,9 @@ export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "i
 export type Stage = "talk" | "work" | "finish";
 export const stages: Stage[] = ["talk", "work", "finish"];
 export const stageLabel: Record<Stage, string> = {
-  talk: issuesWording().boardLabels.stage.talk,
-  work: issuesWording().boardLabels.stage.work,
-  finish: issuesWording().boardLabels.stage.finish,
+  talk: t("web.issue.boardLabels.stage.talk"),
+  work: t("web.issue.boardLabels.stage.work"),
+  finish: t("web.issue.boardLabels.stage.finish"),
 };
 
 export function stageOf(s: IssueStatus): Stage {
@@ -98,7 +98,7 @@ export function stageOf(s: IssueStatus): Stage {
 }
 
 /** The title an issue made by the plus has until the owner says what it is for. */
-export const newIssueTitle = issuesWording().boardLabels.newIssue;
+export const newIssueTitle = t("web.issue.boardLabels.newIssue");
 
 /** A draft came back into it (or the owner wrote it out): it has more than a title. */
 export const isRefined = (issue: Issue) => (issue.description ?? "") !== "" || (issue.criteria ?? []).length > 0;
@@ -139,17 +139,17 @@ export const closedShown = 15;
 function runTriggerText(trigger: RunTrigger) {
   switch (trigger.kind) {
     case "issue":
-      return issuesWording().trigger.issue;
+      return t("web.issue.trigger.issue");
     case "comment":
-      return trigger.message ? issuesWording().trigger.commentNumbered(trigger.message.slice(0, 8)) : issuesWording().trigger.comment;
+      return trigger.message ? t("web.issue.trigger.commentNumbered", { id: trigger.message.slice(0, 8) }) : t("web.issue.trigger.comment");
     case "task":
-      return issuesWording().trigger.task;
+      return t("web.issue.trigger.task");
     case "recurrence":
-      return trigger.missed ? issuesWording().trigger.missed : issuesWording().trigger.recurrence;
+      return trigger.missed ? t("web.issue.trigger.missed") : t("web.issue.trigger.recurrence");
     case "refine":
-      return issuesWording().trigger.refine;
+      return t("web.issue.trigger.refine");
     case "runtime":
-      return issuesWording().trigger.runtime;
+      return t("web.issue.trigger.runtime");
   }
 }
 
@@ -157,8 +157,8 @@ function runTriggerText(trigger: RunTrigger) {
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),
-    r.outcome ? wording().outcome[r.outcome] : issuesWording().run.working,
+    r.outcome ? wording().outcome[r.outcome] : t("web.issue.run.working"),
     took((r.endedAt ?? now) - r.startedAt),
     ...(r.spent?.cny !== undefined ? [`¥${r.spent.cny.toFixed(2)}`] : []),
-    ...(r.heard.length ? [issuesWording().run.heard(r.heard.length)] : []),
+    ...(r.heard.length ? [t("web.issue.run.heard", { n: r.heard.length })] : []),
   ].join(" · ");

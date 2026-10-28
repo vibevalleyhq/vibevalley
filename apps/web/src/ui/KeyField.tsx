@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import type { KeySource, KeyStatus } from "@vibevalley/protocol";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
@@ -15,12 +16,12 @@ const fromText = (s: KeySource) => appWording().form.from[s];
 export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
   const text = () =>
     props.removing
-      ? appWording().form.removeOnSave
+      ? t("web.base.form.removeOnSave")
       : props.status.source
         ? props.status.hint
-          ? appWording().form.inUse(props.status.hint, fromText(props.status.source))
-          : appWording().form.fromOnly(fromText(props.status.source))
-        : appWording().form.unset;
+          ? t("web.base.form.inUse", { hint: props.status.hint, from: fromText(props.status.source) })
+          : t("web.base.form.fromOnly", { from: fromText(props.status.source) })
+        : t("web.base.form.unset");
   return (
     <Tip text={text()}>
       <span role="img" aria-label={text()} tabindex={0} class="inline-flex rounded outline-none focus-visible:outline-2 focus-visible:outline-focus">
@@ -60,7 +61,7 @@ export function KeyField(props: {
           <IconButton
             icon={props.removing ? "undo" : "delete"}
             tone={props.removing ? undefined : "danger"}
-            label={props.removing ? appWording().form.keepKey(props.label) : appWording().form.removeKey(props.label)}
+            label={props.removing ? t("web.base.form.keepKey", { label: props.label }) : t("web.base.form.removeKey", { label: props.label })}
             onClick={() => props.onRemove(!props.removing)}
           />
         </Show>
@@ -82,7 +83,7 @@ export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => vo
           class="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted hover:bg-hover hover:text-ink"
         >
           <Icon name="undo" size={14} />
-          {appWording().form.undo}
+          {t("web.base.form.undo")}
         </button>
       </Show>
       <button
@@ -94,7 +95,7 @@ export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => vo
         }}
         class="inline-flex h-7 cursor-pointer items-center rounded-md border border-accent bg-accent px-2.5 text-sm text-page hover:bg-leaf disabled:cursor-default disabled:opacity-40"
       >
-        {appWording().form.save}
+        {t("web.base.form.save")}
       </button>
     </div>
   );

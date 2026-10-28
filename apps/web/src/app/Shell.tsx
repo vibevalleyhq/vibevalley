@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The workbench's frame: a dark rail of places on the left (the orchestrator's face
 // back to the farm at the top, 设置 and the seeds back to the farm at the bottom), and over every page but the chat a
 // head with the place's name and whether the farm is open.
 
-import { appWording } from "../base/words";
 import { For, onSettled, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { type Place, placeOf, places } from "./places";
@@ -17,7 +17,7 @@ import { QuickSwitcher, switcher } from "../features/channel";
 /** The head's height, the rail's top slot's too. */
 const head = 66;
 
-const linkWords = { connecting: appWording().link.connecting, open: appWording().link.open, lost: appWording().link.lost } as const;
+const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
 function PlaceIcon(props: { place: Place }) {
   return <Icon name={props.place.icon} size={22} />;
@@ -43,7 +43,7 @@ function Rail(props: { here?: Place }) {
   const settings = places.find((p) => p.id === "settings")!;
   return (
     <nav
-      aria-label={appWording().rail}
+      aria-label={t("web.base.rail")}
       class="flex w-16 shrink-0 flex-col items-center overflow-y-auto bg-[#46301d] pb-3 md:w-20"
       // The window's buttons sit over the rail's top: it is at least as wide as they reach, and a little.
       style={titleBar.left > 0 ? { "min-width": `${titleBar.left + 8}px` } : undefined}
@@ -51,7 +51,7 @@ function Rail(props: { here?: Place }) {
       {/* Room for the desktop window's buttons over the rail's top. */}
       <div class="shrink-0" style={{ height: `${titleBar.top}px` }} />
       <div class="flex shrink-0 items-center justify-center" style={{ height: `${head}px` }}>
-        <Slot to="/" label={appWording().farm} current fill="#e5a93c">
+        <Slot to="/" label={t("web.base.farm")} current fill="#e5a93c">
           <OrchestratorFace size={38} />
         </Slot>
       </div>
@@ -68,7 +68,7 @@ function Rail(props: { here?: Place }) {
         <Slot to={settings.path} label={`${settings.label} · ${settings.hint}`} current={props.here === settings}>
           <PlaceIcon place={settings} />
         </Slot>
-        <Slot to="/" label={appWording().farm}>
+        <Slot to="/" label={t("web.base.farm")}>
           <Icon name="farm" size={22} />
         </Slot>
         <span role="status" title={linkWords[frames.link]} class="flex h-4 items-center">
@@ -88,7 +88,7 @@ function Desk(props: { place?: Place }) {
   const core = useCore();
   const live = () => core()?.call === "live";
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
-  const status = () => (live() ? appWording().working(working()) : appWording().off);
+  const status = () => (live() ? t("web.base.working", { n: working() }) : t("web.base.off"));
   return (
     <div class="flex shrink-0 items-center gap-3 border-b border-line px-5" style={{ height: `${head}px` }}>
       <Show when={props.place} fallback={<span class="flex-1" />}>

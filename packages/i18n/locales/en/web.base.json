@@ -1,0 +1,140 @@
+{
+  "place": {
+    "chat": {
+      "label": "Chat",
+      "hint": "Channels and threads"
+    },
+    "issues": {
+      "label": "Tickets",
+      "hint": "Every ticket from written to closed"
+    },
+    "docs": {
+      "label": "Docs",
+      "hint": "Documents you and the helpers write together"
+    },
+    "agents": {
+      "label": "Profiles",
+      "hint": "Profiles: managers and helpers"
+    },
+    "runtimes": {
+      "label": "Machines",
+      "hint": "The coding agents on this computer"
+    },
+    "projects": {
+      "label": "Projects",
+      "hint": "An island for each project"
+    },
+    "catalog": {
+      "label": "Catalog",
+      "hint": "Assets: every picture, cursor and sound the farm uses"
+    },
+    "settings": {
+      "label": "Settings",
+      "hint": "Keys, language, memory, connectors, skills, voice, connecting to this machine"
+    }
+  },
+  "link": {
+    "connecting": "Connecting",
+    "open": "Connected",
+    "lost": "Lost, reconnecting"
+  },
+  "rail": "Workbench",
+  "farm": "Back to the farm",
+  "working": "Open · {n} working",
+  "off": "Not open",
+  "chips": {
+    "drop": "Remove {v}",
+    "valueOf": "{k}'s value",
+    "removeKey": "Delete {k}",
+    "remove": "Delete",
+    "name": "Variable name",
+    "value": "Variable value",
+    "valueHint": "Value",
+    "add": "Add"
+  },
+  "toasts": "Notices",
+  "runtime": "Runs on: {name}",
+  "owner": "Me",
+  "orchestrator": "Manager",
+  "unreachable": "The server cannot be reached for now: try again when it is back.",
+  "form": {
+    "asking": "Asking the server…",
+    "unreachable": "The server cannot be asked: {why}",
+    "none": "None yet",
+    "unset": "Not set",
+    "removeOnSave": "Removed when saved",
+    "removeKey": "Remove {label}",
+    "keepKey": "Keep {label}",
+    "undo": "Undo",
+    "storedIn": "Saved in {file}",
+    "keepEmpty": "Leave empty to keep",
+    "save": "Save",
+    "reset": "Reset",
+    "never": "Never mind",
+    "remove": "Delete",
+    "from": {
+      "settings": "saved in the settings",
+      "config": "from the configuration (vibevalley.yaml or the environment)"
+    },
+    "inUse": "Using {hint} ({from})",
+    "fromOnly": "In use ({from})"
+  },
+  "time": {
+    "justNow": "just now",
+    "secondsAgo": "{s}s ago",
+    "minutesAgo": "{m} min ago",
+    "hoursAgo": "{h, plural, one {an hour ago} other {# hours ago}}",
+    "daysAgo": "{d, plural, one {a day ago} other {# days ago}}",
+    "monthsAgo": "{m, plural, one {a month ago} other {# months ago}}",
+    "yearsAgo": "{y} years ago",
+    "seconds": "{s}s",
+    "minutes": "{m} min {s}s",
+    "hours": "{h} h {m} min",
+    "round": {
+      "underMinute": "under a minute",
+      "minutes": "{m} min",
+      "hours": "{h, plural, one {an hour} other {# hours}}",
+      "days": "{d, plural, one {a day} other {# days}}"
+    },
+    "tenths": "{s}s",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "clock": "{am, select, true {{hh}:{mm} AM} other {{hh}:{mm} PM}}"
+  },
+  "money": {
+    "underCent": "under ¥0.01",
+    "about": "about {yuan}",
+    "spent": "spent {yuan}"
+  },
+  "cast": {
+    "species": {
+      "bear": "Bear",
+      "rabbit": "Rabbit",
+      "fox": "Fox",
+      "cat": "Cat",
+      "owl": "Owl",
+      "hedgehog": "Hedgehog",
+      "raccoon": "Raccoon"
+    },
+    "outfit": {
+      "farmer": "Farmer",
+      "gardener": "Gardener",
+      "rain": "Raincoat",
+      "winter": "Winter coat"
+    },
+    "pose": {
+      "idle": "Standing by",
+      "walk": "Walking over",
+      "think": "Pondering",
+      "work": "Working",
+      "cheer": "Done",
+      "worry": "Bugs!"
+    }
+  },
+  "reading": "Reading…",
+  "write": "Remember it",
+  "secret": {
+    "hide": "Hide",
+    "peek": "Peek"
+  }
+}

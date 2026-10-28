@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // 模板: every template a profile installs from, the orchestrators' first; a card shows its whole recipe before it is
 // installed, and a folder on this machine can be added beside the built-in ones. /agents/templates.
 
@@ -29,7 +30,7 @@ export function TemplatesPage() {
       const got = await api.agent.template.add({ path: path().trim() });
       await client.invalidateQueries({ queryKey: ["agent-templates"] });
       setPath("");
-      toast(agentsWording().templates.added(got.name));
+      toast(t("web.agent.templates.added", { name: got.name }));
     } catch (e) {
       toast(reasonOf(e), "bad");
     } finally {
@@ -41,10 +42,10 @@ export function TemplatesPage() {
       <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-4 pb-8 sm:px-6">
         <div class="flex flex-col gap-1">
           <A href="/agents" class="text-xs text-muted hover:underline">
-            {agentsWording().all}
+            {t("web.agent.all")}
           </A>
-          <h1 class="text-2xl font-semibold">{agentsWording().templates.title}</h1>
-          <p class="max-w-2xl text-sm text-muted">{agentsWording().templates.intro}</p>
+          <h1 class="text-2xl font-semibold">{t("web.agent.templates.title")}</h1>
+          <p class="max-w-2xl text-sm text-muted">{t("web.agent.templates.intro")}</p>
         </div>
         <form
           class="flex items-center gap-2"
@@ -54,14 +55,14 @@ export function TemplatesPage() {
           }}
         >
           <TextInput
-            aria-label={agentsWording().templates.folder}
-            placeholder={agentsWording().templates.folderHint}
+            aria-label={t("web.agent.templates.folder")}
+            placeholder={t("web.agent.templates.folderHint")}
             value={path()}
             onInput={(e) => setPath(e.currentTarget.value)}
             class="min-w-0 flex-1"
           />
           <Button type="submit" disabled={adding() || !path().trim()}>
-            {agentsWording().templates.add}
+            {t("web.agent.templates.add")}
           </Button>
         </form>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -122,10 +123,10 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
           <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
           <span class={["text-xs", here() ? "text-[#3f6427]" : "text-[#b8682a]"]}>
             {orchestrator()
-              ? agentsWording().templates.onServer
+              ? t("web.agent.templates.onServer")
               : here()
-                ? agentsWording().templates.runsOn(runtimeName(props.runtimes, template().runtime))
-                : agentsWording().templates.notHere(runtimeName(props.runtimes, template().runtime))}
+                ? t("web.agent.templates.runsOn", { runtime: runtimeName(props.runtimes, template().runtime) })
+                : t("web.agent.templates.notHere", { runtime: runtimeName(props.runtimes, template().runtime) })}
           </span>
         </span>
       </div>
@@ -133,32 +134,32 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
         <div class="flex flex-col gap-2 rounded-md bg-hover p-3 text-sm">
           <Show when={template().tags.length > 0}>
             <p class="text-muted">
-              {agentsWording().tags}
-              {agentsWording().colon}
+              {t("web.agent.tags")}
+              {t("web.agent.colon")}
               {template().tags.join("、")}
             </p>
           </Show>
-          <p class="text-xs font-medium text-muted">{agentsWording().personaLabel}</p>
-          <p class="whitespace-pre-wrap">{template().persona || agentsWording().templates.noPersona}</p>
+          <p class="text-xs font-medium text-muted">{t("web.agent.personaLabel")}</p>
+          <p class="whitespace-pre-wrap">{template().persona || t("web.agent.templates.noPersona")}</p>
         </div>
       </Show>
       <div class="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs text-muted">
         <span class="flex-1">
-          {template().installed.length > 0 ? agentsWording().templates.installed(template().installed.length) : ""}
-          {template().source === "added" ? agentsWording().templates.addedHere : ""}
+          {template().installed.length > 0 ? t("web.agent.templates.installed", { n: template().installed.length }) : ""}
+          {template().source === "added" ? t("web.agent.templates.addedHere") : ""}
         </span>
         <Button aria-expanded={aria(open())} onClick={() => setOpen(!open())}>
-          {open() ? agentsWording().templates.fold : agentsWording().templates.look}
+          {open() ? t("web.agent.templates.fold") : t("web.agent.templates.look")}
         </Button>
         <Show when={template().source === "added"}>
-          <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{agentsWording().remove}</Button>}>
+          <Show when={sure()} fallback={<Button onClick={() => setSure(true)}>{t("web.agent.remove")}</Button>}>
             <Button tone="danger" onClick={() => void remove()}>
-              {agentsWording().templates.removeSure}
+              {t("web.agent.templates.removeSure")}
             </Button>
           </Show>
         </Show>
         <Button tone="primary" disabled={busy()} onClick={() => void install()}>
-          {agentsWording().templates.install}
+          {t("web.agent.templates.install")}
         </Button>
       </div>
     </section>

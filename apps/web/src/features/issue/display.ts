@@ -1,31 +1,31 @@
+import { t } from "@vibevalley/i18n";
 // The issue board's look: how its list is grouped and ordered.
 
-import { issuesWording } from "./words";
 import type { Priority } from "@vibevalley/protocol";
 import { type Lane, lanes } from "./rules";
 
 export type BoardView = "board" | "list";
 export const boardViews: BoardView[] = ["board", "list"];
-export const viewLabel: Record<BoardView, string> = { board: issuesWording().boardLabels.view.board, list: issuesWording().boardLabels.view.list };
+export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "project" | "agent" | "none";
 export const groupings: Grouping[] = ["status", "project", "agent", "none"];
 export const groupingLabel: Record<Grouping, string> = {
-  status: issuesWording().boardLabels.grouping.status,
-  project: issuesWording().boardLabels.grouping.project,
-  agent: issuesWording().boardLabels.grouping.agent,
-  none: issuesWording().boardLabels.grouping.none,
+  status: t("web.issue.boardLabels.grouping.status"),
+  project: t("web.issue.boardLabels.grouping.project"),
+  agent: t("web.issue.boardLabels.grouping.agent"),
+  none: t("web.issue.boardLabels.grouping.none"),
 };
 
 /** `manual` keeps the order the rows came in: the history's, which for 待办 is the owner's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings: Ordering[] = ["manual", "priority", "updated", "created"];
 export const orderingLabel: Record<Ordering, string> = {
-  manual: issuesWording().boardLabels.ordering.manual,
-  priority: issuesWording().boardLabels.ordering.priority,
-  updated: issuesWording().boardLabels.ordering.updated,
-  created: issuesWording().boardLabels.ordering.created,
+  manual: t("web.issue.boardLabels.ordering.manual"),
+  priority: t("web.issue.boardLabels.ordering.priority"),
+  updated: t("web.issue.boardLabels.ordering.updated"),
+  created: t("web.issue.boardLabels.ordering.created"),
 };
 
 export interface BoardLook {

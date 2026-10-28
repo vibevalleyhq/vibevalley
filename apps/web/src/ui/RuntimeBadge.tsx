@@ -1,4 +1,5 @@
-import { appWording } from "../base/words";
+import { t } from "@vibevalley/i18n";
+
 import { ready, useRuntimes, useSprites } from "../base/query";
 import { runtimeName } from "./runtimes";
 
@@ -6,7 +7,7 @@ import { runtimeName } from "./runtimes";
 export function RuntimeBadge(props: { runtime: string; size: number }) {
   const runtimes = useRuntimes();
   const sprites = useSprites();
-  const label = () => appWording().runtime(runtimeName(ready(runtimes, []), props.runtime));
+  const label = () => t("web.base.runtime", { name: runtimeName(ready(runtimes, []), props.runtime) });
   const icon = () => {
     const name = `logo-${props.runtime}`;
     return name in ready(sprites, {}) ? name : "icon-wrench";

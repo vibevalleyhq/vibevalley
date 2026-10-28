@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // 文档: the documents on the left, the one open on the right, written block by block with the
 // helpers. A block shows its marks until it is clicked into; then it is a plain field (marks are kept through the edit),
 // and Enter splits it, Backspace at its start joins it to the one before, Up and Down at its ends move between blocks.
@@ -73,10 +74,10 @@ export function DocsPage(props: { rest: string }) {
   return (
     <div class="flex h-full min-h-0 flex-col gap-3 p-3 lg:flex-row">
       <nav
-        aria-label={docWording().docs.list}
+        aria-label={t("web.doc.docs.list")}
         class={[id() ? "hidden lg:flex" : "flex", "shrink-0 flex-col gap-2 rounded-lg border border-line bg-page p-2 lg:w-65 lg:overflow-y-auto"]}
       >
-        <h2 class="px-2 pt-1.5 text-base font-semibold">{docWording().docs.title}</h2>
+        <h2 class="px-2 pt-1.5 text-base font-semibold">{t("web.doc.docs.title")}</h2>
         <form
           class="flex gap-1.5"
           onSubmit={(e) => {
@@ -85,20 +86,20 @@ export function DocsPage(props: { rest: string }) {
           }}
         >
           <TextInput
-            aria-label={docWording().docs.newTitle}
-            placeholder={docWording().docs.newTitle}
+            aria-label={t("web.doc.docs.newTitle")}
+            placeholder={t("web.doc.docs.newTitle")}
             value={title()}
             onInput={(e) => setTitle(e.currentTarget.value)}
           />
           <Button type="submit" tone="primary" icon="add">
-            {docWording().docs.new}
+            {t("web.doc.docs.new")}
           </Button>
         </form>
         <Show when={problem() || docs.error}>
           <p class="px-2 text-xs text-berry">{problem() ?? reasonOf(docs.error)}</p>
         </Show>
         <Show when={docs.isSuccess && list().length === 0}>
-          <p class="px-2 text-xs text-muted">{docWording().docs.none}</p>
+          <p class="px-2 text-xs text-muted">{t("web.doc.docs.none")}</p>
         </Show>
         <ul class="flex flex-col gap-0.5">
           <For each={list()}>
@@ -124,7 +125,7 @@ export function DocsPage(props: { rest: string }) {
         <Show when={id()}>
           <div class="lg:hidden">
             <Button icon="back" onClick={() => router.navigate(docPath())}>
-              {docWording().docs.all}
+              {t("web.doc.docs.all")}
             </Button>
           </div>
         </Show>
@@ -193,19 +194,21 @@ function DocView(props: { id: string }) {
     return (
       editor.error ??
       (editor.busy
-        ? docWording().docs.saving
-        : [docWording().docs.saved, docWording().docs.blocks(editor.blocks.length), ...(editor.othersWriting ? [docWording().docs.helpersWriting] : [])].join(
-            " · ",
-          ))
+        ? t("web.doc.docs.saving")
+        : [
+            t("web.doc.docs.saved"),
+            t("web.doc.docs.blocks", { n: editor.blocks.length }),
+            ...(editor.othersWriting ? [t("web.doc.docs.helpersWriting")] : []),
+          ].join(" · "))
     );
   };
   const doc = () => (version(), editor.doc);
   return (
-    <article aria-label={doc()?.title ?? docWording().docs.doc} class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
+    <article aria-label={doc()?.title ?? t("web.doc.docs.doc")} class="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-page pt-4 pr-5 pb-2 pl-2">
       <div class="flex items-start gap-2 pb-1 pl-[35px]">
         <h1 class="min-w-0 flex-1 text-2xl font-semibold">{doc()?.title ?? ""}</h1>
         <Button icon="play" onClick={() => void editor.demo()}>
-          {docWording().docs.demo}
+          {t("web.doc.docs.demo")}
         </Button>
       </div>
       <p role="status" class={["pb-3 pl-[35px] text-xs", (version(), editor.error) ? "text-berry" : "text-muted"]}>
@@ -216,7 +219,7 @@ function DocView(props: { id: string }) {
           {(row) => <BlockRow editor={editor} row={row()} agent={agents().get(row().updatedBy)} />}
         </For>
         {/* Below the last block: a click starts a new paragraph. */}
-        <button type="button" aria-label={docWording().docs.append} class="block h-16 w-full cursor-text" onClick={() => editor.append()} />
+        <button type="button" aria-label={t("web.doc.docs.append")} class="block h-16 w-full cursor-text" onClick={() => editor.append()} />
       </div>
     </article>
   );
@@ -226,7 +229,7 @@ const barHeight = (type: string) => (type === blockDivider ? 16 : type === block
 
 function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
   const r = () => props.row;
-  const writer = () => (r().updatedBy === docOwner ? docWording().docs.owner : (props.agent?.name ?? r().updatedBy));
+  const writer = () => (r().updatedBy === docOwner ? t("web.doc.docs.owner") : (props.agent?.name ?? r().updatedBy));
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
       case blockBulleted:
@@ -234,14 +237,14 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
       case blockNumbered:
         return `${r().number ?? 1}.`;
       case blockMemoryItem:
-        return <span class="text-xs text-muted">{docWording().docs.memoryItem}</span>;
+        return <span class="text-xs text-muted">{t("web.doc.docs.memoryItem")}</span>;
       case blockTodo:
         return (
           <button
             type="button"
             role="checkbox"
             aria-checked={aria(r().attrs.checked ?? false)}
-            aria-label={r().attrs.checked ? docWording().docs.done : docWording().docs.notDone}
+            aria-label={r().attrs.checked ? t("web.doc.docs.done") : t("web.doc.docs.notDone")}
             onClick={() => props.editor.toggle(r().block)}
             class={[
               "mt-[3px] flex size-4 cursor-pointer items-center justify-center rounded-[3px] border-[1.5px]",
@@ -276,8 +279,8 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
         </Show>
       </span>
       <span
-        title={r().writing ? docWording().docs.writing(writer()) : docWording().docs.wrote(writer())}
-        aria-label={r().writing ? docWording().docs.writing(writer()) : undefined}
+        title={r().writing ? t("web.doc.docs.writing", { who: writer() }) : t("web.doc.docs.wrote", { who: writer() })}
+        aria-label={r().writing ? t("web.doc.docs.writing", { who: writer() }) : undefined}
         class={["mt-0.5 mr-2.5 shrink-0 rounded-sm", r().writing ? "w-1 animate-pulse" : "w-[3px]"]}
         style={{ height: `${barHeight(r().type)}px`, background: authorColor(r().updatedBy, props.agent) }}
       />
@@ -293,8 +296,8 @@ function BlockRow(props: { editor: DocEditor; row: Row; agent?: Agent }) {
                   kind() === "image"
                     ? docWording().docs.image(r().attrs.alt ?? "", r().attrs.src ?? "")
                     : kind() === "issue"
-                      ? docWording().docs.issue(r().attrs.issueId ?? "")
-                      : docWording().docs.unknown(r().type)
+                      ? t("web.doc.docs.issue", { id: r().attrs.issueId ?? "" })
+                      : t("web.doc.docs.unknown", { type: r().type })
                 }
               />
             </Show>
@@ -371,12 +374,12 @@ function BlockField(props: { editor: DocEditor; row: Row }) {
         <div
           role="textbox"
           tabindex={0}
-          aria-label={docWording().docs.block(props.row.block.id)}
+          aria-label={t("web.doc.docs.block", { id: props.row.block.id })}
           onFocus={() => setEditing(true)}
           onClick={() => setEditing(true)}
           class={["min-h-6 cursor-text text-base leading-6 break-words whitespace-pre-wrap", typeStyle(props.row)]}
         >
-          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? docWording().docs.heading : " "}</span>}>
+          <Show when={props.row.text} fallback={<span class="text-faint">{props.row.type === blockHeading ? t("web.doc.docs.heading") : " "}</span>}>
             <Marked spans={props.row.spans} />
           </Show>
         </div>
@@ -431,10 +434,10 @@ function Field(props: { editor: DocEditor; row: Row; focusNow: boolean; onLeave:
   return (
     <textarea
       ref={(t) => (el = t)}
-      aria-label={docWording().docs.block(b().id)}
+      aria-label={t("web.doc.docs.block", { id: b().id })}
       rows={1}
       value={props.row.text}
-      placeholder={props.row.type === blockHeading ? docWording().docs.heading : undefined}
+      placeholder={props.row.type === blockHeading ? t("web.doc.docs.heading") : undefined}
       spellcheck="false"
       onFocus={() => props.editor.focus(b(), true)}
       onBlur={() => {

@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // The phone's screens other than the games: the home screen's apps, a call ringing, the missed calls and the log, and
 // the orchestrator's line. The web has no voice yet, so calling the orchestrator says so and points to 田头 instead of dialing.
 
-import { phoneWording } from "./words";
 import { For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { InboxItem } from "@vibevalley/protocol";
@@ -79,7 +79,7 @@ const SmallFace = (props: { children: JSX.Element }) => (
 export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; onDecline: () => void }) {
   return (
     <div class="flex min-h-0 flex-1 flex-col items-center px-3 pt-5 text-center">
-      <span class="phone-blink">{phoneWording().ringing}</span>
+      <span class="phone-blink">{t("web.farm.phone.ringing")}</span>
       <span class="mt-3">
         <BigFace shake>
           <CallerFace call={props.call} size={60} />
@@ -91,8 +91,8 @@ export function RingingScreen(props: { call: InboxItem; onAnswer: () => void; on
       </p>
       <p class="mt-2 line-clamp-3 leading-[1.625]">{props.call.text}</p>
       <div class="mt-auto mb-5 flex gap-8">
-        <RoundKey answer={false} label={phoneWording().decline} onClick={() => props.onDecline()} />
-        <RoundKey answer label={phoneWording().answer} onClick={() => props.onAnswer()} />
+        <RoundKey answer={false} label={t("web.farm.phone.decline")} onClick={() => props.onDecline()} />
+        <RoundKey answer label={t("web.farm.phone.answer")} onClick={() => props.onAnswer()} />
       </div>
     </div>
   );
@@ -131,7 +131,7 @@ function CallOrchestrator(props: { onCall: () => void }) {
       style={{ background: answerGreen, color: cream, "box-shadow": `inset 0 0 0 2px ${bark}` }}
     >
       <PhoneGlyph size={14} lit />
-      {phoneWording().callOrchestrator}
+      {t("web.farm.phone.callOrchestrator")}
     </button>
   );
 }
@@ -158,7 +158,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
               class={["flex-1 cursor-pointer py-1", { "hover:bg-[#b9cf8c]": props.screen !== s }]}
               style={props.screen === s ? { background: lcd.dark, color: lcd.pale } : undefined}
             >
-              {s === "missed" ? phoneWording().missed(missed().length) : phoneWording().log}
+              {s === "missed" ? t("web.farm.phone.missed", { n: missed().length }) : t("web.farm.phone.log")}
             </button>
           )}
         </For>
@@ -167,7 +167,7 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
         <Show
           when={props.screen === "missed"}
           fallback={
-            <Show when={phone().log.length > 0} fallback={empty(phoneWording().noCalls)}>
+            <Show when={phone().log.length > 0} fallback={empty(t("web.farm.phone.noCalls"))}>
               <For each={phone().log} keyed={(e) => `${e.call.id}-${e.at}`}>
                 {(e) => (
                   <li class={row} style={rule}>
@@ -177,14 +177,16 @@ export function ListScreen(props: { screen: "missed" | "log"; onScreen: (s: "mis
                     <span class="min-w-0 flex-1 truncate">
                       {e().call.who} · {e().call.words.label}
                     </span>
-                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>{e().answered ? phoneWording().answered : phoneWording().declined}</span>
+                    <span style={{ color: e().answered ? lcd.dark : declineRed }}>
+                      {e().answered ? t("web.farm.phone.answered") : t("web.farm.phone.declined")}
+                    </span>
                   </li>
                 )}
               </For>
             </Show>
           }
         >
-          <Show when={missed().length > 0} fallback={empty(phoneWording().noMissed)}>
+          <Show when={missed().length > 0} fallback={empty(t("web.farm.phone.noMissed"))}>
             <For each={missed()} keyed={(c) => c.id}>
               {(c) => (
                 <li style={rule}>
@@ -228,13 +230,13 @@ export function OrchestratorScreen() {
   const line = () => {
     switch (phase()) {
       case "connecting":
-        return phoneWording().phase.connecting;
+        return t("web.farm.phone.phase.connecting");
       case "live":
-        return call().agentHere ? phoneWording().phase.live : phoneWording().phase.coming;
+        return call().agentHere ? t("web.farm.phone.phase.live") : t("web.farm.phone.phase.coming");
       case "ending":
-        return phoneWording().phase.ending;
+        return t("web.farm.phone.phase.ending");
       case "idle":
-        return call().problem ? phoneWording().phase.failed(call().problem ?? "") : phoneWording().phase.idle;
+        return call().problem ? t("web.farm.phone.phase.failed", { why: call().problem ?? "" }) : t("web.farm.phone.phase.idle");
     }
   };
   const on = () => phase() === "live" || phase() === "connecting";
@@ -243,14 +245,14 @@ export function OrchestratorScreen() {
       <BigFace shake={phase() === "connecting"}>
         <OrchestratorFace size={60} />
       </BigFace>
-      <p class="mt-2 text-[24px] leading-none">{phoneWording().manager}</p>
+      <p class="mt-2 text-[24px] leading-none">{t("web.farm.phone.manager")}</p>
       <p class="mt-3 line-clamp-4 leading-[1.625]" style={{ color: phase() === "idle" && call().problem ? declineRed : undefined }}>
         {line()}
       </p>
       <div class="mt-auto mb-5">
         <RoundKey
           answer={!on()}
-          label={on() ? phoneWording().hangUp : phoneWording().callOrchestrator}
+          label={on() ? t("web.farm.phone.hangUp") : t("web.farm.phone.callOrchestrator")}
           onClick={() => void (on() ? voiceCall.end() : voiceCall.start())}
         />
       </div>
@@ -273,11 +275,11 @@ const SokobanIcon = () => (
 
 /** The games, in one folder on the home screen. */
 const games = (open: (app: PhoneApp) => void): App[] => [
-  { label: phoneWording().game.blocks, icon: () => <BlocksIcon />, go: () => open("blocks") },
-  { label: phoneWording().game.sokoban, icon: SokobanIcon, go: () => open("sokoban") },
-  { label: phoneWording().game.dino, icon: () => <DinoIcon />, go: () => open("dino") },
-  { label: phoneWording().game.bugs, icon: () => <BugSnakeIcon />, go: () => open("bugs") },
-  { label: phoneWording().game.merge, icon: () => <MergeIcon />, go: () => open("merge") },
+  { label: t("web.farm.phone.game.blocks"), icon: () => <BlocksIcon />, go: () => open("blocks") },
+  { label: t("web.farm.phone.game.sokoban"), icon: SokobanIcon, go: () => open("sokoban") },
+  { label: t("web.farm.phone.game.dino"), icon: () => <DinoIcon />, go: () => open("dino") },
+  { label: t("web.farm.phone.game.bugs"), icon: () => <BugSnakeIcon />, go: () => open("bugs") },
+  { label: t("web.farm.phone.game.merge"), icon: () => <MergeIcon />, go: () => open("merge") },
 ];
 
 /** The games folder's icon: four of them small, as a folder shows what is in it. */
@@ -300,16 +302,16 @@ export function HomeScreen(props: {
 }) {
   const apps: App[] = [
     {
-      label: phoneWording().app.missed,
+      label: t("web.farm.phone.app.missed"),
       icon: () => <PhoneGlyph size={26} lit={props.missed > 0} />,
       badge: () => props.missed,
       go: () => props.onOpen("missed"),
     },
-    { label: phoneWording().log, icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
-    { label: phoneWording().manager, icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
-    { label: phoneWording().app.channels, icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
-    { label: phoneWording().app.graphs, icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
-    { label: phoneWording().app.games, icon: GamesIcon, go: () => props.onOpen("games") },
+    { label: t("web.farm.phone.log"), icon: () => <SpriteIcon name="icon-log" size={28} />, go: () => props.onOpen("log") },
+    { label: t("web.farm.phone.manager"), icon: () => <OrchestratorFace size={28} />, go: () => props.onOrchestrator() },
+    { label: t("web.farm.phone.app.channels"), icon: () => <SpriteIcon name="icon-board" size={28} />, go: () => props.onChannels() },
+    { label: t("web.farm.phone.app.graphs"), icon: () => <SpriteIcon name="icon-task-board" size={28} />, go: () => props.onTaskBoard() },
+    { label: t("web.farm.phone.app.games"), icon: GamesIcon, go: () => props.onOpen("games") },
   ];
   return <AppGrid apps={apps} />;
 }

@@ -1,9 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // One project's farm (/farm/<project>): the village canvas full-bleed, the DOM over it, outside the workbench's shell.
 // Each layer is its own folder's; this page only stacks them, gives the ones that draw the beds this project's part of the
 // frame (scope.ts), and owns the keys, the sounds and the phone's calls. The chat and the title are the whole farm's.
 
 import { type FarmSoundInput } from "./cues";
-import { farmWording } from "./words";
+
 import { createEffect, Show } from "solid-js";
 import { farm } from "./store";
 import { FramesContext, useFrames } from "../base/frame";
@@ -56,7 +57,7 @@ export function FarmPage(props: { project: string }) {
       </FramesContext>
       <Show when={!frames.frame}>
         <p role="status" class="absolute inset-x-0 top-1/3 text-center text-cream-200">
-          {frames.link === "lost" ? farmWording().page.lost : farmWording().page.waiting}
+          {frames.link === "lost" ? t("web.farm.page.lost") : t("web.farm.page.waiting")}
         </p>
       </Show>
       <Show when={titleOpen()}>

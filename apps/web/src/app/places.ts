@@ -1,5 +1,6 @@
+import { t } from "@vibevalley/i18n";
 import type { IconName } from "../ui/icons";
-import { appWording } from "../base/words";
+
 // The workbench's places, in the rail's order; 设置 sits at the rail's bottom.
 
 export interface Place {
@@ -11,14 +12,14 @@ export interface Place {
 }
 
 export const places: readonly Place[] = [
-  { id: "chat", label: appWording().place.chat.label, hint: appWording().place.chat.hint, icon: "chat", path: "/chat" },
-  { id: "issues", label: appWording().place.issues.label, hint: appWording().place.issues.hint, icon: "issues", path: "/issues" },
-  { id: "docs", label: appWording().place.docs.label, hint: appWording().place.docs.hint, icon: "docs", path: "/docs" },
-  { id: "agents", label: appWording().place.agents.label, hint: appWording().place.agents.hint, icon: "agents", path: "/agents" },
-  { id: "runtimes", label: appWording().place.runtimes.label, hint: appWording().place.runtimes.hint, icon: "runtimes", path: "/runtimes" },
-  { id: "projects", label: appWording().place.projects.label, hint: appWording().place.projects.hint, icon: "projects", path: "/projects" },
-  { id: "catalog", label: appWording().place.catalog.label, hint: appWording().place.catalog.hint, icon: "catalog", path: "/catalog" },
-  { id: "settings", label: appWording().place.settings.label, hint: appWording().place.settings.hint, icon: "settings", path: "/settings" },
+  { id: "chat", label: t("web.base.place.chat.label"), hint: t("web.base.place.chat.hint"), icon: "chat", path: "/chat" },
+  { id: "issues", label: t("web.base.place.issues.label"), hint: t("web.base.place.issues.hint"), icon: "issues", path: "/issues" },
+  { id: "docs", label: t("web.base.place.docs.label"), hint: t("web.base.place.docs.hint"), icon: "docs", path: "/docs" },
+  { id: "agents", label: t("web.base.place.agents.label"), hint: t("web.base.place.agents.hint"), icon: "agents", path: "/agents" },
+  { id: "runtimes", label: t("web.base.place.runtimes.label"), hint: t("web.base.place.runtimes.hint"), icon: "runtimes", path: "/runtimes" },
+  { id: "projects", label: t("web.base.place.projects.label"), hint: t("web.base.place.projects.hint"), icon: "projects", path: "/projects" },
+  { id: "catalog", label: t("web.base.place.catalog.label"), hint: t("web.base.place.catalog.hint"), icon: "catalog", path: "/catalog" },
+  { id: "settings", label: t("web.base.place.settings.label"), hint: t("web.base.place.settings.hint"), icon: "settings", path: "/settings" },
 ];
 
 /** The place a path is in (/orchestrator is the agents' too); undefined for the farm. */

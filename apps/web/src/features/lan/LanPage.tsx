@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // 连接到本机: lets the phones and computers on this network use this farm once paired, the owner
 // saying yes to each here. Only this machine manages it: a paired device is refused the status and shown why.
 
 import { lanWording } from "./words";
-import { appWording } from "../../base/words";
+
 import { For, Show } from "solid-js";
 import { useQueryClient } from "@tanstack/solid-query";
 import type { LanPairing, LanStatus } from "@vibevalley/protocol";
@@ -34,27 +35,27 @@ export function LanPage() {
   return (
     <div class="flex max-w-3xl flex-col gap-3">
       <Card
-        title={lanWording().lan.section.label}
-        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? lanWording().lan.open : lanWording().lan.closed}</span>}</Show>}
+        title={t("web.lan.lan.section.label")}
+        action={<Show when={s()}>{(s) => <span class="text-sm text-muted">{s().open ? t("web.lan.lan.open") : t("web.lan.lan.closed")}</span>}</Show>}
       >
-        <Show when={s()} fallback={<Quiet>{status.error ? reasonOf(status.error) : appWording().form.asking}</Quiet>}>
+        <Show when={s()} fallback={<Quiet>{status.error ? reasonOf(status.error) : t("web.base.form.asking")}</Quiet>}>
           {(s) => (
             <>
               <Show
                 when={s().open}
                 fallback={
                   <>
-                    <p class="text-sm">{lanWording().lan.intro}</p>
+                    <p class="text-sm">{t("web.lan.lan.intro")}</p>
                     <div>
                       <Button tone="primary" onClick={() => void act(() => api.lan.update({ open: true }))}>
-                        {lanWording().lan.allow}
+                        {t("web.lan.lan.allow")}
                       </Button>
                     </div>
                   </>
                 }
               >
                 <div class="flex gap-3">
-                  <span class="w-18 shrink-0 text-sm text-muted">{lanWording().lan.address}</span>
+                  <span class="w-18 shrink-0 text-sm text-muted">{t("web.lan.lan.address")}</span>
                   <span class="font-mono text-sm select-all">{s().url ?? "—"}</span>
                 </div>
                 <Show
@@ -62,9 +63,9 @@ export function LanPage() {
                   fallback={
                     <div class="flex flex-wrap gap-2">
                       <Button tone="primary" disabled={!s().url} onClick={() => void act(() => api.lan.pairing.start())}>
-                        {lanWording().lan.add}
+                        {t("web.lan.lan.add")}
                       </Button>
-                      <Button onClick={() => void act(() => api.lan.update({ open: false }))}>{lanWording().lan.close}</Button>
+                      <Button onClick={() => void act(() => api.lan.update({ open: false }))}>{t("web.lan.lan.close")}</Button>
                     </div>
                   }
                 >
@@ -90,7 +91,7 @@ export function LanPage() {
       </Card>
       <Show when={s() && s()!.devices.length > 0 ? s() : undefined}>
         {(s) => (
-          <Card title={lanWording().lan.devices} action={<span class="text-sm text-muted">{lanWording().lan.deviceCount(s().devices.length)}</span>}>
+          <Card title={t("web.lan.lan.devices")} action={<span class="text-sm text-muted">{t("web.lan.lan.deviceCount", { n: s().devices.length })}</span>}>
             <For each={s().devices}>
               {(d) => (
                 <div class="flex items-center gap-2">
@@ -100,8 +101,12 @@ export function LanPage() {
                       {lanWording().lan.paired(momentText(d.pairedAt), d.lastSeen ? momentText(d.lastSeen) : undefined)}
                     </span>
                   </span>
-                  <Button tone="danger" aria-label={lanWording().lan.removeWhich(d.name)} onClick={() => void act(() => api.lan.device.delete({ id: d.id }))}>
-                    {lanWording().lan.remove}
+                  <Button
+                    tone="danger"
+                    aria-label={t("web.lan.lan.removeWhich", { name: d.name })}
+                    onClick={() => void act(() => api.lan.device.delete({ id: d.id }))}
+                  >
+                    {t("web.lan.lan.remove")}
                   </Button>
                 </div>
               )}
@@ -116,9 +121,9 @@ export function LanPage() {
 async function copy(link: string) {
   try {
     await navigator.clipboard.writeText(link);
-    toast(lanWording().lan.copied);
+    toast(t("web.lan.lan.copied"));
   } catch {
-    toast(lanWording().lan.notCopied);
+    toast(t("web.lan.lan.notCopied"));
   }
 }
 
@@ -131,18 +136,18 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
       fallback={
         <div class="flex flex-wrap gap-5">
           <div class="rounded-md border border-line bg-white p-2">
-            <Qr text={props.pairing.link} label={lanWording().lan.qr} />
+            <Qr text={props.pairing.link} label={t("web.lan.lan.qr")} />
           </div>
           <div class="flex max-w-md min-w-50 flex-col gap-2">
-            <p class="text-sm">{lanWording().lan.scan}</p>
+            <p class="text-sm">{t("web.lan.lan.scan")}</p>
             <p class="font-mono text-[11.5px] break-all select-all">{props.pairing.link}</p>
-            <p class="text-xs text-muted">{lanWording().lan.left(left())}</p>
+            <p class="text-xs text-muted">{t("web.lan.lan.left", { s: left() })}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <Button icon="copy" onClick={() => void copy(props.pairing.link)}>
-                {lanWording().lan.copy}
+                {t("web.lan.lan.copy")}
               </Button>
-              <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{lanWording().lan.newCode}</Button>
-              <Button onClick={() => void props.act(() => api.lan.pairing.stop())}>{lanWording().lan.stop}</Button>
+              <Button onClick={() => void props.act(() => api.lan.pairing.start())}>{t("web.lan.lan.newCode")}</Button>
+              <Button onClick={() => void props.act(() => api.lan.pairing.stop())}>{t("web.lan.lan.stop")}</Button>
             </div>
           </div>
         </div>
@@ -150,13 +155,13 @@ function Pairing(props: { pairing: LanPairing; act: Act }) {
     >
       {(asking) => (
         <div class="flex flex-col gap-3">
-          <p class="text-sm">{lanWording().lan.asking(asking())}</p>
+          <p class="text-sm">{t("web.lan.lan.asking", { name: asking() })}</p>
           <div class="flex gap-2">
             <Button tone="primary" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: true }))}>
-              {lanWording().lan.letIn}
+              {t("web.lan.lan.letIn")}
             </Button>
             <Button tone="danger" onClick={() => void props.act(() => api.lan.pairing.answer({ allow: false }))}>
-              {lanWording().lan.refuse}
+              {t("web.lan.lan.refuse")}
             </Button>
           </div>
         </div>

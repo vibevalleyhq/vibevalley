@@ -1,4 +1,5 @@
-import { pixelWording } from "./words";
+import { t } from "@vibevalley/i18n";
+
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { cx, pxRing, pxText } from "./style";
@@ -46,7 +47,7 @@ export function PxField(props: {
             <span class="text-leaf-300"> *</span>
           </Show>
           <Show when={props.optional}>
-            <span class="text-bark-500">{pixelWording().optional}</span>
+            <span class="text-bark-500">{t("web.ui.pixel.optional")}</span>
           </Show>
         </label>
         <Show when={props.aside != null}>

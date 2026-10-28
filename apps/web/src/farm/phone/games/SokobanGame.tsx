@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // 推箱子 on the phone: the rules are farm/phone/games/sokoban.ts; the warehouse is kept while the phone is away or a
 // call comes in.
 
-import { phoneWording } from "../words";
 import { For, Show } from "solid-js";
 import { moveWarehouse, newWarehouse, undoWarehouse, warehouseDone, warehouses } from "./sokoban";
 import { lcd } from "../lcd";
@@ -51,13 +51,13 @@ export function SokobanGame() {
   return (
     <div class="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2">
       <div class="flex justify-between">
-        <span>{phoneWording().sokoban.title(g().level + 1, warehouses.length)}</span>
-        <span>{phoneWording().sokoban.moves(g().moves, g().pushes)}</span>
+        <span>{t("web.farm.phone.sokoban.title", { level: g().level + 1, of: warehouses.length })}</span>
+        <span>{t("web.farm.phone.sokoban.moves", { moves: g().moves, pushes: g().pushes })}</span>
       </div>
       <p class="text-center">{level().name}</p>
       <svg
         role="img"
-        aria-label={phoneWording().sokoban.board(placed(), g().boxes.length)}
+        aria-label={t("web.farm.phone.sokoban.board", { placed: placed(), of: g().boxes.length })}
         viewBox={`0 0 ${width() * 16} ${level().rows.length * 16}`}
         class="mx-auto block w-full max-w-[224px]"
         shape-rendering="crispEdges"
@@ -92,7 +92,7 @@ export function SokobanGame() {
         </For>
       </svg>
       <p role="status" class="text-center">
-        {done() ? (last() ? phoneWording().sokoban.allIn : phoneWording().sokoban.done) : phoneWording().sokoban.goal}
+        {done() ? (last() ? t("web.farm.phone.sokoban.allIn") : t("web.farm.phone.sokoban.done")) : t("web.farm.phone.sokoban.goal")}
       </p>
       <div class="mt-auto flex justify-center gap-3">
         <button
@@ -102,7 +102,7 @@ export function SokobanGame() {
           class="cursor-pointer px-2 py-1 disabled:cursor-default disabled:opacity-40"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >
-          {phoneWording().sokoban.undo}
+          {t("web.farm.phone.sokoban.undo")}
         </button>
         <button
           type="button"
@@ -110,11 +110,11 @@ export function SokobanGame() {
           class="cursor-pointer px-2 py-1"
           style={{ "box-shadow": `inset 0 0 0 1px ${lcd.ink}` }}
         >
-          A {done() ? (last() ? phoneWording().sokoban.again : phoneWording().sokoban.next) : phoneWording().sokoban.restart}
+          A {done() ? (last() ? t("web.farm.phone.sokoban.again") : t("web.farm.phone.sokoban.next")) : t("web.farm.phone.sokoban.restart")}
         </button>
       </div>
       <p class="text-center" style={{ color: lcd.dark }}>
-        {phoneWording().sokoban.help}
+        {t("web.farm.phone.sokoban.help")}
       </p>
     </div>
   );

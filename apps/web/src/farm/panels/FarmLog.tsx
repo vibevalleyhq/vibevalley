@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The farm's log: what you and the orchestrator said in the general channel and every helper's turn report, newest first.
 // Voice captions carry no times, so the log keeps to the typed lines.
 
 import { spentText } from "../../base/format";
-import { farmWording } from "../words";
+
 import { wording } from "@vibevalley/protocol/words";
 import { For, Show } from "solid-js";
 import type { ChatMessage, WorkspaceState, Issue, Outcome } from "@vibevalley/protocol";
@@ -37,7 +38,7 @@ export function FarmLog() {
       ...reports().map((message) => ({ kind: "report" as const, message })),
     ].sort((a, b) => b.message.at - a.message.at);
   return (
-    <Show when={rows().length > 0} fallback={<FarmEmpty text={farmWording().log.empty} />}>
+    <Show when={rows().length > 0} fallback={<FarmEmpty text={t("web.farm.log.empty")} />}>
       <div class="flex flex-col">
         <For each={rows().slice(0, 80)} keyed={(row) => row.message.id}>
           {(row, i) => (
@@ -67,12 +68,12 @@ function Said(props: { m: ChatMessage }) {
   return (
     <>
       <Show when={you()} fallback={<OrchestratorFace size={32} agent={props.m.from} />}>
-        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">{farmWording().log.you}</span>
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-leaf-500 text-[12px] text-cream-50">{t("web.farm.log.you")}</span>
       </Show>
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
-          <span class="text-[13px]">{you() ? farmWording().log.you : farmWording().orchestrator}</span>
-          <FarmTag text={you() ? farmWording().log.said : farmWording().log.answered} ink="#67482d" />
+          <span class="text-[13px]">{you() ? t("web.farm.log.you") : t("web.farm.orchestrator")}</span>
+          <FarmTag text={you() ? t("web.farm.log.said") : t("web.farm.log.answered")} ink="#67482d" />
         </div>
         <div class={["mt-0.5 text-[13px]", you() ? "text-bark-900" : "text-bark-800"]}>
           <PxMarkdown text={props.m.text} />
@@ -100,7 +101,7 @@ function Report(props: { r: ChatMessage; issue?: Issue }) {
           <p class="mt-0.5 text-[13px]">{props.issue!.title}</p>
         </Show>
         <p class={["line-clamp-4 text-[12px]", outcome() === "failed" ? "text-berry" : "text-bark-600"]}>{props.r.text}</p>
-        <Show when={props.r.spent}>{(spent) => <p class="text-[12px] text-bark-400">{farmWording().log.spent(spentText(spent()))}</p>}</Show>
+        <Show when={props.r.spent}>{(spent) => <p class="text-[12px] text-bark-400">{t("web.farm.log.spent", { spent: spentText(spent()) })}</p>}</Show>
       </div>
     </>
   );

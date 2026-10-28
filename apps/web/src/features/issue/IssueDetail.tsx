@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import type { IconName } from "../../ui/icons";
 import { issuesWording } from "./words";
 import { wording } from "@vibevalley/protocol/words";
@@ -94,7 +95,7 @@ export function IssueDetail(props: {
       <Show when={s().inTask ? props.onTask : undefined}>
         {(onTask) => (
           <button type="button" onClick={() => onTask()()} class="mb-1.5 cursor-pointer text-xs text-water hover:underline">
-            ‹ {parent()?.title ? issuesWording().detail.planStep(parent()!.title) : issuesWording().detail.backToPlan}
+            ‹ {parent()?.title ? t("web.issue.detail.planStep", { plan: parent()!.title }) : t("web.issue.detail.backToPlan")}
           </button>
         )}
       </Show>
@@ -107,7 +108,7 @@ export function IssueDetail(props: {
           {[s().project, wording().priority[props.issue.priority]].filter(Boolean).join(" · ")}
         </span>
       </div>
-      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={issuesWording().detail.now}>
+      <div class="mt-1.5 flex items-center gap-2 text-sm" aria-label={t("web.issue.detail.now")}>
         <Dot tone={tone()} />
         <span class={tone() === "berry" ? "text-berry" : "text-ink/80"}>{s().statusLine(now(), timeline()?.spent?.cny)}</span>
       </div>
@@ -118,8 +119,8 @@ export function IssueDetail(props: {
     <>
       <Show when={s().ask}>
         {(ask) => (
-          <section aria-label={issuesWording().detail.yours} class="mb-5">
-            <SheetLabel>{issuesWording().detail.yours}</SheetLabel>
+          <section aria-label={t("web.issue.detail.yours")} class="mb-5">
+            <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <div class="font-semibold">{ask().head}</div>
               <Show when={ask().line}>
@@ -146,21 +147,21 @@ export function IssueDetail(props: {
                 }}
                 placeholder={
                   box() === "reject"
-                    ? issuesWording().detail.rejectWhere
+                    ? t("web.issue.detail.rejectWhere")
                     : s().attention.state === "asking"
-                      ? issuesWording().detail.sayIt
+                      ? t("web.issue.detail.sayIt")
                       : s().attention.state === "canceled"
-                        ? issuesWording().reopen.what
-                        : issuesWording().detail.tell(head().name)
+                        ? t("web.issue.reopen.what")
+                        : t("web.issue.detail.tell", { who: head().name })
                 }
                 aria-label={
                   box() === "reject"
-                    ? issuesWording().detail.rejectLabel
+                    ? t("web.issue.detail.rejectLabel")
                     : s().attention.state === "asking"
-                      ? issuesWording().detail.answer
+                      ? t("web.issue.detail.answer")
                       : s().attention.state === "canceled"
-                        ? issuesWording().reopen.title
-                        : issuesWording().detail.tell(head().name)
+                        ? t("web.issue.reopen.title")
+                        : t("web.issue.detail.tell", { who: head().name })
                 }
               />
             </Show>
@@ -174,7 +175,7 @@ export function IssueDetail(props: {
         )}
       </Show>
       <Show when={!s().ask && box() === "tell"}>
-        <section aria-label={issuesWording().detail.tellSection} class="mb-5">
+        <section aria-label={t("web.issue.detail.tellSection")} class="mb-5">
           <TextArea
             rows={2}
             value={text()}
@@ -186,24 +187,24 @@ export function IssueDetail(props: {
                 sayAct("tell");
               }
             }}
-            placeholder={head().phase._tag === "working" ? issuesWording().detail.tellWorking : issuesWording().detail.tellIdle}
-            aria-label={issuesWording().detail.tell(head().name)}
+            placeholder={head().phase._tag === "working" ? t("web.issue.detail.tellWorking") : t("web.issue.detail.tellIdle")}
+            aria-label={t("web.issue.detail.tell", { who: head().name })}
             autofocus
           />
           <div class="mt-2 flex gap-2">
             {button("tell", () => true)}
             <Button disabled={busy()} onClick={() => setBox(undefined)}>
-              {issuesWording().never}
+              {t("web.issue.never")}
             </Button>
           </div>
         </section>
       </Show>
 
-      <section aria-label={issuesWording().detail.progress}>
+      <section aria-label={t("web.issue.detail.progress")}>
         <SheetLabel>
-          {issuesWording().detail.progress}
+          {t("web.issue.detail.progress")}
           <Show when={s().criteria.length > 0}>
-            <span class="ml-2 font-normal">{issuesWording().detail.met(s().met, s().criteria.length)}</span>
+            <span class="ml-2 font-normal">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</span>
           </Show>
         </SheetLabel>
         <Show when={s().doing}>
@@ -212,24 +213,27 @@ export function IssueDetail(props: {
         <Show when={s().inTask}>
           <div class="mb-1.5 text-xs text-muted">{s().taskText}</div>
         </Show>
-        <Show when={s().criteria.length > 0} fallback={<p class="text-sm text-muted">{issuesWording().detail.noCriteria(props.issue.deliver === "answer")}</p>}>
+        <Show
+          when={s().criteria.length > 0}
+          fallback={<p class="text-sm text-muted">{t("web.issue.detail.noCriteria", { answer: props.issue.deliver === "answer" })}</p>}
+        >
           <Criteria rows={s().criteria} checking={s().attention.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </Show>
         <Show when={s().openFindings.length > 0}>
           <div class="mt-2">
-            <div class="text-xs text-muted">{issuesWording().detail.rejected}</div>
+            <div class="text-xs text-muted">{t("web.issue.detail.rejected")}</div>
             <For each={s().openFindings}>{(f) => <div class="text-sm text-berry">· {f.text}</div>}</For>
           </div>
         </Show>
       </section>
 
-      <section aria-label={issuesWording().detail.made}>
-        <SheetLabel>{issuesWording().detail.made}</SheetLabel>
+      <section aria-label={t("web.issue.detail.made")}>
+        <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
         <Switch
-          fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : issuesWording().detail.nothingToSee}</p>}
+          fallback={<p class="text-sm text-muted">{s().attention.state === "done" ? closedText(props.issue) + "。" : t("web.issue.detail.nothingToSee")}</p>}
         >
           <Match when={props.issue.deliver === "answer"}>
-            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">{issuesWording().detail.noAnswer}</p>}>
+            <Show when={props.issue.answer} fallback={<p class="text-sm text-muted">{t("web.issue.detail.noAnswer")}</p>}>
               {(a) => <AnswerView answer={a()} />}
             </Show>
           </Match>
@@ -237,14 +241,14 @@ export function IssueDetail(props: {
             {(c) => (
               <Show
                 when={c().commits.length > 0 || c().uncommitted.length > 0 || c().files.length > 0}
-                fallback={<p class="text-sm text-muted">{issuesWording().detail.noChanges}</p>}
+                fallback={<p class="text-sm text-muted">{t("web.issue.detail.noChanges")}</p>}
               >
                 <div class="flex flex-col gap-2">
                   <div class="text-sm">{changesLine(c())}</div>
                   <Show when={c().conflicts.length > 0}>
                     <div class="text-sm text-berry">{issuesWording().detail.conflict(c().base, c().conflicts)}</div>
                   </Show>
-                  <Fold label={issuesWording().detail.changedFiles} summary={issuesWording().detail.fileCount(c().files.length)}>
+                  <Fold label={t("web.issue.detail.changedFiles")} summary={t("web.issue.detail.fileCount", { n: c().files.length })}>
                     <ChangesHead changes={c()} />
                     <ChangesBody changes={c()} />
                   </Fold>
@@ -253,7 +257,7 @@ export function IssueDetail(props: {
             )}
           </Match>
           <Match when={s().showsChanges}>
-            <p class="text-sm text-muted">{changesQuery.isPending ? issuesWording().reading : issuesWording().detail.changesUnread}</p>
+            <p class="text-sm text-muted">{changesQuery.isPending ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}</p>
           </Match>
         </Switch>
         <Show when={props.issue.pullRequest}>
@@ -265,26 +269,23 @@ export function IssueDetail(props: {
         </Show>
       </section>
 
-      <section aria-label={issuesWording().detail.story}>
-        <SheetLabel>{issuesWording().detail.story}</SheetLabel>
-        <Show
-          when={timeline()}
-          fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? issuesWording().reading : issuesWording().detail.unread}</p>}
-        >
+      <section aria-label={t("web.issue.detail.story")}>
+        <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>
+        <Show when={timeline()} fallback={<p class="text-xs text-faint">{timelineQuery.isPending ? t("web.issue.reading") : t("web.issue.detail.unread")}</p>}>
           {(line) => <Story milestones={line().milestones} />}
         </Show>
         <div class="mt-3 border-t border-line">
           <Show when={s().description}>
-            <Fold label={issuesWording().detail.full}>
+            <Fold label={t("web.issue.detail.full")}>
               <Markdown class="text-sm text-ink/90" text={s().description} />
             </Fold>
           </Show>
-          <Fold label={issuesWording().detail.steps} summary={steps().length ? stepsLine(steps()) : undefined}>
+          <Fold label={t("web.issue.detail.steps")} summary={steps().length ? stepsLine(steps()) : undefined}>
             <Show when={steps().length ? steps() : undefined} fallback={<p class="text-xs text-faint">{noStepsText(head())}</p>}>
               {(st) => <WorkLog steps={st()} />}
             </Show>
           </Fold>
-          <Fold label={issuesWording().detail.runs} summary={s().historyLine}>
+          <Fold label={t("web.issue.detail.runs")} summary={s().historyLine}>
             <Runs issue={props.issue.id} version={`${props.issue.attention.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
           </Fold>
         </div>
@@ -304,29 +305,29 @@ export function IssueDetail(props: {
           <For each={sideActs()}>{(a) => button(a, () => !s().ask && a === s().lead)}</For>
         </div>
       </Show>
-      <SheetLabel>{issuesWording().detail.time}</SheetLabel>
-      <Property label={issuesWording().detail.opened}>{wallClockText(props.issue.createdAt)}</Property>
-      <Property label={issuesWording().detail.started}>{wallClockText(props.sessions[0]!.hiredAt)}</Property>
+      <SheetLabel>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.detail.opened")}>{wallClockText(props.issue.createdAt)}</Property>
+      <Property label={t("web.issue.detail.started")}>{wallClockText(props.sessions[0]!.hiredAt)}</Property>
       <Show when={s().ask && s().attention.since}>
-        {(at) => <Property label={issuesWording().detail.waiting}>{issuesWording().detail.since(wallClockText(at()))}</Property>}
+        {(at) => <Property label={t("web.issue.detail.waiting")}>{t("web.issue.detail.since", { clock: wallClockText(at()) })}</Property>}
       </Show>
       <Show when={props.issue.reviewedAt}>
         {(at) => (
-          <Property label={issuesWording().detail.reviewed}>
+          <Property label={t("web.issue.detail.reviewed")}>
             <span class="text-accent">{wallClockText(at())}</span>
           </Property>
         )}
       </Show>
-      <Show when={props.issue.closedAt}>{(at) => <Property label={issuesWording().detail.closedAt}>{wallClockText(at())}</Property>}</Show>
-      <SheetLabel>{issuesWording().detail.who}</SheetLabel>
-      <Property label={issuesWording().detail.helper}>{s().whoLine}</Property>
+      <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
+      <SheetLabel>{t("web.issue.detail.who")}</SheetLabel>
+      <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
       <Show when={agent()?.model}>
-        <Property label={issuesWording().detail.model}>{agent()!.model}</Property>
+        <Property label={t("web.issue.detail.model")}>{agent()!.model}</Property>
       </Show>
       <Show when={!s().inTask}>
-        <Property label={issuesWording().detail.deliver}>
+        <Property label={t("web.issue.detail.deliver")}>
           <Pick
-            label={issuesWording().detail.deliver}
+            label={t("web.issue.detail.deliver")}
             value={props.issue.deliver}
             disabled={busy() || !s().open}
             onChange={(v) => {
@@ -339,11 +340,11 @@ export function IssueDetail(props: {
       </Show>
       <More>
         <Show when={s().crewLine}>
-          <Property label={issuesWording().detail.crew}>{s().crewLine}</Property>
+          <Property label={t("web.issue.detail.crew")}>{s().crewLine}</Property>
         </Show>
-        <Property label={issuesWording().detail.profile}>{agent()?.name ?? head().name}</Property>
+        <Property label={t("web.issue.detail.profile")}>{agent()?.name ?? head().name}</Property>
         <Show when={head().branch}>
-          <Property label={issuesWording().detail.branch}>
+          <Property label={t("web.issue.detail.branch")}>
             <span class="font-mono text-xs">{head().branch}</span>
           </Property>
         </Show>
@@ -354,8 +355,8 @@ export function IssueDetail(props: {
                 <span class="min-w-0 flex-1 font-mono text-xs break-all select-text">{worktree()}</span>
                 <button
                   type="button"
-                  aria-label={issuesWording().detail.copyPath}
-                  title={issuesWording().detail.copyPath}
+                  aria-label={t("web.issue.detail.copyPath")}
+                  title={t("web.issue.detail.copyPath")}
                   onClick={() => void navigator.clipboard?.writeText(worktree())}
                   class="cursor-pointer rounded p-0.5 hover:bg-hover"
                 >
@@ -365,9 +366,9 @@ export function IssueDetail(props: {
             </Property>
           )}
         </Show>
-        <Property label={issuesWording().detail.took}>{s().usedLine(steps(), now())}</Property>
+        <Property label={t("web.issue.detail.took")}>{s().usedLine(steps(), now())}</Property>
         <Show when={s().resolvedFindings.length > 0}>
-          <Property label={issuesWording().detail.resolved}>
+          <Property label={t("web.issue.detail.resolved")}>
             <For each={s().resolvedFindings}>{(f) => <div class="text-faint line-through">{f.text}</div>}</For>
           </Property>
         </Show>
@@ -383,7 +384,7 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
     <div class="mt-2.5">
       <div>{props.ask.question}</div>
       <Show when={props.ask.options?.length}>
-        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={issuesWording().detail.answerTo(props.ask.question)}>
+        <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={t("web.issue.detail.answerTo", { question: props.ask.question })}>
           <For each={props.ask.options}>
             {(o) => (
               <Button disabled={props.busy} onClick={() => props.onPick(o)}>
@@ -398,9 +399,9 @@ function Question(props: { ask: Question; busy: boolean; onPick: (words: string)
 }
 
 const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; label: string }> = {
-  met: { icon: "check", label: issuesWording().detail.result.met },
-  unmet: { icon: "cross", label: issuesWording().detail.result.unmet },
-  unsure: { icon: "warn", label: issuesWording().detail.result.unsure },
+  met: { icon: "check", label: t("web.issue.detail.result.met") },
+  unmet: { icon: "cross", label: t("web.issue.detail.result.unmet") },
+  unsure: { icon: "warn", label: t("web.issue.detail.result.unsure") },
 };
 
 /** The criteria with the helper's word on each; while it is judged, each can be ticked off as the owner checks it (on
@@ -422,13 +423,13 @@ function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             <Show when={props.checking}>
               <input
                 type="checkbox"
-                aria-label={issuesWording().detail.ticked(r().text)}
+                aria-label={t("web.issue.detail.ticked", { criterion: r().text })}
                 checked={ticked().has(i())}
                 onChange={() => tick(i())}
                 class="mt-0.5 size-4 shrink-0 cursor-pointer accent-leaf"
               />
             </Show>
-            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title={issuesWording().detail.unsaid} />}>
+            <Show when={r().result} fallback={<span class="mt-1 size-3 shrink-0 rounded-full border border-line" title={t("web.issue.detail.unsaid")} />}>
               {(res) => <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} class="mt-0.5 shrink-0" />}
             </Show>
             <span class="min-w-0 flex-1">
@@ -474,9 +475,9 @@ function Runs(props: { issue: string; version: string }) {
   const runs = () => ready(query, []);
   const now = () => Date.now();
   return (
-    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{issuesWording().detail.noRuns}</p>}>
+    <Show when={runs().length > 0} fallback={<p class="text-xs text-faint">{t("web.issue.detail.noRuns")}</p>}>
       <div>
-        <div class="mb-2 text-xs text-muted">{issuesWording().detail.runCount(runs().length)}</div>
+        <div class="mb-2 text-xs text-muted">{t("web.issue.detail.runCount", { n: runs().length })}</div>
         <For each={[...runs()].reverse()}>
           {(r) => (
             <div class="flex gap-3 pb-2 text-sm">
@@ -497,7 +498,7 @@ function Runs(props: { issue: string; version: string }) {
 
 const stepsLine = (steps: SessionEvent[]) => {
   const tools = steps.filter((e) => e.type === "tool/call").length;
-  return tools === 0 ? issuesWording().detail.stepCount(steps.length) : issuesWording().detail.stepsAndTools(steps.length, tools);
+  return tools === 0 ? t("web.issue.detail.stepCount", { n: steps.length }) : t("web.issue.detail.stepsAndTools", { n: steps.length, tools });
 };
 
 const stepWord: Partial<Record<SessionEvent["type"], string>> = {
@@ -554,7 +555,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       <Show when={props.issue.attention.acts.length > 0}>
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <Show when={props.issue.attention.state === "stuck"}>
-            <span class="text-sm text-berry">{issuesWording().detail.orchestratorStuck}</span>
+            <span class="text-sm text-berry">{t("web.issue.detail.orchestratorStuck")}</span>
           </Show>
           <For each={props.issue.attention.acts}>
             {(a) => (
@@ -566,20 +567,20 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         </div>
       </Show>
       <div class="mt-4">
-        <Property label={issuesWording().detail.who}>{issuesWording().orchestrator}</Property>
+        <Property label={t("web.issue.detail.who")}>{t("web.issue.orchestrator")}</Property>
         <Show when={props.issue.description}>
-          <Property label={issuesWording().detail.job}>
+          <Property label={t("web.issue.detail.job")}>
             <span class="text-base">{props.issue.description}</span>
           </Property>
         </Show>
         <Show when={props.issue.recurrence}>
-          <Property label={issuesWording().detail.from}>{issuesWording().detail.fromRecurrence}</Property>
+          <Property label={t("web.issue.detail.from")}>{t("web.issue.detail.fromRecurrence")}</Property>
         </Show>
-        <Property label={issuesWording().detail.opened}>{wallClockText(props.issue.createdAt)}</Property>
-        <Show when={props.issue.closedAt}>{(at) => <Property label={issuesWording().detail.closedAt}>{wallClockText(at())}</Property>}</Show>
-        <Property label={issuesWording().detail.answer}>{issuesWording().detail.answered}</Property>
+        <Property label={t("web.issue.detail.opened")}>{wallClockText(props.issue.createdAt)}</Property>
+        <Show when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</Show>
+        <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
       </div>
-      <h2 class="mt-5 mb-2 text-sm font-semibold">{issuesWording().detail.runs}</h2>
+      <h2 class="mt-5 mb-2 text-sm font-semibold">{t("web.issue.detail.runs")}</h2>
       <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
     </div>
   );
@@ -598,9 +599,9 @@ export function AnswerView(props: { answer: IssueAnswer }) {
   return (
     <div>
       <p class="text-base">{props.answer.conclusion}</p>
-      {list(issuesWording().detail.evidence, props.answer.evidence)}
-      {list(issuesWording().detail.unsure, props.answer.unsure)}
-      {list(issuesWording().detail.next, props.answer.next)}
+      {list(t("web.issue.detail.evidence"), props.answer.evidence)}
+      {list(t("web.issue.detail.unsure"), props.answer.unsure)}
+      {list(t("web.issue.detail.next"), props.answer.next)}
     </div>
   );
 }

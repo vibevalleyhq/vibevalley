@@ -1,0 +1,119 @@
+{
+  "ringing": "来电…",
+  "decline": "挂断",
+  "answer": "接听",
+  "callOrchestrator": "打给管家",
+  "missed": "未接 {n}",
+  "log": "记录",
+  "noCalls": "还没有通话。",
+  "answered": "接了",
+  "declined": "挂了",
+  "noMissed": "没有未接来电。地里都好好的。",
+  "phase": {
+    "connecting": "正在接通……",
+    "live": "通话中：说吧，管家在听",
+    "coming": "通话中：管家在路上",
+    "ending": "挂断中……",
+    "failed": "没接通：{why}",
+    "idle": "有事直接说，工单交回来、卡住了，管家也会打过来。"
+  },
+  "manager": "管家",
+  "hangUp": "挂断",
+  "app": {
+    "missed": "未接",
+    "log": "记录",
+    "manager": "管家",
+    "channels": "频道",
+    "graphs": "计划",
+    "games": "游戏"
+  },
+  "game": {
+    "blocks": "方块",
+    "sokoban": "推箱子",
+    "dino": "小恐龙",
+    "bugs": "贪吃虫",
+    "merge": "种田 2048"
+  },
+  "phone": "手机",
+  "phoneRinging": "手机：来电",
+  "phoneMissed": "手机，{n} 个未接来电",
+  "phoneUnread": "手机，田头 {n} 条新消息",
+  "ring": "来电",
+  "new": "新",
+  "label": "农场手机",
+  "home": "主屏",
+  "homeHint": "回主屏",
+  "brand": "农场通",
+  "openChat": "展开田头",
+  "openChatUnread": "展开田头，{n} 条新消息",
+  "key": {
+    "up": "上",
+    "left": "左",
+    "right": "右",
+    "down": "下"
+  },
+  "best": "最好 {score}",
+  "pressA": "按 A {what}",
+  "again": "再来",
+  "start": "开始",
+  "resume": "继续",
+  "paused": "暂停",
+  "sokoban": {
+    "title": "推箱子 {level}/{of}",
+    "moves": "{moves} 步 · {pushes} 推",
+    "board": "仓库棋盘，{placed}/{of} 箱已归位",
+    "allIn": "收成全部入仓！",
+    "done": "这一仓收拾好了！",
+    "goal": "把木箱推到 ◆ 上",
+    "undo": "B 撤销",
+    "again": "再玩一轮",
+    "next": "下一关",
+    "restart": "重开",
+    "help": "方向键走动 · 箱子只能推"
+  },
+  "dino": {
+    "road": "小恐龙的路",
+    "crashed": "撞上了",
+    "help": "A 或 ↑ 跳，↓ 或 B 蹲",
+    "help2": "跑得越远越快，后面会有鸟"
+  },
+  "merge": {
+    "start": "按 A 开始",
+    "restartAsk": "重新种这块地？",
+    "restartKeys": "A 重开 · B 接着种",
+    "harvest": "丰收了！",
+    "goOn": "按 A 接着种",
+    "full": "地种满了 · {score} 分",
+    "overKeys": "按 A 再来 · B 悔一步",
+    "score": "分数 {score}",
+    "reached": "种到 {stage}",
+    "field": "田里：{n} 株，最高 {top}",
+    "stages": "收成图鉴",
+    "help": "方向键或划一下：一样的两株长成下一样",
+    "help2": "B 悔一步 · A 重开",
+    "past": "丰收{n}"
+  },
+  "bugs": {
+    "ended": {
+      "wall": "撞到田埂了",
+      "self": "咬到自己了",
+      "full": "田里爬满了"
+    },
+    "tally": "种子 {seeds} · 虫 {bugs}",
+    "field": "贪吃虫的田",
+    "help": "方向键转弯，B 暂停",
+    "help2": "吃种子长一节，虫子飞走前吃掉多得分"
+  },
+  "blocks": {
+    "well": "方块的井",
+    "noRoom": "没地方了",
+    "score": "分数",
+    "lines": "行",
+    "level": "级",
+    "best": "最好",
+    "help": "←→ 移 ↑ 转",
+    "help2": "↓ 落 A 到底",
+    "help3": "B 暂停",
+    "next": "下一个"
+  }
+}

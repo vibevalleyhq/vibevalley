@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The farm's chat, 田头: the right screen of the farm phone when it is unfolded (Phone.tsx), filling it: a head (the channel
 // menu and what the orchestrator is doing, or a thread's title and its helper), the messages newest at the bottom with the
 // lines just sent and not yet back from the server, a few lines to say, and the input row. Double-clicking the head makes
@@ -44,15 +45,15 @@ import { ChatBubble, ChatReport, ChatRow, FaceOf, ParentMessage, ThreadChip } fr
 
 const suggestions = farmWording().chat.suggestions;
 
-const greeting = farmWording().chat.greeting;
+const greeting = t("web.farm.chat.greeting");
 
 const phaseWords: Record<ChatPhase, string> = {
-  off: farmWording().chat.phase.off,
-  connecting: farmWording().chat.phase.connecting,
-  listening: farmWording().chat.phase.listening,
-  thinking: farmWording().chat.phase.thinking,
-  speaking: farmWording().chat.phase.speaking,
-  error: farmWording().chat.phase.error,
+  off: t("web.farm.chat.phase.off"),
+  connecting: t("web.farm.chat.phase.connecting"),
+  listening: t("web.farm.chat.phase.listening"),
+  thinking: t("web.farm.chat.phase.thinking"),
+  speaking: t("web.farm.chat.phase.speaking"),
+  error: t("web.farm.chat.phase.error"),
 };
 
 const small = "font-pixel text-[12px] leading-4 text-bark-500";
@@ -110,10 +111,10 @@ function NewElsewhere(props: { except: string | undefined }) {
           class="ml-2 shrink-0 cursor-pointer bg-berry/15 px-2 py-px text-[12px] text-berry hover:bg-berry/25"
         >
           {waiting().length > 1
-            ? farmWording().chat.newIn(waiting().length)
+            ? t("web.farm.chat.newIn", { n: waiting().length })
             : newest().type === "thread"
-              ? farmWording().chat.newInThread
-              : farmWording().chat.newInChannel(farmChannelLabel(newest()))}
+              ? t("web.farm.chat.newInThread")
+              : t("web.farm.chat.newInChannel", { channel: farmChannelLabel(newest()) })}
         </button>
       )}
     </Show>
@@ -172,7 +173,7 @@ export function ChatWindow() {
   const showSuggestions = () => !thread() && (core()?.call === "live" || (said().ready && said().messages.length === 0));
 
   return (
-    <section aria-label={farmWording().chat.label} class="relative h-full w-full">
+    <section aria-label={t("web.farm.chat.label")} class="relative h-full w-full">
       <div class="flex h-full flex-col overflow-hidden bg-cream-50 font-pixel text-[12px] leading-[1.625] text-bark-900">
         <Show
           when={thread()}
@@ -194,11 +195,11 @@ export function ChatWindow() {
                 </p>
               </div>
               <HeadButton
-                label={large() ? farmWording().chat.restore : farmWording().chat.enlarge}
+                label={large() ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
                 sprite={large() ? "button-shrink" : "button-enlarge"}
                 onClick={toggleLarge}
               />
-              <HeadButton label={farmWording().chat.fold} sprite="button-collapse" onClick={fold} />
+              <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={fold} />
             </div>
           }
         >
@@ -207,7 +208,7 @@ export function ChatWindow() {
         <CallProblem call={call()} />
         <div
           class="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto p-3"
-          aria-label={thread() ? farmWording().chat.thread : farmChannelLabel(shown())}
+          aria-label={thread() ? t("web.farm.chat.thread") : farmChannelLabel(shown())}
           role="log"
         >
           <div class="flex flex-col gap-2">
@@ -217,17 +218,17 @@ export function ChatWindow() {
                 onClick={() => void followed.loadOlder(shown()!.id)}
                 class={["self-center px-2.5 py-0.5 hover:bg-cream-200 hover:text-bark-800", small]}
               >
-                {farmWording().chat.older}
+                {t("web.farm.chat.older")}
               </button>
             </Show>
             <Show when={parent()}>{(m) => <ParentMessage m={m()} face={<FaceOf m={m()} agents={agents()} />} />}</Show>
             <Show when={items().length === 0 && !thread()}>
-              <ChatRow mine={false} first face={<OrchestratorFace size={30} />} name={farmWording().orchestrator}>
+              <ChatRow mine={false} first face={<OrchestratorFace size={30} />} name={t("web.farm.orchestrator")}>
                 <span class="whitespace-pre-line">{greeting}</span>
               </ChatRow>
             </Show>
             <Show when={items().length === 0 && thread()}>
-              <p class={["py-4 text-center", small]}>{farmWording().chat.threadEmpty}</p>
+              <p class={["py-4 text-center", small]}>{t("web.farm.chat.threadEmpty")}</p>
             </Show>
             <For each={items()} keyed={(item) => item.message.id}>
               {(item, i) => (
@@ -242,8 +243,8 @@ export function ChatWindow() {
             </For>
             <For each={sending()} keyed={(p) => p.key}>
               {(p) => (
-                <div class="opacity-70" aria-label={farmWording().chat.sending}>
-                  <ChatRow mine first title={farmWording().chat.sending}>
+                <div class="opacity-70" aria-label={t("web.farm.chat.sending")}>
+                  <ChatRow mine first title={t("web.farm.chat.sending")}>
                     <span class="whitespace-pre-line">{p().text}</span>
                   </ChatRow>
                 </div>
@@ -251,13 +252,13 @@ export function ChatWindow() {
             </For>
             <For each={captions()} keyed={(caption) => caption.speaker + caption.turn}>
               {(caption) => (
-                <div class="opacity-70" aria-label={farmWording().chat.captions}>
+                <div class="opacity-70" aria-label={t("web.farm.chat.captions")}>
                   <ChatRow
                     mine={caption().speaker === "you"}
                     first
                     face={caption().speaker === "you" ? undefined : <OrchestratorFace size={30} />}
-                    name={caption().speaker === "you" ? undefined : farmWording().orchestrator}
-                    title={caption().done ? farmWording().chat.done : farmWording().chat.speaking}
+                    name={caption().speaker === "you" ? undefined : t("web.farm.orchestrator")}
+                    title={caption().done ? t("web.farm.chat.done") : t("web.farm.chat.speaking")}
                   >
                     <span class="whitespace-pre-line">{caption().text}</span>
                     <Show when={!caption().done}>
@@ -290,7 +291,7 @@ export function ChatWindow() {
                     const c = shown();
                     if (!c) return;
                     void say(line, c, newSendKey(), undefined).catch((e: unknown) =>
-                      setProblem(farmWording().chat.notSent(e instanceof Error ? e.message : String(e))),
+                      setProblem(t("web.farm.chat.notSent", { why: e instanceof Error ? e.message : String(e) })),
                     );
                   }}
                   class="max-w-40 shrink-0 cursor-pointer truncate bg-cream-200 px-2.5 py-0.5 text-[12px] text-bark-800 hover:bg-leaf-300 hover:text-bark-900"
@@ -318,8 +319,8 @@ function CallProblem(props: { call: VoiceCall }) {
       <div role="alert" class="shrink-0 border-b border-cream-200 bg-berry/10">
         <div class="flex flex-col gap-2 px-3 py-2.5 font-pixel text-[12px] leading-[1.625] text-bark-900">
           <div class="flex items-start gap-2">
-            <span class="min-w-0 flex-1">{farmWording().chat.noVoice(props.call.problem ?? "")}</span>
-            <PxButton size="sm" icon="button-close" label={farmWording().chat.gotIt} onClick={() => voiceCall.dismiss()} />
+            <span class="min-w-0 flex-1">{t("web.farm.chat.noVoice", { why: props.call.problem ?? "" })}</span>
+            <PxButton size="sm" icon="button-close" label={t("web.farm.chat.gotIt")} onClick={() => voiceCall.dismiss()} />
           </div>
           <Show when={props.call.problemAt}>
             {(at) => (
@@ -332,7 +333,7 @@ function CallProblem(props: { call: VoiceCall }) {
                     router.navigate(`/settings/${at()}`);
                   }}
                 >
-                  {farmWording().chat.settings}
+                  {t("web.farm.chat.settings")}
                 </PxButton>
               </div>
             )}
@@ -353,11 +354,15 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
   const title = () => threadTitle(props.thread, core()?.issues ?? [], core()?.sessions ?? []);
   const status = () => {
     const s = session();
-    return s ? phaseText(s, now()) : props.thread.subjectKind === "issue" ? farmWording().chat.nobodyOnIt : farmWording().chat.replies(props.thread.replies);
+    return s
+      ? phaseText(s, now())
+      : props.thread.subjectKind === "issue"
+        ? t("web.farm.chat.nobodyOnIt")
+        : t("web.farm.chat.replies", { n: props.thread.replies });
   };
   return (
     <div onDblClick={(e) => props.onDouble(e)} class="flex shrink-0 items-center gap-1 border-b border-cream-200 py-2 pr-2 pl-1">
-      <HeadButton label={farmWording().chat.back(farmChannelLabel(channel()))} sprite="button-back" onClick={() => farm.showChat(backTo())} />
+      <HeadButton label={t("web.farm.chat.back", { channel: farmChannelLabel(channel()) })} sprite="button-back" onClick={() => farm.showChat(backTo())} />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="truncate text-[13px]">{title()}</span>
@@ -367,11 +372,11 @@ function ThreadHead(props: { thread: Channel; large: boolean; onLarge: () => voi
         <p class={["h-4 truncate", small]}>{status()}</p>
       </div>
       <HeadButton
-        label={props.large ? farmWording().chat.restore : farmWording().chat.enlarge}
+        label={props.large ? t("web.farm.chat.restore") : t("web.farm.chat.enlarge")}
         sprite={props.large ? "button-shrink" : "button-enlarge"}
         onClick={() => props.onLarge()}
       />
-      <HeadButton label={farmWording().chat.fold} sprite="button-collapse" onClick={() => props.onFold()} />
+      <HeadButton label={t("web.farm.chat.fold")} sprite="button-collapse" onClick={() => props.onFold()} />
     </div>
   );
 }
@@ -393,7 +398,7 @@ function Item(props: { m: ChatMessage; thread?: Channel; first: boolean; agents:
           mine={false}
           first={props.first}
           face={face()}
-          tag={props.m.kind === "dispatch" ? farmWording().chat.dispatch : undefined}
+          tag={props.m.kind === "dispatch" ? t("web.farm.chat.dispatch") : undefined}
           folded={props.m.kind === "dispatch"}
           after={
             <div class="flex flex-col items-start">

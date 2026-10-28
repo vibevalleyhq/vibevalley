@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // Talking to the orchestrator: the server hands out the call (appId, channel, uid, one token) and starts Agora's
 // conversational AI agent in it; the page only joins, on the host's line (the phone's) or Agora's Web SDK (agora.ts). The
 // microphone stays open, as on the phone: the agent hears when you stop, and you can talk over it. Muting is a button.
 // What was said comes over the RTC data stream as captions (captions.ts) and goes to the farm's chat (voice.heard/said).
 
-import { voiceWording } from "./words";
 import type { RtcLine } from "@vibevalley/protocol/host";
 import { currentHost } from "../../base/host";
 import { VibeValleyApiError } from "@vibevalley/protocol";
@@ -129,7 +129,7 @@ export class VoiceCall {
                 if (mine()) await line!.renew(fresh.token);
               } catch (e) {
                 if (!mine()) return;
-                this.problem = voiceWording().call.renew(reasonOf(e));
+                this.problem = t("web.voice.call.renew", { why: reasonOf(e) });
                 this.changed();
               }
             })(),
@@ -159,7 +159,7 @@ export class VoiceCall {
       if (!cancelled)
         this.set(
           "idle",
-          e instanceof Error && e.name === "NotAllowedError" ? voiceWording().call.noMic : reasonOf(e),
+          e instanceof Error && e.name === "NotAllowedError" ? t("web.voice.call.noMic") : reasonOf(e),
           e instanceof VibeValleyApiError && e.error?._tag === "VoiceUnavailable" ? e.error.settings : undefined,
         );
     }

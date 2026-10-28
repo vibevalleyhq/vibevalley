@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import { issuesWording } from "./words";
 import { createSignal, For, Show } from "solid-js";
 
@@ -50,9 +51,9 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
       <div class="flex items-center gap-2 px-2">
         <span class="inline-flex items-center gap-1 rounded bg-leaf/30 px-1.5 py-0.5 text-xs">
           <Icon name="issues" size={12} />
-          {issuesWording().task.label}
+          {t("web.issue.task.label")}
         </span>
-        <span class="text-xs text-muted">{issuesWording().task.steps(total())}</span>
+        <span class="text-xs text-muted">{t("web.issue.task.steps", { n: total() })}</span>
       </div>
       <h1 class="mt-2 px-2 text-xl font-semibold">{g().title}</h1>
       <Show when={g().goal && g().goal !== g().title}>
@@ -65,7 +66,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
     <>
       <div>
         <div class="flex items-center gap-2.5">
-          <span class="text-sm font-semibold">{issuesWording().task.done(settled(), total())}</span>
+          <span class="text-sm font-semibold">{t("web.issue.task.done", { done: settled(), of: total() })}</span>
           {/* Running, the bar already says how far; otherwise the state's own words. */}
           <span class="truncate text-xs text-muted">{g().state === "running" ? "" : taskLine(g())}</span>
         </div>
@@ -75,18 +76,18 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
       </div>
       <Show when={g().asksForYou}>
         <Note tone="wheat" class="mt-2.5">
-          {issuesWording().task.waitsForYou}
+          {t("web.issue.task.waitsForYou")}
         </Note>
       </Show>
       <Show when={g().state === "splitting"}>
         <Note tone="water" class="mt-2.5">
-          {issuesWording().task.splitting}
+          {t("web.issue.task.splitting")}
         </Note>
       </Show>
       <Show when={said()}>
         {(s) => (
           <Note tone={s().ok ? "leaf" : "berry"} class="mt-2.5">
-            {s().text || issuesWording().task.ok}
+            {s().text || t("web.issue.task.ok")}
           </Note>
         )}
       </Show>
@@ -138,27 +139,27 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                             <Markdown class="text-sm" text={task().brief} />
                           </Show>
                           <Show when={task().check}>
-                            <Property label={issuesWording().task.check}>
+                            <Property label={t("web.issue.task.check")}>
                               <span class="font-mono text-xs">{task().check}</span>
                             </Property>
                           </Show>
                           <Show when={task().scope?.length}>
-                            <Property label={issuesWording().task.scope}>
+                            <Property label={t("web.issue.task.scope")}>
                               <span class="font-mono text-xs">{task().scope!.join("、")}</span>
                             </Property>
                           </Show>
                           <Show when={task().conclusion}>
-                            <Property label={issuesWording().task.conclusion}>{task().conclusion}</Property>
+                            <Property label={t("web.issue.task.conclusion")}>{task().conclusion}</Property>
                           </Show>
-                          <Show when={task().spent}>{(sp) => <Property label={issuesWording().task.spent}>{spentText(sp())}</Property>}</Show>
+                          <Show when={task().spent}>{(sp) => <Property label={t("web.issue.task.spent")}>{spentText(sp())}</Property>}</Show>
                           <Show when={task().tries > 1}>
-                            <Property label={issuesWording().task.tried}>{issuesWording().task.tries(task().tries)}</Property>
+                            <Property label={t("web.issue.task.tried")}>{t("web.issue.task.tries", { n: task().tries })}</Property>
                           </Show>
                           <div class="mt-2 flex flex-wrap gap-2">
                             <Show when={issue()}>
                               {(is) => (
                                 <Button icon="open" onClick={() => props.onOpen(is())}>
-                                  {issuesWording().task.open}
+                                  {t("web.issue.task.open")}
                                 </Button>
                               )}
                             </Show>
@@ -194,7 +195,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
         </Show>
         <Show when={g().state === "ready"}>
           <Button tone="primary" onClick={() => setReviewing(true)}>
-            {issuesWording().task.review(word("merge"))}
+            {t("web.issue.task.review", { merge: word("merge") })}
           </Button>
         </Show>
         <Show when={actions().includes("pause")}>
@@ -206,27 +207,27 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
           </Button>
         </Show>
       </div>
-      <Property label={issuesWording().task.state}>{g().stateTag ?? g().state}</Property>
-      <Property label={issuesWording().task.project}>{g().project}</Property>
-      <Property label={issuesWording().task.progress}>{issuesWording().task.progressLine(settled(), total())}</Property>
-      <Show when={g().spent}>{(sp) => <Property label={issuesWording().task.spent}>{spentText(sp())}</Property>}</Show>
+      <Property label={t("web.issue.task.state")}>{g().stateTag ?? g().state}</Property>
+      <Property label={t("web.issue.task.project")}>{g().project}</Property>
+      <Property label={t("web.issue.task.progress")}>{t("web.issue.task.progressLine", { done: settled(), of: total() })}</Property>
+      <Show when={g().spent}>{(sp) => <Property label={t("web.issue.task.spent")}>{spentText(sp())}</Property>}</Show>
       <More>
         <Show when={g().branch}>
-          <Property label={issuesWording().detail.branch}>
+          <Property label={t("web.issue.detail.branch")}>
             <span class="font-mono text-xs">{g().branch}</span>
           </Property>
         </Show>
-        <Property label={issuesWording().task.parallel}>{issuesWording().task.atMost(g().parallel)}</Property>
-        <Property label={issuesWording().task.written}>{wallClockText(g().createdAt)}</Property>
+        <Property label={t("web.issue.task.parallel")}>{t("web.issue.task.atMost", { n: g().parallel })}</Property>
+        <Property label={t("web.issue.task.written")}>{wallClockText(g().createdAt)}</Property>
         <Show when={g().note}>
-          <Property label={issuesWording().task.note}>{g().note}</Property>
+          <Property label={t("web.issue.task.note")}>{g().note}</Property>
         </Show>
       </More>
       <Show when={abandoning()}>
-        <Dialog open onClose={() => setAbandoning(false)} title={issuesWording().task.abandonTitle(word("abandon"))}>
-          <p>{issuesWording().task.abandonLine}</p>
+        <Dialog open onClose={() => setAbandoning(false)} title={t("web.issue.task.abandonTitle", { abandon: word("abandon") })}>
+          <p>{t("web.issue.task.abandonLine")}</p>
           <div class="mt-4 flex justify-end gap-2">
-            <Button onClick={() => setAbandoning(false)}>{issuesWording().never}</Button>
+            <Button onClick={() => setAbandoning(false)}>{t("web.issue.never")}</Button>
             <Button
               tone="danger"
               onClick={() => {
@@ -234,7 +235,7 @@ export function TaskDetail(props: { graph: TaskGraph; stepIssues: Record<string,
                 void act("abandon");
               }}
             >
-              {issuesWording().task.abandon}
+              {t("web.issue.task.abandon")}
             </Button>
           </div>
         </Dialog>
@@ -258,30 +259,30 @@ function GraphMerge(props: { graph: TaskGraph; onDone: (said: Answer | null) => 
         fallback={
           <>
             <p class="text-sm text-berry">
-              {issuesWording().changes.unreadable}
+              {t("web.issue.changes.unreadable")}
               {reasonOf(changes.error)}
             </p>
             <Button class="mt-2" onClick={() => props.onDone(null)}>
-              {issuesWording().later}
+              {t("web.issue.later")}
             </Button>
           </>
         }
       >
-        <Show when={ready(changes, undefined)} fallback={<p class="text-sm text-muted">{issuesWording().task.reading}</p>}>
+        <Show when={ready(changes, undefined)} fallback={<p class="text-sm text-muted">{t("web.issue.task.reading")}</p>}>
           {(c) => (
             <div class="flex flex-col gap-2">
               <ChangesHead changes={c()} />
               <Show when={c().behind > 0}>
-                <p class="text-xs text-muted">{issuesWording().task.behind(c().base, c().behind)}</p>
+                <p class="text-xs text-muted">{t("web.issue.task.behind", { base: c().base, n: c().behind })}</p>
               </Show>
               <Show when={c().conflicts.length > 0}>
                 <Note tone="berry">{issuesWording().task.conflict(c().base, c().conflicts)}</Note>
               </Show>
               <ChangesBody changes={c()} />
               <div class="mt-2 flex justify-end gap-2">
-                <Button onClick={() => props.onDone(null)}>{issuesWording().later}</Button>
+                <Button onClick={() => props.onDone(null)}>{t("web.issue.later")}</Button>
                 <Button tone="primary" disabled={c().conflicts.length > 0} onClick={() => void merge()}>
-                  {issuesWording().task.merge(c().base)}
+                  {t("web.issue.task.merge", { base: c().base })}
                 </Button>
               </div>
             </div>

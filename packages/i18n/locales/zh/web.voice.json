@@ -1,0 +1,158 @@
+{
+  "voice": {
+    "section": {
+      "label": "声音",
+      "line": "和管家打电话"
+    },
+    "noSettings": "问不到服务端的设置（{why}）。",
+    "range": "{min} 到 {max}，默认 {fallback}",
+    "saved": "存好了，下一通电话就用上。",
+    "answer": {
+      "orchestrator": "群聊里那个管家本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
+      "agora": "声网托管的模型，不用别的 key。",
+      "deepseek": "用设置里的 DeepSeek key（{from}）。",
+      "noDeepseek": "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
+      "openai": "任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……"
+    },
+    "title": "声音",
+    "intro": "管家用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。管家的人设、开场白和音色在",
+    "orchestratorPage": "管家页",
+    "period": "。",
+    "ready": "能接通",
+    "missing": "还缺凭据",
+    "nextCall": "改了以后，下一通电话生效",
+    "credentials": "凭据",
+    "console": "声网控制台",
+    "hex": "32 位十六进制",
+    "area": "区域",
+    "areaHint": "Agora 接口的区域，选离服务端近的；中国大陆的项目选中国大陆。",
+    "listen": "听",
+    "listenParts": "识别 · VAD 断句",
+    "asr": "识别",
+    "microsoft": "微软 Azure 语音，用自己的 key。",
+    "hosted": "声网托管，不用别的 key。",
+    "language": "语言",
+    "languageHint": "听哪种话。人设里也写明用这种话回答。",
+    "deepgramModel": "Deepgram 模型",
+    "azureArea": "Azure 区域",
+    "azureAreaHint": "语音资源所在的区域，比如 eastasia、eastus。",
+    "asrArea": "识别的 Azure 区域",
+    "microsoftKey": "微软语音的 key",
+    "think": "想",
+    "who": "谁接电话",
+    "model": "模型",
+    "deepseekModel": "DeepSeek 的模型名。",
+    "deepseekModelLabel": "DeepSeek 模型",
+    "address": "地址",
+    "llmAddress": "OpenAI 兼容的 chat completions 完整地址。",
+    "llmAddressLabel": "大模型地址",
+    "llmModel": "大模型名",
+    "llmKey": "接口的 key",
+    "dictation": "听写",
+    "speechServer": "本机的 speech-server →",
+    "dictationIntro": "聊天输入框旁的录音按钮：说一段，停下以后识别成字放进输入框，看过再发。服务端把录音原样转给下面这个 OpenAI 兼容的转写地址；填本机的 speech-server，声音就不出这台电脑。",
+    "dictationAddress": "到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。",
+    "dictationAddressLabel": "听写的地址",
+    "dictationModel": "本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。",
+    "dictationModelLabel": "听写的模型",
+    "dictationKey": "凭据（本机可以空着）",
+    "persona": {
+      "intro": "打电话时管家怎么开口、用什么声音。凭据、怎么听、谁接电话在",
+      "voicePage": "声音",
+      "page": "页。",
+      "open": "开口",
+      "openParts": "人设 · 开场白",
+      "ownCall": "电话由管家自己接：它就是群聊里那个管家，用它自己的提示词，不另设人设。",
+      "persona": "人设",
+      "personaHint": "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的管家做；写明别编进度。",
+      "greeting": "开场白",
+      "greetingHint": "接通时先说的一句。",
+      "failure": "出错时说",
+      "failureHint": "大模型出错时说的一句。",
+      "speak": "说",
+      "tts": "合成",
+      "ttsModel": "合成模型",
+      "voice": "音色",
+      "openaiVoice": "OpenAI tts-1 的音色。",
+      "ttsArea": "合成的 Azure 区域",
+      "azureVoice": "Azure 的神经网络音色名，比如 zh-CN-XiaoxiaoNeural。",
+      "microsoftVoice": "微软音色",
+      "minimaxVoice": "点名字选它，点左边的播放键先听一句；也可以在下面填别的 MiniMax 系统音色 id。",
+      "voiceId": "音色 id",
+      "sample": "试听：{greeting}",
+      "noSample": "没有样音",
+      "stop": "停下 {name}",
+      "play": "试听 {name}"
+    }
+  },
+  "choices": {
+    "area": {
+      "US": "美国",
+      "EU": "欧洲",
+      "AP": "亚太",
+      "CN": "中国大陆"
+    },
+    "language": {
+      "zh-CN": "普通话",
+      "zh-HK": "粤语（香港）",
+      "zh-TW": "中文（台湾）",
+      "en-US": "英语（美国）",
+      "ja-JP": "日语",
+      "ko-KR": "韩语"
+    },
+    "asr": {
+      "ares": "声网 ARES",
+      "deepgram": "Deepgram",
+      "microsoft": "微软"
+    },
+    "answer": {
+      "orchestrator": "管家",
+      "agora": "声网托管",
+      "deepseek": "DeepSeek",
+      "openai": "自己的接口"
+    },
+    "tts": {
+      "minimax": "MiniMax",
+      "openai": "OpenAI",
+      "microsoft": "微软"
+    },
+    "minimax": {
+      "gentle": "温润青年",
+      "qingse": "青涩青年",
+      "jingying": "精英青年",
+      "badao": "霸道青年",
+      "student": "青年大学生",
+      "girl": "少女",
+      "yujie": "御姐",
+      "mature": "成熟女性",
+      "sweet": "甜美女性",
+      "presenterMale": "男性主持人",
+      "presenterFemale": "女性主持人",
+      "audiobookMale": "男性有声书",
+      "audiobookFemale": "女性有声书"
+    },
+    "number": {
+      "silenceMs": "停顿多久算说完（毫秒）",
+      "interruptMs": "说多久能打断他（毫秒）",
+      "idleSeconds": "没人时多久离开（秒）"
+    }
+  },
+  "dictation": {
+    "unset": "听写还没配：在「声音」页的「听写」里填地址和模型",
+    "recording": "在听…再点一下停",
+    "transcribing": "在认字…",
+    "failed": "上次没认出来：{why}",
+    "start": "听写：点一下开始说，再点一下停",
+    "stop": "停下听写",
+    "label": "听写",
+    "noMic": "录不了音：没有麦克风权限",
+    "cannot": "录不了音：{why}",
+    "nothing": "没录上"
+  },
+  "call": {
+    "renew": "令牌续期失败：{why}",
+    "noMic": "没有麦克风权限",
+    "cannotHear": "声网：听不到对面：{why}",
+    "agora": "声网：{code} {msg}"
+  }
+}

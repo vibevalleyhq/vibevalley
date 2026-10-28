@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The issue board's cards (BoardCard, BoardFilter), how each looks (rowFacts, cardLook), and what a drop between
 // lanes does (cardMove, laneOrder).
 
@@ -74,7 +75,7 @@ function cardWords(c: BoardCard): (string | undefined)[] {
       return [c.issue.title, c.issue.description, head.name, c.issue.project, c.issue.id, head.lastRun?.summary];
     }
     case "orchestrator":
-      return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, issuesWording().card.orchestrator];
+      return [c.issue.title, c.issue.description, c.issue.project, c.issue.id, t("web.issue.card.orchestrator")];
     case "task":
       return [c.graph.title, c.graph.goal, c.graph.project, c.graph.id];
   }
@@ -146,13 +147,17 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
   switch (c.kind) {
     case "todo": {
       const item = c.issue;
-      if (item.refining) flags.push({ text: issuesWording().card.refining(item.refining.name), tone: "water" });
-      else if (item.status === "backlog") flags.push({ text: issuesWording().card.draft, tone: "wheat" });
-      if (item.queuedAt !== undefined) flags.push({ text: issuesWording().card.queued, tone: "water" });
-      if (item.recurrence !== undefined) flags.push({ text: issuesWording().card.recurrence, tone: "faint" });
-      lines.push(item.assignee === undefined ? issuesWording().card.noHelper : nameOf(item.assignee));
-      if (item.assignee === undefined || item.project === undefined) lines.push(issuesWording().card.pickFirst);
-      lines.push(item.queuedAt !== undefined ? issuesWording().card.waiting(ago(item.queuedAt, now)) : issuesWording().card.written(ago(item.createdAt, now)));
+      if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
+      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "wheat" });
+      if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
+      if (item.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
+      lines.push(item.assignee === undefined ? t("web.issue.card.noHelper") : nameOf(item.assignee));
+      if (item.assignee === undefined || item.project === undefined) lines.push(t("web.issue.card.pickFirst"));
+      lines.push(
+        item.queuedAt !== undefined
+          ? t("web.issue.card.waiting", { ago: ago(item.queuedAt, now) })
+          : t("web.issue.card.written", { ago: ago(item.createdAt, now) }),
+      );
       return { number: numberOf(item), title: item.title, status: item.status, priority: item.priority, flags, detail: lines.join("\n") };
     }
     case "issue": {
@@ -165,19 +170,19 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
       const st = issue.attention;
       if (attentionWantsOwner(st.state))
         flags.push({ text: wording().attention[st.state] + (st.stuck ? "：" + wording().stuck[st.stuck] : ""), tone: attentionTone[st.state] });
-      if (issue.canceled === "lost") flags.push({ text: issuesWording().card.lost, tone: "berry" });
-      if (issue.recurrence !== undefined) flags.push({ text: issuesWording().card.recurrence, tone: "faint" });
+      if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
+      if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
       lines.push(head.name);
-      if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(issuesWording().card.quiet(tookText(now - phase.quietSince)));
-      if (sessions.length > 1) lines.push(issuesWording().card.nth(sessions.length));
+      if (phase?._tag === "working" && phase.quietSince !== undefined) lines.push(t("web.issue.card.quiet", { took: tookText(now - phase.quietSince) }));
+      if (sessions.length > 1) lines.push(t("web.issue.card.nth", { n: sessions.length }));
       const turns = Math.round(now0.runs);
       const cny = now0.spent?.cny;
       const took = tagOpen(tag)
-        ? issuesWording().card.open(tookText(now - head.hiredAt))
-        : issuesWording().card.used(tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt));
+        ? t("web.issue.card.open", { took: tookText(now - head.hiredAt) })
+        : t("web.issue.card.used", { took: tookText((issue.closedAt ?? endedAt(head) ?? now) - sessions[0]!.hiredAt) });
       lines.push(
         [
-          tag === "working" ? issuesWording().card.turn(turns + 1) : issuesWording().card.turns(turns),
+          tag === "working" ? t("web.issue.card.turn", { n: turns + 1 }) : t("web.issue.card.turns", { n: turns }),
           took,
           ...(cny !== undefined ? [`¥${cny.toFixed(2)}`] : []),
         ].join(" · "),
@@ -197,13 +202,13 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     }
     case "orchestrator": {
       const { issue } = c;
-      if (issue.recurrence !== undefined) flags.push({ text: issuesWording().card.recurrence, tone: "faint" });
+      if (issue.recurrence !== undefined) flags.push({ text: t("web.issue.card.recurrence"), tone: "faint" });
       const tag = issueTag(issue);
-      lines.push(tagOpen(tag) ? issuesWording().card.orchestratorWorking : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
+      lines.push(tagOpen(tag) ? t("web.issue.card.orchestratorWorking") : `${tagText(issue)} · ${ago(issue.closedAt ?? issue.createdAt, now)}`);
       return { number: numberOf(issue), title: issue.title, status: issue.status, priority: issue.priority, flags, detail: lines.join("\n") };
     }
     case "missing":
-      flags.push({ text: issuesWording().card.missingFlag, tone: "berry" });
+      flags.push({ text: t("web.issue.card.missingFlag"), tone: "berry" });
       return {
         number: numberOf(c.issue),
         title: c.issue.title,
@@ -215,7 +220,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, graphs
     case "task":
       return {
         number: c.issue ? numberOf(c.issue) : undefined,
-        title: issuesWording().card.graph(c.graph.title),
+        title: t("web.issue.card.graph", { title: c.graph.title }),
         status: c.issue?.status ?? laneStatus[c.lane],
         flags,
         detail: taskLine(c.graph),

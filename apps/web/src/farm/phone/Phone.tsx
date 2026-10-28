@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The farm phone: a wooden handset over the phone button, its screen showing a call ringing, else the app picked on the
 // home screen; the games take the pad. It folds like a foldable: folded, a tab on its right edge says 田头 and whether
 // there is something new; unfolded, its right screen is the chat (ChatWindow), and on a narrow screen only the chat
@@ -194,7 +195,7 @@ function Handset(props: {
   const width = () => (!props.unfolded ? appsWidth() : props.narrow ? chatWidth() : appsWidth() + 2 + chatWidth()) + 24;
   return (
     <section
-      aria-label={phoneWording().label}
+      aria-label={t("web.farm.phone.label")}
       class="pointer-events-auto relative px-[10px] pt-[10px] pb-3 font-pixel text-[12px] leading-[1.5] tabular-nums"
       style={{
         width: `${width()}px`,
@@ -211,12 +212,12 @@ function Handset(props: {
           {/* The phone has no keys outside a game: its name in the status bar goes back to the home screen. */}
           <button
             type="button"
-            aria-label={phoneWording().home}
-            title={phoneWording().homeHint}
+            aria-label={t("web.farm.phone.home")}
+            title={t("web.farm.phone.homeHint")}
             onClick={() => props.onHome()}
             class="cursor-pointer hover:underline"
           >
-            {phoneWording().brand}
+            {t("web.farm.phone.brand")}
           </button>
           <span class="ml-auto">
             {two(now().getHours())}:{two(now().getMinutes())}
@@ -260,8 +261,8 @@ function UnfoldTab(props: { unread: number }) {
   return (
     <button
       type="button"
-      aria-label={props.unread > 0 ? phoneWording().openChatUnread(props.unread) : phoneWording().openChat}
-      title={phoneWording().openChat}
+      aria-label={props.unread > 0 ? t("web.farm.phone.openChatUnread", { n: props.unread }) : t("web.farm.phone.openChat")}
+      title={t("web.farm.phone.openChat")}
       onClick={() => {
         playSound("open");
         farm.chatOpen(true);
@@ -335,10 +336,10 @@ function CrossKey(props: { button: PadButton; label: string; at: string }) {
 function Cross() {
   return (
     <span class="relative block size-12">
-      <CrossKey button="up" label={phoneWording().key.up} at="top-0 left-4" />
-      <CrossKey button="left" label={phoneWording().key.left} at="top-4 left-0" />
-      <CrossKey button="right" label={phoneWording().key.right} at="top-4 right-0" />
-      <CrossKey button="down" label={phoneWording().key.down} at="bottom-0 left-4" />
+      <CrossKey button="up" label={t("web.farm.phone.key.up")} at="top-0 left-4" />
+      <CrossKey button="left" label={t("web.farm.phone.key.left")} at="top-4 left-0" />
+      <CrossKey button="right" label={t("web.farm.phone.key.right")} at="top-4 right-0" />
+      <CrossKey button="down" label={t("web.farm.phone.key.down")} at="bottom-0 left-4" />
       <i class="absolute top-4 left-4 size-4" style={{ background: bark }} />
     </span>
   );

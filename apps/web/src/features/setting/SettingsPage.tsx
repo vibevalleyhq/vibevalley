@@ -2,10 +2,10 @@ import { t } from "@vibevalley/i18n";
 // 设置: its parts in a menu on the left, each its own address so a link lands on it; the
 // first four are the server's settings in a card, the rest whole pages of their own.
 
-import { voiceWording, VoiceForm } from "../voice";
-import { runtimesWording, SkillsPage } from "../runtime";
-import { lanWording, LanPage } from "../lan";
-import { connectorWording, ConnectorsPage } from "../connector";
+import { VoiceForm } from "../voice";
+import { SkillsPage } from "../runtime";
+import { LanPage } from "../lan";
+import { ConnectorsPage } from "../connector";
 import { For, Match, Show, Switch } from "solid-js";
 import { Navigate } from "../../ui/A";
 import { Keyed } from "../../base/util";
@@ -18,10 +18,10 @@ export const sections = [
   { id: "language", label: t("web.setting.sections.language.label"), line: t("web.setting.sections.language.line") },
   { id: "memory", label: t("web.setting.sections.memory.label"), line: "Nowledge Mem、EverOS" },
   { id: "github", label: "GitHub", line: t("web.setting.sections.github.line") },
-  { id: "connectors", label: connectorWording().connectors.section.label, line: connectorWording().connectors.section.line },
-  { id: "skills", label: runtimesWording().library.section.label, line: runtimesWording().library.section.line },
-  { id: "voice", label: voiceWording().voice.section.label, line: voiceWording().voice.section.line },
-  { id: "lan", label: lanWording().lan.section.label, line: lanWording().lan.section.line },
+  { id: "connectors", label: t("web.connector.connectors.section.label"), line: t("web.connector.connectors.section.line") },
+  { id: "skills", label: t("web.runtime.library.section.label"), line: t("web.runtime.library.section.line") },
+  { id: "voice", label: t("web.voice.voice.section.label"), line: t("web.voice.voice.section.line") },
+  { id: "lan", label: t("web.lan.lan.section.label"), line: t("web.lan.lan.section.line") },
 ] as const;
 
 /** `rest` is the path after /settings/. */
