@@ -1,52 +1,91 @@
 // The model is shown these bytes: change a Schema only on purpose, with the orchestrator's evals replayed; tool.test.ts
-// holds every one to the bytes it has always had. Unknown fields are let through. requiredOrder is the order the required
-// fields have always been listed in, and a struct that refuses fields it does not know (parseOptions) says so in the JSON
-// Schema too (additionalProperties false).
+// holds every one to the bytes it was last given, and each tool's fields to its endpoint's. Unknown fields are let
+// through. requiredOrder is the order the required fields are listed in, and a struct that refuses fields it does not
+// know (parseOptions) says so in the JSON Schema too (additionalProperties false).
 
 import { Schema } from "effect";
+import type { Handlers } from "@vibevalley/protocol/api";
 import type { JsonSchema } from "../ai/tools.ts";
 import { params } from "./prompts.ts";
 
-/** The orchestrator's, by name; read_chat is a session's too. */
+/** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
+export type Op = keyof Handlers;
+
+/** channel.message.send is channel_message_send, issue.status.update is issue_status_update. */
+export const toolName = (op: Op) =>
+  op
+    .split(".")
+    .map((w) => w.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase()))
+    .join("_");
+
+/** Fields a tool takes that its endpoint does not, which only a model has a use for; tool.test.ts lets these through. */
+export const agentOnly: Partial<Record<Op, readonly string[]>> = {
+  // A helper's words wait while what it has not seen is shown to it, or a thread's reader is sure it means the channel's top.
+  "channel.message.send": ["anyway", "confirm"],
+  // An agent reads what is new to it; a page reads pages of a channel.
+  "channel.message.list": ["unread"],
+  // Written down and sent, or drafted by a helper, in one call, from the channel being answered or the one named.
+  "issue.create": ["start", "draft", "channel"],
+};
+
+const channelRead = Schema.Struct({
+  before: Schema.optionalKey(Schema.Finite),
+  id: Schema.optionalKey(Schema.String.annotate({ description: params.channelMessageList.id })),
+  limit: Schema.optionalKey(Schema.Finite),
+  unread: Schema.optionalKey(Schema.Boolean),
+});
+
+/** The orchestrator's, by endpoint. */
 export const parameters = {
-  accept: Schema.Struct({
-    findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.accept.findings })),
-    pass: Schema.Boolean.annotate({ description: params.accept.pass }),
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
-    text: Schema.optionalKey(Schema.String.annotate({ description: params.accept.text })),
-  }).annotate({ requiredOrder: ["issue", "pass"] }),
-  cancel_recurrence: Schema.Struct({
-    id: Schema.String,
-  }),
-  changes: Schema.Struct({
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
-  }),
-  channel_settings: Schema.Struct({
-    channel: Schema.String,
+  "channel.create": Schema.Struct({
     description: Schema.optionalKey(Schema.String),
+    name: Schema.String,
     project: Schema.optionalKey(Schema.String),
   }),
-  channels: Schema.Struct({}),
-  check: Schema.Struct({
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
+  "channel.list": Schema.Struct({}),
+  "channel.message.list": channelRead,
+  "channel.update": Schema.Struct({
+    description: Schema.optionalKey(Schema.String),
+    id: Schema.String.annotate({ description: params.channelRef }),
+    project: Schema.optionalKey(Schema.String),
   }),
-  dismiss: Schema.Struct({
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
-  }),
-  graph_action: Schema.Struct({
+  "graph.act": Schema.Struct({
     action: Schema.Literals(["start", "pause", "resume", "abandon", "merge"]),
-    graph: Schema.String.annotate({ description: params.planId }),
-  }).annotate({ requiredOrder: ["graph", "action"] }),
-  graph_split: Schema.Struct({
+    id: Schema.String.annotate({ description: params.planId }),
+  }).annotate({ requiredOrder: ["id", "action"] }),
+  "graph.get": Schema.Struct({
+    id: Schema.String.annotate({ description: params.planId }),
+  }),
+  "graph.list": Schema.Struct({}),
+  "graph.split": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphSplit.agent })),
     goal: Schema.String.annotate({ description: params.graphSplit.goal }),
     project: Schema.String.annotate({ description: params.projectFolder }),
   }),
-  graphs: Schema.Struct({
-    id: Schema.optionalKey(Schema.String.annotate({ description: params.graphs.id })),
-  }),
-  issue_create: Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.agent })),
+  "graph.task.act": Schema.Struct({
+    action: Schema.Literals(["retry", "skip"]),
+    id: Schema.String.annotate({ description: params.planId }),
+    task: Schema.String.annotate({ description: params.graphTask.task }),
+  }).annotate({ requiredOrder: ["id", "task", "action"] }),
+  "graph.task.delete": Schema.Struct({
+    id: Schema.String.annotate({ description: params.planId }),
+    task: Schema.String.annotate({ description: params.graphTask.task }),
+  }).annotate({ requiredOrder: ["id", "task"] }),
+  "graph.task.update": Schema.Struct({
+    agent: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.agent })),
+    brief: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.brief })),
+    check: Schema.optionalKey(Schema.String.annotate({ description: params.graphTask.check })),
+    id: Schema.String.annotate({ description: params.planId }),
+    needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.graphTask.needs })),
+    task: Schema.String.annotate({ description: params.graphTask.newTask }),
+    title: Schema.optionalKey(Schema.String),
+  }).annotate({ requiredOrder: ["id", "task"] }),
+  "issue.comment.create": Schema.Struct({
+    id: Schema.String.annotate({ description: params.issueOrAgent }),
+    text: Schema.String.annotate({ description: params.issueComment.text }),
+  }).annotate({ requiredOrder: ["id", "text"] }),
+  "issue.create": Schema.Struct({
+    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.assignee })),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.issueCreate.channel })),
     deliver: Schema.optionalKey(
       Schema.Literals(["change", "branch", "answer"]).annotate({
@@ -60,128 +99,106 @@ export const parameters = {
     start: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueCreate.start })),
     title: Schema.String.annotate({ description: params.issueCreate.title }),
   }),
-  issue_status: Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.agent })),
-    issue: Schema.String.annotate({ description: params.issueNumber }),
-    text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
-    to: Schema.String.annotate({ description: params.issueStatus.to }),
+  "issue.diff.get": Schema.Struct({
+    id: Schema.String.annotate({ description: params.issueOrAgent }),
   }),
-  issue_update: Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.agent })),
+  "issue.get": Schema.Struct({
+    id: Schema.String.annotate({ description: params.issueOrAgent }),
+  }),
+  "issue.list": Schema.Struct({
+    closed: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.closed })),
+    limit: Schema.optionalKey(Schema.Finite.annotate({ description: params.issueList.limit })),
+    project: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.project })),
+    status: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.status })),
+    text: Schema.optionalKey(Schema.String.annotate({ description: params.issueList.text })),
+    wantsOwner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issueList.wantsOwner })),
+  }),
+  "issue.review": Schema.Struct({
+    findings: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueReview.findings })),
+    id: Schema.String.annotate({ description: params.issueOrAgent }),
+    pass: Schema.Boolean.annotate({ description: params.issueReview.pass }),
+    text: Schema.optionalKey(Schema.String.annotate({ description: params.issueReview.text })),
+  }).annotate({ requiredOrder: ["id", "pass"] }),
+  "issue.status.update": Schema.Struct({
+    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.assignee })),
+    id: Schema.String.annotate({ description: params.issueNumber }),
+    status: Schema.String.annotate({ description: params.issueStatus.status }),
+    text: Schema.optionalKey(Schema.String.annotate({ description: params.issueStatus.text })),
+  }).annotate({ requiredOrder: ["id", "status"] }),
+  "issue.update": Schema.Struct({
+    assignee: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.assignee })),
     criteria: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.issueUpdate.criteria })),
     deliver: Schema.optionalKey(Schema.Literals(["change", "branch", "answer"]).annotate({ description: params.issueUpdate.deliver })),
     description: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.description })),
-    issue: Schema.String.annotate({ description: params.issueNumber }),
+    id: Schema.String.annotate({ description: params.issueNumber }),
     priority: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.priority })),
     project: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.project })),
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueUpdate.title })),
   }),
-  issues: Schema.Struct({
-    closed: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issues.closed })),
-    issue: Schema.optionalKey(Schema.String.annotate({ description: params.issues.issue })),
-    limit: Schema.optionalKey(Schema.Finite.annotate({ description: params.issues.limit })),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.issues.project })),
-    status: Schema.optionalKey(Schema.String.annotate({ description: params.issues.status })),
-    text: Schema.optionalKey(Schema.String.annotate({ description: params.issues.text })),
-    wants_owner: Schema.optionalKey(Schema.Boolean.annotate({ description: params.issues.wantsOwner })),
-  }),
-  list_recurrences: Schema.Struct({}),
-  memory_add: Schema.Struct({
+  "memory.create": Schema.Struct({
     agent: Schema.String.annotate({ description: params.agentProfile }),
-    project: Schema.optionalKey(Schema.String.annotate({ description: params.memoryAdd.project })),
-    text: Schema.String.annotate({ description: params.memoryAdd.text }),
+    project: Schema.optionalKey(Schema.String.annotate({ description: params.memoryCreate.project })),
+    text: Schema.String.annotate({ description: params.memoryCreate.text }),
   }),
-  memory_search: Schema.Struct({
+  "memory.search": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.agentProfile })),
     project: Schema.optionalKey(Schema.String.annotate({ description: params.projectFolder })),
-    query: Schema.optionalKey(Schema.String.annotate({ description: params.searchQuery })),
+    text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
   }),
-  open_channel: Schema.Struct({
-    description: Schema.optionalKey(Schema.String),
-    name: Schema.String,
-    project: Schema.optionalKey(Schema.String),
-  }),
-  projects: Schema.Struct({}),
-  read_chat: Schema.Struct({
-    before: Schema.optionalKey(Schema.Finite),
-    limit: Schema.optionalKey(Schema.Finite),
-    target: Schema.optionalKey(Schema.String.annotate({ description: params.readChat.target })),
-    unread: Schema.optionalKey(Schema.Boolean),
-  }),
-  roster: Schema.Struct({}),
-  recurrence: Schema.Struct({
+  "project.list": Schema.Struct({}),
+  "recurrence.create": Schema.Struct({
     agent: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.agent })),
-    at: Schema.optionalKey(Schema.String),
     channel: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.channel })),
-    cron: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.cron })),
-    days: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
-    kind: Schema.Literals(["once", "every", "daily", "weekly", "cron"]),
-    minutes: Schema.optionalKey(Schema.Finite),
     name: Schema.String.annotate({ description: params.recurrence.name }),
     project: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.project })),
     text: Schema.String.annotate({ description: params.recurrence.text }),
-    time: Schema.optionalKey(Schema.String.annotate({ description: "HH:MM" })),
     tz: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.tz })),
-  }).annotate({ requiredOrder: ["name", "text", "kind"] }),
-  stop: Schema.Struct({
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
+    when: Schema.Struct({
+      at: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.at })),
+      days: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
+      expr: Schema.optionalKey(Schema.String.annotate({ description: params.recurrence.expr })),
+      kind: Schema.Literals(["once", "every", "daily", "weekly", "cron"]),
+      minutes: Schema.optionalKey(Schema.Finite),
+      time: Schema.optionalKey(Schema.String.annotate({ description: "HH:MM" })),
+    }).annotate({ description: params.recurrence.when }),
+  }).annotate({ requiredOrder: ["name", "text", "when"] }),
+  "recurrence.delete": Schema.Struct({
+    id: Schema.String,
   }),
-  task_action: Schema.Struct({
-    action: Schema.Literals(["retry", "skip"]),
-    graph: Schema.String.annotate({ description: params.planId }),
-    task: Schema.String.annotate({ description: params.taskAction.task }),
-  }).annotate({ requiredOrder: ["graph", "task", "action"] }),
-  task_edit: Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.taskEdit.agent })),
-    brief: Schema.optionalKey(Schema.String.annotate({ description: params.taskEdit.brief })),
-    check: Schema.optionalKey(Schema.String.annotate({ description: params.taskEdit.check })),
-    graph: Schema.String.annotate({ description: params.planId }),
-    needs: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.String)).annotate({ description: params.taskEdit.needs })),
-    remove: Schema.optionalKey(Schema.Boolean),
-    task: Schema.String.annotate({ description: params.taskEdit.task }),
-    title: Schema.optionalKey(Schema.String),
+  "recurrence.list": Schema.Struct({}),
+  "session.list": Schema.Struct({}),
+  "session.stop": Schema.Struct({
+    id: Schema.String.annotate({ description: params.issueOrAgent }),
   }),
-  tell: Schema.Struct({
-    message: Schema.String.annotate({ description: params.tell.message }),
-    issue: Schema.String.annotate({ description: params.issueOrAgent }),
-  }).annotate({ requiredOrder: ["issue", "message"] }),
 };
 
-/** A session's own, where it differs from the orchestrator's of the same name. */
-const sessionOwn = {
-  memory_add: Schema.Struct({
-    agent: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemoryAdd.agent })),
-    all_projects: Schema.optionalKey(Schema.Boolean.annotate({ description: params.sessionMemoryAdd.allProjects })),
-    text: Schema.String.annotate({ description: params.sessionMemoryAdd.text }),
-  }),
-  memory_search: Schema.Struct({
-    all_projects: Schema.optionalKey(Schema.Boolean.annotate({ description: params.sessionMemorySearch.allProjects })),
-    query: Schema.optionalKey(Schema.String.annotate({ description: params.searchQuery })),
-  }),
-  channel_inbox: Schema.Struct({}),
-  channel_say: Schema.Struct({
-    anyway: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelSay.anyway })),
-    confirm: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelSay.confirm })),
-    reply: Schema.optionalKey(Schema.Int.annotate({ description: params.channelSay.reply })),
-    target: Schema.optionalKey(Schema.String),
+/** A session's, by endpoint; channel.message.list is the orchestrator's. */
+export const sessionParameters = {
+  "channel.message.list": channelRead,
+  "channel.message.send": Schema.Struct({
+    anyway: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelMessageSend.anyway })),
+    confirm: Schema.optionalKey(Schema.Boolean.annotate({ description: params.channelMessageSend.confirm })),
+    id: Schema.optionalKey(Schema.String),
+    replyTo: Schema.optionalKey(Schema.Int.annotate({ description: params.channelMessageSend.replyTo })),
     text: Schema.String,
   }),
-  doc_append: Schema.Struct({
-    doc: Schema.String.annotate({ description: params.docId }),
-    level: Schema.optionalKey(Schema.Int.annotate({ description: params.docAppend.level })),
-    text: Schema.String.annotate({ description: params.docAppend.text }),
-    type: Schema.optionalKey(Schema.String.annotate({ description: params.docAppend.type })),
+  "channel.unread.list": Schema.Struct({}),
+  "doc.block.create": Schema.Struct({
+    id: Schema.String.annotate({ description: params.docId }),
+    level: Schema.optionalKey(Schema.Int.annotate({ description: params.docBlockCreate.level })),
+    text: Schema.String.annotate({ description: params.docBlockCreate.text }),
+    type: Schema.optionalKey(Schema.String.annotate({ description: params.docBlockCreate.type })),
   }),
-  doc_read: Schema.Struct({
-    doc: Schema.String.annotate({ description: params.docId }),
+  "doc.block.update": Schema.Struct({
+    baseRev: Schema.Int.annotate({ description: params.docBlockUpdate.baseRev }),
+    block: Schema.String.annotate({ description: params.docBlockUpdate.block }),
+    id: Schema.String.annotate({ description: params.docId }),
+    text: Schema.String.annotate({ description: params.docBlockUpdate.text }),
+  }).annotate({ requiredOrder: ["id", "block", "baseRev", "text"] }),
+  "doc.get": Schema.Struct({
+    id: Schema.String.annotate({ description: params.docId }),
   }),
-  doc_update: Schema.Struct({
-    base_rev: Schema.Int.annotate({ description: params.docUpdate.baseRev }),
-    block: Schema.String.annotate({ description: params.docUpdate.block }),
-    doc: Schema.String.annotate({ description: params.docId }),
-    text: Schema.String.annotate({ description: params.docUpdate.text }),
-  }).annotate({ requiredOrder: ["doc", "block", "base_rev", "text"] }),
-  issue_split: Schema.Struct({
+  "issue.split": Schema.Struct({
     tasks: Schema.mutable(
       Schema.Array(
         Schema.Struct({
@@ -198,12 +215,16 @@ const sessionOwn = {
     ).annotate({ description: params.issueSplit.tasksDescription }),
     title: Schema.optionalKey(Schema.String.annotate({ description: params.issueSplit.title })),
   }),
-  session_list: Schema.Struct({}),
+  "memory.create": Schema.Struct({
+    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.createProject })),
+    text: Schema.String.annotate({ description: params.sessionMemory.text }),
+  }),
+  "memory.search": Schema.Struct({
+    project: Schema.optionalKey(Schema.String.annotate({ description: params.sessionMemory.searchProject })),
+    text: Schema.optionalKey(Schema.String.annotate({ description: params.searchText })),
+  }),
+  "session.list": Schema.Struct({}),
 };
-
-export const sessionParameters = { ...parameters, ...sessionOwn };
-
-export type Parameters = typeof sessionParameters;
 
 const safe = Number.MAX_SAFE_INTEGER;
 
@@ -252,9 +273,8 @@ export const toolParameters = (parameters: Schema.Struct<Schema.Struct.Fields>):
       ) as JsonSchema);
 
 const shown = <A extends Record<string, Schema.Struct<Schema.Struct.Fields>>>(all: A): Record<keyof A & string, JsonSchema> =>
-  Object.fromEntries(Object.entries(all).map(([name, p]) => [name, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
+  Object.fromEntries(Object.entries(all).map(([op, p]) => [op, toolParameters(p)])) as Record<keyof A & string, JsonSchema>;
 
+/** As the model is shown them, by endpoint. */
 export const schemas = shown(parameters);
-
-/** A session's: the orchestrator's, but where its own differs. */
 export const sessionSchemas = shown(sessionParameters);

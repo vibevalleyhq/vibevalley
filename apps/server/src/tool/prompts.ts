@@ -20,6 +20,9 @@ import { runtimeLabel } from "../agent/seed.ts";
 import { nextText, whenText } from "../recurrence/when.ts";
 import { head } from "../base/text.ts";
 import { yuan } from "../runtime/money.ts";
+import type { Handlers } from "@vibevalley/protocol/api";
+
+type Op = keyof Handlers;
 import type { Roster } from "../session/session.ts";
 
 const wan = (n: number) => (n >= 10_000 ? (n / 10_000).toFixed(n >= 100_000 ? 0 : 1) + " 万" : String(n));
@@ -60,7 +63,7 @@ export function changesText(c: Changes): string {
   return lines.join("\n");
 }
 
-/** How a session reads to the orchestrator, in its situation as in roster; number is its issue's. */
+/** How a session reads to the orchestrator, in its situation as session_list gives it; number is its issue's. */
 export function sessionLine(w: Roster, now: number, number?: number): string {
   const h = w.session;
   let last = "";
@@ -165,8 +168,9 @@ const issueNumber = "工单编号（#41 或 41）";
 const planId = "计划 id";
 const projectFolder = "项目文件夹名";
 const agentProfile = "帮工档案的名字或 id";
-const searchQuery = "要找什么，几个词或一句话；不填就列出最新的";
+const searchText = "要找什么，几个词或一句话；不填就列出最新的";
 const docId = "文档的 id";
+const channelRef = "频道：#clock-in 这样的名字，或它的 id";
 
 /** The orchestrator's and the session's tool parameter descriptions (tool/schemas.ts). */
 export const params = {
@@ -175,10 +179,11 @@ export const params = {
   planId,
   projectFolder,
   agentProfile,
-  searchQuery,
+  searchText,
   docId,
+  channelRef,
 
-  accept: {
+  issueReview: {
     findings: "没过时，每条要修的一句话",
     pass: "验收过了就是 true",
     text: "没过时，还要交代的话",
@@ -187,11 +192,8 @@ export const params = {
     agent: "让谁来拆：帮工名字或 id；不填按规则挑",
     goal: "要做的事，照主人的原话",
   },
-  graphs: {
-    id: "计划 id，比如 p1；不填列出所有还没合进主分支的",
-  },
   issueCreate: {
-    agent: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
+    assignee: "谁来做：帮工的名字、id 或 runtime；不填，开工时按挑帮工的规则挑",
     channel: "工单串开在哪个频道，比如 #clock-in；不填就是你正在回话的频道",
     deliver:
       "交付什么：change 是改代码、合进项目（不填就是它）；branch 是改代码但分支留着不合（主人说「先别合」「分支留着」）；answer 是只查清楚、交回一份带依据的结论，不改代码（「查一下」「看看为什么」「是不是」）",
@@ -203,78 +205,74 @@ export const params = {
     title: "一句话的标题",
   },
   issueStatus: {
-    agent: "挪到待办时谁来做：填另一个帮工的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
+    assignee: "挪到待办时谁来做：填另一个帮工的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
     text: "带给帮工的一句话：从等你看挪回待办（再干一轮，等验收时就是验收意见，一行一条）、重开时必填；卡住了（没做成、冲突、被打断）不填就照原因接着修、解决冲突、接着做；换人时写接手的接着做什么",
-    to: "挪到：备选、待办、已完成、已取消",
+    status: "挪到：备选、待办、已完成、已取消",
   },
   issueUpdate: {
     deliver: "交付方式：change（合进项目）、branch（分支留着不合）、answer（只交结论）",
-    agent: "谁来做：帮工的名字或 id（派出去以前才能改）",
+    assignee: "谁来做：帮工的名字或 id（派出去以前才能改）",
     criteria: "验收标准，一条一个主人能照着验的点；给空列表就是清掉（派出去以前才能改）",
     description: "说明（派出去以前才能改）",
     priority: "紧急、高、普通、低",
     project: "项目（派出去以前才能改）",
     title: "标题（派出去以前才能改）",
   },
-  issues: {
+  issueList: {
     closed: "也列关上的（已完成、已取消）；不填只列开着的",
-    issue: "看一张的全部：工单编号（#41 或 41）；填了它别的条件都不看",
     limit: "最多列几张，默认 20",
     project: "只看这个项目的",
     status: "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
     text: "标题或说明里有这些字的（找重复、找某件事时用）",
     wantsOwner: "只看在等主人的：等回答、等验收、卡住了；按等了多久排，久的在前",
   },
-  memoryAdd: {
+  memoryCreate: {
     project: "只在这个项目里用：项目文件夹名",
     text: "要它记住的一句话",
   },
-  readChat: {
-    target: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
+  channelMessageList: {
+    id: "#general、#clock-in，或 #general:<消息号>；管家和主人的私聊是 @owner",
   },
   recurrence: {
     agent: "直接派给哪个帮工档案（名字或 id）；不填就是到点交给你",
+    at: "ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00",
     channel: "在哪个频道，比如 #clock-in；不填是你正在回话的频道",
-    cron: "五段 cron：分 时 日 月 周几",
+    expr: "五段 cron：分 时 日 月 周几",
     name: "简短的名字，比如 每日测试",
     project: "直接派活时的项目；不填用频道的默认项目",
     text: "到点时说的话：要做的事",
     tz: "时区，比如 Asia/Shanghai；不填是这台电脑的",
+    when: "什么时候：kind 是 once（填 at）、every（填 minutes）、daily（填 time）、weekly（填 days 和 time）、cron（填 expr）",
   },
-  taskAction: {
-    task: "这件的 id",
-  },
-  taskEdit: {
+  graphTask: {
     agent: "帮工档案 id；空字符串表示按规则挑",
     brief: "工单",
     check: "做完跑的检查命令；空字符串表示不跑",
     needs: "要等哪几件做完",
-    task: "这件的 id（新加的就起一个简短的英文 id）",
+    task: "这件的 id",
+    newTask: "这件的 id（新加的就起一个简短的英文 id）",
   },
-  tell: {
-    message: "要带的话",
+  issueComment: {
+    text: "要带的话",
   },
 
   // The session's own schemas, where they differ from the orchestrator's.
-  sessionMemoryAdd: {
-    agent: "不用填：只能记进你自己的档案",
-    allProjects: "所有项目都用得上，不只是这个项目",
+  sessionMemory: {
+    createProject: "不填记在你现在干活的项目；写空字符串是所有项目都用得上",
+    searchProject: "不填找你现在干活的项目和所有项目都用的；写空字符串也找别的项目的",
     text: "一句以后还用得上的话：约定、坑、命令",
   },
-  sessionMemorySearch: {
-    allProjects: "也找别的项目里记下的",
-  },
-  channelSay: {
+  channelMessageSend: {
     anyway: "看过新消息、仍要原样发",
     confirm: "确实要发到频道的顶层，而不是刚读的那个串",
-    reply: "回复同一处的哪一条：它的消息号（msg=）",
+    replyTo: "回复同一处的哪一条：它的消息号（msg=）",
   },
-  docAppend: {
+  docBlockCreate: {
     level: "标题的级别 1–3，只给 heading 用；默认 2",
     text: "这一块的字；可以用 **粗**、_斜_、行内代码、~~删~~ 和链接；代码块照原样存",
     type: "块的类型：paragraph（默认）、heading、bulleted、numbered、todo、quote、code",
   },
-  docUpdate: {
+  docBlockUpdate: {
     baseRev: "你读到或写下这一块时它是第几版",
     block: "块的 id",
     text: "这一块完整的新字，不是增量",
@@ -297,74 +295,81 @@ export const params = {
 /** Who the orchestrator is, as a tool answer names it. */
 export const ownerAgentWord = "管家";
 
-/** A document's block in one line: its id, revision, type and text (tool.ts doc_read, doc_update's conflict). */
+/** A document's block in one line: its id, revision, type and text (doc_get, doc_block_update's conflict). */
 export const blockLine = (b: Block) => `- 〔${b.id} · 第 ${b.rev} 版 · ${b.type}〕${b.text.map((s) => s.t).join("")}`;
 
 /** Where a memory applies, for the tools' answers. */
 export const memoryWhere = (m: Memory) => (m.project ? "项目 " + m.project : "所有项目");
 
-/** A tool's description, shown to the model alongside its name and parameters (tool.ts). */
+/** The orchestrator's tools' descriptions, shown to the model alongside each name and parameters (tool.ts). */
 export const descriptions = {
-  projects: "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
-  channels: "列出频道：名字、哪个是默认的、是做什么的、默认项目。频道是安排活的地方。",
-  roster: "列出在场的所有帮工：在做什么、上一轮的结果。",
-  check: "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
-  changes: "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
-  sessionList: "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
-  readChat:
-    "读一个频道或一个串里说的话。target 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
-  channelInbox: "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
-  accept:
-    "验收一张交回来的工单：先用 changes 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等主人说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
-  tell: "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
-  stop: "叫停在做一张工单的帮工正在做的这一轮。",
-  dismiss: "让在做一张工单的帮工收工离开，不收它的改动（分支留着）。",
-  issues:
-    "找工单、看一批工单：主人问「哪些在等我」（wants_owner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；填 issue 是看一张的全部。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
-  issueCreate:
-    "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status。记之前先用 issues 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
-  issueUpdate:
+  "project.list": "列出工作目录下的项目（每个文件夹是一个项目），以及是不是 git 仓库。",
+  "channel.list": "列出频道：名字、哪个是默认的、是做什么的、默认项目。频道是安排活的地方。",
+  "session.list": "列出在场的所有帮工：在做什么、上一轮的结果。",
+  "issue.get": "看一张工单的全部：要做的、验收标准做到哪了、在等主人什么、来龙去脉；有帮工在做时加上它上一轮的完整汇报。",
+  "issue.diff.get": "看完成一张工单会合进项目什么：它的提交、改了哪些文件（加减行数）、没提交的改动、会不会冲突。主人问「改了什么」或者完成前想确认时用。",
+  "channel.message.list":
+    "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），管家读和主人的私聊写 @owner；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+  "issue.review":
+    "验收一张交回来的工单：先用 issue_diff_get 看改动，对着它的验收标准逐条看。过了（pass: true）就记下验过，完成仍等主人说；没过就把每条要修的写进 findings，帮工会带着这些接着修一轮。",
+  "issue.comment.create": "给在做一张工单的帮工带话：发在工单串里。它正在干就插进去（不能插话的 runtime 会排到这一轮之后），空闲就开新的一轮。",
+  "session.stop": "叫停在做一张工单的帮工正在做的这一轮：工单和改动都留着，带句话就接着做。",
+  "issue.list":
+    "找工单、看一批工单：主人问「哪些在等我」（wantsOwner）、「某个项目有哪些」「卡住了哪些」、记一件事之前查有没有重复（text），都用它；看一张的全部用 issue_get。每行是编号、短标题、现在怎样、项目、谁在做、等了多久。",
+  "issue.create":
+    "记下一张工单。不填 start 就放进备选、不开工：主人说「记一下」「回头做」「先写下来」「让某某做、先别开始」时这样用。主人要马上做（「去做」「帮我改一下」）才填 start: true，记下就开工，没空位就排队。已经有工单的事不要再建：开工、接着做、换人用 issue_status_update。记之前先用 issue_list 的 text 查有没有差不多的，有就问主人是不是同一件。draft 让帮工读过代码把它写成标题、说明、验收标准（花钱），和 start 不一起用。",
+  "issue.update":
     "改一张工单：优先级、交付方式随时能改；标题、说明、项目、谁来做、验收标准只在派出去以前能改。只在主人叫你改时用：你自己看出来该改的，先在频道里问主人。",
-  issueStatus:
-    "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个帮工就是换人接手（在干的要先 stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
-  recurrence:
-    "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（cron 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
-  listRecurrences: "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
-  cancelRecurrence: "删掉一个定时（编号从 list_recurrences 看）。",
-  openChannel:
+  "issue.status.update":
+    "挪一张工单的状态，和主人在看板上拖卡片一样：备选挪到待办就是开工（没空位就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 assignee 填另一个帮工就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照工单的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（主人要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、帮工回家、改动不收。只在主人叫你挪时用；挪不了时照回答里的原因跟主人说。",
+  "recurrence.create":
+    "定一件按时间来的事：到点时频道里出现一条「⏰ 定时」消息，然后你收到它照着做；填了 agent 就直接派那个帮工去做（工单就是 text），不经过你。when.kind：once（at 填 ISO 时间，带时区，比如 2026-10-13T09:00:00+08:00）、every（minutes 每隔几分钟，至少 1）、daily（time 填 HH:MM）、weekly（days 填周几，0 是周日，加 time）、cron（expr 填五段：分 时 日 月 周几，比如工作日 9 点是 0 9 * * 1-5，每月 1 号 10 点是 0 10 1 * *；前四种说不清的才用它）。text 写清楚到时候做什么、做完告诉谁。",
+  "recurrence.list": "列出定时：编号、在哪个频道、什么时候、下次什么时候、到点做什么。",
+  "recurrence.delete": "删掉一个定时（编号从 recurrence_list 看）。",
+  "channel.create":
     "开一个新频道：一件长期的事、一个项目，单独一个地方说话、派活。name 是频道名（字母、数字、汉字、- 和 _），description 写它是做什么的，project 是它的默认项目（在这里派的活默认在这个项目里干）。主人要求了才开。",
-  channelSettings: "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
-  graphSplit:
+  "channel.update": "改一个频道是做什么的（description），或它的默认项目（project，写空字符串就是不要默认项目）。",
+  "graph.split":
     "起一个计划：派一个帮工读代码，把一件很长的活拆成几件，有先后（每件一个帮工），拆好了等主人看过再开工。goal 是主人要做的事，照他的原话写全；project 是项目文件夹名。",
-  graphs: "列出计划：每件的状态、谁在做、结论。",
-  taskEdit:
-    "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。remove 为 true 时删掉它。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
-  graphAction:
+  "graph.list": "列出还没合进主分支的计划：每件的状态、谁在做、结论。",
+  "graph.get": "看一个计划：每件的状态、谁在做、结论。",
+  "graph.task.update":
+    "改计划里的一件：工单、标题、要等的、谁来做、做完跑的检查命令；没有这一件就加上。没开工的计划什么都能改；开工以后只能改还没开始或没做成的。",
+  "graph.task.delete": "从计划里删掉一件：没开工的计划都能删；开工以后只能删还没开始的。",
+  "graph.act":
     "对整个计划：start 开工（主人看过、同意了才用），pause 暂停（正在做的做完，不开新的），resume 继续，abandon 放弃（分支留着），merge 合进主分支（都做完以后，把计划的分支合进主分支）。",
-  taskAction: "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
-  docRead: "读一篇文档：每一块的 id、第几版、类型和字。改一块之前先读，doc_update 要用这里的 id 和版本。",
-  docAppend: "在文档末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 doc_update。",
-  docUpdate: "把一块的字整段换成新的。base_rev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
-  issueSplit: (maxTasks: number) =>
-    `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
-  channelSay:
-    "在群聊里发一条消息。target 不填就是你自己的工单串；#<频道> 是一个频道（channels 列出有哪些、哪个是默认的）；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
-  memorySearchOrchestrator:
+  "graph.task.act": "对计划里的一件：retry 重试没做成的，skip 跳过它（后面的照常开工）。",
+  "memory.search":
     "在帮工档案的记性里找：它们记下的话、主人替它们记的、做过的活。agent 不填就找所有档案；project 只找那个项目的和所有项目都用的。派活前想知道某个项目有什么约定、谁做过类似的活时用。",
-  memorySearchSession:
-    "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。只找这个项目的和所有项目都用的；all_projects 也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
-  memoryAddOrchestrator:
+  "memory.create":
     "替一个帮工档案记一句，它以后派出去的帮工开工时会想起。主人要某个帮工以后都记得一件事时用；不填 project 就是所有项目都用。主人对你自己说的偏好用 remember。",
-  memoryAddSession:
-    "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。记这个项目的；all_projects 记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+} satisfies Partial<Record<Op, string>>;
+
+/** A session's tools' descriptions; channel_message_list is the orchestrator's. */
+export const sessionDescriptions = {
+  "channel.message.list": descriptions["channel.message.list"],
+  "session.list": "现在谁在场：每个帮工的编号、名字、农机、在哪个项目、在做什么。",
+  "channel.unread.list": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
+  "channel.message.send":
+    "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@管家、@主人 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+  "memory.search":
+    "在你的记性里找：你和主人以前替你的档案记下的话、做过的活。不填 project 只找这个项目的和所有项目都用的；project 写空字符串也找别的项目的。干到一半想知道「这个项目的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+  "memory.create":
+    "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 project 记这个项目的；project 写空字符串记成所有项目都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+  "doc.get": "读一篇文档：每一块的 id、第几版、类型和字。改一块之前先读，doc_block_update 要用这里的 id 和版本。",
+  "doc.block.create": "在文档末尾加一块。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 doc_block_update。",
+  "doc.block.update":
+    "把一块的字整段换成新的。baseRev 是你读到或写下它时的版本：这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
+  "issue.split": (maxTasks: number) =>
+    `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
 };
 
 /** The answers and refusals the orchestrator's and the session's tools give (tool.ts). */
 export const answers = {
   failed: (why: string) => "没成：" + why,
-  noIssueNumber: (k: string) => "没有 #" + k + " 这张工单：用 issues 找找",
-  noIssueOrAgent: (k: string) => "没有叫 " + k + " 的工单或帮工：用 issues 找找",
-  nobodyOn: (number: number) => `#${number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status 挪到待办`,
+  noIssueNumber: (k: string) => "没有 #" + k + " 这张工单：用 issue_list 找找",
+  noIssueOrAgent: (k: string) => "没有叫 " + k + " 的工单或帮工：用 issue_list 找找",
+  nobodyOn: (number: number) => `#${number} 现在没有帮工在做：要它接着做，主人说了以后用 issue_status_update 挪到待办`,
   noAgentToDispatch: "没有能派的帮工：先去「帮工」页面建一个，或者把 runtime 装好。",
   noAgentOrRuntime: (key: string) => "没有叫 " + key + " 的帮工档案或 runtime",
   rememberOwnNote: "你自己的记性在系统提示里：要记用 remember，要找旧对话用 search_archive",
@@ -389,7 +394,7 @@ export const answers = {
     intro: "在场的有主人、管家，和这些帮工：",
     row: (id: string, name: string, runtime: string, project: string, phase: string, brief: string) =>
       `- ${id} ${name}（${runtime}，在 ${project}；${phase}）工单：${brief}`,
-    wake: "要叫醒谁，就在 channel_say 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。",
+    wake: "要叫醒谁，就在 channel_message_send 的话里写 @ 加编号（如 @w3）、@管家、@主人；只是提到，不带 @。",
   },
   spoken: {
     held: (target: string, shownCount: number, more: number, inbox: string) =>
@@ -400,7 +405,7 @@ export const answers = {
         "看过了：要改就改了再发；原样发就加 anyway: true；不用发了就不发。",
       ].join("\n"),
     confirm: (target: string, lastRead: string | undefined) =>
-      `先没发：你刚读的是 ${lastRead}，这条却要发到 ${target} 顶层。要回在那个串里，就把 target 写成 ${lastRead}；确实要发到顶层，就加 confirm: true。`,
+      `先没发：你刚读的是 ${lastRead}，这条却要发到 ${target} 顶层。要回在那个串里，就把 id 写成 ${lastRead}；确实要发到顶层，就加 confirm: true。`,
     sent: (target: string, msgNumber: number, absent: string) => `发出去了：${target} msg=${msgNumber}${absent}`,
     absentNote: (names: string) => "。" + names + " 不在场，没送到",
   },
@@ -414,7 +419,7 @@ export const answers = {
     empty: "没有没读的消息。",
     row: (target: string, unread: number, mentionsYou: boolean, latest: string) =>
       `- ${target}：${unread} 条` + (mentionsYou ? "，提到了你" : "") + (latest ? "，最后是 " + latest : ""),
-    nextStep: (target: string) => "下一步：read_chat target=" + target + " unread=true",
+    nextStep: (target: string) => "下一步：channel_message_list id=" + target + " unread=true",
   },
   accept: {
     passed: (number: number) => `#${number} 验收过了，等主人点完成`,
@@ -427,9 +432,6 @@ export const answers = {
   stop: {
     stopped: (number: number) => `#${number} 这一轮叫停了`,
   },
-  dismiss: {
-    dismissed: (name: string, number: number) => `${name} 收工了（#${number}）`,
-  },
   issues: {
     noneWaiting: "没有在等主人的工单。",
     none: "没有这样的工单。",
@@ -437,13 +439,13 @@ export const answers = {
   },
   issueCreate: {
     draftWithStartRefused: "没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。",
-    noChannel: (name: string) => "没有 " + name + " 这个频道：先用 channels 看看有哪些，或者用 open_channel 开一个。",
+    noChannel: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。",
     noDefaultProject: (channel: string) => "#" + channel + " 没有默认项目：填上 project。",
     noDeliver: "没记：deliver 是 change（改代码）、branch（改代码，分支留着）或 answer（只查、交结论）",
     notRecorded: (why: string) => "没记：" + why,
     notRecordedFailed: (why: string) => "没记下：" + why,
     noted: (number: number, title: string, answerOnly: boolean) => `记下了：#${number}「${title}」` + (answerOnly ? "（只查、交结论，不改代码）" : ""),
-    queuedNoStart: (noted: string, why: string) => `${noted}，在备选里；没开工：${why}。要再开工用 issue_status 挪到待办，不要再建一张`,
+    queuedNoStart: (noted: string, why: string) => `${noted}，在备选里；没开工：${why}。要再开工用 issue_status_update 挪到待办，不要再建一张`,
     queuedInChannel: (noted: string, channel: string, queueNote: string) => `${noted}，在 #${channel} 排进待办：${queueNote}`,
     branchNote: (branch: string) => "，分支 " + branch,
     noAgentFallback: "帮工",
@@ -463,7 +465,7 @@ export const answers = {
     moved: (line: string) => "挪好了：" + line,
   },
   recurrence: {
-    noChannelShort: (name: string) => "没有 " + name + " 这个频道：先用 channels 看看",
+    noChannelShort: (name: string) => "没有 " + name + " 这个频道：先用 channel_list 看看",
     badTime: (at: string) => "at 不是一个时间：" + (at || "（没填）"),
     pending: (line: string) =>
       "定好了，等主人同意才生效：\n" +
@@ -490,13 +492,11 @@ export const answers = {
   },
   memory: {
     rememberedFor: (id: string, where: string, memId: string) => "替 " + id + " 记下了（" + where + "）〔" + memId + "〕",
-    notYourProfile: (mine: string, theirs: string) => "只能记进你自己的档案（" + mine + "），" + theirs + " 的记性不归你写",
     remembered: (where: string, memId: string) => "记下了（" + where + "）〔" + memId + "〕",
   },
   doc: {
     header: (title: string, count: number) => "《" + title + "》，" + count + " 块：",
-    badBlockType: (types: readonly string[]) => "块的类型只能是 " + types.join("、"),
-    appended: (id: string, rev: number) => `加了一块〔${id}〕，第 ${rev} 版。接着改它用 doc_update，block 填 ${id}，base_rev 填 ${rev}。`,
+    appended: (id: string, rev: number) => `加了一块〔${id}〕，第 ${rev} 版。接着改它用 doc_block_update，block 填 ${id}，baseRev 填 ${rev}。`,
     updated: (id: string, rev: number | undefined) => `改好了〔${id}〕，现在是第 ${rev} 版。`,
     notUpdated: (reason: string | undefined, rev: number | undefined, currentLine: string) =>
       `没改：${reason}，现在是第 ${rev} 版。${currentLine ? "\n现在的字：" + currentLine : ""}`,

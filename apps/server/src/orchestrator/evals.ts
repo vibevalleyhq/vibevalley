@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type BrainMessage, messageText } from "../agent/brain/messages.ts";
 import { selfTools } from "../agent/brain/self.ts";
-import { schemas } from "../tool/schemas.ts";
+import { type Op, schemas, toolName } from "../tool/schemas.ts";
 
 /** One check on a turn, a closed set by kind: called (tool, with argContains in its arguments' JSON and argLacks not in
  * it, each when given), notCalled (tool), silent (no words said), says (contains in the words), saysNot (contains not in
@@ -41,7 +41,7 @@ export const kinds = ["called", "notCalled", "silent", "says", "saysNot"] as con
 
 /** The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or recurrences). */
 export const orchestratorToolNames = () => [
-  ...Object.keys(schemas),
+  ...(Object.keys(schemas) as Op[]).map(toolName),
   ...selfTools({ home: "", skills: () => [], memory: true, now: () => 0 }).map((t) => t.name),
 ];
 
