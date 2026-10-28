@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // A profile's template: a folder of agent.json (what it is), agent.en.json (its words in English), persona.md and
 // persona.en.md, read in the farm's language. The built-in ones are templates/ beside this file, in the order of
 // templates/index.json; those added on this machine are copies in the home's agent-templates/.
 
-import { agentWording } from "./words.ts";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { type Agent, type AgentTemplate, type AgentTemplateSource, AgentRoleValues, orchestratorRuntime, OrchestratorLookValues } from "@vibevalley/protocol";
@@ -61,7 +61,7 @@ const readJson = <S extends Schema.Codec<unknown, unknown>>(schema: S, dir: stri
   try {
     return Schema.decodeUnknownSync(Schema.fromJsonString(schema))(readFileSync(path, "utf8"));
   } catch (e) {
-    throw new TemplateProblem(agentWording().template.unreadable(path, e instanceof Error ? e.message : String(e)));
+    throw new TemplateProblem(t("server.agent.template.unreadable", { file: path, why: e instanceof Error ? e.message : String(e) }));
   }
 };
 
@@ -71,13 +71,13 @@ const readText = (dir: string, file: string) => (existsSync(join(dir, file)) ? r
  * TemplateProblem when it is not one. installed is filled in by who lists it. */
 export function readTemplate(dir: string, source: AgentTemplateSource): AgentTemplate {
   const item = readJson(TemplateFile, dir, "agent.json");
-  if (!item) throw new TemplateProblem(agentWording().template.noFile(join(dir, "agent.json")));
-  if (!idPattern.test(item.id)) throw new TemplateProblem(agentWording().template.badId(join(dir, "agent.json"), item.id));
-  if (item.version < 1) throw new TemplateProblem(agentWording().template.badVersion(join(dir, "agent.json")));
+  if (!item) throw new TemplateProblem(t("server.agent.template.noFile", { file: join(dir, "agent.json") }));
+  if (!idPattern.test(item.id)) throw new TemplateProblem(t("server.agent.template.badId", { file: join(dir, "agent.json"), id: item.id }));
+  if (item.version < 1) throw new TemplateProblem(t("server.agent.template.badVersion", { file: join(dir, "agent.json") }));
   // An orchestrator always runs on VibeValley's own agent: its template names no other runtime.
   if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
-    throw new TemplateProblem(agentWording().orchestratorRuntime(orchestratorRuntime));
-  if (item.role === "worker" && !item.runtime) throw new TemplateProblem(agentWording().template.noRuntime(join(dir, "agent.json")));
+    throw new TemplateProblem(t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime }));
+  if (item.role === "worker" && !item.runtime) throw new TemplateProblem(t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }));
   const en = currentLocale() === "en";
   const words = en ? readJson(WordsFile, dir, "agent.en.json") : undefined;
   const persona = (en ? readText(dir, "persona.en.md") : undefined) ?? readText(dir, "persona.md") ?? "";

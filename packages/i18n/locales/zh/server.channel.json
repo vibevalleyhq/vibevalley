@@ -1,0 +1,52 @@
+{
+  "name": {
+    "owner": "主人",
+    "orchestrator": "管家"
+  },
+  "mention": {
+    "orchestrator": "@管家",
+    "owner": "@主人",
+    "everyone": "@所有人"
+  },
+  "channelName": "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
+  "channelTaken": "已经有叫 {name} 的频道了",
+  "hopLimit": "帮工之间已经来回 {limit} 次了，先停一停：等主人说一句再接着叫人。",
+  "notBack": "帮工还没接回来",
+  "breaker": "{name} 连续 {failed} 次一叫醒就失败了，先不再叫它；你直接给它带句话会再试。",
+  "dispatch": {
+    "step": "做计划 {graph} 的「{task}」",
+    "split": "拆计划 {graph}",
+    "draft": "看代码，起草这张工单",
+    "project": "项目",
+    "sent": "派 @{id}（{name}）去 {project}：{what}",
+    "redraft": "这张工单交给 @{id}（{name}）再起草一版"
+  },
+  "badTarget": "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
+  "noMessage": "频道里没有 {n} 这条消息",
+  "empty": "没说什么",
+  "sendKeyLong": "sendKey 太长",
+  "channelGone": "找不到这个频道",
+  "noHelper": "没有 {id} 这个帮工",
+  "noChannel": "没有 {id} 这个频道",
+  "notOrchestrator": "{id} 不是管家的档案：频道只能交给管家照看",
+  "noMessageId": "没有 {id} 这条消息",
+  "threadOnlyTitle": "串只能改标题",
+  "defaultStays": "默认频道不能归档、不能删：先把别的频道设成默认",
+  "deletesChannel": "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
+  "inUse": "删不了：{why}。可以归档它",
+  "helpersThere": "还有帮工在这个频道里干活",
+  "recurrencesThere": "还有 {n} 个定时在这里",
+  "connectorsThere": "接着连接器",
+  "queuedThere": "还有 {n} 张工单排着队要在这里开工",
+  "issuesThere": "这里派过 {n} 张工单的活",
+  "noAttachment": "没有 {id} 这个附件：先上传，再带着它说话",
+  "messageGone": "这条消息已经删了",
+  "notYours": "只能改你自己说的话",
+  "badEmoji": "回应是一个表情或一个短词，不带空格",
+  "threadOnlyInChannel": "串只开在频道里的消息下面",
+  "emptyFile": "这个文件是空的",
+  "deletes": "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
+  "deletesDeliveries": "还没交出去的 {n} 份不再送",
+  "defaultIsChannel": "默认频道只能是一个频道，不能是私聊或串",
+  "noDirect": "{target}：你和对方之间没有私聊"
+}

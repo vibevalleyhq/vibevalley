@@ -1,10 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // EverOS (github.com/EverMind-AI/EverOS) over its HTTP API, /api/v2. It is given whole
 // runs and extracts memories itself with a model: memory/add takes a session's messages, memory/flush makes it extract
 // them (here when the session leaves the farm), memory/search reads back. What a helper says is the agent's (agent_id,
 // read back as agent_cases), what it was asked is the owner's (user_id, read back as episodes). Every message is redacted
 // first: a helper's words may carry a key.
 
-import { memoryWording } from "./words.ts";
 import { everosWords } from "./prompts.ts";
 import type { Memory, MemoryKind } from "@vibevalley/protocol";
 import { Clock, Effect, Schema } from "effect";
@@ -149,7 +149,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
 
   return {
     name: "everos",
-    unavailable: () => (c.url ? undefined : memoryWording().noUrl),
+    unavailable: () => (c.url ? undefined : t("server.memory.noUrl")),
     // What it was given and not told to extract yet is extracted now: EverOS only extracts on a flush.
     stop: Effect.gen(function* () {
       if (!(yield* life.stop)) return;
@@ -171,8 +171,8 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
     // A search over every profile has no one owner to ask with: it gives nothing here.
     search: Effect.fnUntraced(function* (q) {
       if (!c.read || q.text.trim() === "") return { found: [] };
-      if (q.project === "") return { found: [], coverage: memoryWording().coverage.everosAcross };
-      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: memoryWording().coverage.everosAgent };
+      if (q.project === "") return { found: [], coverage: t("server.memory.coverage.everosAcross") };
+      if (q.agent === "" && q.kind !== "issue") return { found: [], coverage: t("server.memory.coverage.everosAgent") };
       const kind: MemoryKind = q.kind || "note";
       const hits = yield* find(q.agent, q.text, q.limit, kind, q.project);
       return {
@@ -181,7 +181,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
           .map((h) => ({ id: h.id, agent: q.agent, kind, text: h.text, at: 0, recalled: 0, source: "everos", score: h.score, scope: h.scope })),
       };
     }),
-    list: () => Effect.fail(new SourceError({ message: memoryWording().everosList })),
+    list: () => Effect.fail(new SourceError({ message: t("server.memory.everosList") })),
     // The job once per session, then what the helper said; a failed run says so. A stopped run leaves nothing.
     syncTurn: Effect.fnUntraced(function* (run) {
       if (!c.write || run.outcome === "interrupted") return;
@@ -218,7 +218,7 @@ export function everos(c: MemorySourceConfig, http: HttpClient.HttpClient): Sour
       );
       return undefined;
     }),
-    forget: () => Effect.fail(new SourceError({ message: memoryWording().everosForget })),
+    forget: () => Effect.fail(new SourceError({ message: t("server.memory.everosForget") })),
     can: { list: false, forget: false, transcripts: true },
   };
 }

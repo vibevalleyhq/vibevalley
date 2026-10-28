@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The endpoints as commands: one per entry in the endpoint table (packages/protocol/src/api.ts), `<group> <op>`, path
 // parameters as arguments, query parameters as flags, the body as --json, checked against the endpoint's Schema before it
 // is sent. Nothing here knows an endpoint by name but the composite commands, which call them by op; a new endpoint is a
 // new command with its help.
 
-import { cliWording } from "./words.ts";
 import { Config, Effect, FileSystem, Option, Schema, Stream } from "effect";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
 import { Sse } from "effect/encoding";
@@ -20,14 +20,14 @@ export const ServerFlag = GlobalFlag.Setting("server")({
   flag: Flag.String("server").pipe(
     Flag.withFallbackConfig(Config.String("VIBEVALLEY_SERVER")),
     Flag.withDefault(defaultServer),
-    Flag.withDescription(cliWording().flag.server(defaultServer)),
+    Flag.withDescription(t("server.cli.flag.server", { fallback: defaultServer })),
   ),
 });
 
 /** --dry-run: a command that changes what cannot be taken back answers what it would do (its endpoint's dryRun) and changes
  * nothing; one that only reads runs as it is; any other is refused rather than done. */
 export const DryRunFlag = GlobalFlag.Setting("dry-run")({
-  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(cliWording().flag.dryRun)),
+  flag: Flag.Boolean("dry-run").pipe(Flag.withDefault(false), Flag.withDescription(t("server.cli.flag.dryRun"))),
 });
 
 /** The innermost reason a request did not leave or come back: fetch's "fetch failed" hides ECONNREFUSED in its cause. */
@@ -41,8 +41,8 @@ const unreachable = (base: string) => (e: HttpClientError.HttpClientError) =>
   new Failure({
     code: exit.unreachable,
     tag: "Unreachable",
-    text: cliWording().failure.unreachable(base, whyOf(e)),
-    next: [{ say: cliWording().next.startServer }],
+    text: t("server.cli.failure.unreachable", { base, why: whyOf(e) }),
+    next: [{ say: t("server.cli.next.startServer") }],
   });
 
 const codeOf: Readonly<Record<ApiError["_tag"], number>> = {
@@ -91,19 +91,19 @@ const answer =
   <T>(schema: Schema.Codec<T>) =>
   (text: string) =>
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(
-      Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: cliWording().failure.shape(issue.message) })),
+      Effect.mapError((issue) => new Failure({ code: exit.other, tag: "Server", text: t("server.cli.failure.shape", { why: issue.message }) })),
     );
 
 const usage = (path: readonly string[], text: string, tag = "InvalidValue") =>
-  new Failure({ code: exit.usage, tag, text, next: [{ say: cliWording().next.help, run: [...path, "--help"] }] });
+  new Failure({ code: exit.usage, tag, text, next: [{ say: t("server.cli.next.help"), run: [...path, "--help"] }] });
 
 /** --json's text: as given, `-` for stdin, `@file` for a file's. */
 const bodyText = (given: string, path: readonly string[]) =>
   given === "-"
-    ? stdinText.pipe(Effect.mapError((e) => usage(path, cliWording().failure.stdin(e.message))))
+    ? stdinText.pipe(Effect.mapError((e) => usage(path, t("server.cli.failure.stdin", { why: e.message }))))
     : given.startsWith("@")
       ? Effect.flatMap(FileSystem.FileSystem, (fs) => fs.readFileString(given.slice(1))).pipe(
-          Effect.mapError((e) => usage(path, cliWording().failure.file(given.slice(1), e.message))),
+          Effect.mapError((e) => usage(path, t("server.cli.failure.file", { file: given.slice(1), why: e.message }))),
         )
       : Effect.succeed(given);
 
@@ -113,9 +113,11 @@ const json = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
  * named before anything is sent. */
 const checkedInput = Effect.fnUntraced(function* (e: Endpoint, given: string, args: Readonly<Record<string, unknown>>, path: readonly string[]) {
   const text = given === "" ? "{}" : yield* bodyText(given, path);
-  const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.notJson(issue.message), "InvalidJson")));
+  const fields = yield* json(text).pipe(Effect.mapError((issue) => usage(path, t("server.cli.failure.notJson", { why: issue.message }), "InvalidJson")));
   const value = { ...(fields as Record<string, unknown>), ...args };
-  yield* Schema.decodeUnknownEffect(e.input!)(value).pipe(Effect.mapError((issue) => usage(path, cliWording().failure.body(e.op, issue.message))));
+  yield* Schema.decodeUnknownEffect(e.input!)(value).pipe(
+    Effect.mapError((issue) => usage(path, t("server.cli.failure.body", { op: e.op, why: issue.message }))),
+  );
   return JSON.stringify(value);
 });
 
@@ -126,7 +128,7 @@ function endpointCommand(e: Endpoint) {
   const config: Record<string, Argument.Argument<unknown> | Flag.Flag<unknown>> = {};
   for (const name of e.about) config[name] = Argument.String(name);
   // Only an input with more than what it is about takes --json.
-  if (fieldsOf(e).some((f) => !e.about.includes(f))) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(cliWording().flag.json));
+  if (fieldsOf(e).some((f) => !e.about.includes(f))) config.json = Flag.String("json").pipe(Flag.optional, Flag.withDescription(t("server.cli.flag.json")));
   return Command.make(path.at(-1)!, config as never, (given: Record<string, unknown>) =>
     Effect.gen(function* () {
       const base = yield* ServerFlag;
@@ -146,8 +148,8 @@ function endpointCommand(e: Endpoint) {
             new Failure({
               code: exit.usage,
               tag: "NoDryRun",
-              text: cliWording().failure.dryRun(e.op),
-              next: [{ say: cliWording().next.whatItDoes, run: [...path, "--help"] }],
+              text: t("server.cli.failure.dryRun", { op: e.op }),
+              next: [{ say: t("server.cli.next.whatItDoes"), run: [...path, "--help"] }],
             }),
           );
       }
@@ -169,7 +171,11 @@ const frames = (base: string, path: string) =>
         Stream.mapError((e) =>
           e._tag === "HttpClientError"
             ? unreachable(base)(e)
-            : new Failure({ code: exit.other, tag: "Server", text: e._tag === "Retry" ? cliWording().failure.retry : cliWording().failure.stream(e.message) }),
+            : new Failure({
+                code: exit.other,
+                tag: "Server",
+                text: e._tag === "Retry" ? t("server.cli.failure.retry") : t("server.cli.failure.stream", { why: e.message }),
+              }),
         ),
       );
     }),
@@ -177,17 +183,17 @@ const frames = (base: string, path: string) =>
 
 export const stateCommand = Command.make(
   "state",
-  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(cliWording().flag.watch)) },
+  { watch: Flag.Boolean("watch").pipe(Flag.withDefault(false), Flag.withDescription(t("server.cli.flag.watch"))) },
   ({ watch }) =>
     Effect.flatMap(ServerFlag, (base) =>
       // The server writes each frame on one line, so a stream is one line per frame whatever stdout is; one frame alone
       // is a document.
       watch ? Stream.runForEach(frames(base, statePath), out) : Stream.runForEach(Stream.take(frames(base, statePath), 1), printBody),
     ),
-).pipe(Command.withDescription(cliWording().command.state(statePath)));
+).pipe(Command.withDescription(t("server.cli.command.state", { path: statePath })));
 
 export const eventsCommand = Command.make("events", {}, () => Effect.flatMap(ServerFlag, (base) => Stream.runForEach(frames(base, eventsPath), out))).pipe(
-  Command.withDescription(cliWording().command.events(eventsPath)),
+  Command.withDescription(t("server.cli.command.events", { path: eventsPath })),
 );
 
 /** Only what `issue work` reads of a frame; the rest is left as it came. */
@@ -213,7 +219,7 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
         const now = frame.state.issues!.find((i) => i.id === issue.id);
         return now
           ? Effect.succeed(now.status)
-          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: cliWording().failure.gone(issue.number) }));
+          : Effect.fail(new Failure({ code: exit.missing, tag: "Missing", text: t("server.cli.failure.gone", { n: issue.number }) }));
       }),
       Stream.changes,
       Stream.tap((status) => err(JSON.stringify({ issue: issue.number, status }))),
@@ -222,7 +228,7 @@ export const issueWorkCommand = Command.make("work", { id: Argument.String("id")
     );
     yield* printBody(yield* call(base, "issue.diff.get", { id: issue.id }));
   }),
-).pipe(Command.withDescription(cliWording().command.issueWork));
+).pipe(Command.withDescription(t("server.cli.command.issueWork")));
 
 /** Every endpoint as `<module> [<noun>] <verb>`, with the hand-written commands of a module (issue work, runtime chat) beside them. */
 export function groupCommands(extra: Readonly<Record<string, readonly Command.Command.Any[]>>) {
@@ -235,6 +241,6 @@ export function groupCommands(extra: Readonly<Record<string, readonly Command.Co
   }
   for (const [m, commands] of Object.entries(extra)) of(m).own.push(...commands);
   const group = (name: string, commands: readonly Command.Command.Any[]) =>
-    Command.make(name).pipe(Command.withSubcommands(commands as never), Command.withDescription(cliWording().command.group(name)));
+    Command.make(name).pipe(Command.withSubcommands(commands as never), Command.withDescription(t("server.cli.command.group", { group: name })));
   return [...modules].map(([m, { own, nouns }]) => group(m, [...own, ...[...nouns].map(([n, cs]) => group(n, cs))])) as Command.Command.Any[];
 }

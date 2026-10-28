@@ -1,0 +1,21 @@
+{
+  "lookIn": {
+    "issue": "列出工单，找它的编号",
+    "session": "列出帮工，找它的 id",
+    "project": "列出项目，找它的名字",
+    "runtime": "列出农机，找它的 id",
+    "doc": "列出文档，找它的 id",
+    "agent": "列出档案，找它的 id",
+    "skill": "列出技能，找它的 id",
+    "template": "列出模板，找它的 id",
+    "recurrence": "列出定时，找它的 id",
+    "device": "看连着的设备，找它的 id",
+    "archive": "列出管家的旧账",
+    "channel": "列出频道，找它的 id",
+    "graph": "列出计划，找它的 id",
+    "memories": "列出它的记性，找那一条的 id"
+  },
+  "projectRef": "项目 {id}",
+  "helperRef": "帮工 {id}",
+  "archiveRef": "旧账 {name}"
+}

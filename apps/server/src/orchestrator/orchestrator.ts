@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The orchestrator (管家): the owner's agent that takes the work in, hands it to helpers, follows it and tells the owner.
 // Every input comes in through take, with its source; the intake table (rules.ts) says, per source, its first words,
 // whether it joins the run under way and what its run is triggered by. Each input carries the time, the farm (whole, or
@@ -6,7 +7,7 @@
 // is the host's (session/host.ts).
 
 import { ownersLanguage } from "../prompts.ts";
-import { orchestratorWording } from "./words.ts";
+
 import { agentPrompt, identityNote, lineWords, patrolText, situationWords, systemPrompt, voiceNote } from "./prompts.ts";
 import { orchestrator } from "../base/actor.ts";
 import type { OrchestratorEval, RunTrigger } from "@vibevalley/protocol";
@@ -180,7 +181,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         latestCall: undefined,
         host: run.host<Route>({
           name: id,
-          label: profile?.name || orchestratorWording().label,
+          label: profile?.name || t("server.orchestrator.label"),
           inputType: "orchestratorInput",
           home,
           cwd: projectsDir(config),
@@ -309,7 +310,7 @@ export const make = (options: OrchestratorOptions = {}) =>
         me.cannot.clear();
         return true;
       }
-      const words = taken.why === noDeepSeekKey() ? orchestratorWording().noKey : orchestratorWording().cannotStart(taken.why);
+      const words = taken.why === noDeepSeekKey() ? t("server.orchestrator.noKey") : t("server.orchestrator.cannotStart", { why: taken.why });
       const again = me.cannot.get(i.channel) === words;
       me.cannot.set(i.channel, words);
       if (!again) await go(chat.orchestratorSays(i.channel, words, taken.run, me.id));

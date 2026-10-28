@@ -1,0 +1,5 @@
+{
+  "orchestrator": "管家",
+  "conflictFiles": "{files} 个文件和主分支冲突",
+  "step": "{plan}：{step}"
+}

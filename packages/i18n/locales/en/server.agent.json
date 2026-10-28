@@ -1,0 +1,30 @@
+{
+  "template": {
+    "unreadable": "The template does not read: {file} ({why})",
+    "noFile": "Not a template: there is no {file}",
+    "badId": "The template id \"{id}\" will not do ({file}): lowercase letters, digits and - only, up to 32",
+    "badVersion": "A template's version is a whole number from 1 ({file})",
+    "noRuntime": "A helper's template names the machine it is for, runtime ({file})",
+    "noTemplate": "There is no template {id}",
+    "taken": "There is a template {id} already",
+    "builtIn": "{id} is built in and cannot be deleted",
+    "notFrom": "\"{name}\" was not installed from a template",
+    "gone": "\"{name}\"'s template {template} is gone"
+  },
+  "notSaved": "Not saved: could not write {file} ({why})",
+  "orchestratorStays": "The default manager cannot be deleted: every farm has at least one manager",
+  "defaultStaysOrchestrator": "The default manager stays a manager: every farm has at least one",
+  "noAgent": "There is no profile {id}",
+  "noSkill": "There is no skill {id}",
+  "orchestratorRuntime": "A manager runs only on VibeValley's own agent: its machine must be {runtime}",
+  "newAgentId": "Leave a new profile's id empty; to choose the id, save it instead",
+  "newSkillId": "Leave a new skill's id empty; to choose the id, save it instead",
+  "deleteAgent": "Delete the profile \"{name}\" ({id}, on {runtime}): tickets already sent to it keep it",
+  "deleteSkill": "Delete the skill \"{name}\"",
+  "modelFailed": "the model failed",
+  "noDeepSeekKey": "No DeepSeek key: set DEEPSEEK_API_KEY, or put it in vibevalley.yaml under deepseek.api_key.",
+  "refused": {
+    "launchArgs": "VibeValley runs inside the server process and takes no command-line arguments",
+    "serviceTier": "DeepSeek has no service tiers"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "doc": "document {id}",
+  "untitled": "Untitled document",
+  "otherDoc": "This batch of changes ({batch}) belongs to another document",
+  "noBatch": "This batch of changes has no batchId",
+  "demoNotInserted": "The demo's block was not inserted: {status}",
+  "noWriter": "No helper can write: turn one on in the profiles first",
+  "demoRunning": "The demo is writing: try again when it is done",
+  "notApplied": "The block was not written",
+  "op": {
+    "deleted": "This block was deleted",
+    "noAttr": "There is no attribute {name}",
+    "noBlock": "There is no block {id}",
+    "noId": "The new block has no id",
+    "taken": "Block {id} already exists",
+    "unknownType": "Unknown block type {type}",
+    "badKey": "Not a valid order key: {key}",
+    "missing": "There is no such block",
+    "unknownOp": "Unknown change {op}",
+    "noText": "This block has no text",
+    "noRev": "There is no version {rev}",
+    "changed": "Someone else just changed this block",
+    "underSelf": "A block cannot move under itself",
+    "splitAtEnd": "Someone else just changed this block, so it was split at its end",
+    "splitOutside": "The split position {at} is outside the text ({length} characters)",
+    "intoSelf": "A block cannot merge into itself"
+  }
+}

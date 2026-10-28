@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // Who hears a message and how it is put to them: the chat's rules, held to their
 // recorded cases (rules.test.ts).
 
@@ -55,8 +56,8 @@ const channelNamePattern = /^[\p{L}\p{N}_-]{1,24}$/u;
 const chatThreadTarget = /^[\p{L}\p{N}_-]{1,24}:([0-9]+)$/u;
 
 export function channelNameProblem(name: string, taken: readonly string[]): string {
-  if (!channelNamePattern.test(name)) return channelWording().channelName;
-  if (taken.includes(name)) return channelWording().channelTaken(name);
+  if (!channelNamePattern.test(name)) return t("server.channel.channelName");
+  if (taken.includes(name)) return t("server.channel.channelTaken", { name });
   return "";
 }
 
@@ -164,7 +165,7 @@ export function chatAudience(i: AudienceInput): Delivery[] {
   return out;
 }
 
-export const hopLimitText = (limit: number) => channelWording().hopLimit(limit);
+export const hopLimitText = (limit: number) => t("server.channel.hopLimit", { limit });
 
 export interface UnreadRow {
   readonly target: string;

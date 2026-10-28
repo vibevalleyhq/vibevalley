@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The server's configuration: the defaults, then the YAML file, then the environment
 // (VIBEVALLEY_ and the key, dots as underscores: session.stall_seconds is VIBEVALLEY_SESSION_STALL_SECONDS). A key not in
 // the defaults is never read from the environment. The keys are snake_case in the file and the environment, camelCase here.
 
-import { baseWording } from "./words.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Config as Keys, ConfigProvider, Context, Data, Effect, FileSystem, Schema } from "effect";
@@ -135,7 +135,7 @@ const readFile = Effect.fnUntraced(function* (path: string, optional: boolean) {
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* Effect.orElseSucceed(fs.exists(path), () => false))) {
     if (optional) return undefined;
-    return yield* new ConfigError({ message: baseWording().noFile(path) });
+    return yield* new ConfigError({ message: t("server.base.noFile", { path }) });
   }
   const body = yield* Effect.mapError(fs.readFileString(path), (e) => new ConfigError({ message: `${path}: ${e.message}` }));
   return yield* Effect.try({
@@ -169,9 +169,9 @@ export const loadConfig = Effect.fnUntraced(function* (
     ["voice.line.port", read.voice.line.port],
     ["lan.port", read.lan.port],
   ] as const) {
-    if (n < 0 || n > 65535) return yield* new ConfigError({ message: baseWording().notPort(path, name, n) });
+    if (n < 0 || n > 65535) return yield* new ConfigError({ message: t("server.base.notPort", { path, name, port: n }) });
   }
-  if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: baseWording().prPoll });
+  if (read.github.prPollSeconds <= 0) return yield* new ConfigError({ message: t("server.base.prPoll") });
   const c: Config = { ...base, ...read, home };
   return { ...c, workRoot: expandHome(c.workRoot), tokei: expandHome(c.tokei), web: expandHome(c.web), db: expandHome(c.db) };
 });

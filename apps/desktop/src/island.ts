@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The island at the notch (apps/island): a native helper this process starts and feeds. The farm at a glance comes from
 // the server's state stream, read here rather than by the page, so that it goes on with the window closed. Each change
 // goes to the helper as one line on its stdin; a click on a row comes back on its stdout as the issue to open.
@@ -60,7 +61,7 @@ export function glanceOf(frame: StateFrame, now: number): Glance {
   return {
     working,
     waiting,
-    strip: { working: desktopWording().working(working), waiting: desktopWording().waiting(waiting) },
+    strip: { working: desktopWording().working(working), waiting: t("desktop.waiting", { n: waiting }) },
     rows: rows.map(({ first: _, ...row }) => row),
   };
 }

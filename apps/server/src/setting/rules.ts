@@ -1,3 +1,4 @@
+import { currentLocale, t } from "@vibevalley/i18n";
 // What settings may be saved, and how the voice keeps only what differs from its defaults
 //.
 
@@ -42,16 +43,16 @@ const hasSpace = (s: string) => /\s/.test(s);
 export function settingsProblem(u: SettingsUpdate): string {
   const trimmed = (s: string | undefined) => (s ?? "").trim();
   const deepseek = trimmed(u.deepseekApiKey);
-  if (deepseek !== "" && (hasSpace(deepseek) || deepseek.length < 8)) return settingWording().deepseekKey;
+  if (deepseek !== "" && (hasSpace(deepseek) || deepseek.length < 8)) return t("server.setting.deepseekKey");
   const appID = trimmed(u.agoraAppId);
-  if (appID !== "" && !agoraID.test(appID)) return settingWording().agoraId;
+  if (appID !== "" && !agoraID.test(appID)) return t("server.setting.agoraId");
   const certificate = trimmed(u.agoraAppCertificate);
-  if (certificate !== "" && !agoraID.test(certificate)) return settingWording().agoraCertificate;
-  for (const key of [u.asrKey, u.llmKey, u.ttsKey, u.dictationKey]) if (hasSpace(trimmed(key))) return settingWording().voiceKeySpace;
+  if (certificate !== "" && !agoraID.test(certificate)) return t("server.setting.agoraCertificate");
+  for (const key of [u.asrKey, u.llmKey, u.ttsKey, u.dictationKey]) if (hasSpace(trimmed(key))) return t("server.setting.voiceKeySpace");
   const d = u.dictation;
   if (d && d.url.trim() !== "") {
-    if (!voiceURL.test(d.url.trim())) return settingWording().dictationUrl;
-    if (d.model.trim() === "") return settingWording().dictationModel;
+    if (!voiceURL.test(d.url.trim())) return t("server.setting.dictationUrl");
+    if (d.model.trim() === "") return t("server.setting.dictationModel");
   }
   const sources = memorySourcesProblem(u.memorySources ?? []);
   if (sources) return sources;
@@ -61,13 +62,13 @@ export function settingsProblem(u: SettingsUpdate): string {
 export function memorySourcesProblem(sources: readonly MemorySourceUpdate[]): string {
   const seen = new Set<string>();
   for (const m of sources) {
-    if (!(MemorySourceKindValues as readonly string[]).includes(m.kind)) return settingWording().memory.unknown(m.kind);
-    if (seen.has(m.kind)) return settingWording().memory.twice(m.kind);
+    if (!(MemorySourceKindValues as readonly string[]).includes(m.kind)) return t("server.setting.memory.unknown", { kind: m.kind });
+    if (seen.has(m.kind)) return t("server.setting.memory.twice", { kind: m.kind });
     seen.add(m.kind);
     const url = m.url.trim();
-    if (m.enabled && url === "") return settingWording().memory.noUrl;
-    if (url !== "" && !voiceURL.test(url)) return settingWording().memory.url;
-    if (m.key !== undefined && hasSpace(m.key.trim())) return settingWording().memory.keySpace;
+    if (m.enabled && url === "") return t("server.setting.memory.noUrl");
+    if (url !== "" && !voiceURL.test(url)) return t("server.setting.memory.url");
+    if (m.key !== undefined && hasSpace(m.key.trim())) return t("server.setting.memory.keySpace");
   }
   return "";
 }
@@ -96,21 +97,21 @@ const limits = {
 } as const;
 
 export function voiceProblem(v: SettingsUpdateVoice): string {
-  if (v.asr?.vendor === "microsoft" && v.asr.region.trim() === "") return settingWording().voice.region;
+  if (v.asr?.vendor === "microsoft" && v.asr.region.trim() === "") return t("server.setting.voice.region");
   const answer = v.answer;
-  if (answer?.vendor === "deepseek" && answer.model.trim() === "") return settingWording().voice.model;
+  if (answer?.vendor === "deepseek" && answer.model.trim() === "") return t("server.setting.voice.model");
   if (answer?.vendor === "openai") {
-    if (answer.model.trim() === "") return settingWording().voice.model;
-    if (!voiceURL.test(answer.url.trim())) return settingWording().voice.url;
+    if (answer.model.trim() === "") return t("server.setting.voice.model");
+    if (!voiceURL.test(answer.url.trim())) return t("server.setting.voice.url");
   }
   const tts = v.tts;
-  if (tts?.vendor === "minimax" && tts.voiceId.trim() === "") return settingWording().voice.voiceId;
-  if (tts?.vendor === "microsoft" && (tts.region.trim() === "" || tts.voiceName.trim() === "")) return settingWording().voice.microsoft;
-  if (v.persona !== undefined && v.persona.trim() === "") return settingWording().voice.persona;
+  if (tts?.vendor === "minimax" && tts.voiceId.trim() === "") return t("server.setting.voice.voiceId");
+  if (tts?.vendor === "microsoft" && (tts.region.trim() === "" || tts.voiceName.trim() === "")) return t("server.setting.voice.microsoft");
+  if (v.persona !== undefined && v.persona.trim() === "") return t("server.setting.voice.persona");
   for (const key of ["silenceMs", "interruptMs", "idleSeconds"] as const) {
     const n = v[key];
     const [min, max] = limits[key];
-    if (n !== undefined && (n < min || n > max)) return settingWording().voice.range(settingWording().voice.label[key], min, max);
+    if (n !== undefined && (n < min || n > max)) return t("server.setting.voice.range", { label: settingWording().voice.label[key], min, max });
   }
   return "";
 }
@@ -132,14 +133,14 @@ export function voiceOverrides(defaults: VoiceSettings, settings: VoiceSettings)
 
 export const defaultVoice = (): VoiceSettings => ({
   area: "US",
-  language: settingWording().defaults.language,
+  language: currentLocale() === "zh" ? "zh-CN" : "en-US",
   asr: { vendor: "ares" },
   // The farm's own orchestrator answers: the call is its mouth, answering as it does in the chat (voice/voice.ts, the line).
   answer: { vendor: "orchestrator" },
   tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" },
   persona: voiceOrchestratorPersona(),
   greeting: wording().greeting,
-  failureMessage: settingWording().defaults.failureMessage,
+  failureMessage: t("server.setting.defaults.failureMessage"),
   silenceMs: 480,
   interruptMs: 160,
   idleSeconds: 30,

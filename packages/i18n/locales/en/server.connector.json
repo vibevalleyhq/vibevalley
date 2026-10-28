@@ -1,0 +1,64 @@
+{
+  "media": {
+    "image": "[image]",
+    "file": "[file]",
+    "audio": "[voice]",
+    "video": "[video]",
+    "sticker": "[sticker]",
+    "message": "[message]",
+    "attachment": "[attachment]"
+  },
+  "namedFile": "[file: {name}]",
+  "staleLogin": "WeChat says the login expired",
+  "qqKeys": "Fill in the QQ bot's AppID and AppSecret (on the bot management page at q.qq.com).",
+  "unreadSecrets": "The saved login cannot be read: disconnect and connect again",
+  "expired": "The login expired: try again in an hour, or disconnect and connect again.",
+  "paired": "Paired: what you say here from now on is what you say in the default channel.",
+  "inboundMismatch": "The inbound record's id does not match",
+  "stopped": "receiving stopped",
+  "switched": "the account changed",
+  "disconnected": "disconnected",
+  "noConnector": "There is no connection {id}",
+  "noChannel": "There is no channel called {name}",
+  "line": {
+    "orchestrator": "Manager",
+    "dispatch": "sent",
+    "thread": "in a ticket's thread"
+  },
+  "pairWord": "pair",
+  "feishu": {
+    "register": "Feishu registration: {why}",
+    "registerTimeout": "Feishu registration: timed out",
+    "noQr": "Feishu does not support making an app by scanning right now: try again later.",
+    "noLink": "Feishu gave no QR code: try again.",
+    "denied": "Refused in Feishu.",
+    "qrExpired": "The QR code expired.",
+    "incomplete": "Feishu confirmed, but did not give the whole login: try again.",
+    "tooLong": "Not scanned in time: the QR code expired.",
+    "disconnected": "Feishu's connection dropped: {why}",
+    "send": "Feishu send: {why}",
+    "noId": "Feishu send: no message id confirmed"
+  },
+  "qq": {
+    "auth": "QQ authentication: {why}",
+    "authTimeout": "QQ authentication: timed out",
+    "badKeys": "the AppID or AppSecret is wrong",
+    "gateway": "QQ gateway: {why}",
+    "noGateway": "QQ gave no gateway address",
+    "gatewayError": "QQ gateway: connection error",
+    "reconnect": "QQ gateway: QQ asked to reconnect",
+    "invalid": "QQ gateway: QQ says the session is invalid",
+    "closed": "QQ gateway: connection closed ({code})",
+    "send": "QQ send: {why}",
+    "unread": "QQ send: the result cannot be read: {why}",
+    "noId": "QQ send: no message id confirmed {why}"
+  },
+  "weixin": {
+    "noQr": "Could not get the login QR code: {why}",
+    "qrExpiredTimes": "The QR code expired several times: start again.",
+    "codeWrongTimes": "The digits were wrong several times: start again.",
+    "taken": "This WeChat is already connected: delete it in WeChat first, or scan with another WeChat.",
+    "incomplete": "WeChat confirmed, but did not give the whole login: try again.",
+    "tooLong": "Not scanned in time: the QR code expired."
+  }
+}

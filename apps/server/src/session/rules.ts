@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The session's rules, pure: how a run's end reads, whether there is room for one
 // more helper, which profile a job goes to, and what a session is told about the farm. Lengths are UTF-16 units.
 
@@ -80,19 +81,19 @@ const answerLines = (v: unknown, field: string): string[] => {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v.trim()].filter(Boolean);
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v.map((l) => l.trim()).filter(Boolean);
-  throw new Error(sessionWording().answer.lines(field));
+  throw new Error(t("server.session.answer.lines", { field }));
 };
 
 /** The last block that reads as an answer with a conclusion and something it rests on; problem says why none did. */
 export function parseAnswer(text: string): { answer?: IssueAnswer; problem: string } {
   const blocks = [...text.matchAll(jsonBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: sessionWording().answer.noBlock };
+  if (blocks.length === 0) return { problem: t("server.session.answer.noBlock") };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let a: IssueAnswer;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(sessionWording().answer.notObject);
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.session.answer.notObject"));
       a = {
         conclusion: typeof raw.conclusion === "string" ? raw.conclusion.trim() : "",
         evidence: answerLines(raw.evidence, "evidence"),
@@ -100,11 +101,11 @@ export function parseAnswer(text: string): { answer?: IssueAnswer; problem: stri
         next: answerLines(raw.next, "next"),
       };
     } catch (e) {
-      problem = sessionWording().answer.unreadable(e instanceof Error ? e.message : String(e));
+      problem = t("server.session.answer.unreadable", { why: e instanceof Error ? e.message : String(e) });
       continue;
     }
-    if (!a.conclusion) problem = sessionWording().answer.empty;
-    else if (a.evidence.length === 0) problem = sessionWording().answer.noEvidence;
+    if (!a.conclusion) problem = t("server.session.answer.empty");
+    else if (a.evidence.length === 0) problem = t("server.session.answer.noEvidence");
     else return { answer: a, problem: "" };
   }
   return { problem };
@@ -167,7 +168,7 @@ export function readReport(outcome: TurnOutcome, said: string): SessionRead {
   const text = said.trim();
   // A failed run leads with why it failed; what the session said before that follows.
   const whole = failed && text ? failed + "\n\n" + text : failed || text;
-  const summary = failed || summaryOf(text) || (out === "completed" ? sessionWording().done : sessionWording().unfinished);
+  const summary = failed || summaryOf(text) || (out === "completed" ? t("server.session.done") : t("server.session.unfinished"));
   const answer = out === "completed" ? parseAnswer(text).answer : undefined;
   return {
     outcome: out,
@@ -190,10 +191,11 @@ export interface SessionLimits {
 /** Why one more cannot start; except is a session about to work again, which does not count against itself. */
 export function noRoom(sessions: readonly Session[], runtime: string, project: string, limits: SessionLimits, except = ""): string {
   const room = roomLeft(sessions, project, limits.workspace, limits.perProject, except);
-  if (room.farm === 0) return sessionWording().noRoom.farm(limits.workspace);
+  if (room.farm === 0) return t("server.session.noRoom.farm", { max: limits.workspace });
   const onRuntime = sessions.filter((h) => isBusy(h) && h.id !== except && h.runtime === runtime).length;
-  if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime) return sessionWording().noRoom.runtime(runtimeLabel(runtime), onRuntime, limits.perRuntime);
-  if (room.project === 0) return sessionWording().noRoom.project(project, room.inProject, limits.perProject);
+  if (limits.perRuntime > 0 && onRuntime >= limits.perRuntime)
+    return t("server.session.noRoom.runtime", { runtime: runtimeLabel(runtime), on: onRuntime, max: limits.perRuntime });
+  if (room.project === 0) return t("server.session.noRoom.project", { project, on: room.inProject, max: limits.perProject });
   return "";
 }
 
@@ -268,14 +270,14 @@ export function notTakenIn(
     }
     case "check":
       return {
-        fix: sessionWording().notTaken.checkFix(f.reasonText),
-        owner: sessionWording().notTaken.owner(f.reasonText, name),
-        notice: sessionWording().notTaken.notice(name, f.reasonText),
-        short: sessionWording().notTaken.checkShort,
+        fix: t("server.session.notTaken.checkFix", { reason: f.reasonText }),
+        owner: t("server.session.notTaken.owner", { why: f.reasonText, name }),
+        notice: t("server.session.notTaken.notice", { name, why: f.reasonText }),
+        short: t("server.session.notTaken.checkShort"),
       };
     case "error": {
       const why = f.reasonText || f.message;
-      return { fix: "", owner: sessionWording().notTaken.owner(why, name), notice: sessionWording().notTaken.notice(name, why), short: why };
+      return { fix: "", owner: t("server.session.notTaken.owner", { why, name }), notice: t("server.session.notTaken.notice", { name, why }), short: why };
     }
   }
 }

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // Recurrences: the owner's and the orchestrator's, kept in the recurrence table and in the core state.
 // Every tick what is due runs once, however many runs it missed while the server was off, says so in its channel, and
 // is published for the orchestrator, who does it.
@@ -91,7 +92,7 @@ export const make = Effect.gen(function* () {
 
   const find = (id: string) => {
     const s = (core.state().recurrences ?? []).find((x) => x.id === id);
-    return s ? Effect.succeed(s) : Effect.fail(missing(recurrenceWording().noRecurrence(id), [lookIn.recurrence]));
+    return s ? Effect.succeed(s) : Effect.fail(missing(t("server.recurrence.noRecurrence", { id }), [lookIn.recurrence]));
   };
 
   const ran = (id: string, at: number, enabled: boolean) => db(q.recurrenceRan({ last_run: at, enabled, id }));
@@ -125,13 +126,13 @@ export const make = Effect.gen(function* () {
       if (problem) return yield* Effect.fail(refused(problem));
       const want = req.channel ?? chat.defaultChannel();
       const channel = (yield* chat.channels()).find((c) => c.id === want);
-      if (!channel) return yield* Effect.fail(refused(recurrenceWording().noChannel(want), [lookIn.channel]));
+      if (!channel) return yield* Effect.fail(refused(t("server.recurrence.noChannel", { name: want }), [lookIn.channel]));
       const named = (req.agent ?? "").trim();
       const agents = store.agents();
       const agent = named ? (agents.find((a) => a.id === named) ?? agents.find((a) => a.name === named)) : undefined;
-      if (named && !agent) return yield* Effect.fail(refused(recurrenceWording().noProfile(req.agent ?? ""), [lookIn.agent]));
+      if (named && !agent) return yield* Effect.fail(refused(t("server.recurrence.noProfile", { name: req.agent ?? "" }), [lookIn.agent]));
       const project = (req.project ?? "").trim();
-      if (agent && !project && !channel.project) return yield* Effect.fail(refused(recurrenceWording().noProject(channel.name)));
+      if (agent && !project && !channel.project) return yield* Effect.fail(refused(t("server.recurrence.noProject", { channel: channel.name })));
       const tz = req.tz ?? localZone();
       const pending = needsOK(req, by);
       const s: Recurrence = {

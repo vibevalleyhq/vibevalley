@@ -1,7 +1,7 @@
+import { t } from "@vibevalley/i18n";
 // What the farm draws of the core state: levels, plots,
 // the effects a fact sets off, and the achievements in words.
 
-import { gameWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import type {
   Achievement,
@@ -67,13 +67,13 @@ function growth(h: Session): Crop {
 }
 
 // Made when asked for: their words are the locale's of the moment.
-const badgeRipe = (): Badge => ({ text: gameWording().badge.ripe, tone: "ripe" });
-const badgeBugs = (): Badge => ({ text: gameWording().badge.bugs, tone: "bug" });
+const badgeRipe = (): Badge => ({ text: t("server.game.badge.ripe"), tone: "ripe" });
+const badgeBugs = (): Badge => ({ text: t("server.game.badge.bugs"), tone: "bug" });
 const badgeConflict = (): Badge => ({ text: wording().stuck.conflict, tone: "bug" });
 const badgeQuiet = (): Badge => ({ text: wording().stuck.quiet, tone: "stuck" });
 const badgeHalfway = (): Badge => ({ text: wording().stuck.interrupted, tone: "stuck" });
-const badgeRetrying = (): Badge => ({ text: gameWording().badge.retrying, tone: "stuck" });
-const badgeRest = (): Badge => ({ text: gameWording().badge.rest, tone: "rest" });
+const badgeRetrying = (): Badge => ({ text: t("server.game.badge.retrying"), tone: "stuck" });
+const badgeRest = (): Badge => ({ text: t("server.game.badge.rest"), tone: "rest" });
 const badgeReview = (): Badge => ({ text: wording().attention.reviewing, tone: "wait" });
 const badgeQuestions = (): Badge => ({ text: wording().attention.asking, tone: "wait" });
 
@@ -92,7 +92,7 @@ export function plotOf(h: Session, issue: Issue | undefined): PlotView {
       if (h.phase._tag === "working" && h.phase.retry !== undefined) return { crop: growth(h), badge: badgeRetrying() };
       // Another round after a failed acceptance: it works on what the review said.
       const open = openFindings(issue);
-      return open > 0 ? { crop: "weeds", badge: { text: gameWording().badge.weeding(open), tone: "bug" } } : { crop: growth(h) };
+      return open > 0 ? { crop: "weeds", badge: { text: t("server.game.badge.weeding", { n: open }), tone: "bug" } } : { crop: growth(h) };
     }
     case "asking":
       return { crop: "dry", badge: badgeQuestions() };
@@ -191,13 +191,13 @@ export function achievementInWords(a: AchievementDef): Achievement {
 function tierTitle(a: AchievementDef, tier: number): string {
   const titles = a.tierTitles ?? [];
   if (tier >= 1 && tier <= titles.length) return titles[tier - 1]!;
-  return tier === 2 ? gameWording().tier.silver(a.title) : tier === 3 ? gameWording().tier.gold(a.title) : a.title;
+  return tier === 2 ? t("server.game.tier.silver", { title: a.title }) : tier === 3 ? t("server.game.tier.gold", { title: a.title }) : a.title;
 }
 
 function reachedText(a: AchievementDef, tier: number): string {
-  if (a.category === "starter") return gameWording().reached.starter;
-  if (a.category === "secret") return gameWording().reached.secret;
-  return tier === 3 ? gameWording().reached.gold : tier === 2 ? gameWording().reached.silver : gameWording().reached.unlocked;
+  if (a.category === "starter") return t("server.game.reached.starter");
+  if (a.category === "secret") return t("server.game.reached.secret");
+  return tier === 3 ? t("server.game.reached.gold") : tier === 2 ? t("server.game.reached.silver") : t("server.game.reached.unlocked");
 }
 
 function achievementEffect(id: string, tier: number): GameEffectAchievement {

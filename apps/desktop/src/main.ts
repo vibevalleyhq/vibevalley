@@ -1,8 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // The desktop app: starts the server (server.ts) and shows the page it serves. The page reaches the machine only
 // through the host interface the preload gives it (@vibevalley/protocol/host); nothing of Electron or Node reaches it otherwise.
 
 import { currentLocale, setLocale } from "@vibevalley/protocol/words";
-import { desktopWording, followSavedLocale } from "./words";
+import { followSavedLocale } from "./words";
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -146,8 +147,8 @@ ipcMain.handle("host:tray", (_event, summary: TraySummary) => {
     Menu.buildFromTemplate([
       ...summary.lines.map((label) => ({ label, click: show })),
       { type: "separator" },
-      { label: desktopWording().open, click: show },
-      { label: desktopWording().quit, role: "quit" },
+      { label: t("desktop.open"), click: show },
+      { label: t("desktop.quit"), role: "quit" },
     ]),
   );
 });
@@ -179,7 +180,7 @@ if (!app.requestSingleInstanceLock()) {
       const why = e instanceof Error ? e.message : String(e);
       // Said in the window in place of the bar; closing it quits. Closed already, the box says it.
       if (!window) {
-        dialog.showErrorBox(desktopWording().cannotStart, why);
+        dialog.showErrorBox(t("desktop.cannotStart"), why);
         app.exit(1);
         return;
       }

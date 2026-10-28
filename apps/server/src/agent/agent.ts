@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The profiles (orchestrators and workers), the skills and each runtime's settings: config.json in the home. A profile
 // is made by hand or installed from a template (template.ts); the default orchestrator is installed from its built-in
 // template when it is missing, so a farm always has one.
@@ -174,7 +175,7 @@ export const make = Effect.gen(function* () {
         disk.write(() => JSON.stringify(next));
         s = next;
       },
-      catch: (e) => refused(agentWording().notSaved(file, e instanceof Error ? e.message : String(e))),
+      catch: (e) => refused(t("server.agent.notSaved", { file, why: e instanceof Error ? e.message : String(e) })),
     });
 
   const all = () => structuredClone([...s.agents]);
@@ -183,20 +184,20 @@ export const make = Effect.gen(function* () {
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it
    * stays and is reached on a call; the default one stays an orchestrator. "" when it can. */
   const roleProblem = (a: Agent): string => {
-    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return agentWording().defaultStaysOrchestrator;
-    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return agentWording().orchestratorRuntime(orchestratorRuntime);
+    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
+    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });
     return "";
   };
 
   // The delete and its dry run judge by these, so the dry run is refused exactly when the delete would be.
   const deletableAgent = (id: string) => {
-    if (id === defaultOrchestrator) return Effect.fail(refused(agentWording().orchestratorStays));
+    if (id === defaultOrchestrator) return Effect.fail(refused(t("server.agent.orchestratorStays")));
     const a = s.agents.find((x) => x.id === id);
-    return a ? Effect.succeed(a) : Effect.fail(missing(agentWording().noAgent(id), [lookIn.agent]));
+    return a ? Effect.succeed(a) : Effect.fail(missing(t("server.agent.noAgent", { id }), [lookIn.agent]));
   };
   const deletableSkill = (id: string) => {
     const k = s.skills.find((x) => x.id === id);
-    return k ? Effect.succeed(k) : Effect.fail(missing(agentWording().noSkill(id), [lookIn.skill]));
+    return k ? Effect.succeed(k) : Effect.fail(missing(t("server.agent.noSkill", { id }), [lookIn.skill]));
   };
 
   // Read again on every ask: an added template is a folder in the home, and copying one in or out changes the list.
@@ -211,8 +212,8 @@ export const make = Effect.gen(function* () {
   const templateOf = (id: string) => templates().find((template) => template.id === id);
   const deletableTemplate = (id: string) => {
     const item = templateOf(id);
-    if (!item) return Effect.fail(missing(agentWording().template.noTemplate(id), [lookIn.template]));
-    return item.source === "builtIn" ? Effect.fail(refused(agentWording().template.builtIn(id))) : Effect.succeed(item);
+    if (!item) return Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
+    return item.source === "builtIn" ? Effect.fail(refused(t("server.agent.template.builtIn", { id }))) : Effect.succeed(item);
   };
 
   const shape: AgentShape = {
@@ -235,7 +236,7 @@ export const make = Effect.gen(function* () {
       return cast;
     }),
     createAgent: Effect.fn("Agents.createAgent")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused(agentWording().newAgentId));
+      if (draft.id) return yield* Effect.fail(refused(t("server.agent.newAgentId")));
       const why = roleProblem(draft);
       if (why) return yield* Effect.fail(refused(why));
       let n = 1;
@@ -251,7 +252,7 @@ export const make = Effect.gen(function* () {
       ),
     previewDeleteAgent: (id) =>
       Effect.map(deletableAgent(id), (a) => ({
-        does: [agentWording().deleteAgent(a.name, a.id, a.runtime)],
+        does: [t("server.agent.deleteAgent", { name: a.name, id: a.id, runtime: a.runtime })],
       })),
     saveSkill: (skill) =>
       Effect.as(
@@ -259,7 +260,7 @@ export const make = Effect.gen(function* () {
         skill,
       ),
     createSkill: Effect.fn("Agents.createSkill")(function* (draft) {
-      if (draft.id) return yield* Effect.fail(refused(agentWording().newSkillId));
+      if (draft.id) return yield* Effect.fail(refused(t("server.agent.newSkillId")));
       const stem =
         draft.name
           .toLowerCase()
@@ -284,7 +285,7 @@ export const make = Effect.gen(function* () {
       Effect.map(deletableSkill(id), (k) => {
         const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
         return {
-          does: [agentWording().deleteSkill(k.name), ...(holders.length > 0 ? [agentWording().unequip(holders)] : [])],
+          does: [t("server.agent.deleteSkill", { name: k.name }), ...(holders.length > 0 ? [agentWording().unequip(holders)] : [])],
         };
       }),
     saveSettings: (runtime, settings) =>
@@ -295,17 +296,17 @@ export const make = Effect.gen(function* () {
     templates,
     installTemplate: Effect.fn("Agents.installTemplate")(function* (id) {
       const item = templateOf(id);
-      if (!item) return yield* Effect.fail(missing(agentWording().template.noTemplate(id), [lookIn.template]));
+      if (!item) return yield* Effect.fail(missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]));
       const made = withCast(installed(item, s.agents));
       yield* change((x) => ({ ...x, agents: [...x.agents, made] }));
       return made;
     }),
     updateFromTemplate: Effect.fn("Agents.updateFromTemplate")(function* (agent) {
       const a = s.agents.find((x) => x.id === agent);
-      if (!a) return yield* Effect.fail(missing(agentWording().noAgent(agent), [lookIn.agent]));
-      if (!a.from) return yield* Effect.fail(refused(agentWording().template.notFrom(a.name)));
+      if (!a) return yield* Effect.fail(missing(t("server.agent.noAgent", { id: agent }), [lookIn.agent]));
+      if (!a.from) return yield* Effect.fail(refused(t("server.agent.template.notFrom", { name: a.name })));
       const item = templateOf(a.from.template);
-      if (!item) return yield* Effect.fail(refused(agentWording().template.gone(a.name, a.from.template)));
+      if (!item) return yield* Effect.fail(refused(t("server.agent.template.gone", { name: a.name, template: a.from.template })));
       const next = withCast(updatedFrom(item, a));
       yield* change((x) => ({ ...x, agents: upsert(x.agents, next) }));
       return next;
@@ -316,10 +317,10 @@ export const make = Effect.gen(function* () {
         catch: (e) => refused(e instanceof TemplateProblem ? e.message : String(e)),
       });
       const item = yield* read;
-      if (templateOf(item.id)) return yield* Effect.fail(refused(agentWording().template.taken(item.id)));
+      if (templateOf(item.id)) return yield* Effect.fail(refused(t("server.agent.template.taken", { id: item.id })));
       yield* Effect.try({
         try: () => copyTemplate(path, config.home, item.id),
-        catch: (e) => refused(agentWording().notSaved(path, e instanceof Error ? e.message : String(e))),
+        catch: (e) => refused(t("server.agent.notSaved", { file: path, why: e instanceof Error ? e.message : String(e) })),
       });
       return { ...item, installed: [] };
     }),
@@ -327,7 +328,7 @@ export const make = Effect.gen(function* () {
       Effect.flatMap(deletableTemplate(id), (item) =>
         Effect.try({
           try: () => removeTemplate(config.home, item.id),
-          catch: (e) => refused(agentWording().notSaved(id, e instanceof Error ? e.message : String(e))),
+          catch: (e) => refused(t("server.agent.notSaved", { file: id, why: e instanceof Error ? e.message : String(e) })),
         }),
       ),
     previewDeleteTemplate: (id) => Effect.map(deletableTemplate(id), (item) => ({ does: [agentWording().template.delete(item.name, item.installed.length)] })),

@@ -1,0 +1,58 @@
+{
+  "flag": {
+    "prompt": "问一句就走，不进对话",
+    "runtime": "claude、codex、kimi、pi……；vibevalley 是自己的 agent",
+    "model": "模型",
+    "effort": "思考的力度",
+    "resume": "接着这个会话",
+    "cwd": "在哪个文件夹；不填是当前的",
+    "ownCwd": "自己的 agent 在哪个文件夹干活；不填是当前的",
+    "name": "自己的 agent 的名字（家目录 ~/.vibevalley/agent/<名字>）",
+    "ownModel": "模型；不填用配置里的",
+    "mcp": "MCP 配置文件；不填用家目录里的 mcp.json",
+    "server": "服务端的地址；不填用 VIBEVALLEY_SERVER，再没有是 {fallback}",
+    "dryRun": "只说会做什么，不动手（会删、会合、会关、会让帮工走的命令）",
+    "json": "请求体：JSON 文本，- 读标准输入，@文件 读文件",
+    "watch": "一直看：每一帧一行 JSON"
+  },
+  "command": {
+    "runtimeChat": "和一个农机直接聊，不经过 VibeValley：不记轨迹和花费",
+    "root": "不带命令是和 VibeValley 自己的 agent 聊；别的命令是调 VibeValley 的接口，答复是 JSON",
+    "state": "核心状态（GET {path}）",
+    "events": "副作用，一行一条（GET {path}）",
+    "issueWork": "备选的挪到待办，等它交回来，打出改动；经过的每个状态写到 stderr",
+    "group": "{group} 的接口"
+  },
+  "next": {
+    "help": "看这条命令怎么写",
+    "whatItDoes": "看这条命令做什么",
+    "startServer": "先起服务端（vp run --filter @vibevalley/server start），或用 --server 指到在跑的那个"
+  },
+  "and": "；",
+  "failure": {
+    "unreachable": "连不上 {base}：{why}",
+    "shape": "答复不合 Schema：{why}",
+    "stdin": "读不了标准输入：{why}",
+    "file": "读不了 {file}：{why}",
+    "notJson": "--json 不是 JSON：{why}",
+    "body": "--json 不合 {op} 的请求体：{why}",
+    "dryRun": "{op} 会改东西，但没有试跑：去掉 --dry-run 才会做",
+    "retry": "服务端要流重连，命令行不接着连",
+    "stream": "流读不下去：{why}",
+    "gone": "工单 #{n} 不在了：被删掉了"
+  },
+  "chat": {
+    "error": "\n出错了：{why}",
+    "compacted": "（前面的对话压成了摘要，原文在 {archive}）",
+    "usage": "{aborted, select, true {（停下了，输入 {input}，缓存 {cached}，输出 {output}）} other {（输入 {input}，缓存 {cached}，输出 {output}）}}",
+    "hello": "{skills} 个技能，{tools} 个 MCP 工具。/reset 忘掉对话，/exit 退出，Ctrl+C 停下。",
+    "forgot": "忘掉了。",
+    "noRuntime": "没有 {id} 这个农机",
+    "unknownInstall": "{id} 看不出装没装",
+    "unusable": "{id} 用不了：{kind}",
+    "resumed": "（接着）",
+    "direct": "直接聊：不经过 VibeValley，不记轨迹和花费。Ctrl+C 停这一轮，空着时再按退出。",
+    "rejected": "没接住：{why}",
+    "notSent": "没送进去：{why}"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "orchestrator": "The manager",
+  "conflictFiles": "{files, plural, one {# file conflicts with main} other {# files conflict with main}}",
+  "step": "{plan}: {step}"
+}

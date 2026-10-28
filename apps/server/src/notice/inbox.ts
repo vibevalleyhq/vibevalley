@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // What is waiting on the owner: the inbox the phone rings with, and what the
 // orchestrator's patrol reads; each item worded for every route the owner hears it on (the phone, the system notice, the
 // tray, the call), so a kind added to InboxKind is worded once, here. A graph's own sessions leave their finished, failed and conflicted work to the graph, which
@@ -82,7 +83,7 @@ function gathered(state: WorkspaceState): Unworded[] {
       case "conflict": {
         const files = (h.conflict?.files ?? []).length;
         out.push({
-          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: noticeWording().conflictFiles(files), at, target },
+          item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.notice.conflictFiles", { files }), at, target },
           channel,
           since: at,
           brief: patrolBrief.conflict(who, files),
@@ -127,7 +128,14 @@ function gathered(state: WorkspaceState): Unworded[] {
           const failures = task.failures ?? 0;
           const id = graph.id + ":failed:" + task.id + (failures > 1 ? `:${failures}` : "");
           out.push({
-            item: { id, kind: "task-failed", from: orchestrator, text: cut(noticeWording().step(graph.title, task.title), 40), at: graph.createdAt, target },
+            item: {
+              id,
+              kind: "task-failed",
+              from: orchestrator,
+              text: cut(t("server.notice.step", { plan: graph.title, step: task.title }), 40),
+              at: graph.createdAt,
+              target,
+            },
             channel: general,
             brief: patrolBrief.taskFailed(graph.title, graph.id, task.id, task.title, task.conclusion ? slice(task.conclusion, 0, 80) : ""),
           });
@@ -229,6 +237,6 @@ function clipLine(text: string, max = 140) {
 }
 
 function worded(item: Omit<InboxItem, "who" | "words">): InboxItem {
-  const who = item.from.kind === "session" ? item.from.name : noticeWording().orchestrator;
+  const who = item.from.kind === "session" ? item.from.name : t("server.notice.orchestrator");
   return { ...item, who, words: noticeWording().item[item.kind](who, clipLine(item.text)) };
 }

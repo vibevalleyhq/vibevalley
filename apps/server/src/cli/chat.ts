@@ -1,9 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // The conversations in a terminal: VibeValley's own agent (DeepSeek, with the coding tools, skills, memory, sessions,
 // reminders and the MCP servers in a config file), and any runtime on this machine. What is typed while it works joins
 // the turn, Ctrl+C stops the turn, and again (idle) quits.
 
 import { standaloneLlm } from "./llm.ts";
-import { cliWording } from "./words.ts";
+
 import { instructions } from "./prompts.ts";
 import { currentLocale } from "@vibevalley/protocol/words";
 import { homedir } from "node:os";
@@ -42,7 +43,7 @@ function show(e: BrainEvent, prompt: () => void) {
     }
     case "message_end":
       if (e.message.role !== "assistant") return;
-      if (e.message.stopReason === "error") write(cliWording().chat.error(e.message.errorMessage ?? ""));
+      if (e.message.stopReason === "error") write(t("server.cli.chat.error", { why: e.message.errorMessage ?? "" }));
       write("\n");
       return;
     case "tool_execution_start":
@@ -52,10 +53,12 @@ function show(e: BrainEvent, prompt: () => void) {
       console.log(dim((e.isError ? "✗ " : "✓ ") + short(e.result.content.map((c) => (c.type === "text" ? c.text : "")).join(""))));
       return;
     case "compaction_end":
-      if (e.compaction) console.log(dim(cliWording().chat.compacted(e.compaction.archive ?? "")));
+      if (e.compaction) console.log(dim(t("server.cli.chat.compacted", { archive: e.compaction.archive ?? "" })));
       return;
     case "agent_settled":
-      write(dim(cliWording().chat.usage(e.run.aborted, e.run.usage.input, e.run.usage.cacheRead, e.run.usage.output) + "\n"));
+      write(
+        dim(t("server.cli.chat.usage", { aborted: e.run.aborted, input: e.run.usage.input, cached: e.run.usage.cacheRead, output: e.run.usage.output }) + "\n"),
+      );
       prompt();
       return;
     default:
@@ -117,7 +120,9 @@ export async function ownChat(values: OwnChat) {
       await agent.ask(userMessage(values.p, wallTime.now()));
       return;
     }
-    console.log(dim(`vibevalley agent · ${cwd} · ${home}\n` + cliWording().chat.hello(agent.skills().length, agent.mcpStatus().toolCount)));
+    console.log(
+      dim(`vibevalley agent · ${cwd} · ${home}\n` + t("server.cli.chat.hello", { skills: agent.skills().length, tools: agent.mcpStatus().toolCount })),
+    );
     prompt = () => write("› ");
     prompt();
     let quit = () => {};
@@ -127,7 +132,7 @@ export async function ownChat(values: OwnChat) {
         if (text === "/exit") return quit();
         if (text === "/reset") {
           void agent.reset();
-          console.log(dim(cliWording().chat.forgot));
+          console.log(dim(t("server.cli.chat.forgot")));
           return prompt();
         }
         if (text) void agent.send(userMessage(text, wallTime.now()));
@@ -193,10 +198,10 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
     dshRuntime,
   ]);
   const runtime = registry.get(id);
-  if (!runtime) throw new Error(cliWording().chat.noRuntime(id));
-  if (!runtime.installation) throw new Error(cliWording().chat.unknownInstall(id));
+  if (!runtime) throw new Error(t("server.cli.chat.noRuntime", { id }));
+  if (!runtime.installation) throw new Error(t("server.cli.chat.unknownInstall", { id }));
   const found = await runtime.installation();
-  if (found.kind !== "available") throw new Error(cliWording().chat.unusable(id, found.kind));
+  if (found.kind !== "available") throw new Error(t("server.cli.chat.unusable", { id, kind: found.kind }));
   const cwd = values.cwd ? resolve(values.cwd) : process.cwd();
   const session: Session = await runtime.session(found, {
     cwd,
@@ -205,7 +210,7 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
     ...(values.resume ? { resume: values.resume } : {}),
   });
   try {
-    console.log(dim(`${id} · ${session.id}${values.resume ? cliWording().chat.resumed : ""}\n` + cliWording().chat.direct));
+    console.log(dim(`${id} · ${session.id}${values.resume ? t("server.cli.chat.resumed") : ""}\n` + t("server.cli.chat.direct")));
     session.events(
       (e) => {
         const line = render(e);
@@ -220,7 +225,8 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
       const cancelled = new Promise<void>((r) => (cancel = r));
       const done = promptAndWait(session, text, { cancel: cancelled } as never)
         .then((run) => {
-          if ((run as { kind?: string }).kind === "rejected") console.log(dim(cliWording().chat.rejected(String((run as { reason?: string }).reason ?? ""))));
+          if ((run as { kind?: string }).kind === "rejected")
+            console.log(dim(t("server.cli.chat.rejected", { why: String((run as { reason?: string }).reason ?? "") })));
         })
         .finally(() => {
           turn = undefined;
@@ -242,7 +248,8 @@ export async function runtimeChat(id: string, values: RuntimeChat) {
         if (!text) return turn ? undefined : write("› ");
         if (!turn) return start(text);
         void (session.steer ? session.steer(text) : session.queue(text)).then((r) => {
-          if ((r as { kind?: string }).kind === "rejected") console.log(dim(cliWording().chat.notSent(String((r as { reason?: string }).reason ?? ""))));
+          if ((r as { kind?: string }).kind === "rejected")
+            console.log(dim(t("server.cli.chat.notSent", { why: String((r as { reason?: string }).reason ?? "") })));
         });
       },
       () => {

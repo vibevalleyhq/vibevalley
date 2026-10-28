@@ -1,10 +1,10 @@
+import { t } from "@vibevalley/i18n";
 // The runtimes the farm can run helpers on: oar's, VibeValley's own agent and DeepSeek Harness.
 // Each is probed for whether it is installed, its models, its account's quota and what it carries (skills, MCP servers,
 // tools); probing runs a runtime's own commands, so the answers are kept and asked again only on a refresh, the quota
 // every five minutes and soon after a run. What each runtime spent today is kept in spend.json, and a runtime past its
 // day's budget takes no work.
 
-import { runtimeWording } from "./words.ts";
 import { join } from "node:path";
 import { type AvailableInstallation, defaultRuntimes, type InstallationSnapshot, type InventoryReader, type Runtime, RuntimeRegistry } from "@botiverse/oar";
 import type { AccountUsage, Agent, AgentProblem, InventoryEntry, RuntimeInfo, RuntimeSettings } from "@vibevalley/protocol";
@@ -142,7 +142,7 @@ export function probeInstallation(runtime: Runtime, binPath: string): Promise<In
 
 function fromOar(usage: Awaited<ReturnType<NonNullable<Runtime["accountUsage"]>>>): AccountUsage {
   if (usage.kind === "reauth_required") return { status: "login_required" };
-  if (usage.kind === "unsupported") return { status: "unavailable", reason: usage.reason || runtimeWording().noUsage };
+  if (usage.kind === "unsupported") return { status: "unavailable", reason: usage.reason || t("server.runtime.noUsage") };
   return {
     status: "ok",
     subscription: usage.plan || null,
@@ -296,7 +296,7 @@ export const make = (options: RuntimeOptions = {}) =>
       };
       const runtime = registry.get(id);
       if (!runtime) {
-        const reason = id === "cursor" ? runtimeWording().cursor : runtimeWording().oarUnknown;
+        const reason = id === "cursor" ? t("server.runtime.cursor") : t("server.runtime.oarUnknown");
         return { info: { ...info, installation: { status: "unsupported", reason } }, read: 0 };
       }
       const notFound: InstallationSnapshot = { kind: "not_found" };
@@ -348,7 +348,7 @@ export const make = (options: RuntimeOptions = {}) =>
             ...(s.enabled !== undefined ? { enabled: s.enabled } : {}),
           })),
           inventory(runtime.mcpServers, found, cwd, (m) => {
-            const parts = [m.status, m.toolCount !== undefined ? runtimeWording().tools(m.toolCount) : ""].filter(Boolean);
+            const parts = [m.status, m.toolCount !== undefined ? t("server.runtime.tools", { n: m.toolCount }) : ""].filter(Boolean);
             return {
               name: m.name,
               ...optional("description", parts.join(" · ")),
@@ -462,7 +462,7 @@ export const make = (options: RuntimeOptions = {}) =>
       update: (id, s) =>
         known(id)
           ? Effect.andThen(
-              store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(runtimeWording().notSaved(id, e.reason)) : e))),
+              store.saveSettings(id, s).pipe(Effect.mapError((e) => (e._tag === "Refused" ? refused(t("server.runtime.notSaved", { id, why: e.reason })) : e))),
               refresh(id),
             )
           : Effect.succeed(undefined),
@@ -472,12 +472,13 @@ export const make = (options: RuntimeOptions = {}) =>
       choose: (task, named, picked) => Effect.map(candidates, (c) => chooseAgent(c, task, named, picked)),
       resolve: Effect.fn("Runtimes.resolve")(function* (agent) {
         const runtime = registry.get(agent.runtime);
-        if (!runtime) return yield* Effect.fail(refused(runtimeWording().cannotDrive(agent.runtime)));
+        if (!runtime) return yield* Effect.fail(refused(t("server.runtime.cannotDrive", { runtime: agent.runtime })));
         const { info: i, settings } = yield* configuration(agent.runtime);
         const { model, effort, env, missingModel, problems } = sessionOptions(agent, settings, i);
         const problem = problems.find((i) => i.level === "error");
-        if (problem) return yield* Effect.fail(refused(runtimeWording().cannotSend(agent.name, problem.text)));
-        if (missingModel) yield* core.notice("warn", runtimeWording().defaultModel(runtimeLabel(agent.runtime), missingModel, agent.name));
+        if (problem) return yield* Effect.fail(refused(t("server.runtime.cannotSend", { name: agent.name, why: problem.text })));
+        if (missingModel)
+          yield* core.notice("warn", t("server.runtime.defaultModel", { runtime: runtimeLabel(agent.runtime), model: missingModel, name: agent.name }));
         const observed = cache.get(agent.runtime);
         const installation = observed?.found && observed.info.settings.binPath === settings.binPath ? structuredClone(observed.found) : undefined;
         return {

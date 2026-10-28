@@ -1,4 +1,5 @@
-import { issueWording } from "./words.ts";
+import { t } from "@vibevalley/i18n";
+
 import { draftMatch, refinementBrief } from "./prompts.ts";
 import type { Agent, Question, Issue } from "@vibevalley/protocol";
 import { Effect, Semaphore } from "effect";
@@ -43,14 +44,14 @@ export function refinement(d: RefinementDeps) {
     const candidates = yield* runtimes.candidates;
     let named = "";
     if (issue.assignee) {
-      if (!store.agent(issue.assignee)) return yield* Effect.fail(refused(issueWording().profileGone(issue.assignee)));
+      if (!store.agent(issue.assignee)) return yield* Effect.fail(refused(t("server.issue.profileGone", { id: issue.assignee })));
       named = issue.assignee;
     } else if (issue.project) {
       const last = (yield* one(qs.lastAssigneeIn({ project: issue.project })))?.assignee;
       if (last && candidates.some((c) => c.agent.id === last && c.usable)) named = last;
     }
     const chosen = chooseAgent(candidates, draftMatch(issue.title), named, "");
-    if (!chosen) return yield* Effect.fail(refused(issueWording().draft.noDrafter, [lookIn.agent]));
+    if (!chosen) return yield* Effect.fail(refused(t("server.issue.draft.noDrafter"), [lookIn.agent]));
     return chosen;
   });
 
@@ -95,12 +96,12 @@ export function refinement(d: RefinementDeps) {
   const draft = Effect.fn("Issues.draft")(
     function* (id: string, word: string, channel: string) {
       const item = yield* unsent(id);
-      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(issueWording().draft.orchestrator));
-      if (item.status !== "backlog") return yield* Effect.fail(refused(issueWording().draft.onlyBacklog));
-      if (item.refining) return yield* Effect.fail(refused(issueWording().draft.drafting(item.refining.name)));
+      if (isForOrchestrator(item, store.isOrchestrator)) return yield* Effect.fail(refused(t("server.issue.draft.orchestrator")));
+      if (item.status !== "backlog") return yield* Effect.fail(refused(t("server.issue.draft.onlyBacklog")));
+      if (item.refining) return yield* Effect.fail(refused(t("server.issue.draft.drafting", { name: item.refining.name })));
       const chosen = yield* refiner(item);
       const where = item.project ?? (chosen.workdir ?? "").trim();
-      if (!where) return yield* Effect.fail(refused(issueWording().draft.noProject));
+      if (!where) return yield* Effect.fail(refused(t("server.issue.draft.noProject")));
       const said = word.trim();
       const brief = refinementBrief(item, said, where);
       yield* beforeRefinement(item, said, chosen.id, where);
@@ -109,7 +110,7 @@ export function refinement(d: RefinementDeps) {
       if (kept.kept) yield* Effect.logInfo(`vibevalley: issue ${item.id}: before its draft: ${kept.reason}`);
       // Always a worktree, even for a profile that works in the project folder: the reset after it must not touch the owner's checkout.
       const hired = yield* hire(chosen, brief, where, { worktree: true, channel, issue: id, trigger: { kind: "refine" }, refining: true });
-      if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? issueWording().sendFailed));
+      if (!hired.session) return yield* Effect.fail(refused(hired.refused ?? t("server.issue.sendFailed")));
       // Its moves no longer hold todo while it drafts.
       yield* publish(id);
       return yield* get(id);
@@ -127,9 +128,9 @@ export function refinement(d: RefinementDeps) {
     const tell = (text: string) => (thread ? chat.notice(thread, text, "issue_refinement") : core.notice("warn", text));
     if (f.outcome === "completed") {
       const { draft: d, problem } = parseRefinement(said);
-      if (!d) yield* tell(issueWording().draft.unread(h.name, problem));
+      if (!d) yield* tell(t("server.issue.draft.unread", { name: h.name, problem }));
       else yield* refined(id, d, f.questions);
-    } else yield* tell(issueWording().draft.unfinished(h.name, f.summary));
+    } else yield* tell(t("server.issue.draft.unfinished", { name: h.name, summary: f.summary }));
     yield* sessions.dismiss(f.id, "discard");
     yield* publish(id);
   });
@@ -138,7 +139,7 @@ export function refinement(d: RefinementDeps) {
     if (issue.refining) yield* sessions.dismiss(issue.refining.session, "discard");
     if (issue.project) {
       const kept = yield* sessions.clearWorkplace(issue.id, issue.project, issue.number);
-      if (kept.kept) yield* core.notice("warn", issueWording().draft.canceled(cut(issue.title, 40), kept.reason));
+      if (kept.kept) yield* core.notice("warn", t("server.issue.draft.canceled", { title: cut(issue.title, 40), why: kept.reason }));
       return kept;
     }
     return { kept: false };

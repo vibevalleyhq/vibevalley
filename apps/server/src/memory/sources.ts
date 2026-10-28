@@ -1,9 +1,9 @@
+import { t } from "@vibevalley/i18n";
 // Where memories live: this farm's database, always there and
 // first, and a memory service outside it (Nowledge Mem, EverOS), modeled on Hermes's MemoryProvider. Every read asks them
 // all at once and takes their answers in turns; a source outside the farm that fails or is slow gives nothing, with a line
 // in the log; writes to one go in the background, in order.
 
-import { memoryWording } from "./words.ts";
 import type { Memory, MemorySourceInfo } from "@vibevalley/protocol";
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, FiberSet, Queue, Scope } from "effect";
 import type { MemorySourceConfig } from "../setting/rules.ts";
@@ -278,12 +278,12 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
         const name = c.kind;
         const isOff = (why: string) => off.push({ name, label: sourceLabel(name), on: false, canList: false, canForget: false, transcripts: false, off: why });
         if (!c.enabled) {
-          isOff(memoryWording().off);
+          isOff(t("server.memory.off"));
           continue;
         }
         const one = build(c);
         if (!one) {
-          isOff(memoryWording().unknownSource);
+          isOff(t("server.memory.unknownSource"));
           continue;
         }
         const why = one.unavailable();
@@ -352,9 +352,9 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
 
     const forgetProblem = (id: string) => {
       const g = snapshot();
-      if (!g) return memoryWording().stopped;
+      if (!g) return t("server.memory.stopped");
       const [one] = owner(g.all, id);
-      return one.can.forget ? undefined : memoryWording().forgetThere(sourceLabel(one.name));
+      return one.can.forget ? undefined : t("server.memory.forgetThere", { source: sourceLabel(one.name) });
     };
 
     // The writes still waiting go first, for a moment; then every generation is retired and the local source stopped.
@@ -412,7 +412,7 @@ export const makeSources = (options: SourcesOptions): Effect.Effect<Sources, nev
                 return {
                   source: one.name,
                   found: (page?.found ?? []).map((found) => ({ ...found, id: idOf(one, found.id), source: one.name })),
-                  coverage: page ? page.coverage : memoryWording().coverage.failed,
+                  coverage: page ? page.coverage : t("server.memory.coverage.failed"),
                 };
               }),
           );

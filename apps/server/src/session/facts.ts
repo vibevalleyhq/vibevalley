@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // A session's events read as facts and journal steps. Pure: it reads the session as
 // the core state has it and the session's own bookkeeping, and changes nothing.
 
@@ -89,7 +90,7 @@ export function near(cwd: string, detail: string): string {
 }
 
 const toolOutput = (content: readonly ToolOutputPart[] = []) =>
-  content.flatMap((part) => (part.type === "text" ? (part.text ? [part.text] : []) : part.type === "image" ? [sessionWording().log.image] : [])).join("\n");
+  content.flatMap((part) => (part.type === "text" ? (part.text ? [part.text] : []) : part.type === "image" ? [t("server.session.log.image")] : [])).join("\n");
 
 function label(runtime: string, tool: string, input: string | undefined, cwd: string) {
   const action = classifyTool(runtime, tool, input);
@@ -209,7 +210,7 @@ export function eventFacts(event: Event, session: Session | undefined, tracking:
       if (session && isBusy(session)) {
         const why = sessionWording().log.exited(ctx.runtime, event.code);
         facts.push({ type: "report", id, outcome: "failed", summary: why, runs: session.runs });
-        warn = sessionWording().log.exitedNotice(session.name, why);
+        warn = t("server.session.log.exitedNotice", { name: session.name, why });
       }
       break;
     default:

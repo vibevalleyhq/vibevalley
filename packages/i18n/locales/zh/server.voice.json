@@ -1,0 +1,45 @@
+{
+  "misheard": "嗯？我没听清，你再说一遍？",
+  "unknownSuffix": "服务端还不会用",
+  "unknown": "{what}用的 {vendor} 服务端还不会用",
+  "part": {
+    "asr": "识别",
+    "llm": "大模型",
+    "tts": "合成"
+  },
+  "noAsrKey": "微软识别还没有 key：在声音页的「识别」里填",
+  "noLine": "管家的语音线路没接通",
+  "noDeepseekKey": "用 DeepSeek 要先有 DeepSeek 的 key：在首页「设置」里填",
+  "noLlmKey": "自己的大模型还没有 key：在声音页的「想」里填",
+  "noTtsKey": "微软合成还没有 key：在声音页的「说」里填",
+  "unusable": "语音设置用不了：{why}",
+  "tunnel": {
+    "timedOut": "cloudflared 30 秒没给出地址",
+    "missing": "没有 cloudflared：先 brew install cloudflared，或者在配置里设 voice.line.url，用你自己的隧道",
+    "exited": "cloudflared 退出了，没给出地址"
+  },
+  "noAgora": "还没有 Agora 的凭据：在首页的「设置」里填 App ID 和 App Certificate",
+  "lineDown": "语音线路开不起来：{why}",
+  "lineClosed": "语音线路已经关闭",
+  "lineNotOpen": "语音线路还没开",
+  "hungUp": "这通电话已经挂了",
+  "noToken": "签不出语音令牌：{why}",
+  "stopped": "语音服务已经停下",
+  "grantGone": "这通电话的语音凭据已经失效，请重新接通",
+  "connecting": "这通电话已经在接通",
+  "lineFailed": "管家的语音线路接不通：{why}",
+  "joinFailed": "请管家进频道失败：{why}",
+  "leaveFailed": "请管家离开失败：{why}",
+  "manyCalls": "有几通电话正在接通，请升级客户端后重试",
+  "noCall": "没有正在接通的电话",
+  "dictation": {
+    "unset": "听写还没配：在「声音」页的「听写」里填地址和模型",
+    "format": "听写认不得 {format} 这种录音",
+    "empty": "录音是空的，或者不是 base64",
+    "tooLong": "录音太长了：一段不超过 25 MB",
+    "unreachable": "听写的地址连不上：{why}",
+    "cut": "听写的回答读到一半断了：{why}",
+    "status": "听写的地址回了 {status}：{detail}",
+    "shape": "听写的地址回的不是 OpenAI 的转写格式"
+  }
+}

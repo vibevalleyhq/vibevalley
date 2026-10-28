@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // When a recurrence runs: what is due, whether it was missed, what a run leaves, and
 // whether a recurrence waits for the owner's yes.
 
@@ -56,7 +57,7 @@ export function recurrenceProblem(req: RecurrenceRequest, now: number): string {
 }
 
 export function dueText(s: Recurrence, missed: boolean): string {
-  return recurrenceWording().due(s.name, missed, s.text);
+  return t("server.recurrence.due", { name: s.name, missed, text: s.text });
 }
 
 // Five fields, minute, hour, day of month, month and day of week, each a comma list of *, n or a-b, any with /step.
@@ -67,5 +68,5 @@ function cronProblem(expr: string, now: number, tz: string | undefined): string 
   const spec = parseCron(expr);
   if (typeof spec === "string") return spec;
   const timeZone = tz === undefined ? DateTime.zoneMakeLocal() : givenZone(tz)!;
-  return nextOf(Cron.make({ ...spec, tz: timeZone }), now) === undefined ? recurrenceWording().cron.never(expr) : "";
+  return nextOf(Cron.make({ ...spec, tz: timeZone }), now) === undefined ? t("server.recurrence.cron.never", { expr }) : "";
 }

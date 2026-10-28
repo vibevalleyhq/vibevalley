@@ -1,8 +1,8 @@
+import { t } from "@vibevalley/i18n";
 // The one table the board, the command line, the orchestrator's tools and the server's refusals go by. reduce works it
 // out with each issue's status and attention (withIssueStatuses), so a round that ends changes what the issue may do at
 // once, wherever it is read.
 
-import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { type Issue, type IssueStatus, IssueStatusValues } from "@vibevalley/protocol";
 import { commandOf, type Next } from "@vibevalley/protocol/api";
@@ -31,14 +31,14 @@ export type Move =
 /** The whole table; the reason says why when there is no move. */
 export function statusMove(issue: Issue, to: IssueStatus): [Move, string] {
   const from = issue.status;
-  if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return ["none", issueWording().move.inGraph];
-  if (from === to) return ["none", issueWording().move.same];
-  if (to === "in_progress" || to === "in_review") return ["none", issueWording().move.byHelpers];
+  if (issue.graph || issue.task || issue.delivered === "merged_into_parent") return ["none", t("server.issue.move.inGraph")];
+  if (from === to) return ["none", t("server.issue.move.same")];
+  if (to === "in_progress" || to === "in_review") return ["none", t("server.issue.move.byHelpers")];
   // Run before: by a session, or by an in-process agent (the orchestrator), whoever it was.
   const sent = issue.sessions.length > 0 || issue.lastRun !== undefined;
   switch (from) {
     case "backlog":
-      if (to === "todo") return issue.refining ? ["none", issueWording().move.drafting(issue.refining.name)] : ["start", ""];
+      if (to === "todo") return issue.refining ? ["none", t("server.issue.move.drafting", { name: issue.refining.name })] : ["start", ""];
       if (to === "canceled") return ["drop", ""];
       break;
     case "todo":
@@ -46,20 +46,20 @@ export function statusMove(issue: Issue, to: IssueStatus): [Move, string] {
       if (to === "canceled") return ["drop", ""];
       break;
     case "in_progress":
-      return to === "canceled" ? ["cancel", ""] : ["none", issueWording().move.working];
+      return to === "canceled" ? ["cancel", ""] : ["none", t("server.issue.move.working")];
     case "in_review":
       if (to === "todo") return ["round", ""];
       // A round that failed is never done: done is what was asked for, not how the round ended.
-      if (to === "done") return issue.attention.stuck === "failed" ? ["none", issueWording().move.failed] : ["complete", ""];
+      if (to === "done") return issue.attention.stuck === "failed" ? ["none", t("server.issue.move.failed")] : ["complete", ""];
       if (to === "canceled") return ["cancel", ""];
       break;
     case "done":
     case "canceled":
       if (to === "todo" && sent) return ["reopen", ""];
       if (to === "backlog" && !sent) return ["revive", ""];
-      return sent ? ["none", issueWording().move.reopen] : ["none", issueWording().move.revive];
+      return sent ? ["none", t("server.issue.move.reopen")] : ["none", t("server.issue.move.revive")];
   }
-  return ["none", issueWording().move.cannot(wording().status[from], wording().status[to])];
+  return ["none", t("server.issue.move.cannot", { from: wording().status[from], to: wording().status[to] })];
 }
 
 export const statusMoves = (issue: Issue): IssueStatus[] => IssueStatusValues.filter((to) => statusMove(issue, to)[0] !== "none");
@@ -73,10 +73,10 @@ export function nextSteps(item: Issue): Next[] {
     switch (a.does) {
       case "move":
         return a.words === "required"
-          ? [{ say: issueWording().move.roundWithText(label, commandOf("issue.status.update", [n]).join(" "), a.status) }]
+          ? [{ say: t("server.issue.move.roundWithText", { say: label, command: commandOf("issue.status.update", [n]).join(" "), to: a.status }) }]
           : [{ say: label, run: commandOf("issue.status.update", [n], { status: a.status }) }];
       case "say":
-        return [{ say: issueWording().move.sayWithText(label, commandOf("issue.comment.create", [n]).join(" ")) }];
+        return [{ say: t("server.issue.move.sayWithText", { label, command: commandOf("issue.comment.create", [n]).join(" ") }) }];
       case "stop":
         return session === undefined ? [] : [{ say: label, run: commandOf("session.stop", [session]) }];
     }
@@ -85,9 +85,9 @@ export function nextSteps(item: Issue): Next[] {
   const moves = statusMoves(item)
     .filter((to) => !pressed.has(to))
     .map((to): Next => {
-      const say = issueWording().move.moveTo(wording().status[to]);
+      const say = t("server.issue.move.moveTo", { status: wording().status[to] });
       return statusMove(item, to)[0] === "round"
-        ? { say: issueWording().move.roundWithText(say, commandOf("issue.status.update", [n]).join(" "), to) }
+        ? { say: t("server.issue.move.roundWithText", { say, command: commandOf("issue.status.update", [n]).join(" "), to }) }
         : { say, run: commandOf("issue.status.update", [n], { status: to }) };
     });
   return [...acts, ...moves];

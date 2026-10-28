@@ -1,0 +1,29 @@
+{
+  "source": {
+    "local": "Local",
+    "nowledge": "Nowledge Mem",
+    "everos": "EverOS"
+  },
+  "noUrl": "no address",
+  "off": "off",
+  "unknownSource": "unknown kind of source",
+  "stopped": "The memory sources have stopped",
+  "forgetThere": "Memories in {source} are deleted there",
+  "coverage": {
+    "failed": "reading failed, was canceled or timed out; this source is not included",
+    "everosAcross": "searching across projects is not supported: name a project; EverOS is not included this time",
+    "everosAgent": "this search needs a profile; EverOS is not included this time",
+    "unconfirmed": "some hits' project could not be confirmed and were left out of this project's search",
+    "note": "{source}: {note}"
+  },
+  "everosList": "EverOS memories are not listed here",
+  "everosForget": "EverOS memories are deleted in EverOS",
+  "nowledgeForget": "Nowledge Mem memories are deleted in Nowledge Mem",
+  "empty": "There is nothing to remember",
+  "dbFailed": "Not remembered: the database could not be written",
+  "fileFailed": "Not remembered: MEMORY.md could not be written",
+  "noMemory": "{agent}'s memory has no {id}",
+  "forgetOrchestrator": "Delete this line from the manager's MEMORY.md: \"{text}\"",
+  "forget": "Forget from {agent}'s memory: \"{text}\"",
+  "orchestratorRecall": "The manager does not recall: it always carries its whole memory"
+}

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // When a recurrence runs and how it is said. The next run is
 // the first matching minute strictly after the last run. A wall time skipped by a clock change is taken as the same time
 // before the change (02:30 on a spring-forward night is 03:30); a repeated one is its first occurrence.
@@ -77,11 +78,11 @@ function clock(at: number, tz: string): string {
 export function whenText(when: RecurrenceWhen, tz: string): string {
   switch (when.kind) {
     case "once":
-      return recurrenceWording().when.once(clock(when.at, tz));
+      return t("server.recurrence.when.once", { clock: clock(when.at, tz) });
     case "every":
-      return when.minutes % 60 === 0 ? recurrenceWording().when.hours(when.minutes / 60) : recurrenceWording().when.minutes(when.minutes);
+      return when.minutes % 60 === 0 ? t("server.recurrence.when.hours", { n: when.minutes / 60 }) : t("server.recurrence.when.minutes", { n: when.minutes });
     case "daily":
-      return recurrenceWording().when.daily(when.time);
+      return t("server.recurrence.when.daily", { time: when.time });
     case "weekly": {
       const days = [...new Set(when.days ?? [])].sort((a, b) => a - b);
       return recurrenceWording().when.weekly(
@@ -136,7 +137,7 @@ export const fields = (s: string) => s.split(/[\t\n\v\f\r \u0085\u00a0\u1680\u20
 
 function cronField(field: string, i: number): Set<number> | string {
   const { min: lo, max: hi } = cronFields[i]!;
-  const bad = recurrenceWording().cron.badField(recurrenceWording().cron.fields[i]!, field);
+  const bad = t("server.recurrence.cron.badField", { name: recurrenceWording().cron.fields[i]!, field });
   const bits = new Set<number>();
   for (const item of field.split(",")) {
     const slash = item.indexOf("/");
@@ -168,7 +169,7 @@ function cronField(field: string, i: number): Set<number> | string {
 
 export function parseCron(expr: string): CronSpec | string {
   const f = fields(expr);
-  if (f.length !== 5) return recurrenceWording().cron.fiveFields;
+  if (f.length !== 5) return t("server.recurrence.cron.fiveFields");
   const bits: Set<number>[] = [];
   for (let i = 0; i < 5; i++) {
     const b = cronField(f[i]!, i);

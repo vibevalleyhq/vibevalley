@@ -1,0 +1,7 @@
+{
+  "noFile": "{path}: 没有这个文件",
+  "notPort": "{path}: {name} 不是端口：{port}",
+  "prPoll": "github.pr_poll_seconds 必须大于 0",
+  "homeTaken": "家目录 {home} 正被另一个服务端使用；请连接现有的服务端，或先停掉它",
+  "homeUnlocked": "锁不住家目录 {home}"
+}

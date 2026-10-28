@@ -1,0 +1,55 @@
+{
+  "weekdays": {
+    "0": "日",
+    "1": "一",
+    "2": "二",
+    "3": "三",
+    "4": "四",
+    "5": "五",
+    "6": "六"
+  },
+  "when": {
+    "once": "{clock} 一次",
+    "hours": "每 {n} 小时",
+    "minutes": "每 {n} 分钟",
+    "daily": "每天 {time}",
+    "weekdays": "工作日 {time}",
+    "weekend": "周末 {time}",
+    "monthly": "每月 {day} 号 {time}",
+    "hourly": "每小时第 {minute} 分",
+    "cron": "cron {expr}"
+  },
+  "next": {
+    "never": "不会再到点",
+    "pending": "等主人同意",
+    "done": "做过了",
+    "off": "关着"
+  },
+  "cron": {
+    "fields": {
+      "0": "分钟",
+      "1": "小时",
+      "2": "日",
+      "3": "月",
+      "4": "周几"
+    },
+    "badField": "cron 的{name}写错了：{field}",
+    "fiveFields": "cron 要五段：分 时 日 月 周几，比如 0 9 * * 1-5",
+    "never": "这个 cron 永远不会到点：{expr}"
+  },
+  "problem": {
+    "noName": "定时要有个名字",
+    "noText": "定时要写到点了做什么",
+    "zone": "不认识这个时区：{tz}",
+    "past": "一次性的时间要在以后",
+    "every": "间隔至少 {min} 分钟",
+    "time": "时间写成 HH:MM，比如 09:00：{time}",
+    "days": "每周的哪几天：0 到 6，0 是周日",
+    "kind": "不认识这种定时"
+  },
+  "due": "{missed, select, true {⏰ 定时「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时「{name}」到点了：{text}}}",
+  "noRecurrence": "没有 {id} 号定时",
+  "noChannel": "没有 {name} 这个频道",
+  "noProfile": "没有叫 {name} 的档案",
+  "noProject": "#{channel} 没有默认项目：直接派给帮工的定时要写 project"
+}

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import { issueWording } from "./words.ts";
 import { wording } from "@vibevalley/protocol/words";
 import { reportVerdict } from "../session/rules.ts";
@@ -34,7 +35,7 @@ export function issueJob(pick: Pick<Issue, "title" | "description" | "criteria">
 }
 
 /** 接着修 for an answer that could not be read; cureWords is the one for a failed round. */
-export const answerCureWords = (problem: string) => issueWording().job.answerUnread(problem) + "\n" + answerFormat;
+export const answerCureWords = (problem: string) => t("server.issue.job.answerUnread", { problem }) + "\n" + answerFormat;
 
 /** The first line with words is the title, the rest the description; a first line too long for a title gives its
  * short title (shortTitle) and the whole job is the description. */
@@ -86,13 +87,13 @@ function linesOf(v: unknown, field: string): string[] {
   if (v === undefined || v === null) return [];
   if (typeof v === "string") return [v];
   if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
-  throw new Error(issueWording().draft.lines(field));
+  throw new Error(t("server.issue.draft.lines", { field }));
 }
 
 function textOf(v: unknown, field: string): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v;
-  throw new Error(issueWording().draft.text(field));
+  throw new Error(t("server.issue.draft.text", { field }));
 }
 
 const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
@@ -100,13 +101,13 @@ const refinementBlock = /```(?:json)?[^\n]*\n([\s\S]*?)```/g;
 /** The last block that reads as a draft with a title; problem says why none did. */
 export function parseRefinement(text: string): { draft?: IssueRefinement; problem: string } {
   const blocks = [...text.matchAll(refinementBlock)].map((m) => m[1]!);
-  if (blocks.length === 0) return { problem: issueWording().draft.noBlock };
+  if (blocks.length === 0) return { problem: t("server.issue.draft.noBlock") };
   let problem = "";
   for (let i = blocks.length - 1; i >= 0; i--) {
     let d: IssueRefinement;
     try {
       const raw = JSON.parse(blocks[i]!) as Record<string, unknown>;
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(issueWording().draft.notObject);
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(t("server.issue.draft.notObject"));
       d = {
         title: textOf(raw.title, "title"),
         why: textOf(raw.why, "why"),
@@ -116,12 +117,12 @@ export function parseRefinement(text: string): { draft?: IssueRefinement; proble
         files: linesOf(raw.files, "files"),
       };
     } catch (e) {
-      problem = issueWording().draft.unreadable(e instanceof Error ? e.message : String(e));
+      problem = t("server.issue.draft.unreadable", { why: e instanceof Error ? e.message : String(e) });
       continue;
     }
     const title = clip(d.title, 80);
     if (!title) {
-      problem = issueWording().draft.noTitle;
+      problem = t("server.issue.draft.noTitle");
       continue;
     }
     return { draft: { ...d, title }, problem: "" };
@@ -179,7 +180,7 @@ export function filledTemplate(s: IssueTemplate, stack: Partial<ProjectStack>): 
   const done = s.done.replace(commandHoles, (hole, name: string) =>
     commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : issueWording().template.commands[name]!,
   );
-  const text = issueWording().template.done(s.title, done);
+  const text = t("server.issue.template.done", { title: s.title, done });
   const blank = firstBlank(text);
   const { blank: _, ...rest } = s;
   return { ...rest, done, text, ...(blank ? { blank } : {}) };
@@ -259,7 +260,7 @@ export function milestonesOf(issue: Issue, runs: readonly Run[], names: Readonly
   return { milestones, ...(spent ? { spent } : {}) };
 }
 
-export const resumeWords = () => issueWording().job.resume;
+export const resumeWords = () => t("server.issue.job.resume");
 
 /** Calling it twice gives the same job: a 接着修 told before is taken off first. */
 export function cureWords(job: string): string {

@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The chat apps: WeChat, Feishu and QQ, each tied to one farm channel; each app's protocol is
 // its adapter's. Only outbound connections: no public HTTP endpoint. The bots' secrets never leave the database.
 //
@@ -8,7 +9,6 @@
 // owner's latest message, and only so many times: what an app will not take waits in connector_outbox and goes when the
 // owner next says something, several as one digest.
 
-import { connectorWording } from "./words.ts";
 import { randomInt } from "node:crypto";
 import type { ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus } from "@vibevalley/protocol";
 import { type ApiError } from "@vibevalley/protocol/api";
@@ -125,7 +125,7 @@ export function weixinAdapter(api: WeixinApi): Adapter {
         if (signal.aborted) return undefined;
         const code = weixinFailed(updates.ret, updates.errcode);
         if (code !== undefined) {
-          if (code === staleToken) return { kind: "stale", reason: connectorWording().staleLogin };
+          if (code === staleToken) return { kind: "stale", reason: t("server.connector.staleLogin") };
           return { kind: "failed", reason: "getupdates: " + (updates.errmsg || String(code)) };
         }
         if (updates.longpolling_timeout_ms && updates.longpolling_timeout_ms > 0) timeout = updates.longpolling_timeout_ms;
@@ -209,14 +209,14 @@ export function qqAdapter(api: QQApi): Adapter {
     login: async (signal, input) => {
       const appId = (input.appId ?? "").trim();
       const secret = (input.secret ?? "").trim();
-      if (!appId || !secret) throw new Error(connectorWording().qqKeys);
+      if (!appId || !secret) throw new Error(t("server.connector.qqKeys"));
       await api.check(signal, { appId, secret });
       return { secrets: { appId, secret }, owner: "" };
     },
     receive: async (signal, secrets, io) => {
       try {
         await api.listen(signal, appOf(secrets), (m) => {
-          const parts = [m.content.trim(), m.attachments > 0 ? connectorWording().media.attachment : ""].filter(Boolean);
+          const parts = [m.content.trim(), m.attachments > 0 ? t("server.connector.media.attachment") : ""].filter(Boolean);
           return io.accept([{ id: m.id, from: m.from, text: parts.join("\n"), reply: m.id }], "");
         });
         return undefined;
@@ -351,7 +351,7 @@ export const make = (options: ConnectorOptions = {}) =>
         const r = row.value;
         const secrets = Schema.decodeUnknownOption(Schema.fromJsonString(Secrets))(r.secrets);
         if (Option.isNone(secrets)) {
-          setErr(connectorWording().unreadSecrets);
+          setErr(t("server.connector.unreadSecrets"));
           yield* Effect.logError(`vibevalley: ${id}: the saved secrets cannot be read`);
         }
         account = {
@@ -426,7 +426,7 @@ export const make = (options: ConnectorOptions = {}) =>
       const pause = Effect.gen(function* () {
         yield* run(accountQ.pauseAccount({ paused_until: now() + stalePauseMs, connector: id }));
         yield* reload;
-        setErr(connectorWording().expired);
+        setErr(t("server.connector.expired"));
         return true;
       }).pipe(
         Effect.catch((e) =>
@@ -555,7 +555,7 @@ export const make = (options: ConnectorOptions = {}) =>
           );
           // Told once the owner has the word: the status is not paired before the app's confirmation went out.
           yield* reloadAccount;
-          yield* send(a.secrets, m.from, connectorWording().paired, m.reply ?? "");
+          yield* send(a.secrets, m.from, t("server.connector.paired"), m.reply ?? "");
           told();
           return;
         }
@@ -655,7 +655,7 @@ export const make = (options: ConnectorOptions = {}) =>
             continue;
           }
           const stopped = yield* receive(a.secrets).pipe(
-            Effect.map((f): Failure => f ?? { kind: "failed", reason: connectorWording().stopped }),
+            Effect.map((f): Failure => f ?? { kind: "failed", reason: t("server.connector.stopped") }),
             Effect.catch((e) => Effect.succeed<Failure>({ kind: "failed", reason: e.message })),
           );
           if (stopped.kind === "stale") {
@@ -715,7 +715,7 @@ export const make = (options: ConnectorOptions = {}) =>
                       }),
                     );
                     yield* db(inboundQ.clearInbound({ connector: id }));
-                    yield* retire(connectorWording().switched);
+                    yield* retire(t("server.connector.switched"));
                   }),
                 ).pipe(Effect.andThen(Effect.sync(() => outboxChanged(() => 0))), Effect.andThen(reload)),
               );
@@ -800,7 +800,7 @@ export const make = (options: ConnectorOptions = {}) =>
                   Effect.gen(function* () {
                     yield* db(accountQ.disconnectAccount({ connector: id }));
                     yield* db(inboundQ.clearInbound({ connector: id }));
-                    yield* retire(connectorWording().disconnected);
+                    yield* retire(t("server.connector.disconnected"));
                   }),
                 ),
               );
@@ -860,13 +860,13 @@ export const make = (options: ConnectorOptions = {}) =>
         if (!b)
           return yield* Effect.fail<ApiError>({
             _tag: "ConnectorRefused",
-            reason: connectorWording().noConnector(id),
+            reason: t("server.connector.noConnector", { id }),
           });
         const channel = yield* chat.channelByName(name);
         if (!channel)
           return yield* Effect.fail<ApiError>({
             _tag: "ConnectorRefused",
-            reason: connectorWording().noChannel(name),
+            reason: t("server.connector.noChannel", { name }),
           });
         return yield* Effect.mapError(b.setChannel(channel.id !== chat.defaultChannel() ? channel.id : undefined), (e): ApiError => ({
           _tag: "ConnectorRefused",

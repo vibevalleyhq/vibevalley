@@ -1,6 +1,6 @@
+import { t } from "@vibevalley/i18n";
 // What a run cost and said. One run takes in its tool turns and the inputs that came while it went on.
 
-import { agentWording } from "../words.ts";
 import { type AssistantMessage, type Usage, zeroUsage } from "../../ai/messages.ts";
 import { messageText } from "./messages.ts";
 
@@ -81,7 +81,7 @@ export class RunAccounting {
       usage: addUsage(this.current.usage, m.usage ?? zeroUsage()),
       contextTokens: contextOf(m),
       text: text !== "" ? text : this.current.text,
-      error: m.stopReason === "error" ? m.errorMessage || agentWording().modelFailed : "",
+      error: m.stopReason === "error" ? m.errorMessage || t("server.agent.modelFailed") : "",
       aborted: m.stopReason === "aborted",
     };
   }

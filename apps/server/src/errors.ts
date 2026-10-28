@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // The tagged errors the API answers with (@vibevalley/protocol/api), made where a service refuses.
 
 import { gatewayWording } from "./words.ts";
@@ -37,7 +38,7 @@ export const lookIn = {
 } satisfies Record<string, Next>;
 
 /** Where an agent's memories are listed. */
-export const memoriesOf = (agent: string): Next => ({ say: gatewayWording().lookIn.memories, run: commandOf("memory.list", [agent]) });
+export const memoriesOf = (agent: string): Next => ({ say: t("server.lookIn.memories"), run: commandOf("memory.list", [agent]) });
 
 /** An error's words, whatever its tag. */
 export const reasonOf = (e: ApiError): string =>

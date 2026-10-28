@@ -1,0 +1,10 @@
+{
+  "open": "打开农场",
+  "quit": "退出",
+  "cannotStart": "VibeValley 起不来",
+  "seeLog": "{reason}，日志在 {log}",
+  "noAddress": "服务端 {seconds} 秒内没有发布就绪地址",
+  "failed": "服务端启动失败：{why}",
+  "exited": "服务端退出了（{code}）",
+  "waiting": "{n} 等你"
+}

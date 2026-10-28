@@ -200,28 +200,14 @@ function templateOf(fn: Function): string | undefined {
     }
   };
   const a = call(names.map((_, i) => sentinel(i)));
-  const one = call(names.map(() => 1));
-  const two = call(names.map(() => 2));
-  if (a === undefined || one === undefined || two === undefined) return undefined;
-  // A param read as an object or a list shows up as undefined or [object …]: not a template.
-  if ([a, one, two].some((r) => /undefined|NaN|\[object /.test(r))) return undefined;
-  // A message that depends on the value (a plural, a comparison) is not a template.
-  const shape = (s: string, n: string) => s.split(n).join("#");
-  if (shape(one, "1") !== shape(two, "2")) return undefined;
+  if (a === undefined || /undefined|NaN|\[object /.test(a)) return undefined;
   let text = a;
   names.forEach((n, i) => (text = text.split(sentinel(i)).join(`{${n}}`)));
   if (text.includes("\u0001")) return undefined;
-  // A param that picks a branch (a flag, an optional value) answers differently when it is empty or missing.
+  // A template answers every value by putting it in as it is: a count that picks a plural, a flag or an optional value
+  // that picks a branch, or a param read as an object answers otherwise.
   const filled = (v: string) => names.reduce((s, n) => s.split(`{${n}}`).join(v), text);
-  if (call(names.map(() => "")) !== filled("") || call(names.map(() => undefined)) !== filled("undefined")) return undefined;
-  if (
-    shape(one, "1") !==
-    shape(
-      names.reduce((s, n) => s.split(`{${n}}`).join("1"), text),
-      "1",
-    )
-  )
-    return undefined;
+  for (const v of [1, 2, 7, "x", "", undefined]) if (call(names.map(() => v)) !== filled(String(v))) return undefined;
   return text;
 }
 
@@ -259,7 +245,9 @@ function choiceOf(fn: Function): string | undefined {
     const yes = call(others(i, true));
     const no = call(others(i, false));
     // A param put into the text as it is prints true or false: that is a value, not a flag.
-    if (yes !== undefined && no !== undefined && yes !== no && !/true|false/.test(yes + no)) {
+    // A flag: whatever truthy value comes, the same text (a count or a delay that only looks like one shows itself).
+    const truthy = [7, 5000, "x"].every((v) => call(others(i, v)) === yes);
+    if (yes !== undefined && no !== undefined && yes !== no && truthy && !/true|false/.test(yes + no)) {
       const message = `{${n}, select, true {${named(yes)}} other {${named(no)}}}`;
       if (agrees(message, [others(i, true), others(i, false)])) return message;
     }

@@ -1,0 +1,6 @@
+{
+  "label": "管家",
+  "noKey": "我还没有 DeepSeek 的钥匙，想不了事。到首页的「设置」里填上 DeepSeek 的 API Key（工作台左栏最下面的「设置」也能去），填好再跟我说一遍。",
+  "cannotStart": "我这边起不来：{why}",
+  "onlyDeepseek": "管家只接 DeepSeek 的模型：管家档案的模型设成 deepseek/<模型> 或直接写模型名，{configured} 用不了"
+}

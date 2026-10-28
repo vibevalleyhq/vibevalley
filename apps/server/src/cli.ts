@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 // VibeValley's command line, on effect/cli. With no command: VibeValley's own agent in a terminal (cli/chat.ts).
 // `runtime chat <runtime>` talks to another runtime the same way. Every other command is one of the endpoints
 // (cli/api.ts), called over HTTP: its answer is JSON on stdout; a failure is JSON on stderr with what to do next, and an
@@ -8,7 +9,7 @@
 //	node --import tsx src/cli.ts issue list
 
 import "./cli/locale.ts";
-import { cliWording } from "./cli/words.ts";
+
 import { Cause, Console, Effect, Exit, Option, type Stdio } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
@@ -29,16 +30,16 @@ const chat = (talk: () => Promise<void>) =>
     Effect.tryPromise({ try: talk, catch: (e) => new Failure({ code: exit.other, tag: "Chat", text: e instanceof Error ? e.message : String(e) }) }),
   );
 
-const prompt = text("prompt", cliWording().flag.prompt).pipe(Flag.withAlias("p"));
+const prompt = text("prompt", t("server.cli.flag.prompt")).pipe(Flag.withAlias("p"));
 
 const runtimeChatCommand = Command.make(
   "chat",
   {
-    runtime: Argument.String("runtime").pipe(Argument.withDescription(cliWording().flag.runtime)),
-    model: text("model", cliWording().flag.model),
-    effort: text("effort", cliWording().flag.effort),
-    resume: text("resume", cliWording().flag.resume),
-    cwd: text("cwd", cliWording().flag.cwd),
+    runtime: Argument.String("runtime").pipe(Argument.withDescription(t("server.cli.flag.runtime"))),
+    model: text("model", t("server.cli.flag.model")),
+    effort: text("effort", t("server.cli.flag.effort")),
+    resume: text("resume", t("server.cli.flag.resume")),
+    cwd: text("cwd", t("server.cli.flag.cwd")),
     prompt,
   },
   (o) =>
@@ -51,21 +52,21 @@ const runtimeChatCommand = Command.make(
         ...asked(o.prompt),
       }),
     ),
-).pipe(Command.withDescription(cliWording().command.runtimeChat));
+).pipe(Command.withDescription(t("server.cli.command.runtimeChat")));
 
 const root = Command.make(
   "vibevalley",
   {
-    cwd: text("cwd", cliWording().flag.ownCwd),
-    name: text("name", cliWording().flag.name),
-    model: text("model", cliWording().flag.ownModel),
-    mcp: text("mcp", cliWording().flag.mcp),
+    cwd: text("cwd", t("server.cli.flag.ownCwd")),
+    name: text("name", t("server.cli.flag.name")),
+    model: text("model", t("server.cli.flag.ownModel")),
+    mcp: text("mcp", t("server.cli.flag.mcp")),
     prompt,
   },
   (o) =>
     chat(() => ownChat({ cwd: some(o.cwd) ?? "", name: some(o.name) ?? "vibevalley", model: some(o.model) ?? "", mcp: some(o.mcp) ?? "", ...asked(o.prompt) })),
 ).pipe(
-  Command.withDescription(cliWording().command.root),
+  Command.withDescription(t("server.cli.command.root")),
   Command.withSubcommands([...groupCommands({ issue: [issueWorkCommand], runtime: [runtimeChatCommand] }), stateCommand, eventsCommand] as never),
   Command.withGlobalFlags([ServerFlag, DryRunFlag]),
 );
@@ -77,8 +78,8 @@ function usageOf(e: CliError.CliError): Failure {
   return new Failure({
     code: exit.usage,
     tag: errors[0]?._tag ?? e._tag,
-    text: errors.map((x) => x.message).join(cliWording().and) || e.message,
-    next: [{ say: cliWording().next.help, run: [...path, "--help"] }],
+    text: errors.map((x) => x.message).join(t("server.cli.and")) || e.message,
+    next: [{ say: t("server.cli.next.help"), run: [...path, "--help"] }],
   });
 }
 

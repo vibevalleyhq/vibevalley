@@ -1,0 +1,28 @@
+{
+  "doc": "文档 {id}",
+  "untitled": "没起名的文档",
+  "otherDoc": "这批改动（{batch}）是另一篇文档的",
+  "noBatch": "这批改动没有 batchId",
+  "demoNotInserted": "演示的块没插进去：{status}",
+  "noWriter": "没有能写的帮工：先在档案里打开一个",
+  "demoRunning": "演示正在写，写完再点",
+  "notApplied": "这一块没写进去",
+  "op": {
+    "deleted": "这一块已经删掉了",
+    "noAttr": "没有属性 {name}",
+    "noBlock": "没有块 {id}",
+    "noId": "新块没有 id",
+    "taken": "块 {id} 已经有了",
+    "unknownType": "不认识的块类型 {type}",
+    "badKey": "不是有效的顺序键：{key}",
+    "missing": "没有这一块",
+    "unknownOp": "不认识的改动 {op}",
+    "noText": "这一块没有字",
+    "noRev": "没有第 {rev} 版",
+    "changed": "这一块刚被别人改过",
+    "underSelf": "不能挪到自己下面",
+    "splitAtEnd": "这一块刚被别人改过，从末尾拆开了",
+    "splitOutside": "拆分位置 {at} 不在字里（{length} 个字）",
+    "intoSelf": "不能并进自己"
+  }
+}
