@@ -47,6 +47,10 @@ export interface RtcLine {
 /** grant: the server's for the call (voice.session). */
 export type Rtc = (grant: AgoraGrant, events: RtcEvents) => Promise<RtcLine>;
 
+/** The farm's picture in art pixels (apps/web/public/village.ldtk) and how much of it may be cut off on each side when it
+ * is scaled by a whole number: the page frames the farm by it, and the desktop keeps its window at a size the farm fills. */
+export const farmFraming = { picture: { w: 384, h: 256 }, cut: { across: 0.05, down: 0.08 } } as const;
+
 export interface Host {
   /** For logs and the about box only. */
   readonly name: "desktop" | "mobile" | "browser";

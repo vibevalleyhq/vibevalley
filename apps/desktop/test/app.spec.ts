@@ -61,6 +61,15 @@ test("the desktop app shows the live board and sends a notice", async () => {
     // On macOS the window's buttons sit over the rail's top: the rail reaches past the last of them.
     const titleBar = await page.evaluate(() => (window as unknown as { vibevalleyHost: { titleBar: { left: number } | null } }).vibevalleyHost.titleBar);
     if (titleBar) expect((await page.getByRole("navigation", { name: "工作台" }).boundingBox())?.width).toBeGreaterThan(titleBar.left);
+    // Between two whole scales the farm would have bars around it: when a resize ends, the window takes the nearest size
+    // it fills.
+    const resized = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]!;
+      w.setContentSize(1220, 813);
+      w.emit("resized");
+      return w.getContentSize();
+    });
+    expect(resized).toEqual([1152, 768]);
 
     await page.screenshot({ path: test.info().outputPath("desktop.png") });
   } finally {
