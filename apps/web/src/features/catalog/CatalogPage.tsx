@@ -73,6 +73,7 @@ export function CatalogPage(props: { rest: string }) {
           <A
             href={t.to}
             role="tab"
+            data-key={t.id}
             aria-selected={aria(t.id === shelf())}
             class={[
               "flex h-[26px] flex-1 items-center justify-center rounded-md text-sm",

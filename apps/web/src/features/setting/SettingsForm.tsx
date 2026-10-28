@@ -350,6 +350,7 @@ export function LanguageChoice() {
       <Show when={error()}>{(e) => <Hint text={e()} />}</Show>
       <Segmented
         label={t("web.setting.language.label")}
+        testid="language"
         value={currentLocale()}
         options={LocaleValues.map((l) => ({ value: l, label: t(`web.setting.language.${l}`), disabled: busy() }))}
         onChange={(l) => void choose(l)}

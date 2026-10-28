@@ -80,6 +80,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
           <button
             type="button"
             role="tab"
+            data-key={t.id}
             aria-selected={aria(t.id === at())}
             onClick={() => router.navigate(orchestratorHref(props.agent, t.id))}
             class={["h-8 cursor-pointer rounded-md px-3 text-base", t.id === at() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}

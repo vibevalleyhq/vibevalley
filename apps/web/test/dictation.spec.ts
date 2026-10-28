@@ -7,6 +7,8 @@ import { expect, test } from "./fixtures";
 
 type Counted = Window & { heard: number };
 
+const said = "hello there";
+
 test.use({
   farm: "dictation",
   permissions: ["microphone"],
@@ -21,7 +23,7 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
     req.on("end", () => {
       uploads.push(Buffer.concat(parts));
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ text: "你好" }));
+      res.end(JSON.stringify({ text: said }));
     });
   });
   await new Promise<void>((resolve) => transcriber.listen(0, "127.0.0.1", resolve));
@@ -41,12 +43,13 @@ test("dictation records the microphone as 16 kHz WAV and puts the words in the f
       localStorage.setItem("vibevalley.title.seen", "true");
     });
     await page.goto("/chat");
-    const dictate = page.getByRole("button", { name: "听写" });
+    const dictate = page.getByTestId("dictate");
     await expect(dictate).toBeEnabled();
     await dictate.click();
     await expect.poll(() => page.evaluate(() => (window as unknown as Counted).heard)).toBeGreaterThan(2);
-    await page.getByRole("button", { name: "停下听写" }).click();
-    await expect(page.locator("textarea")).toHaveValue(/你好/);
+    await expect(dictate).toHaveAttribute("data-state", "recording");
+    await dictate.click();
+    await expect(page.locator("textarea")).toHaveValue(new RegExp(said));
 
     expect(uploads).toHaveLength(1);
     const wav = uploads[0]!.subarray(uploads[0]!.indexOf("RIFF"));

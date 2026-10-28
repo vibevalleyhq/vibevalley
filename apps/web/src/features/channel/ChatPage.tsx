@@ -227,6 +227,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <button
               type="button"
               role="tab"
+              data-key={entry.tab}
               aria-selected={aria(tab() === entry.tab)}
               onClick={() => setTab(entry.tab)}
               class={[

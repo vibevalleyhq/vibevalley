@@ -174,6 +174,7 @@ export function SowForm(props: { station: number; onDone: () => void }) {
                     <button
                       type="button"
                       role="tab"
+                      data-key={k().kind.id}
                       aria-selected={aria(k().kind.id === kind()?.kind.id)}
                       onClick={() => setKindId(k().kind.id)}
                       class={[

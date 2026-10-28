@@ -433,6 +433,7 @@ function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo; patch: Patch; 
             <button
               type="button"
               role="tab"
+              data-key={t}
               aria-selected={aria(t === tab())}
               onClick={() => (t === "trajectories" ? props.onTrajectories() : setTab(t))}
               class={["h-7 cursor-pointer rounded-md px-2.5 text-sm", t === tab() ? "bg-selected font-semibold" : "text-muted hover:bg-hover hover:text-ink"]}

@@ -7,13 +7,20 @@ export function Segmented<T extends string>(props: {
   onChange: (v: T) => void;
   label: string;
   block?: boolean;
+  testid?: string;
 }) {
   return (
-    <div role="group" aria-label={props.label} class={["inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}>
+    <div
+      role="group"
+      aria-label={props.label}
+      data-testid={props.testid}
+      class={["inline-flex flex-wrap gap-0.5 rounded-md bg-hover p-0.5", { "flex w-full": !!props.block }]}
+    >
       <For each={props.options}>
         {(o) => (
           <button
             type="button"
+            data-key={o.value}
             aria-pressed={aria(o.value === props.value)}
             disabled={o.disabled}
             title={o.title}

@@ -1,7 +1,7 @@
 // A real server per worker (apps/server) on a free port with a temporary home and work root, serving
 // dist/ at /. Tests drive the page with `page` (its baseURL is the server) and set things up with `api`.
 
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -117,6 +117,9 @@ export async function settled(page: Page) {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
 }
+
+/** A tab by what it is (its data-key), not by what it says. */
+export const tab = (scope: Page | Locator, key: string) => scope.locator(`[role="tab"][data-key="${key}"]`);
 
 /** A gate a route waits at until the test opens it: a slow server is slow until the test has seen what it wanted. */
 export function gate() {

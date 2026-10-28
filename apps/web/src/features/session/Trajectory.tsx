@@ -234,7 +234,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
   const failed = () => (tool() && step().ok === false) || step().type === "run/error";
   const sub = () => step().under !== undefined;
   return (
-    <div ref={(el) => props.refTo(el)} class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}>
+    <div
+      ref={(el) => props.refTo(el)}
+      data-testid="step"
+      data-type={step().type}
+      class={["rounded-md py-[3px] pr-2", props.marked ? "bg-wheat/35" : "hover:bg-hover"]}
+    >
       <button
         type="button"
         aria-label={`${props.spec.tag} ${oneLine(step().text)}`}
