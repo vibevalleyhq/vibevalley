@@ -18,7 +18,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
       onClose={() => props.onClose()}
       onClick={(e) => e.target === dialog && props.onClose()}
       class={[
-        "m-auto rounded-lg border border-line bg-page p-0 text-ink shadow-float backdrop:bg-[#2f1f1340]",
+        "m-auto rounded-lg border border-line bg-page p-0 text-ink shadow-float backdrop:bg-scrim",
         props.wide ? "w-[min(1080px,94vw)]" : "w-[min(480px,92vw)]",
       ]}
     >

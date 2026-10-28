@@ -3,7 +3,7 @@
 
 import { type Effect, Schema } from "effect";
 import type * as T from "./shapes";
-import { pathOf } from "./shapes";
+import { pathOf, type VoiceFix, VoiceFixValues } from "./shapes";
 import * as S from "./schema";
 
 export type Caller = "owner" | "remote" | "orchestrator" | "session";
@@ -29,7 +29,7 @@ export interface Missing {
 }
 
 /** A 设置 section a voice problem is fixed in (the page's /settings/<section>). */
-export type VoiceFix = "deepseek" | "voice";
+export type { VoiceFix } from "./shapes";
 
 export interface VoiceUnavailable {
   readonly _tag: "VoiceUnavailable";
@@ -77,7 +77,7 @@ export const ApiError: Schema.Codec<ApiError> = Schema.Union([
   Schema.Struct({
     _tag: Schema.tag("VoiceUnavailable"),
     reason: Schema.String,
-    settings: Schema.optionalKey(Schema.Literals(["deepseek", "voice"])),
+    settings: Schema.optionalKey(Schema.Literals(VoiceFixValues)),
   }),
   reasonOf("VoiceAgentFailed"),
   reasonOf("ConnectorRefused"),

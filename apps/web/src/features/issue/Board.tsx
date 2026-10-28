@@ -255,7 +255,7 @@ function CardView(props: { card: BoardCard; selected: boolean; onOpen: (id: stri
         }}
         class={[
           "group cursor-pointer rounded-lg border px-2.5 pt-2 pb-2 transition-colors",
-          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-[#2f1f132e] hover:shadow-[0_1px_3px_#2f1f1314]",
+          props.selected ? "border-line bg-selected" : "border-line bg-page hover:border-ink/18 hover:shadow-[0_1px_3px_#2f1f1314]",
           { "opacity-40": props.drag.dragging()?.id === props.card.id },
         ]}
       >

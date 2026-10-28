@@ -343,9 +343,9 @@ function Marked(props: { spans: readonly DocSpan[] }) {
         const cls = {
           "font-semibold": !!s.marks.bold,
           italic: !!s.marks.italic,
-          "rounded bg-[#2f1f1314] px-0.5 font-mono": !!s.marks.code,
+          "rounded bg-ink/8 px-0.5 font-mono": !!s.marks.code,
           "line-through": !!s.marks.strike,
-          "text-[#3f6e2a] underline": !!s.marks.link,
+          "text-ok-ink underline": !!s.marks.link,
         };
         return (
           <Show when={s.marks.link} fallback={<span class={cls}>{s.t}</span>}>

@@ -1,6 +1,13 @@
 import type { SessionAction } from "@vibevalley/protocol";
 import {
   Add,
+  Book,
+  Call,
+  Key,
+  Laptop,
+  Notebook,
+  Palette,
+  SoundwaveCircle,
   AngleRight,
   Archive,
   ArrowLeft,
@@ -118,6 +125,13 @@ export const icons = {
   plug: Plug,
   idea: Lightbulb,
   bolt: Bolt,
+  appearance: Palette,
+  key: Key,
+  memory: Book,
+  skill: Notebook,
+  call: Call,
+  realtime: SoundwaveCircle,
+  devices: Laptop,
 } satisfies Record<string, IconFunction>;
 
 export type IconName = keyof typeof icons;

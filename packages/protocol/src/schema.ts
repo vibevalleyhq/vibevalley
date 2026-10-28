@@ -1595,6 +1595,8 @@ export const Locale: Codec<T.Locale> = Schema.Literals(T.LocaleValues);
 
 export const SettingsStatus: Codec<T.SettingsStatus> = Schema.Struct({
   file: Schema.String,
+  home: Schema.String,
+  version: Schema.String,
   locale: Locale,
   deepseekApiKey: KeyStatus,
   agoraAppId: AgoraAppID,

@@ -120,7 +120,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo; r
             <span class="shrink-0 rounded bg-hover px-1.5 text-xs text-muted">{t(`web.agent.role.${template().role}`)}</span>
           </span>
           <span class="line-clamp-2 text-sm text-muted">{template().duty}</span>
-          <span class={["text-xs", here() ? "text-[#3f6427]" : "text-[#b8682a]"]}>
+          <span class={["text-xs", here() ? "text-ok-ink" : "text-warn-ink"]}>
             {orchestrator()
               ? t("web.agent.templates.onServer")
               : here()

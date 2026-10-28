@@ -58,6 +58,11 @@ test("the desktop app shows the live board and sends a notice", async () => {
         () => (window as unknown as { vibevalleyHost: { voiceShortcut: { accelerator: string } | null } }).vibevalleyHost.voiceShortcut?.accelerator,
       ),
     ).toBe("Alt+Shift+Space");
+    // The window's own parts follow the theme the page chose (设置 › 外观).
+    await page.evaluate(() => (window as unknown as { vibevalleyHost: { theme: (t: string) => void } }).vibevalleyHost.theme("dark"));
+    await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe("dark");
+    await page.evaluate(() => (window as unknown as { vibevalleyHost: { theme: (t: string) => void } }).vibevalleyHost.theme("system"));
+    await expect.poll(() => app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe("system");
     // The menu bar speaks the farm's language, and follows it when the page loads in another.
     const menu = () => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((i) => i.label) ?? []);
     expect(await menu()).toContain("编辑");

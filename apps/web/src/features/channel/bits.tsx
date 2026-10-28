@@ -8,7 +8,7 @@ import type { IconName } from "../../ui/icons";
 import { useAgent } from "../../base/agents";
 import { useCore } from "../../base/frame";
 
-const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-[#c8a46e]" };
+const dotColor: Record<DotTone | "idle", string> = { leaf: "bg-leaf", berry: "bg-berry", wheat: "bg-wheat", idle: "bg-idle" };
 
 /** A phase or the orchestrator's mood: a round dot ringed in the page colour. */
 export function Dot(props: { tone: DotTone | "idle"; size?: number; class?: string }) {

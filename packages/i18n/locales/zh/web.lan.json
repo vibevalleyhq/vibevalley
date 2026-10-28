@@ -1,8 +1,7 @@
 {
   "lan": {
     "section": {
-      "label": "连接到本机",
-      "line": "手机和别的电脑"
+      "label": "连接到本机"
     },
     "open": "开着",
     "closed": "关着",

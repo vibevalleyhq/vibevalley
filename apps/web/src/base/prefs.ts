@@ -1,24 +1,45 @@
-// This machine's choices that the workbench and the farm both read: who the next job goes to and the pet by the
-// orchestrator's door (its look is its profile's). Kept in localStorage; without storage they last until the page closes.
+// This machine's choices, not the farm's: who the next job goes to, the pet by the orchestrator's door (its look is its
+// profile's), and how the workbench looks and where the page opens. A phone and a desktop may want them apart, so they are
+// kept in localStorage, not settings.json; without storage they last until the page closes.
 
+import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 import type { Accessor } from "solid-js";
 import { createExternal } from "./external";
+
+/** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
+export const ScaleValues = [90, 100, 110, 125] as const;
+export type Scale = (typeof ScaleValues)[number];
+
+/** Where / opens. */
+export const StartValues = ["workbench", "farm"] as const;
+export type Start = (typeof StartValues)[number];
 
 export interface Prefs {
   /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose. */
   readonly pick: string;
   readonly pet: string;
+  readonly theme: ThemeChoice;
+  readonly scale: Scale;
+  readonly start: Start;
 }
 
 const key = "vibevalley.prefs";
 
-const fallback: Prefs = { pick: "auto", pet: "dog" };
+const fallback: Prefs = { pick: "auto", pet: "dog", theme: "system", scale: 100, start: "workbench" };
+
+const oneOf = <T>(values: readonly T[], v: unknown, d: T): T => (values.includes(v as T) ? (v as T) : d);
 
 function load(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(key) ?? "{}") as Partial<Record<keyof Prefs, unknown>>;
     const text = (v: unknown, d: string) => (typeof v === "string" && v !== "" ? v : d);
-    return { pick: text(raw.pick, fallback.pick), pet: text(raw.pet, fallback.pet) };
+    return {
+      pick: text(raw.pick, fallback.pick),
+      pet: text(raw.pet, fallback.pet),
+      theme: oneOf(ThemeChoiceValues, raw.theme, fallback.theme),
+      scale: oneOf(ScaleValues, raw.scale, fallback.scale),
+      start: oneOf(StartValues, raw.start, fallback.start),
+    };
   } catch {
     return fallback;
   }
@@ -36,7 +57,7 @@ export const subscribePrefs = (l: () => void) => {
 
 function set(patch: Partial<Prefs>) {
   const next = { ...prefs, ...patch };
-  if (next.pick === prefs.pick && next.pet === prefs.pet) return;
+  if ((Object.keys(next) as (keyof Prefs)[]).every((k) => next[k] === prefs[k])) return;
   prefs = next;
   try {
     localStorage.setItem(key, JSON.stringify(prefs));
@@ -48,6 +69,9 @@ function set(patch: Partial<Prefs>) {
 
 export const setPick = (pick: string) => set({ pick });
 export const setPet = (pet: string) => set({ pet });
+export const setTheme = (theme: ThemeChoice) => set({ theme });
+export const setScale = (scale: Scale) => set({ scale });
+export const setStart = (start: Start) => set({ start });
 
 /** One of the choices, following it. */
 export function usePrefs<T>(select: (p: Prefs) => T): Accessor<T> {

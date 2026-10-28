@@ -45,6 +45,10 @@ export const eventsPath = "/api/v1/events";
 
 export const livePath = "/api/v1/live";
 
+/** The 设置 section a call's problem is fixed in (VoiceUnavailable.settings): its address under /settings. */
+export const VoiceFixValues = ["models", "call", "dictation"] as const;
+export type VoiceFix = (typeof VoiceFixValues)[number];
+
 /** A page's line to MOSS Live: a WebSocket the server relays to wss://api.mosi.cn/v1/realtime with the saved key. The
  * page speaks MOSS's protocol: JSON actions, and binary frames whose first byte is 0x00 for audio (16 kHz mono PCM up,
  * 48 kHz down). */
@@ -1535,6 +1539,9 @@ export { LocaleValues, type Locale } from "@vibevalley/i18n";
 
 export interface SettingsStatus {
   file: string;
+  /** The farm's home ($VIBEVALLEY_HOME) and the server's version, for 关于. */
+  home: string;
+  version: string;
   locale: Locale;
   deepseekApiKey: KeyStatus;
   agoraAppId: AgoraAppID;

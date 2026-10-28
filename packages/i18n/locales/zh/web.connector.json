@@ -1,8 +1,7 @@
 {
   "connectors": {
     "section": {
-      "label": "连接器",
-      "line": "微信 飞书 QQ"
+      "label": "连接器"
     },
     "label": {
       "weixin": "微信",

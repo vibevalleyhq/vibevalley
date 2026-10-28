@@ -1,21 +1,4 @@
 {
-  "sections": {
-    "title": "设置",
-    "label": "设置的分区",
-    "deepseek": {
-      "line": "管家用的钥匙"
-    },
-    "language": {
-      "label": "语言",
-      "line": "界面和管家说哪种话"
-    },
-    "memory": {
-      "label": "记性"
-    },
-    "github": {
-      "line": "gh 和登录，能不能提 PR"
-    }
-  },
   "language": {
     "title": "语言",
     "line": "界面上的字、管家和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
@@ -50,6 +33,89 @@
   "github": {
     "noGh": "没装 gh",
     "note": "能提 PR 的项目在「项目」里看；完成时提 PR 要在配置里打开（github.pr_projects）。",
-    "recheck": "重新检测"
+    "recheck": "重新检测",
+    "cli": "gh 命令行",
+    "cliHint": "合并时开 PR、读仓库用它",
+    "login": "登录",
+    "loginHint": "gh auth login 登录的账号",
+    "notLoggedIn": "没登录"
+  },
+  "nav": {
+    "label": "设置的分区",
+    "search": "搜索设置…",
+    "general": "通用",
+    "appearance": "外观",
+    "models": "模型",
+    "about": "关于",
+    "memory": "记性",
+    "skills": "技能",
+    "call": "通话线路",
+    "dictation": "听写",
+    "chat": "聊天软件",
+    "devices": "设备"
+  },
+  "groups": {
+    "options": "选项",
+    "helpers": "帮工",
+    "voice": "语音",
+    "connect": "连接"
+  },
+  "words": {
+    "general": "语言 language 启动 打开 工作台 农场",
+    "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
+    "models": "DeepSeek key 钥匙 模型 管家",
+    "about": "版本 家目录 设置文件 version",
+    "memory": "Nowledge EverOS 记性 记忆",
+    "skills": "技能 skill",
+    "call": "声网 Agora 电话 识别 合成 谁接电话 区域",
+    "moss": "MOSS 试音 key 实时",
+    "dictation": "听写 转写 语音输入",
+    "github": "gh PR 登录",
+    "chat": "微信 飞书 QQ 连接器 配对",
+    "devices": "手机 配对 连接到本机 局域网"
+  },
+  "scope": {
+    "farm": "对整个农场",
+    "device": "只对这台设备"
+  },
+  "general": {
+    "languageHint": "界面、管家和帮工说的话都用它",
+    "start": "启动时打开",
+    "startHint": "打开应用、或者打开首页时先进哪里",
+    "starts": {
+      "workbench": "工作台",
+      "farm": "农场"
+    }
+  },
+  "appearance": {
+    "intro": "只改工作台；农场、记忆树是画出来的，有自己的颜色和昼夜。",
+    "theme": "主题",
+    "themeHint": "跟随系统时随电脑的浅色和深色变",
+    "themes": {
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    },
+    "scale": "界面大小",
+    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变"
+  },
+  "models": {
+    "intro": "管家和 VibeValley 自己的帮工用的模型。",
+    "deepseekHint": "管家和 VibeValley 自己的帮工用它"
+  },
+  "memory": {
+    "intro": "帮工还能去外面的记性里查、往里记。"
+  },
+  "about": {
+    "version": "版本",
+    "versionHint": "这台电脑上的服务端",
+    "files": "文件",
+    "home": "家目录",
+    "homeHint": "农场的一切都在这里",
+    "settings": "设置文件",
+    "settingsHint": "钥匙和这几页的设置",
+    "copy": "复制路径",
+    "copied": "路径复制好了",
+    "reveal": "在访达里显示"
   }
 }

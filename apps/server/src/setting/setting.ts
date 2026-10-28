@@ -127,6 +127,8 @@ export const make = Effect.gen(function* () {
     const certificate = pick(s.agoraAppCertificate, fromConfig.certificate);
     return {
       file,
+      home: config.home,
+      version: config.version,
       locale: s.locale ?? "zh",
       deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : {},
       agoraAppId: appId ? { source: appId[1], value: appId[0] } : {},

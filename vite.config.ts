@@ -226,6 +226,13 @@ export default defineConfig({
         },
       },
       {
+        // The workbench's colours follow the theme (scripts/oxlint-plugin.ts, no-hex-color); the pixel skin and the
+        // avatars are drawn and keep theirs.
+        files: ["apps/web/src/**"],
+        excludeFiles: ["apps/web/src/farm/**", "apps/web/src/tree/**", "apps/web/src/ui/pixel/**", "apps/web/src/ui/Face.tsx", "apps/web/src/**/*.test.ts"],
+        rules: { "vibevalley/no-hex-color": "error" },
+      },
+      {
         // The page's layers and its features' indexes (scripts/oxlint-plugin.ts, page-layers).
         files: ["apps/web/src/**"],
         rules: { "vibevalley/page-layers": "error" },

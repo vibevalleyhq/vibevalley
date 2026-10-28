@@ -1,8 +1,7 @@
 {
   "lan": {
     "section": {
-      "label": "Connect to this machine",
-      "line": "Phones and other computers"
+      "label": "Connect to this machine"
     },
     "open": "On",
     "closed": "Off",

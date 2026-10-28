@@ -1,8 +1,7 @@
 {
   "connectors": {
     "section": {
-      "label": "Connectors",
-      "line": "WeChat, Feishu, QQ"
+      "label": "Connectors"
     },
     "label": {
       "weixin": "WeChat",

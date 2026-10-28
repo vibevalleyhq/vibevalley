@@ -79,10 +79,6 @@
   "unreported": "不报告。",
   "none": "没有。",
   "library": {
-    "section": {
-      "label": "技能",
-      "line": "帮工能带的技能"
-    },
     "book": "技能书",
     "search": "搜索技能",
     "searchHint": "搜名字、说明、农机……",

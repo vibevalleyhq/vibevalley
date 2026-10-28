@@ -69,7 +69,16 @@ export interface Host {
   /** Told the language the page speaks when it loads, so the host's own words (the tray's menu, the island, its dialogs)
    * match; null where the host says nothing of its own. */
   readonly locale: ((locale: Locale) => void) | null;
+  /** Shows a file or folder on this machine in the system's file manager; null where the host cannot. */
+  readonly reveal: ((path: string) => void) | null;
+  /** Told the theme the page chose, so the host's own parts (menus, scroll bars, the title strip) follow; null where the
+   * host draws nothing of its own. */
+  readonly theme: ((theme: ThemeChoice) => void) | null;
 }
+
+/** Light, dark, or as the system is. */
+export const ThemeChoiceValues = ["light", "dark", "system"] as const;
+export type ThemeChoice = (typeof ThemeChoiceValues)[number];
 
 /** The property a host's preload (or injected script) sets on window. */
 export const hostKey = "vibevalleyHost";
@@ -117,6 +126,9 @@ export function mobileHost(post: (m: ToNative) => void) {
     titleBar: null,
     // The phone's shell speaks the phone's language (apps/mobile words.ts).
     locale: null,
+    // Files on the phone are not the farm's; the phone's status bar follows the system's theme.
+    reveal: null,
+    theme: null,
     rtc: async (grant, on) => {
       const line = next;
       active = { line, events: on };

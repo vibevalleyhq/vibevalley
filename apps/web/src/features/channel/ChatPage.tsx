@@ -82,7 +82,7 @@ function Chat() {
       <div class="hidden w-72 shrink-0 md:flex">{sidebar()}</div>
       <Show when={drawer()}>
         <div class="absolute inset-0 z-30 md:hidden">
-          <div class="absolute inset-0 bg-[#2f1f1340]" onClick={() => setDrawer(false)} />
+          <div class="absolute inset-0 bg-scrim" onClick={() => setDrawer(false)} />
           <div class="absolute inset-y-0 left-0 flex w-72 shadow-float transition-transform duration-180 ease-out starting:-translate-x-full">{sidebar()}</div>
         </div>
       </Show>

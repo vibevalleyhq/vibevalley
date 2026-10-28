@@ -286,7 +286,7 @@ function Problems(props: { problems: AgentProblem[] }) {
     <Show
       when={props.problems.length > 0}
       fallback={
-        <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-[#3f6427]">
+        <p class="flex items-center gap-1.5 border-t border-line px-4 py-3 text-sm text-ok-ink">
           <Icon name="check" size={12} />
           {t("web.agent.fine")}
         </p>
@@ -295,7 +295,7 @@ function Problems(props: { problems: AgentProblem[] }) {
       <ul aria-label={t("web.agent.problems")} class="flex max-h-40 flex-col gap-1 overflow-y-auto border-t border-line px-4 py-3">
         <For each={props.problems}>
           {(i) => (
-            <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-[#b8682a]"]}>
+            <li class={["flex items-start gap-1.5 text-sm", i.level === "error" ? "text-berry" : "text-warn-ink"]}>
               <Icon name={i.level === "error" ? "cross" : "warn"} size={12} class="mt-1" />
               {i.level === "error" ? t("web.agent.cannot") : ""}
               {i.text}

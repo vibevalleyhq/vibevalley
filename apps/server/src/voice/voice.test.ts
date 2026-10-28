@@ -162,8 +162,8 @@ describe("a call's agent", () => {
     ).toBe("");
     expect(problem({ ...d, answer: { vendor: "orchestrator" } })).toContain("语音线路");
     expect(problem({ ...d, asr: { vendor: "whisper" } as never })).toContain(voiceUnknown());
-    expect(fixedIn(deepseek)).toBe("deepseek");
-    expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("voice");
+    expect(fixedIn(deepseek)).toBe("models");
+    expect(fixedIn({ ...d, asr: { vendor: "microsoft", region: "eastasia" } })).toBe("call");
     expect(fixedIn({ ...d, answer: { vendor: "orchestrator" } })).toBeUndefined();
   });
 });

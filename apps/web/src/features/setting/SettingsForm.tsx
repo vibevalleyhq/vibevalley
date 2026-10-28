@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
-// The DeepSeek key, the language and the memory sources (setting.load, setting.save), a part at a time; and what the
-// server found of gh.
+// The DeepSeek key (模型), the language (通用) and the memory sources (记性), a part at a time (setting.update); and what
+// the server found of gh (GitHub).
 
 import { createSignal, For, Match, Show, snapshot, Switch as Pick, untrack } from "solid-js";
 import {
@@ -20,6 +20,7 @@ import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
 import { KeyField, SaveBar } from "../../ui/KeyField";
+import { KeyRow, SettingRow, SettingsGroup } from "../../ui/settings";
 import { Segmented } from "../../ui/Segmented";
 import { Hint, Tip } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
@@ -152,27 +153,26 @@ function Form(props: { part: SettingsPart; status: SettingsStatus }) {
       }}
     >
       <Show when={props.part === "deepseek"}>
-        <KeyField
-          label="DeepSeek API Key"
-          status={status().deepseekApiKey}
-          removing={removing()}
-          onRemove={setRemoving}
-          link={{ href: "https://platform.deepseek.com/api_keys", label: "platform.deepseek.com" }}
-        >
-          <SecretInput
-            aria-label="DeepSeek API Key"
-            placeholder={t("web.setting.keys.deepseekHint")}
+        <SettingsGroup title="DeepSeek">
+          <KeyRow
+            label="API Key"
+            hint={t("web.setting.models.deepseekHint")}
+            status={status().deepseekApiKey}
             value={deepseek()}
-            onInput={(e) => setDeepseek(e.currentTarget.value)}
+            onInput={setDeepseek}
+            removing={removing()}
+            onRemove={setRemoving}
+            placeholder={t("web.setting.keys.deepseekHint")}
+            link={{ href: "https://platform.deepseek.com/api_keys", label: "platform.deepseek.com" }}
           />
-        </KeyField>
+        </SettingsGroup>
       </Show>
       <Show when={props.part === "memory"}>
-        <div class="flex flex-col gap-2">
+        <SettingsGroup>
           <For each={sources()} keyed={(d) => d.kind}>
             {(d) => <SourceField draft={d()} set={(change, touched) => setSource(d().kind, change, touched)} />}
           </For>
-        </div>
+        </SettingsGroup>
       </Show>
       <Show when={dirty() || error()}>
         <SaveBar
@@ -207,8 +207,8 @@ function SourceMark(props: { draft: SourceDraft }) {
 function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDraft>, touched?: boolean) => void }) {
   const label = () => sourceLabels[props.draft.kind];
   return (
-    <div class="rounded-lg border border-line">
-      <div class="flex items-center gap-2 px-3 py-2">
+    <div>
+      <div class="flex items-center gap-2 px-4 py-3">
         <span class="text-sm font-medium">{label()}</span>
         <SourceMark draft={props.draft} />
         <span class="flex-1" />
@@ -226,7 +226,7 @@ function SourceField(props: { draft: SourceDraft; set: (change: Partial<SourceDr
         />
       </div>
       <Show when={props.draft.open}>
-        <div class="flex flex-col gap-3 border-t border-line p-3">
+        <div class="flex flex-col gap-3 border-t border-line px-4 py-3">
           <TextInput
             aria-label={t("web.setting.source.address", { label: label() })}
             class="font-mono"
@@ -307,16 +307,17 @@ export function GitHub() {
       <Pick fallback={<Quiet>{status.error ? t("web.base.form.unreachable", { why: reasonOf(status.error) }) : t("web.base.form.asking")}</Quiet>}>
         <Match when={now()}>
           {(s) => (
-            <div class="flex items-center gap-2 text-sm">
-              <Icon name={s().installed && s().loggedIn ? "check" : s().installed ? "warn" : "cross"} size={16} />
-              <span class="font-mono">{s().installed ? `gh ${s().version}` : t("web.setting.github.noGh")}</span>
-              <Show when={s().loggedIn}>
-                <span class="text-muted">· {s().account}</span>
-              </Show>
-              <Show when={s().reason}>{(r) => <Hint text={r()} />}</Show>
-              <span class="flex-1" />
-              <IconButton icon="refresh" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
-            </div>
+            <SettingsGroup>
+              <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason}>
+                <Icon name={s().installed ? "check" : "cross"} size={16} />
+                <span class="font-mono text-sm">{s().installed ? s().version : t("web.setting.github.noGh")}</span>
+                <IconButton icon="refresh" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
+              </SettingRow>
+              <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")}>
+                <Icon name={s().loggedIn ? "check" : "warn"} size={16} />
+                <span class="text-sm">{s().loggedIn ? s().account : t("web.setting.github.notLoggedIn")}</span>
+              </SettingRow>
+            </SettingsGroup>
           )}
         </Match>
       </Pick>
@@ -329,7 +330,7 @@ export function GitHub() {
 
 /** The farm's language: the page's words, what the orchestrator and the helpers answer in, what goes to the chat apps.
  * Saved, the page opens again in it: its words are read once, when it loads (protocol words/locale.ts). */
-export function LanguageForm() {
+export function LanguageChoice() {
   const [error, setError] = createSignal<string>();
   const [busy, setBusy] = createSignal(false);
   const choose = async (locale: Locale) => {
@@ -345,18 +346,14 @@ export function LanguageForm() {
     }
   };
   return (
-    <div class="flex flex-col gap-3">
-      <div>
-        <Segmented
-          label={t("web.setting.language.label")}
-          value={currentLocale()}
-          options={LocaleValues.map((l) => ({ value: l, label: t(`web.setting.language.${l}`), disabled: busy() }))}
-          onChange={(l) => void choose(l)}
-        />
-      </div>
-      <Show when={error()}>
-        <p class="text-sm text-berry">{error()}</p>
-      </Show>
-    </div>
+    <>
+      <Show when={error()}>{(e) => <Hint text={e()} />}</Show>
+      <Segmented
+        label={t("web.setting.language.label")}
+        value={currentLocale()}
+        options={LocaleValues.map((l) => ({ value: l, label: t(`web.setting.language.${l}`), disabled: busy() }))}
+        onChange={(l) => void choose(l)}
+      />
+    </>
   );
 }

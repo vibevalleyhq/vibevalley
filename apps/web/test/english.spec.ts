@@ -5,7 +5,7 @@ test.use({ farm: "english" });
 
 test("the farm speaks English once the owner picks it, and Chinese again", async ({ page, api }) => {
   await api.issue.create({ title: "Add paging to clock-in" });
-  await page.goto("/settings/language");
+  await page.goto("/settings/general");
   await page.getByRole("button", { name: "English" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
@@ -30,7 +30,7 @@ test("the farm speaks English once the owner picks it, and Chinese again", async
   await nav.getByRole("link", { name: /^Machines · / }).click();
   await expect(page.getByRole("region", { name: "Machines" })).toBeVisible();
 
-  await page.goto("/settings/language");
+  await page.goto("/settings/general");
   await page.getByRole("button", { name: "中文" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
   await expect(page.getByRole("navigation", { name: "工作台" })).toBeVisible();
@@ -51,7 +51,7 @@ test("no page of an English farm shows Chinese of its own", async ({ page, api }
   };
   keep(agents);
   keep(await api.channel.list());
-  const sections = ["deepseek", "language", "memory", "github", "connectors", "skills", "voice", "lan"];
+  const sections = ["general", "appearance", "models", "about", "memory", "skills", "call", "moss", "dictation", "github", "chat", "devices"];
   const paths = [
     "/",
     "/chat",

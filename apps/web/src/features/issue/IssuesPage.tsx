@@ -251,7 +251,7 @@ function Overlay(props: { onClose: () => void; children: JSX.Element }) {
   });
   return (
     <div
-      class="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-[#2f1f1333] px-3 py-6 sm:px-6"
+      class="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-ink/20 px-3 py-6 sm:px-6"
       onClick={(e) => e.target === e.currentTarget && props.onClose()}
     >
       <div

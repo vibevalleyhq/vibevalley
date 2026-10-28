@@ -178,7 +178,7 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
               <Match when={inst().status === "available" ? (inst() as Extract<RuntimeInfo["installation"], { status: "available" }>) : undefined}>
                 {(i) => (
                   <>
-                    <span class="rounded bg-[#e3efd2] px-1.5 text-[#3f6427]">
+                    <span class="rounded bg-ok-soft px-1.5 text-ok-ink">
                       {t("web.runtime.available")} {i().version ?? ""}
                     </span>
                     <span class="font-mono">{i().command}</span>
@@ -187,10 +187,10 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                 )}
               </Match>
               <Match when={inst().status === "unsupported" ? (inst() as Extract<RuntimeInfo["installation"], { status: "unsupported" }>) : undefined}>
-                {(i) => <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
+                {(i) => <span class="rounded bg-bad-soft px-1.5 text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</span>}
               </Match>
               <Match when={inst().status === "not_found"}>
-                <span class="rounded bg-[#f6ddd8] px-1.5 text-berry">{t("web.runtime.notHere")}</span>
+                <span class="rounded bg-bad-soft px-1.5 text-berry">{t("web.runtime.notHere")}</span>
               </Match>
             </Switch>
             <Show when={inst().status !== "checking"} fallback={<span>{t("web.runtime.checking")}</span>}>
@@ -255,7 +255,7 @@ function Usage(props: { info: RuntimeInfo }) {
       {(usage) => (
         <Switch>
           <Match when={usage().status === "login_required"}>
-            <p class="text-xs text-[#b8682a]">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
+            <p class="text-xs text-warn-ink">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</p>
           </Match>
           <Match when={usage().status === "unavailable" ? (usage() as Extract<Usage, { status: "unavailable" }>) : undefined}>
             {(u) => <Quiet>{t("web.runtime.unreadable", { why: u().reason })}</Quiet>}
@@ -528,7 +528,7 @@ function ModelsCard(props: { info: RuntimeInfo }) {
                     <td class="py-1.5">
                       <span class="font-mono text-sm">{m.id}</span>
                       <Show when={m.isDefault}>
-                        <span class="ml-2 rounded bg-[#e3efd2] px-1.5 text-xs text-[#3f6427]">{t("web.runtime.default")}</span>
+                        <span class="ml-2 rounded bg-ok-soft px-1.5 text-xs text-ok-ink">{t("web.runtime.default")}</span>
                       </Show>
                     </td>
                     <td class="py-1.5 text-sm text-muted">{m.effortLevels.length === 0 ? "—" : m.effortLevels.join(" · ")}</td>
